@@ -1,0 +1,35 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== the grapple, as a picture rather than as a velocity ==
+    waited 165 frames for the guidance to go quiet
+  PASS: the head-lamp settled before the shutter (0.03 px residual after 240 frames, held 6)
+    churn samples over 4 periods: 0.06% 0.02% 0.04% 0.06% (median 0.05%)
+    still-frame churn: 0.05% of pixels move on their own (worst pixel 103.5 levels)
+  PASS: CONTROL: the frame is mostly still — 0.05% of it moves between two untouched captures
+  PASS: CONTROL: the fixture still owns the pointer — a released seam would be measuring a human's hand
+    the preview inks 0.00 of the throw and reaches 733 px of 570; 5712 drawn pixels lie off the corridor entirely
+  SKIP: [grapple.gr05-preview-share] GR-05's share of the throw the preview inks (measured 0.00) was NOT asserted — no bound has been decided for it, and the cap that used to stand here was 1.01 over a quantity `_corridor_fill` bounds at 1.0 by construction — an assertion that could not fail. The measurement is the deliverable until there is a design call to assert
+    against dark rock — miner 0.0 levels, preview 6.9 levels (6045 preview pixels)
+  PASS: CONTROL: the preview was actually drawn (6.9 levels of edge over 6045 pixels, floor 1.0 — a floor this low cannot fail; see GHOST_EDGE_FLOOR)
+  FAIL: CONTROL: the miner was actually drawn (0.0 levels of edge, over 1071 pixels)
+  FAIL: the miner out-reads their own telemetry (0.0 vs 6.9 levels, floor 1.15x)
+    aim vs anchored: 1.000 of the corridor is drawn by one and not the other
+  PASS: an aimed line and an attached one are not the same picture (1.000 of the corridor differs)
+    clock baseline draws: 0 0 0 (median 0)
+    the two states differ over 0 pixels of the rope's lane, against 0 from the clock
+  FAIL: a slack rope and a taut one are different pictures (0 px vs a 0 px clock baseline)
+    bow: NO CORD of the chord pulled tight, NO CORD at 0.55 slack (mask rim 0.4650 / 0.4656, drawn cap 0.42)
+      the renderer's own model predicts 0.2736 of the chord here: rope_sag is clamped to SAG_CAP (slack 0.55 solves to 0.6770, every slack above 0.3199 pins) and the chord lies at 49.3 degrees, so a vertical hang of 0.42 departs it by 0.2736
+  PASS: the posed shot leaves the saturation guard room to be a saturation guard — the renderer's predicted departure is 0.2736 of the chord against a 0.42 threshold. If this fails, the shot was flattened and `_bow_measured` will start refusing correct readings
+  FAIL: the taut rope's cord is FOUND before its shape is judged — fewer than 40 pixels in the mask sat within ROPE_TOL of ROPE_HUE, which is a mask that missed and not a rope that is straight
+  FAIL: the slack rope's cord is FOUND before its shape is judged — fewer than 40 pixels in the mask sat within ROPE_TOL of ROPE_HUE, which is a mask that missed and not a rope that is straight
+  SKIP: [grapple.gr03-single-frame-bow] GR-03's single-frame bow — both the floor and the taut-against-slack ratio was NOT asserted — neither number came off the cord, and a verdict on the rope drawn from the mask's rim would be a claim about the instrument wearing the rope's name
+    waited 489 frames for the guidance to go quiet
+  PASS: the head-lamp settled before the shutter (0.03 px residual after 240 frames, held 6)
+    against open sky — miner 0.0 levels, preview 0.0 levels (0 preview pixels)
+  FAIL: CONTROL: the preview drew something against the sky at all (0 pixels)
+    GR-04 REPRODUCES: on dark rock the whole preview adds 7 levels of edge over 6045 pixels; on open sky the endpoint mark alone carries 0 over 0, against a miner whose own silhouette step is 0. How loud an aim mark should be is a design call, not a harness one.
+check_grapple_reads: 6 FAILURE(S) of 13 asserted

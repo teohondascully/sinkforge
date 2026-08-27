@@ -1,0 +1,31 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the rock that says no ==
+  PASS: deepslate names the STONE pickaxe — the lowest drive that can actually bite it
+  PASS: …and ordinary stone names the starter pick, not an upgrade you don't need
+  PASS: …and the drive it names actually meets the tier the rock demands (2)
+  PASS: forty swings at over-tier rock break nothing at all
+  PASS: …and bank no charge either — not slow, NONE
+  PASS: …while the same swings take ordinary rock (the control)
+  PASS: the loop's own predicate calls over-tier rock a REFUSAL
+  PASS: …and the cursor draws it cold and crossed, before any press
+  PASS: …and the moment you own the drive, both agree it bites
+  PASS: …while open air is never a refusal — there is nothing there to refuse
+  PASS: there is a real SKID in the sound library, synthesised like the rest
+  PASS: a swing at rock over your drive skids
+  the inspector says: Deepslate / too hard — the Stone Pickaxe (tier 2) bites it
+  PASS: …and the inspector NAMES the rung — the drive this rock wants, not 'you need a better pick'
+  PASS: …with the tier, so the ladder is legible and not just the next purchase
+  PASS: …and nothing shouts it a second time — two panels saying one sentence is noise
+  PASS: …and owning the named drive is exactly what makes the rock give
+  PASS: with a Wedge equipped there is rock in reach it will not split
+  PASS: …and it is NOT a tier problem — the drive is perfectly good for this rock
+  the wedge refusal said: the Wedge Bit splits ALONG the grain — line the swing up with the seam
+  PASS: …so the tell names the GRAIN, not a pick you already have
+  PASS: …and it is the skid that has to say it: the inspector has nothing to add about rock you CAN mine
+  PASS: …said once, then quiet while the tell is still warm
+  PASS: …and said again once you have been away long enough to forget
+  PASS: rock the pick can take is not a refusal
+  PASS: …so holding LMB through the real loop never skids on it
+  PASS: …and never lectures you about a drive you already have
+check_refusal: PASS (25 asserted) — over-tier rock refuses, and you can see, hear and read why

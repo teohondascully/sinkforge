@@ -1,0 +1,70 @@
+== Sinkforge harness (parallel, JOBS=12, layers=55 of 110 — SUBSET, SF_ONLY='^(check_agility|check_aim|check_bazaar_ruin|check_bits|check_climb|check_controls|check_craftable_registry|check_depth_reads|check_descent|check_dig_hitch|check_draw_cull|check_drift|check_fall|check_grapple|check_head|check_impact|check_input_deafness|check_item_reads|check_lift|check_lode|check_loop_health|check_material_registry|check_mining|check_pacing|check_pack_layout|check_paint_terms|check_pixel_snap|check_plunge|check_progression_payable|check_pump|check_refusal|check_relief|check_rhythm|check_richness|check_room_reads|check_rules_registry|check_save_durability|check_save_frontier|check_save_isolation|check_saveload|check_scan|check_seam|check_seam_flood|check_settings|check_spoil|check_stepup|check_stride|check_teaching|check_tells|check_traverse|check_voice|check_walk|check_water_move|check_water_reads|check_wrap)( |$)', display, STRICT: any skip fails the run, perf-host=unset) ==
+   tree: /Users/thondascully/Projects/sinkforge  branch: main  head: c3e5284  worktree: 55 file(s) modified, delta 11a0467baa0b
+  [ 1/55] check_save_isolation (no harm)       PASS    0s
+  [ 2/55] check_rules_registry                 PASS    0s
+  [ 3/55] check_progression_payable            PASS    1s
+  [ 4/55] check_save_frontier (envelope)       PASS    2s
+  [ 5/55] check_material_registry              PASS    2s
+  [ 6/55] check_craftable_registry             PASS    2s
+  [ 7/55] check_mining                         PASS    2s
+  [ 8/55] check_lift                           PASS    6s
+  [ 9/55] check_water_move (L3 impedance)      PASS   11s
+  [10/55] check_save_durability (P0)           PASS   14s
+  [11/55] check_stepup                         PASS   16s
+  [12/55] check_walk                           PASS   37s
+  [13/55] check_dig_hitch (friction)           PASS   13s
+  [14/55] check_settings                       PASS    1s
+  [15/55] check_rhythm (dig groove)            PASS    2s
+  [16/55] check_room_reads (2nd plane)         PASS    3s
+  [17/55] check_seam (the grain)               PASS    3s
+  [18/55] check_scan (sonar's colour)          PASS    3s
+  [19/55] check_refusal (rock says no)         PASS    3s
+  [20/55] check_fall                           PASS    3s
+  [21/55] check_spoil (crush/pack)             PASS    3s
+  [22/55] check_saveload                       PASS    3s
+  [23/55] check_bits (a bit is a verb)         PASS    3s
+  [24/55] check_draw_cull (offscreen)          PASS    0s
+  [25/55] check_drift (lateral/vertical)       PASS    4s
+  [26/55] check_lode (vein outlives blow)      PASS    3s
+  [27/55] check_seam_flood (same picture)      PASS    0s
+  [28/55] check_paint_terms (per-texel)        PASS    0s
+  [29/55] check_bazaar_ruin (it has art)       PASS    2s
+  [30/55] check_item_reads (icons)             PASS    2s
+  [31/55] check_pixel_snap                     PASS    1s
+  [32/55] check_input_deafness (shutter)       PASS    3s
+  [33/55] check_controls                       PASS    3s
+  [34/55] check_tells (hollow rock)            PASS    3s
+  [35/55] check_pack_layout                    PASS    2s
+  [36/55] check_climb                          PASS    7s
+  [37/55] check_head (stand it on it)          PASS    5s
+  [38/55] check_richness (a rich earth)        PASS    2s
+  [39/55] check_descent (a way down)           PASS    2s
+  [40/55] check_water_reads (fluid)            PASS    6s
+  [41/55] check_relief (a landscape)           PASS    3s
+  [42/55] check_voice (audio reads)            PASS    2s
+  [43/55] check_agility (movement score)       PASS    9s
+  [44/55] check_wrap (rope bends)              PASS    8s
+  [45/55] check_depth_reads (how deep)         PASS    7s
+  [46/55] check_stride (the run)               PASS   17s
+  [47/55] check_teaching (it teaches)          PASS   12s
+  [48/55] check_grapple (swing score)          PASS   17s
+  [49/55] check_aim (honest marker)            PASS   12s
+  [50/55] check_impact (a fall costs)          PASS   11s
+  [51/55] check_loop_health (loop score)       PASS   21s
+  [52/55] check_pacing (session shape)         PASS   27s
+  [53/55] check_traverse (rope=travel)         PASS   56s
+  [54/55] check_pump (wind it up)              PASS   55s
+  [55/55] check_plunge (ride it down)          PASS   59s
+55 PASS / 0 FAIL / 0 SKIP of 55 selected (of 110 declared — SUBSET RUN) — subset green; the full harness has NOT been run  (120s wall-clock)
+HARNESS_EXIT=0
+harness exit 0 — everything that ran passed
+layers reported: 55 of 55
+layer logs: 55   engine-level load failures: 0   silent: 0
+stand-downs: conditional (env) rows and how each resolved this run: save-durability.failed-backup=ASSERTED
+   ASSERTED means this run reached the assertion. Before deleting a row, read it:
+   several exist for the machines where they do NOT resolve ASSERTED.
+stand-downs: registered layers that did not run in this job, so not checked: check_frametime check_grapple_reads check_ceremony_reads check_text_contrast check_binding_persistence
+stand-downs: exactly the registered ones, 0 id(s), 0 line(s) in total
+HARNESS_RESULT=yes
+this run is a RESULT: the runner finished, every declared layer reported, and every layer log
+carries the output of a layer that executed. The verdict above may be quoted.

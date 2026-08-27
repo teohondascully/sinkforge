@@ -1,0 +1,10 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== fall when the floor is mined (no teleport) ==
+  PASS: body is standing on the block
+  PASS: did NOT teleport down on the mine frame (moved 0.2px, a full tile is 32)
+  PASS: fell under gravity and landed on the floor below (dropped 128px)
+  PASS: fall STARTS promptly — dropped 16.5px within 5 frames (no laggy creep)
+  PASS: fall is smooth — no upward stutter mid-drop (worst 0.00px)
+  PASS: no single-frame teleport during the fall (worst 8.2px, tile=32)
+ALL FALL CHECKS PASS

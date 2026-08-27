@@ -1,0 +1,194 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the write ==
+  PASS: a first save writes
+  PASS: …and the slot exists on disk
+  PASS: …with no .tmp left behind (the temp file was promoted, not abandoned)
+  PASS: …and no backup yet, because there was nothing to back up
+  PASS: a second save writes
+  PASS: …and the FIRST save survives as the backup — one bad moment no longer costs two games
+  PASS: the slot holds the newer save
+  PASS: …and the backup holds the older one, intact
+  PASS: there is a real save on disk to protect (2472 bytes)
+WARNING: save: cannot open user://check_save_durability_nodir/deeper/still.save.tmp (err 7) — the existing save is untouched
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] write (res://src/core/save_game.gd:324)
+         [1] _atomic_write (res://tools/check_save_durability.gd:106)
+         [2] _initialize (res://tools/check_save_durability.gd:64)
+  PASS: a save into an unopenable path FAILS rather than half-succeeding
+  PASS: …and the existing save is byte-for-byte untouched by that failure
+WARNING: save: user://check_save_durability.save.tmp did not read back as a valid envelope — the existing save is untouched
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] write (res://src/core/save_game.gd:334)
+         [1] _atomic_write (res://tools/check_save_durability.gd:114)
+         [2] _initialize (res://tools/check_save_durability.gd:64)
+  PASS: an envelope that fails its own readback validation is NOT promoted
+  PASS: …and again the real save is untouched
+  PASS: …and the rejected temp file was cleaned up, not left to rot in user://
+== recovery ==
+  PASS: an older save is written
+  PASS: …then a newer one, demoting it to backup
+  PASS: the slot is now genuinely truncated
+ERROR: Condition "(uint32_t)buff.size() != len" is true. Returning: Variant()
+   at: get_var (core/io/file_access.cpp:383)
+   GDScript backtrace (most recent call first):
+       [0] _read_file (res://src/core/save_game.gd:374)
+       [1] read (res://src/core/save_game.gd:381)
+       [2] _backup_recovery (res://tools/check_save_durability.gd:139)
+       [3] _initialize (res://tools/check_save_durability.gd:65)
+WARNING: save: user://check_save_durability.save is missing or damaged — recovered the previous save from user://check_save_durability.save.bak
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] read (res://src/core/save_game.gd:388)
+         [1] _backup_recovery (res://tools/check_save_durability.gd:139)
+         [2] _initialize (res://tools/check_save_durability.gd:65)
+  PASS: a truncated slot RECOVERS the previous save from backup
+  PASS: …and reports it as a recovery, not as a clean load
+ERROR: Condition "(uint32_t)buff.size() != len" is true. Returning: Variant()
+   at: get_var (core/io/file_access.cpp:383)
+   GDScript backtrace (most recent call first):
+       [0] _read_file (res://src/core/save_game.gd:374)
+       [1] read (res://src/core/save_game.gd:381)
+       [2] _backup_recovery (res://tools/check_save_durability.gd:146)
+       [3] _initialize (res://tools/check_save_durability.gd:65)
+  PASS: with the backup gone too, the damaged slot yields nothing
+  PASS: …reported as CORRUPT, because a file that exists and will not open is not an absent save
+  PASS: a slot that was never written yields nothing
+  PASS: …reported as NONE — the new player, told the truth
+== the restore ==
+  PASS: the live sim has real state to protect [64, 44, 44, 2, 1]
+  PASS: a save naming a machine that no longer exists is refused
+  PASS: …and the running game is untouched
+  PASS: an envelope missing "solid" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: solid)
+  PASS: an envelope missing "wall" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: wall)
+  PASS: an envelope missing "deposits" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: deposits)
+  PASS: an envelope missing "inventory" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: inventory)
+  PASS: an envelope missing "ground" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: ground)
+  PASS: an envelope missing "sink" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: sink)
+  PASS: an envelope missing "produced" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: produced)
+  PASS: an envelope missing "consumed" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: consumed)
+  PASS: an envelope missing "conduit" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: conduit)
+  PASS: an envelope missing "rope" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: rope)
+  PASS: an envelope missing "torch" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: torch)
+  PASS: an envelope missing "research" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: research)
+  PASS: an envelope missing "machines" is refused WHOLE — nothing was written
+  PASS: …caught by the presence gate, not by an index into a hole (reason: missing key: machines)
+  PASS: the ablation really ran, over the whole required-key set (13 of 13)
+  PASS: a complete envelope restores
+  PASS: …and the state really moved
+== versions ==
+  PASS: a v1 save — written before any of this existed — still loads
+  PASS: …with its world intact
+  PASS: …and the missing seep phase migrates to zero rather than to garbage
+  PASS: a save from a NEWER build is refused (v3) — forward compatibility is not free
+  PASS: …without touching the sim
+  PASS: there is an older version for the chain to carry at all (v1..v2) — the loop is not vacuous
+  PASS: every readable version migrates all the way to v2
+== no silent defaults ==
+  PASS: there are fields declared un-defaultable (world_seed, seep_tick) — the loop below is not vacuous
+  PASS: an envelope with no "world_seed" is REFUSED rather than defaulted
+  PASS: …and names the field it refused on (missing key: world_seed (no default: its absence would change the world's future))
+  PASS: …leaving the running game exactly as it was
+  PASS: an envelope with no "seep_tick" is REFUSED rather than defaulted
+  PASS: …and names the field it refused on (missing key: seep_tick (no default: its absence would change the world's future))
+  PASS: …leaving the running game exactly as it was
+  PASS: …while a save from before the lode and the water existed still opens
+  PASS: …holding neither of them, which is the truth about that world
+  PASS: a v1 save from before the seed was captured is refused, not molded from seed 0
+  PASS: …naming the seed as the reason (missing key: world_seed (no default: its absence would change the world's future))
+  PASS: …without touching the sim
+== phase ==
+  PASS: the seep phase is captured (7), not silently dropped
+  PASS: the warm sim really is out of phase before the load (seep=43 rate=40)
+  PASS: the warm sim loads the file
+  PASS: a cold sim loads the same file
+  PASS: both paths resume at the SAVED seep phase (7 / 7)
+  PASS: both paths start the sub-tick accumulator at zero
+  PASS: both paths start the derived rate readout from the same place
+  PASS: the water really did seep over that stretch (2 cells → 3)
+  PASS: …so after four seep cycles the two futures are still identical — one file, one future
+  PASS: …and the seep phase genuinely decides the future — two phases, two worlds
+== the seed ==
+  PASS: a world saved under seed 4242
+  PASS: …opened by a session built on seed 1337
+  PASS: …which loads it
+  PASS: the loaded world's seed is the one it was BUILT with, not the session's
+  PASS: …and is re-saved
+  PASS: the re-saved file STILL claims seed 4242 — the session's stale copy did not overwrite it
+  PASS: …reloaded once more
+  PASS: …and the fine terrain rebuilds identically (262144 cells), because the seed came through
+== the backup generation ==
+  PASS: an older save is written
+  PASS: …then a newer one, demoting it to backup
+  PASS: the slot is genuinely damaged, not empty (824 bytes of 2472)
+ERROR: Condition "(uint32_t)buff.size() != len" is true. Returning: Variant()
+   at: get_var (core/io/file_access.cpp:383)
+   GDScript backtrace (most recent call first):
+       [0] _read_file (res://src/core/save_game.gd:374)
+       [1] read (res://src/core/save_game.gd:381)
+       [2] _backup_generation (res://tools/check_save_durability.gd:426)
+       [3] _initialize (res://tools/check_save_durability.gd:71)
+WARNING: save: user://check_save_durability.save is missing or damaged — recovered the previous save from user://check_save_durability.save.bak
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] read (res://src/core/save_game.gd:388)
+         [1] _backup_generation (res://tools/check_save_durability.gd:426)
+         [2] _initialize (res://tools/check_save_durability.gd:71)
+  PASS: …and the player is now running on a RECOVERED save, with that damage still on disk
+ERROR: Condition "(uint32_t)buff.size() != len" is true. Returning: Variant()
+   at: get_var (core/io/file_access.cpp:383)
+   GDScript backtrace (most recent call first):
+       [0] _read_file (res://src/core/save_game.gd:374)
+       [1] write (res://src/core/save_game.gd:347)
+       [2] _backup_generation (res://tools/check_save_durability.gd:432)
+       [3] _initialize (res://tools/check_save_durability.gd:71)
+WARNING: save: user://check_save_durability.save is damaged — keeping the existing backup rather than overwriting it with a corrupt primary
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] write (res://src/core/save_game.gd:357)
+         [1] _backup_generation (res://tools/check_save_durability.gd:432)
+         [2] _initialize (res://tools/check_save_durability.gd:71)
+  PASS: they save again, and the new save writes
+  PASS: …and the slot holds it
+  PASS: …and the backup is NOT the corrupt primary it just recovered from (2472 bytes vs the wreck's 824)
+  PASS: …it is still the intact seed-11 generation — the net that caught them is still under them
+  PASS: a save over an INTACT slot
+  PASS: …DOES rotate the backup forward — the new guard is a validity check, not a disabled feature
+  PASS: a save exists to be protected
+  PASS: …and it is real bytes (2472), so 'untouched' below compares something
+ERROR: Failed to open '/var/folders/wx/qzmllhgn0cj5q26_mb77s3n00000gn/T//sinkforge-home-909c724feaab/Library/Application Support/Godot/app_userdata/Sinkforge/check_save_durability.save.bak'.
+   at: copy (core/io/dir_access.cpp:423)
+   GDScript backtrace (most recent call first):
+       [0] _backup_generation (res://tools/check_save_durability.gd:456)
+       [1] _initialize (res://tools/check_save_durability.gd:71)
+  HELD: [save-durability.failed-backup] this run asserted it
+ERROR: Failed to open '/var/folders/wx/qzmllhgn0cj5q26_mb77s3n00000gn/T//sinkforge-home-909c724feaab/Library/Application Support/Godot/app_userdata/Sinkforge/check_save_durability.save.bak'.
+   at: copy (core/io/dir_access.cpp:423)
+   GDScript backtrace (most recent call first):
+       [0] write (res://src/core/save_game.gd:348)
+       [1] _backup_generation (res://tools/check_save_durability.gd:465)
+       [2] _initialize (res://tools/check_save_durability.gd:71)
+WARNING: save: could not preserve user://check_save_durability.save as user://check_save_durability.save.bak (err 12) — refusing to promote a new save over a generation we cannot back up; the existing save is untouched
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] write (res://src/core/save_game.gd:350)
+         [1] _backup_generation (res://tools/check_save_durability.gd:465)
+         [2] _initialize (res://tools/check_save_durability.gd:71)
+  PASS: a save whose backup copy FAILS is refused, not promoted over an unbacked slot
+  PASS: …and the existing save is byte-for-byte untouched, exactly as the docstring promises
+  PASS: …with the rejected temp file cleaned up rather than left to rot in user://
+check_save_durability: PASS

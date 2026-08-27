@@ -1,0 +1,212 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== power/water tests ==
+- power field + generator
+  PASS: an unfueled generator emits no power
+  PASS: a fueled generator powers its own cell
+  PASS: the aura reaches an adjacent cell
+  PASS: power attenuates with distance (near > far)
+  PASS: no power past the aura rim
+  PASS: burned exactly one coal so far
+  PASS: out of coal, the generator goes dark
+  PASS: consumed both coal total (extraction finite)
+  PASS: coal conserved across burning (present=0, net=0)
+- conduit network
+  PASS: power reaches down the conduit, past the generator's aura
+  PASS: power attenuates down the trunk
+  PASS: power carries ACROSS the lateral bottom of the U
+  PASS: the up-leg carries no power (U delivers as L)
+  PASS: no power climbs the up-leg (never flows up)
+  PASS: place a carried conduit into an open cell
+  PASS: the cell now holds a conduit
+  PASS: placing spent one conduit from the pack
+  PASS: cannot run a conduit through solid rock
+  PASS: pick the conduit back up
+  PASS: it returned to the pack
+  PASS: conduit conserved with one placed (present=1, net=1)
+- powered lift
+  PASS: power reaches the lift's cell
+  PASS: the lift registers a power boost (factor=1.00)
+  PASS: a powered lift beats the unpowered baseline (6 > 2)
+  PASS: fully powered → full throughput (6)
+  PASS: ore conserved through the powered lift (present=12)
+- pump (powered flood-drain, L3)
+  PASS: the pocket starts brim-full (32 units)
+  PASS: power reaches the pump's cell
+  PASS: water still present after warm-up (28 units)
+  PASS: a POWERED pump drains water out of the pocket (28 -> 0)
+  PASS: the powered pump drains the pocket substantially (0 << 28)
+  PASS: no cell ever holds a negative water level
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: no power reaches the unpowered pump
+  PASS: an UNPOWERED pump drains nothing (32 -> 32) — the on-hook cost rule
+  PASS: the pump only ever removes water, never adds it
+  PASS: an unpowered pump reads idle (no power)
+  PASS: a powered pump over water reads working
+- water (L3 fluid primitive)
+  PASS: add_water returns the amount it actually placed
+  PASS: the poured water is all present
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: water never occupies a solid cell (gravity run)
+  PASS: the top of the shaft drained
+  PASS: all 6 units settled at the bottom of the shaft
+  PASS: gravity run conserved total (6)
+  PASS: poured 15 units into the basin
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: water never occupies a solid cell (basin run)
+  PASS: basin conserved total (15)
+  PASS: the pool settled to a flat top (wet=5, spread=0)
+  PASS: puddle trapped, 5 units present
+  PASS: set_solid onto a watered cell clears its water
+  PASS: total dropped by exactly the displaced cell's level (5)
+  PASS: place_block lands on the watered cell
+  PASS: place_block onto a watered cell displaces its water too
+  PASS: total_water() invariant across 120 ticks (no source/drain, expect 21)
+  PASS: two identical water sims agree on total after 60 ticks
+  PASS: …and on the exact water dict
+  PASS: …and on the whole state signature (water rides it)
+ALL PASS (power/water tests)

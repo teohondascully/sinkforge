@@ -1,0 +1,51 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== Sinkforge driven play-tests ==
+(game clock: 2x, world seed 1337)
+- goal: find & dig ore
+  PASS: find & dig ore   [jumps=0 builds=0 stuck_frames=1]
+- goal: switch carried items
+  PASS: switch carried items   [jumps=0 builds=0 stuck_frames=0]
+- goal: craft a machine
+  PASS: craft a machine   [jumps=1 builds=0 stuck_frames=1]
+- goal: build a machine
+  PASS: build a machine   [jumps=1 builds=0 stuck_frames=1]
+- goal: feed the forge & smelt
+  PASS: feed the forge & smelt   [jumps=1 builds=0 stuck_frames=1]
+- goal: RUNG 1 — reach first automation
+  PASS: RUNG 1 — reach first automation   [jumps=10 builds=0 stuck_frames=9]
+- goal: RUNG 2 — breach the seal into L2
+  gate: mines=1 places=29 jumps=6 frames=1225 stuck=74 | PEAKBULK=68 HANDED=68 MINED=0 UNCLASSIFIED=[&"descent_engine"] | peak carried: rope=195 ingot=68 iron=4 wood_pickaxe=1 stone_pickaxe=1 descent_engine=1  (iron=4 home=true)
+  PASS: RUNG 2 — breach the seal into L2   [jumps=6 builds=0 stuck_frames=74]
+- goal: RUNG 3 — the L2 iron chain
+  chain: mines=2 places=0 jumps=2 frames=423 stuck=2 | PEAKBULK=12 HANDED=12 MINED=0 UNCLASSIFIED=[&"iron_forge"] | peak carried: iron=10 earth=2 wood_pickaxe=1 iron_forge=1 plate=1  (col=62 surface row 20, socket cells filled=0, plates=1 frames=243)
+  PASS: RUNG 3 — the L2 iron chain   [jumps=2 builds=0 stuck_frames=2]
+- goal: traversal: cross the open ground to the far site
+  crossing: hole at cols 69-73, 58 rows deep; finishing on col 75. cols 49-75 rows [20 20 20 20 20 20 20 22 20 20 20 20 20 20 20 20 20 20 22 24 30 30 78 55 51 22 21]
+  crossing: mines=0 places=6 jumps=2 frames=0 stuck=1 | PEAKBULK=0 HANDED=0 MINED=0 | peak carried: (carried nothing)  (hole cols 69-73 58 rows deep, ended at (75, 20), surface band ends row 31)
+  PASS: traversal: cross the open ground to the far site   [jumps=2 builds=6 stuck_frames=1]
+- goal: RUNG 4 — the Borer ferret loop
+  borer: mines=2 places=0 jumps=1 frames=134 stuck=2 | PEAKBULK=6 HANDED=5 MINED=1 UNCLASSIFIED=[&"h_drill"] | peak carried: coal=4 earth=2 wood_pickaxe=1 h_drill=1  (haul=5 frames=134)
+  PASS: RUNG 4 — the Borer ferret loop   [jumps=1 builds=0 stuck_frames=2]
+- goal: RUNG 5 — drain the aquifer (L3 flood loop)
+  aquifer: mines=1 places=0 jumps=0 frames=56 stuck=2 | PEAKBULK=6 HANDED=0 MINED=6 | peak carried: rich_ore=6 conduit=3 wood_pickaxe=1 stone_pickaxe=1  (water 135->33, rich_ore=6)
+  PASS: RUNG 5 — drain the aquifer (L3 flood loop)   [jumps=0 builds=0 stuck_frames=2]
+- goal: RUNG 6 — breach a worldgen aquifer (real descent)
+  breach: mines=11 places=0 jumps=0 frames=1 stuck=0 | PEAKBULK=16 HANDED=16 MINED=0 | peak carried: deepslate=10 rich_ore=6 wood_pickaxe=1 stone_pickaxe=1  (descended 10 rows to 92, rich_ore=6, flood released=true)
+  PASS: RUNG 6 — breach a worldgen aquifer (real descent)   [jumps=0 builds=0 stuck_frames=0]
+- goal: RUNG 7 — pump out a worldgen aquifer (full L3 loop)
+  pump-out: mines=8 places=6 jumps=1 frames=293 stuck=70 | PEAKBULK=16 HANDED=16 MINED=0 UNCLASSIFIED=[&"pump"] | peak carried: rope=25 deepslate=10 rich_ore=6 wood_pickaxe=1 pump=1 stone_pickaxe=1  (descended 10, rich_ore=6, water 214->105, climbed to row 82, escaped=true)
+  PASS: RUNG 7 — pump out a worldgen aquifer (full L3 loop)   [jumps=1 builds=0 stuck_frames=70]
+- goal: friction: round-trip to a buried vein
+  friction: mines=9 places=3 jumps=2 frames=82 stuck=2 | PEAKBULK=25 HANDED=25 MINED=0 | peak carried: earth=20 rope=19 ore=5 wood_pickaxe=1  (down=true ore=5 up=true)
+  PASS: friction: round-trip to a buried vein   [jumps=2 builds=0 stuck_frames=2]
+- goal: friction: descend, build a drill, climb out
+  friction: mines=15 places=6 jumps=2 frames=134 stuck=1 | PEAKBULK=38 HANDED=38 MINED=0 | peak carried: earth=34 rope=19 ore=3 wood_pickaxe=1 stone=1  (depth=14 down=true ore=3 up=true)
+  PASS: friction: descend, build a drill, climb out   [jumps=2 builds=0 stuck_frames=1]
+- goal: friction: escape a deep pit (not trapped)
+  friction: mines=0 places=6 jumps=6 frames=132 stuck=0 | PEAKBULK=12 HANDED=12 MINED=0 | peak carried: stone=12 wood_pickaxe=1  (escaped=true)
+  PASS: friction: escape a deep pit (not trapped)   [jumps=6 builds=0 stuck_frames=0]
+- goal: friction: cross a jagged tunnel
+  friction: mines=0 places=0 jumps=2 frames=0 stuck=1 | PEAKBULK=0 HANDED=0 MINED=0 | peak carried: (carried nothing)  (reached=true at col 64)
+  PASS: friction: cross a jagged tunnel   [jumps=2 builds=0 stuck_frames=1]
+ALL PLAY-GOALS MET

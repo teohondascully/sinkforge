@@ -1,0 +1,17 @@
+# Words that are wrong anywhere in a repository written by one person. One per line, matched whole-word
+# and case-insensitively, with an optional trailing "s". Deliberately NOT tracked: see the note beside
+# WORDS_PATH in tools/check_prose.sh for why the list ships separately from the gate that applies it.
+agentic
+subagent
+sub-agent
+# `AI` is the broad one: matching is case-insensitive and whole-word, so a bare identifier named `ai`
+# would fire it. Nothing in the tree does today. If it ever false-positives, rename the identifier
+# rather than dropping the word -- a loud wrong answer is the trade this list is making.
+AI
+Claude
+Anthropic
+LLM
+ChatGPT
+copilot
+co-pilot
+language model

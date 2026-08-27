@@ -1,0 +1,109 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the hand-kept tables agree ==
+  PASS: there are authored materials on disk to check (16)
+  PASS: HARDNESS keys on &"earth", which is a material that exists
+  PASS: HARDNESS keys on &"stone", which is a material that exists
+  PASS: HARDNESS keys on &"ore", which is a material that exists
+  PASS: HARDNESS keys on &"coal", which is a material that exists
+  PASS: HARDNESS keys on &"deepslate", which is a material that exists
+  PASS: HARDNESS keys on &"iron", which is a material that exists
+  PASS: HARDNESS keys on &"rich_ore", which is a material that exists
+  PASS: HARDNESS keys on &"wood", which is a material that exists
+  PASS: HARDNESS keys on &"leaves", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"stone", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"ore", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"coal", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"deepslate", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"iron", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"rich_ore", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"sealrock", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"wood", which is a material that exists
+  PASS: REQUIRED_TOOL keys on &"leaves", which is a material that exists
+  PASS: REQUIRED_TIER keys on &"deepslate", which is a material that exists
+  PASS: REQUIRED_TIER keys on &"iron", which is a material that exists
+  PASS: REQUIRED_TIER keys on &"rich_ore", which is a material that exists
+  PASS: REQUIRED_TIER keys on &"sealrock", which is a material that exists
+  PASS: the guard actually walked the mining tables (22 keys)
+  PASS: &"deepslate_wall" has no HARDNESS row, and is on the named list of materials allowed to take the default (add a row, or add it to DEFAULT_HARDNESS_OK with a reason)
+  PASS: &"dirt_wall" has no HARDNESS row, and is on the named list of materials allowed to take the default (add a row, or add it to DEFAULT_HARDNESS_OK with a reason)
+  PASS: &"gravel" has no HARDNESS row, and is on the named list of materials allowed to take the default (add a row, or add it to DEFAULT_HARDNESS_OK with a reason)
+  PASS: &"sealrock" has no HARDNESS row, and is on the named list of materials allowed to take the default (add a row, or add it to DEFAULT_HARDNESS_OK with a reason)
+  PASS: &"shale" has no HARDNESS row, and is on the named list of materials allowed to take the default (add a row, or add it to DEFAULT_HARDNESS_OK with a reason)
+  PASS: &"shale_wall" has no HARDNESS row, and is on the named list of materials allowed to take the default (add a row, or add it to DEFAULT_HARDNESS_OK with a reason)
+  PASS: &"stone_wall" has no HARDNESS row, and is on the named list of materials allowed to take the default (add a row, or add it to DEFAULT_HARDNESS_OK with a reason)
+  PASS: the exemption list is exactly the materials that use it: 7 listed, 7 actually defaulting
+  PASS: sealrock is unmineable with EVERY tool in the pack, so its absent hardness is unreachable rather than unset
+  PASS: TOOLS declares at least one class (3)
+  PASS: &"stone" needs a &"pick" and some tool is one
+  PASS: ...and at tier 1, which some pick reaches (best is 3)
+  PASS: &"ore" needs a &"pick" and some tool is one
+  PASS: ...and at tier 1, which some pick reaches (best is 3)
+  PASS: &"coal" needs a &"pick" and some tool is one
+  PASS: ...and at tier 1, which some pick reaches (best is 3)
+  PASS: &"deepslate" needs a &"pick" and some tool is one
+  PASS: ...and at tier 2, which some pick reaches (best is 3)
+  PASS: &"iron" needs a &"pick" and some tool is one
+  PASS: ...and at tier 2, which some pick reaches (best is 3)
+  PASS: &"rich_ore" needs a &"pick" and some tool is one
+  PASS: ...and at tier 2, which some pick reaches (best is 3)
+  PASS: &"sealrock" needs a &"pick" and some tool is one
+  PASS: &"wood" needs a &"pick" and some tool is one
+  PASS: ...and at tier 1, which some pick reaches (best is 3)
+  PASS: &"leaves" needs a &"pick" and some tool is one
+  PASS: ...and at tier 1, which some pick reaches (best is 3)
+  PASS: the guard actually walked REQUIRED_TOOL (9)
+  PASS: TOOL_NAMES names &"wood_pickaxe", which is a tool that exists
+  PASS: TOOL_NAMES names &"stone_pickaxe", which is a tool that exists
+  PASS: TOOL_NAMES names &"iron_pickaxe", which is a tool that exists
+  PASS: TOOL_NAMES names &"wood_axe", which is a tool that exists
+  PASS: TOOL_NAMES names &"scanner", which is a tool that exists
+  PASS: TOOL_RECIPES names &"stone_pickaxe", which is a tool that exists
+  PASS: TOOL_RECIPES names &"iron_pickaxe", which is a tool that exists
+  PASS: TOOL_RECIPES names &"scanner", which is a tool that exists
+  PASS: STARTER_TOOLS seeds &"wood_pickaxe", which is a tool that exists
+  PASS: &"wood_pickaxe" has a display name, so the craft screen does not print its id
+  PASS: &"wood_pickaxe" is craftable, seeded, or a named exception
+  PASS: &"stone_pickaxe" has a display name, so the craft screen does not print its id
+  PASS: &"stone_pickaxe" is craftable, seeded, or a named exception
+  PASS: &"iron_pickaxe" has a display name, so the craft screen does not print its id
+  PASS: &"iron_pickaxe" is craftable, seeded, or a named exception
+  PASS: &"wood_axe" has a display name, so the craft screen does not print its id
+  PASS: &"wood_axe" is craftable, seeded, or a named exception
+  PASS: &"scanner" has a display name, so the craft screen does not print its id
+  PASS: &"scanner" is craftable, seeded, or a named exception
+  PASS: the guard actually walked TOOLS (5)
+  PASS: bit &"point" has a recipe, or is the Point you always have
+  PASS: bit &"broad_bit" has a recipe, or is the Point you always have
+  PASS: bit &"lance_bit" has a recipe, or is the Point you always have
+  PASS: bit &"sinker_bit" has a recipe, or is the Point you always have
+  PASS: bit &"wedge_bit" has a recipe, or is the Point you always have
+  PASS: BIT_RECIPES prices &"broad_bit", which is a bit that exists
+  PASS: BIT_RECIPES prices &"sinker_bit", which is a bit that exists
+  PASS: BIT_RECIPES prices &"lance_bit", which is a bit that exists
+  PASS: BIT_RECIPES prices &"wedge_bit", which is a bit that exists
+  PASS: the guard actually walked BITS (5)
+  PASS: tech &"automation" appears in ORDER, so the research screen can show it
+  PASS: tech &"prospecting" appears in ORDER, so the research screen can show it
+  PASS: tech &"crosscutting" appears in ORDER, so the research screen can show it
+  PASS: tech &"power" appears in ORDER, so the research screen can show it
+  PASS: tech &"descent" appears in ORDER, so the research screen can show it
+  PASS: tech &"ironworks" appears in ORDER, so the research screen can show it
+  PASS: tech &"machining" appears in ORDER, so the research screen can show it
+  PASS: tech &"galleries" appears in ORDER, so the research screen can show it
+  PASS: tech &"packing" appears in ORDER, so the research screen can show it
+  PASS: tech &"enrichment" appears in ORDER, so the research screen can show it
+  PASS: tech &"drainage" appears in ORDER, so the research screen can show it
+  PASS: ORDER lists &"automation", which is a tech that exists
+  PASS: ORDER lists &"prospecting", which is a tech that exists
+  PASS: ORDER lists &"crosscutting", which is a tech that exists
+  PASS: ORDER lists &"power", which is a tech that exists
+  PASS: ORDER lists &"descent", which is a tech that exists
+  PASS: ORDER lists &"ironworks", which is a tech that exists
+  PASS: ORDER lists &"machining", which is a tech that exists
+  PASS: ORDER lists &"galleries", which is a tech that exists
+  PASS: ORDER lists &"packing", which is a tech that exists
+  PASS: ORDER lists &"enrichment", which is a tech that exists
+  PASS: ORDER lists &"drainage", which is a tech that exists
+  PASS: the guard actually walked TECHS (11)
+check_rules_registry: PASS — nine hand-kept tables, no id in one that another disowns

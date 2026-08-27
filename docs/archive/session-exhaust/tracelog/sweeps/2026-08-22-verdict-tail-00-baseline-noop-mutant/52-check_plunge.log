@@ -1,0 +1,9 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the descent, both ways ==
+  the shaft:      32 rows in 297 frames, 28 blocks broken
+  the plunge, legs only:  34 rows in 156 frames (mouth at column 68)
+  the plunge, with rope:  34 rows in 156 frames, 0 blocks broken, 0 hops
+  the way back:   0 rows on legs, 37 rows on the rope (same budget, same hole)
+  the hole is 1.9x faster than the pickaxe; the rope bit on 36 of 36 samples on the way down
+check_plunge: PASS — the hole is a route, and it is one you can steer

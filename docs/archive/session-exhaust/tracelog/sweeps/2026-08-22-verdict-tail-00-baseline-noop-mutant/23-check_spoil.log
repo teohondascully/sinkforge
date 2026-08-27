@@ -1,0 +1,8 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== spoil, crushed and packed ==
+  crusher out: { &"gravel": 10 }   ·   still holding: {  }
+  loose stone wall: 61 units of water found their way through in a minute
+  packed gravel wall: 0 units through
+  rig → spoil column → crusher: 8 gravel, crusher status no_input
+check_spoil: PASS — spoil crushes to gravel, and only packed gravel holds water back

@@ -1,0 +1,55 @@
+diff --git a/src/core/layered_world_gen.gd b/src/core/layered_world_gen.gd
+index d44af2e..26f2d15 100644
+--- a/src/core/layered_world_gen.gd
++++ b/src/core/layered_world_gen.gd
+@@ -886,8 +886,22 @@ func _grow_vein(world: WorldData, rng: RandomNumberGenerator, seed_cell: Vector2
+ 			continue
+ 		var here: StringName = world.blocks.get(cell, &"")
+ 		if here != &"earth" and here != &"stone" and here != &"deepslate" and here != &"shale":
+-			continue                                # only replace SOLID rock (never fill a carved cave)
+-		world.blocks[cell] = material
++			continue                                # only seed inside SOLID rock (never fill a carved cave)
++		if world.lodes.has(cell):
++			continue                                # another vein already owns this cell — bodies do not overlap
++		# THE CUTOVER (`docs/LODE_PLAN.md` phase 3). This line used to be `world.blocks[cell] = material`, and
++		# that one assignment was the whole old game: a vein WAS the rock, so the pick could not tell "get me
++		# through here" apart from "give me that", and a tunnel driven through a body destroyed everything it
++		# did not happen to pocket. Now the host rock stays exactly as the strata laid it down and the metal
++		# goes into its own plane behind it. Nothing else in this function changes — the blob walk, the
++		# richness, the min_row floor and the RNG draw order are identical, so a given seed grows the same
++		# SHAPE it always grew, in the same order, and determinism survives the migration.
++		#
++		# The lodes guard above replaces a check that used to happen for free: an already-placed &"ore" cell
++		# failed the host-material test, so bodies could never overlap. With the host left intact that test
++		# stops refusing them, and without this line a later vein would silently overwrite an earlier one's
++		# material while keeping its richness.
++		world.lodes[cell] = material
+ 		world.amounts[cell] = richness
+ 		filled[cell] = true
+ 		placed += 1
+diff --git a/src/core/world_data.gd b/src/core/world_data.gd
+index abb043c..2caec9b 100644
+--- a/src/core/world_data.gd
++++ b/src/core/world_data.gd
+@@ -22,6 +22,21 @@ var walls: Dictionary = {}
+ ## that doesn't fill this still produces today's one-hit ore). The gen→sim channel for finite,
+ ## depth-scaled deposits: generation decides how rich each vein cell is.
+ var amounts: Dictionary = {}
++## THE LODE PLANE: cell (Vector2i) -> vein material id (&"ore", &"coal", &"iron", &"rich_ore"). Sparse.
++##
++## This is where ore is BORN, and the cell it names is still solid host rock in `blocks` — the two grids
++## describe the same cell answering two different questions. `blocks` says *what you carve*; `lodes` says
++## *what is in there*. A generator that writes a lode without leaving rock in front of it has not made a
++## vein, it has made a hole with ore lying in it.
++##
++## Before the cutover (`docs/LODE_PLAN.md` phase 3) a vein was an ore BLOCK: a cell whose foreground
++## material was &"ore", which meant that clearing the rock and taking the ore were the same act, and every
++## blow that widened a tunnel through a vein silently destroyed the rest of it. Moving ore to its own plane
++## is what makes the two acts separable, and it is the whole point of the migration.
++##
++## Richness for a lode cell lives in `amounts`, exactly as it did when the vein was a block — which is why
++## the cutover left the richness pipeline (depth-scaling, drought, the aquifer's rich roll) untouched.
++var lodes: Dictionary = {}
+ ## Aquifer water (L3): cell (Vector2i) -> level (1..FactorySim.WATER_MAX). Sparse — only
+ ## watered cells appear, and only in CARVED-OPEN cells deep in the rock (a generator seeds sealed pressurized
+ ## pockets you BREACH). Ingested by FactorySim.load_world into `sim.water`; an older WorldData without this

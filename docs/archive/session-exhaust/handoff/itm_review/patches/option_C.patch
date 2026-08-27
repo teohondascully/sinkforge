@@ -1,0 +1,344 @@
+diff --git a/scenes/hud.gd b/scenes/hud.gd
+index a9e06da..9434fec 100644
+--- a/scenes/hud.gd
++++ b/scenes/hud.gd
+@@ -73,6 +73,11 @@ var craft_ids: Array[StringName]:
+ 	set(v): _bazaar_page.craft_ids = v
+ ## The active carried-item slot in the inventory hotbar (set by MainView; mouse-wheel cycles it).
+ var inv_selected_getter: Callable
++## Whether the SELECTED item can act right now (ITM item/hotbar experiment, Options B and C's
++## "unavailable" state) -- MainView._selected_item_available(). Same read-only-callable shape as
++## inv_selected_getter above; unset means "always available" (defaults true) so callers that never wire
++## it see no change.
++var item_available_getter: Callable
+ ## Inspector facts for the machine under the aim, pushed here by MainView: name, recipe, routing mode
+ ## and what it holds. Empty means nothing is hovered. Drawn top-right under FORGED.
+ var hover_info: Dictionary = {}
+@@ -1992,9 +1997,94 @@ func _draw_hint() -> void:
+ 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+ 
+ 
+-## The carried pack as a hotbar of slots, icon and count, centred along the bottom. The active slot,
+-## which the mouse wheel cycles, is highlighted and it is the one the world verbs act with. It reads
+-## `sim.inventory_slots()`.
++## ITM-01/02/04/05/06/09/10/12/15/16/19/20 experiment, Option C (distinctive SINKFORGE treatment;
++## docs/handoff/ITM_VISUAL_EXPERIMENT.md). Where A lightens the well and B adds a category/state vocabulary
++## inside the same one-row bar, C changes the SILHOUETTE: three physical containers side by side -- a tool
++## rack, a material tray, a machine crate -- each with its own backing plate and its own pocket shape, so
++## "what kind of thing is this" reads from geometry before a player even looks at the icon. ITM-12's "UI
++## strip, not a carried kit" is the finding this option answers most directly.
++##
++## Fixed per-container capacity (3 tools / 5 materials / 2 machines, summing to
++## FactorySim.INVENTORY_SLOTS) is a deliberate limit of this option, not an oversight: a player carrying a
++## fourth tool or a sixth material type at once has no represented pocket for it (a small "+N" overflow
++## mark is drawn on that container instead of silently dropping the item). Neither other option has this
++## ceiling; see the report's "what remains unproven" for the real fix -- a per-container overflow scroll --
++## this bounded experiment does not attempt.
++const HOTBAR_TOOL_CAP_C: int = 3
++const HOTBAR_MATERIAL_CAP_C: int = 5
++const HOTBAR_MACHINE_CAP_C: int = 2
++const HOTBAR_PLATE_GAP_C: float = 10.0
++const HOTBAR_PLATE_PAD_C: float = 5.0
++const HOTBAR_TOOL_PLATE_C: Color = Color(0.16, 0.15, 0.14, 0.60)
++const HOTBAR_MATERIAL_PLATE_C: Color = Color(0.20, 0.17, 0.13, 0.48)
++const HOTBAR_MACHINE_PLATE_C: Color = Color(0.13, 0.15, 0.18, 0.60)
++const HOTBAR_TOOL_WELL_C: Color = Color(0.24, 0.22, 0.19, 0.60)
++const HOTBAR_MATERIAL_WELL_C: Color = Color(0.24, 0.26, 0.22, 0.55)
++const HOTBAR_MACHINE_WELL_C: Color = Color(0.20, 0.23, 0.27, 0.60)
++const HOTBAR_WELL_EMPTY_ALPHA_C: float = 0.30      ## multiplies a well's own alpha for an empty pocket
++const HOTBAR_EDGE_QUIET_C: Color = Color(0.30, 0.34, 0.42, 0.40)
++const HOTBAR_TOOL_ACCENT_C: Color = Color(0.80, 0.66, 0.30, 0.80)
++const HOTBAR_MATERIAL_TINT_C: Color = Color(0.58, 0.66, 0.56, 0.65)
++const HOTBAR_MACHINE_RIVET_C: Color = Color(0.86, 0.90, 0.96, 0.55)
++const HOTBAR_FOCUS_RING_C: Color = Color(0.55, 0.74, 0.84, 0.60)
++const HOTBAR_DEPLETED_EDGE_C: Color = Color(0.76, 0.34, 0.30, 0.65)
++const HOTBAR_UNAVAILABLE_VEIL_C: Color = Color(0.02, 0.02, 0.03, 0.50)
++const HOTBAR_DEPLETED_THRESHOLD_C: int = 2
++const HOTBAR_OVERFLOW_MARK_C: Color = Color(0.85, 0.55, 0.35, 0.90)
++
++
++## tool / material / machine, the container each item belongs to.
++func _item_category_c(item: StringName) -> String:
++	if machine_icons.has(item):
++		return "machine"
++	if MiningRules.is_tool_item(item):
++		return "tool"
++	return "material"
++
++
++## A tray pocket: rounded corners, the softest silhouette of the three, since a material is the thing you
++## reach for constantly and should feel like it sits loosely in cloth, not bolted down.
++func _draw_material_well_c(rect: Rect2, fill: Color, edge: Color, edge_w: float) -> void:
++	var sb := StyleBoxFlat.new()
++	sb.bg_color = fill
++	sb.border_color = edge
++	sb.set_border_width_all(edge_w)
++	sb.set_corner_radius_all(7)
++	draw_style_box(sb, rect)
++
++
++## A bolted crate pocket: chamfered corners, drawn as two nested octagons (edge colour behind, fill inset
++## on top) since `draw_colored_polygon` has no stroke-width primitive of its own.
++func _draw_machine_well_c(rect: Rect2, fill: Color, edge: Color, edge_w: float) -> void:
++	draw_colored_polygon(_octagon_points_c(rect, 6.0), edge)
++	draw_colored_polygon(_octagon_points_c(rect.grow(-edge_w), maxf(6.0 - edge_w, 1.0)), fill)
++
++
++func _octagon_points_c(rect: Rect2, chamfer: float) -> PackedVector2Array:
++	var l: float = rect.position.x
++	var t: float = rect.position.y
++	var r: float = rect.end.x
++	var b: float = rect.end.y
++	return PackedVector2Array([
++		Vector2(l + chamfer, t), Vector2(r - chamfer, t), Vector2(r, t + chamfer), Vector2(r, b - chamfer),
++		Vector2(r - chamfer, b), Vector2(l + chamfer, b), Vector2(l, b - chamfer), Vector2(l, t + chamfer),
++	])
++
++
++## A rack pocket: a plain well plus a small brass peg notch at the top centre, suggesting it hangs from
++## the rail drawn across the tool container's plate rather than sitting flush in a tray.
++func _draw_tool_well_c(rect: Rect2, fill: Color, edge: Color, edge_w: float) -> void:
++	draw_rect(rect, fill)
++	draw_rect(rect, edge, false, edge_w)
++	var cx: float = rect.get_center().x
++	draw_colored_polygon(PackedVector2Array([
++		Vector2(cx - 3.0, rect.position.y), Vector2(cx + 3.0, rect.position.y), Vector2(cx, rect.position.y + 4.0),
++	]), HOTBAR_TOOL_ACCENT_C)
++
++
++## The carried pack as three physical containers -- a tool rack, a material tray, a machine crate -- laid
++## out side by side, centred along the bottom. The active slot, which the mouse wheel cycles, is
++## highlighted and it is the one the world verbs act with. It reads `sim.inventory_slots()`.
+ func _draw_inventory() -> void:
+ 	# The big map is the screen, the same rule as the goal plate and decided there for the same reason.
+ 	# The map's panel runs y 41..319 of a 360 canvas, this bar's backing starts at y=295, and the map draws
+@@ -2005,83 +2095,122 @@ func _draw_inventory() -> void:
+ 	if minimap_large:
+ 		return
+ 	var slots: Array[Dictionary] = sim.inventory_slots()
+-	# Show only the slots you actually carry, not a fixed row of empty wells, because a trailing empty slot
+-	# reads as "broken, what goes here?". The bar grows and shrinks with your pack, with a floor of 1.
+-	var n: int = clampi(slots.size(), 1, FactorySim.INVENTORY_SLOTS)
+ 	var sel: int = int(inv_selected_getter.call()) if inv_selected_getter.is_valid() else 0
+-	# The bar is a window onto the pack, not the pack. `inventory_slots()` has no cap: it returns one entry
+-	# per item type, and the type universe is 20 machines plus 16 materials plus the crafted intermediates,
+-	# while this bar is capped at ten and `clampi` used to swallow the difference in silence. Carrying
+-	# eleven types drew ten wells and said nothing about the eleventh. Worse, `_cycle_inventory` wraps
+-	# modulo the full count, so the wheel walks the selection to index 10+ where the loop below never
+-	# reaches it, leaving no lit well anywhere on the bar. The name plate, whose guard is
+-	# `sel < slots.size()` and not `sel < n`, was still drawn at the selection's arithmetic position, off
+-	# the right end of the bar and eventually off the canvas. It is reachable on frame one of a dev start,
+-	# where the dev kit is ten types and the starter pickaxe is an eleventh. So the window is placed to
+-	# contain the selection instead of assuming it does, centred and derived purely from `sel`.
+-	var w0: int = clampi(sel - n / 2, 0, maxi(slots.size() - n, 0))
+-	var total_w: float = n * SLOT + (n - 1) * SLOT_GAP
++	var available: bool = bool(item_available_getter.call()) if item_available_getter.is_valid() else true
++	var mouse: Vector2 = Controls.pointer_viewport(self)
++
++	# Bucket every carried PACK INDEX into its container. A container beyond its own capacity draws an
++	# overflow mark instead of a pocket for the excess -- see the docstring above.
++	var by_cat: Dictionary = {"tool": [], "material": [], "machine": []}
++	for idx: int in slots.size():
++		by_cat[_item_category_c(slots[idx]["item"])].append(idx)
++	var containers: Array[Dictionary] = [
++		{"cat": "tool", "cap": HOTBAR_TOOL_CAP_C, "items": by_cat["tool"] as Array,
++			"plate": HOTBAR_TOOL_PLATE_C, "well": HOTBAR_TOOL_WELL_C},
++		{"cat": "material", "cap": HOTBAR_MATERIAL_CAP_C, "items": by_cat["material"] as Array,
++			"plate": HOTBAR_MATERIAL_PLATE_C, "well": HOTBAR_MATERIAL_WELL_C},
++		{"cat": "machine", "cap": HOTBAR_MACHINE_CAP_C, "items": by_cat["machine"] as Array,
++			"plate": HOTBAR_MACHINE_PLATE_C, "well": HOTBAR_MACHINE_WELL_C},
++	]
++
++	var total_w: float = HOTBAR_PLATE_GAP_C * (containers.size() - 1)
++	for c: Dictionary in containers:
++		total_w += int(c["cap"]) * SLOT + (int(c["cap"]) - 1) * SLOT_GAP + HOTBAR_PLATE_PAD_C * 2.0
+ 	var x0: float = (CANVAS.x - total_w) * 0.5
+ 	var y: float = HOTBAR_BAND_TOP + 7.0            # the band is the definition; the well row sits inside it
+-	# A clean framed backing just for the hotbar, since the craft strip that used to share this panel now
+-	# lives in the E screen. It keeps the bar reading as one deliberate unit rather than as floating slots.
++	# A clean framed backing behind all three containers, so the trio still reads as one carried kit and
++	# not three unrelated panels.
+ 	var backing := Rect2(x0 - 8.0, HOTBAR_BAND_TOP, total_w + 16.0, HOTBAR_BAND_H)
+ 	_panel(backing)
++
+ 	var wells: Array[Rect2] = []
+ 	var sel_lit: bool = false
+-	for k: int in n:
+-		var i: int = w0 + k                                      # window slot -> the pack index it shows
+-		var sx: float = x0 + float(k) * (SLOT + SLOT_GAP)
+-		var slot_rect := Rect2(sx, y, SLOT, SLOT)
+-		var active: bool = i == sel
+-		wells.append(slot_rect)
+-		sel_lit = sel_lit or active
+-		if i < slots.size() and slot_rect.has_point(Controls.pointer_viewport(self)):
+-			_tooltip_item = slots[i]["item"]                     # hovered hotbar slot → tooltip
+-			_tooltip_count = int(slots[i]["count"])
+-			_tooltip_anchor = Vector2(slot_rect.get_center().x, slot_rect.position.y)
+-		if active:
+-			draw_rect(slot_rect.grow(2.0), Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.18))  # selection glow
+-		draw_rect(slot_rect, UI_SLOT)                                                            # well
+-		draw_line(slot_rect.position + Vector2(1.0, 1.0), slot_rect.position + Vector2(SLOT - 1.0, 1.0),
+-			UI_EDGE_HI, 1.0)                                                                      # top bevel
+-		draw_rect(slot_rect, UI_ACCENT if active else UI_EDGE, false, 2.0 if active else 1.0)
+-		# A faint keybind number in the slot corner, so the hotbar reads as keyed, and only where a key really
+-		# exists. The row is 1-9 then 0 for the tenth, so the tenth well said "10" for a key nobody has and
+-		# once the window can scroll, `k + 1` would relabel whichever items happen to be on screen. The digit
+-		# follows the pack index and stops when the keys do, staying blank rather than lying.
+-		if i < 10:
+-			draw_string(_font, slot_rect.position + Vector2(2.0, 9.0), "0" if i == 9 else str(i + 1),
+-				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_FAINT)
+-		if i < slots.size():
+-			var item: StringName = slots[i]["item"]
+-			var count: int = int(slots[i]["count"])
+-			var icon := Rect2(sx + 6.0, y + 6.0, SLOT - 12.0, SLOT - 14.0)
+-			# A machine's sprite or casing-colour-plus-glyph, or a resource's sprite or colour chip. This
+-			# used to be twelve lines of that decision written out again, differing from the Bazaar's copy
+-			# only by the rim, which is now the argument. `inventory_slots()` iterates real inventory keys,
+-			# so the empty-id branch inside is unreachable from here.
+-			Visuals.thing_icon(self, item, icon, machine_icons, Color(0.0, 0.0, 0.0, 0.35))
+-			# Count badge bottom-right with a dark backing so it stays legible over any icon colour.
+-			var cnt: String = str(count)
+-			var cw: float = _font.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+-			draw_rect(Rect2(sx + SLOT - cw - 5.0, y + SLOT - 13.0, cw + 4.0, 12.0), Color(0.03, 0.03, 0.05, 0.85))
+-			draw_string(_font, Vector2(sx + SLOT - cw - 3.0, y + SLOT - 3.0), cnt,
+-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
+-	# The pack continues that way, so a chevron marks whichever end has more pack behind it. It is
+-	# deliberately a mark and not a count, because the number of types you carry is the pack screen's job,
+-	# and a bar that starts reporting totals is on its way to being a second inventory. It only says "not
+-	# all of it is here", which is the fact the bar was concealing.
+-	if w0 > 0:
+-		_more_mark(Vector2(backing.position.x - 5.0, y + SLOT * 0.5), -1.0)
+-	if w0 + n < slots.size():
+-		_more_mark(Vector2(backing.end.x + 5.0, y + SLOT * 0.5), 1.0)
+-	# Name the selected item just above the bar, so the coloured chips stop being mystery squares.
++	var sel_well: Rect2 = Rect2()
++	var cx: float = x0
++	for c: Dictionary in containers:
++		var cap: int = c["cap"]
++		var items: Array = c["items"]
++		var pw: float = cap * SLOT + (cap - 1) * SLOT_GAP + HOTBAR_PLATE_PAD_C * 2.0
++		var plate_rect := Rect2(cx, y - HOTBAR_PLATE_PAD_C, pw, SLOT + HOTBAR_PLATE_PAD_C * 2.0)
++		draw_rect(plate_rect, c["plate"])
++		draw_rect(plate_rect, HOTBAR_EDGE_QUIET_C, false, 1.0)
++		if c["cat"] == "tool":
++			draw_line(plate_rect.position + Vector2(4.0, 2.0),
++				Vector2(plate_rect.end.x - 4.0, plate_rect.position.y + 2.0), HOTBAR_TOOL_ACCENT_C, 1.5)
++		elif c["cat"] == "machine":
++			for corner: Vector2 in [Vector2(4.0, 4.0), Vector2(plate_rect.size.x - 4.0, 4.0),
++					Vector2(4.0, plate_rect.size.y - 4.0), Vector2(plate_rect.size.x - 4.0, plate_rect.size.y - 4.0)]:
++				draw_circle(plate_rect.position + corner, 1.3, HOTBAR_MACHINE_RIVET_C)
++		if items.size() > cap:
++			draw_string(_font, plate_rect.position + Vector2(pw - 16.0, -3.0), "+%d" % (items.size() - cap),
++				HORIZONTAL_ALIGNMENT_LEFT, -1, 9, HOTBAR_OVERFLOW_MARK_C)
++		for slot_k: int in cap:
++			var sx: float = cx + HOTBAR_PLATE_PAD_C + float(slot_k) * (SLOT + SLOT_GAP)
++			var slot_rect := Rect2(sx, y, SLOT, SLOT)
++			var occupied: bool = slot_k < items.size()
++			var i: int = int(items[slot_k]) if occupied else -1
++			var active: bool = occupied and i == sel
++			wells.append(slot_rect)
++			sel_lit = sel_lit or active
++			if active:
++				sel_well = slot_rect
++			var hot: bool = occupied and slot_rect.has_point(mouse)
++			if hot:
++				_tooltip_item = slots[i]["item"]                 # hovered hotbar slot → tooltip
++				_tooltip_count = int(slots[i]["count"])
++				_tooltip_anchor = Vector2(slot_rect.get_center().x, slot_rect.position.y)
++			var count: int = int(slots[i]["count"]) if occupied else 0
++			# Depleted reads as "running low" only for a material -- alarming for a stackable resource,
++			# ordinary for a machine (you carry one or two, never fifty).
++			var depleted: bool = occupied and c["cat"] == "material" and count <= HOTBAR_DEPLETED_THRESHOLD_C
++			var unavailable: bool = active and occupied and not available
++			if active:
++				draw_rect(slot_rect.grow(2.0), Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.20))
++			elif hot:
++				draw_rect(slot_rect.grow(1.0),
++					Color(HOTBAR_FOCUS_RING_C.r, HOTBAR_FOCUS_RING_C.g, HOTBAR_FOCUS_RING_C.b, 0.16))
++			var fill: Color = c["well"]
++			if not occupied:
++				fill = Color(fill.r, fill.g, fill.b, fill.a * HOTBAR_WELL_EMPTY_ALPHA_C)
++			var edge: Color = UI_ACCENT if active \
++				else (HOTBAR_DEPLETED_EDGE_C if depleted else HOTBAR_EDGE_QUIET_C)
++			var edge_w: float = 2.0 if active else 1.0
++			match c["cat"]:
++				"tool": _draw_tool_well_c(slot_rect, fill, edge, edge_w)
++				"machine": _draw_machine_well_c(slot_rect, fill, edge, edge_w)
++				_: _draw_material_well_c(slot_rect, fill, edge, edge_w)
++			if occupied:
++				var item: StringName = slots[i]["item"]
++				var icon := Rect2(sx + 4.0, y + 4.0, SLOT - 8.0, SLOT - 10.0)
++				Visuals.thing_icon(self, item, icon, machine_icons, Color(0.0, 0.0, 0.0, 0.35))
++				if unavailable:
++					draw_rect(icon, HOTBAR_UNAVAILABLE_VEIL_C)
++				# A key digit follows the pack index the same way A and B read it -- but an empty CAPACITY
++				# pocket here has no pack index of its own, so unlike the single-row options it draws no
++				# digit at all rather than label a key that would select nothing.
++				if i < 10:
++					draw_string(_font, slot_rect.position + Vector2(2.0, 9.0), "0" if i == 9 else str(i + 1),
++						HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_FAINT)
++				# A tool is one thing you either have or don't -- no count badge, matching Option B.
++				if c["cat"] != "tool":
++					var cnt: String = str(count)
++					var cw: float = _font.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
++					var badge := Rect2(sx + SLOT - cw - 5.0, y + SLOT - 13.0, cw + 4.0, 12.0)
++					draw_rect(badge, Color(0.03, 0.03, 0.05, 0.85))
++					var tint: Color = HOTBAR_DEPLETED_EDGE_C if depleted \
++						else (HOTBAR_MACHINE_RIVET_C if c["cat"] == "machine" else HOTBAR_MATERIAL_TINT_C)
++					draw_rect(Rect2(badge.position, Vector2(2.0, badge.size.y)), tint)
++					draw_string(_font, Vector2(sx + SLOT - cw - 3.0, y + SLOT - 3.0), cnt,
++						HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_TEXT)
++		cx += pw + HOTBAR_PLATE_GAP_C
++	# Name the selected item just above its own container, so the coloured chips stop being mystery squares.
++	# Looked up from `sel_well`, the well rect this item actually drew at, since grouping into containers
++	# means screen position no longer follows the pack index the way the single-row options' formula assumed.
+ 	var label_rect := Rect2()
+-	if sel >= w0 and sel < mini(w0 + n, slots.size()):
++	if sel_lit:
+ 		var label: String = _item_label(slots[sel]["item"])
+ 		var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+-		var lx: float = x0 + float(sel - w0) * (SLOT + SLOT_GAP) + (SLOT - lw) * 0.5
++		var lx: float = sel_well.get_center().x - lw * 0.5
+ 		var ly: float = y - 12.0
+ 		var plate := Rect2(lx - 5.0, ly - 11.0, lw + 10.0, 15.0)
+ 		draw_rect(plate, Color(0.05, 0.06, 0.09, 0.88))
+@@ -2091,7 +2220,7 @@ func _draw_inventory() -> void:
+ 		label_rect = plate
+ 	if probing:
+ 		hotbar_probe = {"carried": slots.size(), "wells": wells, "sel": sel, "sel_lit": sel_lit,
+-			"window": w0, "backing": backing, "label": label_rect}
++			"window": 0, "backing": backing, "label": label_rect}
+ 
+ 
+ ## "There is more pack this way." A chevron pointing outward from the end of the hotbar, drawn only when
+diff --git a/scenes/main.gd b/scenes/main.gd
+index c33ad2f..3bd2d23 100644
+--- a/scenes/main.gd
++++ b/scenes/main.gd
+@@ -362,6 +362,7 @@ func _ready() -> void:
+ 	hud.rack_ids = rack_ids
+ 	hud.machine_icons = machine_icons
+ 	hud.inv_selected_getter = func() -> int: return _inv_selected
++	hud.item_available_getter = func() -> bool: return _selected_item_available()
+ 	# Tutorial chain, built after the world is seeded so its baseline includes any dev-start kit, and handed
+ 	# to the HUD to render. It only reads the sim; MainView refreshes it each frame.
+ 	_objectives = Objectives.new(sim)
+@@ -2697,6 +2698,18 @@ func _selected_item() -> StringName:
+ 	return slots[clampi(_inv_selected, 0, slots.size() - 1)]["item"]
+ 
+ 
++## The selected item's usability right now (ITM item/hotbar experiment, Options B and C's "unavailable"
++## state). Only a TOOL has a meaningful "can't act" reading in this bounded scope: whether the aimed cell is
++## something it can actually work, via `_workable`, the exact predicate mining already gates on -- not a
++## new rule. Materials and machines default to available; neither has an equivalently precedented
++## usability gate worth inventing for a presentation experiment.
++func _selected_item_available() -> bool:
++	var item: StringName = _selected_item()
++	if item == &"" or not MiningRules.is_tool_item(item):
++		return true
++	return _workable(_aim)
++
++
+ ## The machine def for the active hotbar slot, or null when the selected item is not a placeable machine
+ ## you carry, meaning it is a resource or the pack is empty.
+ func _selected_machine_def() -> MachineDef:

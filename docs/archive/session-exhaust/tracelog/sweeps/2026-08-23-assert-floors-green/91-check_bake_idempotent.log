@@ -1,0 +1,13 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== the bake must not change colour because you dug somewhere else ==
+  sampled 12 painted surface cells across the bake
+    PASS CONTROL: at least 6 painted cells were found to judge (found 12)
+    PASS CONTROL: 8 digs at column 46 actually reached the bake (that column moved 120)
+    PASS 12 of 12 cells nobody dug hold their colour after 8 digs elsewhere (worst drift 0, tol 1)
+check_bake_idempotent: PASS — digging moves only what you dug
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)

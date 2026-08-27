@@ -1,0 +1,12 @@
+== authorship: one author, no co-author or tool-generation trailers ==
+  PASS  the detector fires on a known-bad message (positive control)
+  PASS  ...and does NOT fire on a clean one (negative control)
+  PASS  the repository is not a shallow clone, so the whole history is visible
+  PASS  2450 commits were scanned (floor 100 - a scan of a handful is not a sweep)
+  PASS  the tracked commit-msg hook exists and is executable
+  PASS  core.hooksPath resolves to the tracked hooks ('/Users/thondascully/Projects/sinkforge/.githooks') - run: git config core.hooksPath .githooks
+  PASS  no ref anywhere carries a co-author or tool-generation trailer (0 ref(s) do)
+  PASS  every commit shares one author identity (1 distinct found)
+  PASS  every commit shares one committer identity (1 distinct found)
+
+check_trailers: PASS - 2450 commits, one author, no trailers

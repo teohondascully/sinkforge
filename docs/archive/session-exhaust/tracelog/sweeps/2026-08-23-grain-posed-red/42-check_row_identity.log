@@ -1,0 +1,32 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== works row identity ==
+  PASS: MainView built a HUD and it is the one the game draws
+  PASS: the HUD holds the live sim — the filter reads `sim.is_researched` off it
+  PASS: the counter has rows to resolve (19 machines in WORKS)
+  PASS: and `machine_icons` has entries in it (19), so `_craft_id`'s fallback has material to return
+  PASS: THE RESOLVER RETURNED REAL IDS: every one of the 19 rows names a machine, not the empty name (none)
+  PASS: and every one of them is a machine MainView can actually resolve and place (none)
+  PASS: no two rows resolve to the same machine — 19 distinct ids across 19 rows (none)
+  PASS: the row set spans both cases the filter decides between: 15 gated by a tech, 4 freely craftable
+  PASS: the rows are gated by 10 different techs, so a probe can separate them
+  PASS: with nothing researched the filter opens 4 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only power researched the filter opens 7 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only automation researched the filter opens 6 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only crosscutting researched the filter opens 5 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only descent researched the filter opens 5 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only ironworks researched the filter opens 5 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only machining researched the filter opens 7 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only galleries researched the filter opens 5 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only enrichment researched the filter opens 5 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only packing researched the filter opens 5 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with only drainage researched the filter opens 5 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: with the whole tree researched the filter opens 19 of 19 rows and every one of them is the machine `_craft_id` puts there (none)
+  PASS: EVERY GATED ROW WAS SEEN SHUT at least once — the agreement was tested at both polarities, not read off a constant (none)
+  PASS: and every row was seen open at least once, so no row is unreachable in the counter (none)
+  PASS: the reason it holds: craft_ids covers every row (19 ids for 19 rows), so the fallback never fires and the filter never reads past the end
+  PASS: and the fallback derivation names the same machine on every row today (none)
+  PASS: there was an open row to withhold from the comparator (row 0)
+  PASS: AND IT REJECTS A WRONG ANSWER: withholding row 0 from the expectation is reported, and only that row (row 0 is processor (gated by nothing), which the counter would hide and the filter shows)
+  PASS: the boot research state is back (0 techs)
+check_row_identity: PASS (28 asserted) — 19 WORKS rows, and under 12 research states the row the filter opens is the machine `_craft_id` puts there

@@ -1,0 +1,8 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== a bit is a verb ==
+  a Lance driven at a three-thick face with a gap behind it took 3 cells
+  a Broad through a 2x2 of ore broke 4 cells and pocketed 0 ore
+  a Lance driven into over-tier rock took 1 cell(s)
+  a Wedge along a bedding plane split 8 cells (the Point's cap is 3)
+check_bits: PASS — every bit is worse than the Point somewhere

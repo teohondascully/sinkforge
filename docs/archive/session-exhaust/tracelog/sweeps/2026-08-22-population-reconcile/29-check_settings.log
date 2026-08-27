@@ -1,0 +1,25 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: a first boot, with no settings file, starts with SOUND ON
+  PASS: persist=false writes nothing (fixture isolation)
+  PASS: default: Q -> drop
+  PASS: default: J is unbound
+  PASS: binding label reads SPACE for jump
+  PASS: binding label reads LMB for mine
+  PASS: rebind: J now fires drop
+  PASS: rebind: Q no longer fires drop
+  PASS: rebind persisted to the config file
+  PASS: audio levels round-trip (master=0.50 sound=0.75)
+  PASS: screen-shake toggle round-trips
+  PASS: zoom index round-trips
+  PASS: binding override survives a reload (J -> drop after load)
+  PASS: mute has a default key, so it is reachable before anyone opens the settings page
+  PASS: muted: the Master bus is silenced
+  PASS: …one toggle turns it back on
+  PASS: …and the levels are exactly where they were — unmuting gives back the mix, not a zeroed one
+  PASS: mute round-trips through the config file like every other preference
+  PASS: master 50% lands on the Master bus (-6.0 dB)
+  PASS: sound 75% offsets ~-2.5 dB (-2.50)
+  PASS: reset: Q -> drop again, J unbound
+  PASS: reset persisted (no overrides after reload)
+check_settings: PASS

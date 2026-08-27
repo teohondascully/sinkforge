@@ -1,0 +1,174 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== worldgen tests ==
+- terrain
+  PASS: set_solid marks a cell solid
+  PASS: default material is earth
+  PASS: neighbouring cell stays open
+  PASS: cannot place a machine in solid earth
+  PASS: mining earth returns the earth material
+  PASS: mined cell is now open
+  PASS: can place after mining out the earth
+  PASS: mining a non-solid cell yields nothing
+  PASS: out-of-bounds is never solid
+- ground survives digging
+  PASS: a pad column's ground is the flat row (20)
+  PASS: BEFORE digging the two authorities agree — which is how the wrong one got adopted
+  PASS: ground_row is unmoved by the shaft
+  PASS: surface_row followed the body down to the shaft floor (31)
+  PASS: depth off the ground reads the real 10
+  PASS: depth off surface_row reads NEGATIVE eleven rows down — the defect, pinned so it cannot return
+  PASS: the GRAPPLE hint can fire
+  PASS: ...and off surface_row it never could
+  PASS: the wind bed is silent at the bottom of the shaft
+  PASS: ...and off surface_row it was at FULL surface wind down there
+  PASS: the shaft floor is still inside the legal ground band
+  PASS: walked_surface accepts the shaft floor as ground — it rejects rifts, not shafts
+- generated lodes (GENERATED WORLD — not a seeded fixture)
+  PASS: a generated world contains lode at all (288 cells)
+  PASS: same seed → identical lodes
+  PASS: a different seed → different lodes
+  PASS: lode is generated in BOTH tiers — 239 above the seal, 49 below it
+  PASS: and it carries each tier's own material rather than one everywhere ([&"ore", &"iron"])
+  PASS: no lode shares a cell with a solid ore-like block — the double-source guard (0)
+  PASS: every lode sits behind host rock, never air/seal/foliage (0 bad)
+  PASS: every lode has a wall behind it (0 without)
+  PASS: no lode is in the near-surface shell (0 too shallow)
+  PASS: no lode was seeded inside an aquifer (0 flooded)
+  PASS: every lode carries a positive deposit (0 empty)
+  PASS: the sim ingested every in-bounds lode (288)
+  PASS: there is a lode behind solid rock to work (the case the whole design is about)
+  PASS: a buried lode is NOT workable until the rock is cleared
+  PASS: clearing the host rock EXPOSES a workable lode
+  PASS: working the exposed lode yields its ore
+- surface silhouette
+  PASS: surface_row finds the exposed top
+  PASS: surface_row tracks a raised column
+  PASS: an empty column has no surface
+  PASS: a 1-tile step right reads as a rightward ramp
+  PASS: a 1-tile step left reads as a leftward ramp
+  PASS: flat ground has no ramp
+  PASS: a 2-tile step is a WALL, not a ramp (only single steps slope)
+  PASS: flat ground reads flat before any machine
+  PASS: a placed machine does NOT raise the surface silhouette
+  PASS: a placed machine casts NO phantom ramp (it's a box you bump, not a hill)
+- surface walkability (no un-steppable rises)
+  PASS: heightmap_world_gen.gd seed 1337: every un-steppable rise is the lip of a deliberate mouth or a scarp (0 stray, worst 4 at col 108)
+  PASS: heightmap_world_gen.gd seed 1337: and the ground falls away in only a few PLACES (0, cap 3)
+  PASS: heightmap_world_gen.gd seed 1337: ...and every designed scarp actually stands (3 of 3)
+  PASS: heightmap_world_gen.gd seed 4242: every un-steppable rise is the lip of a deliberate mouth or a scarp (0 stray, worst 4 at col 108)
+  PASS: heightmap_world_gen.gd seed 4242: and the ground falls away in only a few PLACES (0, cap 3)
+  PASS: heightmap_world_gen.gd seed 4242: ...and every designed scarp actually stands (3 of 3)
+  PASS: heightmap_world_gen.gd seed 20260807: every un-steppable rise is the lip of a deliberate mouth or a scarp (0 stray, worst 4 at col 108)
+  PASS: heightmap_world_gen.gd seed 20260807: and the ground falls away in only a few PLACES (0, cap 3)
+  PASS: heightmap_world_gen.gd seed 20260807: ...and every designed scarp actually stands (3 of 3)
+  PASS: layered_world_gen.gd seed 1337: every un-steppable rise is the lip of a deliberate mouth or a scarp (0 stray, worst 48 at col 70)
+  PASS: layered_world_gen.gd seed 1337: and the ground falls away in only a few PLACES (2, cap 3)
+  PASS: layered_world_gen.gd seed 1337: ...and every designed scarp actually stands (3 of 3)
+  PASS: layered_world_gen.gd seed 4242: every un-steppable rise is the lip of a deliberate mouth or a scarp (0 stray, worst 29 at col 30)
+  PASS: layered_world_gen.gd seed 4242: and the ground falls away in only a few PLACES (2, cap 3)
+  PASS: layered_world_gen.gd seed 4242: ...and every designed scarp actually stands (3 of 3)
+  PASS: layered_world_gen.gd seed 20260807: every un-steppable rise is the lip of a deliberate mouth or a scarp (0 stray, worst 47 at col 119)
+  PASS: layered_world_gen.gd seed 20260807: and the ground falls away in only a few PLACES (1, cap 3)
+  PASS: layered_world_gen.gd seed 20260807: ...and every designed scarp actually stands (3 of 3)
+- worldgen
+  PASS: generated a non-empty world
+  PASS: same seed → identical blocks (deterministic)
+  PASS: a different seed → a different world (ore scatter varies)
+  PASS: surface is earth
+  PASS: deep cells are stone (a new material dropped into generation)
+  PASS: walls generated + deterministic
+  PASS: near-surface wall is dirt
+  PASS: deep wall is stone
+  PASS: sim ingested the world (surface cell is solid)
+  PASS: mining cleared the block
+  PASS: the background wall survives mining the block
+- layered worldgen
+  PASS: same seed → identical blocks (deterministic, caves + veins)
+  PASS: a different seed → a different world
+  PASS: caves carved open cells in the rock (3540)
+  PASS: every carved cell kept its wall (Terraria room, not void)
+  PASS: no undirected cave breached the near-surface base (0 cells)
+  PASS: ...but the lid does have doors in it (15 columns)
+  PASS: solid >> cave: UNDIRECTED cave stays opt-in punctuation (16.0% of below-surface)
+  PASS: ...and the underground is solid-dominant all in (25.8% open, routes included)
+  PASS: ore is depth-banded: more deep than shallow (deep=1253, shallow=541)
+  PASS: found a carved cave cell to probe
+  PASS: a carved cave loads as open (not solid)
+  PASS: the carved cave still shows its background wall
+  PASS: aquifers seeded some water (159 cells)
+  PASS: aquifer water exists (159 watered cells)
+  PASS: no aquifer water in the base-safe band (all deep, base stays dry)
+  PASS: every water level is valid (1..WATER_MAX)
+  PASS: no watered cell is solid or in the seal band (water only in carved cells)
+  PASS: same seed → identical aquifer water (deterministic)
+  PASS: load_world ingested the aquifer water (total=1272)
+  PASS: sim.water matches the generated world's water grid exactly
+  PASS: aquifer walls are lined with rich_ore (the reward guarded by the flood; 32 water cells touch it)
+  PASS: every aquifer-wall rich_ore cell carries a real deposit amount (25 cells, all valid)
+  PASS: aquifer rich_ore is only in solid rock, never in the flooded cells
+- worldgen fuzz (seeds × sizes)
+  PASS: fuzzed the whole matrix (60 worlds = 12 seeds × 5 sizes)
+  PASS: in-bounds: every grid key is within (cols,rows) — OK
+  PASS: base-safe: no cave/water in any column's near-surface band — OK
+  PASS: seal intact: full-width sealrock where the world contains the seal — OK
+  PASS: no water in rock: no cell is both solid and watered — OK
+  PASS: water levels valid: every level in 1..WATER_MAX — OK
+  PASS: water deep: every water cell below the base-safe + aquifer band — OK
+  PASS: determinism: same (seed,size) → identical grids — OK
+  PASS: load-clean: ingests without error, water/items conserved — OK
+  PASS: lode legal: every generated vein is behind host rock, dry, out of the seal, walled — OK
+  PASS: lode richness: every generated vein carries a positive deposit — OK
+  PASS: lode load-clean: the plane ingests whole — count, material and a positive lode_max — OK
+  PASS: the both-tier arm actually ran on every production-size world (12 of 12 seeds)
+  PASS: usable buried lode in BOTH tiers, every seed: buried → clear the rock → workable → yields ore — OK
+- horizontal ore pull (frontier richness)
+  PASS: same seed → identical blocks (horizontal field is deterministic)
+  PASS: same seed → identical per-cell deposits (deterministic richness)
+    seed 1337       frontier 112-127    34.8 vs   21.1 = 1.65x   rock 636/682   (old total 1.51x)
+    seed 0          frontier 112-127    53.8 vs   16.8 = 3.19x   rock 763/666   (old total 3.85x)
+    seed 1          frontier 112-127    54.1 vs   14.5 = 3.74x   rock 813/480   (old total 6.59x)
+    seed 7          frontier 112-127    39.5 vs   15.9 = 2.48x   rock 719/731   (old total 4.04x)
+    seed 42         frontier 112-127    41.2 vs   14.0 = 2.93x   rock 476/762   (old total 1.78x)
+    seed 99999      frontier 112-127    48.3 vs   14.8 = 3.27x   rock 682/700   (old total 3.93x)
+    seed 20260807   frontier 112-127    35.9 vs   28.8 = 1.25x   rock 358/704   (old total 1.13x)
+    seed 314159     frontier 112-127    51.9 vs   18.8 = 2.76x   rock 567/578   (old total 2.94x)
+    seed 2          frontier 112-127    42.7 vs   12.7 = 3.36x   rock 590/626   (old total 3.36x)
+    seed 123456789  frontier 112-127    34.9 vs   26.1 = 1.34x   rock 741/609   (old total 1.65x)
+    seed 555        frontier 112-127    31.9 vs   10.4 = 3.05x   rock 754/498   (old total 5.39x)
+    seed 88888      frontier 112-127    52.0 vs   12.2 = 4.27x   rock 777/536   (old total 7.46x)
+  PASS: every seed puts ore in the measured band (12 of 12)
+  PASS: the frontier is richer than spawn on every seed (12 of 12)
+  PASS: the frontier richness edge is a meaningful margin on every seed — worst 1.246x on seed 20260807 (floor 1.15x)
+  PASS: the horizontal multiplier stays bounded by HORIZONTAL_STRENGTH (subtle, never nukes spawn)
+- rich ore + the blast furnace (#48)
+  PASS: worldgen seeded rich veins (1046 cells)
+  PASS: rich ore stays a DEEP find (none far above the band; 0 strays)
+  PASS: rich ore wants the tier-2 pick (the shelf's own gate)
+  PASS: the Blast Furnace gates on Enrichment
+  PASS: the Blast Furnace refuses before Enrichment
+  PASS: Enrichment researches (rich-ore sample + 4 iron ingots)
+  PASS: …and the Blast Furnace crafts (2 plate + 1 gear)
+  PASS: 3 rich ore poured in came out 6 ingots ({ &"ingot": 6 })
+  PASS: rich_ore conserved through enrichment (present=0, net=0)
+  PASS: ingot conserved through enrichment (present=6, net=6)
+  PASS: plate conserved through enrichment (present=0, net=0)
+  PASS: gear conserved through enrichment (present=0, net=0)
+  PASS: iron_ingot conserved through enrichment (present=0, net=0)
+[fine terrain]
+  PASS: fine grid is SUBDIV× the coarse grid
+  PASS: same seed → identical fine array (deterministic)
+  PASS: the fine grid has solid rock in it (164985 cells)
+  PASS: fine molding bends the coarse boundary (8191 fine cells differ from coarse)
+  PASS: coarse solid grid identical across loads (fine is additive)
+  PASS: coarse solid == the ingested WorldData blocks (unchanged by fine)
+  PASS: a known coarse-solid cell is still solid
+  PASS: material_at unchanged by the fine layer
+  PASS: found a solid cell with open air below to mine
+  PASS: mining re-molds the 4×4 fine block toward air (was 14, now 1)
+  PASS: …and the coarse cell is open (coarse still authoritative)
+  PASS: incremental dig-sync == a full rebuild (no drift)
+  PASS: the scarred world restores
+  PASS: load rebuilds byte-identical fine terrain (derived, unsaved)
+  PASS: coarse terrain round-trips exactly
+ALL PASS (worldgen tests)

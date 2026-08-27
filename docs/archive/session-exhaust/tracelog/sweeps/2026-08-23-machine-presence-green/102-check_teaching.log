@@ -1,0 +1,39 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== does the game teach what it actually does ==
+  19 hints (12 on pickup, 7 on the situation); 47 bound key labels
+  PASS: every hint has its own id (0 collisions)
+  the hints tell you to press: F, R, RMB, S, SPACE, W
+  PASS: every key a hint names is really bound (0 dead)
+  the longest bubble is hard_landing at 123 chars (a 9s read allows about 150)
+  PASS: ...and every bubble is readable in the time it is shown (0 too long)
+  PASS: ...and every id resolves to real text (0 blank)
+  PASS: 12 pickup hints exist to be judged
+  PASS: 7 situation hints exist to be judged
+  PASS: the hints were found to name 6 distinct keys
+  swung under the spur at up to 580 px/s; the line took 1 pivot(s) at its most bent
+  PASS: the first time the line BENDS, the game says what just happened
+  released the line airborne at 307 px/s (the hint wants over 210)
+  PASS: the swing got fast enough in the air to be worth chaining (307 px/s)
+    (chain latched 2 process frame(s) after the situation)
+  PASS: ...and letting go at speed is where the game mentions throwing again
+  dropped 22 rows and landed with 0.14s of stagger
+  PASS: the drop actually cost the landing (0.14s stagger)
+  PASS: ...and a landing that costs your footing is where the game offers the rope
+  a second run through the same three moments taught 0 more thing(s)
+  PASS: ...and none of it is ever said twice (5 hints latched, 5 queued)
+  PASS: the sapling is in the pack and selectable (slot 5)
+    (sapling latched 2 process frame(s) after the situation)
+  PASS: picking up a sapling teaches how to plant it
+  PASS: CONTROL: the payoff has NOT fired before anything is planted (if it had, the check below is empty)
+  PASS: the real place verb roots a sapling at (48, 46)
+    (planted latched 1 process frame(s) after the situation)
+  PASS: ...and the renewability lesson UI-05 moved off the pickup lands on the plant that earns it
+  a second plant (refused) taught 0 more thing(s)
+  PASS: ...and it is never said twice
+  PASS: CONTROL: 7 lessons have been given, so there is something for the save to carry (chain, deep_enough, hard_landing, planted, pump, sapling, wrapped)
+  PASS: CONTROL: a fresh hint system starts having taught nothing (this is what a relaunch is)
+  PASS: a save carries which lessons have already been given
+  PASS: ...and marks nothing taught that never was
+  PASS: ...and an unknown id in an old save is dropped rather than latched forever
+check_teaching: PASS (24 asserted) — every technique is taught, once, in real keys, in time to read

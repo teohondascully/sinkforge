@@ -1,0 +1,33 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== the interrupt, and the world underneath it ==
+  PASS: the rig hangs a rope long enough to cross the plate (25 segments)
+  PASS: the reference frame carries no interrupt of its own (waited 146 frames; arrival 0.00, lesson none, 0 queued, hint 0.00)
+  the plate: announced, 74 frames to plateau, _arrival_life 2.17 (full alpha holds 1.42..2.83)
+  PASS: no lesson bubble arrived between the two captures (lesson none, 0 queued, hint alpha 0.00)
+  PASS: the camera has the body at the centre of the frame, which the band is derived from (y=540 of 1080)
+  PASS: the rope was found in both bands (151 across the plate, 151 below it)
+  PASS: the ceremony reached the frame — 0.0554 mean channel change inside the plate against 0.0056 below it
+  PASS: the band below the plate stayed still enough to serve as a control (median 1.7 dE, cap 12.0; mean 11.5 over 151 rows)
+    loud rows in the control band: 21 of 151 over DRIFT_CAP (mechanism UNDETERMINED, see above)
+  PASS: the ceremony's own words were found in the frame (10012 ink pixels)
+  the words: 10012 ink px, reading 47.5 dE against the ground they sit on
+
+  band                         rows   rope med  rope mean  rock mean
+  ACROSS the ceremony           151       10.7       24.5        5.9
+  below it (control)            151        1.7       11.5        1.3
+
+  the rope's own separation from its backing, where nothing is over it: 48.7 dE across the plate, 71.2 dE below it
+  the ceremony takes 4.2x more from the rope than from the rock behind it
+  HELD: [ceremony.words-vs-sky-arm] this run asserted it
+  PASS: the words were found against open sky too (6774 ink pixels at row 30)
+  the words, against open sky: 6774 ink px, 54.6 dE mean, 60.7 dE median (underground: 47.5 mean)
+  the sky's own drift, same band, same length of interval, no plate: 565 px, 16.1 dE mean, 10.0 dE median over 41 rows (at the second reference: hint alpha 0.00, arrival life 0.00)
+  intervals: plate 73 physics frames to plateau, drift control 72 (derived, (3.40 - 2.20)s at 60 ticks/s) — a wide gap between those two means the pair is not a comparison
+  the plate reads 3.4x the drift on the means and 6.0x on the medians
+  SKIP: [ceremony.words-vs-sky] how well the words read against open sky was NOT asserted — the arm now carries a drift floor measured inside its own run — same band, same length of interval, no ceremony — so the reading finally has something in its own units to be a ratio against; what is still owed is the decision about what that ratio must be, and that needs the distribution across several runs, not a bound argued from the first one
+  SKIP: [ceremony.rope-share] how much of the rope an interrupt may take was NOT asserted — no design decision has been made about what the ceremony owes the world it interrupts; a bound guessed before that decision has been wrong four times in this repository
+check_ceremony_reads: PASS (9 asserted) — the plate's effect on the rope is measured against a live control

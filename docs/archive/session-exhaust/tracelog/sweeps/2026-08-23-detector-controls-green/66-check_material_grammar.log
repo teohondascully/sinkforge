@@ -1,0 +1,74 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== dirt and stone have to be different materials, not one material in two colours ==
+    [mg] depth 22 (row 42, THE CLAYBAND): base column 49 at surface row 20; rig offsets [0] -- 18 candidate(s) refused for a depth band that differs there (nearest sat 3 row(s) off), 0 for overlapping a rig already taken
+      [mg-rig] NULL   earth | earth         depth 22 offset  +0: 14 lit of 28  GRAIN  64.3%  ANISO  92.9%
+    [mg] depth 26 (row 46, SHALE REACH): base column 49 at surface row 20; rig offsets [0, 41] -- 0 candidate(s) refused for a depth band that differs there (nearest sat no row(s) off), 17 for overlapping a rig already taken
+      [mg-rig] NULL   earth | earth         depth 26 offset  +0: 19 lit of 28  GRAIN  63.2%  ANISO  63.2%
+      [mg-rig] NULL   earth | earth         depth 26 offset +41: 14 lit of 28  GRAIN  85.7%  ANISO  64.3%
+    [mg] depth 30 (row 50, SHALE REACH): base column 49 at surface row 20; rig offsets [0, 48] -- 7 candidate(s) refused for a depth band that differs there (nearest sat 12 row(s) off), 10 for overlapping a rig already taken
+      [mg-rig] NULL   earth | earth         depth 30 offset  +0: 23 lit of 28  GRAIN  52.2%  ANISO  73.9%
+      [mg-rig] NULL   earth | earth         depth 30 offset +48: 21 lit of 28  GRAIN  61.9%  ANISO  71.4%
+  NULL   earth | earth — 140 mirrored windows pooled over 5 placements, 4x2 cells
+  PASS:   NULL   earth | earth found 140 pairs to judge (floor 30)
+    91 windows lit (mean luma >= 22), 49 dark — median luma lit 51.2, dark 15.9
+    VALUE  left med  +31.584  right med  +29.618  ->  all  54%   LIT  55%   dark  53%
+    CHROMA left med  -21.864  right med  -21.612  ->  all  55%   LIT  58%   dark  52%
+    GRAIN  left med   +0.395  right med   +0.417  ->  all  54%   LIT  58%   dark  53%
+    ANISO  left med   +0.022  right med   +0.019  ->  all  55%   LIT  63%   dark  59%
+    [mg] depth 22 (row 42, THE CLAYBAND): base column 49 at surface row 20; rig offsets [0] -- 18 candidate(s) refused for a depth band that differs there (nearest sat 3 row(s) off), 0 for overlapping a rig already taken
+      [mg-rig] TREAT  earth | stone         depth 22 offset  +0: 21 lit of 28  GRAIN 100.0%  ANISO 100.0%
+    [mg] depth 26 (row 46, SHALE REACH): base column 49 at surface row 20; rig offsets [0, 41] -- 0 candidate(s) refused for a depth band that differs there (nearest sat no row(s) off), 17 for overlapping a rig already taken
+      [mg-rig] TREAT  earth | stone         depth 26 offset  +0: 28 lit of 28  GRAIN  75.0%  ANISO  96.4%
+      [mg-rig] TREAT  earth | stone         depth 26 offset +41: 21 lit of 28  GRAIN  85.7%  ANISO  95.2%
+    [mg] depth 30 (row 50, SHALE REACH): base column 49 at surface row 20; rig offsets [0, 48] -- 7 candidate(s) refused for a depth band that differs there (nearest sat 12 row(s) off), 10 for overlapping a rig already taken
+      [mg-rig] TREAT  earth | stone         depth 30 offset  +0: 25 lit of 28  GRAIN  64.0%  ANISO 100.0%
+      [mg-rig] TREAT  earth | stone         depth 30 offset +48: 21 lit of 28  GRAIN  57.1%  ANISO 100.0%
+  TREAT  earth | stone — 140 mirrored windows pooled over 5 placements, 4x2 cells
+  PASS:   TREAT  earth | stone found 140 pairs to judge (floor 30)
+    116 windows lit (mean luma >= 22), 24 dark — median luma lit 96.8, dark 16.1
+    VALUE  left med  +78.017  right med  +92.994  ->  all  77%   LIT  76%   dark  83%
+    CHROMA left med  -83.809  right med  -72.605  ->  all  91%   LIT  89%   dark 100%
+    GRAIN  left med   +0.324  right med   +0.281  ->  all  80%   LIT  76%   dark 100%
+    ANISO  left med   +0.022  right med   -0.052  ->  all  99%   LIT  98%   dark 100%
+    [mg] depth 22 (row 42, THE CLAYBAND): base column 49 at surface row 20; rig offsets [0] -- 18 candidate(s) refused for a depth band that differs there (nearest sat 3 row(s) off), 0 for overlapping a rig already taken
+      [mg-rig] BASE   earth | stone, ONE GRAMMAR depth 22 offset  +0: 21 lit of 28  GRAIN  57.1%  ANISO  66.7%
+    [mg] depth 26 (row 46, SHALE REACH): base column 49 at surface row 20; rig offsets [0, 41] -- 0 candidate(s) refused for a depth band that differs there (nearest sat no row(s) off), 17 for overlapping a rig already taken
+      [mg-rig] BASE   earth | stone, ONE GRAMMAR depth 26 offset  +0: 28 lit of 28  GRAIN  64.3%  ANISO  64.3%
+      [mg-rig] BASE   earth | stone, ONE GRAMMAR depth 26 offset +41: 22 lit of 28  GRAIN  59.1%  ANISO  63.6%
+    [mg] depth 30 (row 50, SHALE REACH): base column 49 at surface row 20; rig offsets [0, 48] -- 7 candidate(s) refused for a depth band that differs there (nearest sat 12 row(s) off), 10 for overlapping a rig already taken
+      [mg-rig] BASE   earth | stone, ONE GRAMMAR depth 30 offset  +0: 24 lit of 28  GRAIN  62.5%  ANISO  62.5%
+      [mg-rig] BASE   earth | stone, ONE GRAMMAR depth 30 offset +48: 21 lit of 28  GRAIN  61.9%  ANISO  71.4%
+  BASE   earth | stone, ONE GRAMMAR — 140 mirrored windows pooled over 5 placements, 4x2 cells
+  PASS:   BASE   earth | stone, ONE GRAMMAR found 140 pairs to judge (floor 30)
+    116 windows lit (mean luma >= 22), 24 dark — median luma lit 94.8, dark 16.0
+    VALUE  left med  +79.606  right med  +90.507  ->  all  71%   LIT  70%   dark  75%
+    CHROMA left med  -87.416  right med  -67.722  ->  all  91%   LIT  90%   dark 100%
+    GRAIN  left med   +0.324  right med   +0.323  ->  all  54%   LIT  59%   dark  71%
+    ANISO  left med   +0.023  right med   +0.022  ->  all  58%   LIT  52%   dark  88%
+    [mg] depth 22 (row 42, THE CLAYBAND): base column 49 at surface row 20; rig offsets [0] -- 18 candidate(s) refused for a depth band that differs there (nearest sat 3 row(s) off), 0 for overlapping a rig already taken
+      [mg-rig] TREAT  earth | stone, TOOTH OFF depth 22 offset  +0: 21 lit of 28  GRAIN  57.1%  ANISO  85.7%
+    [mg] depth 26 (row 46, SHALE REACH): base column 49 at surface row 20; rig offsets [0, 41] -- 0 candidate(s) refused for a depth band that differs there (nearest sat no row(s) off), 17 for overlapping a rig already taken
+      [mg-rig] TREAT  earth | stone, TOOTH OFF depth 26 offset  +0: 28 lit of 28  GRAIN  57.1%  ANISO  53.6%
+      [mg-rig] TREAT  earth | stone, TOOTH OFF depth 26 offset +41: 21 lit of 28  GRAIN  71.4%  ANISO  52.4%
+    [mg] depth 30 (row 50, SHALE REACH): base column 49 at surface row 20; rig offsets [0, 48] -- 7 candidate(s) refused for a depth band that differs there (nearest sat 12 row(s) off), 10 for overlapping a rig already taken
+      [mg-rig] TREAT  earth | stone, TOOTH OFF depth 30 offset  +0: 21 lit of 28  GRAIN  52.4%  ANISO  71.4%
+      [mg-rig] TREAT  earth | stone, TOOTH OFF depth 30 offset +48: 20 lit of 28  GRAIN  50.0%  ANISO  95.0%
+  TREAT  earth | stone, TOOTH OFF — 140 mirrored windows pooled over 5 placements, 4x2 cells
+  PASS:   TREAT  earth | stone, TOOTH OFF found 140 pairs to judge (floor 30)
+    111 windows lit (mean luma >= 22), 29 dark — median luma lit 89.2, dark 8.8
+    VALUE  left med  +68.781  right med  +78.255  ->  all  76%   LIT  75%   dark  83%
+    CHROMA left med  -83.845  right med  -67.642  ->  all  90%   LIT  87%   dark 100%
+    GRAIN  left med   +0.346  right med   +0.325  ->  all  66%   LIT  58%   dark 100%
+    ANISO  left med   +0.034  right med   +0.021  ->  all  69%   LIT  68%   dark  72%
+  DISQUALIFIED: ANISO separates the NULL rig at 63% (ceiling 62%) — it is reading something other than material, so it cannot carry a verdict about material
+  PASS: at least one structure cue survived its own null rig (1 of 2)
+  PASS: CONTROL: the two slabs really are different materials — colour tells them apart 89% of the time. If this ever falls the rig broke, not the grammar
+  PASS: 116 of the sampled windows are bright enough for a material to be visible in (floor 30)
+  PASS: STRUCTURE, colour removed: dirt and stone are tellable apart 75.86% of the time over 116 lit windows (floor 75.00%, a coin is 50%) — this is TR-02's actual subject
+  BASELINE: with one grammar for both materials, structure reads 59% in the lit band; with the grammar it reads 76%. Both paired, both lit — the comparison the ticket wants.
+  MECHANISM: structure reads 76% with the tooth on and 69% with it off — a large gap here means the material grammar is being overpainted by an isotropic pass, not that it is absent from the bake
+check_material_grammar: PASS (8 asserted) — structure 76%, colour 89%, null 58%

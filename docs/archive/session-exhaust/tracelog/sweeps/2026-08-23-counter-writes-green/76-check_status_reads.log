@@ -1,0 +1,14 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== every status the sim can report has a look ==
+  PASS: all 10 statuses the sim can report have a look
+  PASS: no look describes a status the sim cannot return
+  PASS: no two different jobs share a mark
+  PASS: the need bubble only appears where an item is the answer
+  PASS: every job that reaches the bubble has a glyph to put in it
+  PASS: no glyph is drawn for a job nothing can report
+  PASS: every look carries colour, mark, fix and feeds
+  PASS: the scan read 10 statuses out of the sim
+  PASS: the statuses wear 7 different marks, so the geometry channel carries real information
+  10 statuses, 7 marks, 6 distinct jobs
+check_status_reads: PASS (9 asserted) — the sim's vocabulary and the renderer's table are the same set

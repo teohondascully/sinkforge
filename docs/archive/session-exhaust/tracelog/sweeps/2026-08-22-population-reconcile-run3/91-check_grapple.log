@@ -1,0 +1,16 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== grapple check ==
+  PASS: a shot at the ceiling ANCHORS
+  PASS: it plants fast (10 <= 12 frames)
+  PASS: it anchored in a genuinely solid cell
+  PASS: cutting the line stows it
+  PASS: a shot that hits nothing runs out of line and stows
+  chasm: released=true, body ended at cell (36, 23) (far lip is col 32), on_floor=true
+  momentum: launched at 420 px/s, 372 px/s 30f later (kept 0.89, on_floor=false)
+  swing top speed = 2.80 x RUN_SPEED (floor 1.15)  |  reel lift = 6.8 cells (floor 3.0)
+  PASS: a pumped swing beats walking (2.80x >= 1.15x)
+  PASS: reeling in lifts the body against gravity (6.8 >= 3.0 cells)
+  PASS: a 10-cell chasm no jump can clear is crossed by swinging it
+  PASS: speed built on the line SURVIVES the release (0.89 >= 0.72 of it, 30f later)
+GRAPPLE OK

@@ -1,0 +1,141 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== the HUD must not print on top of itself ==
+  PASS: the bare screen: all 4 panels are on screen
+  PASS: the bare screen: no two panels collide
+  PASS: paused: all 5 panels are on screen
+  PASS: paused: no two panels collide
+  PASS: running fast (the ▶▶ chip beside the depth readout): all 5 panels are on screen
+  PASS: running fast (the ▶▶ chip beside the depth readout): no two panels collide
+  PASS: a machine hovered (the inspector under FORGED): all 5 panels are on screen
+  PASS: a machine hovered (the inspector under FORGED): no two panels collide
+  PASS: running fast AND hovering at once: all 6 panels are on screen
+  PASS: running fast AND hovering at once: no two panels collide
+  PASS: the minimap up: all 5 panels are on screen
+  PASS: the minimap up: no two panels collide
+  PASS: a stratum arrival, map up: all 6 panels are on screen
+  PASS: a stratum arrival, map up: no two panels collide
+  PASS: the BIG map up (M twice): all 3 panels are on screen
+  PASS: the BIG map up (M twice): no two panels collide
+  PASS: a stratum arrival, BIG map up: all 3 panels are on screen
+  PASS: a stratum arrival, BIG map up: no two panels collide
+  PASS: the BIG map WITH a machine hovered: all 3 panels are on screen
+  PASS: the BIG map WITH a machine hovered: no two panels collide
+  PASS: PAUSED during a stratum arrival: all 6 panels are on screen
+  PASS: PAUSED during a stratum arrival: no two panels collide
+  PASS: the Bazaar open: all 17 panels are on screen
+  PASS: the dashboard open: all 1 panels are on screen
+  PASS: the help overlay: all 1 panels are on screen
+  PASS: settings open: all 3 panels are on screen
+  PASS: every CONTROLS line fits its 228px column (widest 226px)
+  PASS: the card carries 25 lines and the widest uses 99% of its column — there was text to measure
+  PASS: AUDIO settled before it was measured (0.00px from its target height)
+  PASS: settings AUDIO registered 8 clickable controls (at least 8, or it never opened)
+  PASS: settings AUDIO: all 8 clickable controls are on screen
+  PASS: ...and every one sits on the 432x210 plate that owns them
+  PASS: settings AUDIO: the same check catches one more once one is pushed off the bottom (0 -> 1)
+  PASS: CONTROLS settled before it was measured (0.47px from its target height)
+  PASS: settings CONTROLS registered 26 clickable controls (at least 25, or it never opened)
+  PASS: settings CONTROLS: all 26 clickable controls are on screen
+  PASS: ...and every one sits on the 432x273 plate that owns them
+  PASS: settings CONTROLS: the same check catches one more once one is pushed off the bottom (0 -> 1)
+  PASS: FEEL settled before it was measured (0.48px from its target height)
+  PASS: settings FEEL registered 6 clickable controls (at least 6, or it never opened)
+  PASS: settings FEEL: all 6 clickable controls are on screen
+  PASS: ...and every one sits on the 432x196 plate that owns them
+  PASS: settings FEEL: the same check catches one more once one is pushed off the bottom (0 -> 1)
+  PASS: the three faces register 40 controls between them (the old single page: 26)
+  PASS: the big-map state drew the LARGE map: 278x278, past the 150x116 corner box
+  PASS: the big map has nothing buried under it
+  PASS: the bare screen drew the pack bar along the bottom ([P: (297.0, 295.0), S: (46.0, 44.0)]) — there was something to stand down
+  PASS: the pack bar stands down while the big map is up (found [P: (181.0, 41.0), S: (278.0, 278.0)])
+  PASS: the bare screen drew the goal plate at top-centre ([P: (173.0, 8.0), S: (294.0, 37.0)]) — there was something to suppress
+  PASS: the big map suppresses the goal plate (found [P: (0.0, 0.0), S: (0.0, 0.0)])
+  PASS: hovering a machine drew MORE panels than the bare screen (5 vs 4) — the cursor reached it
+  PASS: ...and the extra panel is the inspector, at its 218px floor or wider ([P: (410.0, 44.0), S: (218.0, 50.0)])
+  PASS: the big-map-plus-hover state drew the LARGE map (278x278)
+  PASS: the inspector stands down under the big map
+  PASS: the fixture put 5 item types in the pack and the bar saw 5 (got 5)
+  PASS: a pack of 5 draws wells that are whole, disjoint and inside their own backing — 5 wells, x 237..403, backing [P: (229.0, 295.0), S: (182.0, 44.0)]
+  PASS: ...and the selected well is lit
+  PASS: ...and the name plate was drawn ([P: (337.0, 279.0), S: (34.0, 15.0)])
+  PASS: a pack of 13 types reports 13 carried (got 13)
+  PASS: ...and a short window still draws whole, disjoint wells inside their backing — 10 wells, x 152..488, backing [P: (144.0, 295.0), S: (352.0, 44.0)]
+  PASS: selecting the 15th of 15 types still lights a DRAWN well (window starts at 5)
+  PASS: ...because the window scrolled to contain it (starts at 5)
+  PASS: ...and its name plate sits over the bar, not off the end of it (plate [P: (448.5, 279.0), S: (49.0, 15.0)] vs bar [P: (144.0, 295.0), S: (352.0, 44.0)])
+  PASS: ...and on the canvas (plate [P: (448.5, 279.0), S: (49.0, 15.0)])
+  PASS: ...and a SCROLLED window's wells are still whole, disjoint and on their backing — 10 wells, x 152..488, backing [P: (144.0, 295.0), S: (352.0, 44.0)]
+  PASS: CONTROL: with the map closed, the arrival plate registers exactly one panel in its band (1)
+  PASS: CONTROL: with the map closed the plate's clock RUNS (0.036 of 3.4 used)
+  PASS: the arrival plate draws NOTHING once the big map opens under it (0 panels in its band)
+  PASS: ...and it is HELD, not spent: 3.364 s left before the map opened, 3.364 s after four frames
+  PASS: ...and it comes back when the map closes, with its remaining life intact (3.328 s)
+  PASS: CONTROL: a lesson reaches full opacity with the announce channel free
+  PASS: CONTROL: with no ceremony up, the lesson's clock RUNS (8.771 -> 8.670)
+  PASS: CONTROL: the ceremony is still up at the end of the window measured under it (3.279 s of 3.4 left)
+  PASS: a lesson draws nothing while the ceremony owns the channel (alpha 0.00)
+  PASS: ...and it is HELD rather than dropped: the same lesson is still the active one
+  PASS: ...with its clock stopped, not burning down unseen (8.670 -> 8.670)
+  PASS: ...and the same lesson returns at full opacity once the channel is free (alpha 1.00)
+  PASS: there are 19 lessons to measure (if this collapses, everything below passes empty)
+    lessons: 19 measured, tallest 47px (ceiling 52), largest 3.92% of canvas (chain)
+  PASS: every lesson fits the 52px tutorial ceiling
+  PASS: CONTROL: a deliberately over-long lesson measures 71px and would fail this ceiling
+  PASS: CONTROL: a one-word lesson measures 23px, so the ceiling is not simply above everything
+  PASS: the HUD reports 30 _draw* methods to classify (if this collapses, everything below passes empty)
+  PASS: every drawing surface is classified by UI-07
+  PASS: ...and the table names nothing that has been deleted
+    helpers: critical 4 · active 3 · discoverable 6 · ambient 5 · internal 12
+  PASS: CONTROL: the tags are actually distributed, not all one bucket (critical 4 active 3 discoverable 6 ambient 5 internal 12)
+    widest arrival plate: "THE LONG DARK" -> 160px of text, core [P: (206.1, 61.6), S: (227.8, 50.0)]
+  PASS: CONTROL: the widest band name measures 160px (a zero here empties the check)
+  PASS: the PAUSED chip [P: (10.0, 60.0), S: (104.0, 22.0)] clears the arrival plate's widest possible core [P: (206.1, 61.6), S: (227.8, 50.0)] — two criticals, one strip
+  PASS: the probe flag is off once the matrix has finished with it
+  PASS: the probe records while it is on — 18 panels, hotbar yes (if this fails the check below means nothing)
+  PASS: ...and records NOTHING while it is off — 0 panels, hotbar no
+    footprint = union area of HUD PANELS / canvas. Panels only — bare draw_rect/draw_string
+    (chips, legends, glyphs, loose text) are NOT counted, so each figure is a LOWER BOUND.
+    NOT a test of "~85-90% of the interface floats above the world": that is composition
+    (screen-space vs diegetic), a different population, from a subjective audit.
+    footprint    7.84%  the bare screen
+    footprint    8.84%  paused
+    footprint    8.46%  running fast (the ▶▶ chip beside the depth readout)
+    footprint   12.55%  a machine hovered (the inspector under FORGED)
+    footprint   13.17%  running fast AND hovering at once
+    footprint   14.30%  the minimap up
+    footprint   19.22%  a stratum arrival, map up
+    footprint   35.79%  the BIG map up (M twice)
+    footprint   35.79%  a stratum arrival, BIG map up
+    footprint   35.79%  the BIG map WITH a machine hovered
+    footprint   13.75%  PAUSED during a stratum arrival
+    footprint   69.17%  the Bazaar open
+    footprint   40.49%  the dashboard open
+    footprint   52.53%  the help overlay
+    footprint   39.38%  settings open
+  PASS: the bare screen was measured for footprint
+  PASS: ...and it is not zero (7.8% of the canvas is HUD panel)
+  PASS: ...and every modal covers more than the bare screen
+  PASS: ...and no larger than the day the T2.1 subtractions landed (7.84% vs ceiling 8.00%)
+  PASS: the matrix drew 73 panels across 15 states, so there was geometry to judge
+  PASS: every state drew a different screen from every other
+  PASS: all 3 declared identities in the big-map group really are identical (3)
+  PASS: the PACK counter stopped moving before it was measured (0.50px from its asking height)
+  PASS: the PACK rail drew 7 boxes in the counter's 56px left column (at least 7 — short means the counter never opened, or a slot has been pushed off the bottom of it)
+  PASS: ...and PACK is the lit tab, so one box in the column is larger than the rest ([P: (25.0, 93.0), S: (38.0, 38.0)])
+  PASS: the PACK rail's 7 boxes do not print over each other
+  PASS: ...and the same sweep catches one more once a 14x14 box is dropped on the tile (0 -> 1)
+  PASS: the WORKS counter stopped moving before it was measured (0.46px from its asking height)
+  PASS: the WORKS rail drew 7 boxes in the counter's 56px left column (at least 7 — short means the counter never opened, or a slot has been pushed off the bottom of it)
+  PASS: ...and WORKS is the lit tab, so one box in the column is larger than the rest ([P: (25.0, 159.08), S: (38.0, 38.0)])
+  PASS: the WORKS rail's 7 boxes do not print over each other
+  PASS: ...and the same sweep catches one more once a 14x14 box is dropped on the tile (0 -> 1)
+  PASS: the BENCH counter stopped moving before it was measured (0.47px from its asking height)
+  PASS: the BENCH rail drew 7 boxes in the counter's 56px left column (at least 7 — short means the counter never opened, or a slot has been pushed off the bottom of it)
+  PASS: ...and BENCH is the lit tab, so one box in the column is larger than the rest ([P: (25.0, 190.0), S: (38.0, 38.0)])
+  PASS: the BENCH rail's 7 boxes do not print over each other
+  PASS: ...and the same sweep catches one more once a 14x14 box is dropped on the tile (0 -> 1)
+check_hud_layout: PASS (112 asserted) — every panel is on screen, and the furniture does not collide

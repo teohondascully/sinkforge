@@ -1,0 +1,10 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the rock tells you what is behind it ==
+  approach (8 cells out → 1): 0.00, 0.00, 0.00, 0.00, 0.16, 0.48, 0.96, 1.00
+  PASS: the tell is up 3 cells out (0.48, floor 0.30)
+  PASS: ...and it only ever climbs on approach (no false peak to walk away from)
+  PASS: the last face before the void clears the breach beat (1.00 >= 0.45)
+  PASS: solid rock says nothing (loudest 0.00 at , ceiling 0.02)
+  PASS: it answers the swing, not the standing spot (into 0.96 vs away 0.00)
+check_tells: PASS — the tell rises on approach and stays silent in solid rock

@@ -1,0 +1,8 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== can you tell what happened with your eyes shut ==
+  20 one-shots, 30869 samples in the longest
+  the closest pair in the whole library is drip/clunk at 0.201
+  8 looping beds; the worst seam steps 2.6x its own signal
+  the winch runs -60 dB idle and -17 dB hauling; the line -60 / -22
+check_voice: PASS — every event has a voice, and no two share one

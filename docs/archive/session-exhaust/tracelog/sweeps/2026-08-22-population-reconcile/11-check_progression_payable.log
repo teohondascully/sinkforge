@@ -1,0 +1,52 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the tree is payable in order ==
+  PASS: the machine catalogue was read (20 defs)
+  PASS: the material catalogue was read (16 raw items)
+  PASS: the research tree was read (11 rungs)
+== the bootstrap ==
+  PASS: the world stands up machines for you: processor
+  PASS: WITHOUT that gift the first ingot is unreachable — the Processor that makes ingots costs ingots
+  PASS: …and WITH it the loop opens, which is the whole job the seeded forge is doing
+== every rung, paid for by the rungs below it ==
+  PASS: "automation" costs 2x ingot and you can make all of it by the time you get there
+  PASS: …and its sample (ore) is something you can be holding
+  PASS: …and the drill it unlocks costs 2x ingot, which you can also make
+  PASS: …and the hopper it unlocks costs 3x ingot, which you can also make
+  PASS: "prospecting" costs 4x ingot and you can make all of it by the time you get there
+  PASS: …and its sample (ore) is something you can be holding
+  PASS: "crosscutting" costs 5x ingot and you can make all of it by the time you get there
+  PASS: …and its sample (ore) is something you can be holding
+  PASS: …and the spur it unlocks costs 1x ingot, which you can also make
+  PASS: "power" costs 12x ingot and you can make all of it by the time you get there
+  PASS: …and its sample (coal) is something you can be holding
+  PASS: …and the generator it unlocks costs 3x ingot, which you can also make
+  PASS: …and the conduit it unlocks costs 1x ingot, which you can also make
+  PASS: …and the lift it unlocks costs 4x ingot, which you can also make
+  PASS: "descent" costs 8x ingot and you can make all of it by the time you get there
+  PASS: …and its sample (deepslate) is something you can be holding
+  PASS: …and the descent_engine it unlocks costs 6x ingot, which you can also make
+  PASS: "ironworks" costs 10x ingot and you can make all of it by the time you get there
+  PASS: …and its sample (iron) is something you can be holding
+  PASS: …and the iron_forge it unlocks costs 4x ingot + 2x iron, which you can also make
+  PASS: "machining" costs 6x iron_ingot and you can make all of it by the time you get there
+  PASS: …and its sample (iron_ingot) is something you can be holding
+  PASS: …and the plate_press it unlocks costs 2x iron_ingot + 2x ingot, which you can also make
+  PASS: …and the gear_mill it unlocks costs 2x iron_ingot + 2x ingot, which you can also make
+  PASS: …and the h_drill it unlocks costs 2x plate + 2x gear + 2x ingot, which you can also make
+  PASS: "galleries" costs 3x plate + 3x gear and you can make all of it by the time you get there
+  PASS: …and its sample (stone) is something you can be holding
+  PASS: …and the drift_rig it unlocks costs 4x plate + 4x gear + 4x iron_ingot, which you can also make
+  PASS: "packing" costs 2x plate + 2x gear and you can make all of it by the time you get there
+  PASS: …and its sample (stone) is something you can be holding
+  PASS: …and the crusher it unlocks costs 3x plate + 2x gear, which you can also make
+  PASS: "enrichment" costs 4x iron_ingot and you can make all of it by the time you get there
+  PASS: …and its sample (rich_ore) is something you can be holding
+  PASS: …and the blast_furnace it unlocks costs 1x gear + 2x plate, which you can also make
+  PASS: "drainage" costs 4x plate + 2x gear and you can make all of it by the time you get there
+  PASS: …and its sample (iron_ingot) is something you can be holding
+  PASS: …and the pump it unlocks costs 4x ingot, which you can also make
+  PASS: the recipe graph produces something to analyse (5 items)
+  produced: 5 · consumed by another recipe: 5 · DEAD ENDS: gear, plate
+  PASS: no NEW dead end entered the economy
+check_progression_payable: PASS — every rung can be paid for by the time you reach it

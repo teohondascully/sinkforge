@@ -1,0 +1,38 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+  boot bake: 43520 of 262144 fine cells (17%), rect [P: (70, 0), S: (256, 170)]
+  PASS: the boot bake's rect [P: (70, 0), S: (256, 170)] contains the body's fine cell (196, 76)
+  PASS: ...and it is still a SPLIT, not the whole grid (43520 of 262144)
+  PASS: the boot bake left rows outstanding (418)
+  PASS: the pending-fill probe site (42, 27) is solid rock
+  PASS: a dig stays a SMALL region even with 418 rows of fill outstanding (576 cells)
+  PASS: ...and the dig did not drag the outstanding fill along with it (418 rows before, 418 after)
+  PASS: finish_pending drained the outstanding fill and left the grid whole
+  PASS: dig site (64, 30) is solid rock
+  PASS: dig site (25, 38) is solid rock
+  PASS: dig site (39, 23) is solid rock
+  PASS: dig site (89, 35) is solid rock
+  PASS: dig site (90, 35) is solid rock
+  dig rebaked 576 fine cells (limit 4096, full grid ~262144)
+  PASS: a dig triggered a fine rebake
+  PASS: a single dig rebakes a SMALL region, not the whole grid (no freeze)
+  PASS: the DEAREST dig of the set, including the multi-cell one, still rebakes a small region (672 <= 4096)
+  HELD: [dig-hitch.byte-identity] this run asserted it
+  PASS: both textures read back at full size (got 1048576, ref 1048576, expected 1048576)
+  PASS: the baked texture carries real variation, so the comparison below could actually fail (108 distinct sampled values)
+  PASS: region bake is byte-identical to a full bake of the same world (margin is safe)
+  PASS: the sim handed over a full fine grid to time the bulk path against (262144 bytes)
+  COST full bake 1398.47 ms / 262144 cells (5.335 us/cell)
+  COST full bake, BULK fine grid 1234.69 ms (4.710 us/cell) — 1.13x the per-cell Callable path
+  PASS: handing the fine grid over whole is not SLOWER than reading it a cell at a time (1234.69 vs 1398.47 ms)
+  COST dig region 3.37 ms / 576 cells (5.851 us/cell)
+  COST per-cell region/full = 1.097 (gate 3.00), best of 3 each; total ratio 0.0024
+  PASS: the timed pair really is full-grid vs region, and the region baked something (262144 vs 576 cells)
+  PASS: a dig's bake costs no more PER CELL than a full bake — the fast lane is fast in TIME, not just small in extent (1.097 <= 3.00)
+  (absolute ms budget not asserted: SF_DIG_BUDGET_MS unset — the per-cell ratio is what CI enforces)
+check_dig_hitch: PASS
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)

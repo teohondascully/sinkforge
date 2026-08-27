@@ -1,0 +1,18 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: FactorySim's field list was read (36 script variables)
+== the partition ==
+  PASS: the envelope carries real sim fields (20 of them)
+  PASS: no envelope key names a field that no longer exists
+  PASS: every FactorySim field is either SAVED or declared NOT_SAVED with a reason
+  PASS: no NOT_SAVED entry names a field that has been deleted
+  PASS: no field is both saved and declared unsaved
+  (20 saved · 16 declared not-saved · 36 total)
+== no leak across a load ==
+  PASS: the dirty sim and a fresh one disagree about 20 fields before the load
+  PASS: the envelope restores into the dirty sim
+  PASS: …and into the fresh one
+  PASS: after the load both sims hold IDENTICAL state in all 36 fields — nothing leaked from the past
+  PASS: the loaded world is one where time does something (water moved)
+  PASS: …and four seep cycles later they are STILL identical
+check_save_frontier: PASS

@@ -1,0 +1,25 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== craftable registry contract ==
+  PASS: _machine_defs_by_id resolves every _craftable entry (19)
+  PASS: _craftable is populated (19 machines)
+  PASS: 'drill' (unlocked by automation) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'hopper' (unlocked by automation) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'spur' (unlocked by crosscutting) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'generator' (unlocked by power) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'conduit' (unlocked by power) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'lift' (unlocked by power) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'descent_engine' (unlocked by descent) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'iron_forge' (unlocked by ironworks) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'plate_press' (unlocked by machining) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'gear_mill' (unlocked by machining) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'h_drill' (unlocked by machining) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'drift_rig' (unlocked by galleries) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'crusher' (unlocked by packing) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'blast_furnace' (unlocked by enrichment) is registered in MainView._craftable — researchable AND placeable
+  PASS: 'pump' (unlocked by drainage) is registered in MainView._craftable — researchable AND placeable
+  PASS: the guard actually walked machine unlocks (15 checked)
+  PASS: every one of the 1 machine kinds the world placed can be drawn in the pack if you pick it up
+  PASS: the fresh world placed 1 machine kinds to check
+  PASS: the same lookup rejects an id that was never registered
+check_craftable_registry: PASS (21 asserted)

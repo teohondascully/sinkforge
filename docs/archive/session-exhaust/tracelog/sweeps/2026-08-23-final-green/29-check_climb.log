@@ -1,0 +1,11 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== rope climb check ==
+  PASS: the rope unrolled the full shaft (10 segments)
+  PASS: body settled at the pit bottom
+  PASS: holding UP rides the rope upward (row 11)
+  PASS: the climb is a glide, never a teleport (max frame rise 1.8px)
+  PASS: releasing mid-rope HANGS in place (drift 0.0px)
+  PASS: holding UP at the rope top HOLDS steady — no un-grip jitter (drift 0.0px)
+  PASS: walked off the rope onto the surface (at (7, 7))
+check_climb: PASS (7 asserted)

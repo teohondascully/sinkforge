@@ -1,0 +1,29 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== mining line-of-sight ==
+  PASS: the exposed wall FACE is mineable
+  PASS: a block BEHIND the face is NOT mineable (can't dig through rock)
+  PASS: a block two-deep behind the wall is NOT mineable
+  PASS: the hidden block is IN REACH yet blocked by line-of-sight (the exact reported bug)
+  PASS: mining the face succeeds
+  PASS: after carving the face, the next layer IS now exposed + mineable
+  PASS: the layer after that is still hidden (carve one at a time)
+  PASS: the cell directly below the body is mineable
+  PASS: the cell two-below (through solid) is NOT mineable
+  PASS: mining straight down one cell succeeds
+  PASS: after digging one down, the next-down IS exposed (shaft deepens one at a time)
+  PASS: the staged block really is solid AND line-of-sight blocked (the setup is what it claims)
+  PASS: a LOS-blocked block is never 'mineable' → the hold-gate won't charge it (no phantom crack loop)
+  PASS: the effective aim is never a solid that would crack forever (eff=(44, 22), mineable)
+  PASS: …it snapped to a face the hold-gate will really charge ((44, 22))
+  PASS: …and the charge breaks it — no phantom crack loop on either face
+-- dig queue (#24 smart mining) --
+  PASS: the drag stroke painted the column + the far dab (marks=4)
+  PASS: a block beyond reach CAN be planned (reach gates work, not intent)
+  PASS: the queue dug (52,23) hands-free
+  PASS: the queue dug (52,24) hands-free
+  PASS: the queue dug (52,25) hands-free
+  PASS: the far mark is UNDUG — reach still gates the work
+  PASS: …and stays in the plan for when you walk over
+  PASS: spent marks left the plan
+ALL MINING-LOS CHECKS PASS

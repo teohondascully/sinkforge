@@ -1,0 +1,43 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the bulk carry cap, on the verb ==
+  PASS: fixture: PACK_BULK_CAP is a positive number of units (90)
+  PASS: fixture: the pack starts exactly at the cap (90)
+  PASS: fixture: ...so it reports no room
+  PASS: THE SWING IS NOT REFUSED — a full pack still breaks the block out of the wall
+  PASS: the pack never exceeds the cap (90 <= 90)
+  PASS: and standing exactly at the cap it took nothing at all (90 -> 90)
+  PASS: CONTROL the burst really happened — the world gave up 3 unit(s) of ore
+  PASS: CONSERVATION every produced unit is in the pack or on the floor (0 + 3 == 3)
+  PASS: ...and with the pack full the overflow is what reached the floor (3 there)
+  PASS: fixture: the spill left a pile to try collecting
+  PASS: A FULL PACK COLLECTS NOTHING from its own spill — otherwise the return trip never happens
+  PASS: ...and the pile is left whole for that trip (3 -> 3)
+  PASS: CONTROL and once there is room the same pile comes up whole (3 of 3)
+  PASS: fixture: the lode face is exposed and workable
+  PASS: fixture: and the pack is at the cap
+  PASS: A FULL PACK TAKES NOTHING FROM THE FACE (returned '')
+  PASS: ...the pack did not grow (90 -> 90)
+  PASS: ...the vein is intact, not drained onto the floor (5 -> 5)
+  PASS: ...and nothing was spilled: a face that keeps its ore has none to spill
+  PASS: CONTROL a pack with room takes the unit from the identical face ('ore')
+  PASS: ...and it is in the pack
+  PASS: fixture: cutting the base brought the whole trunk down (0 left)
+  PASS: THE CASCADE does not push a full pack past the cap (90 <= 90)
+  PASS: ...no felled wood entered a pack with no room for it
+  PASS: ...and it is on the floor: a full pack does not destroy a tree it cannot carry (4 there)
+  PASS: A FULL PACK CANNOT TAKE A PLANTED SAPLING BACK
+  PASS: ...and it is still in the ground, growing, rather than deleted
+  PASS: ...and the pack did not pass the cap
+  PASS: CONTROL a pack with room takes the same sapling back
+  PASS: fixture: a machine def loads for the salvage case
+  PASS: fixture: the machine is placed
+  PASS: fixture: salvage succeeds — the machine is removed either way
+  PASS: SALVAGING a loaded machine does not push a full pack past the cap (90 <= 90)
+  PASS: ...its buffered ore did not enter a pack with no room
+  PASS: ...it went to the floor instead of being deleted with the machine (40 there)
+  PASS: CONTROL an EMPTY pack still fills from the same verb (3 unit(s))
+  PASS: ...and with room to spare nothing was spilled that did not need to be
+  PASS: CONTROL a pickaxe still fits a pack that is full of freight
+  PASS: ...on the very same pack that refuses one more unit of ore
+check_carry_cap: PASS (39 asserted) — a full pack breaks the block, keeps the cap, spills the rest where it can be fetched, and does not pick it straight back up

@@ -1,0 +1,15 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== nameplates: the count is about the factory ==
+  the run is built from Blast Furnace
+  PASS: the fixture stood 3 machines in a run and 1 alone (a plan over nothing proves nothing)
+  PASS: the far reading actually straddles the label radius (1 of 3 machines outside it)
+  PASS: both readings were taken through the same view, so distance is the only variable
+  PASS: both readings produced plates (3 near, 2 far)
+  PASS: standing beside them, every plate counts its whole run
+  PASS: standing beside them, one run publishes one plate
+  PASS: from 5 cells west, every plate counts its whole run
+  PASS: from 5 cells west, one run publishes one plate
+  PASS: the posed run of 3 is collapsed and counted from beside it (read 3)
+  PASS: ...and still reads 3 from 5 cells west, where part of it is outside the label radius (read 3) — this is the assertion the defect failed
+check_nameplate_truth: PASS (10 asserted) — a plate counts its run, not the machines you happen to be near

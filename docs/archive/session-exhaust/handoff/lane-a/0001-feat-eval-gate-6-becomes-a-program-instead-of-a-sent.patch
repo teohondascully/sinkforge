@@ -1,0 +1,681 @@
+From dacfd4c878a12409656ccd7552e3547ab5d8222e Mon Sep 17 00:00:00 2001
+From: teohondascully <121736842+teohondascully@users.noreply.github.com>
+Date: Sun, 23 Aug 2026 16:27:05 -0700
+Subject: [PATCH] feat(eval): gate 6 becomes a program instead of a sentence
+
+The agent-journey evaluation protocol says an actor whose decision policy can reach FactorySim, target
+cells, inventories, resource lists, objective IDs or world-event state makes the run INVALID rather than
+low-scoring. Until now that was prose, and prose cannot be enforced against a script.
+
+TWO ORTHOGONAL RULES, BECAUSE EITHER ALONE IS THEATRE.
+
+Every class_name in this project is a global reachable by bare name from any script, so an actor handed
+the strictest feed imaginable can write FactorySim.new() on its next line and never touch it. Rule 1 reads
+the actor's source and refuses 49 project globals plus 20 engine escapes. The 49 are DERIVED from the tree
+on every run: a hand-written list of forbidden names is correct the day it is written and silently wrong
+after the next class lands, which is the failure this repository keeps finding in its own instruments.
+
+Rule 2 exists because an actor can name nothing forbidden and still be HANDED a live sim, a parameter
+arriving already constructed with its type chosen by the caller. The entry point takes exactly one
+argument and it is the feed.
+
+    clean_actor.gd      VALID
+    leaky_actor.gd      INVALID, 1 name: FactorySim
+    smuggled_actor.gd   INVALID by ARGUMENT COUNT, having named nothing
+    play_agent.gd       INVALID, 6 names and 2 arguments
+
+The last line is the readiness report's finding reproduced by a program rather than by reading, and it is
+not a defect in play_agent.gd. That actor is the deterministic driver and reading the sim is why it is
+cheap enough for a sweep; the protocol's reachability oracle is privileged for the same good reason. The
+judged actor is a different actor, which is the whole point.
+
+CONTROLS THAT TRAVEL INSIDE THE CHECK, run every time rather than once elsewhere, because a boundary
+checker whose ability to say no was established somewhere else can rot into a rubber stamp between runs.
+
+Both controls were wrong first, and the record is worth more than the fix. A fresh worktree has no
+.godot, so every class_name fails to resolve, the smuggler fixture would not compile, and "did not parse"
+was printed as "refused by its signature" -- a real rejection that meant nothing. And a script that fails
+to parse still loads as an object with an empty method list, which the first version reported as "no
+entry point", which would have sent an author to add one they already had. The rules return a REASON now
+and the controls assert which rule fired, not merely that something did.
+
+The evaluation remains INVALID: one gate of six. Two are unmeasured and one is satisfied over a smaller
+population than it names. Nothing here is registered in the harness, by instruction.
+---
+ tools/eval/LANE.md                        |  77 ++++++
+ tools/eval/check_actor_boundary.gd        | 303 ++++++++++++++++++++++
+ tools/eval/check_actor_boundary.gd.uid    |   1 +
+ tools/eval/fixtures/clean_actor.gd        |  22 ++
+ tools/eval/fixtures/clean_actor.gd.uid    |   1 +
+ tools/eval/fixtures/leaky_actor.gd        |  20 ++
+ tools/eval/fixtures/leaky_actor.gd.uid    |   1 +
+ tools/eval/fixtures/smuggled_actor.gd     |  19 ++
+ tools/eval/fixtures/smuggled_actor.gd.uid |   1 +
+ tools/eval/player_feed.gd                 |  98 +++++++
+ tools/eval/player_feed.gd.uid             |   1 +
+ 11 files changed, 544 insertions(+)
+ create mode 100644 tools/eval/LANE.md
+ create mode 100644 tools/eval/check_actor_boundary.gd
+ create mode 100644 tools/eval/check_actor_boundary.gd.uid
+ create mode 100644 tools/eval/fixtures/clean_actor.gd
+ create mode 100644 tools/eval/fixtures/clean_actor.gd.uid
+ create mode 100644 tools/eval/fixtures/leaky_actor.gd
+ create mode 100644 tools/eval/fixtures/leaky_actor.gd.uid
+ create mode 100644 tools/eval/fixtures/smuggled_actor.gd
+ create mode 100644 tools/eval/fixtures/smuggled_actor.gd.uid
+ create mode 100644 tools/eval/player_feed.gd
+ create mode 100644 tools/eval/player_feed.gd.uid
+
+diff --git a/tools/eval/LANE.md b/tools/eval/LANE.md
+new file mode 100644
+index 0000000..8378e80
+--- /dev/null
++++ b/tools/eval/LANE.md
+@@ -0,0 +1,77 @@
++# Lane A — agent-journey readiness prototype
++
++    worktree     /tmp/sinkforge-agent-journey-eval   (detached, created from main at 4b7e160)
++    owner        the canonical session; one owner, no second writer
++    expiry       delete once its patch and receipts are archived, or on the director's next review,
++                 whichever comes first. It is a laboratory and not a product line.
++    merge gate   integration only when gate 6 is mechanically enforced, gates 2 to 5 have evidence, and
++                 the first manual pilot produces a valid receipt. Cherry-pick reviewed commits; never
++                 merge this worktree wholesale.
++
++## What this lane may touch
++
++The player-visible feed and adapter, actor calibration, loop detection, scenario and receipt schemas,
++readiness checks, journey orchestration, evaluation documentation, and tests for those. **Not** `scenes/`,
++`src/`, gameplay behaviour, Freight or sink design, HUD or terrain presentation, harness thresholds, the
++canonical harness registry, canonical captures, or user saves.
++
++**Nothing here is registered in `tools/run_harness.sh`.** The director's instruction is that this lane must
++not become a per-commit green, and a readiness check that runs on every commit stops being read.
++
++## Gate 6 — DONE, and it is the only gate this lane has closed
++
++`docs/AGENT_PLAY_EVALUATION_PROTOCOL.md` gate 6 says an actor whose decision policy can reach `FactorySim`,
++target cells, inventories, resource lists, objective IDs or world-event state makes the evaluation INVALID
++rather than low-scoring. That was a sentence in a document. It is now a program:
++
++    bash tools/with_machine.sh --headless --script res://tools/eval/check_actor_boundary.gd -- <actor.gd>
++
++    tools/eval/player_feed.gd              pixels, screen size, audio flag, the verb vocabulary, screen-space
++                                           pointing, and an input log. Nine public methods, no world state.
++    tools/eval/check_actor_boundary.gd     two orthogonal rules and four controls
++    tools/eval/fixtures/clean_actor.gd     negative control: pixels only
++    tools/eval/fixtures/leaky_actor.gd     positive control for the name rule
++    tools/eval/fixtures/smuggled_actor.gd  positive control for the signature rule
++
++**Rule 1, the names.** Every `class_name` in this project is a global reachable by bare name from any
++script, so a perfect feed prevents nothing on its own. The denylist is 49 names DERIVED from the source
++tree each run plus 20 enumerated engine escapes, because a hand-written list is correct on the day it is
++written and quietly wrong afterwards.
++
++**Rule 2, the signature.** An actor that names nothing forbidden can still be HANDED a live sim, since a
++parameter arrives already constructed and its type is the caller's choice. The entry point takes exactly
++one argument and it is the feed.
++
++**The verdict against the two actors that matter:**
++
++    tools/eval/fixtures/clean_actor.gd   VALID
++    tools/play_agent.gd                  INVALID: reaches MachineDef, MachineState, FactorySim, PlayAgent,
++                                         Player, MainView, and takes two entry arguments
++
++That second line is the readiness report's finding reproduced by a program rather than by reading, and it
++is also the reason `play_agent.gd` must keep its privileges: it is the deterministic driver, not the judged
++actor. The protocol's reachability oracle is privileged for the same good reason.
++
++## Two things this lane got wrong first, recorded because they will recur
++
++**A fresh worktree has no `.godot`, so every `class_name` fails to resolve and every fixture fails to
++parse.** The smuggler control was refused on its first run and reported as refused BY ITS SIGNATURE. It was
++refused because it did not compile. Import the worktree before believing any result from it.
++
++**A script that fails to parse still loads as an object with an empty method list**, which the first version
++read as "no entry point". The rejection was right and its reason was invented. Both were fixed by making
++the rule return a REASON and having the control assert which rule fired, rather than that something did.
++
++## Gates still open, and none of them is closed by the above
++
++    1 safe isolation      likely satisfied; wants an explicit receipt rather than an inference
++    2 truthful route      UNMEASURED. Nothing asserts the opening route is completable through
++                          player-facing verbs with no injected inventory
++    3 unmanufactured      UNMEASURED. Has to be established by playing it, not by grep
++    4 legible route       partially satisfied over a SMALLER population than the gate names
++    5 evidence feed       likely satisfied; wants an explicit receipt
++    6 actor boundary      DONE, above
++
++**The evaluation stays INVALID.** One gate closed out of six is not readiness, and the report that said
++"one gate short" was wrong in the other direction: it is one failed, two unmeasured, one narrower than its
++gate. No pilot may be run or scored until all six hold.
+diff --git a/tools/eval/check_actor_boundary.gd b/tools/eval/check_actor_boundary.gd
+new file mode 100644
+index 0000000..5c4f555
+--- /dev/null
++++ b/tools/eval/check_actor_boundary.gd
+@@ -0,0 +1,303 @@
++extends SceneTree
++
++## GATE 6, MADE MECHANICAL. `docs/AGENT_PLAY_EVALUATION_PROTOCOL.md` says an actor whose decision policy
++## can reach `FactorySim`, target cells, inventories, resource lists, objective IDs or world-event state
++## makes the whole evaluation INVALID rather than low-scoring. That is a claim about a program, so a
++## program can settle it, and until something does the gate is a sentence in a document that an actor
++## cannot read.
++##
++## THE THREAT IS NOT A LEAKY FEED, WHICH IS WHY A NARROW FEED PROVES NOTHING ON ITS OWN. Every
++## `class_name` in this project is a GLOBAL, reachable by bare name from any script. An actor handed the
++## strictest feed imaginable can still write `FactorySim.new()` on its next line and never touch it.
++## `tools/eval/fixtures/leaky_actor.gd` does exactly that, in legal GDScript, and it is this file's
++## positive control: if it passes, nothing here is enforcing anything.
++##
++## THE DENYLIST IS DERIVED, NOT WRITTEN DOWN. It is read out of the repository every run, so a class added
++## tomorrow is covered tonight without anyone remembering this file exists. A hand-maintained list of
++## forbidden names would be correct on the day it was written and quietly wrong afterwards, which is the
++## failure this project keeps finding in its own instruments.
++##
++##     bash tools/with_machine.sh --headless --script res://tools/eval/check_actor_boundary.gd -- <actor.gd>
++##
++## Exit 0 the actor is inside the boundary; 1 it is outside; 2 the check could not be performed, which is
++## NOT a pass. Not registered in the harness: the director's instruction is that this lane must not become
++## a per-commit green.
++
++## Reaches outside a script that no denylist of project names would catch. These are engine surfaces, so
++## unlike the project globals they cannot be derived and have to be enumerated; each one is a way to get
++## from a RefCounted with no references to the live scene, the filesystem, or the input layer underneath
++## the feed.
++const ESCAPES: Array[String] = [
++	"get_tree", "get_node", "find_child", "get_parent", "owner",
++	"Engine.", "ClassDB", "ResourceLoader", "ProjectSettings", "instance_from_id",
++	"load(", "preload(", "FileAccess", "DirAccess", "OS.",
++	"RenderingServer", "PhysicsServer2D", "AudioServer", "DisplayServer", "Performance",
++]
++## The feed's own class, and the actor base, are the two names an actor is SUPPOSED to say.
++const ALLOWED_GLOBALS: Array[String] = ["EvalPlayerFeed"]
++## A member on the feed itself whose name reads like privileged state. This catches the feed growing a
++## leak later, which is the direction nobody watches: the denylist above guards the actor, and nothing
++## would guard the object the actor is handed.
++const LEAKY_WORDS: Array[String] = [
++	"sim", "cell", "inventory", "pack", "ore", "lode", "objective", "machine", "world",
++	"coord", "tile", "solid", "resource", "recipe", "target", "route",
++]
++
++
++func _initialize() -> void:
++	var args: PackedStringArray = OS.get_cmdline_user_args()
++	if args.is_empty():
++		printerr("check_actor_boundary: name the actor script to judge")
++		quit(2)
++		return
++	var globals: Array[String] = _project_globals()
++	if globals.size() < 20:
++		printerr("check_actor_boundary: only %d project globals found; the denylist did not build, and an "
++			% globals.size() + "empty denylist passes everything")
++		quit(2)
++		return
++	print("== gate 6: the judged actor may not reach past its feed ==")
++	print("denylist: %d project globals derived from source, %d engine escapes enumerated"
++		% [globals.size(), ESCAPES.size()])
++
++	var fails: int = 0
++	fails += _judge_feed_surface()
++	# THE CONTROLS RUN EVERY TIME AND INSIDE THE SAME PROCESS, not as a separate invocation somebody has to
++	# remember. A boundary checker whose ability to say no is established once, elsewhere, is a boundary
++	# checker that can rot into a rubber stamp between runs.
++	var leaky: Dictionary = _scan("res://tools/eval/fixtures/leaky_actor.gd", globals)
++	var clean: Dictionary = _scan("res://tools/eval/fixtures/clean_actor.gd", globals)
++	# The smuggler names nothing forbidden and must still be refused, by the signature rule rather than by
++	# the denylist. Its control belongs beside the others: a rule whose only exercise is the file it was
++	# written for is a rule nobody will notice going quiet.
++	var smug: Dictionary = _judge_entry("res://tools/eval/fixtures/smuggled_actor.gd")
++	var smug_named: int = int(_scan("res://tools/eval/fixtures/smuggled_actor.gd", globals)["hits"])
++	if String(smug["why"]) == "argc" and smug_named == 0:
++		print("  PASS: CONTROL the smuggler is REJECTED by ARGUMENT COUNT (%s), having named nothing"
++			% smug["detail"])
++	elif bool(smug["ok"]):
++		print("  FAIL: CONTROL the smuggler was ACCEPTED; a second parameter is an unwatched door")
++		fails += 1
++	else:
++		print("  FAIL: CONTROL the smuggler was refused for '%s' (%s), not by the signature rule. %s"
++			% [smug["why"], smug["detail"],
++			"The denylist fired too, so this proves nothing about signatures."
++				if smug_named > 0 else "A refusal for the wrong reason is not enforcement."])
++		fails += 1
++	var clean_entry: Dictionary = _judge_entry("res://tools/eval/fixtures/clean_actor.gd")
++	if bool(clean_entry["ok"]):
++		print("  PASS: CONTROL the pixels-only actor's signature is ACCEPTED (one arg, typed %s)"
++			% clean_entry["detail"])
++	else:
++		print("  FAIL: CONTROL the pixels-only actor's signature was refused for '%s': %s"
++			% [clean_entry["why"], clean_entry["detail"]])
++		fails += 1
++	if int(leaky.get("hits", 0)) > 0:
++		print("  PASS: CONTROL the deliberately leaky actor is REJECTED (%d reach%s: %s)"
++			% [leaky["hits"], "" if int(leaky["hits"]) == 1 else "es", ", ".join(leaky["names"])])
++	else:
++		print("  FAIL: CONTROL the deliberately leaky actor PASSED, so this check cannot say no")
++		fails += 1
++	if int(clean.get("hits", 0)) == 0:
++		print("  PASS: CONTROL the pixels-only actor is ACCEPTED, so the rule is not simply refusing")
++	else:
++		print("  FAIL: CONTROL the pixels-only actor was rejected for %s" % [clean["names"]])
++		fails += 1
++
++	for a: String in args:
++		var path: String = a if a.begins_with("res://") else "res://" + a
++		var r: Dictionary = _scan(path, globals)
++		if int(r.get("error", 0)) != 0:
++			print("  FAIL: %s could not be read, which is not a pass" % path)
++			fails += 1
++			continue
++		if int(r["hits"]) == 0:
++			print("  PASS: %s reaches nothing outside its feed (%d identifiers screened)"
++				% [path, r["screened"]])
++		else:
++			print("  FAIL: %s reaches %d privileged name(s): %s"
++				% [path, r["hits"], ", ".join(r["names"])])
++			fails += 1
++		var ent: Dictionary = _judge_entry(path)
++		if bool(ent["ok"]):
++			print("  PASS: %s is handed exactly one argument and it is typed %s" % [path, ent["detail"]])
++		else:
++			print("  FAIL: %s entry signature refused (%s): %s" % [path, ent["why"], ent["detail"]])
++			fails += 1
++
++	if fails == 0:
++		print("check_actor_boundary: VALID -- the judged actor is inside the boundary")
++		quit(0)
++	else:
++		print("check_actor_boundary: INVALID -- %d failure(s); the protocol says INVALID, not low-scoring"
++			% fails)
++		quit(1)
++
++
++## Every `class_name` declared anywhere in the project. Read from source rather than from `ClassDB`,
++## because the point is the set of names an actor's script can WRITE, and that set is a property of the
++## source tree.
++func _project_globals() -> Array[String]:
++	var out: Array[String] = []
++	var stack: Array[String] = ["res://"]
++	while not stack.is_empty():
++		var dir_path: String = stack.pop_back()
++		var d: DirAccess = DirAccess.open(dir_path)
++		if d == null:
++			continue
++		d.list_dir_begin()
++		var n: String = d.get_next()
++		while n != "":
++			if n.begins_with("."):
++				n = d.get_next()
++				continue
++			var full: String = dir_path.path_join(n)
++			if d.current_is_dir():
++				stack.append(full)
++			elif n.ends_with(".gd"):
++				for line: String in FileAccess.get_file_as_string(full).split("\n"):
++					if line.begins_with("class_name "):
++						var nm: String = line.substr(11).strip_edges().split(" ")[0]
++						if nm != "" and not ALLOWED_GLOBALS.has(nm) and not out.has(nm):
++							out.append(nm)
++			n = d.get_next()
++		d.list_dir_end()
++	return out
++
++
++## Read one actor and report which privileged names it reaches. Comments and string literals are removed
++## first: a file that DISCUSSES `FactorySim` in a docstring is not a file that reaches it, and a checker
++## that cannot tell those apart teaches people to stop writing docstrings.
++func _scan(path: String, globals: Array[String]) -> Dictionary:
++	if not FileAccess.file_exists(path):
++		return {"error": 1, "hits": 0, "names": [], "screened": 0}
++	var src: String = _strip(FileAccess.get_file_as_string(path))
++	var names: Array[String] = []
++	for g: String in globals:
++		if _has_identifier(src, g):
++			names.append(g)
++	for e: String in ESCAPES:
++		if src.contains(e) and not names.has(e):
++			names.append(e)
++	return {"error": 0, "hits": names.size(), "names": names, "screened": globals.size() + ESCAPES.size()}
++
++
++## An identifier match, not a substring one. `Score` must not fire on `_scored`, and `Art` must not fire
++## on `_start`; a substring rule over 49 short names would reject every actor ever written and the
++## rejection would look exactly like enforcement.
++func _has_identifier(src: String, name: String) -> bool:
++	var from: int = 0
++	while true:
++		var i: int = src.find(name, from)
++		if i < 0:
++			return false
++		var before: String = "" if i == 0 else src[i - 1]
++		var after_i: int = i + name.length()
++		var after: String = "" if after_i >= src.length() else src[after_i]
++		if not _wordish(before) and not _wordish(after):
++			return true
++		from = i + 1
++	return false
++
++
++func _wordish(c: String) -> bool:
++	if c == "":
++		return false
++	return c == "_" or (c >= "0" and c <= "9") or (c.to_lower() >= "a" and c.to_lower() <= "z")
++
++
++## Comments and string literals out, so the scan reads code and not prose.
++func _strip(src: String) -> String:
++	var out: String = ""
++	var in_str: bool = false
++	var quote: String = ""
++	var in_com: bool = false
++	for i: int in src.length():
++		var c: String = src[i]
++		if in_com:
++			if c == "\n":
++				in_com = false
++				out += c
++			continue
++		if in_str:
++			if c == quote and (i == 0 or src[i - 1] != "\\"):
++				in_str = false
++			continue
++		if c == "#":
++			in_com = true
++			continue
++		if c == "\"" or c == "'":
++			in_str = true
++			quote = c
++			continue
++		out += c
++	return out
++
++
++## The other direction: the feed itself must not grow a privileged accessor. Nothing else watches this,
++## because the denylist above reads the ACTOR and a leak added here would be invisible to it.
++func _judge_feed_surface() -> int:
++	var script: GDScript = load("res://tools/eval/player_feed.gd") as GDScript
++	if script == null:
++		print("  FAIL: the feed script did not load, so its surface was never judged")
++		return 1
++	var bad: Array[String] = []
++	var seen: int = 0
++	for m: Dictionary in script.get_script_method_list():
++		var nm: String = String(m.get("name", ""))
++		if nm.begins_with("_") and nm != "_init":
++			continue
++		seen += 1
++		for w: String in LEAKY_WORDS:
++			if nm.to_lower().contains(w) and not bad.has(nm):
++				bad.append(nm)
++	if seen < 5:
++		print("  FAIL: only %d public method(s) found on the feed; the surface was not read" % seen)
++		return 1
++	if bad.is_empty():
++		print("  PASS: the feed's %d public methods name nothing privileged" % seen)
++		return 0
++	print("  FAIL: the feed exposes %s" % [bad])
++	return 1
++
++
++## THE DOOR THE DENYLIST CANNOT SEE. An actor that names nothing forbidden can still be HANDED a live sim,
++## because a parameter arrives already constructed and its type is the orchestrator's choice rather than
++## the actor's. So the entry point takes exactly one argument and it is the feed. Anything else is refused
++## without reading another line, which also means the rule holds for an actor written by someone who never
++## read this file.
++##
++## IT RETURNS A REASON AND NOT A VERDICT, because the first version returned a bare failure and its own
++## control passed for the wrong reason: in a freshly created worktree there is no `.godot`, so every
++## `class_name` fails to resolve, the smuggler fixture would not parse, and "did not load" was reported as
++## "refused by its signature". The rejection was real and meant nothing. A control that cannot tell which
++## rule fired is not a control, so the caller now asserts the reason.
++func _judge_entry(path: String) -> Dictionary:
++	var script: GDScript = load(path) as GDScript
++	if script == null:
++		return {"ok": false, "why": "noload", "detail": "did not load at all"}
++	# A SCRIPT THAT FAILED TO PARSE STILL COMES BACK AS AN OBJECT, with an empty method list, and the first
++	# version read that as "no _init". The rejection was correct and its reason was invented: an author
++	# with a type error would have been told to add an entry point they already had. Ask whether it parsed
++	# before asking what it declares.
++	if not script.can_instantiate():
++		return {"ok": false, "why": "noparse",
++			"detail": "loaded but did not parse, so nothing about its signature could be read"}
++	var init: Dictionary = {}
++	for m: Dictionary in script.get_script_method_list():
++		if String(m.get("name", "")) == "_init":
++			init = m
++			break
++	if init.is_empty():
++		return {"ok": false, "why": "noinit", "detail": "no _init, so nothing states what it is handed"}
++	var args: Array = init.get("args", [])
++	if args.size() != 1:
++		return {"ok": false, "why": "argc",
++			"detail": "takes %d entry arguments; exactly one is allowed and it is the feed" % args.size()}
++	var a: Dictionary = args[0]
++	var cls: String = String(a.get("class_name", ""))
++	if int(a.get("type", 0)) != TYPE_OBJECT or cls == "":
++		return {"ok": false, "why": "untyped",
++			"detail": "entry argument is type %d / class %s, so it accepts anything"
++				% [int(a.get("type", 0)), "<none>" if cls == "" else cls]}
++	return {"ok": true, "why": "typed", "detail": cls}
+diff --git a/tools/eval/check_actor_boundary.gd.uid b/tools/eval/check_actor_boundary.gd.uid
+new file mode 100644
+index 0000000..a2b913a
+--- /dev/null
++++ b/tools/eval/check_actor_boundary.gd.uid
+@@ -0,0 +1 @@
++uid://dbvhcp7543w80
+diff --git a/tools/eval/fixtures/clean_actor.gd b/tools/eval/fixtures/clean_actor.gd
+new file mode 100644
+index 0000000..83dcc86
+--- /dev/null
++++ b/tools/eval/fixtures/clean_actor.gd
+@@ -0,0 +1,22 @@
++extends RefCounted
++
++## NEGATIVE CONTROL for `check_actor_boundary`. A blind actor that only ever looks at pixels and presses
++## verbs. It plays badly on purpose; being a good player is not what it is here to demonstrate.
++
++var _feed: EvalPlayerFeed = null
++
++
++func _init(feed: EvalPlayerFeed) -> void:
++	_feed = feed
++
++
++func decide() -> void:
++	var img: Image = _feed.frame()
++	if img == null:
++		return
++	var size: Vector2i = _feed.screen_size()
++	var mid: Color = img.get_pixel(size.x / 2, size.y / 2)
++	var verbs: Array[StringName] = _feed.actions()
++	if mid.get_luminance() < 0.2 and verbs.size() > 0:
++		_feed.act(verbs[0], true)
++	_feed.point_at_screen(Vector2(size) * 0.5)
+diff --git a/tools/eval/fixtures/clean_actor.gd.uid b/tools/eval/fixtures/clean_actor.gd.uid
+new file mode 100644
+index 0000000..952fac6
+--- /dev/null
++++ b/tools/eval/fixtures/clean_actor.gd.uid
+@@ -0,0 +1 @@
++uid://bss7cuu0c8q31
+diff --git a/tools/eval/fixtures/leaky_actor.gd b/tools/eval/fixtures/leaky_actor.gd
+new file mode 100644
+index 0000000..c7303c2
+--- /dev/null
++++ b/tools/eval/fixtures/leaky_actor.gd
+@@ -0,0 +1,20 @@
++extends RefCounted
++
++## POSITIVE CONTROL for `check_actor_boundary`, and the reason the checker exists rather than a promise.
++## Every line below is legal GDScript that no feed can prevent, because a `class_name` is a global
++## reachable by bare name from any script in the project. If the checker passes this file, it is not
++## enforcing gate 6 and every verdict it has ever printed is void.
++
++var _feed: EvalPlayerFeed = null
++
++
++func _init(feed: EvalPlayerFeed) -> void:
++	_feed = feed
++
++
++func decide() -> void:
++	var sim: FactorySim = FactorySim.new()
++	var solid: bool = sim.is_solid(Vector2i(4, 9))
++	var pack: Array[Dictionary] = sim.inventory_slots()
++	if solid and pack.size() > 0:
++		_feed.act(&"sf_mine", true)
+diff --git a/tools/eval/fixtures/leaky_actor.gd.uid b/tools/eval/fixtures/leaky_actor.gd.uid
+new file mode 100644
+index 0000000..6fb9591
+--- /dev/null
++++ b/tools/eval/fixtures/leaky_actor.gd.uid
+@@ -0,0 +1 @@
++uid://mscqww5ufj7a
+diff --git a/tools/eval/fixtures/smuggled_actor.gd b/tools/eval/fixtures/smuggled_actor.gd
+new file mode 100644
+index 0000000..ff8d39f
+--- /dev/null
++++ b/tools/eval/fixtures/smuggled_actor.gd
+@@ -0,0 +1,19 @@
++extends RefCounted
++
++## POSITIVE CONTROL for the entry-signature rule, and the hole the name denylist cannot see. This actor
++## names nothing forbidden. It does not have to: it takes a second parameter, and whatever the harness
++## hands it arrives already constructed. A boundary that only reads the actor's own vocabulary is a
++## boundary with a door in the back.
++
++var _feed: EvalPlayerFeed = null
++var _extra: Variant = null
++
++
++func _init(feed: EvalPlayerFeed, extra: Variant) -> void:
++	_feed = feed
++	_extra = extra
++
++
++func decide() -> void:
++	if _extra != null and _extra.is_solid(Vector2i(4, 9)):
++		_feed.act(&"sf_mine", true)
+diff --git a/tools/eval/fixtures/smuggled_actor.gd.uid b/tools/eval/fixtures/smuggled_actor.gd.uid
+new file mode 100644
+index 0000000..26b7275
+--- /dev/null
++++ b/tools/eval/fixtures/smuggled_actor.gd.uid
+@@ -0,0 +1 @@
++uid://bktpx7v81a2up
+diff --git a/tools/eval/player_feed.gd b/tools/eval/player_feed.gd
+new file mode 100644
+index 0000000..9f67d87
+--- /dev/null
++++ b/tools/eval/player_feed.gd
+@@ -0,0 +1,98 @@
++class_name EvalPlayerFeed
++extends RefCounted
++
++## WHAT A PLAYER CAN SEE, AND NOTHING ELSE. This is the object a judged actor is handed for the
++## agent-journey evaluation, and it exists because gate 6 of `docs/AGENT_PLAY_EVALUATION_PROTOCOL.md`
++## is the one gate a prompt cannot satisfy. The protocol says an actor exposed to `FactorySim`, target
++## cells, inventories, resource lists, objective IDs or world-event state makes the evaluation INVALID
++## rather than low-scoring, so the boundary has to be a property of the code.
++##
++## THIS IS NOT `tools/play_agent.gd` AND MUST NOT REPLACE IT. That actor reads the sim fifty times and is
++## right to: it drives the deterministic layers, and reading state is why it is fast enough for a sweep
++## and stable enough to assert against. It is a privileged test driver. This is the blind one.
++##
++## The reachability oracle the protocol describes is also privileged, also legitimate, and also not this.
++## The evidence chain is: the oracle proves a path exists, the capability suite proves the actor can
++## operate the controls, and only then does a blind actor say anything about communication or motivation.
++##
++## HOW THE BOUNDARY IS ACTUALLY HELD, since an object with a narrow API proves little on its own: every
++## `class_name` in this project is a global reachable by bare name from any script in it, so an actor
++## could write `FactorySim` without ever touching this feed. The structural half is here; the other half
++## is `tools/eval/check_actor_boundary.gd`, which reads the actor's SOURCE and rejects those names. Both
++## halves are needed and neither is sufficient. Read that file before trusting this one.
++
++## The rendered frame, which is the actor's only view of the world. A copy: handing back the live texture
++## image would let a caller keep a reference that updates underneath its own decision.
++var _vp: Viewport = null
++## The verb vocabulary a player has, passed in rather than read off `Controls`, so that this file needs no
++## project global of its own and the checker's rule can be uniform instead of carrying an exception.
++var _actions: Array[StringName] = []
++var _audio: bool = false
++## Every input this feed was asked to deliver, in order, for the receipt. The protocol requires the exact
++## input cadence to be retainable, and a feed that cannot say what it sent cannot support that claim.
++var _log: Array[Dictionary] = []
++
++
++func _init(vp: Viewport, actions: Array[StringName], audio: bool) -> void:
++	_vp = vp
++	_actions = actions.duplicate()
++	_audio = audio
++
++
++## The pixels on the screen this instant. The actor's whole world model comes through here.
++func frame() -> Image:
++	if _vp == null:
++		return null
++	var tex: ViewportTexture = _vp.get_texture()
++	return null if tex == null else tex.get_image()
++
++
++func screen_size() -> Vector2i:
++	return Vector2i.ZERO if _vp == null else _vp.get_visible_rect().size
++
++
++func audio_enabled() -> bool:
++	return _audio
++
++
++## The verbs a player has. Names only, the same strings the settings screen shows when remapping.
++func actions() -> Array[StringName]:
++	return _actions.duplicate()
++
++
++## Press or release one of those verbs. An action outside the vocabulary is refused rather than passed
++## through, because a feed that forwards anything asked of it is a feed with no boundary.
++func act(action: StringName, pressed: bool) -> bool:
++	if not _actions.has(action):
++		_log.append({"kind": "refused", "action": action})
++		return false
++	var ev := InputEventAction.new()
++	ev.action = action
++	ev.pressed = pressed
++	Input.parse_input_event(ev)
++	_log.append({"kind": "act", "action": action, "pressed": pressed})
++	return true
++
++
++## Point at a place ON THE SCREEN, in pixels, which is what a hand on a mouse can do. Deliberately not a
++## world cell: a cell is a coordinate the actor would have had to be told, and being told is the thing
++## gate 6 forbids.
++func point_at_screen(px: Vector2) -> void:
++	var ev := InputEventMouseMotion.new()
++	ev.position = px
++	ev.global_position = px
++	Input.parse_input_event(ev)
++	_log.append({"kind": "point", "px": px})
++
++
++func click(button: int, pressed: bool) -> void:
++	var ev := InputEventMouseButton.new()
++	ev.button_index = button
++	ev.pressed = pressed
++	Input.parse_input_event(ev)
++	_log.append({"kind": "click", "button": button, "pressed": pressed})
++
++
++## The input record, for the receipt. Read-only to the actor by being a copy.
++func input_log() -> Array[Dictionary]:
++	return _log.duplicate(true)
+diff --git a/tools/eval/player_feed.gd.uid b/tools/eval/player_feed.gd.uid
+new file mode 100644
+index 0000000..9e28f9a
+--- /dev/null
++++ b/tools/eval/player_feed.gd.uid
+@@ -0,0 +1 @@
++uid://lfh2sjnea57x
+-- 
+2.39.5 (Apple Git-154)
+

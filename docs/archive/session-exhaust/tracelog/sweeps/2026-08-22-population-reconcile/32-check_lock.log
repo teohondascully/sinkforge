@@ -1,0 +1,34 @@
+== the lock is the reason two runs can share one machine ==
+  PASS  a lock that never frees ends the run with 5, not 0 (got 5)
+  PASS  ...and says NOTHING RAN on stdout, for every caller that drops the code
+  PASS  a lock left behind by a killed run is cleared, not waited on
+  PASS  exit 0 travels through the wrapper unchanged (got 0)
+  PASS  exit 1 travels through the wrapper unchanged (got 1)
+  PASS  exit 42 travels through the wrapper unchanged (got 42)
+  PASS  the lock is released even when the run inside it failed
+  PASS  (setup) the holder started and took the lock
+  PASS  a run that no longer owns the lock leaves it alone on the way out (owner 60120)
+  PASS  (setup) the delayed copy carries the sweep pause, so this case is not vacuous
+  PASS  a late sweeper does not clear a lock somebody else now holds (saw: inA outA inB outB )
+  PASS  ...and both runs actually ran (4 stamps)
+  PASS  two runs racing for the machine never overlap (saw: in out in out )
+  PASS  ...and both runs actually ran (4 stamps)
+  PASS  a shell command where Godot flags belong is REFUSED (exit 2, got 2)
+  PASS  ...and says NOTHING RAN, on stdout, before taking the lock
+  PASS  ...and a refused call never took the lock at all
+  PASS  a fixture that hangs forever is KILLED by the cap (exit 6, got 6)
+  PASS  ...and says CAPPED on stdout, for every caller that drops the code
+  PASS  ...and the lock is released, which is the whole point
+  PASS  ...and the hung process is GONE, not merely disowned (pid 60529)
+  PASS  a run that finishes inside its cap is untouched (exit 0, got 0)
+  PASS  SF_RUN_CAP=0 disables the cap and the inner code still survives (got 42)
+  PASS  all three lock takers source the shared protocol (3 of 3)
+  PASS  and none of them redefines it locally
+  PASS  ...and the shared protocol defines all four entry points (4 of 4)
+  PASS  both cap users source the shared watchdog (2 of 2)
+  PASS  and neither redefines it locally
+  PASS  ...and the shared watchdog defines both entry points (2 of 2)
+  PASS  the watchdog polls rather than sleeping the whole cap (no orphan holding stdout)
+  PASS  ...and the watchdog subshell never holds the caller's stdout at all
+
+check_lock: PASS — the machine lock holds, and giving up is not a pass

@@ -1,0 +1,24 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== the selection, with the colour taken away ==
+  surface                              RGB px    LUMA px   peak dY     kept
+  the hotbar, whole                     17165      15944     211.4      93%
+  PASS: the hotbar reported its own geometry, so the wells could be isolated
+    the lit well alone                   6696       6696     150.9     100%
+  PASS:   the lit well alone — the same standing twice is still (0 px changed, cap 400)
+  PASS:   the lit well alone — moving the cursor drew a different picture (6696 px, floor 800)
+  PASS:   the lit well alone — the mark survives the loss of colour (100% of it is luminance, floor 90%)
+  the counter, a WORKS row              90694      90548     207.2     100%
+    the mark alone                      60130      60076     150.1     100%
+  PASS:   the mark alone — the same standing twice is still (0 px changed, cap 400)
+  PASS:   the mark alone — moving the cursor drew a different picture (60130 px, floor 800)
+  PASS:   the mark alone — the mark survives the loss of colour (100% of it is luminance, floor 90%)
+  the counter, a PACK well              75037      74783     213.8     100%
+    the mark alone                      24716      24625     150.1     100%
+  PASS:   the mark alone — the same standing twice is still (0 px changed, cap 400)
+  PASS:   the mark alone — moving the cursor drew a different picture (24716 px, floor 800)
+  PASS:   the mark alone — the mark survives the loss of colour (100% of it is luminance, floor 90%)
+check_selection_reads: PASS (10 asserted) — every selection mark is a value change, not only a hue

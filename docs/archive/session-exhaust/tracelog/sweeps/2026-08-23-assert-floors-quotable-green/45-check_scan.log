@@ -1,0 +1,15 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== does the scanner answer in a colour you can see ==
+  PASS: the buried subject is ore behind STONE, not an exposed face ((54, 21) reads 'stone')
+  PASS: ...and the lode plane holds ore there ('ore')
+  PASS: ...and it reports a positive yield, so the sonar's own filter admits it (7)
+  PASS: the pulse fired (scanner carried, not paused, off cooldown)
+  PASS: the pulse returned echoes at all (14)
+  PASS: the buried vein came back as an echo — the sonar can see through rock
+  PASS: the solid ore block came back as an echo (the CONTROL)
+  PASS: CONTROL: a solid ore block answers in a visible colour (ore, a=1.00) — the assertion below CAN pass
+  PASS: a buried vein answers in a visible colour, so its arc, pip and through-rock glow all draw (material 'ore', a=1.00)
+  PASS: amount and identity agree on every one of the 4860 deposit cells (0 disagreed)
+  PASS: ...and there were deposit cells to walk (4860)
+check_scan: PASS (11 asserted) — a buried vein answers in its own ore colour, not in the rock's

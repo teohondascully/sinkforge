@@ -1,0 +1,21 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the bazaar you have not finished yet ==
+  PASS: the shipping world stamps exactly ONE unfinished bazaar (found 1)
+  PASS: ...and it is NOT yet a bazaar, so nothing but this layer could see it before now
+  PASS: the missing cell is genuinely EMPTY — a block goes straight in, nothing to dig first
+  PASS: ...and it is a FRAME cell (rel (3, 2)), not a hole in the interior you walk through
+  PASS: one wood block goes into the gap
+  PASS: ...and the frame is now a live bazaar at the same origin
+  PASS: ...and nothing is left listed as unfinished — the marker goes away, and casts no phantom beside it
+  PASS: break it again and it is once more one block short (the cache is not stale)
+  PASS: a frame missing one post IS one block short (the control — without this the rest is vacuous)
+  PASS: a frame missing TWO blocks is not one block short — no marker on something you cannot finish
+  PASS: a hole with STONE in it is not one block short — you would have to dig it out first
+  PASS: a COMPLETE frame is a bazaar and is not also a ruin
+  PASS: ...and a frame whose INTERIOR is filled in is not one block short either
+  PASS: one update and the view holds the unfinished frames it is meant to dress (1)
+  PASS: ...and the gap it will mark is the gap the sim reported
+  PASS: draw() dresses the unfinished frame (1) — the bug was a loop that had the list and ignored it
+  PASS: ...and does not draw it as a finished stall, which is the thing it is not yet
+check_bazaar_ruin: PASS — the unfinished stall is a thing the game can see and point at

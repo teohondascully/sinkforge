@@ -1,0 +1,72 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== every machine in the registry is still lit ==
+  PASS: drill working: its edges stand off its body by 0.144 (floor 0.06)
+  PASS: drill idle: its edges stand off its body by 0.187 (floor 0.06)
+  PASS: lift working: its edges stand off its body by 0.145 (floor 0.06)
+  PASS: lift idle: its edges stand off its body by 0.188 (floor 0.06)
+  PASS: splitter working: its edges stand off its body by 0.177 (floor 0.06)
+  PASS: splitter idle: its edges stand off its body by 0.187 (floor 0.06)
+  PASS: generator working: its edges stand off its body by 0.115 (floor 0.06)
+  PASS: generator idle: its edges stand off its body by 0.165 (floor 0.06)
+  PASS: conduit working: its edges stand off its body by 0.171 (floor 0.06)
+  PASS: conduit idle: its edges stand off its body by 0.194 (floor 0.06)
+  PASS: hopper working: its edges stand off its body by 0.191 (floor 0.06)
+  PASS: hopper idle: its edges stand off its body by 0.171 (floor 0.06)
+  PASS: rope working: its edges stand off its body by 0.166 (floor 0.06)
+  PASS: rope idle: its edges stand off its body by 0.200 (floor 0.06)
+  PASS: torch working: its edges stand off its body by 0.126 (floor 0.06)
+  PASS: torch idle: its edges stand off its body by 0.173 (floor 0.06)
+  PASS: descent working: its edges stand off its body by 0.149 (floor 0.06)
+  PASS: descent idle: its edges stand off its body by 0.116 (floor 0.06)
+  PASS: iron_forge working: its edges stand off its body by 0.179 (floor 0.06)
+  PASS: iron_forge idle: its edges stand off its body by 0.185 (floor 0.06)
+  PASS: blast_furnace working: its edges stand off its body by 0.128 (floor 0.06)
+  PASS: blast_furnace idle: its edges stand off its body by 0.175 (floor 0.06)
+  PASS: plate_press working: its edges stand off its body by 0.147 (floor 0.06)
+  PASS: plate_press idle: its edges stand off its body by 0.190 (floor 0.06)
+  PASS: gear_mill working: its edges stand off its body by 0.145 (floor 0.06)
+  PASS: gear_mill idle: its edges stand off its body by 0.188 (floor 0.06)
+  PASS: h_drill working: its edges stand off its body by 0.180 (floor 0.06)
+  PASS: h_drill idle: its edges stand off its body by 0.184 (floor 0.06)
+  PASS: pump working: its edges stand off its body by 0.175 (floor 0.06)
+  PASS: pump idle: its edges stand off its body by 0.189 (floor 0.06)
+  PASS: drift working: its edges stand off its body by 0.173 (floor 0.06)
+  PASS: drift idle: its edges stand off its body by 0.135 (floor 0.06)
+  PASS: crush working: its edges stand off its body by 0.169 (floor 0.06)
+  PASS: crush idle: its edges stand off its body by 0.132 (floor 0.06)
+  PASS: spur working: its edges stand off its body by 0.156 (floor 0.06)
+  PASS: spur idle: its edges stand off its body by 0.196 (floor 0.06)
+  PASS: ore_vent working: its edges stand off its body by 0.133 (floor 0.06)
+  PASS: ore_vent idle: its edges stand off its body by 0.104 (floor 0.06)
+  PASS: fallback the sooty furnace working: its edges stand off its body by 0.119
+  PASS: fallback the sooty furnace idle: its edges stand off its body by 0.093
+  PASS: fallback the generic runner working: its edges stand off its body by 0.166
+  PASS: fallback the generic runner idle: its edges stand off its body by 0.199
+  PASS: a near-white body is REJECTED (margin 0.017) — the floor is live
+  PASS: a near-black body is REJECTED (margin 0.020) — the floor is live
+  PASS: 42 machine bodies were judged (every registry colour, in both states)
+  PASS: the bodies really are different colours (luminance 0.238..0.661)
+  tightest margin: fallback the sooty furnace idle at 0.093 (floor 0.06)
+  PASS: furnace's face sits on one of its own body parts
+  PASS: generator's face sits on one of its own body parts
+  PASS: drill's face sits on one of its own body parts
+  PASS: h_drill's face sits on one of its own body parts
+  PASS: hopper's face sits on one of its own body parts
+  PASS: lift's face sits on one of its own body parts
+  PASS: fork's face sits on one of its own body parts
+  PASS: crush's face sits on one of its own body parts
+  PASS: press's face sits on one of its own body parts
+  PASS: gear's face sits on one of its own body parts
+  PASS: pump's face sits on one of its own body parts
+  PASS: drift's face sits on one of its own body parts
+  PASS: descent's face sits on one of its own body parts
+  PASS: rope's face sits on one of its own body parts
+  PASS: torch's face sits on one of its own body parts
+  PASS: conduit's face sits on one of its own body parts
+  PASS: 16 profiles were judged
+  PASS: CONTROL: a full-cell face is REJECTED against the drill's carved body — the test bites
+  PASS: the bevel constants here still match draw_machine_casing's (0.34 up, 0.50 down)
+  PASS: idle machines are still different machines (cold luminance 0.208..0.515)
+  PASS: idle really is darker than working at the top of the range (0.515 cold vs 0.661 lit)
+check_casing_light: PASS (67 asserted) — every registry colour keeps a top face and a shadow

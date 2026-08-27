@@ -1,0 +1,10 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== step-up traversal (no jumping) ==
+  dug a 1-pit at (15, 16); body dropped in
+  PASS: climbed OUT of a dug 1-pit by walking (x=546)
+  placed a machine at col 21; body left of it
+  PASS: walked OVER a 1-tile machine (x=736)
+  planted a 2-tall wood trunk at col 27; body left of it
+  PASS: walked THROUGH a 2-tall tree trunk (x=928)
+ALL STEP-UP TRAVERSALS PASS

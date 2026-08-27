@@ -1,0 +1,132 @@
+== Sinkforge harness (parallel, JOBS=12, layers=111, display, STRICT: any skip fails the run, perf-host=unset) ==
+   tree: /Users/thondascully/Projects/sinkforge  branch: main  head: 60d9afe  worktree: 4 file(s) modified, delta 47c5d7a0e72e
+save_sentinel: armed (planted, sha=bb82fbce65f9)
+  [ 1/111] check_save_isolation (no harm)       PASS    0s
+  [ 2/111] check_ci_coverage (every layer runs) PASS    0s
+  [ 3/111] check_shaders (they still compile)   PASS    0s
+  [ 4/111] check_doc_counts (docs match the runner) PASS    0s
+  [ 5/111] check_verdict_claims (a verdict claims what was tested) PASS    1s
+  [ 6/111] check_verdict_route (nobody exits 0 alone) PASS    1s
+  [ 7/111] check_rules_registry                 PASS    1s
+  [ 8/111] check_progression_payable            PASS    2s
+  [ 9/111] check_save_frontier (envelope)       PASS    2s
+  [10/111] check_craftable_registry             PASS    2s
+  [11/111] check_material_registry              PASS    2s
+  [12/111] power/water (field/flood)            PASS    4s
+  [13/111] check_step                           PASS    4s
+  [14/111] measure_player (motion feel)         PASS    5s
+  [15/111] stress (invariants/flow/power)       PASS    6s
+  [16/111] check_mining                         PASS    2s
+  [17/111] check_fastforward                    PASS    3s
+  [18/111] check_lift                           PASS    6s
+  [19/111] check_body_stress                    PASS    8s
+  [20/111] check_water_move (L3 impedance)      PASS   11s
+  [21/111] sim (core/determinism)               PASS   15s
+  [22/111] check_save_durability (P0)           PASS   16s
+  [23/111] check_stepup                         PASS   16s
+  [24/111] worldgen (gen/ore/fine)              PASS   32s
+  [25/111] check_walk                           PASS   37s
+  [26/111] check_dig_hitch (friction)           PASS   13s
+  [27/111] check_settings                       PASS    0s
+  [28/111] check_binding_conflict (one key, one job) PASS    0s
+  [29/111] check_trailers (one author, no trailers) PASS    0s
+  [30/111] check_fall                           PASS    2s
+  [31/111] check_saveload                       PASS    2s
+  [32/111] check_progressive_bake (#17)         PASS    5s
+  [33/111] check_climb                          PASS    6s
+  [34/111] check_lock (the machine lock's own properties) PASS   21s
+  [35/111] check_exit_codes (the table and its reader agree) PASS    1s
+  [36/111] check_binding_persistence (a boot may not re-duplicate) PASS    1s
+  [37/111] check_score (the descent)            PASS    1s
+  [38/111] check_water_audio (L3 sound)         PASS    2s
+  [39/111] check_encoding (no mojibake)         PASS    2s
+  [40/111] check_prose (the comment register)   PASS    3s
+  [41/111] check_shared_constants (one value, many owners) PASS    3s
+  [42/111] check_row_identity (one row, one machine) PASS    3s
+  [43/111] check_rhythm (dig groove)            PASS    3s
+  [44/111] check_room_reads (2nd plane)         PASS    2s
+  [45/111] check_hash_mixing (no lattices)      PASS    3s
+  [46/111] check_scan (sonar's colour)          PASS    3s
+  [47/111] check_seam (the grain)               PASS    2s
+  [48/111] check_vein_guard (rock only)         PASS    2s
+  [49/111] check_bits (a bit is a verb)         PASS    3s
+  [50/111] check_carry_cap (the pack fills)     PASS    3s
+  [51/111] check_refusal (rock says no)         PASS    3s
+  [52/111] check_draw_cull (offscreen)          PASS    1s
+  [53/111] check_spoil (crush/pack)             PASS    5s
+  [54/111] check_bazaar_ruin (it has art)       PASS    3s
+  [55/111] check_opening (no dead space)        PASS    3s
+  [56/111] check_drift (lateral/vertical)       PASS    5s
+  [57/111] check_lode (vein outlives blow)      PASS    7s
+  [58/111] check_grid (no tilemap)              PASS    9s
+  [59/111] check_item_reads (icons)             PASS    3s
+  [60/111] check_water_reads (fluid)            PASS    6s
+  [61/111] check_head (stand it on it)          PASS   10s
+  [62/111] check_underground (lit rock)         PASS    7s
+  [63/111] check_rock_reads (rock vs void)      PASS   10s
+  [64/111] check_texture (no static)            PASS   16s
+  [65/111] check_contact_edge (rock meets air)  PASS   10s
+  [66/111] check_base_namespace (no layer shadows its base) PASS   22s
+  [67/111] check_material_grammar (dirt vs stone) PASS   26s
+  [68/111] check_frametime (hitch+budget)       PASS*  13s  1 skipped: [frametime.absolute-budget] the 8.33ms/frame (120fps) budget was N
+  [69/111] check_paint_terms (per-texel)        PASS    1s
+  [70/111] check_posed_fields (poses hold)      PASS    1s
+  [71/111] check_casing_light (machines lit)    PASS    0s
+  [72/111] check_status_reads (every state)     PASS    0s
+  [73/111] check_seam_flood (same picture)      PASS    1s
+  [74/111] check_input_deafness (shutter)       PASS    2s
+  [75/111] check_controls                       PASS    2s
+  [76/111] check_tells (hollow rock)            PASS    3s
+  [77/111] check_machine_identity (which box)   PASS   14s
+  [78/111] check_stride (the run)               PASS   17s
+  [79/111] check_machine_state (running reads)  PASS   19s
+  [80/111] check_grapple_reads (tool not geometry) PASS*  28s  1 skipped: [grapple.gr05-preview-share] GR-05's share of the throw the previe
+  [81/111] check_gamepad (playable on a pad)    PASS    1s
+  [82/111] check_tool_text (says=does)          PASS    2s
+  [83/111] check_text_contrast (text is readable) PASS*   2s  2 skipped: [contrast.bright-backdrop] the bright-backdrop column was NOT asse
+  [84/111] check_binding_text (keys=jobs)       PASS    2s
+  [85/111] check_pixel_snap                     PASS    2s
+  [86/111] check_pack_layout                    PASS    5s
+  [87/111] check_bake_idempotent (bake holds)   PASS    6s
+  [88/111] check_snap_frame (snap on screen)    PASS    6s
+  [89/111] check_richness (a rich earth)        PASS    5s
+  [90/111] check_descent (a way down)           PASS    5s
+  [91/111] check_relief (a landscape)           PASS    4s
+  [92/111] check_hud_layout (no collisions)     PASS    9s
+  [93/111] check_selection_reads (no colour)    PASS   10s
+  [94/111] check_voice (audio reads)            PASS    4s
+  [95/111] check_agility (movement score)       PASS   11s
+  [96/111] check_nameplate_truth (a plate counts its run) PASS    3s
+  [97/111] check_fixture_pointer (void vs fail) PASS    1s
+  [98/111] check_wrap (rope bends)              PASS    9s
+  [99/111] check_hint_gate (lesson waits)       PASS    8s
+  [100/111] check_depth_reads (how deep)         PASS    8s
+  [101/111] check_grapple (swing score)          PASS   19s
+  [102/111] check_teaching (it teaches)          PASS   14s
+  [103/111] check_ceremony_reads (interrupt vs world) PASS*  24s  2 skipped: [ceremony.words-vs-sky] how well the words read against open sky w
+  [104/111] check_loop_health (loop score)       PASS   23s
+  [105/111] check_impact (a fall costs)          PASS   12s
+  [106/111] check_aim (honest marker)            PASS   14s
+  [107/111] check_pacing (session shape)         PASS   30s
+  [108/111] check_traverse (rope=travel)         PASS   58s
+  [109/111] check_pump (wind it up)              PASS   57s
+  [110/111] check_plunge (ride it down)          PASS   60s
+  [111/111] play-tests (scripted pilot + friction) PASS  102s
+
+save_sentinel: verified — the run's own slot is untouched, and the player's real save is byte-identical (absent throughout)
+PASSED WITHOUT VERIFYING EVERYTHING — assertions stood down inside: check_frametime (hitch+budget) check_grapple_reads (tool not geometry) check_text_contrast (text is readable) check_ceremony_reads (interrupt vs world)
+111 PASS / 0 FAIL / 0 SKIP of 111 (4 of those passes stood down 6 assertion group(s)) — FAIL: 0 layer(s) did not run and 6 assertion group(s) across 4 layer(s) were stood down while SF_STRICT is on; this run does not count as a full sweep  (294s)
+HARNESS_EXIT=4
+
+harness exit 4 — something was SKIPPED under SF_STRICT: this was NOT a full sweep
+layers reported: 111 of 111
+layer logs: 111   engine-level load failures: 0   silent: 0
+stand-downs: conditional (env) rows and how each resolved this run: frametime.paced-phase=out-of-reach grapple.gr03-single-frame-bow=ASSERTED ceremony.words-vs-sky-arm=ASSERTED save-durability.failed-backup=ASSERTED bindings.file-order-control=ASSERTED
+   ASSERTED means this run reached the assertion. Before deleting a row, read it:
+   several exist for the machines where they do NOT resolve ASSERTED.
+stand-downs: exactly the registered ones, 6 id(s), 6 line(s) in total
+HARNESS_RESULT=yes
+this run is a RESULT: the runner finished, every declared layer reported, and every layer log
+carries the output of a layer that executed. The verdict above may be quoted.
+
+per-layer logs: /tmp/claude-501/-Users-thondascully-Projects-sinkforge/8c7fc2d6-0991-4fc2-b8c7-db2e05d5faa2/scratchpad/logs/full-02

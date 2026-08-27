@@ -1,0 +1,30 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the drift rig ==
+  PASS: fixture: the Drift Rig def loads
+  pay column { &"ore": 16 }   ·   spoil column { &"stone": 1 }
+  PASS: the rig sends ORE down its own column
+  PASS: …and STONE down the column behind it
+  PASS: no spoil ever reaches the ore column
+  PASS: …and no ore ever reaches the spoil column — the sort is total
+  PASS: …and it is the rig doing it, not a splitter downstream
+  PASS: NOTHING the rig cut left by any column but its two (0 stray item(s))
+  produced 17, still accounted for 17
+  PASS: every cell it took is still matter somewhere
+  spoil sealed: 28 ore delivered, 48 spoil pooled, status blocked_spoil
+  PASS: a jammed SPOIL column does not stop the ore coming
+  PASS: …the spoil pools in its own belly rather than vanishing
+  PASS: …and the status names the SPOIL column the moment it is full, not just 'blocked'
+  PASS: a jammed ORE column does not stop the spoil leaving
+  PASS: …and the status names the ORE column
+  PASS: unpowered, the rig cuts NOTHING at all
+  PASS: …and says so — 'no power', in its own word
+  PASS: …and it never burned a lump of coal to try
+  PASS: powered, it cuts
+  PASS: …and LABOURS on one generator's aura rather than refusing (0.67 of full)
+  three generators on a conduit trunk: throttle 1.00
+  PASS: a real conduit trunk runs the rig at FULL speed — the demand is meetable
+  after 30s: 4 floor cells and 4 head cells cut, 0 above the head
+  PASS: the gallery is cut TWO cells high — you can walk it
+  PASS: …and not three: the rig never takes the gallery's ceiling
+check_drift: PASS — it sorts at the face, and neither stream ever moves sideways

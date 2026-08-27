@@ -1,0 +1,62 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== pack-layout check ==
+  PASS: real: panel on-screen horizontally (16..624)
+  PASS: real: panel on-screen vertically (6..354)
+  PASS: real: the content area is inside the panel
+  the counter holds 8 rows per column, 3 columns (24 in all)
+  PASS: the counter holds twenty rows without scrolling
+  MACHINES takes 2 column(s), THE RACK 1 — of 3
+  PASS: both lists fit the counter in whole columns UNSQUEEZED (3 asked of 3)
+  PASS: …and the counter gave each list the columns it asked for (2+1, wanted 2+1)
+  PASS: every machine is reachable without a window (10 of 16)
+  PASS: every Rack row is reachable without a window (7 of 8)
+  PASS: the detail plate is inside the panel and tall enough to matter (72px)
+  PASS: at the stall, tab 0 has rows it could lose (8)
+  PASS: at the stall, tab 1 has rows it could lose (17)
+  PASS: at the stall, tab 2 has rows it could lose (11)
+  PASS: no-bazaar: panel on-screen horizontally (16..624)
+  PASS: no-bazaar: panel on-screen vertically (6..354)
+  PASS: no-bazaar: the content area is inside the panel
+  PASS: the geometry has fields to compare at all (9)
+  PASS: the panel is the same shape FIELD FOR FIELD away from a Bazaar as at one (nothing moved)
+  PASS: …and tab 0 still lists all 8 of its rows down a shaft (8) — only the verbs gate
+  PASS: …and tab 1 still lists all 17 of its rows down a shaft (17) — only the verbs gate
+  PASS: …and tab 2 still lists all 11 of its rows down a shaft (11) — only the verbs gate
+  PASS: …and WORKS still splits its columns the same way (unchanged { "machines": 2, "rack": 1, "total": 3 })
+  PASS: WORKS offers every machine and every Rack row to the cursor
+  PASS: the cursor clamps at the bottom
+  PASS: …which is a Rack row
+  PASS: the cursor clamps at the top
+  PASS: …which is a machine row
+  PASS: right jumps a column, still in MACHINES
+  PASS: …and the next one lands in the Rack
+  PASS: …and back
+  PASS: BENCH offers every rung to the cursor
+  PASS: …and Enter acts on a tech
+  PASS: PACK offers every carried slot to the cursor
+  PASS: …and Enter holds the one under the cursor
+  PASS: …and the row it reports is the slot it drew
+  PASS: a machine behind unresearched tech is NOT on the counter (1 of 2 listed)
+  PASS: …so the cursor cannot even land on it
+  PASS: …and researching its tech puts it on the counter
+  PASS: the reported row indexes the catalogue, not the filtered view
+  PASS: map-corner: on-screen horizontally (512..628)
+  PASS: map-corner: on-screen vertically (34..150 of 360)
+  PASS: map-corner: keeps the world's aspect (1.00 vs 1.00)
+  PASS: map-large: on-screen horizontally (184..456)
+  PASS: map-large: on-screen vertically (44..316 of 360)
+  PASS: map-large: keeps the world's aspect (1.00 vs 1.00)
+  PASS: map-corner: inside its 150x116 box (116x116)
+  PASS: map-corner: stays in the top half (bot=150)
+  PASS: the shipping catalogue is 19 machines and 7 Rack rows, so there are lists to judge
+  PASS: fresh: both lists fit UNSQUEEZED (4 machines + 6 rack ask 2 of 3 columns)
+  PASS: researching the whole ladder opened more machines (4 -> 19)
+  PASS: full tech: the counter IS squeezed (19 machines + 7 rack ask 4 of 3) — the state hud.gd said never happens
+  PASS: full tech: every row of both groups is inside the drawn window when the cursor is on it
+  the counter asks for 190 fresh (1 slots), 236 stocked (20), 348 on BENCH — of 190..348
+  PASS: fixture: the sim scooped 76 items into the pack (1 slots -> 20)
+  PASS: a fresh pack asks for the counter's floor, exactly (190 of 190)
+  PASS: …and a stocked pack asks for MORE than a fresh one (190 -> 236)
+  PASS: …and the deepest BENCH tier is still held at the ceiling, unchanged (348 of 348)
+PACK LAYOUT OK

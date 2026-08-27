@@ -1,0 +1,31 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== outside the lamp, rock and air have to be tellable apart ==
+  the delve reached 27 rows below the surface (asked for 30, floor 24)
+  sampled 517 solid cells and 195 air cells outside the lamp (2952 skipped: 945 near the surface, 817 inside the lamp, 1190 off the judged slab, 0 flooded)
+  PASS: 517 solid cells were found to judge (floor 40)
+  PASS: 195 air cells were found to judge (floor 40)
+  PASS: the sampled region is actually dark — median luminance 13.4, ceiling 34.0 (a brighter region than this is not the place the complaint was about)
+  VALUE: rock median 15.0, air median 8.8, gap 6.2 -> you would be right 88% of the time
+  GRAIN: rock median 4.20, air median 1.82, gap 2.38 -> you would be right 84% of the time
+  ORIENTATION (diagnostic, not gated): rock median -0.151, air median -0.005 -> 62% of the time
+  CHROMA b-r (diagnostic, not gated): rock median +2.44, air median +7.47, gap 5.03 -> 89% of the time
+  the better cue is VALUE at 88% (a coin flip is 50%, the floor is 75%)
+  rock spread: min 4.3  p25 12.3  med 15.0  p75 18.8  max 37.7  (IQR 6.5)
+  air  spread: min 1.0  p25 4.8  med 8.8  p75 11.4  max 18.6  (IQR 6.5)
+  rock partition (diagnostic only — the verdict above is the pooled global measure):
+    plain interior     n= 398  median  14.43  vs air 86%
+    plain BOUNDARY     n=  73  median  23.61  vs air 99%
+    stained interior   n=  34  median  12.72  vs air 79%   [below the 40 floor — no conclusion]
+    stained BOUNDARY   n=  12  median  18.56  vs air 92%   [below the 40 floor — no conclusion]
+  rock partition ON GRAIN — the cue the verdict is actually made of (diagnostic only):
+    plain interior     n= 398  median   4.10  vs air 83%
+    plain BOUNDARY     n=  73  median   7.03  vs air 94%
+    stained interior   n=  34  median   3.94  vs air 81%   [below the 40 floor — no conclusion]
+    stained BOUNDARY   n=  12  median   5.39  vs air 90%   [below the 40 floor — no conclusion]
+  sampled rows: rock median 52, air median 47 (the two populations should be looking at the same depths; far apart means they are not the same picture)
+  PASS: a player can tell rock from air out in the dark — 87.77% on the better of the two cues (floor 75.00%)
+check_rock_reads: PASS (4 asserted) — 517 rock and 195 air cells, best cue 88%

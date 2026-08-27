@@ -179,3 +179,19 @@ tools/scratch/*
 
 # Python bytecode cache, regenerated automatically by every gate script's own interpreter.
 __pycache__/
+
+# Two authored, working files under the otherwise-fully-tracked legacy/tools/, deliberately never
+# committed. docs/archive/session-exhaust/handoff/CONVERGENCE_LEDGER.md (2026-08-23) has the original
+# reasoning: they are session-coordination tooling (a director-bus protocol for multi-session work), and
+# this is a public portfolio repository (CONTEXT.md) -- process internals don't belong in that tree, the
+# same reason an earlier history rewrite removed their kind on purpose. Moved here from the local-only
+# .git/info/exclude (ANVIL step 1, D0062/D0063): the reason is a project policy, not machine state, so a
+# fresh clone should omit them too, not just this one.
+legacy/tools/director_bus.sh
+legacy/tools/test_director_bus.sh
+
+# Staging area for proposals under director review, not yet a tracked decision -- currently
+# incoming/ANVIL_ARCHITECTURE.md. Ignored rather than tracked or archived because neither is this
+# session's call to make; flagged in ANVIL step 1's report as a follow-up disposition question (track
+# once acted on, archive if rejected, or something else) rather than decided here.
+/incoming/

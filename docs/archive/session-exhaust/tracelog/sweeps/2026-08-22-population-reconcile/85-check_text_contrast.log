@@ -1,0 +1,38 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== text against the plate it is drawn on ==
+  PASS: white on black measures the defined extreme (21.0000, exactly 21 by construction)
+  PASS: #767676 on white measures 4.54 against the published 4.54 — the luminance is linearised, not the repository's gamma-encoded luma, which would read 2.05 here
+  PASS: the population is the thirteen pairs the header enumerates (13)
+  PASS: at least one plate is translucent, so the compositing path is exercised rather than being carried untested (6 of 13 rows)
+  PASS: at least one row carries an ink alpha, so the ink-compositing path is exercised and not carried untested (1 of 13 rows)
+  ink              plate       on dark   on lit   drawn at
+  GOLD_DIM         UI_MODAL       5.40     5.23   the detail plate's refusal note — its one remaining site, over a wash on this plate
+  PASS: GOLD_DIM on UI_MODAL is readable — 5.40:1, floor 4.5 (the detail plate's refusal note — its one remaining site, over a wash on this plate)
+  GOLD_PALE        UI_MODAL      13.02    12.61   the hot slider's value cap
+  PASS: GOLD_PALE on UI_MODAL is readable — 13.02:1, floor 4.5 (the hot slider's value cap)
+  VERB_INK         UI_ACCENT      8.30     8.30   the live verb's word
+  PASS: VERB_INK on UI_ACCENT is readable — 8.30:1, floor 4.5 (the live verb's word)
+  VERB_INK @0.75   UI_ACCENT      5.15     5.15   the live verb's key hint, thinned
+  PASS: VERB_INK @0.75 on UI_ACCENT is readable — 5.15:1, floor 4.5 (the live verb's key hint, thinned)
+  UI_TEXT          UI_BG         12.48     9.35   the FORGED count, the grand total, a machine name
+  PASS: UI_TEXT on UI_BG is readable — 12.48:1, floor 4.5 (the FORGED count, the grand total, a machine name)
+  UI_TEXT_DIM      UI_BG          6.10     4.57   the FORGED label, PRODUCTION, CONTROLS, the hint
+  PASS: UI_TEXT_DIM on UI_BG is readable — 6.10:1, floor 4.5 (the FORGED label, PRODUCTION, CONTROLS, the hint)
+  UI_WARN          UI_BG          6.69     5.01   the dashboard's stalled counts
+  PASS: UI_WARN on UI_BG is readable — 6.69:1, floor 4.5 (the dashboard's stalled counts)
+  UI_TEXT_FAINT    UI_SLOT        4.81     4.11   the hotbar's keybind digit
+  PASS: UI_TEXT_FAINT on UI_SLOT is readable — 4.81:1, floor 4.5 (the hotbar's keybind digit)
+  UI_TEXT          UI_MODAL      12.57    12.17   the BAZAAR title, the chip counts, a works row
+  PASS: UI_TEXT on UI_MODAL is readable — 12.57:1, floor 4.5 (the BAZAAR title, the chip counts, a works row)
+  UI_TEXT_FAINT    UI_MODAL       5.39     5.21   the tab name, both key legends, the tally
+  PASS: UI_TEXT_FAINT on UI_MODAL is readable — 5.39:1, floor 4.5 (the tab name, both key legends, the tally)
+  UI_TEXT          UI_RAIL       13.13    10.91   the lit rail label, on both rails
+  PASS: UI_TEXT on UI_RAIL is readable — 13.13:1, floor 4.5 (the lit rail label, on both rails)
+  UI_TEXT_FAINT    UI_RAIL        5.62     4.67   the unlit rail labels, on both rails
+  PASS: UI_TEXT_FAINT on UI_RAIL is readable — 5.62:1, floor 4.5 (the unlit rail labels, on both rails)
+  UI_TEXT_DIM      UI_MODAL       6.15     5.95   the detail blurb, the settings rows, the ledger heading, both works group titles, the research pointer
+  PASS: UI_TEXT_DIM on UI_MODAL is readable — 6.15:1, floor 4.5 (the detail blurb, the settings rows, the ledger heading, both works group titles, the research pointer)
+  SKIP: [contrast.bright-backdrop] the bright-backdrop column was NOT asserted — how much light the world can put through a 0.90 plate is a property of the renderer, not of the palette, and this layer's lane is the palette
+  SKIP: [contrast.wash-and-brass] the wash tiles and the picked row's brass was NOT asserted — they are literals in the drawing code rather than named constants, so no row here can reference them — the inks that land on them were measured by hand for the ticket and cleared, but nothing re-measures them on the next edit
+check_text_contrast: PASS (18 asserted) — every named HUD ink clears 4.5:1 on every named plate it lands on

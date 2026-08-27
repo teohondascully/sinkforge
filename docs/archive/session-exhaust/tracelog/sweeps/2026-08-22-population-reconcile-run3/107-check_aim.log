@@ -1,0 +1,15 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the hook you can aim ==
+  48 shots: the marker called 44 bites and 4 misses
+  PASS: the rig gives the marker something to find (44 bites called)
+  PASS: every predicted bite lands in the cell it pointed at (0 disagreed)
+  PASS: ...and a shot the marker called out-of-range never secretly plants (0 did)
+  the same arc (358 px/s at the throw), 40 frames on from reaching for the same hold:
+    chained       -> +142 px along, -6 px down
+    cut-then-fire -> +231 px along, -28 px down
+  PASS: the line holds for every frame the next hook is in the air (0 dropped)
+  PASS: ...and the anchor actually moves to the new hook
+  PASS: ...and the old way really did drop you (12 frames off the line)
+  PASS: a chained throw that finds no rock leaves you on the line you were already on
+check_aim: PASS — the marker is honest and the chain holds the arc

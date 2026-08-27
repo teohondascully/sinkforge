@@ -1,0 +1,31 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: scenes/main.gd read (153163 chars)
+  PASS: MainView still names the production slot (players keep their saves)
+  PASS: MainView.save_path is an overridable static, not a const (the harness can point elsewhere)
+  PASS: a spliced slot literal is invisible to a plain contains()
+  PASS: …and visible once flattened — the normaliser really fires
+  PASS: res://tools opened and yielded .gd files (121)
+  PASS: res://tests opened and yielded .gd files (5)
+  PASS: the scan actually read the harness (124 .gd files)
+  PASS: every scanned file gave up its source
+  43 scratch cop(ies) excluded (tools/_scratch_*.gd — gitignored, and registered nowhere)
+  PASS: no fixture names the production slot
+  PASS: at least one layer reaches the save path (res://tools/check_saveload.gd, res://tools/check_teaching.gd) — the override rule is not vacuous
+  PASS: every save-reaching layer overrides MainView.save_path
+  PASS: the scan found 10 distinct isolated save slots to compare
+  PASS: the slot extractor really extracts, and de-duplicates within a file (user://one.save, user://two.save)
+  PASS: no two fixtures write the same isolated slot
+  PASS: tools/run_harness.sh read (93535 chars)
+  PASS: the runner drives the save sentinel through one capped helper, not a bare engine call
+  PASS: the runner ARMS the save sentinel before the sweep
+  PASS: the runner VERIFIES the save sentinel after the sweep
+  PASS: …and DISARMS it from the cleanup trap, so an aborted run does not leave a marker behind
+  PASS: …with that cleanup actually installed as an EXIT trap, not merely defined
+  PASS: every layer-registering line in the runner resolved to a verb (4/4: add, add_gl, add_excl, add_excl_hl)
+  PASS: the sentinel is a runner instrument, not a harness layer
+  PASS: save_game.gd (19712 chars) and save_sentinel.gd (15795 chars) both read
+  PASS: the game's own write refusal keys on 2 environment markers (SF_ISOLATED_HOME, SF_REAL_HOME)
+  PASS: the sentinel consults every marker that refusal does
+  PASS: …through a named refusal of its own, not by hoping the runner always wraps it
+check_save_isolation: PASS (27 asserted)

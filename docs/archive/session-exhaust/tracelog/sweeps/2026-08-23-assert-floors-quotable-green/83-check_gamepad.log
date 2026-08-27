@@ -1,0 +1,14 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== you can play this game with a controller ==
+  PASS: every essential verb is reachable from the pad
+  PASS: no pad input drives two verbs
+  PASS: CONTROL: the clash detector finds two verbs on one input (1 found)
+  PASS: CONTROL: ...and finds none when they are on different inputs (0 found)
+  PASS: every stick and trigger binding picks one half of its axis
+  PASS: every essential verb still works on keyboard and mouse
+  PASS: every pad spec builds into a pad event
+  PASS: 15 essential verbs have pad bindings
+  PASS: 16 distinct pad inputs are in use
+  the pad drives: PAD A, PAD B, PAD BACK, PAD LEFT, PAD LT, PAD RB, PAD RIGHT, PAD RT, PAD START, PAD UP, PAD X, PAD Y, STICK DOWN, STICK LEFT, STICK RIGHT, STICK UP
+check_gamepad: PASS (9 asserted) — every verb the loop needs is on the pad, once each

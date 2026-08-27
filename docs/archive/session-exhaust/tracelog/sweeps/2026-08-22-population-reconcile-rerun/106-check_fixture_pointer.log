@@ -1,0 +1,25 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== a human at the keyboard is a contaminant, and this is how we notice ==
+  PASS  an untouched pointer is NOT contamination (40 identical samples)
+  PASS  ...and it says so: an aim failure on a quiet box is our bug, not the user's hand
+  PASS  sub-pixel jitter is noise, not a hand (below TOL_PX 1.0)
+  PASS  a 132.3 px jump IS contamination — the number that misled me
+  PASS  ...and the verdict is VOID, not failed — the distinction that cost real edits
+  PASS  ...and it reports HOW MANY samples moved (1 of 40), not just that one did
+  PASS  ...and the largest jump is the real magnitude, carried into the message
+  PASS  a pointer moving all run counts every move (29 of 30), so travel is not understated
+  PASS  (setup) the warp scan opened 118 fixture scripts under tools/
+  PASS  (setup) every fixture under tools/ could be read (all readable)
+  PASS  no fixture gained a new warp_mouse call — it moves the USER'S cursor (all within budget)
+  PASS  ...and the scanner recognises a real call
+  PASS  ...and does NOT count a comment about one
+  PASS  ...and does not count a doc comment either
+    warp_mouse debt: 0 calls across 0 file(s)
+  PASS  (setup) the game-side scan opened 54 scripts under scenes/ and src/
+  PASS  no shipped script outside the controls.gd seam reads the OS cursor (clean)
+  PASS  ...and the scanner recognises a raw read
+  PASS  ...and does NOT count the prose describing the seam
+    OS-cursor reads outside the seam: 0, across 54 scanned script(s)
+
+check_fixture_pointer: PASS — contamination is detected, and quiet is not called dirty

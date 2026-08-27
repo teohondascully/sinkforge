@@ -1,0 +1,44 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== stand it on the thing it eats ==
+  PASS: a drill can be placed IN the cell whose backing is the vein
+  PASS: …and its target is the face it stands on, not a column below
+  PASS: it draws the vein down (20 of 40)
+  PASS: …and every unit it took is realised as production exactly once — the ledger still balances
+  PASS: …and the vein is still a vein until it is actually empty
+  PASS: not one unit moved SIDEWAYS out of the Head's column
+  PASS: …and the haul is below the Head, where gravity put it (20)
+  PASS: a Head with no shaft under it still runs (5 left)
+  PASS: …and never reports itself blocked for want of a drain
+  PASS: …the ore piles where it landed (15), which is a state you can see and dig out of
+  PASS: a fresh Head on a fresh vein is working
+  PASS: the vein is worked out
+  PASS: …and the Head says SPENT — its own word, because nothing is wrong with it
+  PASS: …having produced exactly the vein, no more (6)
+  PASS: …while a drill placed on nothing at all reads as STARVED, not spent
+  PASS: a drill above a SOLID vein still targets it exactly as before
+  PASS: …and is not confused for a Head (no lode under it)
+  PASS: …and bores the whole body out (10)
+  PASS: …carving its shaft as it goes, exactly as it always did
+  PASS: the preview over a lode shows ONE cell — the face itself
+  PASS: …and pours from directly under it
+  PASS: …and never previews as blocked
+  PASS: …and the supply it reports is the face it stands on (40), not a column sum
+  PASS: two Spurs chain off a Head along the seam
+  PASS: …and the Head's reach is all three cells, its own first (3)
+  PASS: …the far Spur knows which Head it answers to, through the near one
+  PASS: the Head draws the FAR cell too — reach is real, not a label (10 left)
+  PASS: …and every unit off the whole chain is realised exactly once (60)
+  PASS: …and the whole haul comes out of the HEAD's column, not each Spur's
+  PASS: in the same time a wide Head out-produces a lone one (60 vs 20)
+  PASS: …and burns more coal doing it (20 vs 7) — reach is a trade, not a free upgrade
+  PASS: a Spur fits on a lode cell touching the Head
+  PASS: …and is refused two cells out, where it would touch nothing — an orphan is not a build
+  PASS: …but fits once the gap is bridged: a chain reaches as far as you build it
+  PASS: …and is refused where there is no vein, because a Spur eats what it stands on, same as a Head
+  PASS: the Head's own cell is worked out
+  PASS: …and it does NOT say spent, because moving it would throw away a chain that is still paying
+  PASS: …it draws from the nearest link that still has something in it
+  PASS: …and only when the WHOLE reach is dry does it ask to be moved
+  PASS: a Spur reaching no Head says UNLINKED — its own word, because nothing else is wrong with it
+check_head: PASS — a Head works the face it stands on

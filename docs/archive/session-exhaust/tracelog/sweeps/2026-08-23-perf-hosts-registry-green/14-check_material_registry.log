@@ -1,0 +1,40 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== material registry contract ==
+  PASS: the renderer's material registry is populated (16 defs)
+  PASS: …including the &"earth" fallback every miss silently resolves to
+  PASS: there are authored materials on disk to check (16)
+  PASS: coal.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: deepslate.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: deepslate_wall.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: dirt_wall.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: earth.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: gravel.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: iron.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: leaves.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: ore.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: rich_ore.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: sealrock.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: shale.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: shale_wall.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: stone.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: stone_wall.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: wood.tres is registered in WorldRenderer._materials, so it draws as itself
+  PASS: the guard actually walked the material files (16)
+  PASS: _material(&"ore") returns its own def, not the dirt fallback
+  PASS: _material(&"rich_ore") returns its own def, not the dirt fallback
+  PASS: _material(&"coal") returns its own def, not the dirt fallback
+  PASS: _material(&"iron") returns its own def, not the dirt fallback
+  PASS: _material(&"earth") returns its own def, not the dirt fallback
+  PASS: _material(&"stone") returns its own def, not the dirt fallback
+  PASS: _material(&"shale") returns its own def, not the dirt fallback
+  PASS: _material(&"deepslate") returns its own def, not the dirt fallback
+  PASS: _material(&"sealrock") returns its own def, not the dirt fallback
+  PASS: _material(&"gravel") returns its own def, not the dirt fallback
+  PASS: _material(&"wood") returns its own def, not the dirt fallback
+  PASS: _material(&"leaves") returns its own def, not the dirt fallback
+  PASS: &"ore" has flecks, so an exposed lode of it is something you can see
+  PASS: &"rich_ore" has flecks, so an exposed lode of it is something you can see
+  PASS: &"coal" has flecks, so an exposed lode of it is something you can see
+  PASS: &"iron" has flecks, so an exposed lode of it is something you can see
+check_material_registry: PASS (36 asserted)

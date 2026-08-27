@@ -1,0 +1,23 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== a working machine has to look different from a stopped one ==
+  PASS: CONTROL: the camera has stopped — a cell's screen rect is identical 20 frames apart ([P: (1176, 421), S: (48, 49)] vs [P: (1176, 421), S: (48, 49)])
+    empty stage mean luma 17.3, 1.26 levels of still-frame drift across five shots
+    2 floor reference(s) taken with the stage empty
+    drove 3 of 6 subjects to `working` — could not drive: Crusher (no_power), Spur (unlinked), Gear Mill (no_input)
+  PASS: at least two machines could be driven to `working` (3) — one is a machine, not a family
+    machine       ignite     work     stop  D_motion   D_state clip@ig clip@wk   verdict
+    (ignite = the frame the status flips; work = the same state 75 frames later; told = what _machine_active reported)
+    Forge          115.6    128.9     51.5     11.59     77.38      0%      0%  on->off   reads
+    Drill          171.2    166.3     76.8     14.37     90.20      0%      0%  on->off   reads
+    Generator       68.5    198.1     68.0     12.13    130.12      0%      4%  on->off   reads
+    settling lag (not a failure): Generator (off at the flip, on once settled)
+  PASS: CONTROL: every subject was actually drawn on the stage
+  PASS: the renderer's `_machine_active` and the sim's `machine_status` agree once both have settled
+  PASS: no subject's working frame is clipped white, which would hide any cue it has
+  PASS: every subject produced comparable patches
+  PASS: every machine's HARDWARE says whether it is running, with labels hidden and in luma
+check_machine_state: PASS (7 asserted) — the hardware says whether it is running

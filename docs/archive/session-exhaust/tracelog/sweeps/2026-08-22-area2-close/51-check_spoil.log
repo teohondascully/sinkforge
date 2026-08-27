@@ -1,0 +1,37 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== spoil, crushed and packed ==
+  PASS: fixture: the Crusher def loads
+  crusher out: { &"gravel": 10 }   ·   still holding: {  }
+  PASS: the crusher pours GRAVEL (10 of it)
+  PASS: …and no uncrushed rock ever reaches the column below
+  PASS: the ledger balances: 20 spoil consumed → 10 gravel at 2:1
+  PASS: …and every gravel it made is on the produced ledger — the stream halves, it doesn't vanish
+  PASS: every scrap of pay passes through the crusher UNTOUCHED (ore 9, iron 3)
+  PASS: …and the crusher never consumes an ore — it is a filter, not a furnace
+  PASS: …while the rock in the same stream still becomes gravel
+  PASS: unpowered, it crushes nothing
+  PASS: …and says so — 'no power', in its own word
+  PASS: …and burns no coal doing it
+  PASS: powered, it runs
+  PASS: …and a LONE generator is enough for one crusher (1.00 of full)
+  PASS: fixture: a stone block goes into the wall at row 40
+  PASS: fixture: a stone block goes into the wall at row 41
+  PASS: fixture: a stone block goes into the wall at row 42
+  PASS: fixture: a stone block goes into the wall at row 43
+  loose stone wall: 61 units of water found their way through in a minute
+  PASS: a wall of LOOSE FILL weeps — the rock you stacked back is not a bulkhead
+  PASS: …and not one unit was created doing it (128 in, 128 out)
+  PASS: …and the sim knows why: the cell is LOOSE fill, not strata
+  PASS: fixture: a gravel block goes into the wall at row 40
+  PASS: fixture: a gravel block goes into the wall at row 41
+  PASS: fixture: a gravel block goes into the wall at row 42
+  PASS: fixture: a gravel block goes into the wall at row 43
+  packed gravel wall: 0 units through
+  PASS: a PACKED GRAVEL wall holds the water back completely
+  PASS: …and reads as packed, which is what the renderer draws
+  PASS: …while undisturbed strata is neither: the seep is a property of what YOU built
+  rig → spoil column → crusher: 8 gravel, crusher status no_input
+  PASS: a gallery's spoil stream falls into a crusher and comes out as gravel, hands-free
+  PASS: …and every gravel is accounted for by rock the rig actually cut
+check_spoil: PASS — spoil crushes to gravel, and only packed gravel holds water back

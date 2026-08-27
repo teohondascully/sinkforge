@@ -1,0 +1,66 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the vein outlives the blow ==
+  PASS: every spawn opens with a vein you can SEE and work without a swing (4 cells)
+  PASS: …because the rock is already off it — that is what makes it a face and not a guess
+  PASS: …and the break-in end is bare, so the vein is a reason to go deeper rather than a thing you land on
+  PASS: the ground OVER the pocket is unbroken — you can walk across it without knowing it is there
+  PASS: every column of the cut is a clear run at least 2 rows tall — the body's own height
+  PASS: …and each column overlaps the next by 2, so you can walk through at the height you arrive at
+  PASS: …dropping exactly one row per column, which is the reach of a step-up — two would be a trap
+  PASS: …so getting in costs exactly ONE swing at the roof, which is the lesson the whole migration is about
+  PASS: the vein CONTINUES behind the rock below the face (3 cells)
+  PASS: …and it gets richer as it goes, so following it is worth the digging
+  PASS: …while the exposed part is a taste (180), not a factory's worth
+  PASS: there is a bit set to swing at all (4 bits)
+  PASS: broad_bit: the blows land (1 took rock off)
+  PASS: broad_bit: …and what they opened is a lode you can still work
+  PASS: broad_bit: the rock comes off and the vein is untouched (830799 → 830799)
+  PASS: sinker_bit: the blows land (2 took rock off)
+  PASS: sinker_bit: …and what they opened is a lode you can still work
+  PASS: sinker_bit: the rock comes off and the vein is untouched (830799 → 830799)
+  PASS: lance_bit: the blows land (2 took rock off)
+  PASS: lance_bit: …and what they opened is a lode you can still work
+  PASS: lance_bit: the rock comes off and the vein is untouched (830799 → 830799)
+  PASS: wedge_bit: the blows land (1 took rock off)
+  PASS: wedge_bit: …and what they opened is a lode you can still work
+  PASS: wedge_bit: the rock comes off and the vein is untouched (830799 → 830799)
+  PASS: …across the whole bit set, not one unit of ore was destroyed by clearing rock (3323196 → 3323196)
+  PASS: the pick takes the ore BLOCK off the face
+  PASS: …and pays a loose burst for the blow (5)
+  PASS: …the cell is open, as it always was
+  PASS: …but what is behind it is a LODE, not nothing
+  PASS: …and it is workable: exposed, and with something left in it
+  PASS: …and the burst came OUT of the vein (60 - 5 = 55)
+  PASS: ten hand-pulls take ten units (10)
+  PASS: …off the same pool the drill reads (25 → 15)
+  PASS: …into the pack, one for one
+  PASS: …and realised as production exactly once, so the ledger still balances
+  PASS: a vein can actually be worked dry (7 pulls)
+  PASS: …and a dry vein gives nothing more
+  PASS: …it stops being a lode at all
+  PASS: …it reads as no vein
+  PASS: …and it stops drawing as one (the renderer thins on this)
+  PASS: …so the hold-loop has nothing to work here
+  PASS: an open vein with 35 in it
+  PASS: …build a wall over it and the vein is still there
+  PASS: …just not workable, because you cannot reach through a wall
+  PASS: …take the wall back off and it is the same vein, unchanged (35)
+  PASS: there is iron in the wall, and the sim says it is workable rock
+  PASS: …but the starter drive cannot touch it
+  PASS: …so it REFUSES, through the same predicate rock refuses with
+  PASS: …and the cursor goes cold and crossed before you press
+  PASS: …and the verb takes nothing
+  PASS: …and the moment you own the drive it gives
+  PASS: …and the Wedge — the one bit that refuses rock — never refuses ORE, because it shapes no hole here
+  PASS: the lode survives a save/load round-trip
+  PASS: …with what was left in it (39)
+  PASS: …and a save from before the lode existed still loads, with none
+  PASS: rock with a vein behind it is NOT the colour of the rock beside it (0.043)
+  PASS: …and it reads DARKER, like metal in stone, without becoming a hole (0.27 vs 0.34)
+  PASS: …while an OPEN face never darkens, because a hole that reads dark is just more rock
+  PASS: …and an OPEN face stains further still (0.061 vs 0.043)
+  PASS: …and the SOLID terrain pass picks it up, so the tell survives into the rock you have not dug
+  PASS: …and only the OPEN one carries metal you can see and work — that is what the swing buys
+  PASS: …on a cell sealed in rock, which is exactly where a GLINT would read as a floating star
+check_lode: PASS (62 asserted) — the blow opens the vein instead of ending it

@@ -1,0 +1,575 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== Sinkforge sim tests ==
+- placement
+  PASS: place in an empty cell
+  PASS: machine_at finds the placed machine
+  PASS: cannot place on an occupied cell
+  PASS: cannot place out of bounds
+  PASS: remove clears the cell
+- conservation
+  PASS: ore conserved (present=2, produced-consumed=2)
+  PASS: ingot conserved (present=4, produced-consumed=4)
+- determinism
+  PASS: identical state after 200 ticks
+- determinism canary covers the whole state
+  PASS: canary sees solid
+  PASS: canary sees wall
+  PASS: canary sees deposits
+  PASS: canary sees inventory
+  PASS: canary sees ground
+  PASS: canary sees conduit
+  PASS: canary sees rope
+  PASS: canary sees torch
+  PASS: canary sees water
+  PASS: canary sees research
+  PASS: canary sees sapling
+  PASS: canary sees world seed
+  PASS: canary sees ledger
+  PASS: canary sees machine facing
+  PASS: canary sees machine filter
+  PASS: canary sees machine mode
+- production sanity
+  PASS: produced ingots (9 after 400 ticks)
+  PASS: 2 ore per ingot (ingots=9, consumed_ore=18)
+- production rate (X/min)
+  PASS: no history -> rate 0
+  PASS: steady vent reads ~60 ore/min (got 60.0)
+  PASS: unknown item -> rate 0
+  PASS: production_rates lists the one flowing item
+  PASS: rate sampling is conservation-neutral (made=10 present=10)
+- machine census (dashboard)
+  PASS: empty world -> no census
+  PASS: two machine TYPES tallied (got 2)
+  PASS: census total == grid.size() == 3 (got 3)
+  PASS: two vents counted (got 2)
+  PASS: both vents read WORKING (got 2)
+  PASS: sorted most-numerous-first (vents lead)
+- machine problems (alerts)
+  PASS: healthy world -> no alerts
+  PASS: one grouped alert (both generators, one row) — got 1
+  PASS: the alert is generator/no_fuel
+  PASS: both starving generators counted (got 2)
+  PASS: carries a real representative cell to ping
+- splitter routing
+  PASS: down branch delivered raw ore to the sink (15)
+  PASS: right branch fed the processor (ingots=6)
+  PASS: split is roughly even (down=15 of produced=30)
+  PASS: ore conserved through splitter (present=18, net=18)
+  PASS: ingot conserved through splitter (present=6, net=6)
+  PASS: the panel can set a splitter's ratio directly
+  PASS: …and the mode landed (1:2 RIGHT)
+  PASS: an out-of-range mode clamps to a real pattern
+  PASS: a non-splitter refuses the ratio knob
+  PASS: splitter chain is deterministic
+- mining + deposit
+  PASS: mining a vein returns ore
+  PASS: mining a vein drops a 3-6 loose burst into the pack (got 3)
+  PASS: the pack accumulates across mines (9)
+  PASS: mined ore conserved
+  PASS: deposited all carried ore into the processor
+  PASS: pack emptied after depositing all
+  PASS: processor received the ore
+  PASS: hand-fed ore forged at least one ingot (4)
+  PASS: ore conserved across the by-hand loop (present=1, net=1)
+  PASS: ingot conserved across the by-hand loop (present=4, net=4)
+  PASS: cannot deposit ore you don't carry
+- hand-built chain
+  PASS: placed a splitter by hand
+  PASS: placed a processor under the down branch
+  PASS: placed a processor under the right branch
+  PASS: dug a stock of ore into the pack (36)
+  PASS: hand-fed all the ore into the splitter
+  PASS: the hand-built chain forged ingots (8)
+  PASS: ore conserved in the hand-built chain (present=20, net=20)
+  PASS: ingot conserved in the hand-built chain (present=8, net=8)
+  PASS: picked the processor back up (cell is buildable again)
+  PASS: ore conserved after raw removal (present=10, net=10)
+  PASS: ingot conserved after raw removal (present=8, net=8)
+  PASS: picked up a machine holding ore
+  PASS: the 4 held ore were salvaged into the pack
+  PASS: salvage consumed nothing (pickup ≠ destroy)
+  PASS: salvaged ore conserved
+- inventory slots
+  PASS: empty pack = no slots
+  PASS: two mined ore blocks = one stack
+  PASS: the ore stack shows the carried count (11)
+  PASS: second item type = second slot
+  PASS: insertion order preserved (ore, then ingot)
+- spit + collect
+  PASS: hand-fed 2 ore into the forge
+  PASS: nothing fell into the void sink (a floor caught it)
+  PASS: one ingot rests on the floor
+  PASS: collecting the pile returns 1 item
+  PASS: collected ingot is now in the pack
+  PASS: the pile is gone after collecting
+  PASS: ore conserved across spit+collect (present=7, net=7)
+  PASS: ingot conserved across spit+collect (present=1, net=1)
+- slope item flow
+  PASS: item on a down-right ramp rolls to the base (got (5, 7))
+  PASS: the rolled item rests at the base of the slope
+  PASS: nothing is left perched on the ramp top
+  PASS: an item on flat ground stays put
+  PASS: an item on an interior floor does NOT roll along the outdoor slope (got (3, 19))
+  PASS: ore conserved across slope rolls (present=3, net=3)
+- pile falls when floor mined
+  PASS: mined the block under the pile
+  PASS: the pile no longer hangs where its floor was
+  PASS: the pile fell to the floor below
+  PASS: a flow_event was emitted so the fall animates
+  PASS: a pile falling onto a machine feeds its input
+  PASS: ingot conserved across the re-settle (present=3, net=3)
+  PASS: ore conserved across the re-settle (present=2, net=2)
+- craft + build
+  PASS: craft a processor with enough ingots
+  PASS: crafting spent 3 ingots
+  PASS: a processor item is now in the pack
+  PASS: spent ingots counted as consumed
+  PASS: cannot craft a second one (only 2 ingots left)
+  PASS: placed the processor from the pack
+  PASS: placing consumed the processor item
+  PASS: cannot place a machine you don't carry
+  PASS: ore handed into the machine left the pack
+  PASS: picked the machine back up
+  PASS: the machine item returned to the pack
+  PASS: the machine's held ore was salvaged back to the pack (9)
+  PASS: ore conserved across craft+pickup (present=9, net=9)
+  PASS: ingot conserved across craft+pickup (present=2, net=2)
+  PASS: processor conserved across craft+pickup (present=1, net=1)
+- lift
+  PASS: placed a lift
+  PASS: 5 ore present before lifting
+  PASS: lift carries only LIFT_THROUGHPUT/tick (the rest is backlog = the cost)
+  PASS: lift drained upward
+  PASS: all 5 ore arrived at the TOP of the shaft
+  PASS: ore conserved across lifting (present=5)
+- ore mining + drill (boring model)
+  PASS: one strike breaks the whole ore block
+  PASS: hand-mining drops a 3-6 loose burst (got 5)
+  PASS: a hand-mined cell IS a vein, less what the blow took (12 - 5 = 7)
+  PASS: …exposed in the wall, and workable — the swing opened it, it did not destroy it
+  PASS: burst ore conserved
+  PASS: a solid vein reads its remaining richness (for the hover)
+  PASS: an unseeded solid ore cell reads the default richness
+  PASS: the solid vein carries its full drill-yield (14)
+  PASS: placed a drill above the vein
+  PASS: the drill targets the solid vein below it
+  PASS: the drill bored the vein cell out (carved the shaft)
+  PASS: total ore = the drilled vein yield (14)
+  PASS: all ore conserved through the drill
+  PASS: an exhausted drill stops producing (extraction is finite)
+  PASS: a drill high above the vein finds it straight down (forgiving reach)
+  PASS: the offset drill bored the vein below it out
+  PASS: ore conserved through the offset drill
+  PASS: the boring drill undermines: it targets the DEEPEST ore
+  PASS: no loose ore pile is ever stranded on top of unmined ore (drains bottom-up)
+  PASS: bored-out ore cell (5,6) is now carved open
+  PASS: bored-out ore cell (5,7) is now carved open
+  PASS: bored-out ore cell (5,8) is now carved open
+  PASS: bored-out ore cell (5,9) is now carved open
+  PASS: the whole ore body's deposit was extracted (12)
+  PASS: ore conserved through boring the solid body
+  PASS: a spent, fully-bored body leaves the drill nothing (idles)
+  PASS: the blocked drill still SEES the ore below it
+  PASS: a drill with rock directly under the vein reads 'blocked'
+  PASS: a blocked drill produces NOTHING (stalls, no dead-pocket mining)
+  PASS: the blocked drill left the vein intact (didn't bore into a dead pocket)
+  PASS: once a drain is dug below, the drill reads 'working'
+  PASS: with a drain, the once-blocked drill drains the full vein
+  PASS: ore conserved after unblocking
+  PASS: preview lists all 3 ore cells the drill would bore
+  PASS: preview spans top→bottom of the vein
+  PASS: preview drop cell is just below the deepest ore
+  PASS: preview reads NOT blocked when a drain is open below
+  PASS: preview over no ore lists nothing
+- coal mining + drill fuel
+  PASS: mining coal drops a 3-6 coal burst (got 6)
+  PASS: one strike breaks the whole coal block
+  PASS: coal conserved
+  PASS: an UNFUELED drill produces nothing (needs coal)
+  PASS: the vein is untouched without coal
+  PASS: fed coal, the drill pulls ore
+  PASS: the drill burned coal to run
+  PASS: a drill over a COAL vein produces coal (material-aware)
+- trees + wood
+  PASS: worldgen planted trees (wood=23, leaves=36)
+  PASS: foliage is NOT the walkable surface — the ground row is (trees don't ramp)
+  PASS: a trunk cell is solid (you collide with / can chop it)
+  PASS: chopping the base trunk returns wood material
+  PASS: the whole tree falls → BOTH trunk cells' wood (base + felled)
+  PASS: both trunk cells cleared
+  PASS: the CANOPY fell too — no floating leaves (nothing floats)
+  PASS: the ground under the tree survives (terrain does NOT collapse)
+  PASS: wood conserved through the fall
+  PASS: digging the earth under the tree returns earth
+  PASS: the un-rooted tree fell entirely — no floating trunk or leaves
+  PASS: no floating foliage remains anywhere
+- mining rules (tools + friction)
+  PASS: can't crack stone bare-handed
+  PASS: the pickaxe cracks stone
+  PASS: the pickaxe chops wood too (the axe is gone)
+  PASS: a legacy axe is a keepsake, not a key
+  PASS: dirt is always hand-mineable
+  PASS: the starter pick can mine ore
+  PASS: one starter tool: the wooden pick
+  PASS: no pick → stone never breaks
+  PASS: with a pick stone takes finite time
+  PASS: tools are distinguished from resources
+  PASS: deepslate requires a tier-2 pick
+  PASS: ordinary rock is tier-1 (any pick)
+  PASS: the wood pick (tier 1) can't crack deepslate
+  PASS: the stone pick (tier 2) cracks deepslate
+  PASS: wood pick → deepslate never breaks (gated)
+  PASS: stone pick → deepslate takes finite time
+  PASS: best_tier reads the pack's top pick
+  PASS: craft a Stone Pickaxe with enough stone+wood
+  PASS: the stone pickaxe is now in the pack
+  PASS: crafting spent the recipe cost (8 stone, 3 wood)
+  PASS: with the crafted pick, deepslate is now mineable
+  PASS: can't craft the pick without enough materials
+  PASS: craft an Iron Pickaxe from 6 iron ingots + 3 wood
+  PASS: the iron pick is tier 3
+  PASS: …and cuts deepslate at exactly the same speed as the stone pick — the ladder is a key, not a stat
+  PASS: even tier 3 cannot hand-mine THE SEAL
+- hopper (storage + metered feed)
+  PASS: the hopper released its stockpile downward over time
+  PASS: metered ore reached the forge and got smelted
+  PASS: back-pressure kept the forge's buffer small (peak=3) — the bulk stayed banked
+  PASS: ore conserved through the hopper (present=6, net=6)
+  PASS: ingot conserved through the hopper (present=7, net=7)
+  PASS: with no consumer below, the hopper HOLDS its whole stockpile (storage)
+  PASS: the held stockpile is conserved
+- drop / toss (gravity feed)
+  PASS: dropped 3 ore into the column
+  PASS: the ore fell into the forge's input buffer
+  PASS: the dropped ore left the pack
+  PASS: ore conserved through the drop (2 pack + 3 in forge)
+  PASS: drop_item records the landing cell for the pickup grace
+  PASS: dropped 4 ingot down an open column
+  PASS: the ingots rest as a ground pile on the floor
+  PASS: ingot conserved as a ground pile
+  PASS: a tossed stack lands by the target column, not the throw origin
+- block placement + bazaar
+  PASS: placed a wood block from the pack
+  PASS: block is solid, pack spent one
+  PASS: cannot place onto an occupied cell
+  PASS: wood conserved across placement (place = consume)
+  PASS: frame missing one post is NOT yet a bazaar
+  PASS: completion cell points at the single missing post
+  PASS: completing the frame forms a valid bazaar
+  PASS: a complete bazaar has no completion cell
+  PASS: find_bazaars locates exactly it
+  PASS: near_bazaar true at the interior
+  PASS: near_bazaar false far away
+  PASS: a top-beam cell is a walk-through frame cell
+  PASS: a post cell is a walk-through frame cell
+  PASS: the completing post is a walk-through frame cell
+  PASS: the interior FLOOR is solid ground, not a frame cell (you stand on it)
+  PASS: a lone wood block (tree) is NOT a bazaar frame cell (trees still block)
+  PASS: a blocked interior is no longer a valid bazaar
+- block support (no mid-air blocks)
+  PASS: isolated open-sky cell has NO support (can't float a block)
+  PASS: on top of a solid block IS supported
+  PASS: beside a solid block IS supported (extend a structure)
+  PASS: two cells from anything is still unsupported
+  PASS: a wall behind the cell supports a block (backfill a dug room)
+- automated ore→ingot line (Rung 1)
+  PASS: the line forged ingots with NO hand intervention (14)
+  PASS: the drill supplied the ore the forge smelted
+  PASS: ingots piled on the floor, ready to collect (14)
+  PASS: ore conserved in the automated line (present=2, net=2)
+  PASS: ingot conserved in the automated line (present=14, net=14)
+- machine status (legibility mirror)
+  PASS: unfueled drill over ore reads no_fuel
+  PASS: fueled drill over ore reads working
+  PASS: drill with no ore below reads no_input
+  PASS: starved forge reads no_input
+  PASS: fed forge reads working
+  PASS: empty hopper reads idle
+  PASS: loaded hopper reads working
+- objectives: the L1->L2 handoff nudges (power / generator / descent / breach)
+  PASS: handoff nudges are all pending at boot (nothing fires early)
+  PASS: 'power' step latches on is_researched(power)
+  PASS: 'generator' step waits for the generator to be FUELED (not just placed)
+  PASS: 'generator' step latches when the generator is burning coal
+  PASS: 'descent' step latches on is_researched(descent)
+  PASS: 'breach' step is pending while the seal is intact
+  PASS: the fed engine bored the seal cell open (breach happened)
+  PASS: 'breach' step latches once a snapshotted seal cell is opened
+  PASS: 'breach' is the final step — the chain ends there, player self-directs
+- no empty ground piles (splitter leak guard)
+  PASS: no empty ground pile lingers when the tick returns (splitter routes one way; found 0)
+  PASS: ore conserved through the splitter to ground
+  PASS: resettling a pile leaves no empty landing pile behind (found 0)
+  PASS: ingot conserved through the resettle cascade
+- behavior registry
+  PASS: lift.run resolves to a sim method
+  PASS: lift.status resolves to a sim method
+  PASS: lift.dests resolves to a sim method
+  PASS: lift has a MACHINE_STYLE look
+  PASS: splitter.run resolves to a sim method
+  PASS: splitter.status resolves to a sim method
+  PASS: splitter.dests resolves to a sim method
+  PASS: splitter has a MACHINE_STYLE look
+  PASS: drill.run resolves to a sim method
+  PASS: drill.status resolves to a sim method
+  PASS: drill has a MACHINE_STYLE look
+  PASS: generator.run resolves to a sim method
+  PASS: generator.status resolves to a sim method
+  PASS: generator has a MACHINE_STYLE look
+  PASS: hopper.run resolves to a sim method
+  PASS: hopper.status resolves to a sim method
+  PASS: hopper has a MACHINE_STYLE look
+  PASS: descent.run resolves to a sim method
+  PASS: descent.status resolves to a sim method
+  PASS: descent has a MACHINE_STYLE look
+  PASS: h_drill.run resolves to a sim method
+  PASS: h_drill.status resolves to a sim method
+  PASS: h_drill.dests resolves to a sim method
+  PASS: h_drill has a MACHINE_STYLE look
+  PASS: drift.run resolves to a sim method
+  PASS: drift.status resolves to a sim method
+  PASS: drift.dests resolves to a sim method
+  PASS: drift has a MACHINE_STYLE look
+  PASS: pump.run resolves to a sim method
+  PASS: pump.status resolves to a sim method
+  PASS: pump has a MACHINE_STYLE look
+  PASS: crush.run resolves to a sim method
+  PASS: crush.status resolves to a sim method
+  PASS: crush has a MACHINE_STYLE look
+  PASS: spur.run resolves to a sim method
+  PASS: spur.status resolves to a sim method
+  PASS: spur has a MACHINE_STYLE look
+  PASS: an unknown behavior tag falls through to the default recipe-runner
+  PASS: unknown tag still derives a status
+- rope
+  PASS: rope unrolled from the anchor down to the floor (hung 6/6)
+  PASS: anchor + bottom are climbable
+  PASS: the floor itself is not roped
+  PASS: each segment spent one carried rope
+  PASS: an already-roped anchor refuses (no double-hang)
+  PASS: cannot anchor inside solid rock
+  PASS: unroll stops when the pack runs out
+  PASS: a block cannot be placed into a roped cell
+  PASS: a machine cannot be placed into a roped cell
+  PASS: a dropped item falls straight through the rope to the floor
+  PASS: rope_length counts the whole connected run from any segment
+  PASS: rope_anchor walks up to the top segment
+  PASS: no rope -> length 0
+  PASS: cutting mid-rope takes it + the tail below (3/3)
+  PASS: the rope above the cut stays
+  PASS: cut segments returned to the pack
+  PASS: retract from a low segment recovers the whole hang via the anchor (3/3)
+  PASS: nothing left hanging after retract-all
+  PASS: retracting where there is no rope is a no-op
+  PASS: every segment came home
+  PASS: rope conserved through place+cut+retract (present=20, net=20)
+- saplings (renewable wood)
+  PASS: the grove hides SOME seeds (10/30 — a share, not all/none)
+  PASS: chopping the grove dropped exactly the hash-share (10/10)
+  PASS: mid-air (no soil below) refuses
+  PASS: stone is not soil
+  PASS: open cell on earth roots the sapling
+  PASS: an occupied sapling cell refuses a second seed
+  PASS: a planted sapling can be taken back
+  PASS: …and replanted
+  PASS: the grown sapling retired
+  PASS: a trunk stands where it was planted
+  PASS: the tree grew a canopy (6 leaf cells)
+  PASS: plant the crush candidate
+  PASS: a built-over sapling is crushed
+  PASS: plant the uproot candidate
+  PASS: losing the soil uproots the sapling
+  PASS: the uprooted seed dropped as a ground item
+  PASS: saplings conserved through the whole loop (present=12, net=12)
+- torches (placeable light)
+  PASS: no torch carried -> refused
+  PASS: a floating sky cell refuses (nothing to mount on)
+  PASS: a wall-backed open cell mounts
+  PASS: a rock-adjacent open cell mounts
+  PASS: no double-mount
+  PASS: cannot mount inside solid rock
+  PASS: each mount spent one carried torch
+  PASS: a block cannot be placed into a torch cell
+  PASS: a machine cannot be placed into a torch cell
+  PASS: removal takes the torch back
+  PASS: …into the pack
+  PASS: torches are research-UNGATED (never lock the light)
+  PASS: torch conserved through mount+remove (present=2, net=2)
+- save/load (versioned, determinism-verified)
+  PASS: an unknown save version refuses
+  PASS: an unknown machine def refuses
+  PASS: a refused restore leaves the sim untouched
+  PASS: the envelope writes to disk
+  PASS: …and reads back
+  PASS: the restore lands
+  PASS: terrain + walls + deposits + lodes round-trip
+  PASS: pack + ground + sink round-trip
+  PASS: the placed layers round-trip
+  PASS: research round-trips
+  PASS: every machine came back
+  PASS: machine runtime state (fuel mid-burn) survives
+  PASS: restored sim stays in LOCKSTEP with the original (120 ticks on)
+  PASS: …down to the ledgers
+- the L2 iron chain (crafter modules)
+  PASS: the iron forge gates on Ironworks
+  PASS: the modules gate on Machining
+  PASS: the iron forge refuses before Ironworks
+  PASS: Ironworks refuses before the L1 ladder is done
+  PASS: Ironworks researches (iron sample + 10 ingots)
+  PASS: the iron forge crafts
+  PASS: Machining researches — iron pays for iron
+  PASS: Machining opens the module branch
+  PASS: iron poured in the top comes out PLATES on the floor ({ &"plate": 2 })
+  PASS: the mill WAITS for both streams (starved on iron alone)
+  PASS: iron+copper merged -> 2 gears per craft ({ &"gear": 4 })
+  PASS: iron conserved through the chain (present=1, net=1)
+  PASS: iron_ingot conserved through the chain (present=0, net=0)
+  PASS: plate conserved through the chain (present=2, net=2)
+  PASS: gear conserved through the chain (present=4, net=4)
+  PASS: ingot conserved through the chain (present=24, net=24)
+- the horizontal drill (the Borer)
+  PASS: the Borer gates on Machining
+  PASS: dark without coal
+  PASS: no coal, no boring
+  PASS: the first bite cleared the face
+  PASS: the haul sits in the BELLY (no drain below)
+  PASS: nothing spilled onto the tunnel floor (on-hook: no lateral piles)
+  PASS: the gallery ran through the coal seam to its last cell
+  PASS: belly holds the bored earth
+  PASS: bored coal fed the FUEL BUNKER, not the belly
+  PASS: gallery spent -> idle (carry it to a new face)
+  PASS: the belly drained the moment a drain opened
+  PASS: …straight down its own column onto the catch floor
+  PASS: earth conserved through the gallery (present=3, net=3)
+  PASS: coal conserved through the gallery (present=2, net=2)
+  PASS: a full 5-slot belly stalls the bit (blocked: empty me)
+  PASS: facing -1 bores LEFT
+- filters, ratios & pass-through
+  PASS: the forge PASSED the coal it can't smelt
+  PASS: …and the generator below caught it and burns
+  PASS: the ore still smelted (2 ingots)
+  PASS: the hopper latched the FIRST thing it tasted
+  PASS: …banks it (nothing below -> holds the stock)
+  PASS: …and passed the coal
+  PASS: the passed coal fell on down the column
+  PASS: R clears the filter (re-taste)
+  PASS: …cleared
+  PASS: R cycles the splitter ratio (splitter: 2:1 DOWN)
+  PASS: 2:1 DOWN dealt exactly 8/4 (got 8/4)
+  PASS: …cycles on to 1:2 RIGHT
+  PASS: …and wraps to even
+  PASS: ore conserved (present=0, net=0)
+  PASS: coal conserved (present=0, net=0)
+  PASS: ore conserved (present=3, net=3)
+  PASS: coal conserved (present=3, net=3)
+  PASS: ore conserved (present=12, net=12)
+- research (the PULL)
+  PASS: the drill refuses to craft before Automation is researched
+  PASS: power refuses before its prereq (automation)
+  PASS: an unknown tech refuses
+  PASS: research refuses WITHOUT the analyze-sample (no ore held)
+  PASS: automation researches with an ore sample + the ingot price
+  PASS: the tech is recorded
+  PASS: analyzing consumed ONE ore sample
+  PASS: the bench consumed the ingot price
+  PASS: a researched tech refuses a second spend
+  PASS: the drill crafts once Automation is researched
+  PASS: the generator stays locked behind Power
+  PASS: power researches after automation (coal sample + 12 ingots)
+  PASS: power opened its branch
+  PASS: ore conserved through the research flow (present=1, net=1)
+  PASS: ingot conserved through the research flow (present=4, net=4)
+  PASS: coal conserved through the research flow (present=0, net=0)
+  PASS: drill conserved through the research flow (present=1, net=1)
+  PASS: automation unlock 'drill' resolves to a machine def or a tool recipe
+  PASS: automation unlock 'hopper' resolves to a machine def or a tool recipe
+  PASS: prospecting unlock 'scanner' resolves to a machine def or a tool recipe
+  PASS: crosscutting unlock 'spur' resolves to a machine def or a tool recipe
+  PASS: power unlock 'generator' resolves to a machine def or a tool recipe
+  PASS: power unlock 'conduit' resolves to a machine def or a tool recipe
+  PASS: power unlock 'lift' resolves to a machine def or a tool recipe
+  PASS: descent unlock 'descent_engine' resolves to a machine def or a tool recipe
+  PASS: ironworks unlock 'iron_forge' resolves to a machine def or a tool recipe
+  PASS: machining unlock 'plate_press' resolves to a machine def or a tool recipe
+  PASS: machining unlock 'gear_mill' resolves to a machine def or a tool recipe
+  PASS: machining unlock 'h_drill' resolves to a machine def or a tool recipe
+  PASS: galleries unlock 'drift_rig' resolves to a machine def or a tool recipe
+  PASS: packing unlock 'crusher' resolves to a machine def or a tool recipe
+  PASS: enrichment unlock 'blast_furnace' resolves to a machine def or a tool recipe
+  PASS: drainage unlock 'pump' resolves to a machine def or a tool recipe
+- the descent gate (L1→L2)
+  PASS: the seal band is UNBROKEN across the world (holes=0)
+  PASS: IRON seeds only below the seal (below=612 above=0)
+  PASS: a mineable deepslate SHELF sits above the seal (418 cells — the Descent sample)
+  PASS: no pick can mine sealrock — the wall is not a tool gate
+  PASS: the engine ate the first ingots (fed=10/10)
+  PASS: the seal holds below quota
+  PASS: non-ingot goods pass THROUGH the engine and pile on the seal (2 coal)
+  PASS: the quota fills and CAPS (fed=64)
+  PASS: THE BREACH: the seal bored open straight down
+  PASS: a breached engine reads done (idle)
+  PASS: the seal-top pile + the overfeed FELL through the breach to the L2 floor ({ &"coal": 2, &"ingot": 5 })
+  PASS: ingot conserved through the gate (present=5, net=5)
+  PASS: coal conserved through the gate (present=2, net=2)
+  PASS: a misplaced engine eats nothing
+  PASS: …and reads blocked (stand it ON the seal)
+  PASS: …and its ingots pass through untouched
+  PASS: the engine is locked at boot
+  PASS: Descent researches after Power (deepslate sample + ingots)
+  PASS: …and unlocks the engine
+- descent gate out-produced by an automated line
+  PASS: the AUTOMATED line reached the quota within 4000 ticks (fed=64/64)
+    (out-produced the gate in 2600 ticks — 1400-tick margin under the 4000 budget)
+  PASS: the engine ate a full quota of ingots off gravity, hands-free (fed=64)
+  PASS: THE BREACH: the automated feed bored the seal open — the factory descends
+  PASS: ore conserved through the automated gate (present=2, net=2)
+  PASS: ingot conserved through the automated gate (present=0, net=0)
+  PASS: coal conserved through the automated gate (present=124, net=124)
+[hints]
+  PASS: no hint on an empty pack
+  PASS: first rope in the pack teaches the rope
+  PASS: …with a live fade envelope
+  PASS: the bubble expires
+  PASS: re-acquiring never re-teaches (latched)
+  PASS: simultaneous triggers show one bubble at a time
+  PASS: …the second queues behind it
+  PASS: a pre-stocked pack fires nothing at boot
+  PASS: …but a genuinely new item still teaches
+  PASS: resync clears the live bubble (post-load)
+  PASS: resync re-arms edges for what comes after
+[hint: water]
+  PASS: a dry body fires no water hint
+  PASS: still dry: no water hint after a dry poke
+  PASS: wading into water teaches the AQUIFER loop
+  PASS: the water bubble expires
+  PASS: re-entering water never re-teaches (latched)
+  PASS: a body that spawns IN water teaches on the first frame
+  PASS: resync with a still-wet body never re-teaches (post-load)
+  PASS: a simultaneous pack hint shows first; water queues behind
+  PASS: …the queued water hint shows after the pack hint
+[falling pool]
+  PASS: live drops hard-cap at MAX_ITEMS (240)
+  PASS: motes track the live count
+  PASS: mid-flight drops survive advance
+  PASS: arrived drops all retire
+  PASS: …and the motes scratch drains with them
+  PASS: post-retire spawns fly again (pool reuse path)
+  PASS: a reused drop carries ITS OWN fields, not the retired one's
+[scanner]
+  PASS: the scanner refuses to craft before Prospecting
+  PASS: a research-free tool still crafts on materials alone (the gate touches only locked ids)
+  PASS: automation researches
+  PASS: the bench's next rung after Automation is Prospecting (before the Power wall)
+  PASS: prospecting researches (ore sample + 4 ingots)
+  PASS: …and the scanner crafts
+  PASS: one scanner in the pack
+  PASS: the scanner is EQUIPMENT (never machine-feedable)
+  PASS: …and its class never satisfies a pick gate (a lone scanner can't crack stone)
+  PASS: ingot conserved through research + craft (present=12, net=12)
+  PASS: ore conserved through research + craft (present=1, net=1)
+  PASS: coal conserved through research + craft (present=2, net=2)
+  PASS: stone conserved through research + craft (present=0, net=0)
+  PASS: wood conserved through research + craft (present=0, net=0)
+  PASS: scanner conserved through research + craft (present=1, net=1)
+ALL PASS (sim tests)

@@ -1,0 +1,22 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== does the rope catch on things ==
+  hook planted at (36, 26); the spur runs cols 38..44 on row 31
+    in  f  0 at (47, 30) pivots=0 spent=0 free=360 len=360 v=378
+    in  f 25 at (42, 33) pivots=1 spent=273 free=88 len=360 v=412
+    in  f 50 at (40, 30) pivots=0 spent=0 free=360 len=360 v=150
+    in  f 75 at (38, 30) pivots=0 spent=0 free=360 len=360 v=150
+    in  f100 at (36, 32) pivots=0 spent=0 free=360 len=360 v=362
+    in  f125 at (34, 37) pivots=0 spent=0 free=360 len=360 v=82
+  swinging in under the spur: the line took 1 pivot(s)
+  PASS: the line BENDS around the rock instead of hanging through it (1)
+  PASS: ...and wrapping never moves the HOOK ((36, 26))
+  the line came off the corner during the arc: true
+  PASS: ...and it COMES OFF again (peak 1 pivots, stack emptied)
+  the arc turned at up to 1.2 rad/s while free and 4.8 rad/s while wrapped
+  PASS: there was a FREE arc to measure the whip against (1.2 rad/s)
+  PASS: ...and catching a corner WHIPS you round it (4.8 rad/s vs 1.2, needs 2.0x)
+  2 wrap event(s) at speed; through the sharpest the body kept 100% (420 -> 420 px/s)
+  PASS: ...and there was a wrap AT SPEED to judge (2)
+  PASS: ...without the pivot EATING the arc (100% kept, floor 80%)
+check_wrap: PASS (7 asserted) — the line goes around the rock, and comes back off it

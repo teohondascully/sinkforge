@@ -1,0 +1,11 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the inlined per-texel terms still say what the obvious ones said ==
+  PASS: _air_weight agrees with the loop it replaced on all 2867 cells (0 differ, 0 of those on the border)
+  PASS: _sky_form agrees with the loop it replaced on all 2867 cells (0 differ)
+  PASS: _air_weight returned 13 distinct values, so the comparison had something to disagree about
+  PASS: _sky_form returned 49 distinct values over the same grid
+  PASS: _sky_form agrees off the grid too, where the hoisted column bound is the only thing acting (0 differ)
+  PASS: on an all-solid grid the (0,0) corner still reads 3.5 — off-grid counts as air, as it always did
+  PASS: ...while a cell in the middle of solid rock reads 0.0, which is what makes the corner meaningful
+check_paint_terms: PASS (7 asserted) — the flat rewrites agree with the loops they replaced, everywhere

@@ -1,0 +1,42 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== can you tell what you are holding ==
+  PASS: every item the view draws specifically is compared against the others
+  PASS: every item compared here is still one the view knows
+  PASS: the scan read 27 items out of visuals.gd
+  PASS: every one of the 23 ids the game can put in a pack is one the view draws
+  PASS: the pack universe read 23 ids off disk
+  PASS: the same comparison catches one more once an unknown id is planted (0 -> 1)
+  PASS: every item draws something (0 blank: )
+  27 items, 351 pairs; the most alike outlines are stone/sealrock at IoU 1.00
+  the six most alike OUTLINES (IoU on the drawn icon; the clash floor is dE 10 + IoU 0.90):
+    IoU 1.00  dE  19.0  stone/sealrock
+    IoU 1.00  dE  52.7  ingot/iron_ingot
+    IoU 0.89  dE  24.6  ore/coal
+    IoU 0.85  dE  25.4  earth/ore
+    IoU 0.80  dE  30.4  earth/coal
+    IoU 0.75  dE  64.8  gear/coal
+  the six most alike COLOURS (dE on the drawn icon; the clash floor is dE 10 + IoU 0.90):
+    dE   2.2  IoU 0.33  rich_ore/stone_pickaxe
+    dE   2.9  IoU 0.31  stone/gravel
+    dE   3.2  IoU 0.75  iron_ingot/plate
+    dE   3.2  IoU 0.57  lance_bit/wedge_bit
+    dE   3.3  IoU 0.36  sinker_bit/lance_bit
+    dE   3.9  IoU 0.73  ore/rich_ore
+  PASS: no pair shares BOTH an outline and a colour (0 pair(s) do)
+  PASS: the carried ground still contains colour-close pairs to judge (5) — else this asserts nothing
+  PASS: ...and every one of them is separated by SHAPE instead (0 not: )
+  PASS: gravel and stone are plainly different objects (IoU 0.31) — the sieve/bulkhead choice reads
+  AT HOTBAR SIZE (13 px, what the HUD asks for) the three closest COLOURS are:
+    dE   1.5  IoU 0.13  gravel/iron_pickaxe
+    dE   1.7  IoU 0.47  ore/stone_pickaxe
+    dE   1.7  IoU 0.41  rich_ore/stone_pickaxe
+  ...and the three closest OUTLINES:
+    IoU 1.00  dE  38.7  ingot/iron_ingot
+    IoU 1.00  dE  17.1  stone/sealrock
+    IoU 0.92  dE  19.9  ore/coal
+  no pair shares both an outline and a colour at hotbar size either
+check_item_reads: PASS (11 asserted) — no two items wear the same icon

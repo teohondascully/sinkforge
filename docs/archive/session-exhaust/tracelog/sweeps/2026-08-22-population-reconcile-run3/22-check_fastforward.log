@@ -1,0 +1,8 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== fast-forward tunnel guard (time_scale = 8) ==
+  ledge at col 14 row 16, void beneath; body dropped from 6 tiles up
+  PASS: fell onto the 1-tile ledge under 8x — no tunnel (bottom=512, ledge=512)
+  runway built: cols 47..102 on row 20 (floor_top=640); sprinting right for 60 real frames
+  PASS: covered 1695px in 60 real frames under 8x (a 1x run manages ~150px); stayed on the runway floor throughout — worst deviation 0.0px of 8 allowed
+FAST-FORWARD GUARD PASS

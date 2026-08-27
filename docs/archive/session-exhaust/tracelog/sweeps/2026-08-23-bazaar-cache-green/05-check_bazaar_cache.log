@@ -1,0 +1,33 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: the fixture starts as a ruin and not as a bazaar
+  PASS: ...and the cache agrees before anything grows
+  PASS: the sapling at (43, 42) has soil under it, so it will actually grow
+  PASS: ...and it grew: (43, 42) is wood now
+  PASS: the bazaars the cache names are the bazaars in the world after a tree grew into the ruin's missing cell (cache [(40, 40)], world [(40, 40)])
+  PASS: ...and so are the ruins after a tree grew into the ruin's missing cell (cache [], world [])
+  PASS: ...and the case is live: the frame really did complete (1 bazaar(s))
+  PASS: the fixture starts as a bazaar, and the cache is warm on it
+  PASS: the sapling at (41, 42) has soil under it, so it will actually grow
+  PASS: ...and it grew: (41, 42) is wood now
+  PASS: the bazaars the cache names are the bazaars in the world after a tree grew inside the frame and closed its interior (cache [], world [])
+  PASS: ...and so are the ruins after a tree grew inside the frame and closed its interior (cache [], world [])
+  PASS: ...and the case is live: the frame really did stop being a bazaar
+  PASS: the fixture starts as a bazaar (mining case)
+  PASS: the bazaars the cache names are the bazaars in the world after a frame cell was mined out (cache [], world [])
+  PASS: ...and so are the ruins after a frame cell was mined out (cache [], world [])
+  PASS: ...and the case is live: mining really did break it
+  PASS: the fixture starts as a ruin (placing case)
+  PASS: the missing post can be placed
+  PASS: the bazaars the cache names are the bazaars in the world after the missing post was placed (cache [(40, 40)], world [(40, 40)])
+  PASS: ...and so are the ruins after the missing post was placed (cache [], world [])
+  PASS: ...and the case is live: placing really did complete it
+  PASS: the fixture starts as a bazaar (set_solid case)
+  PASS: the bazaars the cache names are the bazaars in the world after set_solid filled the interior (cache [], world [])
+  PASS: ...and so are the ruins after set_solid filled the interior (cache [], world [])
+  PASS: ...and the case is live: the interior really did close
+  PASS: the fixture starts as a bazaar, cache warm (load case)
+  PASS: the bazaars the cache names are the bazaars in the world after an empty world was loaded over a warm cache (cache [], world [])
+  PASS: ...and so are the ruins after an empty world was loaded over a warm cache (cache [], world [])
+  PASS: ...and the case is live: the loaded world holds no bazaar
+check_bazaar_cache: PASS (30 asserted) — the cached answer matches a full scan after growth, mining, placing, set_solid and a world load

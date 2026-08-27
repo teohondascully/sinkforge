@@ -1,0 +1,255 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== pixel-snap check ==
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.620 p=(0.0, 0.0) → snap stays within a pixel (moved 0.000, px=1.613)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.620 p=(100.3, 240.7) → snap stays within a pixel (moved 0.482, px=1.613)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.620 p=(-55.9, 12.1) → snap stays within a pixel (moved 0.974, px=1.613)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.620 p=(1234.56, 789.01) → snap stays within a pixel (moved 0.752, px=1.613)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.620 p=(0.49, 0.51) → snap stays within a pixel (moved 0.707, px=1.613)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.900 p=(0.0, 0.0) → snap stays within a pixel (moved 0.000, px=1.111)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.900 p=(100.3, 240.7) → snap stays within a pixel (moved 0.509, px=1.111)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.900 p=(-55.9, 12.1) → snap stays within a pixel (moved 0.365, px=1.111)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.900 p=(1234.56, 789.01) → snap stays within a pixel (moved 0.167, px=1.111)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.900 p=(0.49, 0.51) → snap stays within a pixel (moved 0.707, px=1.111)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.300 p=(0.0, 0.0) → snap stays within a pixel (moved 0.000, px=0.769)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.300 p=(100.3, 240.7) → snap stays within a pixel (moved 0.308, px=0.769)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.300 p=(-55.9, 12.1) → snap stays within a pixel (moved 0.328, px=0.769)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.300 p=(1234.56, 789.01) → snap stays within a pixel (moved 0.228, px=0.769)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.300 p=(0.49, 0.51) → snap stays within a pixel (moved 0.381, px=0.769)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.420 p=(0.0, 0.0) → snap stays within a pixel (moved 0.000, px=2.381)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.420 p=(100.3, 240.7) → snap stays within a pixel (moved 0.374, px=2.381)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.420 p=(-55.9, 12.1) → snap stays within a pixel (moved 1.155, px=2.381)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.420 p=(1234.56, 789.01) → snap stays within a pixel (moved 1.473, px=2.381)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.420 p=(0.49, 0.51) → snap stays within a pixel (moved 0.707, px=2.381)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.600 p=(0.0, 0.0) → snap stays within a pixel (moved 0.000, px=1.667)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.600 p=(100.3, 240.7) → snap stays within a pixel (moved 0.762, px=1.667)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.600 p=(-55.9, 12.1) → snap stays within a pixel (moved 0.881, px=1.667)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.600 p=(1234.56, 789.01) → snap stays within a pixel (moved 0.807, px=1.667)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.600 p=(0.49, 0.51) → snap stays within a pixel (moved 0.707, px=1.667)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.850 p=(0.0, 0.0) → snap stays within a pixel (moved 0.000, px=1.176)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.850 p=(100.3, 240.7) → snap stays within a pixel (moved 0.563, px=1.176)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.850 p=(-55.9, 12.1) → snap stays within a pixel (moved 0.662, px=1.176)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.850 p=(1234.56, 789.01) → snap stays within a pixel (moved 0.598, px=1.176)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.850 p=(0.49, 0.51) → snap stays within a pixel (moved 0.707, px=1.176)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.000 p=(0.0, 0.0) → snap stays within a pixel (moved 0.000, px=1.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.000 p=(100.3, 240.7) → snap stays within a pixel (moved 0.424, px=1.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.000 p=(-55.9, 12.1) → snap stays within a pixel (moved 0.141, px=1.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.000 p=(1234.56, 789.01) → snap stays within a pixel (moved 0.440, px=1.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=1.000 p=(0.49, 0.51) → snap stays within a pixel (moved 0.693, px=1.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.333 p=(0.0, 0.0) → snap stays within a pixel (moved 0.000, px=3.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.333 p=(100.3, 240.7) → snap stays within a pixel (moved 1.476, px=3.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.333 p=(-55.9, 12.1) → snap stays within a pixel (moved 1.105, px=3.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.333 p=(1234.56, 789.01) → snap stays within a pixel (moved 1.441, px=3.000)
+ERROR: String formatting error: unsupported format character.
+   at: validated_evaluate (core/variant/variant_op.h:770)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/check_pixel_snap.gd:44)
+  PASS: z=%.3f p=%s → grid-aligned (off=%.2e)
+  PASS: z=0.333 p=(0.49, 0.51) → snap stays within a pixel (moved 0.707, px=3.000)
+  PASS: sub-pixel nudge (-0.476,-0.476) → identical snapped frame
+  PASS: sub-pixel nudge (-0.476,0.000) → identical snapped frame
+  PASS: sub-pixel nudge (-0.476,0.476) → identical snapped frame
+  PASS: sub-pixel nudge (0.000,-0.476) → identical snapped frame
+  PASS: sub-pixel nudge (0.000,0.000) → identical snapped frame
+  PASS: sub-pixel nudge (0.000,0.476) → identical snapped frame
+  PASS: sub-pixel nudge (0.476,-0.476) → identical snapped frame
+  PASS: sub-pixel nudge (0.476,0.000) → identical snapped frame
+  PASS: sub-pixel nudge (0.476,0.476) → identical snapped frame
+  PASS: a full-pixel move DOES shift (quantized, not frozen)
+  PASS: zoom 0 is a safe no-op
+PIXEL SNAP OK

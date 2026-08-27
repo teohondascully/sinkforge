@@ -1,0 +1,42 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the sapling lesson waits for ground that would take a sapling ==
+  PASS: the scene came up with a sim, a body and a hint system to drive
+  PASS: the sapling lesson declares the gate plantable_ground (it waits on 'plantable_ground')
+  PASS: 1 lesson(s) name a `when` and 1 made it into the gate table — the two agree
+  PASS: there is an UNGATED lesson to compare against (rope)
+  PASS: CONTROL: the ungated lesson 'rope' is showable with nothing poked relevant
+  the natural surface across cols 60-78 runs rows 20-21; the shelf is levelled to row 21
+  PASS: the carve is deep enough to clear the highest ground on the span (1 rows of relief, 10 carved)
+  PASS: the body is standing on the shelf it was dropped onto
+  PASS: both in-reach cells really are in reach (1.00 and 1.00 of the 3.2-cell limit)
+  PASS: ...and the far cell really is out of it, at 10.00 cells — past twice the reach, so the aim cannot snap to a block between the two
+  the opening ceremony released the announce channel after 134 physics frame(s) (2.2s)
+  PASS: CONTROL: nothing else is holding the announce channel — a lesson held by the arrival plate would look exactly like a lesson held by the gate
+  PASS: the sapling lesson has FIRED and is waiting in the queue (1 queued: sapling, active: )
+    good         (65, 20)    in reach: true   plantable: true   nothing refuses it
+    stone floor  (63, 20)    in reach: true   plantable: false  the floor under it is 'stone', not soil
+    far earth    (74, 20)    in reach: false  plantable: true   nothing refuses it
+  PASS: the posed cursor really put the aim on the rock face (aim is (63, 20), wanted (63, 20))
+  PASS: CONTROL: the sim refuses a seed there — the floor under it is 'stone', not soil
+  PASS: ...so the controller pokes the gate SHUT
+  PASS: ...and the lesson is not ready to show
+  PASS: THE LESSON IS HELD over ground that would not take a seed — the rock face UI-02 was written for
+  PASS: the posed cursor put the aim on the far cell without snapping (aim is (74, 20))
+  PASS: CONTROL: the SIM would take a seed there, so reach is the only term left to refuse
+  PASS: ...and the gate is still shut, which can only be main.gd's own `_can_reach` doing it
+  PASS: THE LESSON IS HELD over ground it cannot get to — the half of the rule the sim cannot see
+  PASS: CONTROL: with the seed out of the pack the same good cell is refused — no seed in the pack
+  PASS: THE LESSON IS HELD when there is nothing to plant, on the very cell that will show it next
+  PASS: the posed cursor put the aim on the plantable cell (aim is (65, 20))
+  PASS: CONTROL: both halves of the situation now hold — a seed in the pack and reachable soil
+  PASS: ...so the controller pokes the gate OPEN
+  PASS: ...and the lesson is ready to show
+  PASS: THE LESSON ARRIVES the moment the cursor finds ground that would take the seed (`_active` is 'sapling')
+  PASS: ...and what is on screen is the sapling's own text, not another lesson wearing its slot
+  PASS: ...and it reports the gate it waited on, so the bubble can be pointed at the cell that opened it
+  PASS: ...and nothing is clamping it to invisible (alpha 0.067, busy=false, ceremony=false)
+  PASS: CONTROL: the cursor is back on the rock face and the gate has shut again
+  PASS: ...and the lesson already on screen STAYS there — the gate holds arrival, it does not strobe the display
+  32 assertions: 32 PASS / 0 FAIL
+check_hint_gate: PASS (32 asserted) — the lesson arrives on plantable ground in reach and on nothing else

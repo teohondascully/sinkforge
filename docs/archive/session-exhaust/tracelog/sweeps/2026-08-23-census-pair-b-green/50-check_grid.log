@@ -1,0 +1,15 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  (finished 427 rows of outstanding boot fill before judging)
+== the rock must not betray its grid ==  (fine grid 512x512, 4 fine cells per coarse side)
+  -- the rock you have not dug --
+  across a face (left-right): seam step 5.410 vs body step 5.675  ->  0.95x  (25477 seam / 94687 body pairs)
+    PASS: 0.95x (cap 1.20x)
+  down a face (top-bottom): seam step 7.001 vs body step 6.659  ->  1.05x  (22921 seam / 94628 body pairs)
+    PASS: 1.05x (cap 1.20x)
+  -- the wall behind what you have dug --
+  across the wall (left-right): seam step 3.459 vs body step 3.221  ->  1.07x  (9352 seam / 28287 body pairs)
+    PASS: 1.07x (cap 1.20x)
+  down the wall (top-bottom): seam step 4.497 vs body step 4.131  ->  1.09x  (8299 seam / 28266 body pairs)
+    PASS: 1.09x (cap 1.20x)
+check_grid: PASS — the paint does not know where the coarse cells are

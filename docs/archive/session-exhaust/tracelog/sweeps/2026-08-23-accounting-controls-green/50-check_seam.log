@@ -1,0 +1,23 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the rock has a grain ==
+  grain density 38.1% of cells
+  PASS: between 24% and 45% of the rock is grained
+  PASS: the probe spread caught both grained and plain rock (31 of 96) — there is something to compare
+  PASS: a cell's seam is the same answer re-asked out of order with another seed in between
+  PASS: a different seed grains the world differently (it is seeded, not hard-coded)
+  PASS: there is a bedding row and a joint column to cross (row 32, joint at col 31 on plain row 26)
+  PASS: a column that answers VERTICAL on row 26 answers BEDDING where the plane crosses it (row 32 gave 1) — bedding beats joint, the order this file's fixtures already assume
+  PASS: the world has at least one bedding plane in it
+  PASS: a bedding plane runs the full width of the world (a plane, not a sprinkle)
+  along a bedding plane, one blow took 3 cells
+  PASS: striking ALONG the grain calves more than the struck cell
+  PASS: a blow never takes more than RUN_CAP (3) cells
+  PASS: the world has at least one joint on an unbedded row
+  across a joint, one blow took 1 cell(s)
+  PASS: striking ACROSS the grain takes exactly one cell — the grain never punishes
+  along a plane running into over-tier rock, one blow took 1 cell(s)
+  PASS: a run stops at rock the drive cannot bite — a seam never smuggles you past a gate
+  along a plane with a hole in it, one blow took 1 cell(s)
+  PASS: a run stops at a gap — one blow never reaches across open space
+check_seam: PASS (14 asserted) — reading the grain pays, and ignoring it costs nothing

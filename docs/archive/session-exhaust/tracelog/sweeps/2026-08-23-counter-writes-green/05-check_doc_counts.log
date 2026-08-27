@@ -1,0 +1,22 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: read the registration list out of run_harness.sh (111 layers)
+  PASS: no script is registered twice (0 duplicate path(s): )
+  PASS: every registered script exists on disk (0 missing: )
+  PASS: the registry resolves to 111 distinct existing scripts, one per registration (111 counted)
+  PASS: README.md says 111 where the runner registers 111 ("registers 111 layers")
+  PASS: README.md says 111 where the runner registers 111 ("its 111 layers")
+  PASS: README.md says 111 where the runner registers 111 ("111 is a count of registered layers")
+  PASS: CONTRIBUTING.md says 111 where the runner registers 111 ("whole suite: 111 layers")
+  PASS: ENGINEERING.md says 111 where the runner registers 111 ("111 registered check layers")
+  PASS: derived the registration verbs from the runner: add, add_gl, add_excl, add_excl_hl
+  PASS: ENGINEERING.md says 93 layers use `add` where the runner registers 93
+  PASS: `add` (93 layers) has a row in the execution-class table
+  PASS: ENGINEERING.md says 14 layers use `add_gl` where the runner registers 14
+  PASS: `add_gl` (14 layers) has a row in the execution-class table
+  PASS: ENGINEERING.md says 3 layers use `add_excl` where the runner registers 3
+  PASS: `add_excl` (3 layers) has a row in the execution-class table
+  PASS: ENGINEERING.md says 1 layers use `add_excl_hl` where the runner registers 1
+  PASS: `add_excl_hl` (1 layers) has a row in the execution-class table
+  PASS: the scan actually found the layer-count claims (9 found, at least 3 expected)
+check_doc_counts: PASS (19 asserted) — 9 claim(s) across 3 doc(s) agree with the runner's 111

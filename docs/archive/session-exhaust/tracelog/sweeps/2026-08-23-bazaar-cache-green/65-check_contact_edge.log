@@ -1,0 +1,41 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+  delve: col 49, surface row 20, body started row 19, target (49, 50) (solid before the dig: false), dig_down_to returned true, body landed row 47
+== where rock meets air, the meeting has to be visible (6b) ==
+  world: GENERATED WORLD (the fixture digs into it; nothing is injected)
+  the delve reached 27 rows below the surface (asked for 30, floor 24)
+  view: 45 x 27 cells (cols 15..59, rows 40..66), cell 48.0px, patch 8px, face offset 9.0px
+  view: 45 x 28 cells (cols 26..70, rows 37..64), cell 48.0px, patch 8px, face offset 9.0px
+  view: 45 x 28 cells (cols 39..83, rows 34..61), cell 48.0px, patch 8px, face offset 9.0px
+  sampled 87 rock|air faces and 613 rock|rock faces (7232 skipped: 1602 near the surface, 1749 lit, 1491 off the judged slab, 0 touching water, 1876 air|air by design, 514 straddling the lamp edge)
+  PASS: the skip breakdown accounts for every skipped face
+  PASS: 87 rock|air faces were found to judge (floor 40)
+  PASS: 613 rock|rock faces were found to judge (floor 40)
+  PASS: the sampled region is actually dark — median luminance 20.5, ceiling 34.0 (a brighter region than this is not the place the complaint was about)
+  DETECTABILITY: rock|air step median 19.1, rock|rock step median 1.9 -> a real edge outsteps an interior 97% of the time
+  POLARITY:      the rock side is the brighter one on 98% of edges
+  (a coin flip is 50% for both; the floor is 75%)
+  edge step spread: min 0.2  p25 12.0  med 19.1  p75 26.1  max 42.9  (IQR 14.1)
+  flat step spread: min 0.0  p25 0.8  med 1.9  p75 3.2  max 20.0  (IQR 2.4)
+  514 faces straddled the lamp's edge (one side lit) and are in NEITHER arm
+  INSIDE THE LAMP — both sides lit (diagnostic, never gated): 111 rock|air faces, step median 27.55 against a lit flat-rock step of 4.47 (n=619); rock brighter on 95% of them
+    this is 6b's ACTUAL subject — the blind tester's complaint was about the rock inside the lamp, and every number above this line is about the dark outside it
+    lit ROCK by face orientation — TOP 42.7 (n=49), SIDE 39.4 (n=49), UNDER n=13, under the 30 floor — no median reported
+    TOP sits 3.3 levels above SIDE. Fog has no orientation; a mass lit from above does, so a key light reaching the lit pool is what separates them. UNDER is NOT measured here — the ordering claim is TOP vs SIDE only, and the third leg is an open question.
+  luminance profile from the face (- air, + rock), median over 87 faces:
+    pooled:  -9:9.4  -5:4.7  -2:4.0  +1:27.2  +3:24.6  +5:26.4  +7:25.6  +9:39.8  +13:39.8  +17:41.6  
+    rock TOP (lit lip)     -9:26.6  -5:3.9  -2:2.4  +1:29.3  +3:23.8  +5:26.6  +7:26.5  +9:46.2  +13:46.1  +17:46.0  
+    rock UNDER (ceiling)   -9:4.0  -5:5.7  -2:6.4  +1:19.2  +3:21.6  +5:22.8  +7:25.6  +9:31.5  +13:34.8  +17:43.2  
+    rock SIDE (wall)       -9:7.7  -5:5.7  -2:6.8  +1:25.8  +3:25.8  +5:27.2  +7:25.0  +9:34.8  +13:36.0  +17:36.6  
+  by orientation — n, step median, polarity WITHIN that orientation:
+    rock TOP (lit lip)     n= 32  step 23.02  polarity 100%   [below the 40 floor — no conclusion]
+    rock UNDER (ceiling)   n= 13  step 18.22  polarity  92%   [below the 40 floor — no conclusion]
+    rock SIDE (wall)       n= 42  step 14.45  polarity  98%
+  polarity by host: 84 plain-rock edges at 98%, 3 lode-stained edges at 100%
+    (one arm is below the 40-sample floor, so the split is DIAGNOSTIC ONLY and no conclusion is drawn from the difference between them)
+  PASS: a rock/air contact is distinguishable from rock's own texture — 97% (floor 75%)
+  PASS: having found an edge, you can tell which side is wall — 98% (floor 75%)
+check_contact_edge: PASS (6 asserted) — 87 edges / 613 interiors, detect 97%, polarity 98% [GENERATED WORLD (the fixture digs into it; nothing is injected)]

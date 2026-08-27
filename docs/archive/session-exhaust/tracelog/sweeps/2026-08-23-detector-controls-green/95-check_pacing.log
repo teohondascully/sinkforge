@@ -1,0 +1,62 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the shape of a session ==
+  played 1507 frames (opening 1101, descent 406 to row 60 of 62) and the game said 48 things:
+       18  first ore in hand
+       18  ▼ TOPSOIL
+       64  objective ✓ mine
+       64  now: forge 2 ingots
+      229  first ingot in hand
+      349  objective ✓ smelt
+      349  now: get wood
+      395  first wood in hand
+      395  first sapling in hand
+      396  objective ✓ wood
+      396  now: claim the bazaar
+      439  objective ✓ bazaar
+      439  now: research automation
+      478  first earth in hand
+      479  struck a vein (1 this session)
+      677  AUTOMATION opens
+      678  objective ✓ research
+      678  now: craft a drill
+      698  first drill in hand
+      699  objective ✓ craft
+      699  now: build the line
+      834  a machine goes down (3 placed)
+      835  objective ✓ build
+      835  now: fuel the drill
+      850  first coal in hand
+      896  objective ✓ fuel
+      896  now: first automation
+      931  objective ✓ auto
+      931  now: research power
+      931  ★ THE LINE RUNS
+     1136  struck a vein (2 this session)
+     1152  5 metres down
+     1176  first shale in hand
+     1202  ▼ THE CLAYBAND
+     1212  11 metres down
+     1216  first stone in hand
+     1256  struck a vein (3 this session)
+     1272  17 metres down
+     1332  23 metres down
+     1342  ▼ SHALE REACH
+     1346  struck a vein (4 this session)
+     1356  struck a vein (5 this session)
+     1386  struck a vein (6 this session)
+     1392  29 metres down
+     1452  35 metres down
+     1496  struck a vein (7 this session)
+     1502  ▼ THE LONG DARK
+     1506  struck a vein (8 this session)
+    |..|.......|.....|.|..|.|.........||......|..||..........|||||.||..||||..|.|
+           ^ one column per 20 frames; | = the game said something
+  PASS: the session is playable at all (the opening reached first automation)
+  PASS: the descent this layer times ACTUALLY HAPPENED (row 19 → 60, 41 rows, asked for 62)
+  PASS: the game says something during a session
+  longest silence 205 frames = 13.60% of the session  (★ THE LINE RUNS → struck a vein (2 this session))
+  density 31.85 events / 1000 frames
+  PASS: no stretch of the session is dead air (13.60% = 205 of 1507 frames, cap 20.00%)
+  PASS: ...and it is not thin either (31.85 = 48 events in 1507 frames, floor 24.00)
+check_pacing: PASS (5 asserted) — the session keeps talking

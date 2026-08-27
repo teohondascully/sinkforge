@@ -1,0 +1,45 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== texture fields must resolve on the sample grid ==
+  PASS: fine.grain (octave 1)    lag-1 correlation 0.99
+  PASS: fine.grain (octave 2)    lag-1 correlation 1.00
+  PASS: fine.grain down-column   lag-1 correlation 0.91
+  PASS: fine.grain2 down-column  lag-1 correlation 0.98
+  PASS: fine.patch               lag-1 correlation 0.96
+  PASS: fine.stone               lag-1 correlation 0.89
+  PASS: fine.crack               lag-1 correlation 0.83
+  PASS: fine.moss                lag-1 correlation 0.77
+  PASS: fine.tonal drift         lag-1 correlation 0.98
+  PASS: fine.hue x               lag-1 correlation 0.98
+  PASS: fine.hue y               lag-1 correlation 0.98
+  PASS: sim.fine_edge            lag-1 correlation 0.55
+  PASS: sim.fine_grit            lag-1 correlation 0.82
+== and the rock each grammar paints must read as rock ==
+  PASS: clastic  across a face  lag-1 0.95, roughness 5.3%  (101600 samples)
+  PASS: clastic  down a face    lag-1 0.94, roughness 5.6%  (100980 samples)
+  PASS: bedded   across a face  lag-1 0.93, roughness 4.7%  (101600 samples)
+  PASS: bedded   down a face    lag-1 0.91, roughness 6.1%  (100980 samples)
+  PASS: massive  across a face  lag-1 0.91, roughness 3.7%  (101600 samples)
+  PASS: massive  down a face    lag-1 0.93, roughness 2.7%  (100980 samples)
+  PASS: the three grammars paint three different rocks (5.30%, 4.70%, 3.67% across)
+== census: what worldgen actually put in rows 60..110 (REPORT ONLY, nothing asserted) ==
+   deepslate    massive   26.57% of deep cells   coarse rows 74..109
+   ore          clastic   20.67% of deep cells   coarse rows 60..109
+   rich_ore     clastic   12.20% of deep cells   coarse rows 74..109
+   stone        massive   12.05% of deep cells   coarse rows 60..109
+   coal         clastic    9.75% of deep cells   coarse rows 60..109
+   iron         clastic    9.55% of deep cells   coarse rows 86..109
+   sealrock     clastic    6.14% of deep cells   coarse rows 84..85
+   shale        bedded     3.04% of deep cells   coarse rows 64..67
+                clastic    0.01% of deep cells   coarse rows 62..109
+   pooled  across a face  lag-1 0.91  roughness 6.53%  (57907 samples)
+      clastic  across a face  lag-1 0.93  roughness 6.43%  (31963 samples)
+      bedded   across a face  lag-1 0.92  roughness 6.58%  (1523 samples)
+      massive  across a face  lag-1 0.86  roughness 5.61%  (19760 samples)
+      contact  across a face  lag-1 0.83  roughness 11.22%  (4661 samples)
+   pooled  down a face    lag-1 0.91  roughness 6.14%  (57132 samples)
+      clastic  down a face    lag-1 0.93  roughness 6.50%  (31077 samples)
+      bedded   down a face    lag-1 0.92  roughness 6.80%  (1366 samples)
+      massive  down a face    lag-1 0.87  roughness 4.25%  (18824 samples)
+      contact  down a face    lag-1 0.83  roughness 10.23%  (5865 samples)
+check_texture: PASS — fields resolve, and every grammar's rock reads as rock

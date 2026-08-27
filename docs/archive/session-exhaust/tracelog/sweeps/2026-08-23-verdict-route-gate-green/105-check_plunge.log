@@ -1,0 +1,17 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the descent, both ways ==
+  the shaft:      32 rows in 297 frames, 28 blocks broken
+  the plunge, legs only:  34 rows in 156 frames (mouth at column 68)
+  the plunge, with rope:  34 rows in 156 frames, 0 blocks broken, 0 hops
+  the way back:   0 rows on legs, 37 rows on the rope (same budget, same hole)
+  the hole is 1.9x faster than the pickaxe; the rope bit on 36 of 36 samples on the way down
+  PASS: the hole GOES somewhere (34 rows, asked for 34)
+  PASS: ...and the 10367 cells of rock around it are untouched by the trip — the hole was already there
+  PASS: the shaft got all the way down too, so the two frame counts are of the same journey (32 rows)
+  PASS: ...and it is worth walking to (1.9x the shaft, floor 1.0x)
+  PASS: ...and there is rock to hold the whole way (rope bit 100%, floor 50%)
+  PASS: the legs-only ride went down that same hole first (34 rows, asked for 34)
+  PASS: ...and on legs alone it is a ONE-WAY door (0 rows regained, cap 3)
+  PASS: ...and the ROPE is what gets you back out of it (37 rows climbed vs 0 on legs, needs +20)
+check_plunge: PASS (8 asserted) — the hole is a route, and it is one you can steer

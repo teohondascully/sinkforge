@@ -1,0 +1,72 @@
+diff --git a/scenes/hud.gd b/scenes/hud.gd
+index a9e06da..9253dfb 100644
+--- a/scenes/hud.gd
++++ b/scenes/hud.gd
+@@ -1992,6 +1992,17 @@ func _draw_hint() -> void:
+ 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_TEXT_DIM)
+ 
+ 
++## ITM-01/02/04/05/20 experiment, Option A (restrained repair; docs/handoff/ITM_VISUAL_EXPERIMENT.md).
++## The original design deliberately hid empty trailing wells ("a trailing empty slot reads as broken,
++## what goes here?") and let the bar grow/shrink with the pack. This option bets that a QUIET empty
++## well -- an outline only, no fill -- reads as spare capacity rather than a defect, which is cheaper
++## than the geometry instability it removes: a bar that never resizes is easier to reach for by muscle
++## memory, and ITM-20 asks for exactly that. Nothing about the interaction model changes.
++const HOTBAR_WELL_A: Color = Color(0.20, 0.22, 0.28, 0.60)         ## lighter, semi-transparent (was UI_SLOT flat black)
++const HOTBAR_WELL_EMPTY_A: Color = Color(0.20, 0.22, 0.28, 0.16)   ## quiet capacity marker, no fill weight
++const HOTBAR_EDGE_QUIET_A: Color = Color(0.30, 0.34, 0.42, 0.40)   ## unselected border, quieter than UI_EDGE
++
++
+ ## The carried pack as a hotbar of slots, icon and count, centred along the bottom. The active slot,
+ ## which the mouse wheel cycles, is highlighted and it is the one the world verbs act with. It reads
+ ## `sim.inventory_slots()`.
+@@ -2005,9 +2016,10 @@ func _draw_inventory() -> void:
+ 	if minimap_large:
+ 		return
+ 	var slots: Array[Dictionary] = sim.inventory_slots()
+-	# Show only the slots you actually carry, not a fixed row of empty wells, because a trailing empty slot
+-	# reads as "broken, what goes here?". The bar grows and shrinks with your pack, with a floor of 1.
+-	var n: int = clampi(slots.size(), 1, FactorySim.INVENTORY_SLOTS)
++	# Option A: fixed geometry, always FactorySim.INVENTORY_SLOTS positions, so the bar never resizes.
++	# Carrying more than ten types still shows only ten at once and scrolls (w0 below) -- that ceiling
++	# was never this option's problem, only the sub-ten shrink-to-fit was.
++	var n: int = FactorySim.INVENTORY_SLOTS
+ 	var sel: int = int(inv_selected_getter.call()) if inv_selected_getter.is_valid() else 0
+ 	# The bar is a window onto the pack, not the pack. `inventory_slots()` has no cap: it returns one entry
+ 	# per item type, and the type universe is 20 machines plus 16 materials plus the crafted intermediates,
+@@ -2040,19 +2052,30 @@ func _draw_inventory() -> void:
+ 			_tooltip_item = slots[i]["item"]                     # hovered hotbar slot → tooltip
+ 			_tooltip_count = int(slots[i]["count"])
+ 			_tooltip_anchor = Vector2(slot_rect.get_center().x, slot_rect.position.y)
++		var occupied: bool = i < slots.size()
+ 		if active:
+ 			draw_rect(slot_rect.grow(2.0), Color(UI_ACCENT.r, UI_ACCENT.g, UI_ACCENT.b, 0.18))  # selection glow
+-		draw_rect(slot_rect, UI_SLOT)                                                            # well
+-		draw_line(slot_rect.position + Vector2(1.0, 1.0), slot_rect.position + Vector2(SLOT - 1.0, 1.0),
+-			UI_EDGE_HI, 1.0)                                                                      # top bevel
+-		draw_rect(slot_rect, UI_ACCENT if active else UI_EDGE, false, 2.0 if active else 1.0)
++		# ITM-01/04: an occupied well is lighter and semi-transparent instead of flat near-black, so a dark
++		# underground frame does not turn every carried item into the same opaque square. ITM-05/13: an
++		# EMPTY well is quieter still -- low-alpha fill only, no bevel, no full border -- so spare capacity
++		# reads as capacity, not as a broken or missing slot.
++		if occupied:
++			draw_rect(slot_rect, HOTBAR_WELL_A)
++			draw_line(slot_rect.position + Vector2(1.0, 1.0), slot_rect.position + Vector2(SLOT - 1.0, 1.0),
++				UI_EDGE_HI, 1.0)                                                                  # top bevel
++			draw_rect(slot_rect, UI_ACCENT if active else HOTBAR_EDGE_QUIET_A, false, 2.0 if active else 1.0)
++		else:
++			draw_rect(slot_rect, HOTBAR_WELL_EMPTY_A)
++			draw_rect(slot_rect, UI_ACCENT if active else HOTBAR_EDGE_QUIET_A, false, 2.0 if active else 1.0)
+ 		# A faint keybind number in the slot corner, so the hotbar reads as keyed, and only where a key really
+ 		# exists. The row is 1-9 then 0 for the tenth, so the tenth well said "10" for a key nobody has and
+ 		# once the window can scroll, `k + 1` would relabel whichever items happen to be on screen. The digit
+ 		# follows the pack index and stops when the keys do, staying blank rather than lying.
+ 		if i < 10:
++			var key_ink: Color = UI_TEXT_FAINT if occupied \
++				else Color(UI_TEXT_FAINT.r, UI_TEXT_FAINT.g, UI_TEXT_FAINT.b, UI_TEXT_FAINT.a * 0.5)
+ 			draw_string(_font, slot_rect.position + Vector2(2.0, 9.0), "0" if i == 9 else str(i + 1),
+-				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_FAINT)
++				HORIZONTAL_ALIGNMENT_LEFT, -1, 8, key_ink)
+ 		if i < slots.size():
+ 			var item: StringName = slots[i]["item"]
+ 			var count: int = int(slots[i]["count"])

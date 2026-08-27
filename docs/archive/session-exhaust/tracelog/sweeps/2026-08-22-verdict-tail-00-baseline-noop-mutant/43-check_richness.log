@@ -1,0 +1,15 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== is there anything down there ==
+  17 shafts, 1020 rows descended, 85 encounters
+    OPEN SKY            18 rows     3 met   16.7 per 100 rows
+    TOPSOIL            134 rows     6 met    4.5 per 100 rows
+    THE CLAYBAND       235 rows    23 met    9.8 per 100 rows
+    SHALE REACH        272 rows    22 met    8.1 per 100 rows
+    THE LONG DARK      268 rows    24 met    9.0 per 100 rows
+    THE DEEPSLATE       76 rows     5 met    6.6 per 100 rows
+    THE SEAL             6 rows     2 met   33.3 per 100 rows
+    STONEREACH          11 rows     0 met    0.0 per 100 rows
+    what you meet: sealrock x2, ore x32, coal x19, open space x32
+  density 8.3 per 100 rows  |  longest drought 20 rows at column 41, rows 20-39 (THE CLAYBAND)
+check_richness: PASS — the earth has things in it

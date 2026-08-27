@@ -1,0 +1,11 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== does the running game know how deep you are ==
+  PASS: before the dig both authorities agree on the spawn column (surface_row=20, ground_row=20)
+  PASS: the shaft was actually sunk (the agent reports arrival, not just an open target)
+  PASS: the body is 14 rows below its column's ground (needs >= 12 for the readings to mean anything)
+  PASS: standing here, the OLD expression reads -1 — still under the 10-row threshold 14 rows down. This is the defect, and the assertions below are only meaningful while it holds
+  PASS: the depth hint latched 14 rows down — the climb out of your own shaft is teachable
+  PASS: the surface wind has died at the bottom of the shaft (wind=0.00)
+  PASS: the cave bed has arrived at the bottom of the shaft (cave=1.00)
+check_depth_reads: PASS (7 asserted) — the shipped consumers read the ground, not the floor of your shaft

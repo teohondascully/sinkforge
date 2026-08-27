@@ -1,0 +1,19 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== can you wind a swing up ==
+    phase +0: 9 half-swings, line 388 -> 388 px, widest 0.59 rad, peak 0.93 rad/s
+    phase +1: 21 half-swings, line 360 -> 86 px, widest 0.89 rad, peak 16.41 rad/s
+  PASS:     ...phase +1 kept a real line to swing on (86 px)
+    phase -1: 8 half-swings, line 360 -> 480 px, widest 0.64 rad, peak 1.45 rad/s
+  PASS:     ...phase -1 kept a real line to swing on (480 px)
+  widest arc  — untouched 0.59, pumped 0.89, fought 0.64 rad
+  peak spin   — untouched 0.93, pumped 16.41, fought 1.45 rad/s
+  PASS: the rig actually swings when left alone (0.59 rad)
+  PASS: reeling IN PHASE winds the arc up (0.89 vs 0.59 rad, needs 1.12x)
+  PASS: ...and it is the RHYTHM that pays, not the reeling (0.64 vs 0.89 rad, cap 0.92x)
+  playing a real swing drove the winch to 1.00 and the line to 1.00
+  PASS: the game itself runs the WINCH while it hauls (1.00, floor 0.25)
+  PASS: ...and the LINE sings under the load it is carrying (1.00, floor 0.25)
+  after cutting the line the winch sits at 0.00 and the fibre at 0.00
+  PASS: ...and both go quiet when the line is cut (0.00 / 0.00)
+check_pump: PASS (8 asserted) — the arc answers the rhythm, and you can hear it

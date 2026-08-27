@@ -1877,3 +1877,118 @@ evidence a fourth trim (D0059) should not have preceded the eventual split.
 
 Reverse: CHEAP. This entry and the test-file split are documentation and a `Dictionary`-into-two-
 constants change — no behavior change, only clearer attribution of an existing measured number.
+
+## D0062 · 2026-08-27 · ANVIL step 1a/1b/1c/1f — the exclusion-hole triage, executed
+
+Precedent for this whole exercise: `incoming/ANVIL_ARCHITECTURE.md` proposes an event-sourced
+development substrate; the director's own review found `.git/info/exclude` hiding fifteen real doc paths
+from any fresh clone, and directed a three-bucket triage (into the tree / into `docs/archive/` /
+deliberately deleted) with buckets reported before acting, per `CONTEXT.md`'s existing "review bandwidth"
+discipline. Full triage reasoning is in this session's own transcript; this entry records what was
+decided and executed, not the derivation.
+
+**Decided and executed:**
+- `legacy/tools/prose_words.txt` tracked, completing `legacy/`'s otherwise-complete freeze (358 -> 359
+  tracked files under `legacy/`).
+- **`legacy/tools/director_bus.sh` and `legacy/tools/test_director_bus.sh` NOT tracked**, reversing this
+  session's own earlier bucket-1 proposal after reading `docs/archive/session-exhaust/handoff/CONVERGENCE_LEDGER.md`
+  (2026-08-23) as part of step 1b: a prior session deliberately decided to keep these two files untracked
+  specifically because this is a public portfolio repository (`CONTEXT.md`: "a senior staff engineer
+  reads this repository for ten minutes") and re-tracking session-coordination tooling would put process
+  internals into that public tree — the exact thing an earlier history rewrite (memory:
+  `history-rewrite-2026-08-19`) already removed on purpose. This finding surfaced AFTER the director had
+  already confirmed the original bucket-1 proposal for all three files; flagged rather than executed
+  silently, since it directly contradicts a specific, reasoned, dated prior decision this session had no
+  way to know about until step 1b's read. Both files' exclusion moved from `.git/info/exclude` (local,
+  invisible to a fresh clone) to the shipped `.gitignore` (visible, so a fresh clone deliberately omits
+  them too, matching the intent CONVERGENCE_LEDGER.md already stated) — see the `.gitignore` entry itself
+  for the restated reasoning.
+- Thirteen paths moved from `docs/` (untracked) into `docs/archive/` (tracked, each with a dated header
+  stating why): `PRIORITY.md`, `DIRECTOR_BRIEF-postpivot-edit-2026-08-25.md` (second snapshot, twin
+  diverges 738 lines, authority not reconciled — deliberately not guessed at),
+  `VISUAL_DESIGN_SYSTEM_AND_THREE_WAY_EVALS-postpivot-edit-2026-08-25.md` (same, twin diverges 497
+  lines), `AGENT_PLAY_EVALUATION_PROTOCOL.md`, `FEEL_GAP.md`, `MENU_MATRIX.md`, `ORCHESTRATOR.md`,
+  `VISUAL_RECOMMENDATIONS_SURFACE.md`, `A_PLUS_PROGRAM.md`, `DIRECTOR_BUS.md`, `PEER_SESSIONS.md`,
+  `RELEASE_HARDENING.md`, `REPO_PORTFOLIO_AUDIT.md`, plus `docs/superpowers/plans/2026-08-17-director-bus.md`
+  -> `docs/archive/director-bus-plan-2026-08-17.md` (14 total).
+- `docs/tracelog/` and `docs/handoff/` (~3,055 files) moved to `docs/archive/session-exhaust/{tracelog,handoff}/`
+  and tracked whole, per the director's explicit instruction, overriding this session's own initial
+  recommendation to delete after only classifying by filename/date/size. Reasoning the director gave,
+  restated because it is the load-bearing precedent for the whole triage: untracked deletion is not
+  recoverable from git and is not a decision, it is an event; archiving trades repository weight for
+  reversibility, and a wrong call becomes a normal commit instead of a permanent loss. README at
+  `docs/archive/session-exhaust/README.md`.
+
+**A precedence question the director asked to have recorded explicitly, because it is a good instance of
+the rule working, not just a housekeeping note:** `docs/archive/PIVOT_PLAN_2026-08-25.md` §1 recommended
+KEEPING several of the fourteen files above (`A_PLUS_PROGRAM.md`, `DIRECTOR_BUS.md`, `PEER_SESSIONS.md`,
+`RELEASE_HARDENING.md`, `REPO_PORTFOLIO_AUDIT.md`) as tracked, normative-adjacent docs. They were archived
+instead of restored to the live tree. Reasoning: `docs/README.md`'s current normative table — a later,
+real, already-shipped decision — does not include any of them, and `docs/README.md` states its own rule
+plainly: "If a document is not listed as normative below, it is not normative." Restoring files to
+`docs/` on an old plan's authority, when a later real decision already superseded it, would have been
+exactly the "acting on a stale doc" failure `incoming/ANVIL_ARCHITECTURE.md`'s own retrospective (F1)
+documents — the precedence rule (later real decision beats older plan, regardless of which one is louder
+or longer) applied correctly here, not just stated.
+
+**A related finding, flagged and NOT acted on — out of this task's confirmed scope:** while executing the
+moves above, `docs/*.md` was found to contain eleven further TRACKED files not listed in `docs/README.md`'s
+normative table and carrying no `ARCHIVED`/`SUPERSEDED` header — `A_PLUS_STATUS.md`, `BITS.md`,
+`BRANCHING.md`, `CAPTURE_MANIFEST.md`, `CONTENT_CATALOG_PLAN.md`, `ENGINEERING.md`, `HARNESS_LAYERS.md`,
+`LODE.md`, `SANDBOX.md`, `VISUAL_TRIAGE.md`, and `DECISIONS.md` (this last one IS normative, per
+`docs/README.md`'s table — not a defect, listed here only because it was checked alongside the others).
+The other ten are a live instance of the exact three-state violation `docs/README.md` itself forbids
+("not listed as normative... is not normative," with no third state described) — but discovered inside
+the TRACKED tree, not the untracked one this task was scoped to. Not triaged here: the director's queue
+named "bucket 1 and 2 moves, per the confirmed triage" specifically, and re-triaging the tracked doc set
+is materially more work than that, not something to decide unilaterally mid-task. Flagged for the
+director; `docs/README.md`'s own commit history (`docs(pivot): triage the document set, land the five new
+normative docs`, 2026-08-25) touched several of these files directly, suggesting an incomplete execution
+of the pivot's own triage rather than a fresh problem.
+
+**Step 1f, corrected the same round:** this session's own persistent memory (`feel-gap-analysis.md`,
+`menus-must-read-2026.md`) cited `docs/FEEL_GAP.md` and `docs/MENU_MATRIX.md` as live reference docs at
+their pre-move paths. Both now point at `docs/archive/`. A stale pointer in an agent's own memory is the
+same class of defect as a stale pointer in a document (F7) — recorded here as one deliberately-kept
+instance of that class, per the director's explicit ask, not because this is the only one that exists.
+
+Reverse: CHEAP for the fourteen `docs/archive/` moves and the `.gitignore` change (all are `git mv`-shaped,
+content unchanged). MODERATE for `session-exhaust/` given its size (~3,055 files, repository weight added
+rather than removed) — reversing means deleting a tracked directory, which is at least a reviewable diff,
+the entire point of not deleting it untracked in the first place.
+
+## D0063 · 2026-08-27 · ANVIL step 1d/1e — closing the exclusion hole itself, and the untracked-files gate
+
+`.git/info/exclude` reduced to the stock git template with nothing project-specific remaining, once
+D0062's triage removed every doc path it was hiding and the `claude-code-runtime` block was found fully
+redundant with `.gitignore`'s existing `/.claude/*` + `!/.claude/commands/` handling (confirmed before
+deleting: `.claude/`'s only tracked contents are the four `commands/*.md` files, already correctly
+re-included there; the runtime-state entries in `.git/info/exclude` duplicated exactly what `/.claude/*`
+already excludes). `legacy/tools/director_bus.sh` / `legacy/tools/test_director_bus.sh`'s exclusion moved
+into `.gitignore` itself rather than dropped, per D0062 — a fresh clone should also omit them, since the
+reason is a project policy (public-repo hygiene), not local machine state.
+
+**The gate** (`tools/layer_lint/check_untracked_files.py`, `docs/QUALITY.md` gate 27): fails on any file
+that is untracked AND not matched by the shipped `.gitignore` — deliberately NOT "any untracked file,"
+which would fail permanently on legitimately-ignored local state (`.DS_Store`, `.godot/`, `__pycache__/`,
+etc.) the first time it ran, the exact design flaw the director caught in this session's own first
+proposal for this gate. Implemented via `git ls-files --others --exclude-from=.gitignore` rather than
+`git status`/`git ls-files --others --exclude-standard`, because `--exclude-standard` also honors
+`.git/info/exclude` and the global excludesfile — both invisible to a fresh clone — which would make the
+gate blind to the exact failure class it exists to catch.
+
+Mutation-tested, each branch observed failing before trusted (see this round's `BRIEF.md`/session report
+for the actual command transcripts):
+1. **Positive control** — a file created outside any `.gitignore` pattern: gate FAILS, names the file.
+2. **Negative control** — a file matched by an existing `.gitignore` pattern (`.DS_Store`): gate PASSES,
+   confirming legitimate exclusions do not trip it.
+3. **The core property** — a file added ONLY to `.git/info/exclude` (not `.gitignore`): gate still FAILS,
+   proving the gate does not trust the local-only exclude file, which is the entire reason this gate
+   exists. Without this specific case passing, the gate would have reproduced the exact hole it was built
+   to close.
+4. **Real tree, post-triage**: gate PASSES against the actual working tree after D0062's moves landed.
+
+Reverse: CHEAP for the gate script and the `.git/info/exclude` cleanup (both are additive/subtractive
+with no behavior elsewhere depending on them). The `.gitignore` addition for the two held-back files is
+CHEAP to reverse and MODERATE to get wrong silently — tracking them by accident later is exactly the
+regression D0062 exists to prevent, which is why the mutation test above specifically covers this case.

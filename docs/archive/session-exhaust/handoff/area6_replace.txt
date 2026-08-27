@@ -1,0 +1,14 @@
+.github/workflows/harness.yml
+.gitignore
+docs/DECISIONS.md
+docs/GDD.md
+docs/LODE_PLAN.md
+README.md
+scenes/main.gd
+src/core/layered_world_gen.gd
+src/data/mining_rules.gd
+tools/check_prose.sh
+tools/check_trailers.sh
+tools/play_agent.gd
+tools/play_tests.gd
+tools/run_harness.sh

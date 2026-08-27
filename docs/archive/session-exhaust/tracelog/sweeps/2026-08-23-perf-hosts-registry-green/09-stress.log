@@ -1,0 +1,455 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== stress tests ==
+- STRESS: interleaved-op invariants (adversarial)
+  PASS: burst 0 (12 ops) — conservation holds for every item
+  PASS: burst 0 (12 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 0 (12 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 0 (12 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 0 (12 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 1 (24 ops) — conservation holds for every item
+  PASS: burst 1 (24 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 1 (24 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 1 (24 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 1 (24 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 2 (36 ops) — conservation holds for every item
+  PASS: burst 2 (36 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 2 (36 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 2 (36 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 2 (36 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 3 (48 ops) — conservation holds for every item
+  PASS: burst 3 (48 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 3 (48 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 3 (48 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 3 (48 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 4 (60 ops) — conservation holds for every item
+  PASS: burst 4 (60 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 4 (60 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 4 (60 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 4 (60 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 5 (72 ops) — conservation holds for every item
+  PASS: burst 5 (72 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 5 (72 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 5 (72 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 5 (72 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 6 (84 ops) — conservation holds for every item
+  PASS: burst 6 (84 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 6 (84 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 6 (84 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 6 (84 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 7 (96 ops) — conservation holds for every item
+  PASS: burst 7 (96 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 7 (96 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 7 (96 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 7 (96 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 8 (108 ops) — conservation holds for every item
+  PASS: burst 8 (108 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 8 (108 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 8 (108 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 8 (108 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 9 (120 ops) — conservation holds for every item
+  PASS: burst 9 (120 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 9 (120 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 9 (120 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 9 (120 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 10 (132 ops) — conservation holds for every item
+  PASS: burst 10 (132 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 10 (132 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 10 (132 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 10 (132 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 11 (144 ops) — conservation holds for every item
+  PASS: burst 11 (144 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 11 (144 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 11 (144 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 11 (144 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: mid-sequence save→disk→load round-trips
+  PASS: the restored mid-sequence state is byte-identical to the live one
+  PASS: burst 12 (156 ops) — conservation holds for every item
+  PASS: burst 12 (156 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 12 (156 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 12 (156 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 12 (156 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 13 (168 ops) — conservation holds for every item
+  PASS: burst 13 (168 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 13 (168 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 13 (168 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 13 (168 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 14 (180 ops) — conservation holds for every item
+  PASS: burst 14 (180 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 14 (180 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 14 (180 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 14 (180 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 15 (192 ops) — conservation holds for every item
+  PASS: burst 15 (192 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 15 (192 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 15 (192 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 15 (192 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 16 (204 ops) — conservation holds for every item
+  PASS: burst 16 (204 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 16 (204 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 16 (204 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 16 (204 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 17 (216 ops) — conservation holds for every item
+  PASS: burst 17 (216 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 17 (216 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 17 (216 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 17 (216 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 18 (228 ops) — conservation holds for every item
+  PASS: burst 18 (228 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 18 (228 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 18 (228 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 18 (228 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 19 (240 ops) — conservation holds for every item
+  PASS: burst 19 (240 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 19 (240 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 19 (240 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 19 (240 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 20 (252 ops) — conservation holds for every item
+  PASS: burst 20 (252 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 20 (252 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 20 (252 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 20 (252 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 21 (264 ops) — conservation holds for every item
+  PASS: burst 21 (264 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 21 (264 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 21 (264 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 21 (264 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 22 (276 ops) — conservation holds for every item
+  PASS: burst 22 (276 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 22 (276 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 22 (276 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 22 (276 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: burst 23 (288 ops) — conservation holds for every item
+  PASS: burst 23 (288 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: burst 23 (288 ops) — no machine occupies a solid cell (0 bad)
+  PASS: burst 23 (288 ops) — no empty ground pile lingers (0 found)
+  PASS: burst 23 (288 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: final (288 ops) — conservation holds for every item
+  PASS: final (288 ops) — no rope/conduit/torch overlaps solid rock or a machine (0 bad)
+  PASS: final (288 ops) — no machine occupies a solid cell (0 bad)
+  PASS: final (288 ops) — no empty ground pile lingers (0 found)
+  PASS: final (288 ops) — no ground pile hangs in mid-air (0 floating)
+  PASS: the sequence is long enough to stress interleavings (288 ops)
+  PASS: the WHOLE interleaved sequence is deterministic (identical final state)
+- STRESS: factory-flow / routing network under churn (adversarial)
+  PASS: burst 0 (10 ops) — conservation holds for every flow item
+  PASS: burst 0 (10 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 0 (10 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 1 (20 ops) — conservation holds for every flow item
+  PASS: burst 1 (20 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 1 (20 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 2 (30 ops) — conservation holds for every flow item
+  PASS: burst 2 (30 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 2 (30 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 3 (40 ops) — conservation holds for every flow item
+  PASS: burst 3 (40 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 3 (40 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 4 (50 ops) — conservation holds for every flow item
+  PASS: burst 4 (50 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 4 (50 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 5 (60 ops) — conservation holds for every flow item
+  PASS: burst 5 (60 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 5 (60 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 6 (70 ops) — conservation holds for every flow item
+  PASS: burst 6 (70 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 6 (70 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 7 (80 ops) — conservation holds for every flow item
+  PASS: burst 7 (80 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 7 (80 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 8 (90 ops) — conservation holds for every flow item
+  PASS: burst 8 (90 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 8 (90 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 9 (100 ops) — conservation holds for every flow item
+  PASS: burst 9 (100 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 9 (100 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 10 (110 ops) — conservation holds for every flow item
+  PASS: burst 10 (110 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 10 (110 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 11 (120 ops) — conservation holds for every flow item
+  PASS: burst 11 (120 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 11 (120 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 12 (130 ops) — conservation holds for every flow item
+  PASS: burst 12 (130 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 12 (130 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: mid-flow save→disk→load round-trips
+  PASS: the restored mid-flow state is byte-identical to the live one
+  PASS: burst 13 (140 ops) — conservation holds for every flow item
+  PASS: burst 13 (140 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 13 (140 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 14 (150 ops) — conservation holds for every flow item
+  PASS: burst 14 (150 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 14 (150 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 15 (160 ops) — conservation holds for every flow item
+  PASS: burst 15 (160 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 15 (160 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 16 (170 ops) — conservation holds for every flow item
+  PASS: burst 16 (170 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 16 (170 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 17 (180 ops) — conservation holds for every flow item
+  PASS: burst 17 (180 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 17 (180 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 18 (190 ops) — conservation holds for every flow item
+  PASS: burst 18 (190 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 18 (190 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 19 (200 ops) — conservation holds for every flow item
+  PASS: burst 19 (200 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 19 (200 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 20 (210 ops) — conservation holds for every flow item
+  PASS: burst 20 (210 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 20 (210 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 21 (220 ops) — conservation holds for every flow item
+  PASS: burst 21 (220 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 21 (220 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 22 (230 ops) — conservation holds for every flow item
+  PASS: burst 22 (230 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 22 (230 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 23 (240 ops) — conservation holds for every flow item
+  PASS: burst 23 (240 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 23 (240 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 24 (250 ops) — conservation holds for every flow item
+  PASS: burst 24 (250 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 24 (250 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: burst 25 (260 ops) — conservation holds for every flow item
+  PASS: burst 25 (260 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: burst 25 (260 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: final (260 ops) — conservation holds for every flow item
+  PASS: final (260 ops) — back-pressure is lossless (present+consumed never fell → nothing evaporated)
+  PASS: final (260 ops) — no negative/runaway buffer, deposit, or pile
+  PASS: the flow sequence is long enough to stress interleavings (260 ops)
+  PASS: the sequence really forged ingots (40) — flow was live
+  PASS: the drills bored real ore from the veins (38 produced)
+  PASS: the WHOLE flow sequence is deterministic (identical final state)
+- STRESS: power network + consumers (pump/lift) under churn (adversarial)
+  PASS: burst 0 (11 ops) — power field finite/>=0/bounded
+  PASS: burst 0 (11 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 0 (11 ops) — conservation holds for every item
+  PASS: burst 0 (11 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 0 (11 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 0 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 1 (22 ops) — power field finite/>=0/bounded
+  PASS: burst 1 (22 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 1 (22 ops) — conservation holds for every item
+  PASS: burst 1 (22 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 1 (22 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 1 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 2 (33 ops) — power field finite/>=0/bounded
+  PASS: burst 2 (33 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 2 (33 ops) — conservation holds for every item
+  PASS: burst 2 (33 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 2 (33 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 2 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 3 (44 ops) — power field finite/>=0/bounded
+  PASS: burst 3 (44 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 3 (44 ops) — conservation holds for every item
+  PASS: burst 3 (44 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 3 (44 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 3 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 4 (55 ops) — power field finite/>=0/bounded
+  PASS: burst 4 (55 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 4 (55 ops) — conservation holds for every item
+  PASS: burst 4 (55 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 4 (55 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 4 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 5 (66 ops) — power field finite/>=0/bounded
+  PASS: burst 5 (66 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 5 (66 ops) — conservation holds for every item
+  PASS: burst 5 (66 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 5 (66 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 5 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 6 (77 ops) — power field finite/>=0/bounded
+  PASS: burst 6 (77 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 6 (77 ops) — conservation holds for every item
+  PASS: burst 6 (77 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 6 (77 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 6 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 7 (88 ops) — power field finite/>=0/bounded
+  PASS: burst 7 (88 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 7 (88 ops) — conservation holds for every item
+  PASS: burst 7 (88 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 7 (88 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 7 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 8 (99 ops) — power field finite/>=0/bounded
+  PASS: burst 8 (99 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 8 (99 ops) — conservation holds for every item
+  PASS: burst 8 (99 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 8 (99 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 8 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 9 (110 ops) — power field finite/>=0/bounded
+  PASS: burst 9 (110 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 9 (110 ops) — conservation holds for every item
+  PASS: burst 9 (110 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 9 (110 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 9 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 10 (121 ops) — power field finite/>=0/bounded
+  PASS: burst 10 (121 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 10 (121 ops) — conservation holds for every item
+  PASS: burst 10 (121 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 10 (121 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 10 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 11 (132 ops) — power field finite/>=0/bounded
+  PASS: burst 11 (132 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 11 (132 ops) — conservation holds for every item
+  PASS: burst 11 (132 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 11 (132 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 11 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: mid-power save→disk→load round-trips
+  PASS: the restored mid-power state is byte-identical to the live one
+  PASS: burst 12 (143 ops) — power field finite/>=0/bounded
+  PASS: burst 12 (143 ops) — conservation holds for every item
+  PASS: burst 12 (143 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 12 (143 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 12 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 13 (154 ops) — power field finite/>=0/bounded
+  PASS: burst 13 (154 ops) — conservation holds for every item
+  PASS: burst 13 (154 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 13 (154 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 13 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 14 (165 ops) — power field finite/>=0/bounded
+  PASS: burst 14 (165 ops) — conservation holds for every item
+  PASS: burst 14 (165 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 14 (165 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 14 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 15 (176 ops) — power field finite/>=0/bounded
+  PASS: burst 15 (176 ops) — conservation holds for every item
+  PASS: burst 15 (176 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 15 (176 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 15 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 16 (187 ops) — power field finite/>=0/bounded
+  PASS: burst 16 (187 ops) — conservation holds for every item
+  PASS: burst 16 (187 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 16 (187 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 16 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 17 (198 ops) — power field finite/>=0/bounded
+  PASS: burst 17 (198 ops) — conservation holds for every item
+  PASS: burst 17 (198 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 17 (198 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 17 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 18 (209 ops) — power field finite/>=0/bounded
+  PASS: burst 18 (209 ops) — conservation holds for every item
+  PASS: burst 18 (209 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 18 (209 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 18 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 19 (220 ops) — power field finite/>=0/bounded
+  PASS: burst 19 (220 ops) — conservation holds for every item
+  PASS: burst 19 (220 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 19 (220 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 19 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 20 (231 ops) — power field finite/>=0/bounded
+  PASS: burst 20 (231 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 20 (231 ops) — conservation holds for every item
+  PASS: burst 20 (231 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 20 (231 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 20 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 21 (242 ops) — power field finite/>=0/bounded
+  PASS: burst 21 (242 ops) — no fueled generator → the power field must be EMPTY, but holds 0 GHOST cell(s) (0-valued conduit entries that light the minimap)
+  PASS: burst 21 (242 ops) — conservation holds for every item
+  PASS: burst 21 (242 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 21 (242 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 21 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 22 (253 ops) — power field finite/>=0/bounded
+  PASS: burst 22 (253 ops) — conservation holds for every item
+  PASS: burst 22 (253 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 22 (253 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 22 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: burst 23 (264 ops) — power field finite/>=0/bounded
+  PASS: burst 23 (264 ops) — conservation holds for every item
+  PASS: burst 23 (264 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: burst 23 (264 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: burst 23 — total_water never ROSE without an add (96 -> 96): pumps only drain
+  PASS: final (264 ops) — power field finite/>=0/bounded
+  PASS: final (264 ops) — conservation holds for every item
+  PASS: final (264 ops) — every water level is valid (0..WATER_MAX) and never in rock
+  PASS: final (264 ops) — no conduit overlaps solid rock or a machine (0 bad)
+  PASS: the power sequence is long enough to stress interleavings (264 ops)
+  PASS: the pockets started flooded (96 units) — drainage had something to test
+  PASS: generators actually burned coal (2) — power was live
+  PASS: the WHOLE power sequence is deterministic (identical final state)
+- STRESS: research→craft→place gating under churn (adversarial)
+  PASS: burst 0 (14 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 0 (14 ops) — research set is discrete/monotone/consistent
+  PASS: burst 0 (14 ops) — conservation holds for every item
+  PASS: burst 1 (28 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 1 (28 ops) — research set is discrete/monotone/consistent
+  PASS: burst 1 (28 ops) — conservation holds for every item
+  PASS: burst 2 (42 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 2 (42 ops) — research set is discrete/monotone/consistent
+  PASS: burst 2 (42 ops) — conservation holds for every item
+  PASS: burst 3 (56 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 3 (56 ops) — research set is discrete/monotone/consistent
+  PASS: burst 3 (56 ops) — conservation holds for every item
+  PASS: burst 4 (70 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 4 (70 ops) — research set is discrete/monotone/consistent
+  PASS: burst 4 (70 ops) — conservation holds for every item
+  PASS: burst 5 (84 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 5 (84 ops) — research set is discrete/monotone/consistent
+  PASS: burst 5 (84 ops) — conservation holds for every item
+  PASS: burst 6 (98 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 6 (98 ops) — research set is discrete/monotone/consistent
+  PASS: burst 6 (98 ops) — conservation holds for every item
+  PASS: burst 7 (112 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 7 (112 ops) — research set is discrete/monotone/consistent
+  PASS: burst 7 (112 ops) — conservation holds for every item
+  PASS: burst 8 (126 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 8 (126 ops) — research set is discrete/monotone/consistent
+  PASS: burst 8 (126 ops) — conservation holds for every item
+  PASS: burst 9 (140 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 9 (140 ops) — research set is discrete/monotone/consistent
+  PASS: burst 9 (140 ops) — conservation holds for every item
+  PASS: burst 10 (154 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 10 (154 ops) — research set is discrete/monotone/consistent
+  PASS: burst 10 (154 ops) — conservation holds for every item
+  PASS: burst 11 (168 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 11 (168 ops) — research set is discrete/monotone/consistent
+  PASS: burst 11 (168 ops) — conservation holds for every item
+  PASS: burst 12 (182 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 12 (182 ops) — research set is discrete/monotone/consistent
+  PASS: burst 12 (182 ops) — conservation holds for every item
+  PASS: mid-sequence research save→disk→load round-trips
+  PASS: the restored mid-sequence research state is byte-identical to the live one
+  PASS: burst 13 (196 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 13 (196 ops) — research set is discrete/monotone/consistent
+  PASS: burst 13 (196 ops) — conservation holds for every item
+  PASS: burst 14 (210 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 14 (210 ops) — research set is discrete/monotone/consistent
+  PASS: burst 14 (210 ops) — conservation holds for every item
+  PASS: burst 15 (224 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 15 (224 ops) — research set is discrete/monotone/consistent
+  PASS: burst 15 (224 ops) — conservation holds for every item
+  PASS: burst 16 (238 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 16 (238 ops) — research set is discrete/monotone/consistent
+  PASS: burst 16 (238 ops) — conservation holds for every item
+  PASS: burst 17 (252 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 17 (252 ops) — research set is discrete/monotone/consistent
+  PASS: burst 17 (252 ops) — conservation holds for every item
+  PASS: burst 18 (266 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 18 (266 ops) — research set is discrete/monotone/consistent
+  PASS: burst 18 (266 ops) — conservation holds for every item
+  PASS: burst 19 (280 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 19 (280 ops) — research set is discrete/monotone/consistent
+  PASS: burst 19 (280 ops) — conservation holds for every item
+  PASS: burst 20 (294 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 20 (294 ops) — research set is discrete/monotone/consistent
+  PASS: burst 20 (294 ops) — conservation holds for every item
+  PASS: burst 21 (308 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 21 (308 ops) — research set is discrete/monotone/consistent
+  PASS: burst 21 (308 ops) — conservation holds for every item
+  PASS: burst 22 (322 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 22 (322 ops) — research set is discrete/monotone/consistent
+  PASS: burst 22 (322 ops) — conservation holds for every item
+  PASS: burst 23 (336 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 23 (336 ops) — research set is discrete/monotone/consistent
+  PASS: burst 23 (336 ops) — conservation holds for every item
+  PASS: burst 24 (350 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 24 (350 ops) — research set is discrete/monotone/consistent
+  PASS: burst 24 (350 ops) — conservation holds for every item
+  PASS: burst 25 (364 ops) — the craft gate matches the research state for every unlock
+  PASS: burst 25 (364 ops) — research set is discrete/monotone/consistent
+  PASS: burst 25 (364 ops) — conservation holds for every item
+  PASS: final (364 ops) — the craft gate matches the research state for every unlock
+  PASS: final (364 ops) — research set is discrete/monotone/consistent
+  PASS: final (364 ops) — conservation holds for every item
+  PASS: the research sequence is long enough to stress interleavings (364 ops)
+  PASS: some techs actually researched — the yes-path was exercised (8)
+  PASS: some gated machine/tool actually crafted — the craft yes-path was exercised
+  PASS: the WHOLE research→craft→place sequence is deterministic (identical final state)
+ALL PASS (stress tests)

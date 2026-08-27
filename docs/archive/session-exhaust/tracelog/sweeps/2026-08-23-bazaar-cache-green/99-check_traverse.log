@@ -1,0 +1,19 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== is the rope a way to travel ==
+  IN THE GALLERY (a roof overhead, 88 columns to cross)
+    on legs:     758 frames, top speed  232 px/s
+    on the rope: 589 frames, top speed  399 px/s (20 throws, 20 bit)
+  UNDER OPEN SKY (the same body, nothing to hook, 40 columns)
+    on legs:     466 frames, 40 columns covered
+    on the rope: 437 frames, 40 columns covered (1 throws, 1 bit)
+  PASS: under a roof the line CROSSES FASTER than the legs (1.29x, floor 1.15x)
+  PASS: ...and the lifted speed clamp is real (1.72x top speed, floor 1.10x)
+  PASS: ...because there is always something over your head to bite (20 of 20 throws)
+  AT THE HEADLAND SCARP (a 5-row face, 600 frames)
+    on legs: stopped;  on the rope: over it
+  PASS: the headland face is genuinely past the legs (5 rows)
+  PASS: ...and the rope is the answer the world already put in your hand
+  under open sky the line still crosses 1.07x faster, on 1 opportunist throws — trees, scarps
+  ...so the surface is not ropeless, it is SPARSE: every hold out there is a landmark
+check_traverse: PASS (5 asserted) — under a roof, the line is the fast way across

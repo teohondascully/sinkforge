@@ -1,0 +1,9 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== step-up check ==
+  PASS: climbed the 1-tile step and walked on (dy=-32, x=473)
+  PASS: glided up the ramp (max single-frame rise 5.5px — a teleport would be ~32)
+  PASS: the 2-tile wall stopped the body (x=473, wall at 480)
+  PASS: jumped the 2-tile wall and landed on top (x=555)
+  PASS: a one-row opening refused the body from all 4 start phases
+STEP-UP OK

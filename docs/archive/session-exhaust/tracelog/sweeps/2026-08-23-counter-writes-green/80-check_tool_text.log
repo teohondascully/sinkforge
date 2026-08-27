@@ -1,0 +1,27 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== what the game says about a tool is true of the tool ==
+  PASS: wood_pickaxe says tier-1 and is tier 1
+  PASS: wood_pickaxe names earth, and can break it (needs nothing tier 0; this is pick tier 1)
+  PASS: wood_pickaxe names stone, and can break it (needs pick tier 1; this is pick tier 1)
+  PASS: wood_pickaxe names ore, and can break it (needs pick tier 1; this is pick tier 1)
+  PASS: wood_pickaxe names coal, and can break it (needs pick tier 1; this is pick tier 1)
+  PASS: wood_pickaxe promises no speed advantage, because every pick cuts at the same rate
+  PASS: stone_pickaxe says tier-2 and is tier 2
+  PASS: stone_pickaxe names ore, and can break it (needs pick tier 1; this is pick tier 2)
+  PASS: stone_pickaxe names deepslate, and can break it (needs pick tier 2; this is pick tier 2)
+  PASS: stone_pickaxe names iron, and can break it (needs pick tier 2; this is pick tier 2)
+  PASS: stone_pickaxe names rich_ore, and can break it (needs pick tier 2; this is pick tier 2)
+  PASS: stone_pickaxe promises no speed advantage, because every pick cuts at the same rate
+  PASS: iron_pickaxe says tier-3 and is tier 3
+  PASS: iron_pickaxe promises no speed advantage, because every pick cuts at the same rate
+  PASS: wood_axe promises no speed advantage, because every axe cuts at the same rate
+  PASS: scanner promises no speed advantage, because every scanner cuts at the same rate
+  PASS: 5 tools have a tooltip to check
+  PASS: 3 of those tooltips claim a tier, so the tier rule had work to do
+  PASS: 8 material claims were checked against the tier gates
+  PASS: every pick still cuts at the same rate, so the speed rule above is live and not merely inert
+  PASS: every one of the 42 things the counter can put on the detail plate says what it is for
+  PASS: the scan found 42 selectable ids to check
+  PASS: the same lookup comes back empty for an id with no entry
+check_tool_text: PASS (23 asserted) — every mechanically-decidable claim in a tool tooltip holds

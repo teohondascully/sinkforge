@@ -1,0 +1,8 @@
+check_exit_codes: tools/run_harness.sh documents 11 codes; tools/harness_verdict.sh handles 11
+  PASS  (setup) both tables parsed: 11 documented, 11 handled
+  PASS  every documented exit code has a case in harness_verdict.sh
+  PASS  every interpreted exit code appears in the runner's table
+  PASS  the gate's default branch sets bad=1 rather than warning and passing
+  PASS  the local runner calls the gate
+  PASS  the CI action calls the gate
+check_exit_codes: PASS (11 codes, 6 asserted)

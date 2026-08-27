@@ -1,0 +1,646 @@
+From 0d25347bc3b584f3cfbed1560f3782e622fca0c6 Mon Sep 17 00:00:00 2001
+From: teohondascully <121736842+teohondascully@users.noreply.github.com>
+Date: Sun, 23 Aug 2026 16:54:55 -0700
+Subject: [PATCH 1/2] docs(eval): gates 1 and 5 measured, and neither was
+ "likely satisfied"
+
+Both read as inferences in the readiness handoff and in LANE.md. Measured from source, git, and the
+filesystem, with no engine booted this session: gate 1 is NARROWER-THAN-CLAIMED and gate 5 FAILS.
+
+Gate 1. The mechanism is REDIRECTION, not confinement: the wrappers move HOME so user:// resolves
+elsewhere, and the process keeps full access to the player's directory throughout. Verified from
+artifacts rather than from the comment claiming it -- a Godot user:// tree keyed to the canonical
+checkout's ROOT hash sits under $TMPDIR, written by other lanes today. So does the counter-evidence:
+four bare boots wrote into the player's REAL directory today, six days after the isolation landed.
+The empirical witness does not travel with the run the gate is about, because only run_harness.sh
+exports SF_PRODUCTION_SLOT and a journey run boots through with_machine.sh. It witnesses one file,
+not the .bak the game itself falls back to; there is no sinkforge.save on this box, so its comparison
+is absent-to-absent, which is the hazard the sentinel's own header identifies for the other slot; and
+of the gate's three verbs, "cannot read" has no instrument at all. The lock is sound and has 26
+properties behind it, but it is per-invocation and capped at 1800s, not per session.
+
+Gate 5 names seven artifacts. The two tools cited as its evidence retain none of them: no video path
+exists anywhere, capture_moments has a closed vocabulary of 40 poses and refuses any other name,
+capture_manifest deliberately dropped its sha column and enumerates only tracked frames, and nothing
+under tools/ writes a run receipt at all. EvalPlayerFeed's input log has no timestamp and no frame
+index, so it is an order and not a cadence. The eighth item -- no canonical capture is overwritten --
+is genuinely satisfied by four independent mechanisms, and it is one item out of eight.
+
+Every claim is marked VERIFIED, SOURCE or UNVERIFIED, and the six runs that would settle the
+remainder are written out with the output each must show. Two of them would show an instrument going
+red; nothing else here rests on a guard anyone has watched fail.
+---
+ tools/eval/READINESS_GATES_1_AND_5.md | 440 ++++++++++++++++++++++++++
+ 1 file changed, 440 insertions(+)
+ create mode 100644 tools/eval/READINESS_GATES_1_AND_5.md
+
+diff --git a/tools/eval/READINESS_GATES_1_AND_5.md b/tools/eval/READINESS_GATES_1_AND_5.md
+new file mode 100644
+index 0000000..ae04a7a
+--- /dev/null
++++ b/tools/eval/READINESS_GATES_1_AND_5.md
+@@ -0,0 +1,440 @@
++# Gates 1 and 5, measured — a receipt, and a list of what is still an inference
++
++    subject      docs/AGENT_PLAY_EVALUATION_PROTOCOL.md, readiness gates 1 and 5
++    written at   worktree /private/tmp/sinkforge-agent-journey-eval, detached at dacfd4c
++    date         2026-08-23
++    prior state  both gates read "likely satisfied" in docs/handoff/AGENT_JOURNEY_READINESS_2026-08-23.md
++                 and in tools/eval/LANE.md, on an inference in each case
++
++**Verdicts: gate 1 NARROWER-THAN-CLAIMED. Gate 5 FAILS.** Neither was "likely satisfied". Gate 1 is real
++and load-bearing over a smaller population than its sentence names; gate 5 names seven artifacts and the
++two tools cited as its evidence retain none of them.
++
++## The constraint this receipt was written under, and what it costs
++
++**No Godot was booted, and no `with_machine.sh` invocation was made,** on the director's instruction that
++engine runs on this box are not to be parallelised across lanes. Everything below is source reading, `git`,
++`grep`, and read-only inspection of the filesystem. That is enough to settle most of both gates and it is
++not enough to settle all of it, so every claim carries which it is:
++
++    VERIFIED     I ran something, or read the artifact, and the output is quoted here
++    SOURCE       read out of the code; true of the text, unexercised
++    UNVERIFIED   needs an engine run; the command that would settle it is given, with what it must show
++
++A `SOURCE` reading is stronger than the inference it replaces and weaker than a run. It is written as
++`SOURCE` rather than rounded up, because rounding up is the defect this pass exists to repair.
++
++---
++
++# Gate 1 — safe isolation
++
++> *"the run cannot read, overwrite, or delete a real player save and it owns the machine lock for its whole
++> session."*
++
++That is four claims: cannot **read**, cannot **overwrite**, cannot **delete**, and **owns the lock for the
++whole session**. They are not equally supported, and the mechanism is not the one the sentence implies.
++
++## The single most important finding: this is REDIRECTION, not CONFINEMENT
++
++Nothing sandboxes the process. `tools/with_machine.sh:60` and `tools/run_harness.sh:184` move `HOME`, so
++`user://` resolves somewhere else. The engine keeps full read and write access to the user's home
++directory throughout. The player's save is not out of reach; it is out of the way.
++
++Every conclusion below follows from that distinction.
++
++## 1a. `user://` really does follow `HOME` on this machine — VERIFIED
++
++This is the load-bearing empirical premise of the whole mechanism, and `run_harness.sh:158-163` asserts it
++was "measured on this box before choosing". I could not re-measure it without booting. I did not have to:
++the two directories are on disk right now, written by other lanes today, and they answer it.
++
++    $ for R in /Users/thondascully/Projects/sinkforge /private/tmp/sinkforge-agent-journey-eval; do \
++        printf '%s -> %s\n' "$R" "$(printf '%s' "$R" | shasum -a 256 | cut -c1-12)"; done
++    /Users/thondascully/Projects/sinkforge          -> 909c724feaab
++    /private/tmp/sinkforge-agent-journey-eval       -> b42ab8b68b8d
++
++    $ ls -la "$TMPDIR/sinkforge-home-909c724feaab/Library/Application Support/Godot/app_userdata/Sinkforge/"
++    drwxr-xr-x  logs                          23 Aug 16:45
++    drwxr-xr-x  shader_cache                  22 Aug 22:15
++    -rw-r--r--  862k  sinkforge.save.bak      18 Aug 00:21
++    -rw-r--r--  867k  test_fine_terrain.save  23 Aug 16:31
++    -rw-r--r--  867k  test_fine_terrain.save.bak
++    drwxr-xr-x  vulkan
++
++    $ ls .../sinkforge-home-909c724feaab/.../Sinkforge/logs/ | tail -3
++    godot2026-08-23T16.34.39.log
++    godot2026-08-23T16.36.24.log
++    godot2026-08-23T16.45.16.log
++
++A Godot `user://` tree, keyed to the canonical checkout's ROOT hash, sitting under `$TMPDIR` and written
++minutes ago. `user://` followed `HOME`. **Verified from the artifact, not inferred from the comment.**
++
++**What would make it false:** these directories being empty or absent while the real one accumulated the
++same files. They are not.
++
++## 1b. The redirect fails closed — SOURCE, and it is the one thing already fixed by a gate-1 audit
++
++`tools/with_machine.sh:57-59` refuses to boot when the isolated home cannot be created:
++
++    mkdir -p "$SF_HOME/.local/share" "$SF_HOME/.config" \
++        || { echo "!! could not create the isolated home at $SF_HOME — REFUSING to boot Godot against the" \
++            "player's real save slot. ..." >&2; exit 2; }
++
++`tools/run_harness.sh:175-176` does the same with `|| exit 2`. The comment at `with_machine.sh:47-56`
++records that this line used to be `if mkdir ...; then export HOME=...; fi` — failing **open**, into the
++player's real slot, silently — and that it was found by an earlier pass of this same gate (`e463767`,
++2026-08-17 23:08). So gate 1 has already caught one live defect of exactly the shape it is about.
++
++The refusal happens at line 57, before the argument check at line 82 and before the lock is taken at line
++96. A refused call therefore boots nothing and queues behind nobody.
++
++**UNVERIFIED — the exact run that settles it:**
++
++    SF_HOME=/dev/null/cannot-exist bash tools/with_machine.sh --headless --script res://tools/check_grid.gd
++    # must print "REFUSING to boot Godot against the player's real save slot", exit 2,
++    # and must NOT create the lock directory
++
++**What would make it fail:** the `||` branch being dropped, or the `export HOME` moving above the `mkdir`.
++Nothing in the harness watches for either — see 1e.
++
++## 1c. Only WRAPPED runs are isolated, and unwrapped boots happen on this box — VERIFIED
++
++`grep -rn 'SF_ISOLATED_HOME|SF_REAL_HOME|SF_PRODUCTION_SLOT|SF_HOME'` over the whole tree returns five
++files: `tools/with_machine.sh`, `tools/run_harness.sh`, `tools/save_sentinel.gd`, `src/core/save_game.gd`,
++`CONTRIBUTING.md`. **No `check_*` layer names any of them.** The isolation mechanism has no test.
++
++And the escape hatch is not hypothetical. The player's real Godot directory:
++
++    $ find "$HOME/Library/Application Support/Godot/app_userdata/Sinkforge" -type f \
++        -exec stat -f '%Sm %N' -t '%Y-%m-%d %H:%M' {} \; | sort -r | head -6
++    2026-08-23 13:06  .../Sinkforge/logs/godot2026-08-23T13.06.47.log
++    2026-08-23 13:06  .../Sinkforge/logs/godot.log
++    2026-08-23 13:03  .../Sinkforge/logs/godot2026-08-23T13.03.34.log
++    2026-08-23 12:51  .../Sinkforge/logs/godot2026-08-23T12.51.59.log
++    2026-08-23 12:42  .../Sinkforge/logs/godot2026-08-23T12.42.08.log
++    2026-08-19 23:30  .../Sinkforge/settings.cfg
++
++    $ cat ".../Sinkforge/logs/godot.log"
++    Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
++
++Four Godot boots wrote into the **player's real directory today**, at 12:42, 12:51, 13:03 and 13:06 — six
++days after the isolation landed (`84f2546`, 2026-08-17 11:46). Each log is 73 bytes, the banner alone, so
++these were short-lived bare invocations rather than sweeps. They are not mine; this session has booted
++nothing and began at 16:2x. The same directory still holds `test_fine_terrain.save` (847K, 17 Aug 15:11)
++and `zoom.png` (12K, 16 Aug) — harness artifacts in the player's slot.
++
++**This is the population statement gate 1 needs and does not make.** The gate says "the run". The property
++holds for a run routed through one of two wrapper scripts, and there is nothing on this machine that makes
++routing mandatory. The agent-journey run would be safe *because someone typed the wrapper*.
++
++## 1d. The game's own writer refuses unguarded writes — SOURCE, and narrower than it reads
++
++`src/core/save_game.gd:305-312`:
++
++    static func _fixture_may_not_write(path: String) -> bool:
++        if not path.begins_with("user://"):        return false
++        if not OS.get_environment("SF_ISOLATED_HOME").is_empty():  return false
++        if OS.get_environment("SF_REAL_HOME") == "1":              return false
++        return OS.get_cmdline_args().has("--script")
++
++Good design: a positive marker, so absence of proof of isolation is the refusal condition. Three limits,
++all from the source:
++
++- it guards `SaveGame.write` only. A `FileAccess.open(...)` or `DirAccess.remove_absolute(...)` anywhere
++  else is untouched by it;
++- `--script` is the fixture tell. **A judged actor driven by a scene, an autoload, or `--main-pack`
++  carries no `--script`, so this refusal would not fire for it at all;**
++- it is disarmed by `SF_ISOLATED_HOME` being merely *set*. If `export HOME=` at `with_machine.sh:60` were
++  deleted while `export SF_ISOLATED_HOME=` at line 69 survived, `user://` would be the player's directory
++  and this guard would report the run as sandboxed. Nothing checks the pair.
++
++## 1e. "cannot NAME the production slot" is a guard over one spelling — VERIFIED
++
++`tools/check_save_isolation.gd` is a registered layer (`run_harness.sh:267`, first in the list) and it is a
++good one: recursive over `tools/` and `tests/`, so `tools/eval/` is inside its population — 127 `.gd` under
++`tools/` and 5 under `tests/`, of which the layer scans 130 (it exempts itself and `save_sentinel.gd`)
++against its floor of 40. Non-vacuity is proved in both directions and the splice-flattener is proved to
++fire on a sample built for it.
++
++Its subject is the literal `"user://sinkforge.save"` (line 38) and a `"user://…​.save"` regex (line 114). I
++ran both matchers over the ways a script could reach the player's file:
++
++    $ cat probe.txt
++    var a := "user://sinkforge.save"
++    var b := "user://" + "sinkforge.save"
++    var c := "/Users/thondascully/Library/Application Support/Godot/app_userdata/Sinkforge/sinkforge.save"
++    var d := OS.get_environment("HOME") + "/Library/.../Sinkforge/sinkforge.save"
++    var e := "/Users/thondascully/Library/.../Sinkforge/sinkforge.save.bak"
++
++    $ grep -n -F 'user://sinkforge.save' probe.txt                       # the raw contains(SLOT)
++    1:var a := "user://sinkforge.save"
++
++    $ sed -E 's/"[[:space:]]*\+[[:space:]]*"//g' probe.txt | grep -n -F 'user://sinkforge.save'
++    1:var a := "user://sinkforge.save"
++    2:var b := "user://sinkforge.save"
++
++    $ sed -E 's/"[[:space:]]*\+[[:space:]]*"//g' probe.txt \
++        | grep -n -oE '"(user://[A-Za-z0-9_%./-]+\.save)"'              # the _slots() regex
++    1:"user://sinkforge.save"
++    2:"user://sinkforge.save"
++
++**Lines c, d and e match nothing, under either matcher.** The layer's own docstring says as much at lines
++22-27 ("it still cannot see a path built from a variable or a format string at runtime") and names
++`save_sentinel.gd` as the half that covers it. That is honest, and 1f is where that cover runs out.
++
++Line `e` is the sharper one: it is not an evasion, it is the **sibling file the game itself reads**.
++`save_game.gd:36` defines `BAK_SUFFIX = ".bak"` and line 23 says a slot that is "missing, truncated or
++malformed falls back to `.bak`". A real player save is at least two files. Nothing here, and nothing in 1f,
++watches the second one.
++
++## 1f. The empirical witness does not travel with the run the gate is about — SOURCE
++
++`tools/save_sentinel.gd` is the instrument that makes "the harness never touched your save" **proved**
++rather than true-by-construction. It hashes the real slot before and after. Its subject is
++`SF_PRODUCTION_SLOT` (line 106), and:
++
++    $ grep -rn 'SF_PRODUCTION_SLOT' --exclude-dir=.git .
++    tools/save_sentinel.gd:106  ...    tools/save_sentinel.gd:219  ...
++    tools/run_harness.sh:180    export SF_PRODUCTION_SLOT="$HOME/Library/.../sinkforge.save"
++    tools/run_harness.sh:182    export SF_PRODUCTION_SLOT="${XDG_DATA_HOME:-$HOME/.local/share}/godot/..."
++
++**`with_machine.sh` never sets it.** Under `with_machine.sh` the witness reads `NO_WITNESS` (`"-"`, line
++108) and the sentinel prints *"verified — the run's own slot is untouched (no production slot named)"*.
++The hard rule for this lane, and the only sane rule for a journey run, is that everything boots through
++`with_machine.sh`. **So for the agent-journey run specifically, the production witness is unarmed, and the
++sentinel is not invoked at all** — nothing outside `run_harness.sh` calls it (`arm` at line 1180, `verify`
++at 1364, `disarm` at 988).
++
++Three further limits, all from the source:
++
++- **It witnesses one file.** `SF_PRODUCTION_SLOT` names `sinkforge.save`. Not `.bak` (1e), not
++  `settings.cfg` (`scenes/settings.gd:33`, and it is 120 bytes of the player's real audio and feel
++  preferences dated 19 Aug), not `logs/`, not the ten other `user://*.save` fixture slots.
++- **Absent-to-absent passes, and that is the state of this machine.** There is no `sinkforge.save` in the
++  player's directory (see the `find` in 1c). `_production_digest()` returns `"absent"`; `verify` compares
++  `"absent" == "absent"` and passes, printing *"absent throughout"*. A run that created the file and then
++  deleted it scores identically. The sentinel's own header, lines 22-28, identifies exactly this hazard for
++  the `user://` slot and pays for it with a planted marker. **The production witness has no plant** — it
++  must not write there — so the hazard is unmitigated on the production side, by necessity rather than by
++  oversight. On this box today, that is not a corner case; it is the only case.
++- **A hash is invariant under reading.** Of the gate's three verbs, "cannot **read**" has no instrument at
++  all. Nothing in this repository detects or prevents a read of the player's save. It is prevented in
++  practice only by the redirect, and only for code that spells the path with `user://`.
++
++## 1g. The lock — SOURCE, well tested, and per-invocation rather than per-session
++
++`with_machine.sh` acquires by `mkdir "$LOCK"` (line 96), writes a four-line owner file (line 133), and
++releases from an EXIT/INT/TERM trap (line 179) that releases **only a lock it still owns**
++(`lock_lib.sh:64-68`). The stale sweep runs under its own mutex with a verify-and-put-back recovery
++(`lock_lib.sh:96-143`), and the reasoning for why an atomic rename is not sufficient is written out and is
++correct.
++
++`tools/check_lock.sh` holds it to 26 properties, is registered at `run_harness.sh:355` through
++`add_excl_hl` (alone, no surface), and needs no Godot — it drives the wrapper against a stub engine and its
++own `SF_LOCK`. **I did not run it**, because it invokes `with_machine.sh` and the standing instruction is no
++`with_machine.sh` runs. It is the strongest single piece of evidence available for this clause and it is
++one command away.
++
++**UNVERIFIED — the exact run that settles it:** `bash tools/check_lock.sh`, which must end
++`check_lock: PASS — the machine lock holds, and giving up is not a pass` and exit 0.
++
++What check_lock does **not** cover, read off its own case list: it says nothing about `HOME`, nothing about
++`user://`, and nothing about the save. It is a lock test. The two halves of gate 1 have one test between
++them and it is the half that does not concern the player's data.
++
++**"for its whole session" is the part that does not hold as written.** Three separate reasons, all from
++source:
++
++- **The lock is per-invocation.** It is taken at line 96 and released at line 179 of one
++  `with_machine.sh` call. A journey session assembled from more than one invocation — boot, then capture,
++  then a second scenario — is unlocked in the gaps, and another lane can take the box there.
++- **`SF_RUN_CAP` defaults to 1800s** (line 153) and a capped run exits 6 having been SIGTERMed then
++  SIGKILLed (`cap_lib.sh:51-60`). The protocol's run is *20 minutes of normal game time* with an actor in
++  the loop; wall-clock for an LLM-driven actor is not game-clock. A session that overruns 30 minutes is
++  killed mid-run, and the receipt for that is `DRIVER_INVALID`, not a result.
++- **`SF_LOCK_WAIT` defaults to 900s** (line 38). A 20-minute session holding the box makes every concurrent
++  harness run give up at 15 minutes with exit 5. Correct behaviour, and an operational fact the protocol
++  should state: a journey run takes the machine off the air for its duration.
++
++Documented bypasses, all honoured silently and none recorded in any receipt: `SF_NO_LOCK=1`
++(`run_harness.sh:1142`, `seed_corpus.sh:89` — not honoured by `with_machine.sh`), `SF_LOCK=<path>` (a
++private lock that serialises with nobody), `SF_REAL_HOME=1` (no isolation whatsoever, and it also switches
++off `save_game.gd`'s refusal and the sentinel's).
++
++## Gate 1 verdict: **NARROWER-THAN-CLAIMED**
++
++What is genuinely established: `user://` follows `HOME` on this box (verified from artifacts on disk); the
++redirect fails closed in source and was already repaired once by this gate; a good source scan keeps the
++`user://` spelling of the player's slot out of 132 fixture files; the machine lock is sound and has 26
++properties behind it.
++
++Read against the gate's actual sentence, over the population the gate names:
++
++| clause | holds for | does not hold for |
++|---|---|---|
++| cannot **read** a real player save | nothing | no instrument exists; a hash cannot see a read |
++| cannot **overwrite** | `user://`-spelled paths, in wrapped runs | absolute or composed paths; `.bak`; `settings.cfg`; unwrapped runs |
++| cannot **delete** | same | same, plus: absent-to-absent passes, which is this machine's state |
++| **owns the lock for its whole session** | one `with_machine.sh` invocation, up to 1800s | multi-invocation sessions; overruns; `SF_LOCK`/`SF_NO_LOCK` |
++
++The three things that would most change this verdict, in order:
++
++1. A layer that asserts the wrappers export `HOME` **and** `SF_ISOLATED_HOME` together, and that the second
++   is never exported without the first. That pair is the quiet-green: isolation off, guard on.
++2. `with_machine.sh` exporting `SF_PRODUCTION_SLOT` the way `run_harness.sh` does, so the witness travels
++   with the runs the journey evaluation will actually make.
++3. A witness over the save **family** (`sinkforge.save`, `.bak`, `settings.cfg`) rather than one path.
++
++---
++
++# Gate 5 — evidence feed
++
++> *"video or ordered captures, audio status, exact input cadence, commit, settings, seed, and save state
++> can all be retained without overwriting canonical captures."*
++
++Seven artifacts and one condition. The prior reading was *"likely satisfied — `tools/capture_moments.gd`
++and `tools/capture_manifest.sh` exist and retain captures without overwriting canonical ones."* That
++sentence is true and it is a receipt for the **condition**, which is the eighth item, not for any of the
++seven.
++
++## Item by item
++
++**1. Video or ordered captures — ABSENT.**
++
++    $ grep -rn -E 'write-movie|write_movie|movie_writer|MovieWriter|ffmpeg|\.avi' --exclude-dir=.git .
++    (no output)
++
++No video path of any kind. Godot's own `--write-movie` is used nowhere.
++
++Ordered captures do not exist either, and `capture_moments.gd` structurally cannot produce them. It is a
++**closed vocabulary of 40 named poses** — counted with `capture_manifest.sh`'s own extraction off the
++`match moment:` arms (`boot`, `delve`, `swing`, `counter`, …) — one PNG per process, each behind a full
++scene boot and a 60-frame settle. An unrecognised name is refused rather than saved (lines 429-434):
++
++    _:
++        printerr("capture_moments: unknown moment '%s' — refusing to save a boot frame under its name" % moment)
++        return 2
++
++So a journey runner cannot ask it for `_moment_0001.png`. Producing an ordered sequence means new code —
++a per-frame `get_root().get_texture().get_image().save_png(...)` loop — which does not exist. **Not a
++defect in `capture_moments.gd`: it is a posing instrument for the Sees tier and it is good at that. It is
++simply not the thing this gate names.**
++
++**2. Audio status — NOT RETAINED.** The state is reachable (`Settings.muted`, `AudioServer.is_bus_mute(0)`,
++exercised by `check_settings.gd:79-93`) and `EvalPlayerFeed.audio_enabled()` carries a flag for the actor's
++side. Neither capture tool records it. Note that `capture_moments._deafen` (line 155) is **input** deafness
++— `Controls.deaf`, `set_process_input(false)` — and has nothing to do with audio; reading it as an audio
++record would be the wrong instrument.
++
++**3. Exact input cadence — NARROWER THAN THE BRIEF STATES.** `EvalPlayerFeed._log` (`player_feed.gd:33`)
++appends one dictionary per input:
++
++    {"kind": "act",   "action": action, "pressed": pressed}
++    {"kind": "point", "px": px}
++    {"kind": "click", "button": button, "pressed": pressed}
++
++**There is no timestamp, no frame index, and no tick in any of them.** The log is an ORDER, and cadence is
++a rate; an order with no clock cannot express one. The protocol asks for cadence in two places — gate 5,
++and the scenario record's `feed: resolution, frame cadence, audio state` — and neither is answerable from
++this. Nothing persists the log to disk either; `input_log()` returns a copy to whoever holds the feed.
++Adding `Time.get_ticks_msec()` and `Engine.get_process_frames()` to each entry is a two-line change and
++would make this item true. Until then it covers input **order**, for the actor's side only.
++
++**4. Commit — RETAINED FOR SWEEPS, NOT FOR A JOURNEY RUN.** `run_harness.sh:1136` writes a header line with
++`tree`, `branch`, `head` and a `git diff HEAD | git hash-object` digest of the uncommitted delta. That is a
++real commit record and it is exactly the right shape. It is printed by the **harness runner**, which a
++journey run does not use.
++
++`capture_manifest.sh` does not supply it: lines 39-48 record that the sha column was **deliberately
++removed** ("an identifier that changes every time history is tidied"), leaving an author date and a
++renderer signature. It also enumerates by `git ls-files 'docs/media/moments/_moment_*.png'` (line 176), so
++its population is 52 tracked, committed frames. A journey run's captures would be untracked and outside
++that directory: the manifest would describe none of them, and `--check` would not notice they exist.
++
++**5. Settings — NOT RETAINED.** No tool snapshots `user://settings.cfg` or the resolution/zoom/feel state
++into a run record. `capture_moments` prints `zoom=%.2f` inside its `CAPTURED` line; that is one field of
++one frame, to stdout.
++
++**6. Seed — NOT RETAINED.** `capture_moments.gd` never prints a seed. The nearest thing in the repository
++is `play_tests.gd:56` (`"(game clock: %.0fx, world seed %d)"`), a different tool, printing to stdout. The
++protocol requires the seed in the scenario record, the receipt, and the population rule.
++
++**7. Save state — NOT RETAINED.** `save_sentinel.gd` computes exactly the digests this item wants and
++writes them to `$DIR/save_sentinel.state`, which lives in the harness log directory and is consumed and
++discarded by `verify`; the log directory itself is deleted when a run is clean. And per 1f the sentinel is
++not invoked outside `run_harness.sh` at all.
++
++**8. …without overwriting canonical captures — SATISFIED.** This is the one item with real engineering
++behind it, and four independent mechanisms hold it:
++
++- `SF_MOMENT_DIR` redirects the destination and nothing else, and **fails closed** — an unusable directory
++  refuses the capture rather than falling back to the repo root (lines 461-472);
++- an existing capture is copied to `_moment_prev/` before any write, and the capture is **refused** if the
++  copy fails, "because a capture is worth less than the capture it would destroy" (lines 509-521);
++  `_moment_prev/` is gitignored (`.gitignore:111`), so the undo generation is local;
++- a contamination gate runs **before** the shutter, so a wrong-scene frame never replaces a good one
++  (lines 479-486);
++- an unknown moment name is refused (lines 429-434).
++
++`capture_manifest.sh --check` is a registered layer (`run_harness.sh:338`) and asserts its own population
++before comparing (lines 196-210), so it cannot pass by describing nothing.
++
++## Gate 5 verdict: **FAILS**
++
++Seven artifacts named; **zero are retained by the two tools cited as the gate's evidence**. One (commit) is
++retained by a third tool for a different kind of run. One (input cadence) has an order-only log with no
++clock and no persistence. The condition — no canonical capture is overwritten — is genuinely satisfied and
++is one item out of eight.
++
++It fails because the retention pipeline **does not exist yet**, not because anything is broken. Nothing in
++`tools/` writes a run receipt at all:
++
++    $ grep -rln -E 'JSON\.stringify|store_string.*json|\.json"' tools/
++    (no output)
++
++The protocol's own receipt schema (`### Journey receipts`) lists commit, scenario ID, seed, actor profile,
++model/version, prompt hash, settings, controls, frame/audio feed, machine-lock status, timestamps, raw
++artifacts **and their checksums**. That is a superset of gate 5, and there is no writer for any of it. Gate
++5 is the smaller of the two jobs and it is unstarted.
++
++The cheapest honest close, in the same spirit as gate 6's: one receipt writer, run by the journey
++orchestrator, emitting a single file per session with those seven fields, plus timestamps on
++`EvalPlayerFeed._log`, plus an in-session frame writer under `SF_MOMENT_DIR`-style redirection so it
++inherits the non-overwriting property already proved. Then gate 5 becomes checkable by a layer that asserts
++the receipt has all seven keys and that none of them is empty — which is the form that cannot pass by
++describing nothing.
++
++---
++
++# What is still unverified, and the exact runs that would settle it
++
++Nothing below was executed. Each line states what its output must show, so a later run either settles it or
++does not.
++
++| # | claim | command | must show |
++|---|---|---|---|
++| 1 | the lock's 26 properties still hold | `bash tools/check_lock.sh` | `check_lock: PASS`, exit 0 |
++| 2 | the redirect fails closed | `SF_HOME=/dev/null/x bash tools/with_machine.sh --headless --script res://tools/check_grid.gd` | `REFUSING to boot Godot`, exit 2, `$LOCK` never created |
++| 3 | the save-isolation scan is green over `tools/eval/` | `bash tools/with_machine.sh --headless --script res://tools/check_save_isolation.gd` | `res://tools opened and yielded .gd files (127)`, `res://tests … (5)`, `the scan actually read the harness (130 .gd files)`, no offenders |
++| 4 | …and that scan **can** go red on this lane's files | add a `.gd` under `tools/eval/` naming `"user://sinkforge.save"`, re-run 3, then delete it | the layer names that file as an offender. Without this the scan's reach into `tools/eval/` is inferred from `_sources`' recursion, not observed |
++| 5 | the production witness reports on a real path | `SF_PRODUCTION_SLOT=<a scratch file> bash tools/with_machine.sh --headless --script res://tools/save_sentinel.gd -- arm <state>`, mutate the file, then `verify` | `THE PLAYER'S REAL SAVE CHANGED DURING THIS RUN`. A witness never watched go red is a witness with no demonstrated direction |
++| 6 | `user://` follows `HOME` **now**, not merely on 17 Aug | any wrapped `--script` printing `OS.get_user_data_dir()` | a path under `$TMPDIR/sinkforge-home-<hash>/` |
++
++Item 4 and item 5 are the two that matter most: they are the only ones that would show an instrument going
++**red**, and every other line in this document rests on guards nobody has watched fail.
++
++---
++
++# Standing of the six gates after this pass
++
++    1 safe isolation    NARROWER-THAN-CLAIMED   redirection not confinement; witness absent for
++                                                with_machine.sh runs; lock is per-invocation
++    2 truthful route    UNMEASURED              needs play
++    3 unmanufactured    UNMEASURED              needs play
++    4 legible route     NARROWER-THAN-CLAIMED   smaller population than the gate names
++    5 evidence feed     FAILS                   0 of 7 artifacts retained; the 8th condition holds
++    6 actor boundary    DONE                    dacfd4c
++
++**The evaluation stays INVALID, and this pass moved it further away rather than closer.** Two gates that
++read "likely satisfied" were inferences; measured, one is narrower than its sentence and one is false. One
++gate of six is closed.
+-- 
+2.39.5 (Apple Git-154)
+
+
+From 7775e8ba11a76f6b56a757d8c7e86f8a54b71d8b Mon Sep 17 00:00:00 2001
+From: teohondascully <121736842+teohondascully@users.noreply.github.com>
+Date: Sun, 23 Aug 2026 17:46:19 -0700
+Subject: [PATCH 2/2] eval(gate5): stamp the input feed with two clocks, and
+ cost the other six items
+
+An order is not a cadence. _log recorded what came after what, and both the
+gate and the scenario record ask for a rate, which a list with no clock in
+it cannot express. _push now stamps frame and ms onto every entry before it
+lands, in one helper rather than at four call sites, so a fifth input
+cannot be added unstamped.
+
+Two clocks because they answer different questions. frame is the tick the
+game acted on, which a replay lines up against and which survives a scaled
+clock. ms is wall time, which is what a rate needs and the only one of the
+two that can show a stall: a hitch is a gap in wall time and is invisible
+to a counter that only advances when a frame happens.
+
+That closes item 3 of seven. The other six are BLOCKED rather than open,
+and the receipt now says why and what they would cost: five of them are one
+run-record artifact, and ordered captures are the only genuinely separate
+piece of work. All six are harness expansion under a frozen A+ programme,
+for an evaluation separately blocked at gate 6, so closing them would
+unblock nothing.
+
+Worktree-local. Disposable lane, no push from here.
+---
+ tools/eval/READINESS_GATES_1_AND_5.md | 50 ++++++++++++++++++++++++++-
+ tools/eval/player_feed.gd             | 24 ++++++++++---
+ 2 files changed, 69 insertions(+), 5 deletions(-)
+
+diff --git a/tools/eval/READINESS_GATES_1_AND_5.md b/tools/eval/READINESS_GATES_1_AND_5.md
+index ae04a7a..c6a9fb6 100644
+--- a/tools/eval/READINESS_GATES_1_AND_5.md
++++ b/tools/eval/READINESS_GATES_1_AND_5.md
+@@ -326,7 +326,17 @@ side. Neither capture tool records it. Note that `capture_moments._deafen` (line
+ — `Controls.deaf`, `set_process_input(false)` — and has nothing to do with audio; reading it as an audio
+ record would be the wrong instrument.
+ 
+-**3. Exact input cadence — NARROWER THAN THE BRIEF STATES.** `EvalPlayerFeed._log` (`player_feed.gd:33`)
++**3. Exact input cadence — CLOSED 2026-08-23, and it was the only one of the seven that could be.**
++`_push` now stamps every entry with `Engine.get_process_frames()` and `Time.get_ticks_msec()` before it
++reaches `_log`, so the record carries a tick and a wall clock rather than an order alone. Two clocks
++because they answer different questions: `frame` is what a replay lines up against and survives a scaled
++clock, `ms` is what a rate needs and is the only one of the two that can show a stall, since a hitch is a
++gap in wall time and is invisible to a counter that only advances when a frame happens. One helper rather
++than four edited call sites, so a fifth input cannot be added unstamped.
++
++The reading it replaces follows, because the reasoning is what makes the fix checkable:
++
++**3. (SUPERSEDED) Exact input cadence — NARROWER THAN THE BRIEF STATES.** `EvalPlayerFeed._log` (`player_feed.gd:33`)
+ appends one dictionary per input:
+ 
+     {"kind": "act",   "action": action, "pressed": pressed}
+@@ -438,3 +448,41 @@ Item 4 and item 5 are the two that matter most: they are the only ones that woul
+ **The evaluation stays INVALID, and this pass moved it further away rather than closer.** Two gates that
+ read "likely satisfied" were inferences; measured, one is narrower than its sentence and one is false. One
+ gate of six is closed.
++
++
++---
++
++# DISPOSITION, 2026-08-23 — gate 5 is BLOCKED, not open, and one item of seven is closed
++
++    item 1  ordered captures / video     BLOCKED   new per-frame capture path, does not exist
++    item 2  audio status                 BLOCKED   reachable, recorded by nothing
++    item 3  exact input cadence          CLOSED    two clocks on every entry, one helper
++    item 4  commit                       BLOCKED   the record exists, in the harness runner a journey
++                                                   run does not use
++    item 5  settings                     BLOCKED   nothing snapshots settings.cfg into a run record
++    item 6  seed                         BLOCKED   never printed by the capture path
++    item 7  save state                   BLOCKED   same
++    condition: without overwriting canonical captures      SATISFIED, and it always was
++
++**Why the six are not autonomous work, stated so the next reader does not re-derive it.** Each one is new
++evidence-feed instrumentation, which is harness expansion. The A+ programme is frozen: no harness-expansion
++commit without a director-approved priority ID attached to a P0/P1 correctness issue, a selected
++player-facing change, or a demonstrated regression. Gate 5 is none of those. It is a readiness gate for an
++evaluation that is **separately blocked at gate 6** on the actor boundary, so closing gate 5 would not
++unblock anything even if it were free.
++
++**What it would take, so the decision is costed rather than deferred.** Items 4, 5, 6 and 7 are one
++artifact between them: a run-record JSON written beside the captures, carrying the harness runner's
++existing `tree`/`branch`/`head`/diff-digest header plus a settings snapshot, the world seed, and the save
++slot in use. Item 2 is one field on that record. Item 1 is the genuinely separate one and the only one
++that is real work: a per-frame `get_root().get_texture().get_image().save_png()` path with its own
++ordering, throughput and disk budget, which `capture_moments.gd` cannot grow into because it is a closed
++vocabulary of 40 named poses at one PNG per process boot.
++
++    THE ASK, IF A DIRECTOR WANTS GATE 5 CLOSED: one priority ID covering a run-record artifact
++    (items 2, 4, 5, 6, 7 together) and a separate one for an ordered-capture path (item 1). Gate 6
++    still gates the evaluation either way.
++
++**And the standing caution about this receipt.** Everything above marked `SOURCE` is read out of the code
++and unexercised. The gate-1 finding that isolation is REDIRECTION rather than CONFINEMENT is the durable
++result of this lane and does not depend on any of the above.
+diff --git a/tools/eval/player_feed.gd b/tools/eval/player_feed.gd
+index 9f67d87..023c10f 100644
+--- a/tools/eval/player_feed.gd
++++ b/tools/eval/player_feed.gd
+@@ -38,6 +38,22 @@ func _init(vp: Viewport, actions: Array[StringName], audio: bool) -> void:
+ 	_actions = actions.duplicate()
+ 	_audio = audio
+ 
++## Stamp one input and record it. AN ORDER IS NOT A CADENCE, which is the whole reason this exists: the
++## protocol's gate 5 asks for the exact input cadence and the scenario record asks for a frame cadence,
++## and a list with no clock in it can only say what came after what. It was written as an order and read
++## as a cadence, which is the quieter half of the mistake.
++##
++## TWO CLOCKS, BECAUSE THEY ANSWER DIFFERENT QUESTIONS AND NEITHER SUBSTITUTES FOR THE OTHER. `frame` is
++## the tick the game acted on, which is what a replay has to line up against and what stays correct when
++## the clock is scaled or the run is stepped by hand. `ms` is wall time, which is what a RATE needs, and
++## it is the only one of the two that can show a stall: a hitch that costs a second shows up as a gap in
++## `ms` and not at all in a frame counter that only advances when a frame happens.
++func _push(entry: Dictionary) -> void:
++	entry["frame"] = Engine.get_process_frames()
++	entry["ms"] = Time.get_ticks_msec()
++	_log.append(entry)
++
++
+ 
+ ## The pixels on the screen this instant. The actor's whole world model comes through here.
+ func frame() -> Image:
+@@ -64,13 +80,13 @@ func actions() -> Array[StringName]:
+ ## through, because a feed that forwards anything asked of it is a feed with no boundary.
+ func act(action: StringName, pressed: bool) -> bool:
+ 	if not _actions.has(action):
+-		_log.append({"kind": "refused", "action": action})
++		_push({"kind": "refused", "action": action})
+ 		return false
+ 	var ev := InputEventAction.new()
+ 	ev.action = action
+ 	ev.pressed = pressed
+ 	Input.parse_input_event(ev)
+-	_log.append({"kind": "act", "action": action, "pressed": pressed})
++	_push({"kind": "act", "action": action, "pressed": pressed})
+ 	return true
+ 
+ 
+@@ -82,7 +98,7 @@ func point_at_screen(px: Vector2) -> void:
+ 	ev.position = px
+ 	ev.global_position = px
+ 	Input.parse_input_event(ev)
+-	_log.append({"kind": "point", "px": px})
++	_push({"kind": "point", "px": px})
+ 
+ 
+ func click(button: int, pressed: bool) -> void:
+@@ -90,7 +106,7 @@ func click(button: int, pressed: bool) -> void:
+ 	ev.button_index = button
+ 	ev.pressed = pressed
+ 	Input.parse_input_event(ev)
+-	_log.append({"kind": "click", "button": button, "pressed": pressed})
++	_push({"kind": "click", "button": button, "pressed": pressed})
+ 
+ 
+ ## The input record, for the receipt. Read-only to the actor by being a copy.
+-- 
+2.39.5 (Apple Git-154)
+

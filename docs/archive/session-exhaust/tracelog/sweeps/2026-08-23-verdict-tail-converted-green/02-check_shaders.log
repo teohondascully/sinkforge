@@ -1,0 +1,8 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: erase.gdshader compiles (0 uniforms declared, 0 survived the parser)
+  PASS: heat_haze.gdshader compiles (2 uniforms declared, 2 survived the parser)
+  PASS: post_fx.gdshader compiles (10 uniforms declared, 10 survived the parser)
+  PASS: rock_grit.gdshader compiles (4 uniforms declared, 4 survived the parser)
+  PASS: rock_tooth.gdshader compiles (7 uniforms declared, 7 survived the parser)
+check_shaders: PASS (5 asserted) — 5 shader(s) compiled

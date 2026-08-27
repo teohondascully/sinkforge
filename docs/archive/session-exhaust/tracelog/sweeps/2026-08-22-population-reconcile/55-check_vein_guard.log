@@ -1,0 +1,10 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== veins grow into rock, not into the holes you walk through ==
+  PASS: the vein placed 60 cells, so there was accretion to judge
+  PASS: the cave is still a cave — 24 cells, 0 filled
+  PASS: ...and the vein reached the cave wall (7 of 24 cave cells have ore against them), so the guard was actually asked
+  PASS: the shipping world seeded 159 watered cells, so there is an aquifer to judge
+  PASS: every watered cell is open rock — 159 watered, 0 solid
+  PASS: ...and the sim ingested all 159 of them, dropping 0
+check_vein_guard: PASS (6 asserted) — no carved cell was filled by a vein, and no watered cell is solid

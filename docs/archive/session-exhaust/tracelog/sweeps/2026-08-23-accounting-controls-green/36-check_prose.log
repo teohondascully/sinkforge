@@ -1,0 +1,37 @@
+check_prose: main @ e61bba6
+check_prose: a file named here may be absent or already correct on another ref.
+
+reference  scenes/fine_terrain.gd               842 comment lines  0.702 commas/line
+ceiling    0.772 commas/line  (reference x 1.10, anchor ratchet 0.705)
+
+  wide sweep: asserted unconditionally (10 digest(s); positive and negative controls both behaved)
+FILE                                        #CMNT  TOTAL  COMMA  SHARE
+scenes/ui_theme.gd                            183    236  0.672    78%
+scenes/bazaar_costs.gd                         43     67  0.698    64%
+scenes/fine_terrain.gd                        842   1408  0.702    60%
+src/core/world_data.gd                         22     39  0.682    56%
+scenes/world_seeder.gd                         85    152  0.482    56%
+src/data/machine_def.gd                        11     21  0.545    52%
+scenes/rock_grit.gdshader                      23     44  0.739    52%
+scenes/rock_tooth.gdshader                     36     69  0.611    52%
+scenes/post_fx.gdshader                        44     85  0.591    52%
+src/core/machine_state.gd                      23     45  0.609    51%
+scenes/bazaar_surface.gd                       26     52  0.692    50%
+scenes/machine_view.gd                        362    726  0.685    50%
+scenes/bazaar_works.gd                        116    237  0.681    49%
+src/data/material_def.gd                       22     46  0.364    48%
+
+(comment share is reported, never asserted: no defensible bound exists for it)
+
+wide sweep: 10 word(s) tested over 358 text file(s) -- every tracked file in the repository
+            248 binary, 0 excluded by name, 0 tracked-but-absent,
+            0 unreadable
+
+   note: 1892 em-dash(es) in 157 tracked file(s) OUTSIDE the categorical rule's population
+         (that rule reads scenes/ and src/ comment bodies only). Counted, not gated: this
+         is a backlog, and a report of 0 em-dashes above is a statement about 60 file(s),
+         not about the tree.
+
+positional-layer sweep: 22 tracked .md file(s) read; a layer is cited by path, never by index
+
+check_prose: 60 file(s) clean, 358 more clean on the wide sweep

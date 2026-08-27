@@ -1,0 +1,35 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== nothing may hitch ==  (200 frames per phase, macOS, asserting the hitch ratio only — no absolute budget on unnamed hardware)
+  IDLE  standing on the surface
+      mean  8.37ms ( 120 fps)   p50  7.93   p95 10.34   p99 11.25   worst  15.70
+      -> a quiet frame is 7.93ms (0.95x the display's 8.33ms refresh interval); everything below is judged against it
+  RUN   moving, chunks streaming
+      mean  8.31ms ( 120 fps)   p50  8.33   p95  9.19   p99 11.10   worst  11.13
+      PASS: p95 is 1.2x a quiet frame (cap 2.0x)
+  PASS: RUN holds its hitch gate
+    dig site: col 55, surface_row 20, body at row 19, 43 solid rows found, under the feet [#####], paused=false, deaf=true
+      (dig site: 43 rows of solid rock under the body, needs 40)
+    !! try_mine REFUSED 30 TIMES IN A ROW at (55, 20) (body at (55, 19), 1 cells away)
+       paused=false  solid=true  material=earth
+       can_mine=true  pack={ &"wood_pickaxe": 1 }
+       reach=true  line_of_sight=true  bit=point grain_only=false bites=true
+       body px=(1776.0, 623.0)  target centre px=(1776.0, 656.0)  distance=1.0 cells (reach is 3.2)
+  DIG   mining, region rebakes
+      mean  8.60ms ( 116 fps)   p50  8.33   p95 10.66   p99 17.54   worst  20.84
+      PASS: p95 is 1.3x a quiet frame (cap 6.0x)
+  PASS: DIG holds its hitch gate
+  SWING on the rope at speed
+      mean  8.32ms ( 120 fps)   p50  8.21   p95 10.32   p99 10.86   worst  11.98
+      PASS: p95 is 1.3x a quiet frame (cap 2.0x)
+  PASS: SWING holds its hitch gate
+  draw calls in the last frame: 399   objects: 779
+  workload: RUN moved 205px · DIG landed 11 mines in 400 frames (window) · SWING anchored 198 frames of 200   (body ended RUN at (51, 19), DIG at (55, 29), SWING at (55, 30))
+  PASS: every phase did the work it is named for
+  SKIP: [frametime.absolute-budget] the 8.33ms/frame (120fps) budget was NOT asserted — SF_PERF_HOST is unset, so this is arbitrary hardware and the p95s above are a measurement, not a claim. Set SF_PERF_HOST=<machine-id> on a quiet, controlled box to turn it on.
+  UNREACHED: [frametime.paced-phase] nothing here will assert it — _absolute() returns above the phase loop while SF_PERF_HOST is unset, so the paced branch is never evaluated on this machine
+  PASS: every phase meets the absolute frame SLO, where one applies
+check_frametime: PASS (5 asserted) — nothing hitches; a dig costs a few quiet frames, not twenty. Frame RATE is unasserted here (set SF_PERF_HOST on controlled hardware for that)

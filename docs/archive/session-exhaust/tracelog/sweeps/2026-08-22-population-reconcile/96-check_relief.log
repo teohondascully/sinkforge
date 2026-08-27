@@ -1,0 +1,14 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== is the surface a place ==
+  ground runs rows 12..26 (range 14) over 116 columns
+  mean step 0.42 rows/column; 94% of off-scarp steps are walked; 3 faces of 3+ rows
+  longest near-level run: 27 columns
+  1000011224555555555555565555655555755698877888775233333333
+  PASS: there is relief (14 rows, floor 11)
+  PASS: ...it is not one long ramp either (0.42 rows/column, floor 0.30)
+  PASS: ...and no endless plain (27 columns level, cap 46)
+  PASS: the world OFF the scarps is still WALKED, not climbed (94% of steps, floor 90%)
+  PASS: ...but something in it needs the rope (3 faces, floor 2)
+  PASS: the tutorial's ground is dead level (columns 39..58)
+check_relief: PASS — a landscape, and one you can still walk across

@@ -1,0 +1,43 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== hash mixing: a multiply is not a hash ==
+  scanned tree: /Users/thondascully/Projects/sinkforge/  [main @ b3b7507]
+  every path below is relative to THAT checkout; a site named here may be absent or already correct on another ref.
+  PASS: CONTROL the shelf band: a product shifted three and taken mod three: 1 site(s), 1 wrong, 0 exempt (expected 1/1/0)
+  PASS: CONTROL the bird: a product masked to 31 bits and taken mod two: 1 site(s), 1 wrong, 0 exempt (expected 1/1/0)
+  PASS: CONTROL a fold that arrives after the value has already been read: 1 site(s), 1 wrong, 0 exempt (expected 1/1/0)
+  PASS: CONTROL two inputs xored together and consumed with no fold at all: 2 site(s), 2 wrong, 0 exempt (expected 2/2/0)
+  PASS: CONTROL a multiply at class scope, where no function can be shown to fold it: 1 site(s), 1 wrong, 0 exempt (expected 1/1/0)
+  PASS: CONTROL finalised by taking the top half, which is Fibonacci hashing and not a defect: 2 site(s), 0 wrong, 0 exempt (expected 2/0/0)
+  PASS: CONTROL a shift too small to clear the weak bits still reads them: 1 site(s), 1 wrong, 0 exempt (expected 1/1/0)
+  PASS: CONTROL the correct shape, multiply and fold twice over: 2 site(s), 0 wrong, 0 exempt (expected 2/0/0)
+  PASS: CONTROL two inputs xored together and THEN folded, which is the shape this tree uses: 3 site(s), 0 wrong, 0 exempt (expected 3/0/0)
+  PASS: CONTROL a constant xored in as a salt, never multiplied, which is not this defect: 1 site(s), 0 wrong, 1 exempt (expected 1/0/1)
+  PASS: CONTROL a named salt, counted once where it is declared and once where it is used: 2 site(s), 0 wrong, 2 exempt (expected 2/0/2)
+  PASS: CONTROL the same salt multiplied through its name, where the digits are three lines away: 2 site(s), 1 wrong, 1 exempt (expected 2/1/1)
+  PASS: CONTROL a shader function, braces for scope, taking a modulus off a bare product: 1 site(s), 1 wrong, 0 exempt (expected 1/1/0)
+  PASS: CONTROL the same shader function with the fold put back: 1 site(s), 0 wrong, 0 exempt (expected 1/0/0)
+  PASS: every directory under res:// opened
+  PASS: every source file read back non-empty
+  PASS: the walk found 181 GDScript files (floor 120, under which assume the glob broke)
+  PASS: …and 5 shader files, so the shader half of the sweep is not silently empty
+  PASS: the scan found uses of the known mixing constants at all
+  PASS: it found at least the 3 multiplication sites already known to be correct (11 judged, 29 exempt salts)
+  judged sites (a known constant inside a multiplication):
+    scenes/terrain_painter.gd:427:21  0x165667B1, in-tree mixing prime  in _fringe_hash()  OK — folded at 428:8 before anything reads it
+    scenes/terrain_painter.gd:427:43  0x27D4EB2F, in-tree mixing prime  in _fringe_hash()  OK — folded at 428:8 before anything reads it
+    scenes/terrain_painter.gd:428:23  0x4BF19F61, in-tree second-stage multiplier  in _fringe_hash()  OK — folded at 429:11 before anything reads it
+    src/core/layered_world_gen.gd:318:40  0x9E3779B1, 2^32 over the golden ratio  in _band_hash()  OK — folded at 319:8 before anything reads it
+    src/core/layered_world_gen.gd:320:10  0x2545F491, xorshift multiplier  in _band_hash()  OK — not folded, but the only read is `>> 16`, so the weak low bits never reach the answer
+    src/data/seams.gd:70:21  0x27D4EB2F, in-tree mixing prime  in grain()  OK — folded at 71:8 before anything reads it
+    src/data/seams.gd:70:41  0x165667B1, in-tree mixing prime  in grain()  OK — folded at 71:8 before anything reads it
+    src/data/seams.gd:71:23  0x4BF19F61, in-tree second-stage multiplier  in grain()  OK — folded at 72:11 before anything reads it
+    src/data/seams.gd:78:23  0x165667B1, in-tree mixing prime  in _plane()  OK — folded at 79:8 before anything reads it
+    src/data/seams.gd:78:44  0x27D4EB2F, in-tree mixing prime  in _plane()  OK — folded at 79:8 before anything reads it
+    src/data/seams.gd:79:23  0x4BF19F61, in-tree second-stage multiplier  in _plane()  OK — folded at 80:17 before anything reads it
+  exempt (constant present, never multiplied): scenes/fine_terrain.gd x10, src/data/seams.gd x6, tools/check_hash_mixing.gd x13
+  PASS: scenes/terrain_painter.gd::_fringe_hash is reached by the scan and judged correctly mixed
+  PASS: src/data/seams.gd::grain is reached by the scan and judged correctly mixed
+  PASS: src/data/seams.gd::_plane is reached by the scan and judged correctly mixed
+  PASS: no product of a mixing constant has its bits read before it is folded
+check_hash_mixing: PASS (24 asserted) — 11 multiplication sites judged and 29 salts exempt across 181 GDScript and 5 shader files, with 14 controls proving the judge fires both ways

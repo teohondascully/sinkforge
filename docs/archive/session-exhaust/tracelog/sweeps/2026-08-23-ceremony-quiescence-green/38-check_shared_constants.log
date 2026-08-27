@@ -1,0 +1,125 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== shared constants: one name, one value, everywhere ==
+  scanned tree: /Users/thondascully/Projects/sinkforge/  [main]
+  scanned 181 .gd file(s)
+  PASS: the scan opened 181 .gd files, at least 120 expected — below this the walk missed whole directories, and a scan that barely ran agrees with itself trivially
+  CELL: 1 declaration(s), all must equal 32.0
+  PASS: CELL is declared exactly once and found 1
+  PASS: CELL: every declaration holds 32.0
+  SHORT_SELECTED: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_works.gd
+  PASS: SHORT_SELECTED is DEFINED in exactly one file and found 1
+  PASS: SHORT_SELECTED is defined in scenes/bazaar_works.gd and it is in scenes/bazaar_works.gd:38
+  BAZAAR_GUTTER: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_surface.gd
+  PASS: BAZAAR_GUTTER is DEFINED in exactly one file and found 1
+  PASS: BAZAAR_GUTTER is defined in scenes/bazaar_surface.gd and it is in scenes/bazaar_surface.gd:25
+  BAZAAR_ROW_H: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_surface.gd
+  PASS: BAZAAR_ROW_H is DEFINED in exactly one file and found 1
+  PASS: BAZAAR_ROW_H is defined in scenes/bazaar_surface.gd and it is in scenes/bazaar_surface.gd:26
+  BAZAAR_COLS: 1 definition(s), 1 alias(es), owner must be scenes/bazaar_surface.gd
+  PASS: BAZAAR_COLS is DEFINED in exactly one file and found 1
+  PASS: BAZAAR_COLS is defined in scenes/bazaar_surface.gd and it is in scenes/bazaar_surface.gd:24
+  PACK_CELL: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_surface.gd
+  PASS: PACK_CELL is DEFINED in exactly one file and found 1
+  PASS: PACK_CELL is defined in scenes/bazaar_surface.gd and it is in scenes/bazaar_surface.gd:19
+  TAB_PACK: 1 definition(s), 1 alias(es), owner must be scenes/bazaar_page.gd
+  PASS: TAB_PACK is DEFINED in exactly one file and found 1
+  PASS: TAB_PACK is defined in scenes/bazaar_page.gd and it is in scenes/bazaar_page.gd:76
+  TAB_WORKS: 1 definition(s), 1 alias(es), owner must be scenes/bazaar_page.gd
+  PASS: TAB_WORKS is DEFINED in exactly one file and found 1
+  PASS: TAB_WORKS is defined in scenes/bazaar_page.gd and it is in scenes/bazaar_page.gd:78
+  TAB_BENCH: 1 definition(s), 1 alias(es), owner must be scenes/bazaar_page.gd
+  PASS: TAB_BENCH is DEFINED in exactly one file and found 1
+  PASS: TAB_BENCH is defined in scenes/bazaar_page.gd and it is in scenes/bazaar_page.gd:80
+  TAB_NAMES: 1 definition(s), 1 alias(es), owner must be scenes/bazaar_page.gd
+  PASS: TAB_NAMES is DEFINED in exactly one file and found 1
+  PASS: TAB_NAMES is defined in scenes/bazaar_page.gd and it is in scenes/bazaar_page.gd:82
+  BENCH_NARROW: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_bench.gd
+  PASS: BENCH_NARROW is DEFINED in exactly one file and found 1
+  PASS: BENCH_NARROW is defined in scenes/bazaar_bench.gd and it is in scenes/bazaar_bench.gd:18
+  BENCH_DOT_R: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_bench.gd
+  PASS: BENCH_DOT_R is DEFINED in exactly one file and found 1
+  PASS: BENCH_DOT_R is defined in scenes/bazaar_bench.gd and it is in scenes/bazaar_bench.gd:21
+  BENCH_NAME_AIR: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_bench.gd
+  PASS: BENCH_NAME_AIR is DEFINED in exactly one file and found 1
+  PASS: BENCH_NAME_AIR is defined in scenes/bazaar_bench.gd and it is in scenes/bazaar_bench.gd:24
+  BENCH_NAME_PAD: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_bench.gd
+  PASS: BENCH_NAME_PAD is DEFINED in exactly one file and found 1
+  PASS: BENCH_NAME_PAD is defined in scenes/bazaar_bench.gd and it is in scenes/bazaar_bench.gd:27
+  BENCH_NAME_FS: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_bench.gd
+  PASS: BENCH_NAME_FS is DEFINED in exactly one file and found 1
+  PASS: BENCH_NAME_FS is defined in scenes/bazaar_bench.gd and it is in scenes/bazaar_bench.gd:30
+  BENCH_NAME_FS_MIN: 1 definition(s), 0 alias(es), owner must be scenes/bazaar_bench.gd
+  PASS: BENCH_NAME_FS_MIN is DEFINED in exactly one file and found 1
+  PASS: BENCH_NAME_FS_MIN is defined in scenes/bazaar_bench.gd and it is in scenes/bazaar_bench.gd:33
+  STATE_INK: 1 definition(s), 0 alias(es), owner must be scenes/ui_theme.gd
+  PASS: STATE_INK is DEFINED in exactly one file and found 1
+  PASS: STATE_INK is defined in scenes/ui_theme.gd and it is in scenes/ui_theme.gd:163
+  REMAP_ROWS: 1 definition(s), 1 alias(es), owner must be scenes/settings_page.gd
+  PASS: REMAP_ROWS is DEFINED in exactly one file and found 1
+  PASS: REMAP_ROWS is defined in scenes/settings_page.gd and it is in scenes/settings_page.gd:33
+  AUDIO_ROWS: 1 definition(s), 1 alias(es), owner must be scenes/settings_page.gd
+  PASS: AUDIO_ROWS is DEFINED in exactly one file and found 1
+  PASS: AUDIO_ROWS is defined in scenes/settings_page.gd and it is in scenes/settings_page.gd:67
+  FEEL_ROWS: 1 definition(s), 1 alias(es), owner must be scenes/settings_page.gd
+  PASS: FEEL_ROWS is DEFINED in exactly one file and found 1
+  PASS: FEEL_ROWS is defined in scenes/settings_page.gd and it is in scenes/settings_page.gd:73
+  CAT_NAMES: 1 definition(s), 1 alias(es), owner must be scenes/settings_page.gd
+  PASS: CAT_NAMES is DEFINED in exactly one file and found 1
+  PASS: CAT_NAMES is defined in scenes/settings_page.gd and it is in scenes/settings_page.gd:27
+  FOCUS_KEYLINE: 1 definition(s), 0 alias(es), owner must be scenes/visuals.gd
+  PASS: FOCUS_KEYLINE is DEFINED in exactly one file and found 1
+  PASS: FOCUS_KEYLINE is defined in scenes/visuals.gd and it is in scenes/visuals.gd:1753
+  FOCUS_SPINE_DX: 1 definition(s), 0 alias(es), owner must be scenes/visuals.gd
+  PASS: FOCUS_SPINE_DX is DEFINED in exactly one file and found 1
+  PASS: FOCUS_SPINE_DX is defined in scenes/visuals.gd and it is in scenes/visuals.gd:1760
+  KEYCAP_BASE: 1 definition(s), 0 alias(es), owner must be scenes/visuals.gd
+  PASS: KEYCAP_BASE is DEFINED in exactly one file and found 1
+  PASS: KEYCAP_BASE is defined in scenes/visuals.gd and it is in scenes/visuals.gd:1788
+  KEYCAP_DROP: 1 definition(s), 0 alias(es), owner must be scenes/visuals.gd
+  PASS: KEYCAP_DROP is DEFINED in exactly one file and found 1
+  PASS: KEYCAP_DROP is defined in scenes/visuals.gd and it is in scenes/visuals.gd:1789
+  UI_ACCENT: 1 definition(s), 1 alias(es), owner must be scenes/ui_theme.gd
+  PASS: UI_ACCENT is DEFINED in exactly one file and found 1
+  PASS: UI_ACCENT is defined in scenes/ui_theme.gd and it is in scenes/ui_theme.gd:63
+  UI_TEXT: 1 definition(s), 1 alias(es), owner must be scenes/ui_theme.gd
+  PASS: UI_TEXT is DEFINED in exactly one file and found 1
+  PASS: UI_TEXT is defined in scenes/ui_theme.gd and it is in scenes/ui_theme.gd:130
+  UI_MODAL: 1 definition(s), 1 alias(es), owner must be scenes/ui_theme.gd
+  PASS: UI_MODAL is DEFINED in exactly one file and found 1
+  PASS: UI_MODAL is defined in scenes/ui_theme.gd and it is in scenes/ui_theme.gd:156
+  CANVAS: 1 definition(s), 3 alias(es), owner must be scenes/ui_theme.gd
+  PASS: CANVAS is DEFINED in exactly one file and found 1
+  PASS: CANVAS is defined in scenes/ui_theme.gd and it is in scenes/ui_theme.gd:170
+  RAIL_ON_FILL: 1 definition(s), 0 alias(es), owner must be scenes/ui_theme.gd
+  PASS: RAIL_ON_FILL is DEFINED in exactly one file and found 1
+  PASS: RAIL_ON_FILL is defined in scenes/ui_theme.gd and it is in scenes/ui_theme.gd:181
+  SET_W: 1 definition(s), 0 alias(es), owner must be scenes/settings_page.gd
+  PASS: SET_W is DEFINED in exactly one file and found 1
+  PASS: SET_W is defined in scenes/settings_page.gd and it is in scenes/settings_page.gd:184
+  RAIL_TOP_FRAC: 1 definition(s), 0 alias(es), owner must be scenes/ui_theme.gd
+  PASS: RAIL_TOP_FRAC is DEFINED in exactly one file and found 1
+  PASS: RAIL_TOP_FRAC is defined in scenes/ui_theme.gd and it is in scenes/ui_theme.gd:208
+  impl "sb.corner_detail = 8": in 1 file(s)
+  PASS: the implementation "sb.corner_detail = 8" is in exactly one file and found 1
+  PASS: "sb.corner_detail = 8" lives in scenes/visuals.gd and it is in scenes/visuals.gd
+  impl "get_string_size(ch, HORIZONTAL_...": in 1 file(s)
+  PASS: the implementation "get_string_size(ch, HORIZONTAL_..." is in exactly one file and found 1
+  PASS: "get_string_size(ch, HORIZONTAL_..." lives in scenes/visuals.gd and it is in scenes/visuals.gd
+  impl "box.grow(grow - 1.0)": in 1 file(s)
+  PASS: the implementation "box.grow(grow - 1.0)" is in exactly one file and found 1
+  PASS: "box.grow(grow - 1.0)" lives in scenes/visuals.gd and it is in scenes/visuals.gd
+  impl "Vector2(0.0, KEYCAP_DROP)": in 1 file(s)
+  PASS: the implementation "Vector2(0.0, KEYCAP_DROP)" is in exactly one file and found 1
+  PASS: "Vector2(0.0, KEYCAP_DROP)" lives in scenes/visuals.gd and it is in scenes/visuals.gd
+  impl "Art.tex("machine_" + String(": in 1 file(s)
+  PASS: the implementation "Art.tex("machine_" + String(" is in exactly one file and found 1
+  PASS: "Art.tex("machine_" + String(" lives in scenes/visuals.gd and it is in scenes/visuals.gd
+  impl "return String(id).capitalize()": in 1 file(s)
+  PASS: the implementation "return String(id).capitalize()" is in exactly one file and found 1
+  PASS: "return String(id).capitalize()" lives in scenes/visuals.gd and it is in scenes/visuals.gd
+  impl "return need - int(inventory.get...": in 1 file(s)
+  PASS: the implementation "return need - int(inventory.get..." is in exactly one file and found 1
+  PASS: "return need - int(inventory.get..." lives in scenes/bazaar_costs.gd and it is in scenes/bazaar_costs.gd
+  PASS: every .gd file opened and returned text
+check_shared_constants: PASS (80 asserted) — one name, one value: a constant declared in many files is a constant nothing relates

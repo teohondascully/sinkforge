@@ -1,0 +1,87 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the write ==
+WARNING: save: cannot open user://check_save_durability_nodir/deeper/still.save.tmp (err 7) — the existing save is untouched
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] write (res://src/core/save_game.gd:324)
+         [1] _atomic_write (res://tools/check_save_durability.gd:106)
+         [2] _initialize (res://tools/check_save_durability.gd:64)
+WARNING: save: user://check_save_durability.save.tmp did not read back as a valid envelope — the existing save is untouched
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] write (res://src/core/save_game.gd:334)
+         [1] _atomic_write (res://tools/check_save_durability.gd:114)
+         [2] _initialize (res://tools/check_save_durability.gd:64)
+== recovery ==
+ERROR: Condition "(uint32_t)buff.size() != len" is true. Returning: Variant()
+   at: get_var (core/io/file_access.cpp:383)
+   GDScript backtrace (most recent call first):
+       [0] _read_file (res://src/core/save_game.gd:374)
+       [1] read (res://src/core/save_game.gd:381)
+       [2] _backup_recovery (res://tools/check_save_durability.gd:139)
+       [3] _initialize (res://tools/check_save_durability.gd:65)
+WARNING: save: user://check_save_durability.save is missing or damaged — recovered the previous save from user://check_save_durability.save.bak
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] read (res://src/core/save_game.gd:388)
+         [1] _backup_recovery (res://tools/check_save_durability.gd:139)
+         [2] _initialize (res://tools/check_save_durability.gd:65)
+ERROR: Condition "(uint32_t)buff.size() != len" is true. Returning: Variant()
+   at: get_var (core/io/file_access.cpp:383)
+   GDScript backtrace (most recent call first):
+       [0] _read_file (res://src/core/save_game.gd:374)
+       [1] read (res://src/core/save_game.gd:381)
+       [2] _backup_recovery (res://tools/check_save_durability.gd:146)
+       [3] _initialize (res://tools/check_save_durability.gd:65)
+== the restore ==
+== versions ==
+== no silent defaults ==
+== phase ==
+== the seed ==
+== the backup generation ==
+ERROR: Condition "(uint32_t)buff.size() != len" is true. Returning: Variant()
+   at: get_var (core/io/file_access.cpp:383)
+   GDScript backtrace (most recent call first):
+       [0] _read_file (res://src/core/save_game.gd:374)
+       [1] read (res://src/core/save_game.gd:381)
+       [2] _backup_generation (res://tools/check_save_durability.gd:426)
+       [3] _initialize (res://tools/check_save_durability.gd:71)
+WARNING: save: user://check_save_durability.save is missing or damaged — recovered the previous save from user://check_save_durability.save.bak
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] read (res://src/core/save_game.gd:388)
+         [1] _backup_generation (res://tools/check_save_durability.gd:426)
+         [2] _initialize (res://tools/check_save_durability.gd:71)
+ERROR: Condition "(uint32_t)buff.size() != len" is true. Returning: Variant()
+   at: get_var (core/io/file_access.cpp:383)
+   GDScript backtrace (most recent call first):
+       [0] _read_file (res://src/core/save_game.gd:374)
+       [1] write (res://src/core/save_game.gd:347)
+       [2] _backup_generation (res://tools/check_save_durability.gd:432)
+       [3] _initialize (res://tools/check_save_durability.gd:71)
+WARNING: save: user://check_save_durability.save is damaged — keeping the existing backup rather than overwriting it with a corrupt primary
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] write (res://src/core/save_game.gd:357)
+         [1] _backup_generation (res://tools/check_save_durability.gd:432)
+         [2] _initialize (res://tools/check_save_durability.gd:71)
+ERROR: Failed to open '/var/folders/wx/qzmllhgn0cj5q26_mb77s3n00000gn/T//sinkforge-home-909c724feaab/Library/Application Support/Godot/app_userdata/Sinkforge/check_save_durability.save.bak'.
+   at: copy (core/io/dir_access.cpp:423)
+   GDScript backtrace (most recent call first):
+       [0] _backup_generation (res://tools/check_save_durability.gd:456)
+       [1] _initialize (res://tools/check_save_durability.gd:71)
+  HELD: [save-durability.failed-backup] this run asserted it
+ERROR: Failed to open '/var/folders/wx/qzmllhgn0cj5q26_mb77s3n00000gn/T//sinkforge-home-909c724feaab/Library/Application Support/Godot/app_userdata/Sinkforge/check_save_durability.save.bak'.
+   at: copy (core/io/dir_access.cpp:423)
+   GDScript backtrace (most recent call first):
+       [0] write (res://src/core/save_game.gd:348)
+       [1] _backup_generation (res://tools/check_save_durability.gd:465)
+       [2] _initialize (res://tools/check_save_durability.gd:71)
+WARNING: save: could not preserve user://check_save_durability.save as user://check_save_durability.save.bak (err 12) — refusing to promote a new save over a generation we cannot back up; the existing save is untouched
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] write (res://src/core/save_game.gd:350)
+         [1] _backup_generation (res://tools/check_save_durability.gd:465)
+         [2] _initialize (res://tools/check_save_durability.gd:71)
+check_save_durability: PASS

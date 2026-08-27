@@ -1,0 +1,3 @@
+  PASS  the detector finds a redeclared `_failures` (positive control)
+  PASS  ...and stays quiet on a subclass that redeclares nothing (negative control)
+check_base_namespace: PASS — 110 of 110 subclasses, none redeclares any of the 15 base members

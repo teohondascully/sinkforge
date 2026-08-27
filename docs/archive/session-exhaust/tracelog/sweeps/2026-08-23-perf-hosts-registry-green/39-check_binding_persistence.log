@@ -1,0 +1,54 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: posed pre-fix config: the posed config exists on disk
+  PASS: posed pre-fix config: and the file reads back as a whole binding set (25 of 25 actions)
+  PASS: THE FIXTURE IS REAL: the file itself puts two actions on one key before anything loads it ("UP" is both sf_up and sf_jump)
+  PASS: and the collision is on climb-up's SECOND event, not its first (W, UP, STICK UP)
+  PASS: the SUPERSEDED first-event comparison reports NOTHING about this file — the grain is the defect
+  PASS: the fixture has bytes in it (41)
+  PASS: after the load the arrow does what the player bound it to: jump
+  PASS: AND IT NO LONGER ALSO CLIMBS — one press, one action, which is the defect stated at the engine
+  PASS: climb up KEPT W — one EVENT moved, not the binding (W, STICK UP)
+  PASS: and kept its stick — a keyboard collision did not cost it the gamepad (W, STICK UP)
+  PASS: no two actions answer to one key anywhere in the live map (all 25 clear)
+  PASS: the pass reports moving climb-up's arrow (sf_up)
+  PASS: and repaired nothing else — it resolves collisions, it does not rebuild bindings
+  PASS: persist=false wrote NOTHING — the file still carries the duplicate the map no longer has
+  PASS: back on the shipped defaults, so §2 measures a repair rather than re-reading §1's
+  PASS: the same file resolves the same way on a second machine-state — the rule reads nothing that varies
+  PASS: THE REPAIR IS PERSISTED: the file on disk no longer implies a duplicate (unbound)
+  PASS: and it kept climb-up's other two events on the way through (W, STICK UP)
+  PASS: so the gate being open is what wrote it
+  PASS: reloading the file it just wrote moves NOTHING — the repair converges instead of churning
+  PASS: and the second load leaves the same map as the first
+  PASS: posed clean config: the posed config exists on disk
+  PASS: posed clean config: and the file reads back as a whole binding set (25 of 25 actions)
+  PASS: the clean fixture carries no duplicate (unbound)
+  PASS: and it IS a config with a real override in it, not an empty file passing by default (J, PAD Y)
+  PASS: EVERY ONE of the 25 actions loaded exactly what the file said (nothing moved)
+  PASS: the pass reports doing nothing at all to a clean config
+  PASS: and materialised no override for anyone else ([&"sf_drop"])
+  PASS: a clean config comes out of a boot BYTE FOR BYTE as it went in, gate open
+  PASS: posed two-override collision: the posed config exists on disk
+  PASS: posed two-override collision: and the file reads back as a whole binding set (25 of 25 actions)
+  PASS: THE FIXTURE IS REAL: two overridden actions are both on J before the load ("J" is both sf_left and sf_dashboard)
+  PASS: move left keeps the contested key (J)
+  PASS: THE DASHBOARD IS NOT LEFT UNBOUND — silence would be worse than the duplicate (G)
+  PASS: it is back on its own shipped default, which nothing else answers to (G)
+  PASS: and the pass says so, rather than a repair nobody can tell from an oversight (sf_dashboard)
+  PASS: the rescue introduced no second duplicate (unbound)
+  PASS: posed unrescuable collision: the posed config exists on disk
+  PASS: posed unrescuable collision: and the file reads back as a whole binding set (25 of 25 actions)
+  PASS: THE FIXTURE IS REAL: move left is on research's only key before the load ("R" is both sf_left and sf_research)
+  PASS: research still answers R — reconciling never takes an action's LAST event (R)
+  PASS: so the CONTROLS row shows a key rather than the word unbound
+  PASS: the duplicate SURVIVES, which is the outcome that was chosen ("R" is both sf_left and sf_research)
+  PASS: AND THE CHOICE IS ON THE RECORD — the only thing separating it from a pass that never looked (sf_research)
+  PASS: with research's entry left alone rather than rewritten with its own contents
+  PASS: posed collision, keys reversed: the posed config exists on disk
+  PASS: posed collision, keys reversed: and the file reads back as a whole binding set (25 of 25 actions)
+  HELD: [bindings.file-order-control] this run asserted it
+  NOTE: the two fixtures are in opposite key order (sf_left, sf_dashboard vs sf_dashboard, sf_left)
+  PASS: SAME OUTCOME FROM THE REVERSED FILE: move left keeps J, the dashboard falls back to G (J / G)
+  PASS: resolved by the same rule and for the same reason as §4 (sf_dashboard)
+check_binding_persistence: PASS (49 asserted) — a pre-fix config is reconciled through the real load path, a clean one survives byte for byte, and no action is left without a key

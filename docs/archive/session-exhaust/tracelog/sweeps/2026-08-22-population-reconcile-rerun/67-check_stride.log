@@ -1,0 +1,14 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== the run ==
+  PASS: the first 0.85s runs at RUN_SPEED and no faster (150.0 px/s vs RUN_SPEED 150.0)
+  PASS: a held run does reach full stride (1.00 at 2.17s)
+  PASS: ...and ramps in rather than snapping on (1.18s from first to full)
+  PASS: a full run is worth having (+55%, floor +50%)
+  PASS: the swing still beats the best run by a clear margin (420 vs 232 px/s)
+  PASS: letting go loses the run promptly (0.33s, cap 0.60s)
+  PASS: turning around costs the run (1.00 -> 0.40)
+    run-up  3 cells -> fell into the gap at column 61
+    run-up 40 cells -> jumped at 56, landed at 62 (stride 0.50, 232 px/s)
+  PASS: a 5-cell gap is cleared running and NOT walking (walk=false run=true)
+check_stride: PASS — the run is worth building, costs something, and leaves mining alone

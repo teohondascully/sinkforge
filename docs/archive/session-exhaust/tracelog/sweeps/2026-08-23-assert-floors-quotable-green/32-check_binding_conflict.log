@@ -1,0 +1,31 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: grapple ships with three events, one per device (3)
+  PASS: a rebind did not change how many events grapple has (3 -> 3) ["G", "MMB", "PAD RB"]
+  PASS: the desk key moved F -> G ["G", "MMB", "PAD RB"]
+  PASS: MIDDLE MOUSE SURVIVED the rebind — the destructive bug is closed
+  PASS: and so did the pad button — remapping a keyboard is not asking to lose a pad
+  PASS: NO multi-event action loses an event to a rebind (all held)
+  PASS: taking the arrow named climb up as displaced, so the page can say so [&"sf_up"]
+  PASS: the arrow no longer climbs ["W", "STICK UP"]
+  PASS: climb up KEPT W — displacement took one event, not the binding
+  PASS: jump answers the arrow and still answers its pad ["UP", "PAD A"]
+  PASS: a duplicate on a SECOND event is detected, on both rows [&"sf_up", &"sf_jump"]
+  PASS: and the phrase names the COLLIDING key rather than the row's own chip ["UP is also climb up"]
+  PASS: the OLD first-event comparison reports NOTHING in this exact state — the upgrade is not cosmetic
+  PASS: a duplicate applied the way load_settings applies one SURVIVES and stays visible
+  PASS: no clash on the shipped defaults — the detector is not simply always-on []
+  PASS: the label sweep is 90+ distinct keycodes wide (95)
+  PASS: and every code reaches the checker under its own name (95 codes -> 95 rows)
+  PASS: no code in the sweep is one the engine cannot name — a band with a hole in it would sweep junk
+  PASS: NO TWO KEYCODES ANSWER TO ONE LABEL, so no two keys can merge in the conflict check (all 95 caps distinct)
+  PASS: NOT ONE label on the CONTROLS page is a developer identifier (all 95 read as keycaps)
+  PASS: and none is wider than the 7 characters the chip holds (widest cap fits)
+  PASS: the game-speed row shows the glyph printed on the key, not the engine's word for it (.)
+  PASS: the injectivity check FIRES on the near-miss the cap table exists to avoid — Enter and Kp Enter BOTH label "ENTER"
+  PASS: and stands down the moment the two are told apart — it is not simply always-on
+  PASS: the identifier check REJECTS "Period", the exact string that shipped onto the page
+  PASS: and accepts "NUM ENT" and "." — it is not rejecting every label it is handed
+  PASS: the width check REJECTS "BACKSPACE", nine characters, what the fallback yields for a key the table forgets
+  PASS: and passes "NUM ENT", the widest cap the table ships
+check_binding_conflict: PASS (28 asserted) — per-event: a rebind moves one event, no action answers twice, and no two keys answer to one cap

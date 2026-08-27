@@ -1,0 +1,34 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== a bit is a verb ==
+  PASS: selecting a bit equips it
+  PASS: selecting ore puts you back on the Point
+  PASS: an empty pack is the Point
+  PASS: the Point is not an item — nothing to seed or migrate
+  PASS: a bit is GEAR, so it can't be fed to a machine as fuel
+  PASS: the Point cuts the cell you aimed at
+  PASS: the Broad cuts the cell you aimed at
+  PASS: the Lance cuts the cell you aimed at
+  PASS: the Sinker cuts the cell you aimed at
+  PASS: the Wedge cuts the cell you aimed at
+  PASS: the Point takes one cell
+  PASS: the Broad takes a 2x2
+  PASS: the Lance drives five cells
+  PASS: the Sinker takes three straight down
+  a Lance driven at a three-thick face with a gap behind it took 3 cells
+  PASS: a driven bit stops at rock's edge — it never crosses a chamber
+  a Broad through a 2x2 of ore broke 4 cells and pocketed 0 ore
+  PASS: the Broad broke the whole 2x2 of ore
+  PASS: …and NONE of it reached the pack
+  PASS: …and none of it was counted as produced (the ledger stays total)
+  PASS: the Point pockets the same ore (it is the bit's cost, not the rock's)
+  a Lance driven into over-tier rock took 1 cell(s)
+  PASS: a bit's shape never breaks rock the drive cannot bite
+  PASS: the across-grain target is genuinely in reach (so the next check means something)
+  PASS: the Wedge REFUSES rock across the grain in _mineable — the cursor greys out, the charge never spins
+  PASS: …and the verb refuses it too
+  PASS: the Wedge accepts rock ALONG the grain
+  a Wedge along a bedding plane split 8 cells (the Point's cap is 3)
+  PASS: the Wedge splits further along a seam than a plain swing does
+  PASS: …and never past its own cap
+check_bits: PASS — every bit is worse than the Point somewhere

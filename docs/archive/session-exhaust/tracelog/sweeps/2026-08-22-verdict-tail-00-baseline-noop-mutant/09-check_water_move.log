@@ -1,0 +1,7 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== water-move check (L3 impedance) ==
+  horizontal: D_dry=199.4px  D_wet=107.3px  ratio=0.54 (must be <= 0.85)
+    exit: drove from a flooded basin to cell (16, 22) (dry=true) in 185 frames
+  vertical: fall_air=116.2px  fall_water=52.3px (deep water must fall SLOWER)
+WATER-MOVE OK

@@ -1,0 +1,23 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: read tools/run_harness.sh
+  PASS: read .github/workflows/harness.yml
+  PASS: derived the registration verbs from the runner: add, add_gl, add_excl, add_excl_hl
+  PASS: the runner registers 110 layers (floor 40 — under it, assume the scan broke)
+  PASS: 17 of them need a real surface, via add_gl, add_excl: check_dig_hitch (friction), check_opening (no dead space), check_underground (lit rock), check_water_reads (fluid), check_rock_reads (rock vs void), check_contact_edge (rock meets air), check_material_grammar (dirt vs stone), check_item_reads (icons), check_frametime (hitch+budget), check_machine_state (running reads), check_machine_identity (which box), check_grapple_reads (tool not geometry), check_hud_layout (no collisions), check_ceremony_reads (interrupt vs world), check_selection_reads (no colour), check_snap_frame (snap on screen), check_bake_idempotent (bake holds)
+  PASS: found 104 layer files on disk to check (floor 40 — under it, assume the scan broke)
+  PASS: every layer file on disk is registered in the runner
+  PASS: no CI job selects layers by NAME — a hand-kept list is what left two layers running nowhere
+  PASS: the display job selects by REGISTRATION (SF_GL_ONLY=1), so a new add_gl layer is covered the day it lands
+  PASS: the display job states its exclusions in SF_NOT rather than by omission
+  PASS: SF_NOT ('check_frametime') compiles as a pattern at all
+  PASS: SF_NOT ('check_frametime') stays inside the names-and-alternation subset where PCRE2 and grep -E agree — anything richer must be verified against grep by hand
+  PASS: SF_NOT ('check_frametime') actually matches a registered layer — an exclusion that matches nothing is a typo wearing the costume of a decision
+  PASS: ...and it does not exclude every surface layer (1 of 17) — that would be the display job doing nothing while reporting green
+  PASS: check_frametime is excluded from CI under an explicit `# CI-EXCLUDED check_frametime:` declaration saying why
+  CI coverage: 110 layers declared · 17 need a surface · 16 run on the display job · 1 excluded
+      on the display job: check_dig_hitch (friction), check_opening (no dead space), check_underground (lit rock), check_water_reads (fluid), check_rock_reads (rock vs void), check_contact_edge (rock meets air), check_material_grammar (dirt vs stone), check_item_reads (icons), check_machine_state (running reads), check_machine_identity (which box), check_grapple_reads (tool not geometry), check_hud_layout (no collisions), check_ceremony_reads (interrupt vs world), check_selection_reads (no colour), check_snap_frame (snap on screen), check_bake_idempotent (bake holds)
+      excluded by SF_NOT: check_frametime (hitch+budget)
+  PASS: every layer needing a surface is either run by the display job or named in its exclusion — set equality, not containment
+  PASS: nothing turns the display job's selection off while leaving it looking enabled
+check_ci_coverage: PASS (17 asserted) — 17 surface layers, 16 covered, 1 excluded on the record

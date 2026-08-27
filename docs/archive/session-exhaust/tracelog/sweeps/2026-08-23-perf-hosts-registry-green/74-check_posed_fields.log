@@ -1,0 +1,28 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+== no fixture poses a field the game recomputes every frame ==
+  PASS: read the repository's own ignore rules (33 patterns) — with none, this scans everything
+  PASS: CONTROL: a path the repository ignores is left out of the scan
+  PASS: CONTROL: …and a tracked one is not
+  PASS: the scan of the game found `hud.can_craft` recomputed per frame (main.gd:750) — without this the sweep below is vacuous
+  PASS: …and it found the rest of the per-frame pushes with it (52 fields)
+  PASS: no fixture writes one
+  PASS: the exemption for `capture_moments.gd:hud._arrival_life` still describes a real write
+  PASS: the exemption for `capture_moments.gd:main._hover_latch` still describes a real write
+  PASS: the exemption for `check_hud_layout.gd:hud._arrival_life` still describes a real write
+  PASS: the exemption for `check_hud_layout.gd:main._hover_latch` still describes a real write
+  PASS: the exemption for `check_pack_layout.gd:hud.can_craft` still describes a real write
+  PASS: the exemption for `check_pack_layout.gd:hud.minimap_large` still describes a real write
+  PASS: the exemption for `check_snap_frame.gd:main._cam_pos` still describes a real write
+  PASS: the `auto_input` guard on `player.input_dir` still excuses a real write
+  PASS: the `auto_input` guard on `player.input_climb` still excuses a real write
+  PASS: the `auto_input` guard on `player.jump_held` still excuses a real write
+  PASS: CONTROL: the extractor finds a field assigned inside `_process`
+  PASS: CONTROL: …and does NOT find one assigned in `_ready` — the scan is scoped to the body, not the file
+  PASS: CONTROL: …and does NOT find one assigned on a LOCAL declared inside the body — a local is not posed state, and this is the false positive the first run produced
+  PASS: CONTROL: the extractor finds a field the body assigns on ITSELF, with no receiver to key on
+  PASS: CONTROL: …and does not mistake a bare LOCAL or the function's own PARAMETER for one
+  PASS: CONTROL: …and the bare rule is scoped to the body too, not the file
+  PASS: CONTROL: both writes are caught, and neither the field-twin, the receiver-twin nor the differently-handled twin beside them is (2 hit(s))
+  PASS: CONTROL: each of `_assigned_pair`'s rejections returns the verdict it exists for, and the two acceptances still land (23 cases)
+check_posed_fields: PASS (24 asserted) — 52 per-frame fields in the game, 7 exemptions and 3 guards each with a reason, and the extractor is proven to fire on both shapes and to decline in 23 places on purpose

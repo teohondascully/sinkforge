@@ -1,0 +1,47 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 Pro (Apple9)
+ERROR: Can't create shader cache folder, no shader caching will happen: user://
+   at: RendererCompositorRD (servers/rendering/renderer_rd/renderer_compositor_rd.cpp:295)
+
+== the grapple, as a picture rather than as a velocity ==
+    waited 165 frames for the guidance to go quiet
+  PASS: the head-lamp settled before the shutter (0.03 px residual after 240 frames, held 6)
+    churn samples over 4 periods: 0.09% 0.22% 0.06% 0.12% (median 0.11%)
+    still-frame churn: 0.11% of pixels move on their own (worst pixel 226.0 levels)
+  PASS: CONTROL: the frame is mostly still — 0.11% of it moves between two untouched captures
+  PASS: CONTROL: the fixture still owns the pointer — a released seam would be measuring a human's hand
+    the preview inks 0.26 of the throw and reaches 550 px of 570; 692 drawn pixels lie off the corridor entirely
+  SKIP: [grapple.gr05-preview-share] GR-05's share of the throw the preview inks (measured 0.26) was NOT asserted — no bound has been decided for it, and the cap that used to stand here was 1.01 over a quantity `_corridor_fill` bounds at 1.0 by construction — an assertion that could not fail. The measurement is the deliverable until there is a design call to assert
+    against dark rock — miner 88.4 levels, preview 3.1 levels (3280 preview pixels)
+  PASS: CONTROL: the preview was actually drawn (3.1 levels of edge over 3280 pixels, floor 1.0 — a floor this low cannot fail; see GHOST_EDGE_FLOOR)
+  PASS: CONTROL: the miner was actually drawn (88.4 levels of edge, over 1071 pixels)
+  PASS: the miner out-reads their own telemetry (88.4 vs 3.1 levels, floor 1.15x)
+    aim vs anchored: 0.998 of the corridor is drawn by one and not the other
+  PASS: an aimed line and an attached one are not the same picture (0.998 of the corridor differs)
+    clock baseline draws: 1009 923 917 (median 923)
+    the two states differ over 6340 pixels of the rope's lane, against 923 from the clock
+  PASS: a slack rope and a taut one are different pictures (6340 px vs a 923 px clock baseline)
+    [bow-diag] pct99 0.0536  binned 0.0536  occupied 14/24  px 372  span 533  rim 0.4650
+    [bow-diag] profile ......01111.00..00.00000   (each station's peak offset as a share of the rim, . = empty)
+    [bow-diag] clean 0.0536  ->  sag 0.0809 of the chord once the cosine is undone  in-band 14/24  over-band 0  (NOT yet what this layer asserts on)
+    [bow-diag] chord fully inside the frame (hand (946.0, 531.0), hitch (1300.0, 132.0), image 1920x1080)
+    [bow-diag] largest offset 29 px at station 8 of 24 (t=0.35); the hang's apex must be at t=0.50, and the renderer's apex here is 2 px
+    [bow-diag] renderer drew 0.0056 of the chord at slack 0.000 (asked 0.00); chord 48.5 deg off horizontal, cos 0.663, so a perpendicular mask should read 0.0037
+    [bow-diag] pct99 0.2372  binned 0.2366  occupied 17/24  px 470  span 526  rim 0.4656
+    [bow-diag] profile 33444..44..333...1111000   (each station's peak offset as a share of the rim, . = empty)
+    [bow-diag] clean 0.2366  ->  sag 0.3631 of the chord once the cosine is undone  in-band 17/24  over-band 0  (NOT yet what this layer asserts on)
+    [bow-diag] chord fully inside the frame (hand (957.0, 531.0), hitch (1300.0, 132.0), image 1920x1080)
+    [bow-diag] largest offset 125 px at station 4 of 24 (t=0.19); the hang's apex must be at t=0.50, and the renderer's apex here is 127 px
+    [bow-diag] renderer drew 0.3718 of the chord at slack 0.269 (asked 0.55); chord 49.3 deg off horizontal, cos 0.652, so a perpendicular mask should read 0.2422
+    bow: 0.081 of the chord pulled tight, 0.363 at 0.55 slack (mask rim 0.4650 / 0.4656, drawn cap 0.42)
+      the renderer's own model predicts 0.2736 of the chord here: rope_sag is clamped to SAG_CAP (slack 0.55 solves to 0.6770, every slack above 0.3199 pins) and the chord lies at 49.3 degrees, so a vertical hang of 0.42 departs it by 0.2736
+  PASS: the posed shot leaves the saturation guard room to be a saturation guard — the renderer's predicted departure is 0.2736 of the chord against a 0.42 threshold. If this fails, the shot was flattened and `_bow_measured` will start refusing correct readings
+  HELD: [grapple.gr03-single-frame-bow] this run asserted it
+  PASS: a slack rope HANGS — it departs its own chord by 0.363 of it (floor 0.15)
+  PASS: and a taut one does not (0.363 slack against 0.081 taut)
+    waited 490 frames for the guidance to go quiet
+  PASS: the head-lamp settled before the shutter (0.03 px residual after 240 frames, held 6)
+    against open sky — miner 86.7 levels, preview 3.6 levels (5293 preview pixels)
+  PASS: CONTROL: the preview drew something against the sky at all (5293 pixels)
+    GR-04 REPRODUCES: on dark rock the whole preview adds 3 levels of edge over 3280 pixels; on open sky the endpoint mark alone carries 4 over 5293, against a miner whose own silhouette step is 87. How loud an aim mark should be is a design call, not a harness one.
+check_grapple_reads: PASS (13 asserted) — the rope reads as a tool and the miner out-reads it

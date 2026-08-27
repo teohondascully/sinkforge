@@ -1,0 +1,11 @@
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+  PASS: the scar landed (world changed)
+  PASS: the dug scar healed — terrain restored exactly
+  PASS: the pack restored
+  PASS: the body is back where it saved
+  PASS: conservation holds across the live round-trip (present=7 net=7)
+  PASS: the round-trip went through the isolated slot on disk
+  PASS: the atomic write left no .tmp behind — the temp file was promoted, not abandoned
+  PASS: F5 saves the seed the SIM was built with, not a second copy the controller kept
+check_saveload: PASS (8 asserted)
