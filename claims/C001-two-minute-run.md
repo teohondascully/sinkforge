@@ -1,7 +1,7 @@
 ---
 id: C001
 title: A bounded two-minute run completes end to end, headless
-status: BLOCKED
+status: RETIRED
 kind: structural
 owner: engineering
 created: 2026-08-25
@@ -10,6 +10,14 @@ first_failed_at: never
 scenario: scenarios/first_bore.yaml
 blocked_on: sim/run does not exist. No session lifecycle, flood clock, or extraction resolution exists in any form.
 ---
+
+**RETIRED, 2026-08-27.** The run-based roguelite structure this claim measures is retired (`docs/GDD.md`
+§9, `docs/DECISIONS_LEDGER.md` D0076) — there is no more bounded run to complete, no `MetaIdle`/
+`RunResolved` state machine, no run-relative threshold to source 7,200 ticks from. Never measured, never
+built past `blocked_on`; nothing regresses by retiring it. Everything below is left exactly as written,
+per `docs/CLAIMS.md` §4 ("never deleted; the history is the record of what was believed and when") — it
+is what was believed, correctly, under the design that existed at the time. Replaced by `C003`, an
+episode claim against the persistent-world structure.
 
 ## Claim
 
@@ -65,3 +73,4 @@ Each of those needs its own claim. This one establishes only that the loop close
 | Date | Commit | Data version | Value | Status | Note |
 |---|---|---|---|---|---|
 | 2026-08-25 | — | — | not measured | BLOCKED | Claim authored at pivot. Blocked on `sim/run`. |
+| 2026-08-27 | ebf17e1 | — | not measured | RETIRED | Run-based structure retired (`docs/GDD.md` §9, D0076). Never measured. Replaced by `C003`. |

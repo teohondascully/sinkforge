@@ -42,9 +42,9 @@ Queue, one commit per document group so the diff stays reviewable (director's ex
       whether to make the change). D0076. Two spots left deliberately stale (§2 "forty-minute
       run", R2's "every run that fails") — inside explicit "keep verbatim" spans, flagged not
       fixed.
-- [ ] 2. `claims/C001-two-minute-run.md` RETIRED + new episode claim filed BLOCKED, plus the two
-      narrow "C001 is the definition of done" lines in `CONTEXT.md` and `ONBOARDING.md` — same
-      commit, per explicit instruction.
+- [x] 2. `claims/C001-two-minute-run.md` RETIRED + `C003-cold-start-reaches-d1.md` filed BLOCKED,
+      plus the two narrow "C001 is the definition of done" lines in `CONTEXT.md` and
+      `ONBOARDING.md` — same commit, per explicit instruction. D0077.
 - [ ] 3. `CONTEXT.md` + `README.md` broader cleanup (roguelite language, R3 restated, "current
       state" section) — excludes the lines already touched by commit 2.
 - [ ] 4. `ONBOARDING.md` broader cleanup (stages 6/9/10, the deferred run-console section, Draft

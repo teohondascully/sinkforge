@@ -260,4 +260,7 @@ Pivoted from a persistent-world factory game on 2026-08-25. The prior codebase i
 
 What was found structurally absent in the prior codebase, and is therefore greenfield: run lifecycle, typed command layer, run/meta save separation, declarative scenario format, R1's transport cost model, R3's flood clock. Those are L2 through L4 of the instrument, which is why they were absent.
 
-Start point: `claims/C001-two-minute-run.md`, currently BLOCKED on `sim/run` not existing. It is the definition of done for the entire first sequence of work.
+`claims/C001-two-minute-run.md` is RETIRED — it measured the run-based roguelite structure, which is
+retired (`docs/GDD.md` §9, `docs/DECISIONS_LEDGER.md` D0076). Start point now: `claims/C003-cold-start-reaches-d1.md`,
+BLOCKED on nearly the entire remaining build sequence (its own `blocked_on` names what's missing). It is
+the definition of done for the entire first sequence of work.

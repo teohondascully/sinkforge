@@ -119,7 +119,7 @@ Report when Task 0 is complete, with the clone size numbers and the document tri
 
 ## Task 1 onward: to a passing C001
 
-Ordered. Each stage is small enough to review and lands as its own PR. `claims/C001-two-minute-run.md` is the definition of done for the whole sequence.
+Ordered. Each stage is small enough to review and lands as its own PR. `claims/C001-two-minute-run.md` is RETIRED — it measured a run-based structure that no longer exists. `claims/C003-cold-start-reaches-d1.md` is the definition of done for the whole sequence now.
 
 **1. `core/`** — fixed-point arithmetic, seeded splittable RNG, generational IDs. Small, pure, fully unit-tested. Everything above depends on it, so it is worth getting exactly right.
 

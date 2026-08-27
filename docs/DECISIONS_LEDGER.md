@@ -2560,3 +2560,40 @@ established and confirmed-correct discipline for this task.
 
 Reverse: CHEAP — prose only, no code or schema touched, `git revert` recovers the pre-reversal document
 in full.
+
+---
+
+## D0077 · 2026-08-27 · claims/C001-two-minute-run.md — RETIRED, not edited; C003 replaces it
+
+Decided: `C001`'s title, falsifiable form (`MetaIdle → RunActive → RunResolved`), metric
+(`run_end.reason`, `banked`), and threshold (7,200 ticks, sourced explicitly from "Draft A's first run
+length") are bounded-run constructs with no referent left, per D0076. Marked `status: RETIRED`, per
+`docs/CLAIMS.md` §4's own convention — never deleted, never edited in place, a one-line reason plus the
+date in a new History row. The director's explicit call: "editing it in place would erase that a design
+change happened."
+
+Filed `C003-cold-start-reaches-d1.md` as the replacement, `status: BLOCKED`, shaped as the director's own
+episode idea (`checkpoint, seed, policy, horizon`) rather than a bounded run: cold start, does a scripted
+bot satisfy the rig's first demand within N sim-minutes. Threshold deliberately left unset — there is no
+source to derive one from yet (`data/economy/` doesn't exist), and `docs/CLAIMS.md` §9's own rule against
+"a guess wearing a decimal point" applies here as much as it did to setting one prematurely. `blocked_on`
+names every real gap found during the earlier review, not a summary: no save/load code anywhere in the
+repository, no `interface/`/`harness/` beyond stub files, no `sim/commands` beyond a skeleton, no
+`data/economy/`, and determinism proven only against `core/` plus a stub sim, never a real session — the
+director's own instruction was that this "stops being prose," so the claim's `blocked_on` and its "why
+this is blocked on nearly everything" section carry the same specific list my review gave in chat,
+verified again here rather than copied from memory.
+
+Same commit, per the director's explicit instruction: the two places `C001` was named as "the definition
+of done for the entire first/whole sequence" — `CONTEXT.md`'s "Start point" paragraph and
+`ONBOARDING.md`'s Task 1 preamble — both now point to `C003` instead, with a one-clause note that `C001`
+is retired rather than silently swapping the citation.
+
+Alternative: edit `C001` in place to describe the new claim, keeping its ID and history. Rejected per the
+director's own reasoning — a retired-and-replaced claim is a different fact than an edited one, and
+`docs/CLAIMS.md`'s RETIRED status exists specifically so a reader can tell the difference between "this
+was refined" and "the thing this measured stopped existing."
+
+Reverse: CHEAP to un-retire `C001` (flip the status field back) if the design reverses again; the new
+`C003` file is additive and costs nothing to remove if it turns out mis-shaped once `data/economy/`
+actually exists.
