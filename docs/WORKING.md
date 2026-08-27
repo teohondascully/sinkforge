@@ -8,6 +8,44 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## External audit response — surviving run-structure specifications, 2026-08-27 — CLOSED
+
+An external (Codex) audit read the documentation corpus cold, independent of both prior sweeps, and
+found live run-structure specifications neither sweep caught: `CLAUDE.md`'s auto-loaded reading order
+still pointed at retired `C001`; `docs/CLAIMS.md` and `docs/ARCHITECTURE.md` §5/§6 (the methodology and
+scenario-format documents) used `C001`/Draft A as live worked examples; eight `sim/*/MODULE.md` files
+still specified the run-based flood clock, per-run terrain generation, or run-ending termination events;
+several `harness/*`/`shell/`/`data/progression/` files used "run" ambiguously; `docs/GDD.md`'s own §9
+dead-list collided in wording with its own §1 premise; `C003` carried a citation error of its own.
+
+Verified every claim independently before acting — two of the audit's own findings were downgraded
+(CONTEXT.md/README.md's "a run must complete with no renderer" is the harness-execution sense, not a
+contradiction; the tier-rule "decorative demand" attack is real but out of scope since `data/economy/`
+doesn't exist yet, held for the director per their own instruction) and one pre-existing, reversal-
+unrelated gap (`docs/README.md`'s normative table missing three documents `CLAUDE.md` already calls
+normative) was fixed anyway per explicit instruction, since it's document governance itself.
+
+**New standing rule adopted this round:** "run" is reserved for evaluation/harness executions
+(`sinkforge run`, a scenario execution, "an agent run"); "a session" or "a playthrough" for the
+sim-execution/game sense. Removes the need to disambiguate by context. Checked, not assumed, across
+every touched file — several "run" instances turned out to already be correct under this rule and were
+left alone (verified individually, not pattern-matched).
+
+Eight commits, grouped by surface per the director's explicit ordering:
+
+- [x] a. `CLAUDE.md` alone, first — `54dbe60`, D0084.
+- [x] (governance) `docs/README.md`'s normative table — `caaa19f`, D0085.
+- [x] b. `docs/CLAIMS.md` + `docs/ARCHITECTURE.md` §5/§6 — `aa3ca85`, D0086.
+- [x] c. `sim/*/MODULE.md`, the eight with real content — `eaade2a`, D0087.
+- [x] d. `harness/*`/`shell/`/`data/progression/` wording standardization — `ee68508`, D0088.
+- [x] e. `docs/GDD.md`:7 + the persistent-world disambiguation (`docs/GDD.md`:219, `docs/DECISIONS.md`) —
+      `94fcd2e`, D0089.
+- [x] f. `C003`'s citation fix — `1f07a0d`, D0090.
+- [x] meta-finding: the bounded-sweep pattern, second instance after D0026 — `84a21de`, D0091.
+
+Stopped, as instructed. `data/economy/` waits for the director — the corrected reachability rule and the
+tier-rule "decorative demand" critique both wait for that session, not before.
+
 ## Design reversal — run-based roguelite to persistent single shaft, 2026-08-27 — CLOSED
 
 All six commits landed (`ebf17e1`, `23118e8`, `f415b5e`, `fc03219`, `31b1f84`, `87f127b`), each with its
