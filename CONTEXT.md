@@ -6,13 +6,13 @@
 
 ## What this is
 
-**Sinkforge is a factory game with a roguelite structure and an idle game's progression curve.** 2D, side-view, vertical.
+**Sinkforge is a factory game with a persistent underground shaft and an idle game's progression curve.** 2D, side-view, vertical.
 
-The player bores a shaft from a permanent surface rig, builds extraction and routing infrastructure inside it, hauls refined material back up, and surfaces before the shaft floods. The shaft is lost. The material upgrades the rig, which extends and deepens the next run. Two factories exist: the shaft factory is disposable and different every run, the surface rig is permanent and optimized across dozens.
+The player bores a shaft from a permanent surface rig, builds extraction and routing infrastructure inside it, and hauls refined material back up to satisfy demands waiting at the rig. There is no reset: the shaft is the same one the player started on, deeper and more built-out than it was an hour ago. Satisfying a demand unlocks the next capability, which is what lets the shaft go deeper still. One shaft, one permanent rig — the shaft is where the factory lives, the rig is the standing consumer that makes building it necessary in the first place.
 
 Three things follow that are easy to miss and expensive to get wrong:
 
-- **The terrain is the factory.** The shape you dig is the routing. This is why roguelite structure works here and does not work for factory games generally: procedural geology rewrites your layout every run, where in a game with a flat infinite plane it would not change your build at all.
+- **The terrain is the factory.** The shape you dig is the routing, independent of whether the shaft resets — an aquifer where you wanted your main chute, ore forty meters further than the last vein. What no longer holds: geology used to reshuffle every run and no longer does, since there is one shaft now. Lateral variety instead has to come from the un-mined extent of that one world; whether that's enough is an open question (`docs/GDD.md` §8).
 - **No global multipliers. Ever.** Factory games are ratio puzzles; idle games are number puzzles. Every upgrade is a new capability or a changed constraint, never a rate multiplied. See `docs/GDD.md` §2 and §5.
 - **Down is free, up is powered.** The central asymmetry. R1 below.
 
@@ -72,7 +72,7 @@ These are invariants. A proposal that violates one is a design change, not an im
 
 **R2. Deep material is required, not more valuable.** No exponential per-unit value by depth. Tier-N upgrades require tier-N material *and* large quantities of tier-1 material. The exponential lives in quantity required.
 
-**R3. Run length is a purchased resource.** Rig pump capacity determines how long a shaft holds before flooding. Run duration derives from rig state, never a constant.
+**R3. Water is continuous upkeep, not a countdown.** Groundwater seeps into every excavated section, always. Pump capacity is infrastructure, not a one-time purchase against a clock. A starved section floods and its machines are wrecked into scrap.
 
 **R4. Every tool tier removes one skill and introduces another.** Upgrades change the shape of the problem, not the numbers.
 
@@ -256,9 +256,17 @@ Any claim about engagement needs a stated proxy metric and a stated account of w
 
 ## Current state
 
-Pivoted from a persistent-world factory game on 2026-08-25. The prior codebase is in `legacy/`, tagged `pre-pivot`. The prior compatibility audit and pivot plan are in `docs/archive/`; both remain accurate about the code they measured.
+Pivoted from a persistent-world factory game on 2026-08-25, then pivoted again on 2026-08-27 when the
+run-based roguelite structure the first pivot adopted was itself retired, back to a persistent shaft
+(`docs/GDD.md` §9, D0076). The prior codebase is in `legacy/`, tagged `pre-pivot`; the compatibility
+audit and pivot plan in `docs/archive/` remain accurate about the code they measured — the engineering
+layers (`core/`, `sim/world`, `sim/terrain_gen`, `sim/body`) are unaffected by the second pivot,
+confirmed directly (D0076).
 
-What was found structurally absent in the prior codebase, and is therefore greenfield: run lifecycle, typed command layer, run/meta save separation, declarative scenario format, R1's transport cost model, R3's flood clock. Those are L2 through L4 of the instrument, which is why they were absent.
+What was found structurally absent in the prior codebase, and is therefore greenfield: session/save
+infrastructure, typed command layer, declarative scenario format, R1's transport cost model, R3's local
+flood mechanics — L2 through L4 of the instrument. Session/save shape is open again as of the second
+pivot: the run/meta split `sim/run`/`sim/meta` assumed no longer applies, and nothing replaces it yet.
 
 `claims/C001-two-minute-run.md` is RETIRED — it measured the run-based roguelite structure, which is
 retired (`docs/GDD.md` §9, `docs/DECISIONS_LEDGER.md` D0076). Start point now: `claims/C003-cold-start-reaches-d1.md`,

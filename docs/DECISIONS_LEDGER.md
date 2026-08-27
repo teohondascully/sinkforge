@@ -2597,3 +2597,32 @@ was refined" and "the thing this measured stopped existing."
 Reverse: CHEAP to un-retire `C001` (flip the status field back) if the design reverses again; the new
 `C003` file is additive and costs nothing to remove if it turns out mis-shaped once `data/economy/`
 actually exists.
+
+---
+
+## D0078 · 2026-08-27 · CONTEXT.md, README.md — orientation-docs propagation of D0076/D0077
+
+Decided: propagate the run-structure reversal into the two documents a first-time reader hits before
+anything else. `CONTEXT.md`'s premise line, "two factories" paragraph, terrain-is-the-factory bullet, R3
+summary, and "Current state" section; `README.md`'s opening paragraph, stage-progress paragraph, the
+pivot section (renamed "Two pivots"), the "what exists" claim count, and the claim-corpus paragraph.
+Same content changes as `docs/GDD.md` (D0076) and `claims/` (D0077), compressed to each document's own
+terse register rather than copied verbatim.
+
+One judgment call worth naming: `CONTEXT.md` states its own budget ("kept under 250 lines deliberately")
+and was already at 266 lines before this commit — over budget going in, not something this session
+caused. This edit nets +8 lines (274 total) after one deliberate trim pass; going further to claw the
+file back under 250 would mean cutting content this commit didn't touch, which is scope beyond what was
+asked. Flagged, not fixed further.
+
+`sim/run`/`sim/meta`'s split is stated as *open again*, not resolved, in both files — matches the
+approach the next commit (`sim/run`/`sim/meta`/`sim/commands` `MODULE.md`) takes: mark it TBD rather than
+invent a replacement architecture unprompted (`ONBOARDING.md`'s own "do not resolve the open design
+questions yourself").
+
+Alternative: leave `CONTEXT.md`/`README.md` untouched until every downstream document group lands, then
+do one final consistency pass. Rejected — a portfolio reader hits these two files first, and leaving the
+project's own front door describing a retired structure while the design doc underneath it has already
+moved on is a worse inconsistency than a slightly fatter `CONTEXT.md`.
+
+Reverse: CHEAP — prose only, `git revert` recovers both files in full.

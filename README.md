@@ -1,25 +1,26 @@
 # Sinkforge
 
-Sinkforge is a 2D vertical excavation and factory game: bore a shaft, automate the extraction and
-routing inside it, haul what you refine back to the surface before the shaft floods, and spend the
-yield on a permanent rig that lets the next run go deeper. It is equally, and not incidentally, a
-measurement instrument for game design — the entire simulation runs headless and deterministic, so
-scripted agents can play it thousands of times and produce falsifiable evidence about whether the
-design works, rather than an opinion about whether it might.
+Sinkforge is a 2D vertical excavation and factory game: bore a persistent shaft, automate the extraction
+and routing inside it, and haul what you refine back to a permanent rig that stands as a continuous
+demand for specific material, unlocking the next capability each time it's satisfied. It is equally, and
+not incidentally, a measurement instrument for game design — the entire simulation runs headless and
+deterministic, so scripted agents can play it thousands of times and produce falsifiable evidence about
+whether the design works, rather than an opinion about whether it might.
 
-**Stage 4 of 7 toward `C001`, the first playable milestone — last updated 2026-08-26.** The build
-sequence toward `claims/C001-two-minute-run.md` — a scripted agent completing one bounded run entirely
-headless — is ordered and stage-gated (`ONBOARDING.md`). `core/` (stage 1), a stub determinism harness
-(stage 2), and `sim/world`+`sim/terrain_gen` (stage 3) landed first. `sim/body` — collision, the
-heightfield ground plane, the full forgiveness set (step-up, corner correction, coyote time, jump
-buffer) — is stage 4, and its movement acceptance suite is green against a hostile fixed chamber
-(`docs/ARCHITECTURE.md` §9). Next: `sim/commands`+`interface` (5), `sim/run`+`meta` (6), and `harness/`
-(7) — `first_bore`, the first scripted-agent run through the full interface. `ONBOARDING.md` lists five
-more stages after that (items/machines/behaviors/transport, `sim/fluid`, extraction and haul, a minimal
-`view/`, then closing `C001` itself) toward the fuller game. Live detail: `docs/WORKING.md` (current
-state) and `docs/BRIEF.md` (this session's digest).
+**Stage 4 of 7 toward `C003`, the first playable milestone — last updated 2026-08-27.** The build
+sequence toward `claims/C003-cold-start-reaches-d1.md` — a scripted agent satisfying the rig's first
+demand from a cold start, entirely headless — is ordered and stage-gated (`ONBOARDING.md`). `core/`
+(stage 1), a stub determinism harness (stage 2), and `sim/world`+`sim/terrain_gen` (stage 3) landed
+first. `sim/body` — collision, the heightfield ground plane, the full forgiveness set (step-up, corner
+correction, coyote time, jump buffer) — is stage 4, and its movement acceptance suite is green against a
+hostile fixed chamber (`docs/ARCHITECTURE.md` §9). Next: `sim/commands`+`interface` (5), session/save
+infrastructure (6, shape open as of the second pivot below), and `harness/` (7) — the first
+scripted-agent run through the full interface. `ONBOARDING.md` lists five more stages after that
+(items/machines/behaviors/transport, `sim/fluid`, extraction and haul, a minimal `view/`, then closing
+`C003` itself) toward the fuller game. Live detail: `docs/WORKING.md` (current state) and `docs/BRIEF.md`
+(this session's digest).
 
-## The pivot, and why it's a strength
+## Two pivots, and why they're a strength
 
 Until 2026-08-25 this was a persistent-world factory game. It didn't get rewritten on a hunch — it got
 measured, twice, independently. A 20-agent structural audit found the simulation layer roughly 72%
@@ -29,10 +30,16 @@ rather than the code's shape, found the core loop had no continuous demand at th
 tree: two of its highest-tier products were dead ends nobody needed more of, and the material meant to
 anchor the economy had quietly become a currency standing in for one
 (`docs/archive/PIVOT_PLAN_2026-08-25.md`). The architecture was sound. The game built on top of it
-wasn't demanding enough of the player to keep being a game. The pivot kept the architecture, most of
-the code, and the central asymmetry — down is free, up is powered — and rebuilt the loop around it as
-a run-based roguelite with a permanent surface rig: the shape that actually needs a continuous stream
-of return trips. Full design reasoning: `docs/GDD.md`.
+wasn't demanding enough of the player to keep being a game.
+
+The first pivot's fix was a run-based roguelite: delete the factory every few minutes to force demand.
+It worked, but for the wrong reason — the diagnosis (no continuous demand) was correct, the persistence
+of the world was not the actual cause. A second pivot on 2026-08-27 kept the diagnosis and replaced the
+fix: the permanent surface rig is the continuous demand now, sitting above the player instead of below,
+wanting specific material instead of everything. Both pivots kept the architecture, nearly all the code,
+and the central asymmetry — down is free, up is powered — intact; neither touched `core/`, `sim/world`,
+`sim/terrain_gen`, or `sim/body` (confirmed directly, `docs/DECISIONS_LEDGER.md` D0076). Full design
+reasoning: `docs/GDD.md`.
 
 ## What exists, and what doesn't
 
@@ -47,11 +54,13 @@ runs every suite under the real, pinned engine on every push, not only locally).
 
 Scaffolded and not yet built: ten more `sim/` modules (`commands`, `run`, `meta`, `items`, `machines`,
 `behaviors`, `transport`, `fluid`, `economy`, `telemetry`) each have a `MODULE.md` stating their
-responsibility and boundaries, and zero lines of code. There is no `interface/`, no `harness/`, no
-`view/`, no playable build, and no packaged release. Two claims exist (`claims/`) and both are
-`BLOCKED`, never measured, because the modules they depend on don't exist yet. None of this is softened
-elsewhere in the repository — `docs/WORKING.md` and `docs/BRIEF.md` say
-the same thing in more detail, and the claim files carry `BLOCKED` in their own front matter.
+responsibility and boundaries, and zero lines of code — `run`/`meta`'s own split is itself an open
+question again after the second pivot below, not just unbuilt. There is no `interface/`, no `harness/`,
+no `view/`, no playable build, and no packaged release. Three claims exist (`claims/`): one `RETIRED`
+(the design it measured no longer exists), two `BLOCKED`, never measured, because the modules they
+depend on don't exist yet. None of this is softened elsewhere in the repository — `docs/WORKING.md` and
+`docs/BRIEF.md` say the same thing in more detail, and the claim files carry their real status in their
+own front matter.
 
 ## The architecture, and why
 
@@ -92,16 +101,18 @@ stand in for the rest.
 
 Every design assertion the project currently defends is a file in `claims/`: an English statement, the
 scenario that exercises it, a metric, a threshold fixed before anything was measured, the current
-measured value, and a status. `C001-two-minute-run.md` is the tracer bullet — a scripted agent starts
-a run, descends a fresh shaft, smelts one ingot, delivers it to the surface, and the run resolves,
-entirely headless, in under 7,200 ticks. It's `BLOCKED`: `sim/run` doesn't exist yet, so there's
-nothing to measure. `C002-traversal-over-rubble.md` is narrower and further out — the same 0.92
-velocity-efficiency threshold already required over clean geometry, measured instead against terrain
-the player just dug, because a controller that only passes on clean floors hasn't actually proven the
-resolution-split collision architecture works. It's blocked on `sim/body` and `sim/world`'s heightfield
-derivation. Both claims state plainly, in their own "what this does not measure" section, exactly what
-passing them would and wouldn't prove — a claim that oversells its own result is a defect in the claim,
-not a virtue.
+measured value, and a status. `C001-two-minute-run.md`, the original tracer bullet, is `RETIRED` — it
+measured a bounded two-minute run, and the run-based structure it depended on no longer exists (second
+pivot, below). `C003-cold-start-reaches-d1.md` replaces it: a scripted agent starts from a cold
+checkpoint and satisfies the rig's first demand, entirely headless. It's `BLOCKED` on nearly the entire
+remaining build sequence — no save/load code, no `interface/`, no `harness/`, no `data/economy/` yet.
+`C002-traversal-over-rubble.md` is narrower and further out — the same 0.92 velocity-efficiency
+threshold already required over clean geometry, measured instead against terrain the player just dug,
+because a controller that only passes on clean floors hasn't actually proven the resolution-split
+collision architecture works. It's blocked on `sim/body` and `sim/world`'s heightfield derivation.
+Every claim states plainly, in its own "what this does not measure" section, exactly what passing it
+would and wouldn't prove — a claim that oversells its own result is a defect in the claim, not a
+virtue.
 
 ## The gates
 
