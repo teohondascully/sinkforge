@@ -48,6 +48,51 @@ route is mechanically possible. Keep these layers in separate receipts and run t
 deterministic checks per change, encounter checks for selected visible changes, and journey/A-B/human work
 as a slower corpus-level evaluation.
 
+### Layer 1's own split: a regression route is not exploration
+
+`docs/DECISIONS_LEDGER.md` D0055/D0056 found the same failure twice in one stage, from two different
+mechanisms: a real out-of-bounds launch a human found in minutes of ordinary play, and a fixture constant
+(`HostileChamber.JUMP_CORNER_ROW`) tuned by watching the controller's own trajectory until a threshold
+passed. Both are the same underlying gap. `ScriptedTraverse` is a hand-authored ROUTE: hold right, jump
+here, mantle there. It proves one known-good path still works — a real, necessary regression check — and
+it structurally cannot find anything off that path, because it never goes anywhere the route doesn't name.
+The out-of-bounds launch lived at column 160, past where the scripted policy ever travels. It was not a
+near miss; it was outside the space the check could see at all.
+
+**A scripted route and an exploring agent are not the same instrument, and layer 1 needs both:**
+
+- **Regression route** (what exists today, `ScriptedTraverse`): proves a known-good path still behaves the
+  same way it did last time it was measured. Cheap, deterministic, fast to run per commit. Answers "did
+  this change break what already worked," never "what else is out there."
+- **Exploration tier** (new, `docs/DECISIONS_LEDGER.md` D0057 begins it): a family of goalless bots, none
+  individually clever, each covering ground the others do not.
+  - An **input fuzzer**: fully random input every tick, thousands of seeded runs, asserting only
+    invariants (in bounds, no depenetration, position continuous within max velocity, no NaN/overflow, no
+    state deadlock) — never a goal, never a route. A goalless fuzzer cannot be defeated by a fixture tuned
+    to make a goal reachable, which is exactly how `JUMP_CORNER_ROW` went green on a jump the real
+    controller could not make.
+  - A **human-biased fuzzer**: the same invariant-only harness, but input drawn from distributions fit to
+    real recorded sessions (`tests/body/recordings/`) rather than uniform noise — held directions lasting
+    hundreds of milliseconds, repeated jump taps, mid-air release-and-re-press, mashing when stuck. Uniform
+    noise never holds a button for 400ms; it explores a different part of input space than a player does,
+    and both parts matter.
+  - A **coverage-seeking bot**: biased toward unvisited reachable cells and untaken state transitions,
+    reported as a metric (which chamber cells has any agent ever occupied, against the reachable set) —
+    the out-of-bounds bug's own column would have shown up as never-visited territory before a human ever
+    found the bug by hand.
+  - A **chaos bot**: adversarial rather than random — actively seeks the input sequence most likely to
+    violate a stated property, complementing the fuzzer's breadth with targeted pressure.
+
+**State the limit plainly, because it is easy to overclaim:** this tier finds crashes, softlocks,
+invariant violations, and unreachable or under-tested geometry — every class of bug with a definable
+correctness property, at a scale and consistency no human playtesting session can match. It does not find
+"the jump feels floaty," "I could not tell that ledge was climbable," or any question that requires a
+subjective, first-time human reaction. Those remain layers 3-6's job (calibrated agent journeys, screenshot
+criticism, counterfactual A/B, human calibration) — this section adds coverage to layer 1, it does not
+collapse the six-layer split above. The claim is not that agents replace human playtesting; it is that
+agents should be doing all of the work that has a machine-checkable answer, so human attention — the
+director's, or a future playtester's — is spent only on the questions that genuinely need judgment.
+
 ### What the journey layer must discover
 
 Completion is only one signal. A valid journey should record whether the actor independently formed the

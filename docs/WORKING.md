@@ -313,6 +313,19 @@ Registered in CI alongside the other nine structural gates (now ten). Mutation-t
 incident's own shape (the `enable=` line dropped), a demoted `untyped_declaration=1`, and the whole
 `[debug]` section missing — all three fail with the specific wrong key/value; the real file passes clean.
 
+**In progress (D0057): the exploration-tier reframe, item 1 (goalless input fuzzer) built and RED on two
+real findings, not yet CI-registered.** `docs/EXPERIENCE_EVALUATION.md` now states the reframe: a
+scripted route proves a known path still works and cannot find anything off it; exploration (fuzzer,
+human-biased fuzzer, coverage bot, chaos bot) is a separate tier. `tests/fixture_body_fuzz_probe.gd` +
+`tests/test_body_fuzz.gd`: 1000 seeds x 1500 ticks of fully-decorrelated random input, asserting four
+invariants hard (embedded, discontinuity, overflow, deadlock) and reporting two as coverage data (bounds,
+floor_selection — already covered by dedicated accepting tests). Found on its first full run: mantling
+onto `HostileChamber.JUMP_CORNER`'s single floating tile embeds the body (1,749 occurrences); a
+previously-unaudited "bottom" margin gap mirroring D0055's top-margin fix, ~4,000 occurrences, NOT
+root-caused yet. Not added to `.github/workflows/harness.yml` — it would land a new gate immediately red
+on pre-existing bugs this round did not fix. Next: items 2-4 (human-biased fuzzer, property-based tests,
+coverage metric), proposed but not yet built; then triage the two findings above before CI registration.
+
 **Closed (D0056): `JUMP_CORNER_ROW` generalizes — a fixture tuned by watching the controller is not
 independent of it.** New `docs/QUALITY.md` §2 rule; full `HostileChamber` constant audit found exactly
 one constant in the bad category (`JUMP_CORNER_COL`/`JUMP_CORNER_ROW` — positioned twice by watching a

@@ -1553,3 +1553,81 @@ its own tuning target failure mode in place; the fuzzer replaces the need for it
 
 Reverse: CHEAP — a documentation-only change (`docs/QUALITY.md`, this entry). No code or test behavior
 changed.
+
+## D0057 · 2026-08-26 · a goalless input fuzzer — item 1 of the director's exploration-tier reframe
+Decided, per the director's own framing (`docs/EXPERIENCE_EVALUATION.md` now carries the full reframe):
+`ScriptedTraverse` is a regression check, not a playtester -- it proves one known-good route still works
+and structurally cannot find anything off that route, which is exactly how both the out-of-bounds launch
+and the `JUMP_CORNER_ROW` fitted-pair problem (D0055/D0056) went undetected. Built
+`tests/fixture_body_fuzz_probe.gd` (the actual sweep: 1000 seeds x 1500 ticks, fully-decorrelated random
+`InputFrame` every tick -- `move_dir` uniform in {-1,0,1}, each of the three booleans independently
+`next_float() < 0.5`, no temporal correlation at all, deliberately unrealistic -- item 2's human-biased
+version is the contrast) and `tests/test_body_fuzz.gd` (subprocess wrapper, matching the established
+`fixture_div_by_zero_probe.gd` pattern since counting a script's own prints/push_errors in-process
+doesn't work).
+
+Two new `Body` telemetry fields added to make detection precise rather than fragile:
+`bounds_violation_this_tick`/`floor_selection_violation_this_tick`, set every tick the underlying
+condition is true (NOT rate-limited like the push_error reports) -- a fuzzer needs every occurrence, a
+human reading logs needs the rate limit; conflating them was the wrong call before this file needed both.
+
+Checks six invariant classes per tick, four asserted HARD (zero tolerance):
+- `embedded`: the body's final resolved position (`_box_blocked` re-checked after `tick()` returns)
+  overlaps solid material. Nothing currently corrects this the way bounds/floor-selection do.
+- `discontinuity`: per-tick displacement exceeds what any KNOWN legitimate mechanic can produce --
+  computed per-tick from the body's own event flags (step-up/mantle/corner-nudge each add their own
+  allowance only on the tick they actually fired), not a single flat cap, so it doesn't false-positive on
+  an ordinary mantle and doesn't get blind to a genuinely silent teleport.
+- `overflow`: position magnitude past 1,000,000px in either axis -- Fx is a signed 64-bit int, not IEEE
+  float, so literal NaN can't occur; this is the representable proxy for "numeric state went wrong."
+- `deadlock`: `(pos_x, pos_y, vel_x, vel_y, on_floor)` identical for 300+ consecutive ticks despite
+  continuously-varying random input -- a real freeze, not a body legitimately resting (which still shows
+  vel_x jitter tick to tick as `move_dir` flips).
+
+Two checks (`bounds`, `floor_selection`) are DELIBERATELY REPORTED, NOT asserted zero -- a real judgment
+call, not an oversight. Both already have a verified, unconditional correction and a dedicated accepting
+test (`test_bounds_invariant.gd`'s sustained-pressure test; `test_cave_geometry.gd`'s ambiguous-floor
+tests, ADR-0005). Asserting zero here would just be re-litigating those tests' own already-accepted
+scope, and would fail immediately and uninformatively on the chamber's own known left edge.
+
+**Verified working by finding two real, previously-unknown defects on its first full run, not by
+construction:**
+- `embedded`: 1,749 occurrences across the 1.5M-tick sweep. Traced one instance (seed 48, tick 776) in
+  detail: mantling (`mantle_hold=true`, random input) against `HostileChamber.JUMP_CORNER`'s single
+  floating solid tile (col 15, row 46 -- never intended to be climbable, only ever grazed by a jump's
+  rising arc) succeeds via the same step-up/mantle classifier a real ledge uses, landing the body
+  embedded in/against the single cell rather than on a stable surface. `ScriptedTraverse` never sets
+  `mantle_hold` anywhere near column 15 (its own window starts at `MANTLE_START`, 96 columns later), so
+  this was structurally invisible to every existing test. Not fixed in this entry -- reported per the
+  director's "build 1, report, then 2" instruction; a real, additional data point for D0056's own
+  `JUMP_CORNER` finding (the same constant, a different failure mode than the fitted-threshold problem).
+- `discontinuity`: 438 occurrences, clustering around the same incidents as `embedded` (the body escaping
+  the corner tile via a large uncredited depenetration jump, e.g. seed 48 tick 777: dx≈19.8px against an
+  allowed 2.5px).
+- `bounds`: 22,132 occurrences at full scale (1000x1500), by inferred-clamp-value: 18,131 left, 3,978
+  bottom, 23 left+bottom same tick. Left is the expected case -- 1/3 of random `move_dir` draws point
+  left from a spawn two columns in, and nothing in `HostileChamber` places a wall past column 0, so the
+  correction (verified separately, `test_bounds_invariant.gd`) is doing real, constant work rather than
+  guarding a hypothetical. **Bottom is a NEW finding this entry did not expect and has not root-caused**:
+  the grid's declared height is `max(SHAFT_FLOOR_ROW, CAVE_LOWER_FLOOR_ROW) + 10` -- only 10 rows of
+  margin below the deepest floor, the same shape of gap `TOP_MARGIN_ROWS` closed at row 0 (D0055), never
+  audited at the bottom edge. Flagged, not investigated further in this entry -- the next session touching
+  this chamber should check whether the bottom needs the same margin treatment the top already got.
+  `floor_selection`: 3 occurrences (seeds 205/603/746), two landing at the exact same position across
+  different seeds (4059136,10805248) -- a real, specific, reproducible location, not scattered noise.
+  Consistent with ADR-0005's own framing that 0/4,800 was "a null result below this sample's resolution,
+  not proof the case cannot occur" -- this is new evidence the case is rare but real, at a scale
+  (1.5M ticks) the original 4,800-column measurement never had.
+- `overflow`/`deadlock`: 0. Not vacuous passes -- the same run's `embedded`/`discontinuity` checks show
+  the harness is capable of firing on real conditions, so these zeros mean absence, not blindness.
+
+Full sweep runtime: ~114s (1.5M ticks). Not yet registered in `.github/workflows/harness.yml` as a
+blocking gate -- it is currently, honestly RED on two real, pre-existing findings this entry did not fix,
+and landing a new blocking gate in a known-red state either breaks CI for everyone or requires a
+stand-down neither this entry nor the director has issued. Registration is the next step once the
+`JUMP_CORNER` embedding is triaged (fixed, or the director explicitly stands it down with a reason, per
+`docs/QUALITY.md` §2's own rule against silent stand-downs).
+
+Reverse: CHEAP for the fuzzer files themselves (two new test files, additive). MODERATE for the two new
+`Body` telemetry fields -- both are read-only signals, no behavior change, but removing them would break
+this fuzzer's own detection precision.

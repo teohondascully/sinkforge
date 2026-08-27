@@ -89,17 +89,16 @@ var _was_jump_held: bool = false
 ## with a real violation and correctly reads as "no active violation" at construction.
 var _last_violation_col: int = -1
 var _last_violation_row: int = -1
+var _had_bounds_violation: bool = false  ## same D0052 pattern: one excursion latch, no sub-cases
 
-var _had_bounds_violation: bool = false  ## D0052 pattern again: one excursion latch, no sub-cases
-
-## Per-tick telemetry, read once by the caller and not cleared automatically -- the caller (the
-## acceptance driver) resets what it needs each tick. Exists so the acceptance suite can count events
+## Per-tick telemetry, read by the caller, not auto-cleared -- exists so a caller can count events
 ## without `body.gd` knowing anything about scenarios, metrics, or telemetry schemas.
 var stepped_up_this_tick: bool = false
 var mantled_this_tick: bool = false
 var corner_corrected_this_tick: bool = false
 var edge_caught_this_tick: bool = false
 var depenetrated_this_tick: bool = false
+var bounds_violation_this_tick: bool = false; var floor_selection_violation_this_tick: bool = false  ## NOT rate-limited, unlike the push_error reports
 
 
 func _init(start_x: int, start_y: int) -> void:
@@ -155,6 +154,8 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	corner_corrected_this_tick = false
 	edge_caught_this_tick = false
 	depenetrated_this_tick = false
+	bounds_violation_this_tick = false
+	floor_selection_violation_this_tick = false
 
 	_integrate_horizontal(input)
 	pos_x += vel_x / TICK_HZ
@@ -222,9 +223,8 @@ func _handle_jump(input: InputFrame) -> void:
 ## that height is clear. Both call this identically -- the only difference is which caller allows a
 ## larger `lift` and under what input condition, per docs/ARCHITECTURE.md §9.
 ##
-## D0055: refuses a lift crossing row 0, BEFORE moving -- correcting after the fact alone left the body
-## oscillating forever against the same wall (measured: 258 ticks); this falls through to the normal
-## depenetration/stop path instead, as if solid rock were there.
+## D0055: refuses a lift crossing row 0, BEFORE moving -- correcting after alone left the body
+## oscillating forever against the wall (measured: 258 ticks); falls through to the normal stop path.
 func _try_step(grid: TileGrid, lift: int) -> bool:
 	if _top_y() - lift < 0:
 		return false
@@ -358,9 +358,9 @@ func _resolve_floor(grid: TileGrid) -> bool:
 		# (rather than only ever remembering the LAST reported pair) means a condition that resolves and later
 		# recurs -- even at the exact same (column, floor) -- is treated as a fresh occurrence, which
 		# is the right call: it did stop and start again, that's a second episode, not a continuation.
+		floor_selection_violation_this_tick = violation != null
 		if violation == null:
-			_last_violation_col = -1
-			_last_violation_row = -1
+			_last_violation_col = -1; _last_violation_row = -1
 		elif violation.column != _last_violation_col or violation.chosen_floor_row != _last_violation_row:
 			Invariants.report_floor_selection(
 				grid, check_col, scan_from, FLOOR_SCAN_ROWS, chosen_row, HEIGHT_PX / CELL_PX, grid.seed, pos_x, pos_y)
@@ -372,13 +372,13 @@ func _resolve_floor(grid: TileGrid) -> bool:
 	return true
 
 
-## World boundary, not terrain -- D0055 has the root cause. Called last in `tick()`. Reports via
-## `Invariants` (rate-limited, D0052's pattern) BEFORE correcting -- silent clamping would hide this.
+## World boundary, not terrain (D0055) -- called last in `tick()`, reports (D0052) BEFORE correcting.
 func _enforce_grid_bounds(grid: TileGrid) -> void:
 	var grid_max_x: int = grid.width * CELL_PX * Fx.SCALE
 	var grid_max_y: int = grid.height * CELL_PX * Fx.SCALE
 	var violation: Invariants.BoundsViolation = Invariants.check_bounds(
 		0, 0, grid_max_x, grid_max_y, _left_x(), _top_y(), _right_x(), _bottom_y())
+	bounds_violation_this_tick = violation != null
 	if violation == null:
 		_had_bounds_violation = false
 	elif not _had_bounds_violation:
