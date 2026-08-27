@@ -56,11 +56,10 @@ Queue, one commit per document group so the diff stays reviewable (director's ex
       row, §8's "Draft A versus Draft C is a data file" line, `docs/QUALITY.md`'s "a corrupt run
       save never takes down the meta save" line. D0080. §11 kept, retitled "pre-reversal design,
       not current spec" rather than deleted.
-- [ ] 6. `sim/run`/`sim/meta`/`sim/commands` `MODULE.md` — the run/meta split assumed multiple
-      discrete sessions. Zero lines of code exist under any of the three, confirmed. Mark the
-      split as explicitly open/TBD rather than inventing a replacement architecture myself — that
-      is a real design question (`ONBOARDING.md`: "do not resolve the open design questions
-      yourself").
+- [x] 6. `sim/run`/`sim/meta`/`sim/commands` `MODULE.md` — the run/meta split assumed multiple
+      discrete sessions. Zero lines of code exist under any of the three, confirmed. Marked the
+      split explicitly open/TBD rather than inventing a replacement architecture. D0081. Queue
+      complete — all six commits landed. Stopped before `data/economy/`, as instructed.
 
 **Explicitly not touched this round, flagged not fixed:** `docs/DECISIONS_LEDGER.md` D0017's
 reasoning (aquifers/rifts cut partly because they "assumed a persistent explorable world")

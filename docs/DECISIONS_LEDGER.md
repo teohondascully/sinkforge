@@ -2702,3 +2702,44 @@ way editing `C001` in place instead of retiring it would have (D0077's own argum
 architecture section instead of a claim).
 
 Reverse: CHEAP — prose only, `git revert` recovers both files in full.
+
+---
+
+## D0081 · 2026-08-27 · sim/run, sim/meta, sim/commands MODULE.md — the run/meta split marked open, not resolved
+
+Decided: rewrite all three `MODULE.md` files' Purpose sections to state plainly that the run/meta split
+is an open design question again, rather than silently leaving stale scaffolding in place or inventing a
+replacement architecture myself. Zero lines of code exist under any of the three modules — confirmed via
+`find` before this commit, same check as during the earlier review — so this is a pure documentation
+change with no code migration risk.
+
+`sim/run/MODULE.md`: Purpose rewritten to state the `MetaIdle → RunResolved` state machine it named is
+retired along with the run-based structure, and that what replaces it — this module, a renamed version,
+or a fold into `sim/meta` — is undecided. Dependencies/Tick-phase sections softened to match (the
+cyclic-dependency concern against `sim/meta` survives in spirit; the specific `RunConfig`-time resolution
+named there does not, since `RunConfig` is no longer a concept).
+
+`sim/meta/MODULE.md`: the deeper of the two findings. Its Purpose was "everything that survives between
+runs" — a definition that only makes sense relative to a `sim/run` whose state was disposable. With
+nothing disposable left, "survives between runs" has no referent, and it is now genuinely undecided
+whether `sim/meta` should keep existing as a module distinct from shaft state, or whether rig/unlocks/
+stockpile become part of one persistent world-state module instead. Flagged as the load-bearing open
+question, ahead of (and coupled to) the already-known buildable-rig-vs-fixed-deck question. One thing
+kept, deliberately, as unaffected: offline processing is a function of real-world elapsed time on load
+and was never actually gated by run boundaries — stated explicitly so a future reader doesn't assume
+this whole module goes stale, only the parts that were actually about runs.
+
+`sim/commands/MODULE.md`: one paragraph, narrower — the Freight Winch gating note's "run lifecycle" now
+points at an admittedly-undecided target, which the entry states makes the gate stricter rather than
+looser (there is currently no session concept at all to route a haul command through, not just an
+unbuilt one).
+
+Alternative: pick a specific replacement shape now (e.g., merge `run` and `meta` into one module, or keep
+the split and rename it) so the scaffolding states something concrete. Rejected — deciding module shape
+for session/save state is exactly the kind of EXPENSIVE, architecture-shaping call `CONTEXT.md`'s
+"Review bandwidth" section says to stop and wait on, not proceed and log. The director did not make this
+call in the reversal brief or its follow-up; inventing one here would be resolving a design question
+unprompted, the same failure `ONBOARDING.md` names directly ("do not resolve the open design questions
+yourself").
+
+Reverse: CHEAP — prose only, no code, no schema; `git revert` recovers all three files in full.

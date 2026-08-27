@@ -1,46 +1,58 @@
 # sim/run
 
-## Purpose
+## Purpose — SHAPE OPEN, 2026-08-27
 
-Run lifecycle: `MetaIdle -> SiteSelect -> RunConfig -> RunActive ->
-RunEnding -> RunResolved`. Owns the flood clock, which is driven by rig
-state (implements the rule that run length is a purchased resource, R3),
-termination, and extraction resolution.
+This module's purpose used to be a session lifecycle: `MetaIdle -> SiteSelect
+-> RunConfig -> RunActive -> RunEnding -> RunResolved`, owning a flood clock
+driven by rig state, termination, and extraction resolution. That entire
+premise assumed a session was a bounded, disposable expedition with a
+defined end. The run-based structure it implemented is retired
+(`docs/GDD.md` §9, `docs/DECISIONS_LEDGER.md` D0076) — one persistent shaft
+under one permanent rig doesn't reset, so there is no `RunResolved` to
+reach and no `MetaIdle` to return to.
+
+What replaces this module is genuinely undecided, not just unbuilt. Local
+flooding (R3, now continuous section-level upkeep rather than a run-ending
+clock) and shaft-to-surface haul/extraction resolution still need to live
+somewhere — this module, a renamed version of it, or something that folds
+into `sim/meta` once that module's own open question (below) resolves. Do
+not build the state machine above. Read `docs/ARCHITECTURE.md` §4's `run`
+row and §11 (kept as a record of the pre-reversal design, not a spec)
+before deciding anything here — this is a real design question, not
+something to resolve unprompted (`ONBOARDING.md`: "do not resolve the open
+design questions yourself").
 
 ## Must-not
 
-- Know about menus. No UI concepts here — lifecycle state is data that
+- Know about menus. No UI concepts here — whatever session state ends up being is data that
   `view`/`shell` render, not something this module presents.
-- Know about saves. Persisting run/meta state across process launches is
-  `shell`'s job; `run` just produces the state that gets saved.
+- Know about saves. Persisting state across process launches is `shell`'s job; this module just
+  produces the state that gets saved.
 
 ## Dependencies
 
-`core` and the gameplay submodules it sits above: `world`, `terrain_gen`
-(generates the shaft at run start), `body`, `items`, `machines`,
-`behaviors`, `transport`, `fluid`, `economy` (extraction resolution
-converts hauled items to value).
+`core` and the gameplay submodules it sits above: `world`, `terrain_gen` (generates the shaft, once,
+at creation — no longer "at run start"), `body`, `items`, `machines`, `behaviors`, `transport`,
+`fluid`, `economy` (extraction resolution converts hauled items to value).
 
-Deliberately *not* declared as a dependency: `sim/meta`. R3's "flood clock
-driven by rig state" implies `run` needs to read rig state that lives in
-`meta`, but `meta` also needs to read run results (to update stockpile),
-which would make `run -> meta` and `meta -> run` both true — a cycle.
-Flagged as unresolved: the likely resolution is that rig state is handed
-to `run` as data at `RunConfig` time (via a command), and run results are
-read back out by whatever orchestrates the meta/run transition, so neither
-sim submodule depends on the other directly. Not asserted as fact here,
-just kept out of both dependency lists so nothing forecloses it.
+The cyclic-dependency question this file used to flag against `sim/meta` (rig state feeding a flood
+clock, results feeding stockpile, each module needing the other) survives the reversal in spirit —
+local flooding still needs rig-adjacent state, and haul results still need to reach a stockpile —
+even though the specific "at `RunConfig` time" resolution no longer applies, since `RunConfig` doesn't
+exist as a concept. Still deliberately *not* declaring `sim/meta` as a dependency until this is
+resolved, for the same reason as before: keeping both out of each other's dependency list forecloses
+nothing.
 
 ## Consumers
 
-`interface`, at minimum, which is what surfaces run phase and state via
-`observe()`. No sim-internal consumer is declared — see the note above.
+`interface`, at minimum, once there is a concept for it to surface via `observe()`. No sim-internal
+consumer is declared.
 
 ## Tick phase
 
-Not itself a tick phase. `run` is the lifecycle state machine that governs
-*whether* the fixed tick loop runs at all (only during `RunActive`), not a
-phase within it.
+Not itself a tick phase. The old framing — this module gates *whether* the fixed tick loop runs at
+all, only during `RunActive` — assumed a session with an inactive phase. Under one persistent shaft,
+does the tick loop simply always run? Unresolved, part of the same open question as Purpose above.
 
 ## Public API
 
@@ -48,9 +60,10 @@ None yet.
 
 ## Gotchas
 
-See the `meta` dependency note above — this is the most consequential open
-question in `sim/`'s dependency graph.
+**The Purpose section above is the load-bearing gotcha now: this module's entire premise changed
+2026-08-27 and its replacement isn't decided.** Read it before assuming anything else in this file.
 
 **Freight Winch / haul-mechanic work is gated on this module and `sim/commands` having real
 implementations, not just skeletons.** Same directive and reasoning as `sim/commands/MODULE.md`'s
-Gotchas entry — do not resume Freight Winch work until both modules actually exist as code.
+Gotchas entry — do not resume Freight Winch work until both modules actually exist as code, and note
+that "real implementation" now depends on the shape question above being resolved first.
