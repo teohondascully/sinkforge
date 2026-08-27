@@ -300,3 +300,16 @@ migration was rejected ("untyped declarations are already a build failure via pr
 Registered in CI alongside the other nine structural gates (now ten). Mutation-tested against the real
 incident's own shape (the `enable=` line dropped), a demoted `untyped_declaration=1`, and the whole
 `[debug]` section missing — all three fail with the specific wrong key/value; the real file passes clean.
+
+**Discovery, not yet acted on: the director's first real `--play` session hit a jump glitch that put
+the body out of bounds, and the invariants guard caught it live.** Reported stderr: `body resolved to
+floor row 1 in column 160/161/162/163/164..., seed=20260825 pos=(42070016,-1038746)` — decoding
+`pos_y=-1038746` gives **-15.85px**, meaning the body's own centre was above row 0, above the top of
+the entire generated grid, while `pos_x` placed it at column 160 — right at `HostileChamber.END_COL`
+(the scripted traversal never goes there; this is real human input finding a real out-of-bounds state
+past where the acceptance suite drives). The rate-limiter (D0052) is doing exactly its designed job
+here, not misbehaving: a fresh report per DISTINCT column as the body swept rightward through many of
+them while stuck in the anomalous state, not 60 reports/sec of the same one — the volume is real
+because the glitch is real (something launched the body somewhere it should never physically reach,
+possibly at high velocity), not because rate-limiting failed. Not investigated further — the director
+said to hold, and whatever else comes back from the play session decides what happens next.
