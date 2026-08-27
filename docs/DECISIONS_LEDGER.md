@@ -1631,3 +1631,43 @@ stand-down neither this entry nor the director has issued. Registration is the n
 Reverse: CHEAP for the fuzzer files themselves (two new test files, additive). MODERATE for the two new
 `Body` telemetry fields -- both are read-only signals, no behavior change, but removing them would break
 this fuzzer's own detection precision.
+
+## D0058 · 2026-08-26 · item 3 (property-based tests): grounded_implies_solid_beneath -- and the real, precise root cause of D0057's "bottom" bounds finding
+Decided: added `tests/property_checks.gd` (`PropertyChecks`, a test-only, stateless-predicate module --
+never wired into a live `tick()`, since a violated property here is a testing signal, not something the
+shipped controller should silently correct, unlike `sim/invariants`' own checks). First property:
+`grounded_implies_solid_beneath(body, grid)` -- whenever `on_floor == true`, real solid material must
+exist directly beneath the body's ENTIRE horizontal footprint, not just somewhere within reach. Wired
+into `fixture_body_fuzz_probe.gd` as a seventh per-tick check, reusing D0057's existing seed/tick loop
+rather than building a parallel harness for one property.
+
+**This property, not asserted zero by design elsewhere, immediately explained D0057's own open "bottom"
+finding precisely.** 4,021 violations on the first full run; cross-referencing by exact (seed, tick) key
+against the "bounds edge=bottom" violations from the same run found 3,978 of the 4,021 fire on the
+IDENTICAL (seed, tick) pair as a bottom-edge bounds correction -- not a coincidence, a shared cause.
+Read `body.gd::_enforce_grid_bounds()`: the top clamp only zeroes velocity (`vel_y = maxi(vel_y, 0)`);
+the bottom clamp ALSO set `on_floor = true` unconditionally -- an asymmetry between the two branches that
+was itself the tell. Fixed: removed the bottom clamp's `on_floor = true`. Real, in-bounds floors leave
+10+ rows of margin below the grid's own declared height (`TileGrid.new`'s own height arg), so ordinary
+play never reaches this branch at all -- verified by re-running the FULL pre-existing 15-suite regression
+unchanged (all green) and a 300-seed fuzz sample before/after: `bounds`/`discontinuity`/`embedded`/
+`floor_selection` counts identical to the pre-fix run (591/134/5612/1), `grounded_no_floor` dropped from
+what would have been the correlated count to 6 -- the small, separate population D0057's own bottom-clamp
+theory never explained, still open.
+
+The remaining 43 (full-scale run) / 6 (300-seed sample) `grounded_no_floor` occurrences not explained by
+the bottom clamp are NOT investigated in this entry -- one is at the exact same position as one of
+D0057's three `floor_selection` occurrences (seed=205, tick=1409), suggesting at least some of this
+residual shares a cause with either the ambiguous-floor-selection case or the `JUMP_CORNER` embedding
+(D0057) rather than being a third, independent defect. Flagged for the next session to correlate properly
+rather than guessed at here.
+
+Not built in this entry, explicitly scoped as separate, larger follow-on work: the `reachable_state_can_
+reach_surface` property (`docs/QUALITY.md` gate 10, "No softlock," stated since the gate list existed but
+never implemented) needs a real reachability analysis over the tile grid respecting jump/mantle/step-up
+reach, not just floor adjacency -- the single largest piece of work across the director's four-item
+exploration-tier list, deliberately not attempted inline here. Shrinking (minimal input sequence for a
+found violation, e.g. the `JUMP_CORNER` embedding) is also not built yet.
+
+Reverse: CHEAP. `property_checks.gd` is new and additive. The `_enforce_grid_bounds` fix removes one line
+or behavior most real play can never reach; reverting it restores the asymmetry, not a needed capability.

@@ -313,18 +313,30 @@ Registered in CI alongside the other nine structural gates (now ten). Mutation-t
 incident's own shape (the `enable=` line dropped), a demoted `untyped_declaration=1`, and the whole
 `[debug]` section missing — all three fail with the specific wrong key/value; the real file passes clean.
 
-**In progress (D0057): the exploration-tier reframe, item 1 (goalless input fuzzer) built and RED on two
-real findings, not yet CI-registered.** `docs/EXPERIENCE_EVALUATION.md` now states the reframe: a
-scripted route proves a known path still works and cannot find anything off it; exploration (fuzzer,
-human-biased fuzzer, coverage bot, chaos bot) is a separate tier. `tests/fixture_body_fuzz_probe.gd` +
-`tests/test_body_fuzz.gd`: 1000 seeds x 1500 ticks of fully-decorrelated random input, asserting four
-invariants hard (embedded, discontinuity, overflow, deadlock) and reporting two as coverage data (bounds,
-floor_selection — already covered by dedicated accepting tests). Found on its first full run: mantling
-onto `HostileChamber.JUMP_CORNER`'s single floating tile embeds the body (1,749 occurrences); a
-previously-unaudited "bottom" margin gap mirroring D0055's top-margin fix, ~4,000 occurrences, NOT
-root-caused yet. Not added to `.github/workflows/harness.yml` — it would land a new gate immediately red
-on pre-existing bugs this round did not fix. Next: items 2-4 (human-biased fuzzer, property-based tests,
-coverage metric), proposed but not yet built; then triage the two findings above before CI registration.
+**In progress (D0057/D0058): the exploration-tier reframe.** `docs/EXPERIENCE_EVALUATION.md` states the
+reframe: a scripted route proves a known path still works and cannot find anything off it; exploration
+(fuzzer, human-biased fuzzer, coverage bot, chaos bot) is a separate tier. Item 1, built:
+`tests/fixture_body_fuzz_probe.gd` + `tests/test_body_fuzz.gd`, 1000 seeds x 1500 ticks of
+fully-decorrelated random input, four invariants asserted hard, two (bounds, floor_selection) reported as
+coverage data since dedicated tests already accept the underlying condition. Item 3, started:
+`tests/property_checks.gd`'s `grounded_implies_solid_beneath`, wired into the same fuzzer loop.
+
+Findings, current status:
+- **Fixed**: `_enforce_grid_bounds`'s bottom clamp set `on_floor=true` unconditionally, asymmetric with
+  the top clamp (velocity-only) — accounted for 3,978 of D0057's "bottom" bounds violations AND 3,978 of
+  D0058's `grounded_no_floor` violations, the same (seed,tick) pairs exactly. Removed; full regression
+  and a before/after fuzz sample confirm the fix touches only that mechanism.
+- **Open**: mantling onto `HostileChamber.JUMP_CORNER`'s single floating tile embeds the body (1,749
+  occurrences, D0057) — `ScriptedTraverse` never reaches it. Not fixed yet.
+- **Open**: ~43-46 residual `grounded_no_floor`/rare `floor_selection` occurrences not yet correlated to a
+  single cause — one shares an exact position with a `floor_selection` hit, suggesting overlap rather than
+  a third independent defect. Not investigated further this round.
+- **Not built**: item 2 (human-biased fuzzer — blocked, `tests/body/recordings/` is currently empty, held
+  per director's explicit choice), the `reachable_state_can_reach_surface` property (`docs/QUALITY.md`
+  gate 10, "No softlock" — never implemented, scoped as its own larger effort), shrinking, item 4
+  (coverage metric).
+- Not added to `.github/workflows/harness.yml` — the `JUMP_CORNER` embedding is still real and unfixed;
+  landing this as a blocking gate now would immediately redden CI on a bug this round did not close.
 
 **Closed (D0056): `JUMP_CORNER_ROW` generalizes — a fixture tuned by watching the controller is not
 independent of it.** New `docs/QUALITY.md` §2 rule; full `HostileChamber` constant audit found exactly

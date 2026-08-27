@@ -90,9 +90,8 @@ var _was_jump_held: bool = false
 var _last_violation_col: int = -1
 var _last_violation_row: int = -1
 var _had_bounds_violation: bool = false  ## same D0052 pattern: one excursion latch, no sub-cases
-
-## Per-tick telemetry, read by the caller, not auto-cleared -- exists so a caller can count events
-## without `body.gd` knowing anything about scenarios, metrics, or telemetry schemas.
+## Per-tick telemetry, read by the caller, not auto-cleared -- so a caller can count events without
+## `body.gd` knowing anything about scenarios, metrics, or telemetry schemas.
 var stepped_up_this_tick: bool = false
 var mantled_this_tick: bool = false
 var corner_corrected_this_tick: bool = false
@@ -222,9 +221,8 @@ func _handle_jump(input: InputFrame) -> void:
 ## Auto step-up (1 tile) and mantle (2 tiles): raise the body by `lift` if the space it would occupy at
 ## that height is clear. Both call this identically -- the only difference is which caller allows a
 ## larger `lift` and under what input condition, per docs/ARCHITECTURE.md §9.
-##
 ## D0055: refuses a lift crossing row 0, BEFORE moving -- correcting after alone left the body
-## oscillating forever against the wall (measured: 258 ticks); falls through to the normal stop path.
+## oscillating forever (measured: 258 ticks); falls through to the normal stop path instead.
 func _try_step(grid: TileGrid, lift: int) -> bool:
 	if _top_y() - lift < 0:
 		return false
@@ -395,6 +393,8 @@ func _enforce_grid_bounds(grid: TileGrid) -> void:
 		pos_y = (HEIGHT_PX * Fx.SCALE) / 2
 		vel_y = maxi(vel_y, 0)
 	elif _bottom_y() > grid_max_y:
+		# D0058: used to also set on_floor=true, asymmetric with the top clamp (velocity-only, above) --
+		# false whenever this fires from falling PAST a missing floor, not landing. Caught by the
+		# fuzzer's grounded_implies_solid_beneath property (~3,978 violations, all this exact clamp).
 		pos_y = grid_max_y - (HEIGHT_PX * Fx.SCALE) / 2
 		vel_y = 0
-		on_floor = true

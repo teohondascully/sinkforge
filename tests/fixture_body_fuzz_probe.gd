@@ -92,6 +92,9 @@ func _check_tick(body: Body, grid: TileGrid, grid_w: int, grid_h: int, state: _R
 	if body._box_blocked(grid, body._left_x(), body._top_y(), body._right_x(), body._bottom_y()):
 		print("FUZZ_VIOLATION type=embedded seed=%d tick=%d pos=(%d,%d)" % [seed, tick, body.pos_x, body.pos_y])
 		violations += 1
+	if not PropertyChecks.grounded_implies_solid_beneath(body, grid):
+		print("FUZZ_VIOLATION type=grounded_no_floor seed=%d tick=%d pos=(%d,%d)" % [seed, tick, body.pos_x, body.pos_y])
+		violations += 1
 	if absi(body.pos_x) > POSITION_SANITY_PX * Fx.SCALE or absi(body.pos_y) > POSITION_SANITY_PX * Fx.SCALE:
 		print("FUZZ_VIOLATION type=overflow seed=%d tick=%d pos=(%d,%d)" % [seed, tick, body.pos_x, body.pos_y])
 		violations += 1
