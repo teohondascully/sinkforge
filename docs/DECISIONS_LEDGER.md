@@ -1829,3 +1829,51 @@ Reverse: CHEAP. The CI job additions are pure YAML; reverting drops the fuzzer f
 D0057/D0058's state, run only locally). The allowlist constants are two integers in one `Dictionary`;
 tightening them to 0 the moment D0059's two open items are actually fixed is a one-line change, not a
 structural one.
+
+## D0061 · 2026-08-27 · grid_floor_backstop's grounded_no_floor is a design trade, not a residual — corrects D0060's framing
+Decided, per the director's own review of D0060: split `grounded_no_floor` (32) out of the single
+"allowlist" it shared with `embedded` (1) in D0060, because the two are different KINDS of thing and
+filing them together reads as one kind to whoever inherits it. `tests/test_body_fuzz.gd` now carries two
+separate constants, `RESIDUAL` (`embedded <= 1`) and `DESIGN_TRADEOFF` (`grounded_no_floor <= 32`), with
+distinct assertion messages naming which is which.
+
+**`embedded <= 1` is a genuine residual** — an unresolved leftover that should trend toward zero, never
+designed around. D0059 already explains it precisely (a single-tick JUMP_CORNER graze, self-resolving).
+
+**`grounded_no_floor <= 32` is a design decision with a real alternative, not a leftover.**
+`grid_floor_backstop` (D0059f) rests a body on the topmost solid row anywhere in its own footprint the
+moment ANY of that footprint is on real ground, rather than requiring the ENTIRE footprint to be
+supported before granting `on_floor = true`. That is the trade being made, stated as one:
+
+- **Alternative considered**: require full-footprint support (match `PropertyChecks.
+  grounded_implies_solid_beneath`'s own stricter standard exactly) before the backstop grants `on_floor`.
+  This would make the count zero by construction.
+- **Cost of that alternative**: at `HostileChamber`'s pit lip specifically, nothing else supports the
+  body once the backstop declines — it does not have a fallback second landing spot, it would just keep
+  falling (into a pit that, per this fixture, has no floor beneath it at all within the built extent), so
+  the body could never rest at the lip at all, only approach it and fall past. More generally, ANY narrow
+  ledge edge — not just this pit — would require a body to walk its full 4-cell width fully onto the
+  platform before being treated as grounded, which is a real behavior change to ordinary ledge-standing,
+  not scoped to pits.
+- **What shipped instead, and its cost**: partial-footprint grounding, which is what produces the 32.
+  The cost is exactly what `grounded_implies_solid_beneath` (D0058) is built to catch: `on_floor = true`
+  is momentarily reported for a body whose FULL footprint is not supported.
+- **In play, one sentence**: a body standing at a pit's lip with most of its own width hanging over open
+  air reads as grounded (does not fall, can jump) even though the sampled points underneath don't all
+  agree there's floor — visually and mechanically similar to the ledge-edge forgiveness `Body`'s own
+  coyote time already grants elsewhere, not a new kind of wrongness a player would be able to name, but
+  stated here rather than left implicit.
+- **Reversal cost**: MODERATE. Reverting to the full-footprint alternative is a small code change (one
+  new condition in `grid_floor_backstop`) but a real behavior change at every narrow ledge in the
+  chamber, not just the pit lip that motivated it — would need re-running `test_body_acceptance.gd`'s own
+  ledge/step-up cases to confirm ordinary platforming still passes before shipping it, since the
+  alternative has never been measured against them.
+
+Also logged here per the director's instruction: `docs/QUALITY.md` §2 gained a new rule (this entry's
+sibling change, same commit) naming "a file that meets its size gate only by trimming comments should be
+split, not trimmed further" as its own load-bearing standard, citing `sim/body/body.gd`'s three
+consecutive exactly-400-line commits (`e755dff`, `2ea7c70`, `c7826cd`, verified via `git show`) as the
+evidence a fourth trim (D0059) should not have preceded the eventual split.
+
+Reverse: CHEAP. This entry and the test-file split are documentation and a `Dictionary`-into-two-
+constants change — no behavior change, only clearer attribution of an existing measured number.

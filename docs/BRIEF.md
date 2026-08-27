@@ -17,9 +17,13 @@ followed the director's own: "JUMP_CORNER, then fuzzer into CI, then gate 10" �
 Full sweep (`tests/test_body_fuzz.gd`, 1000 seeds x 1500 ticks, 1,500,000 total ticks, ~114-142s
 wall-clock measured this round): **18,251 total violations** — 18,218 `bounds` + 0 `floor_selection`
 (both reported, not gated — dedicated tests already accept the underlying condition), 0 `overflow` / 0
-`discontinuity` / 0 `deadlock` (hard-asserted), **1 `embedded` / 32 `grounded_no_floor`** (allowlisted,
-D0060 — both explained in D0059, not unexplained noise). Allowlist bound: `embedded <= 1`,
-`grounded_no_floor <= 32` — exact match to what this round's sweep produced.
+`discontinuity` / 0 `deadlock` (hard-asserted). Two more, DIFFERENT KINDS of bound, per D0061's own
+correction to D0060's framing — do not read these as one "allowlist":
+- **`embedded` <= 1 (RESIDUAL, D0059)** — a genuine, unresolved leftover, should trend toward zero. This
+  round: exactly 1, a single-tick self-resolving JUMP_CORNER graze.
+- **`grounded_no_floor` <= 32 (DESIGN TRADE-OFF, D0061)** — `grid_floor_backstop` deliberately rests a
+  body on partial footprint support at a pit lip rather than requiring the full footprint; the
+  alternative and its cost are stated in D0061, not just the number. This round: exactly 32.
 
 Fast sweep (`tests/test_body_fuzz_fast.gd`, 100 seeds x 500 ticks, every push/PR, ~5s): all six types
 hard zero — the known residual above falls entirely outside this narrower seed/tick range, verified by

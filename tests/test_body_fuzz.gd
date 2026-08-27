@@ -10,10 +10,12 @@ extends "res://tests/test_base.gd"
 ## `overflow`, `discontinuity`, `deadlock` are asserted HARD (zero tolerance) -- no known, accepted
 ## exception exists for any of the three at this sweep size.
 ##
-## `embedded` and `grounded_no_floor` are asserted against a NAMED, COUNTED allowlist, not zero -- D0060.
-## Both started far higher (1,749 and thousands respectively) and were root-caused and fixed down to a
-## known, narrow residual across D0059's four sub-fixes; the numbers below are the exact counts measured
-## on this sweep after every one of those fixes landed, not a guess:
+## `embedded` and `grounded_no_floor` are asserted against NAMED, COUNTED bounds, not zero -- but the two
+## are DIFFERENT KINDS OF THING (D0061, correcting D0060's own framing, which lumped them together as one
+## "allowlist"), and are kept in two separate constants below so a future reader can't mistake one for
+## the other:
+##
+## `RESIDUAL` -- a genuine, unresolved leftover that should trend toward zero, never designed around:
 ##   - `embedded` <= 1: a single-tick graze of `HostileChamber.JUMP_CORNER` (seed=605, tick=844) while a
 ##     body already correctly falling toward the real floor below clips the isolated tile's corner for
 ##     exactly one tick before `_resolve_horizontal`'s depenetration clears it the next tick. Not an
@@ -22,12 +24,20 @@ extends "res://tests/test_base.gd"
 ##     `_grid_floor_backstop`'s own "is there a real, unreached floor still further down" guard (D0059g)
 ##     correctly refuses to treat as a landing, at the cost of not being able to suppress the single-tick
 ##     geometric overlap itself.
+##
+## `DESIGN_TRADEOFF` -- a deliberate choice with a stated cost and a real alternative, not a bug to fix:
 ##   - `grounded_no_floor` <= 32: `_grid_floor_backstop` (D0059f) deliberately rests a body on the
-##     TOPMOST solid row anywhere in its footprint when it is the only real ground available (a pit's own
-##     lip) -- by construction this can leave OTHER columns of the same footprint over open air, which is
-##     exactly what `PropertyChecks.grounded_implies_solid_beneath` (D0058) checks for. This is the
-##     backstop's own known trade-off (rest fully, embed, and oscillate forever vs. rest partially and
-##     report it), not an unexplained defect.
+##     TOPMOST solid row anywhere in its footprint when that is the only real ground available (a pit's
+##     own lip), rather than requiring the ENTIRE footprint to be supported before granting `on_floor`.
+##     The alternative (full-footprint support required) was available and is not what shipped -- it
+##     would make this count zero, at the cost of a body standing at ANY narrow ledge edge (not just a
+##     pit) needing to walk fully onto it before resting, and a pit-lip body specifically would just keep
+##     falling instead of resting at all, since nothing else supports it. D0061 has the full reasoning and
+##     the reversal cost. In play: a body standing at a lip with most of its own width still hanging over
+##     open air reads as grounded (can jump, doesn't fall) even though the FULL footprint isn't supported
+##     -- visually similar to the ledge-edge forgiveness coyote time already grants, not a new kind of
+##     wrongness a player would name, but worth stating plainly rather than leaving implicit.
+##
 ## An allowlist with a number attached is honest; a disabled check is not (the director's own words) --
 ## if either count grows on a future run, that is a new, real regression, not a widening of this bound.
 
@@ -36,10 +46,14 @@ func _initialize() -> void:
 	_finish("body_fuzz")
 
 
-## D0060: the allowlist bounds above, as data -- kept here rather than inlined so `test_body_fuzz_fast.gd`
+## D0060/D0061: the bounds above, as data -- kept here rather than inlined so `test_body_fuzz_fast.gd`
 ## can read the same source of truth for its own (tighter, currently-zero) expectations without a second
-## place either file's bound could drift out of sync with the other.
-const ALLOWLIST: Dictionary = {"embedded": 1, "grounded_no_floor": 32}
+## place either file's bound could drift out of sync with the other. Two separate constants, not one
+## dictionary, because they answer different questions when one of them moves: a `RESIDUAL` count moving
+## is a regression to root-cause; a `DESIGN_TRADEOFF` count moving is a change in how often the traded-off
+## scenario actually occurs, worth noting but not automatically a defect.
+const RESIDUAL: Dictionary = {"embedded": 1}
+const DESIGN_TRADEOFF: Dictionary = {"grounded_no_floor": 32}
 
 
 func _test_fuzz_finds_no_new_correctness_defects() -> void:
@@ -59,14 +73,18 @@ func _test_fuzz_finds_no_new_correctness_defects() -> void:
 		if line.begins_with("FUZZ_SUMMARY"):
 			summary_line = line
 	_check(summary_line != "", "the fuzz probe printed its own summary line (got none -- did it crash mid-run?)")
-	print("body_fuzz coverage: %s -- bounds=%d floor_selection=%d (reported, not gated) -- allowlisted: embedded=%d/%d grounded_no_floor=%d/%d" %
+	print("body_fuzz coverage: %s -- bounds=%d floor_selection=%d (reported, not gated) -- residual: embedded=%d/%d -- design trade-off: grounded_no_floor=%d/%d" %
 		[summary_line, counts["bounds"], counts["floor_selection"],
-		counts["embedded"], ALLOWLIST["embedded"], counts["grounded_no_floor"], ALLOWLIST["grounded_no_floor"]])
+		counts["embedded"], RESIDUAL["embedded"], counts["grounded_no_floor"], DESIGN_TRADEOFF["grounded_no_floor"]])
 	for kind: String in ["overflow", "discontinuity", "deadlock"]:
 		_check(counts[kind] == 0,
 			"zero '%s' violations across the fuzz sweep (got %d) -- see this run's own stdout above for the first occurrences" %
 			[kind, counts[kind]])
-	for kind: String in ALLOWLIST:
-		_check(counts[kind] <= ALLOWLIST[kind],
-			"'%s' violations stay within the documented D0060 allowlist (got %d, allowlisted %d) -- see this run's own stdout above; a count ABOVE the allowlist is a new regression, not the known residual" %
-			[kind, counts[kind], ALLOWLIST[kind]])
+	for kind: String in RESIDUAL:
+		_check(counts[kind] <= RESIDUAL[kind],
+			"'%s' violations stay within the documented D0059 RESIDUAL bound (got %d, bound %d) -- see this run's own stdout above; a count ABOVE the bound is a new regression, not the known residual" %
+			[kind, counts[kind], RESIDUAL[kind]])
+	for kind: String in DESIGN_TRADEOFF:
+		_check(counts[kind] <= DESIGN_TRADEOFF[kind],
+			"'%s' violations stay within the documented D0061 DESIGN TRADE-OFF bound (got %d, bound %d) -- see this run's own stdout above; a count ABOVE the bound means the traded-off scenario is occurring more than measured, worth a fresh look at whether the trade-off still holds" %
+			[kind, counts[kind], DESIGN_TRADEOFF[kind]])
