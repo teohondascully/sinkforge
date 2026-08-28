@@ -13,6 +13,10 @@ harness already produced.
   consequence, terminal products, plus breach reachability), checked as a pure graph query over
   synthetic fixtures, ahead of any real `data/economy/` content. Not yet wired into CI — no real data to
   check yet.
+- `quality_check/` — four code-quality instruments correctness gates never covered: function-length
+  distribution, cross-language duplication (the headline one — the actual legacy failure), cyclomatic
+  complexity, and module fan-in/fan-out. Reports distributions and IQR outliers; gates nothing yet. Not
+  wired into CI.
 - `report/` — turns run artifacts (`telemetry.jsonl`, `result.json`) into human-readable output.
   Empty until `harness/driver` produces something to report on.
 - `scratch/` — gitignored. Scratch work lives here and only here. If a script here turns out to be

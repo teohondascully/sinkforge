@@ -8,6 +8,25 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## tools/quality_check/ — four code-quality instruments, 2026-08-28 — CLOSED
+
+Director-requested, unrelated to `data/economy/`. Correctness gates existed; nothing measured modularity
+or duplication ("the previous project carried six near-identical copies of one function across fifty
+layers and nothing flagged it, because nothing was looking"). Built four instruments — function length,
+duplication (weighted as most important per instruction), complexity, module coupling — as a DASHBOARD
+(no gate, no exit-code reaction to a finding), self-calibrating IQR outlier fences, not a priori
+thresholds. Full reasoning, design decisions, and this run's actual findings against the real tree:
+`docs/DECISIONS_LEDGER.md` D0096 — not repeated here.
+
+Headline: duplication found 4 real clusters (`core/entity_id_pool.gd`/`core/split_rng.gd`'s `_ushr`,
+two pre-existing clusters inside `tools/layer_lint/` itself, and one inside this round's own
+`tools/quality_check/`). Coupling closed a real blind spot (GDScript `class_name` global visibility —
+`sim/` had zero `res://`-based cross-references but 13 `class_name` declarations) rather than shipping
+blind to `sim/`'s actual coupling mechanism. 17/17 mutation cases OBSERVED. 794 implementation / 217
+test / 1,011 total LOC — over the director's own "a few hundred lines" bar, stated plainly, not hidden.
+
+Not wired into CI. No thresholds set — that's the director's next call, from the real numbers.
+
 ## tools/economy_check/ — the tier-rule checker, 2026-08-28 — CLOSED
 
 Director-requested design instrument, built ahead of `data/economy/` (which the director authors

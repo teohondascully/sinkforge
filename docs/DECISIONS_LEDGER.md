@@ -3274,3 +3274,113 @@ the reversal. Nothing game-shaped has landed since the persistent-shaft reversal
 number the director asked to see move once `data/economy/` does.
 
 Reverse: N/A — a record entry, not an action with a cost to undo.
+
+## D0096 · 2026-08-28 · tools/quality_check/ — four code-quality instruments, dashboard first, findings against the current tree
+
+Director's task, unrelated to `data/economy/`: the repo has correctness gates (`tools/layer_lint`) but
+nothing measures modularity or duplication. Named cause: "the previous project carried six near-identical
+copies of one function across fifty layers and nothing flagged it, because nothing was looking." Build
+four instruments — function-length distribution, cross-language duplication (explicitly weighted as the
+most important, "duplication is what actually happened"), cyclomatic complexity, module coupling —
+report as a dashboard first, propose thresholds from real numbers, don't pick them a priori. Two
+constraints: the suite counts against the instrument budget and should be small; every instrument gets a
+yield counter from day one, same retirement-candidate rule as any other instrument.
+
+**Design decisions, in order of how much they shaped the result:**
+
+1. **Self-calibrating outlier fences, not hand-picked thresholds.** Every instrument that flags outliers
+   (length, complexity, coupling) uses the standard boxplot rule (`scan.iqr_outlier_fence`: Q3 +
+   1.5×IQR) — a fence that adapts to the actual data instead of a number chosen before seeing it, which
+   is the literal instruction ("propose thresholds from the actual numbers") operationalized rather than
+   just followed in prose.
+
+2. **Duplication normalizes identifiers only, not literals.** Two functions match only if identical
+   after every variable/function/parameter name is replaced with a placeholder — literal values
+   (numbers, strings) are kept as-is. Normalizing literals too would also flag structurally-similar-but-
+   substantively-different code (e.g. two test fixtures sharing a shape but different domain data) as
+   "duplicate," which is noise, not the target. The director's own framing named the target precisely —
+   "renamed copies must be caught" — renaming, not reconstanting.
+
+3. **The coupling instrument's `sim/` blind spot was closed, not just inherited and disclosed.**
+   `tools/layer_lint/layer_lint.py`'s own path-based `res://` scanning is documented as blind to
+   GDScript's `class_name` global visibility. Reusing that scanner alone for `sim/`'s module graph would
+   have shipped a coupling instrument blind to `sim/`'s actual dominant coupling mechanism — verified,
+   not assumed: a real scan of this tree found ZERO `res://`-based `sim/` cross-references but 13
+   `class_name` declarations. Added a second edge source (`coupling._sim_class_name_edges`) scanning for
+   global `class_name` usage with no `preload`/`load` required. This is the reason `coupling.py` is the
+   largest of the four files — closing a real correctness gap in the instrument's primary declared
+   scope, not padding.
+
+4. **Coupling does NOT diff against MODULE.md's prose "Consumers"/"Must not" text.** Considered and
+   rejected: that text is free-form prose ("Read input devices; know about rendering" names no `sim/`
+   module at all), not structured data, and reliably parsing it into a formal expected-graph is a
+   materially larger and fuzzier problem than measuring the real graph and reporting its distribution.
+   What's measured is real, from code; what a MODULE.md says is a separate, human-read cross-check this
+   instrument does not attempt to automate. Stated as a scope decision, not a silent omission.
+
+5. **Testability required an injectable root, and this was caught, not assumed.** `coupling.analyze`
+   initially hardcoded the real repository path. Fixed by threading an optional `root: Path` parameter
+   through every filesystem-touching function, mirroring `tools/anvil/check_integrity.py`'s own
+   `check_integrity(log_dir)` — this project's established fix for the same problem, applied proactively
+   here rather than rediscovered the hard way. `function_length.analyze`/`complexity`'s functions/
+   `duplication.analyze` all already accepted an injectable function list by design from the first draft.
+
+**Mutation-tested**, `test_quality_check.py`, 17 cases, all OBSERVED — an outlier flagged among a uniform
+distribution and a uniform distribution flagging nothing (length); branch counting for both languages
+including that a nested Python function's own branches do not leak into its enclosing function's count
+(complexity); a renamed-copy pair caught while a genuinely-different function is excluded, and trivial
+functions excluded by the size floor (duplication); `class_name`-only coupling caught, local-import-
+resolution correctly beating a same-named module in a different subdirectory (the real `anvil`/
+`economy_check` `schema.py` collision, reproduced synthetically), and an ambiguous multi-match name left
+uncounted rather than guessed (coupling). **The trickiest assertion — local-resolution-wins — was
+independently confirmed to have real teeth**: the guard it protects was deliberately removed in a
+standalone reproduction and the assertion was observed correctly failing against the broken version
+before being trusted against the correct one.
+
+**Honest sizing, against the director's own stated bar.** "If the whole suite cannot be built in a few
+hundred lines, it is too clever." Measured, not estimated: 794 implementation (`scan.py` 237,
+`function_length.py` 61, `duplication.py` 89, `complexity.py` 107, `coupling.py` 208, `dashboard.py` 92)
+/ 217 test / 1,011 total. This is over that literal bar. What it bought, stated rather than argued away:
+two languages, four distinct structural properties, heavy reuse where reuse was possible
+(`check_size_limits.py`'s function-span scanner and `layer_lint.py`'s `module_of`/`references_in`
+imported directly, not reimplemented), and the `class_name` correctness fix above. Reported in
+`tools/quality_check/README.md`'s own LOC section too, not only here — whether the tradeoff was right is
+the director's call, not settled by this entry.
+
+**The findings, run against the real tree, duplication weighted first per instruction:**
+
+- **Duplication: 4 clusters.** `core/entity_id_pool.gd:20:_ushr` and `core/split_rng.gd:38:_ushr` —
+  identical after normalization, two separate files, genuine cross-file duplication of a real utility
+  function. Two Python clusters inside `tools/layer_lint/` itself: `find_gd_files` duplicated between
+  `check_coordinate_naming.py`/`no_engine_imports.py`, and separately (a syntactically distinct copy)
+  between `check_size_limits.py`/`layer_lint.py` — pre-existing debt this instrument's own build
+  surfaced in the gates it reused code from. One cluster of 4 inside `tools/quality_check/` itself: this
+  round's own `main()` functions in `complexity.py`/`coupling.py`/`duplication.py`/`function_length.py`
+  are identical after normalization (`result = analyze(); print(format_report(result)); return 0`) —
+  real, low-stakes, and a concrete data point for where `MIN_LINES`/`MIN_TOKENS` should sit once a
+  threshold is set.
+- **Function length: 8 GDScript outliers (fence >19.5 lines), 13 Python outliers (fence >42.5 lines)** —
+  full lists in the dashboard's own output, not repeated here. `check_size_limits.py`'s existing 50-line
+  hard cap sits ABOVE this run's own IQR fence for GDScript (19.5) — worth noting when a real threshold
+  gets set, since the existing gate's number and this round's distribution-derived number disagree.
+- **Complexity: 7 GDScript outliers (fence >6.0), 9 Python outliers (fence >13.5).** Highest single
+  values: `sim/body/body.gd:242:_resolve_horizontal` at 24 (GDScript), `tools/anvil/schema.py:173:
+  validate_event` at 33 (Python).
+- **Coupling: `sim/` has real structure once `class_name` edges are counted** — `world` fan-in 3 (the
+  expected shape: a foundational type read by several consumers), `body`/`invariants` fan-out 3,
+  `terrain_gen` fan-in 2 + fan-out 1. Ten of 14 `sim/` modules have zero measured cross-references so
+  far. `tools/` shows near-zero coupling (`layer_lint` fan-in 1, `quality_check` fan-out 1, everything
+  else 0) — plausible for a project where most `tools/` subdirectories are still self-contained. **Caveat
+  stated plainly, not left implicit**: with 14 `sim/` modules and 10 of them at exactly zero, the IQR
+  fence itself lands near 0, so "outlier" here largely means "the only modules with ANY cross-reference
+  yet," not "dramatically hub-like" — a real, sample-size-driven artifact, not a defect in the method.
+
+**Yield, this run — the first recorded data point for each instrument, stated so a future retirement
+evaluation has something to check against:** duplication 4 clusters, function length 21 outliers,
+complexity 16 outliers, coupling 2 outliers (repo-wide totals across both languages/scopes).
+
+No `data/economy/` content, no `core/`/`sim/` `.gd` code touched by this build (only read). All
+structural gates, `schema_validator.py`, `data_codegen --check`, and `tools/anvil/check_integrity.py`
+re-run and PASS.
+
+Reverse: delete `tools/quality_check/`, revert the `tools/README.md` addition. No other file touched.
