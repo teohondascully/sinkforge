@@ -18,9 +18,12 @@ consecutive commits with no test moving red to green. Work in order:
 1. DONE (D0099). Wire the four quality instruments into CI at decided tiers — CI confirmed green.
 2. DONE (D0100). `_resolve_horizontal` refactor: complexity 24 → 13 worst-case, two Extract Methods,
    behavior verified byte-identical (full fuzzer + fast fuzzer + 5 other suites, before/after diffed).
-3. IN PROGRESS. Same treatment for `vertical_resolve.gd`'s functions if they're complexity outliers too
-   (they hold the other 3 D0059 defects); leave and say so if not outliers.
-4. NOT STARTED. Full-tree duplication sweep (not just `core/`/`tools/`) — fix unambiguous clusters, flag
+3. DONE (D0101). `resolve_ceiling` (6, exactly at the fence) and `resolve_floor` (7, no D0059 defect)
+   left alone, stated why. `move_and_resolve` 11→9 (partial, real — remaining complexity is the substep
+   loop's own control flow). `grid_floor_backstop` 10→3, fully resolved. Behavior byte-identical again
+   (full fuzzer + 8 suites). A small correction to D0098's FINDING recorded (which function held which
+   defect, one level more precise — doesn't change the FINDING's core claim).
+4. IN PROGRESS. Full-tree duplication sweep (not just `core/`/`tools/`) — fix unambiguous clusters, flag
    judgment-dense ones for review rather than fixing.
 
 DON'T: touch `data/economy/`; refactor beyond the named complexity targets; lower a threshold to make

@@ -32,8 +32,7 @@ static func move_and_resolve(body: Body, grid: TileGrid) -> void:
 		var move: int = mini(remaining, substep)
 		body.pos_y += dir * move
 		remaining -= move
-		var stopped: bool = (resolve_ceiling(body, grid) if dir < 0
-			else (resolve_floor(body, grid) or grid_floor_backstop(body, grid)))
+		var stopped: bool = _resolve_substep_collision(body, grid, dir)
 		if stopped:
 			# D0059b: a failed ceiling nudge only halts further movement -- it never undoes the substep
 			# that moved the box into the ceiling, unlike `resolve_floor` (always recomputes pos_y from
@@ -47,6 +46,16 @@ static func move_and_resolve(body: Body, grid: TileGrid) -> void:
 	# still can't see -- `resolve_floor` alone would unconditionally re-set `on_floor = false` there.
 	if dir >= 0 and not resolved_this_tick:
 		resolve_floor(body, grid) or grid_floor_backstop(body, grid)  ## also catches a body at rest
+
+
+## Resolves ONE substep's collision: ceiling if moving up (`dir < 0`), else the ground plane
+## (heightfield, falling back to the grid-solidity backstop). Extracted 2026-08-28
+## (`docs/DECISIONS_LEDGER.md` D0100) from `move_and_resolve`'s own ternary, a pure Extract Method --
+## returns true iff the substep was stopped, exactly the original ternary's own value.
+static func _resolve_substep_collision(body: Body, grid: TileGrid, dir: int) -> bool:
+	if dir < 0:
+		return resolve_ceiling(body, grid)
+	return resolve_floor(body, grid) or grid_floor_backstop(body, grid)
 
 
 ## Hard grid-swept ceiling block, with corner correction: a horizontal nudge up to 6px toward the
@@ -82,26 +91,42 @@ static func grid_floor_backstop(body: Body, grid: TileGrid) -> bool:
 	var lo_col: int = Body._px_to_cell(body._left_x())
 	var hi_col: int = Body._px_to_cell(body._right_x() - 1)
 	var hi_row: int = Body._px_to_cell(body._bottom_y() - 1)
+	var top_row: int = _topmost_solid_row(grid, Body._px_to_cell(body._top_y()), hi_row, lo_col, hi_col)
+	if _has_deferred_floor_below(body, grid, lo_col, hi_col, top_row):
+		return false
+	body.pos_y = Fx.from_int(top_row * Body.CELL_PX) - (Body.HEIGHT_PX * Fx.SCALE) / 2
+	body.vel_y = 0
+	body.on_floor = true
+	return true
+
+
+## The topmost solid row across [lo_col, hi_col], scanning rows [row_start, hi_row]; `hi_row + 1`
+## ("none found") if the whole scanned range is open. Extracted 2026-08-28 (`docs/DECISIONS_LEDGER.md`
+## D0100) from `grid_floor_backstop`'s own first loop, a pure Extract Method -- no logic changed.
+static func _topmost_solid_row(grid: TileGrid, row_start: int, hi_row: int, lo_col: int, hi_col: int) -> int:
 	var top_row: int = hi_row + 1
-	for row: int in range(Body._px_to_cell(body._top_y()), hi_row + 1):
+	for row: int in range(row_start, hi_row + 1):
 		for col: int in range(lo_col, hi_col + 1):
 			if grid.is_solid(Vector2i(col, row)):
 				top_row = row
 				break
 		if top_row <= hi_row:
 			break
-	# An OPEN column at `top_row` with a real, unreached floor further down is an ordinary gap with a
-	# lower floor (docs/adr/0005's overhang), not a pit lip -- defer so the fall reaches that floor.
+	return top_row
+
+
+## True iff some OPEN column at `top_row` has a real, unreached floor further down -- an ordinary gap
+## with a lower floor (docs/adr/0005's overhang), not a pit lip, so the caller should defer so the fall
+## reaches that floor rather than snapping to `top_row`. Extracted 2026-08-28 (D0100) from
+## `grid_floor_backstop`'s own second loop, a pure Extract Method -- no logic changed.
+static func _has_deferred_floor_below(body: Body, grid: TileGrid, lo_col: int, hi_col: int, top_row: int) -> bool:
 	for col: int in range(lo_col, hi_col + 1):
 		if grid.is_solid(Vector2i(col, top_row)):
 			continue
 		var deeper: int = Heightfield.column_surface_y(grid, col, top_row, Body.FLOOR_SCAN_ROWS)
 		if deeper != Heightfield.NO_FLOOR and body._bottom_y() < deeper:
-			return false
-	body.pos_y = Fx.from_int(top_row * Body.CELL_PX) - (Body.HEIGHT_PX * Fx.SCALE) / 2
-	body.vel_y = 0
-	body.on_floor = true
-	return true
+			return true
+	return false
 
 
 ## The ground plane: sample the heightfield under both feet and the centre, rest on whichever is

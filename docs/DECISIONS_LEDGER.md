@@ -3668,3 +3668,62 @@ the corpus, not just added to it). `check_size_limits.py` unaffected: no functio
 
 Reverse: revert this commit; `_resolve_horizontal`'s pre-refactor body is recoverable verbatim from the
 prior commit, since nothing about the logic itself changed, only its shape.
+
+## D0101 · 2026-08-28 · `vertical_resolve.gd`'s D0059 functions, checked against the fence and treated where they were outliers
+
+Item 3 of the director's queue: same treatment as D0100 for `vertical_resolve.gd`'s functions, IF they
+were complexity outliers. Checked all four directly before touching anything, not assumed from D0098's
+report (which only printed the top-7/8, not every function's own value):
+
+| function | complexity | outlier (>6.0)? | holds a D0059 defect? | action |
+|---|---|---|---|---|
+| `move_and_resolve` | 11 | yes | holds the "back out a failed nudge" fix code (D0059 item 2) | refactored |
+| `resolve_ceiling` | 6 | **no** (exactly at the fence) | holds the world-bounds guard (D0059 item 3) | **left alone** |
+| `grid_floor_backstop` | 10 | yes | the pit-lip mismatch fix (D0059 item 5) | refactored |
+| `resolve_floor` | 7 | yes | **no D0059 defect** | **left alone, out of this item's scope** |
+
+**A small correction to D0098's own FINDING, worth stating plainly rather than left standing uncorrected:**
+that FINDING attributed BOTH the "failed-nudge-never-backs-out" defect (D0059 item 2) and the world-
+bounds guard (item 3) to `resolve_ceiling`. Reading the current source for this item found the "back
+out" fix code actually lives in `move_and_resolve` (lines 37-42, backing out the substep's own
+displacement on a failed ceiling stop) -- `resolve_ceiling` itself only reports whether it stopped;
+the bounds guard (item 3) is the one defect genuinely inside `resolve_ceiling`. Does not change D0098's
+core, already-verified claim (only 1 of 4 D0059 defects lives in `_resolve_horizontal`) -- a finer-
+grained correction one level down, found by reading the code for THIS item's own purpose, not chased
+further since it doesn't change any decision made here or at D0098. The Anvil FINDING event itself is
+immutable and not amended; this entry is the correction's permanent record.
+
+**`resolve_ceiling` and `resolve_floor` left untouched, exactly as instructed** ("if they're not
+outliers, leave them and say so" / out of this item's named-target scope) -- not refactored for their
+own sake.
+
+**Two extractions in `grid_floor_backstop` (10 → 3), a complete resolution, not partial:** the function
+had two cleanly separable, sequential phases already named by its own comments -- find the topmost solid
+row across the box's footprint, then check whether an open column at that row defers to a real floor
+further down. Extracted as `_topmost_solid_row` (5) and `_has_deferred_floor_below` (5). All three
+functions now clear the fence.
+
+**One extraction in `move_and_resolve` (11 → 9), a real but partial reduction, stated honestly as such:**
+extracted the ternary deciding which collision to resolve (ceiling vs. floor-plane) into
+`_resolve_substep_collision` (3). The function's REMAINING complexity (9, still above the fence) is the
+substep `while` loop's own control flow (early-exit `break` on a stopped substep, the backout branch,
+the trailing catch-all) -- not safely separable by pure extraction without converting `break`-based
+loop control into a return-value contract across a function boundary, which is a real design decision
+about how that state machine is expressed, not a mechanical move. Stopped here rather than making that
+call unilaterally, consistent with the same standard D0100 already set: real progress, not the fence
+chased to a number regardless of cost.
+
+**Behavior verified byte-identical, same rigor as D0100:** `test_body`/`test_body_acceptance`/
+`test_hostile_chamber`/`test_reachability_sweep`/`test_bounds_invariant`/`test_body_fuzz_fast`/
+`test_replay_determinism`/`test_cave_geometry` (added here since `resolve_floor`'s own docstring cites
+it as the real-world source of the rate-limiting measurement, and `grid_floor_backstop` sits right next
+to that logic) -- ALL PASS. The full `test_body_fuzz.gd` sweep (1000×1500) run again:
+`FUZZ_SUMMARY` byte-identical to D0100's own post-refactor run across 1,500,000 ticks --
+`violations=18251`, `bounds=18218`, `embedded=1/1`, `grounded_no_floor=32/32`. `godot --check-only`
+parse-clean.
+
+Gates re-run and PASS, `duplication.py` 0 clusters (50 GDScript functions now considered, up from 47
+after D0100's own split, matching the net +3 functions this item adds).
+
+Reverse: revert this commit; every changed function's pre-refactor body is recoverable verbatim from the
+prior commit.
