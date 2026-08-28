@@ -110,8 +110,17 @@ def format_report(result: dict) -> str:
     return "\n".join(lines)
 
 
+def gate_exit(result: dict) -> int:
+    """1 if any duplicate cluster was found in either language, else 0 -- CI's blocking check
+    (`docs/DECISIONS_LEDGER.md` D0099). The only one of the four instruments that gates: 0 clusters is
+    this project's current, verified-clean state, so a regression here is a fact about the tree a build
+    should refuse, not merely report."""
+    total = sum(len(result[lang]["clusters"]) for lang in ("gd", "py"))
+    return 1 if total else 0
+
+
 def main() -> int:
-    return run_cli(analyze, format_report)
+    return run_cli(analyze, format_report, exit_fn=gate_exit)
 
 
 if __name__ == "__main__":

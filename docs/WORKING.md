@@ -8,6 +8,28 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## IN PROGRESS — director's execution-dense queue, 2026-08-28, budget 1hr/12 commits
+
+Autonomous, execution-dense (specs settled, not judgment-dense). Report at end, not per-task. Hard stops:
+any unproven movement-controller behavior change, any gate red not clearable in one attempt, a refactor
+needing a design decision instead of mechanical extraction, an instrument/Anvil cap crossing, three
+consecutive commits with no test moving red to green. Work in order:
+
+1. Wire the four quality instruments into CI at decided tiers: duplication BLOCKING (0 clusters is
+   clean; regressions fail the build), Python length/complexity guardrails ADVISORY, GDScript length
+   (existing hard cap stays, fence advisory), coupling report-only (stubs excluded per D0098). Same
+   pattern as the existing `gates` job in `.github/workflows/harness.yml`.
+2. `_resolve_horizontal` refactor: complexity 24 → down, behavior-preserving (fuzzer + acceptance suite
+   green throughout, byte-identical). Holds 1 of D0059's 4 defects (corrected FINDING scope). Stop and
+   report if it can't come down without behavior risk.
+3. Same treatment for `vertical_resolve.gd`'s functions if they're complexity outliers too (they hold
+   the other 3 D0059 defects); leave and say so if not outliers.
+4. Full-tree duplication sweep (not just `core/`/`tools/`) — fix unambiguous clusters, flag
+   judgment-dense ones for review rather than fixing.
+
+DON'T: touch `data/economy/`; refactor beyond the named complexity targets; lower a threshold to make
+something pass.
+
 ## tools/quality_check/ — four code-quality instruments, 2026-08-28 — CLOSED
 
 Director-requested, unrelated to `data/economy/`. Correctness gates existed; nothing measured modularity

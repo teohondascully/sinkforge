@@ -239,7 +239,7 @@ def iqr_outlier_fence(values: list[float]) -> float:
 
 # --- Shared CLI dispatch, one instrument each -------------------------------------------------------
 
-def run_cli(analyze_fn, format_report_fn) -> int:
+def run_cli(analyze_fn, format_report_fn, exit_fn=None) -> int:
     """The body every `tools/quality_check/` instrument's own `main()` delegates to -- extracted
     2026-08-28 (`docs/DECISIONS_LEDGER.md` D0097) after `duplication.py`'s own first real run found
     the four instruments' `main()` functions clustered as an identical duplicate: each was
@@ -249,7 +249,15 @@ def run_cli(analyze_fn, format_report_fn) -> int:
     (that's `duplication.MAIN_BOILERPLATE_MAX_LINES`, a separate, narrower calibration for main()-
     shaped functions this extraction cannot reach, e.g. ones with real branching of their own).
     Two-argument, not zero: each instrument's `analyze`/`format_report` pair is real, distinct domain
-    logic this harness has no business hardcoding or importing by name."""
+    logic this harness has no business hardcoding or importing by name.
+
+    `exit_fn`, optional (`docs/DECISIONS_LEDGER.md` D0099): a `result -> int` callable that decides the
+    process exit code from the analysis result. Omitted (the default, used by `function_length.py`/
+    `complexity.py`/`coupling.py`) means always 0 -- dashboard, never blocking, by construction, not by
+    remembering to check something at every call site. `duplication.py` is the one instrument this
+    project decided should gate CI (director: "0 clusters is the current clean state; regressions fail
+    the build"), so it is the one caller that passes an `exit_fn` -- the other three staying gate-less is
+    guaranteed by the shared default, not by each of their own `main()` independently getting it right."""
     result = analyze_fn()
     print(format_report_fn(result))
-    return 0
+    return exit_fn(result) if exit_fn is not None else 0

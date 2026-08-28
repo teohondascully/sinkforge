@@ -3593,3 +3593,31 @@ Reverse: `git revert` this commit. The Anvil `FINDING` event stays (immutable, a
 would need a superseding event, not a deletion. `.gdignore`/`.gitignore` reversal would re-track the 88
 sidecars at their next stale state, not their current corrected one; re-running `godot --import` first
 would be needed to make that meaningful.
+
+## D0099 · 2026-08-28 · the four quality instruments wired into CI, duplication becomes a real gate
+
+Execution-dense follow-through on decided tiers (D0096-D0098), not a new judgment call about what the
+tiers should be. `.github/workflows/harness.yml`'s `gates` job, same pattern as the existing structural
+gates (one named step each, Python-only, no Godot needed).
+
+**Duplication is the one instrument that gates, BLOCKING.** Required a real code change, not just a CI
+line: `run_cli` (`scan.py`) gained an optional `exit_fn` parameter (`result -> int`), defaulting to
+`None` (always exit 0) so `function_length.py`/`complexity.py`/`coupling.py` are guaranteed dashboard-only
+by the shared default, not by each remembering to stay that way. `duplication.py` gained `gate_exit`
+(1 if any cluster in either language, else 0) and is the one caller passing `exit_fn=gate_exit`.
+Mutation-tested: `gate_exit` directly against synthetic clean/dirty result dicts, and separately — the
+plumbing, not just the pure function — that `run_cli` actually CALLS `exit_fn` and returns its value
+(proven by a dirty synthetic result routed through `run_cli` itself, not just `gate_exit` in isolation),
+and that omitting `exit_fn` still defaults to 0. 6 new cases, 38/38 total. Real run against the current
+tree: exit 0 (0 clusters, unchanged from D0097/D0098).
+
+**The other three stay `continue-on-error: true` in the CI YAML itself**, not just always-0 by accident —
+GDScript length reports against the still-enforced `check_size_limits.py` hard cap (D0098, unchanged),
+Python length/complexity report against the frozen advisory guardrails (`PY_LENGTH_GUARDRAIL=42.5`,
+`PY_COMPLEXITY_GUARDRAIL=13.5`, D0098), coupling reports fan-in/fan-out with stub modules excluded and
+named (D0098). None of them gates.
+
+Each instrument's yield-counter statement (D0097) is unchanged, not removed by this wiring.
+
+Gates re-run and PASS, including the new `test_quality_check.py` cases. No `core/`/`sim/` file touched by
+this item.

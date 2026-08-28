@@ -126,6 +126,29 @@ jobs:
       - name: No untracked file exists outside the shipped .gitignore (QUALITY gate 27, D0063)
         run: python3 tools/layer_lint/check_untracked_files.py
 
+      # tools/quality_check/ (docs/DECISIONS_LEDGER.md D0096-D0099). Duplication is the one instrument
+      # that gates -- BLOCKING per D0099, since 0 clusters is this project's verified-clean state and a
+      # regression is a fact about the tree a build should refuse. The other three are `continue-on-
+      # error: true` on purpose, not because they happen to always exit 0: each prints a real dashboard
+      # (GDScript length against the still-enforced hard cap above; Python length/complexity against
+      # frozen advisory guardrails, D0098; module coupling with stub directories excluded and named) and
+      # none of them gates, by the director's own explicit instruction -- the flag makes that a property
+      # of the CI config, not something that depends on the script continuing to behave itself.
+      - name: Duplication across core/sim/interface/view/shell + harness/experiment/tools (D0099) — BLOCKING
+        run: python3 tools/quality_check/duplication.py
+
+      - name: Function-length distribution + Python advisory guardrail (D0096, D0098) — report only
+        continue-on-error: true
+        run: python3 tools/quality_check/function_length.py
+
+      - name: Cyclomatic complexity distribution + Python advisory guardrail (D0096, D0098) — report only
+        continue-on-error: true
+        run: python3 tools/quality_check/complexity.py
+
+      - name: Module coupling, sim/ and tools/, stub modules excluded (D0096, D0098) — report only
+        continue-on-error: true
+        run: python3 tools/quality_check/coupling.py
+
   # Runs every tests/test_*.gd suite under the real, pinned engine (QUALITY gates 8, 9, 11 —
   # determinism, conservation, movement acceptance — all depend on this actually happening).
   # Godot is downloaded and checksum-verified rather than pulled from a marketplace action,

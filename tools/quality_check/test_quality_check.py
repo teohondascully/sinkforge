@@ -24,7 +24,7 @@ import coupling  # noqa: E402
 import dashboard  # noqa: E402
 import duplication  # noqa: E402
 import function_length  # noqa: E402
-from scan import Func  # noqa: E402
+from scan import Func, run_cli  # noqa: E402
 
 RESULTS: list[tuple[str, bool]] = []
 
@@ -246,6 +246,34 @@ def branch_duplication_main_exclusion() -> None:
           detail=str(result3["py"]["clusters"]))
 
 
+def branch_duplication_gate_exit() -> None:
+    clean = {"gd": {"functions_considered": 5, "clusters": []},
+             "py": {"functions_considered": 5, "clusters": []}}
+    dirty_gd = {"gd": {"functions_considered": 5, "clusters": [["a", "b"]]},
+                "py": {"functions_considered": 5, "clusters": []}}
+    dirty_py = {"gd": {"functions_considered": 5, "clusters": []},
+                "py": {"functions_considered": 5, "clusters": [["c", "d"]]}}
+    check("duplication.gate_exit: 0 clusters in either language exits 0",
+          duplication.gate_exit(clean) == 0, detail=str(duplication.gate_exit(clean)))
+    check("duplication.gate_exit: a GDScript cluster exits 1",
+          duplication.gate_exit(dirty_gd) == 1, detail=str(duplication.gate_exit(dirty_gd)))
+    check("duplication.gate_exit: a Python cluster exits 1",
+          duplication.gate_exit(dirty_py) == 1, detail=str(duplication.gate_exit(dirty_py)))
+
+    # The plumbing itself, not just the pure function: run_cli must actually CALL exit_fn and return
+    # its value, and must default to 0 when no exit_fn is given (the other three instruments' path).
+    exit_code_no_fn = run_cli(lambda: clean, lambda r: "report text")
+    exit_code_clean = run_cli(lambda: clean, lambda r: "report text", exit_fn=duplication.gate_exit)
+    exit_code_dirty = run_cli(lambda: dirty_gd, lambda r: "report text", exit_fn=duplication.gate_exit)
+    check("run_cli: no exit_fn given defaults to 0 (function_length/complexity/coupling's own path)",
+          exit_code_no_fn == 0, detail=str(exit_code_no_fn))
+    check("run_cli: exit_fn given and the result is clean returns 0",
+          exit_code_clean == 0, detail=str(exit_code_clean))
+    check("run_cli: exit_fn given and the result is dirty returns exit_fn's own verdict (1), proving "
+          "run_cli actually calls exit_fn rather than ignoring it", exit_code_dirty == 1,
+          detail=str(exit_code_dirty))
+
+
 # --- coupling ---------------------------------------------------------------------------------------
 
 def _write(root: Path, rel: str, content: str) -> None:
@@ -330,7 +358,7 @@ def branch_dashboard_runs_end_to_end() -> None:
 def main() -> int:
     for branch in (branch_function_length_outlier, branch_function_length_guardrail,
                    branch_complexity, branch_complexity_guardrail, branch_duplication,
-                   branch_duplication_main_exclusion,
+                   branch_duplication_main_exclusion, branch_duplication_gate_exit,
                    branch_coupling_sim_path_and_class_name, branch_coupling_tools_import_resolution,
                    branch_coupling_stub_exclusion,
                    branch_dashboard_runs_end_to_end):
