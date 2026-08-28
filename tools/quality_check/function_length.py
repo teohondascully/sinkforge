@@ -7,12 +7,16 @@ numbers, don't pick one a priori. It does not replace `check_size_limits.py`'s e
 not itself gate anything -- dashboard, not enforcement (`docs/DECISIONS_LEDGER.md` D0096).
 
     python3 tools/quality_check/function_length.py
+
+Carries a yield counter from day one (`dashboard.py`'s YIELD section, this file's own outlier count) --
+stated here, not only in the dashboard wrapper, so it is not exempted from the project's standing
+retire-what-never-fires rule by feeling virtuous.
 """
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scan import all_functions, iqr_outlier_fence, summarize  # noqa: E402
+from scan import all_functions, iqr_outlier_fence, run_cli, summarize  # noqa: E402
 
 
 def analyze(functions=None) -> dict:
@@ -52,9 +56,7 @@ def format_report(result: dict) -> str:
 
 
 def main() -> int:
-    result = analyze()
-    print(format_report(result))
-    return 0
+    return run_cli(analyze, format_report)
 
 
 if __name__ == "__main__":

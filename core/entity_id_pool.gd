@@ -16,15 +16,6 @@ var _generations: PackedInt64Array = PackedInt64Array()
 var _free_indices: Array[int] = []
 
 
-## Logical (zero-fill) right shift -- see `core/split_rng.gd` for why GDScript's `>>` needs this.
-static func _ushr(x: int, n: int) -> int:
-	if n <= 0:
-		return x
-	if n >= 64:
-		return 0
-	return (x >> n) & ((1 << (64 - n)) - 1)
-
-
 ## `generation` is masked to 32 bits before the shift, matching `index` -- explicit, not a behavior
 ## change: verified directly (D0048) that GDScript's `<<` on a 64-bit int already drops any bits of
 ## `generation` at position 32 or above when shifting left by 32 (standard 2's-complement wraparound), so
@@ -44,7 +35,7 @@ static func unpack_index(id: int) -> int:
 
 
 static func unpack_generation(id: int) -> int:
-	return _ushr(id, 32)
+	return BitOps.ushr(id, 32)
 
 
 func allocate() -> int:

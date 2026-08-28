@@ -13,10 +13,10 @@ extends RefCounted
 ##
 ## GDScript ints are signed 64-bit. Every constant and intermediate value below is a raw 64-bit BIT
 ## PATTERN, not a magnitude -- values with the top bit set are written as their signed two's-complement
-## decimal equivalent because GDScript hex literals cannot represent values >= 2^63. `_ushr()` exists
-## because GDScript's `>>` is an arithmetic (sign-extending) shift; SplitMix64's mixing steps require a
-## logical shift. Both of these were verified empirically against the running engine, not assumed --
-## see the commit message for D0005 in docs/DECISIONS_LEDGER.md.
+## decimal equivalent because GDScript hex literals cannot represent values >= 2^63. `BitOps.ushr()`
+## (`core/bit_ops.gd`) exists because GDScript's `>>` is an arithmetic (sign-extending) shift;
+## SplitMix64's mixing steps require a logical shift. Both of these were verified empirically against the
+## running engine, not assumed -- see the commit message for D0005 in docs/DECISIONS_LEDGER.md.
 
 const _GOLDEN_GAMMA: int = -7046029254386353131  # 0x9E3779B97F4A7C15
 const _MUL1: int = -4658895280553007687          # 0xBF58476D1CE4E5B9
@@ -33,24 +33,14 @@ func _init(seed: int) -> void:
 	_state = seed
 
 
-## Logical (zero-fill) right shift of a 64-bit bit pattern held in a signed int. `x >> n` in GDScript
-## sign-extends for negative x; this does not.
-static func _ushr(x: int, n: int) -> int:
-	if n <= 0:
-		return x
-	if n >= 64:
-		return 0
-	return (x >> n) & ((1 << (64 - n)) - 1)
-
-
 ## Advances the stream and returns the next 64-bit draw as a raw bit pattern (may print negative --
 ## that's the sign bit of an otherwise-unsigned value, not an error).
 func next_u64() -> int:
 	_state += _GOLDEN_GAMMA
 	var z: int = _state
-	z = (z ^ _ushr(z, 30)) * _MUL1
-	z = (z ^ _ushr(z, 27)) * _MUL2
-	z = z ^ _ushr(z, 31)
+	z = (z ^ BitOps.ushr(z, 30)) * _MUL1
+	z = (z ^ BitOps.ushr(z, 27)) * _MUL2
+	z = z ^ BitOps.ushr(z, 31)
 	return z
 
 
@@ -58,7 +48,7 @@ func next_u64() -> int:
 ## standard technique, and exact: dividing an exactly-representable integer by an exactly-representable
 ## power of two has no rounding error, so this can never round up to 1.0.
 func next_float() -> float:
-	var top53: int = _ushr(next_u64(), 11)
+	var top53: int = BitOps.ushr(next_u64(), 11)
 	return float(top53) / float(1 << 53)
 
 

@@ -18,6 +18,10 @@ real pass, for both languages.
   large match blocks, named here rather than silently accepted as precise.
 
 McCabe's base complexity is 1 (a function with no branches has complexity 1, not 0).
+
+Carries a yield counter from day one (`dashboard.py`'s YIELD section, this file's own outlier count) --
+stated here, not only in the dashboard wrapper, so it is not exempted from the project's standing
+retire-what-never-fires rule by feeling virtuous.
 """
 import sys
 from pathlib import Path
@@ -25,7 +29,7 @@ from pathlib import Path
 import ast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scan import all_functions, gd_tokenize, iqr_outlier_fence, summarize  # noqa: E402
+from scan import all_functions, gd_tokenize, iqr_outlier_fence, run_cli, summarize  # noqa: E402
 
 GD_DECISION_KEYWORDS = {"if", "elif", "for", "while", "and", "or", "match"}
 _STOP_TYPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
@@ -98,9 +102,7 @@ def format_report(result: dict) -> str:
 
 
 def main() -> int:
-    result = analyze()
-    print(format_report(result))
-    return 0
+    return run_cli(analyze, format_report)
 
 
 if __name__ == "__main__":

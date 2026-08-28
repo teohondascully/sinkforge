@@ -1,0 +1,11 @@
+{
+  "alternative": "Raise MIN_LINES/MIN_TOKENS generally so the trivial main() dispatch shape stops clearing the size floor -- rejected: that would have hidden real duplication of a DIFFERENT, smaller shape elsewhere in the corpus, which is the actual failure this instrument exists to catch, in exchange for silencing one specific known-benign structural pattern. A named exclusion trades a small, stated risk for keeping the general detector at full sensitivity.",
+  "author": "claude-code-session-2026-08-28",
+  "choice": "tools/quality_check/duplication.py excludes a Python function literally named main(), with no parameters, at or under MAIN_BOILERPLATE_MAX_LINES=8 lines, from duplication comparison -- a named, length-bounded exclusion (_is_trivial_main_dispatch), not a blanket skip-anything-named-main rule and not a general lowering of MIN_LINES/MIN_TOKENS.",
+  "commit": "91bd77feb9a734459901f2ed78fa37a18417f359",
+  "id": "d61283eb-ffdb-4871-bfa6-ff13c90527c1",
+  "rationale": "The four-instrument main() cluster this instrument first found (docs/DECISIONS_LEDGER.md D0096) was a false positive in the sense that matters: entry-point dispatch scaffolding this whole tools/ tree repeats on purpose (every instrument here and in tools/economy_check/, tools/anvil/, tools/layer_lint/ ends def main() -> int: ... / sys.exit(main())), not logic duplication. The bound (8 lines) was picked against real data, not a priori: every OTHER main() in this repo -- check_tier_rule.py --json dispatch, check_integrity.py bootstrap-state check, every layer_lint/ gate own violation-printing -- is real branching logic well over this threshold and stays fully compared, verified by grep before picking the number.",
+  "reversal_cost": "Cheap. Delete _is_trivial_main_dispatch and its one call site in duplication.analyze(); re-run duplication.py and dashboard.py to confirm the four-instrument main() cluster (or whatever supersedes it) reappears in the report. No other file depends on this function.",
+  "timestamp": "2026-08-28T21:31:52.609167+00:00",
+  "type": "DECISION"
+}

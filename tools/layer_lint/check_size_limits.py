@@ -20,6 +20,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gd_scan import gd_files_excluding  # noqa: E402
+
 FUNC_NAME_RE = re.compile(r'^\s*(?:static\s+)?func\s+([A-Za-z_]\w*)')
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,11 +33,7 @@ FUNC_LIMIT = 50
 
 
 def find_gd_files():
-    for p in ROOT.rglob("*.gd"):
-        rel = p.relative_to(ROOT)
-        if rel.parts[0] in EXCLUDED_TOP or rel.parts[0].startswith("."):
-            continue
-        yield rel
+    return gd_files_excluding(ROOT, EXCLUDED_TOP)
 
 
 def indent_of(line: str) -> int:

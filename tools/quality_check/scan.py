@@ -235,3 +235,21 @@ def iqr_outlier_fence(values: list[float]) -> float:
         return max(values) + 1 if values else 0.0
     q1, q3 = percentile(values, 25), percentile(values, 75)
     return q3 + 1.5 * (q3 - q1)
+
+
+# --- Shared CLI dispatch, one instrument each -------------------------------------------------------
+
+def run_cli(analyze_fn, format_report_fn) -> int:
+    """The body every `tools/quality_check/` instrument's own `main()` delegates to -- extracted
+    2026-08-28 (`docs/DECISIONS_LEDGER.md` D0097) after `duplication.py`'s own first real run found
+    the four instruments' `main()` functions clustered as an identical duplicate: each was
+    `result = analyze(); print(format_report(result)); return 0`, byte-for-byte after identifier
+    normalization. This is that duplication's actual fix -- the repeated dispatch logic now exists
+    once, here, not four times with different names in front of it -- not merely a detector exclusion
+    (that's `duplication.MAIN_BOILERPLATE_MAX_LINES`, a separate, narrower calibration for main()-
+    shaped functions this extraction cannot reach, e.g. ones with real branching of their own).
+    Two-argument, not zero: each instrument's `analyze`/`format_report` pair is real, distinct domain
+    logic this harness has no business hardcoding or importing by name."""
+    result = analyze_fn()
+    print(format_report_fn(result))
+    return 0

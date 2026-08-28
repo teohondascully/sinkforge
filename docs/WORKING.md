@@ -15,17 +15,28 @@ or duplication ("the previous project carried six near-identical copies of one f
 layers and nothing flagged it, because nothing was looking"). Built four instruments — function length,
 duplication (weighted as most important per instruction), complexity, module coupling — as a DASHBOARD
 (no gate, no exit-code reaction to a finding), self-calibrating IQR outlier fences, not a priori
-thresholds. Full reasoning, design decisions, and this run's actual findings against the real tree:
-`docs/DECISIONS_LEDGER.md` D0096 — not repeated here.
+thresholds. Full reasoning and design decisions: `docs/DECISIONS_LEDGER.md` D0096.
 
-Headline: duplication found 4 real clusters (`core/entity_id_pool.gd`/`core/split_rng.gd`'s `_ushr`,
-two pre-existing clusters inside `tools/layer_lint/` itself, and one inside this round's own
-`tools/quality_check/`). Coupling closed a real blind spot (GDScript `class_name` global visibility —
-`sim/` had zero `res://`-based cross-references but 13 `class_name` declarations) rather than shipping
-blind to `sim/`'s actual coupling mechanism. 17/17 mutation cases OBSERVED. 794 implementation / 217
-test / 1,011 total LOC — over the director's own "a few hundred lines" bar, stated plainly, not hidden.
+**Follow-up round, same day, CLOSED (D0097):** all four of D0096's own findings acted on. `core/_ushr`
+extracted to `core/bit_ops.gd` (a test-file reference the original grep missed was caught by actually
+running the Godot suite, not anticipated — fixed, both suites re-run, ALL PASS). The two `tools/
+layer_lint/find_gd_files` duplications extracted to `tools/layer_lint/gd_scan.py` (two genuinely
+different filter styles kept as two named functions, not forced behind one flag). The `main()` cluster
+calibrated as a named, length-bounded, mutation-tested exclusion (`duplication.
+MAIN_BOILERPLATE_MAX_LINES=8`) — its risk (a future short-and-duplicated `main()` would be hidden)
+logged as a real Anvil `DECISION` event, not only ledger prose, matching D0074's own precedent. A shared
+CLI harness (`scan.run_cli`) extracted so the fix is real, not just excluded from the report.
+`duplication.py` confirms 0 clusters where it found 4 at D0096.
 
-Not wired into CI. No thresholds set — that's the director's next call, from the real numbers.
+**LOC went up, not down — stated plainly, same as D0096's own overrun.** 847 implementation / 265 test /
+1,112 total (was 794/217/1,011). The `main()` boilerplate that came out was only 16 lines; the named
+exclusion + its risk statement (+29) and the harness's new home (+18) — both explicitly required this
+round — added more back. Full accounting in D0097 and `tools/quality_check/README.md`'s LOC section.
+21/21 mutation cases OBSERVED (17 → 21, four new cases for the exclusion). All gates re-run and PASS.
+
+Not wired into CI. No thresholds set — that's the director's next call, from the real distributions
+(named outliers + a recommended guardrail line per metric, reported to the director directly this round,
+not repeated here).
 
 ## tools/economy_check/ — the tier-rule checker, 2026-08-28 — CLOSED
 

@@ -3384,3 +3384,115 @@ structural gates, `schema_validator.py`, `data_codegen --check`, and `tools/anvi
 re-run and PASS.
 
 Reverse: delete `tools/quality_check/`, revert the `tools/README.md` addition. No other file touched.
+
+## D0097 · 2026-08-28 · D0096's own findings acted on: `_ushr` extracted, `layer_lint`'s duplication fixed, `main()` calibrated as a named exclusion, the honest post-extraction LOC
+
+Five explicit director instructions issued together, worked in order, each verified against real tool
+output before moving to the next.
+
+**1. `core/_ushr` — the find this tool exists for, fixed.** `core/entity_id_pool.gd` and
+`core/split_rng.gd` each defined a byte-identical private `_ushr(x, n)` static helper (logical/zero-fill
+right shift on a 64-bit signed int, since GDScript's `>>` sign-extends). Extracted to `core/bit_ops.gd`
+(`class_name BitOps`, `static func ushr(x, n)`); both call sites updated. **Found mid-fix, not
+anticipated**: `tests/test_entity_id_pool.gd:97` called the removed private helper directly
+(`EntityIdPool._ushr(draw, 1)`) — a real Godot run failed with `Parse Error: Static function "_ushr()"
+not found`, caught by actually running the suite, not by the two-file grep that scoped the original fix.
+Fixed to `BitOps.ushr(draw, 1)`; a full-repo grep afterward found no other stray reference. Both real
+Godot suites (`tests/test_entity_id_pool.gd`, `tests/test_split_rng.gd`) re-run: ALL PASS. `duplication.py`
+re-run: GDScript clusters 1 → 0. **Surfaced, not silently overwritten**: `core/MODULE.md`'s own Gotchas
+section had previously documented this exact duplication as a deliberate, considered decision ("Each
+defines its own small `_ushr()` static helper rather than sharing one file for two call sites — verified
+empirically against the pinned engine... not assumed"). That "verified empirically" clause was about the
+shift-math correctness, not a structural reason the two copies had to stay separate — MODULE.md now
+states the reversal and cites this entry.
+
+**2. `tools/layer_lint/find_gd_files` — pre-existing tooling duplication, fixed the same way, not
+exempted.** Not one function duplicated four times over identical data: `check_coordinate_naming.py`/
+`no_engine_imports.py` each named an explicit ALLOW-list of policed directories (different lists) and
+yielded absolute paths; `check_size_limits.py`/`layer_lint.py` each named a DENY-list and yielded
+root-relative paths. Two genuinely different styles, not one duplicated logic — extracted to
+`tools/layer_lint/gd_scan.py` as two small named functions (`gd_files_in`, `gd_files_excluding`) sharing
+one glob primitive, rather than forcing both styles behind one flag (which would have made every call
+site less self-evident about what it actually scans, for a marginal line-count win). All four consumer
+files updated to thin delegating wrappers, their own `POLICED_DIRS`/`EXCLUDED_TOP`/`UNPOLICED` constants
+untouched. All four `layer_lint/` gates re-run: PASS, each file count exactly +1 against its last-known
+baseline (matching the one new file, `core/bit_ops.gd`, added to the tree — no unintended scope change).
+`duplication.py` re-run: both `tools/layer_lint/` Python clusters gone.
+
+**3. The `main()` cluster — calibrated as a named, length-bounded exclusion, not suppressed by lowering
+sensitivity.** `duplication.py` now excludes a Python function literally named `main`, taking no
+parameters, at or under `MAIN_BOILERPLATE_MAX_LINES=8` lines
+(`_is_trivial_main_dispatch`) — this repo's own established CLI entry-point shape
+(`def main() -> int: ...` / `sys.exit(main())`, every instrument in `tools/economy_check/`,
+`tools/anvil/`, `tools/layer_lint/`, and here all use it). The bound was picked against real data, not a
+priori: checked against every OTHER `main()` in the repo before choosing 8 —
+`check_tier_rule.py`'s `--json` dispatch, `check_integrity.py`'s bootstrap-state check, and every
+`layer_lint/` gate's own violation-printing are all real branching logic well over this threshold and
+stay fully compared. **Risk, stated explicitly per instruction, not left implicit**: if a future `main()`
+is BOTH genuinely duplicated AND fits within 8 lines, this exclusion hides that duplication from the
+report. Accepted because the alternative — raising `MIN_LINES`/`MIN_TOKENS` generally to clear this one
+known shape — would have hidden real duplication of a *different* shape elsewhere instead, which is the
+actual failure this instrument exists to catch. **Logged as a real Anvil `DECISION` event**, matching
+D0074's own precedent for a calibration judgment call, not only ledger prose:
+`.anvil/log/2026-08-28T213152.609167Z-d61283eb.json` (choice/alternative/rationale/reversal_cost fields).
+Verified referentially sound via `check_integrity.py` before this entry was written. Mutation-tested,
+4 new cases in `test_quality_check.py`: a trivial `main()` pair NOT clustered; the identical shape under
+names other than `main` (`dispatch`/`run`) STILL clustered, proving the exclusion is keyed on the name,
+not on brevity; a real, over-threshold `main()` (branching CLI logic, 10 lines, confirmed over the 8-line
+bound before asserting on it) duplicated verbatim STILL clustered, proving the exclusion is keyed on
+length too, not the name alone.
+
+**4. The shared CLI harness — the actual fix, not merely a detector exclusion.** `scan.run_cli(analyze_fn,
+format_report_fn)` now holds the one dispatch body (`result = analyze_fn(); print(format_report_fn(result));
+return 0`) all four instruments' own `main()` delegates to (`return run_cli(analyze, format_report)`).
+The repeated logic exists once, not four times with different names in front of it. Both fixes — item 3
+and item 4 — were required together per instruction: the general exclusion so the *shape* never cries
+wolf again anywhere in this repo, the harness so *this specific instance* of it is gone from the source,
+not merely hidden from the report.
+
+**5. LOC re-measured, honest direction stated plainly: up, not down.** 847 implementation / 265 test /
+1,112 total — against D0096's 794/217/1,011. The instruction was that the count should come down because
+the boilerplate comes out; it did come out (`duplication.py`: 1 cluster → 0), but the boilerplate itself
+was only 16 lines (four 4-line `main()` bodies), and this round's two OTHER explicit requirements —
+the named, documented, mutation-tested exclusion (item 3) and the harness's own new home (item 4) — added
+more than that back. Exact accounting via `git diff --stat` against the D0096 commit (91bd77f), not
+estimated: `scan.py` +18 (`run_cli`), `duplication.py` +29 (`_is_trivial_main_dispatch` + its risk
+statement), `function_length.py`/`complexity.py`/`coupling.py` +2 each (the yield-counter header line,
+item 6 below), `test_quality_check.py` +48 (the 4 new mutation cases) — net +117 insertions/−16
+deletions, +101 total. Not trimmed to hide this: full breakdown in `tools/quality_check/README.md`'s LOC
+section. Same precedent as the Anvil cap adjustment (D0074) — the wrong response to an honest overrun is
+cutting good, requested code to fit a stale figure; the right one is accepting the real number with the
+reason recorded, which is what this entry does.
+
+**6. Yield-counter statement added to each of the four instruments' own headers**, not only
+`dashboard.py`'s — `function_length.py`, `complexity.py`, `coupling.py`, `duplication.py` each now state
+in their own module docstring that they carry a yield counter from day one, so the standing
+retire-what-never-fires rule is not exempted by only living in the wrapper.
+
+**Distributions, re-read after this round's fixes (method unchanged from D0096 — full lists in the
+dashboard's own output, summarized for the director's read here, no thresholds proposed):**
+- **Duplication: 0 clusters, both languages** (was 4 at D0096 — all four addressed this round).
+- **Function length**: GDScript 85 functions, IQR fence 19.5, 8 above it (top: `vertical_resolve.gd:
+  resolve_floor` at 50 — exactly at `check_size_limits.py`'s own hard 50-line cap, worth the director's
+  attention since the two numbers disagree by more than 2x). Python 187 functions, fence 42.5, 14 above
+  it (top: `check_tier_rule.py:check_output_consequence` at 67).
+- **Complexity**: GDScript 85 functions, fence 6.0, 7 above it (top: `body.gd:_resolve_horizontal` at 24
+  — the same function D0059's four-defect JUMP_CORNER investigation centered on, a real correlation
+  between this metric and prior incident history, not asserted further here). Python 187 functions, fence
+  13.5, 9 above it (top: `anvil/schema.py:validate_event` at 33).
+- **Coupling**: unchanged in substance from D0096 (this round touched dispatch plumbing, not the edge
+  scanners) — `sim/`'s 4 outliers and `tools/`'s 2 remain artifacts of a 10-of-14-modules-at-zero
+  distribution dragging the IQR fence near 0, per D0096's own stated caveat, re-confirmed rather than
+  newly found.
+
+Gates re-run and PASS: all nine `layer_lint/` gates (after staging the new files — `check_untracked_files`
+correctly failed while `core/bit_ops.gd`/`gd_scan.py` were unstaged, exactly what it exists to catch),
+`schema_validator.py`, `data_codegen --check`, `tools/anvil/check_integrity.py`, `test_quality_check.py`
+(21/21), `test_check_tier_rule.py` (44/44, unaffected but re-confirmed), both real Godot suites. No
+`data/economy/` content touched. Not wired into CI, per explicit instruction — dashboard only, holding
+for D1 through D6.
+
+Reverse: `git revert` this commit; delete `core/bit_ops.gd`(`.uid`) and restore the two `_ushr` copies;
+delete `tools/layer_lint/gd_scan.py` and restore each gate's own `find_gd_files`; revert `duplication.py`/
+`scan.py`/the other three instruments to D0096's shape. The Anvil `DECISION` event stays (immutable,
+append-only) — a reversal would need a superseding event, not a deletion.

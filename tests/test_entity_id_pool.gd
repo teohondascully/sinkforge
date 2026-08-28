@@ -94,7 +94,7 @@ func _test_stress_churn() -> void:
 			live[id] = true
 		else:
 			var keys: Array = live.keys()
-			var pick: int = keys[EntityIdPool._ushr(draw, 1) % keys.size()]
+			var pick: int = keys[BitOps.ushr(draw, 1) % keys.size()]
 			live.erase(pick)
 			pool.release(pick)
 	var all_live_valid: bool = true

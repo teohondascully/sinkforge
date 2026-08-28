@@ -134,6 +134,53 @@ def branch_duplication() -> None:
           tiny_result["gd"]["clusters"] == [], detail=str(tiny_result["gd"]["clusters"]))
 
 
+def branch_duplication_main_exclusion() -> None:
+    main_a = py_func_from("def main():\n    result = analyze()\n    print(format_report(result))\n"
+                            "    return 0\n")
+    main_b = py_func_from("def main():\n    result = analyze()\n    print(format_report(result))\n"
+                            "    return 0\n")
+    result = duplication.analyze([main_a, main_b])
+    check("duplication (py): two trivial main()-shaped dispatch functions are NOT clustered",
+          result["py"]["clusters"] == [], detail=str(result["py"]["clusters"]))
+
+    # A same-length, same-token-shape function under a DIFFERENT name is not exempt -- the exclusion is
+    # keyed on the name "main", not on being short.
+    not_main_a = py_func_from("def dispatch():\n    result = analyze()\n    print(format_report(result))\n"
+                                "    return 0\n")
+    not_main_b = py_func_from("def run():\n    result = analyze()\n    print(format_report(result))\n"
+                                "    return 0\n")
+    result2 = duplication.analyze([not_main_a, not_main_b])
+    check("duplication (py): the SAME shape under names other than main() is still caught -- the "
+          "exclusion is not a generic short-function exemption",
+          any(not_main_a.qualname in cl and not_main_b.qualname in cl for cl in result2["py"]["clusters"]),
+          detail=str(result2["py"]["clusters"]))
+
+    # A main() with real branching logic, over MAIN_BOILERPLATE_MAX_LINES, is not exempt either -- the
+    # exclusion is length-bounded, not name-only.
+    big_main_src = (
+        "def main():\n"
+        "    if len(sys.argv) < 2:\n"
+        "        print('usage')\n"
+        "        return 2\n"
+        "    result = analyze(sys.argv[1])\n"
+        "    if result.ok:\n"
+        "        print('pass')\n"
+        "        return 0\n"
+        "    print('fail')\n"
+        "    return 1\n"
+    )
+    big_main_a = py_func_from(big_main_src)
+    big_main_b = py_func_from(big_main_src)
+    check("duplication (py): main()'s own length still gates the exclusion -- this fixture is "
+          f"{big_main_a.length} lines, over MAIN_BOILERPLATE_MAX_LINES={duplication.MAIN_BOILERPLATE_MAX_LINES}",
+          big_main_a.length > duplication.MAIN_BOILERPLATE_MAX_LINES, detail=str(big_main_a.length))
+    result3 = duplication.analyze([big_main_a, big_main_b])
+    check("duplication (py): a real, over-threshold main() duplicated verbatim is still caught -- the "
+          "exclusion does not silently swallow genuine main()-body duplication",
+          any(big_main_a.qualname in cl and big_main_b.qualname in cl for cl in result3["py"]["clusters"]),
+          detail=str(result3["py"]["clusters"]))
+
+
 # --- coupling ---------------------------------------------------------------------------------------
 
 def _write(root: Path, rel: str, content: str) -> None:
@@ -196,6 +243,7 @@ def branch_dashboard_runs_end_to_end() -> None:
 
 def main() -> int:
     for branch in (branch_function_length_outlier, branch_complexity, branch_duplication,
+                   branch_duplication_main_exclusion,
                    branch_coupling_sim_path_and_class_name, branch_coupling_tools_import_resolution,
                    branch_dashboard_runs_end_to_end):
         branch()

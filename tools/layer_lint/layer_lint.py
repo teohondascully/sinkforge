@@ -30,6 +30,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gd_scan import gd_files_excluding  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 
 # docs/ARCHITECTURE.md §3 — the allowed dependency set for each layer.
@@ -67,11 +70,7 @@ def module_of(rel_path: Path) -> str | None:
 
 
 def find_gd_files():
-    for p in ROOT.rglob("*.gd"):
-        rel = p.relative_to(ROOT)
-        if rel.parts[0] in UNPOLICED or rel.parts[0].startswith("."):
-            continue
-        yield rel
+    return gd_files_excluding(ROOT, UNPOLICED)
 
 
 def references_in(path: Path):

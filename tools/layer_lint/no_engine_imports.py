@@ -75,6 +75,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gd_scan import gd_files_in  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 POLICED_DIRS = ("core", "sim")
 
@@ -173,10 +176,7 @@ PATTERNS = [
 
 
 def find_gd_files():
-    for top in POLICED_DIRS:
-        base = ROOT / top
-        if base.is_dir():
-            yield from base.rglob("*.gd")
+    return gd_files_in(ROOT, POLICED_DIRS)
 
 
 def main() -> int:

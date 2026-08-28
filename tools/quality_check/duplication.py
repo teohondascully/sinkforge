@@ -24,19 +24,48 @@ regardless of what either copy's identifiers are actually called.
 - Exact match only after normalization (no fuzzy/edit-distance matching). A near-miss that also
   reorders statements or adds/removes one line is NOT caught. Stated as a real boundary, not silently
   assumed solved.
+- Python `main()` entry-point dispatch functions at or under `MAIN_BOILERPLATE_MAX_LINES` lines are
+  excluded from comparison -- see `_is_trivial_main_dispatch` for the exact rule and the risk this
+  trades away, logged as a decision per `docs/DECISIONS_LEDGER.md` D0097.
+
+Carries a yield counter from day one (`dashboard.py`'s YIELD section, this file's own cluster count) --
+stated here, not only in the dashboard wrapper, so it is not exempted from the project's standing
+retire-what-never-fires rule by feeling virtuous.
 """
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scan import all_functions, gd_tokenize, py_tokenize_source  # noqa: E402
+from scan import all_functions, gd_tokenize, py_tokenize_source, run_cli  # noqa: E402
 
 MIN_LINES = 4
 MIN_TOKENS = 15
+MAIN_BOILERPLATE_MAX_LINES = 8
 
 
 def _normalize(tokens: list[tuple[str, str]]) -> tuple:
     return tuple("ID" if kind == "ID" else text for kind, text in tokens)
+
+
+def _is_trivial_main_dispatch(f) -> bool:
+    """True for a Python function literally named `main`, taking this repo's own zero-argument CLI
+    entry-point shape, at most `MAIN_BOILERPLATE_MAX_LINES` lines long -- the one structural pattern
+    this whole `tools/` tree repeats on purpose (every instrument here and in `tools/economy_check/`,
+    `tools/anvil/`, `tools/layer_lint/` ends `def main() -> int: ...` / `sys.exit(main())`), not logic
+    duplication in the sense this detector exists to catch (`docs/DECISIONS_LEDGER.md` D0096's "the
+    previous project carried six near-identical copies of one function... because nothing was
+    looking"). Named and length-bounded, not a blanket "skip anything called main": checked against
+    every OTHER `main()` in this repo before picking the bound -- `check_tier_rule.py`'s --json
+    dispatch, `check_integrity.py`'s bootstrap-state check, and every `layer_lint/` gate's own
+    violation-printing are all real branching logic well over this threshold, and stay fully compared.
+
+    Risk, stated per D0097 rather than left implicit: if a future `main()` is BOTH genuinely duplicated
+    AND happens to fit within `MAIN_BOILERPLATE_MAX_LINES`, this exclusion hides that duplication from
+    the report. Accepted because the alternative -- raising `MIN_LINES`/`MIN_TOKENS` generally to clear
+    this one known shape -- would have hidden real duplication of a DIFFERENT shape elsewhere instead,
+    which is the actual failure mode this instrument exists to catch. A named, narrow exclusion trades a
+    small, stated risk for keeping the general detector at full sensitivity."""
+    return f.lang == "py" and f.name == "main" and f.length <= MAIN_BOILERPLATE_MAX_LINES
 
 
 def analyze(functions=None) -> dict:
@@ -47,6 +76,8 @@ def analyze(functions=None) -> dict:
         groups: dict[tuple, list] = {}
         for f in functions:
             if f.lang != lang or f.length < MIN_LINES:
+                continue
+            if _is_trivial_main_dispatch(f):
                 continue
             toks = tokenize(f.source)
             if len(toks) < MIN_TOKENS:
@@ -80,9 +111,7 @@ def format_report(result: dict) -> str:
 
 
 def main() -> int:
-    result = analyze()
-    print(format_report(result))
-    return 0
+    return run_cli(analyze, format_report)
 
 
 if __name__ == "__main__":

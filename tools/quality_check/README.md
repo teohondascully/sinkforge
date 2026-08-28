@@ -38,10 +38,13 @@ seeing it — a threshold set without the data first is "a guess wearing a decis
 
 File discovery, function-span extraction (GDScript spans reuse `check_size_limits.py`'s own scanner
 directly, not reimplemented), two tokenizers (Python via stdlib `tokenize`, exact; GDScript hand-rolled,
-approximate — both documented), and the shared distribution/outlier-fence math every instrument that
-flags outliers uses. Factored out once four consumers needed the same thing — a duplication detector
-whose own source duplicated this logic across four files would be the tool disproving its reason to
-exist.
+approximate — both documented), the shared distribution/outlier-fence math every instrument that flags
+outliers uses, and `run_cli` — the one-line dispatch (`result = analyze(); print(format_report(result));
+return 0`) every instrument's own `main()` now delegates to, extracted after `duplication.py`'s first
+real run found that exact shape clustered as a duplicate across all four `main()` functions
+(`docs/DECISIONS_LEDGER.md` D0097). Factored out once four consumers needed the same thing — a
+duplication detector whose own source duplicated this logic across four files would be the tool
+disproving its reason to exist.
 
 ## Testability
 
@@ -53,29 +56,42 @@ without risking it."
 
 ## Mutation testing
 
-`test_quality_check.py`, run directly (`python3 tools/quality_check/test_quality_check.py`) — 17 cases,
+`test_quality_check.py`, run directly (`python3 tools/quality_check/test_quality_check.py`) — 21 cases,
 covering an outlier being flagged and a uniform distribution flagging nothing (length), branch counting
 including that a nested function's complexity does not leak into its enclosing function's count
-(complexity), a renamed-copy pair being caught while a genuinely different function is not, and trivial
-functions being excluded by the size floor (duplication), and — the trickiest logic in this round —
-`class_name`-only coupling being caught, local-import-resolution correctly beating a same-named module
-in a different subdirectory (the real `anvil`/`economy_check` `schema.py` collision, reproduced
+(complexity), a renamed-copy pair being caught while a genuinely different function is not, trivial
+functions being excluded by the size floor, and the `main()` exclusion's own four branches — a trivial
+pair not clustered, the SAME shape under non-`main` names still caught (the exclusion is keyed on the
+name, not on being short), and a real over-threshold `main()` duplicated verbatim still caught (the
+exclusion is keyed on length too, not on the name alone) (duplication), and — the trickiest logic in this
+round — `class_name`-only coupling being caught, local-import-resolution correctly beating a same-named
+module in a different subdirectory (the real `anvil`/`economy_check` `schema.py` collision, reproduced
 synthetically), and a name matching multiple other subdirectories with no local match being left
-uncounted rather than guessed (coupling). All 17 OBSERVED. One assertion — the local-resolution-wins
+uncounted rather than guessed (coupling). All 21 OBSERVED. One assertion — the local-resolution-wins
 case — was independently confirmed to have real teeth by deliberately removing the guard it protects and
 observing the test correctly fail against the broken version, not just pass against the correct one.
 
 ## LOC, reported honestly against the director's own sizing instruction
 
-**794 implementation / 217 test / 1,011 total.** The director's instruction was explicit: "if the whole
-suite cannot be built in a few hundred lines, it is too clever." This is over that literal bar, and
-that's stated here rather than left for someone else to notice. What it bought: two languages, four
-distinct structural properties, heavy reuse of existing gate code where reuse was possible
-(`check_size_limits.py`'s function-span scanner, `layer_lint.py`'s `module_of`/`references_in`), and one
-real correctness fix (the `class_name` coupling closure) that a smaller version would have shipped
-without — measuring `sim/`'s actual dominant coupling mechanism instead of reporting a near-vacuous
-"no coupling" on it. Whether that tradeoff was the right one is the director's call, not asserted here as
-settled.
+**847 implementation / 265 test / 1,112 total, as of `docs/DECISIONS_LEDGER.md` D0097** — up from
+D0096's 794/217/1,011, not down, and that direction is stated plainly because the director's explicit
+instruction after D0096 was to extract the `main()` boilerplate so "the line count comes down because
+the actual duplication comes out." It did come out — `duplication.py` reports 0 clusters where it
+found 1 (the four-`main()` cluster) at D0096 — but the boilerplate itself was small (16 lines: four
+4-line `main()` bodies) and D0097 also added two things the director separately, explicitly required in
+the same round: a *named, documented, mutation-tested exclusion* for the general `main()`-dispatch shape
+(`duplication.MAIN_BOILERPLATE_MAX_LINES`/`_is_trivial_main_dispatch`, +29 lines with its risk statement)
+and a shared dispatch home for the fix itself (`scan.run_cli`, +18 lines). Both are real, requested
+content, not padding kept to protect a number. Full accounting, measured via `git diff --stat` against
+the D0096 commit, not estimated: `scan.py` +18, `duplication.py` +29, `function_length.py`/`complexity.py`
+/`coupling.py` +2 each (a one-line yield-counter header addition), `test_quality_check.py` +48 (4 new
+mutation cases) — net +117/−16, +101 total. What D0096's number bought still applies unchanged (two
+languages, four structural properties, heavy reuse, the `class_name` coupling fix); what this round adds
+on top is the calibration decision the director asked for, mutation-tested to the same standard as
+everything else here. Whether the tradeoff is right, now including this round's honest direction, is the
+director's call — same as the Anvil cap adjustment (`docs/DECISIONS_LEDGER.md` D0074): the wrong response
+to an overrun is cutting good, requested code to hide under a stale figure, not accepting the real number
+with the reason recorded.
 
 ## Consumers
 
@@ -93,7 +109,11 @@ by the director, to see the real distribution before any threshold is proposed.
   resolution, but a more exotic `sys.path` manipulation than "insert my own parent directory" (this
   repo's only pattern so far) could still fool it.
 - Duplication's `MIN_LINES=4`/`MIN_TOKENS=15` floor is a judgment call, not derived from data the way the
-  outlier fences are. This run's own results include a borderline case worth knowing about when tuning
-  it: four `main()` functions across this very directory's own five instrument files clustered as an
-  exact duplicate (`result = analyze(); print(format_report(result)); return 0`) — real duplication, but
-  about as low-stakes as duplication gets, and a useful data point for where the floor should sit.
+  outlier fences are.
+- `duplication.py` carries a named, length-bounded exclusion for Python `main()` functions
+  (`MAIN_BOILERPLATE_MAX_LINES=8`, `_is_trivial_main_dispatch`) — added after four `main()` functions
+  across this directory's own instrument files clustered as an exact duplicate at D0096, and calibrated,
+  not guessed, against every other `main()` in the repo (D0097). **Risk, stated per the director's own
+  instruction rather than left implicit**: if a future `main()` is both genuinely duplicated AND fits
+  within the 8-line bound, this exclusion hides that duplication from the report. Logged as a real Anvil
+  `DECISION` event (`.anvil/log/2026-08-28T213152.609167Z-d61283eb.json`), not only here.

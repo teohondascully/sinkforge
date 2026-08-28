@@ -39,6 +39,10 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   (`(generation << 32) | index`) so ids compare with plain `==` and serialize as one integer.
   `.allocate()`, `.release(id) -> bool` (false on double-release or an id that was never allocated,
   never a crash), `.is_valid(id) -> bool`, `.live_count()`.
+- `BitOps` (`bit_ops.gd`) — bit-level integer primitives with no domain concept of their own.
+  `.ushr(x: int, n: int) -> int`, a logical (zero-fill) right shift of a 64-bit bit pattern held in a
+  signed GDScript int — extracted 2026-08-28 (`docs/DECISIONS_LEDGER.md` D0097) from `SplitRng` and
+  `EntityIdPool`, which each independently defined a byte-for-byte identical private `_ushr()` helper.
 - `Fx` (`fixed_point.gd`) — fixed-point scalar arithmetic, i32 with 16 fractional bits. World-scale
   constants and the range/precision check this format was validated against: `docs/ARCHITECTURE.md` §9
   ("The world scale"), `docs/adr/0003-fixed-point-representation.md`. `.from_int()`, `.to_float()`
@@ -54,11 +58,14 @@ Every other layer: sim, interface, harness, experiment, view, shell.
 
 - **GDScript's `>>` is an arithmetic (sign-extending) shift, not logical.** `SplitRng` and
   `EntityIdPool` need a logical right shift to treat a 64-bit int as an unsigned bit pattern (SplitMix64's
-  mixing steps; unpacking the generation field). Each defines its own small `_ushr()` static helper
-  rather than sharing one file for two call sites — verified empirically against the pinned engine
-  (4.6.2-stable), not assumed; see the relevant test suite for the mutation check. `Fx` doesn't need this
-  helper: its rescale step (`mul`'s `>>`) wants arithmetic (sign-preserving) shift semantics, which is
-  what GDScript already gives it for free.
+  mixing steps; unpacking the generation field). **Both call `BitOps.ushr()` (`bit_ops.gd`)** — until
+  2026-08-28 each defined its own identical private `_ushr()` static helper instead of sharing one file;
+  `tools/quality_check/duplication.py`'s first run against this tree found the two copies byte-for-byte
+  identical and this was extracted as a direct result (`docs/DECISIONS_LEDGER.md` D0097). Verified
+  empirically against the pinned engine (4.6.2-stable), not assumed — see `tests/test_split_rng.gd` and
+  `tests/test_entity_id_pool.gd`, both re-run and unchanged (ALL PASS) after the extraction. `Fx` doesn't
+  need this helper: its rescale step (`mul`'s `>>`) wants arithmetic (sign-preserving) shift semantics,
+  which is what GDScript already gives it for free.
 - **GDScript's parser rejects `>>`/`<<` where the LEFT OPERAND is syntactically a negative literal, a
   negative const, or a direct unary-minus expression** ("Invalid operands for bit shifting. Only positive
   operands are supported") — but allows it fine at runtime through a plain variable that happens to hold

@@ -33,6 +33,10 @@ cross-check, not something this instrument verifies.
   `tools/anvil/schema.py` share a filename, and without local-first resolution this would wrongly count
   every `from schema import ...` in `economy_check` as a reference to `anvil`. A name matching MULTIPLE
   other subdirectories with no local match is ambiguous and is not counted, not guessed.
+
+Carries a yield counter from day one (`dashboard.py`'s YIELD section, this file's own outlier count) --
+stated here, not only in the dashboard wrapper, so it is not exempted from the project's standing
+retire-what-never-fires rule by feeling virtuous.
 """
 import ast
 import re
@@ -43,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "layer_lint"))
 from layer_lint import module_of, references_in  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scan import ROOT, iqr_outlier_fence, summarize  # noqa: E402
+from scan import ROOT, iqr_outlier_fence, run_cli, summarize  # noqa: E402
 
 _CLASS_NAME_RE = re.compile(r'^\s*class_name\s+(\w+)', re.MULTILINE)
 
@@ -199,9 +203,7 @@ def format_report(result: dict) -> str:
 
 
 def main() -> int:
-    result = analyze()
-    print(format_report(result))
-    return 0
+    return run_cli(analyze, format_report)
 
 
 if __name__ == "__main__":
