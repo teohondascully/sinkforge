@@ -4,9 +4,28 @@ Not a log. Current stage, what's actually happening, and what would be lost if t
 right now. Updated as work happens. Resets when a stage closes — durable content moves to an ADR,
 a MODULE.md, or a claim first.
 
-**Last updated: 2026-08-27.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-08-28.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
+
+## tools/economy_check/ — the tier-rule checker, 2026-08-28 — CLOSED
+
+Director-requested design instrument, built ahead of `data/economy/` (which the director authors
+separately). Two rounds: a schema proposal (chat, stopped for review per explicit "propose the schema
+first and stop" instruction), then this round's build, after the director approved the schema and
+issued four decisions plus one addition — clause (a) decided by structural reference not author
+self-classification, D2's provenance exemption removed, the scope boundary stated in the checker's own
+output not just its docstring, and breach reachability added as a fourth check. Full reasoning and a
+fifth decision found during implementation (clause (b) needed the same "referenced elsewhere" discipline
+as clause (a), or every hardness-escalator chain passes it trivially) — `docs/DECISIONS_LEDGER.md`
+D0092.
+
+Built: `tools/economy_check/schema.py`, `check_tier_rule.py`, `README.md`, `test_check_tier_rule.py` —
+19 mutation cases across the director's 5 fixtures plus the breach-reachability addition, all OBSERVED.
+CLI verified directly against two hand-built chain files. 376 implementation / 255 test / 631 total LOC.
+No `data/economy/` content, no `core/`/`sim/` code touched. All gates re-run and pass.
+
+Stopped, as instructed — "I author the real rows against it."
 
 ## External audit response — surviving run-structure specifications, 2026-08-27 — CLOSED
 

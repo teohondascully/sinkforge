@@ -9,6 +9,10 @@ harness already produced.
 - `schema_validator/` — validates `data/` against per-kind schemas. `docs/QUALITY.md` gate 13.
 - `data_codegen/` — generates `data/<kind>/generated.gd` from `data/<kind>/*.yaml`; `--check` mode is
   the staleness gate. `docs/QUALITY.md` gate 22, `docs/adr/0004-data-codegen.md`.
+- `economy_check/` — the corrected three-part rig-demand tier rule (input provenance, output
+  consequence, terminal products, plus breach reachability), checked as a pure graph query over
+  synthetic fixtures, ahead of any real `data/economy/` content. Not yet wired into CI — no real data to
+  check yet.
 - `report/` — turns run artifacts (`telemetry.jsonl`, `result.json`) into human-readable output.
   Empty until `harness/driver` produces something to report on.
 - `scratch/` — gitignored. Scratch work lives here and only here. If a script here turns out to be

@@ -3052,3 +3052,76 @@ cold read is the next-best substitute, and this round is the second time it has 
 one.
 
 Reverse: N/A — a record entry, not an action with a cost to undo.
+
+## D0092 · 2026-08-28 · tools/economy_check/ — the tier-rule checker, built against synthetic fixtures ahead of any real data/economy/ content
+
+The director's task: build a design instrument validating the corrected, three-part rig-demand tier rule
+(input provenance, output consequence, terminal products) before `data/economy/` gets a single real row,
+which the director authors separately. Two rounds: a schema proposal (chat, stopped for review per
+explicit instruction), then this session's build, after the director approved the schema and issued four
+decisions plus one addition.
+
+**The four decisions, as given, implemented as given:**
+1. **Output-consequence clause (a) is decided by structural reference, not author self-classification.**
+   A verb counts as capability-granting only if some `Recipe.requires_verbs` names it — a `kind:
+   cosmetic` field would have asked the author to self-certify the exact thing this check exists to
+   catch.
+2. **D2's provenance exemption is removed.** The original design brief's "D2 passes vacuously" carve-out
+   is not implemented. D1 alone gets the structural exemption (no prior demand exists to compare
+   against, reported `n/a`, never `pass`) — D2 is checked exactly like every later demand.
+3. **The scope boundary (rig-demand chain only, not artifact-granted verbs from ruins, `docs/GDD.md`:135)
+   is stated in the checker's own output**, not only its docstring — `SCOPE_NOTE`, printed first in
+   every `format_report` call, asserted present in `test_check_tier_rule.py`.
+4. **Addition: breach reachability.** Check 3 exempts material the breach consumes from "nothing
+   consumes it" — this addition requires the breach's own `requires` to be satisfiable BY THE CHAIN,
+   checked against the capability state at the end of it (capabilities are monotonic — never decay — so
+   "reachable at the end" and "reachable at some point" are the same question). Without this, the
+   exemption could launder an unreachable terminal state.
+
+**A fifth decision, mine, found while building fixture 3 (the chain-of-three-decorative-demands case),
+not dictated by the schema review or the director's four decisions above.** Output-consequence clause
+(b) as originally specified ("opens access to a material that was inaccessible") turned out to have the
+exact vacuity clause (a) was fixed for, for a different reason. If a demand's numeric capability grant
+(`cut_hardness`) is what causally satisfies the *next* demand's input-provenance requirement — which is
+how every hardness-escalator chain works — then, by construction, that same grant also "opens access" to
+that same material, so clause (b) would pass trivially for every demand whose grant enables the next
+one's provenance, at every step, always. That collapses output consequence into a restatement of input
+provenance for the single most common real pattern (progressively harder rock), which is precisely the
+"policed inputs only" vacuity the three-part rule was written to replace. Fix: clause (b) now requires
+the newly-reachable material to also be in `schema.meaningfully_referenced_materials()` — consumed by a
+recipe input or required by the breach, mirroring clause (a)'s "referenced elsewhere in the graph"
+discipline exactly. **Confirmed necessary, not just defensible, by direct mutation test**: fixture 3's
+chain first without this exclusion (verified by hand before writing the code — every step of the
+hardness-escalator chain passes clause (b) trivially, silently) and then with it (all three decorative
+demands correctly fail, and fixing only the last one retroactively passes the other two via clause (c) —
+observed in `test_check_tier_rule.py`, not assumed).
+
+**Honest residual, stated in the module docstring and the README, not overclaimed:** clause (a)'s
+"referenced elsewhere" test and clause (b)'s matching one close the single-hop decorative dodge. A
+sufficiently motivated author could still wire a decorative verb into a fake recipe whose own output
+nothing meaningfully consumes — but that output is then caught by check 3, or the fake chain has to keep
+growing to dodge it, at which point it is a real subsystem, not a free pass. The three checks compose to
+close the single-hop case; they do not close every possible adversarial multi-hop one.
+
+**Built:** `tools/economy_check/schema.py` (97 lines — Capability accumulation, Material accessibility,
+`meaningfully_referenced_materials`), `check_tier_rule.py` (279 lines — the four checks, `check_chain`,
+`format_report`, a CLI with no default target since no real chain file exists yet), `README.md`. Test:
+`test_check_tier_rule.py` (255 lines) — the director's 5 fixtures plus the breach-reachability addition,
+19 mutation cases total, every BROKEN case observed actually failing before its FIXED counterpart is
+trusted, `tools/anvil/test_check_integrity.py`'s own discipline. All 19 OBSERVED, verified by running the
+file, not assumed. CLI verified directly against two hand-built chain files (a clean one: exit 0, every
+line PASS or n/a; the decorative-chain one: exit 1, D2/D3/D4 correctly FAIL, and check 3 independently
+flagged the chain's own unconsumed recipe output — the composition working exactly as the residual-gap
+note above describes).
+
+**LOC, implementation/test split per this project's convention:** 376 implementation (`schema.py` +
+`check_tier_rule.py`) / 255 test / 631 total. Counts toward `tools/`'s instrument total
+(`check_loc_ratio.py`: instrument +631 this window, game +0 — still ADVISORY, game LOC under the
+2,000-line floor, reported per instruction, not reacted to). Does not touch or count against the Anvil
+budget — a separate instrument, `tools/anvil/` untouched.
+
+No `data/economy/` content, no `core/`/`sim/` code touched (`git diff --stat -- '*.gd'` confirms empty).
+All 9 structural gates + `schema_validator.py` + `data_codegen/generate.py --check` re-run and PASS after
+the build (`check_untracked_files` FAILs pre-commit as expected — new files — and PASSes once committed).
+
+Reverse: delete `tools/economy_check/`, revert the `tools/README.md` addition. No other file touched.
