@@ -3621,3 +3621,50 @@ Each instrument's yield-counter statement (D0097) is unchanged, not removed by t
 
 Gates re-run and PASS, including the new `test_quality_check.py` cases. No `core/`/`sim/` file touched by
 this item.
+
+## D0100 · 2026-08-28 · `_resolve_horizontal` refactored: complexity 24 → 13 (worst case), two Extract Methods, proven behavior-preserving
+
+Director's acceptance condition on the FINDING filed at D0098 (`.anvil/log/2026-08-28T215456.495534Z-
+4b27d7cb.json`). Mechanical extraction only, no behavior change of any kind — every transformation is
+Extract Method: a contiguous block of statements moved verbatim into a new private function, called from
+where it used to sit, with `continue` (only meaningful inside the original loop) becoming `return`
+(equally meaningful once that block is its own function called once per iteration with nothing after the
+call) — not a single condition, operator, or ordering changed.
+
+**Two extractions, one function split into three:**
+1. `_resolve_horizontal` (was: the whole per-cell classify/step/mantle/depenetrate body, inline in a
+   doubly-nested for-loop) is now JUST the loop, calling `_resolve_horizontal_cell` once per `(cx, cy)`.
+   Dropped out of the complexity outlier list entirely (was 24, now below the 6.0 fence, not printed).
+2. `_resolve_horizontal_cell` (new) got a second extraction of its own: the step-up/mantle/edge-catch
+   cascade — which shared `extends_forward`/`vel_x != 0` across all three of its `if`s — moved into
+   `_try_climb`, returning `true` (climb succeeded, caller returns early) or `false` (caller falls
+   through to depenetration), the exact `continue`-vs-fall-through shape the original had.
+
+**Real, measured result — real progress, not the fence chased to zero.** Worst-case GDScript complexity
+in the whole corpus: 24 → 13 (`_try_climb`; `_resolve_horizontal_cell` itself is 11). Neither new
+function clears the 6.0 fence. Stopped here deliberately: a third extraction (splitting the bbox-reject
+or ledge-classifier checks out of `_resolve_horizontal_cell`, or splitting `_try_climb`'s three cascading
+`if`s into three separate functions) was considered and rejected — each would fragment one cohesive
+"does this obstruction let the body climb it" decision into pieces that don't stand alone, trading real
+cohesion for a smaller number, the same failure class as lowering a threshold to pass. Two functions
+above the fence, both far below the original 24 and each independently nameable, is the honest stopping
+point, not three-plus functions chasing the fence itself.
+
+**Behavior verified byte-identical, not merely "still green,"** before touching anything and again after
+both extractions: `test_body.gd`, `test_body_acceptance.gd`, `test_hostile_chamber.gd`,
+`test_reachability_sweep.gd`, `test_bounds_invariant.gd`, `test_body_fuzz_fast.gd`,
+`test_replay_determinism.gd` — ALL PASS both times, diffed line-by-line against the pre-refactor output;
+the only differences found were stack-trace line numbers (`_enforce_grid_bounds` moved from body.gd:292
+to :316, since two new functions now sit above it in the file) — a diagnostic artifact, not a behavior
+change. The FULL `test_body_fuzz.gd` sweep (1000 seeds × 1500 ticks, ~140s, not part of the fast per-
+commit path) was also run before and after, given the stakes: `FUZZ_SUMMARY` is byte-for-byte identical
+across 1,500,000 simulated ticks — `violations=18251`, `bounds=18218`, `floor_selection=0`,
+`embedded=1/1` (D0059's own residual bound), `grounded_no_floor=32/32` (D0061's design trade-off bound).
+`godot --check-only` parse-clean after each edit.
+
+Gates re-run and PASS (including `duplication.py`, 0 clusters — the new functions were checked against
+the corpus, not just added to it). `check_size_limits.py` unaffected: no function in this file crosses
+50 lines.
+
+Reverse: revert this commit; `_resolve_horizontal`'s pre-refactor body is recoverable verbatim from the
+prior commit, since nothing about the logic itself changed, only its shape.
