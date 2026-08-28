@@ -140,7 +140,7 @@ check_integrity.py` (9 events, referentially sound) + `duplication.py` (CI's blo
 re-run and PASS. `test_quality_check.py` 41/41. `tests/test_body.gd` re-run ALL PASS after the
 `vertical_resolve.gd` docstring addition (comment-only, parse-checked clean, no logic touched).
 
-**Commits this round: pending (about to commit). Unpushed before this round's commit: 0.**
+**Commits this round: 1 (`864dcd4`). Unpushed: 1, about to push.**
 
 ## Claims
 
