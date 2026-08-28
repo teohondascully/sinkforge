@@ -5,13 +5,35 @@ executes anything. Built against `tools/economy_check/test_check_tier_rule.py`'s
 
     python3 tools/economy_check/check_tier_rule.py <chain.json|chain.yaml>
 
-## Scope, stated here AND in every report's output (not just this docstring, per the director's explicit
-instruction -- a green result that silently excludes a whole verb path is exactly the kind of thing an
-audit catches later, not something to bury in a comment)
+## Two things stated here AND in every report's output (not just this docstring, per the director's
+explicit instruction -- a green result that silently excludes something is exactly what an audit catches
+later, not something to bury in a comment)
 
-This checks the RIG-DEMAND chain only. `docs/GDD.md`:135 names a second, separate verb path -- artifacts
-found in ruins, unlocking verbs "through a different door." Nothing here models that path. A PASS from
-this checker says the rig-demand chain is coherent; it says nothing about artifact-granted verbs.
+**Scope** (`SCOPE_NOTE`). This checks the RIG-DEMAND chain only. `docs/GDD.md`:135 names a second,
+separate verb path -- artifacts found in ruins, unlocking verbs "through a different door." Nothing here
+models that path. A PASS from this checker says the rig-demand chain is coherent; it says nothing about
+artifact-granted verbs.
+
+**The two-hop residual** (`RESIDUAL_NOTE`). Output consequence (check 2, below) verifies one hop:
+"meaningfully referenced" means a Recipe or the Breach uses the thing directly, right now. It does not
+verify that THAT recipe's own output, or a demand consuming that material, is itself non-decorative. A
+demand granting a verb whose only real consumer is a recipe feeding a second, independently-decorative
+demand can still PASS -- because check 3 treats "required by a demand" as consumption regardless of
+whether that demand itself passes anything. Director-confirmed, left open on purpose
+(`docs/DECISIONS_LEDGER.md` D0093, logged as an Anvil FINDING, `source_class: artifact-instrument`, so
+the gap travels with the checker rather than living only in a chat transcript). Demonstrated, not just
+asserted, by `test_check_tier_rule.py`'s `witness_two_hop_decorative_gap_documented_not_fixed`.
+
+## The checks
+
+**0. Reference integrity**, run first. Every material id `schema.iter_material_references()` yields must
+resolve to a real `chain["materials"]` entry; demand and recipe ids must be unique within their own list.
+The untyped-reference class `tools/anvil/schema.py`'s `REFERENCE_FIELDS` closes for the event log
+(`docs/DECISIONS_LEDGER.md` D0069), applied here so the same discipline holds in both schemas -- the
+director's explicit instruction, since "one architecture at two scales" is only true if the reference
+discipline is actually identical, not merely similar. If this fails, the other four checks are NOT run --
+a graph query over an id that doesn't resolve would raise, not report, and a raised exception is a worse
+failure mode than a named one.
 
 ## The three checks
 
@@ -55,7 +77,8 @@ the design, which is the checker doing its job, not a bug in the checker.
 another recipe's input, required by a demand, or required by the breach. Scoped to manufactured
 materials (recipe outputs) -- raw ore sitting unmined is a different, milder problem than a refined
 product with no sink, and conflating them would blur the exact failure this check exists to catch (the
-legacy game's terminal high-tier products).
+legacy game's terminal high-tier products). **This is the exact clause the two-hop residual above lives
+in**: "required by a demand" does not ask whether that demand itself passed anything.
 
 **4. Breach reachability (the director's addition).** The breach's own `requires` must be satisfiable BY
 THE CHAIN, not merely declared. Checked against the capability state at the END of the demand chain --
@@ -71,12 +94,47 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from schema import accessible_for, accumulate, material_reachable, meaningfully_referenced_materials  # noqa: E402
+from schema import (accessible_for, accumulate, iter_material_references, material_reachable,  # noqa: E402
+                     meaningfully_referenced_materials)
 
 SCOPE_NOTE = (
     "SCOPE: rig-demand chain only. Artifact-granted verbs from ruins (docs/GDD.md:135) are a second, "
     "separate unlock path this instrument does not model -- a PASS below says nothing about that path."
 )
+
+RESIDUAL_NOTE = (
+    "RESIDUAL (known, open, not fixed -- docs/DECISIONS_LEDGER.md D0093): output consequence verifies "
+    "ONE HOP. A verb/material counts as meaningfully referenced the moment a recipe or the breach uses "
+    "it directly -- this checker does NOT verify that recipe's own output, or a demand consuming that "
+    "material, is itself non-decorative. A demand granting a verb consumed only by another demand that "
+    "itself fails every check can still PASS below."
+)
+
+
+def check_reference_integrity(chain: dict) -> list[str]:
+    """Every material id iter_material_references() yields must resolve to a real chain["materials"]
+    entry; demand and recipe ids must be unique within their own list. Mirrors
+    tools/anvil/check_integrity.py's reference-resolution walk -- the director's explicit instruction
+    that the two schemas carry identical reference discipline, not merely analogous ones."""
+    errors = []
+    materials = chain["materials"]
+    for location, material_id in iter_material_references(chain):
+        if material_id not in materials:
+            errors.append(f"{location}: references unknown material {material_id!r}")
+
+    seen_demand_ids: set[str] = set()
+    for demand in chain["demands"]:
+        if demand["id"] in seen_demand_ids:
+            errors.append(f"demand id {demand['id']!r}: duplicate, appears more than once in this chain")
+        seen_demand_ids.add(demand["id"])
+
+    seen_recipe_ids: set[str] = set()
+    for recipe in chain["recipes"]:
+        if recipe["id"] in seen_recipe_ids:
+            errors.append(f"recipe id {recipe['id']!r}: duplicate, appears more than once in this chain")
+        seen_recipe_ids.add(recipe["id"])
+
+    return errors
 
 
 def check_input_provenance(chain: dict) -> list[tuple[str, str, str]]:
@@ -220,7 +278,11 @@ def check_breach_reachable(chain: dict) -> list[tuple[str, str, str]]:
 
 
 def check_chain(chain: dict) -> dict:
+    reference_errors = check_reference_integrity(chain)
+    if reference_errors:
+        return {"reference_integrity": reference_errors}
     return {
+        "reference_integrity": [],
         "input_provenance": check_input_provenance(chain),
         "output_consequence": check_output_consequence(chain),
         "terminal_products": check_terminal_products(chain),
@@ -230,7 +292,22 @@ def check_chain(chain: dict) -> dict:
 
 def format_report(report: dict) -> tuple[str, bool]:
     ok = True
-    lines = [SCOPE_NOTE, ""]
+    lines = [SCOPE_NOTE, RESIDUAL_NOTE, ""]
+
+    if report["reference_integrity"]:
+        ok = False
+        lines.append("Reference integrity:")
+        for error in report["reference_integrity"]:
+            lines.append(f"  [FAIL] {error}")
+        lines.append("")
+        lines.append("Input provenance, output consequence, terminal products, and breach reachability "
+                      "were NOT run -- this chain does not resolve, and running graph queries over an "
+                      "unresolved reference would raise, not report.")
+        return "\n".join(lines), ok
+
+    lines.append("Reference integrity: PASS -- every material id resolves, no duplicate demand/recipe "
+                  "ids.")
+    lines.append("")
 
     def section(title: str, rows: list[tuple[str, str, str]], empty_note: str) -> None:
         nonlocal ok

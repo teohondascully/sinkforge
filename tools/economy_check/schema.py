@@ -95,3 +95,34 @@ def meaningfully_referenced_materials(chain: dict) -> set[str]:
     referenced = {entry["material"] for recipe in chain["recipes"] for entry in recipe["inputs"]}
     referenced |= {entry["material"] for entry in chain["breach"]["requires"]}
     return referenced
+
+
+# Typed-reference table, mirroring tools/anvil/schema.py's REFERENCE_FIELDS -- the director's explicit
+# instruction (docs/DECISIONS_LEDGER.md D0093) that the two schemas carry the SAME reference discipline,
+# not merely an analogous one. Every entry maps (entity_kind, field_name) -> the registry a reference in
+# that field must resolve against. Materials are the only referenceable registry today (demands and
+# recipes have no id-references to each other) -- kept in this shape rather than a bare "always check
+# materials" so a future reference type (a demand naming a prerequisite demand, say) slots into the same
+# table instead of forcing a redesign, the same reasoning tools/anvil/schema.py gives for keeping its own
+# table even where a field's legal-target set has just one member.
+REFERENCE_FIELDS = {
+    ("demand", "requires"): "materials",
+    ("recipe", "inputs"): "materials",
+    ("recipe", "outputs"): "materials",
+    ("breach", "requires"): "materials",
+}
+
+
+def iter_material_references(chain: dict):
+    """Yield (location, material_id) for every material-id reference REFERENCE_FIELDS names, walked
+    against the chain's actual data -- tools/anvil/schema.py's iter_reference_targets, for this schema."""
+    for demand in chain["demands"]:
+        for entry in demand["requires"]:
+            yield f"demand {demand['id']!r}.requires", entry["material"]
+    for recipe in chain["recipes"]:
+        for entry in recipe["inputs"]:
+            yield f"recipe {recipe['id']!r}.inputs", entry["material"]
+        for entry in recipe["outputs"]:
+            yield f"recipe {recipe['id']!r}.outputs", entry["material"]
+    for entry in chain["breach"]["requires"]:
+        yield "breach.requires", entry["material"]

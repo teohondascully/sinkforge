@@ -3125,3 +3125,61 @@ All 9 structural gates + `schema_validator.py` + `data_codegen/generate.py --che
 the build (`check_untracked_files` FAILs pre-commit as expected — new files — and PASSes once committed).
 
 Reverse: delete `tools/economy_check/`, revert the `tools/README.md` addition. No other file touched.
+
+## D0093 · 2026-08-28 · tools/economy_check/ — reference integrity, the two-hop residual named in output, and an Anvil FINDING recording it
+
+Three director follow-ups to D0092, none blocking, before the director authors D1-D6 against the checker.
+
+**1. Reference integrity, mirroring `tools/anvil/schema.py`'s typed-reference discipline exactly.** The
+director's framing: an unresolved reference here is the same untyped-reference class Codex found in
+Anvil's schema (D0069) reappearing, and "one architecture at two scales" is only true if the reference
+discipline is identical, not merely analogous. Added `schema.REFERENCE_FIELDS` +
+`iter_material_references` (mirroring `REFERENCE_FIELDS`/`iter_reference_targets`) and
+`check_tier_rule.check_reference_integrity` (mirroring `check_integrity.py`'s resolution walk): every
+material id named by a `Demand.requires`, `Recipe.inputs`, `Recipe.outputs`, or `Breach.requires` entry
+must resolve to a real `chain["materials"]` entry; demand and recipe ids must be unique within their own
+list. `check_chain` now runs this FIRST and skips the four graph-query checks entirely if it fails — a
+graph query over an unresolved id would raise, not report, and a raised exception is a worse failure mode
+than a named one. Mutation-tested: one broken/fixed pair per reference site (demand.requires,
+recipe.inputs, recipe.outputs, breach.requires) plus duplicate demand id and duplicate recipe id, plus
+direct assertions that `check_chain` skips the four checks on a broken reference and runs them on a clean
+one, plus that `format_report` names the bad reference and explains the skip rather than crashing — 12
+new cases, all OBSERVED. **One of those mutation tests caught a bug in its own fixture**: the "FIXED"
+chain referenced `ingot_iron` as a recipe output and a breach requirement but never added it to the
+materials registry — caught by the very check being tested, fixed once observed, exactly the discipline
+this project asks of every new guard.
+
+**2. The two-hop decorative gap, left open, named in the checker's OUTPUT.** D0092's own docstring
+already stated the residual (clause (a)'s "referenced elsewhere" test closes the single-hop dodge, not
+every multi-hop one) — but only in the docstring. The director's instruction: a reader of a green result
+must be able to see this specific case was not verified, without having read the source. Added
+`RESIDUAL_NOTE`, printed in every `format_report` call alongside `SCOPE_NOTE` (same treatment, same
+justification: a silent exclusion is what an audit finds later). Demonstrated, not just asserted, with a
+concrete witness (`test_check_tier_rule.py`'s `witness_two_hop_decorative_gap_documented_not_fixed`): a
+demand D1 grants a verb referenced only by a recipe whose sole output is required only by demand D2, and
+D2 independently fails output consequence — D1 still passes (correctly, per clause (a) as designed), and
+`check_terminal_products` does not flag the recipe's output as terminal either, since "required by a
+demand" doesn't ask whether that demand itself passed anything. This is NOT a fix — the witness documents
+current, accepted behavior; closing it fully would mean recursively verifying that everything downstream
+of a reference is itself non-decorative, arbitrarily deep, which the director explicitly did not ask for.
+
+**3. Logged as an Anvil FINDING**, not just this ledger entry — `.anvil/log/2026-08-28T165338.936688Z-
+a677726d.json`, `source_class: artifact-instrument`, `severity: medium`, `confidence: high`,
+`independent_of: []` (single-source, not yet corroborated), citing the witness test as evidence directly.
+`tools/anvil/check_integrity.py` re-run after appending: `PASS -- 5 event(s) checked, referentially
+sound.` The director's own reasoning for why this needs to be an Anvil event and not only prose: "when
+the real economy is authored, this finding is the thing to check the D-chain against by hand" — a finding
+that exists only in a chat transcript would not reach that session.
+
+**Numbers, verified not assumed:** `test_check_tier_rule.py` now 34/34 OBSERVED (up from 19). LOC: 128
+`schema.py` (+31) / 356 `check_tier_rule.py` (+77) / 375 `test_check_tier_rule.py` (+120) = 484
+implementation / 375 test / 859 total (up from 376/255/631). CLI re-verified directly against a clean
+chain (exit 0, both new notes present in the output) and a broken-reference chain (exit 1, names the bad
+reference, explains the skip). All structural gates, `schema_validator.py`, `data_codegen --check`, and
+`tools/anvil/check_integrity.py` re-run and PASS. No `data/economy/` content, no `core/`/`sim/` code
+touched.
+
+Reverse: revert `tools/economy_check/{schema.py,check_tier_rule.py,test_check_tier_rule.py,README.md}` to
+their D0092 state; the Anvil FINDING event is immutable per Anvil's own append-only design (D0092's
+`check_integrity.py`) and cannot be reversed by deletion — a correction, if ever needed, would be a new
+event, not an edit.

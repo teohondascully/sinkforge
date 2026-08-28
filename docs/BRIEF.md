@@ -4,74 +4,87 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-28. This round: built `tools/economy_check/`, the tier-rule checker, against
-synthetic fixtures — no `data/economy/` content, which the director authors next.** Two-stage: a schema
-proposal reviewed and approved with four corrections plus one addition, then the build. One further
-design gap found and fixed during implementation, not dictated by the review — output-consequence clause
-(b) needed the same "referenced elsewhere in the graph" discipline clause (a) got, confirmed necessary by
-the most important of the six mutation fixtures. All 19 mutation cases observed firing correctly. No
-`core/`/`sim/` code touched.
+**Last updated: 2026-08-28. This round: `tools/economy_check/` approved, then three follow-ups landed —
+reference integrity, the two-hop residual named in the checker's own output, and an Anvil FINDING
+recording it.** Director's verdict on the checker itself: "the instrument whose absence killed the last
+game, proven against synthetic failure first." The three follow-ups mirror Anvil's typed-reference
+discipline exactly (a director-stated requirement, not a nice-to-have — "one architecture at two scales"
+only holds if the reference discipline is identical), surface a known, deliberately-unfixed gap in the
+report a reader actually sees, and put that gap in the permanent record rather than only this document.
+`test_check_tier_rule.py`: 34/34 OBSERVED. No `core/`/`sim/` code touched. Stopped, as instructed — the
+director authors D1-D6 against this checker next, present.
 
 ---
 
 ## EXPENSIVE, awaiting you
 
-- **`data/economy/`** — the real demand/material/recipe/unlock rows, checked against
-  `tools/economy_check/` once authored. Explicitly held for you.
+- **`data/economy/`, D1 through D6** — the real demand/material/recipe/unlock rows, authored with you
+  present, checked against `tools/economy_check/` as they land. The step this tool was built to make
+  safe.
 - **`sim/run`/`sim/meta`'s actual shape** — still open, unchanged this round.
 - **Whether lateral variety survives losing re-rolled geology** — unchanged, `docs/GDD.md` §8.
 - Eleven tracked `docs/*.md` files outside `docs/README.md`'s normative table — unchanged.
 - `incoming/ANVIL_ARCHITECTURE.md`'s disposition — unchanged.
-- **Whether `tools/economy_check/` gets wired into CI** — not decided. No real data exists yet for a
-  gate to check; deferred until `data/economy/` does.
+- **Whether `tools/economy_check/` gets wired into CI** — not decided, still waiting on real data to
+  check.
+- **The two-hop decorative gap itself** — logged, not fixed, on purpose. When D1-D6 land, this is the
+  finding to check the chain against by hand (`.anvil/log/2026-08-28T165338.936688Z-a677726d.json`).
 
 ## What was learned
 
 - **Output-consequence clause (b) had the same vacuity clause (a) did, for a structurally different
-  reason, and it only surfaced while building the mutation fixture meant to catch it.** If a demand's
-  numeric capability grant is what causally satisfies the *next* demand's input-provenance requirement —
-  the normal shape of a hardness-escalator chain — then by construction that same grant "opens access"
-  to that same material, so clause (b) as originally specified would pass trivially at every step of the
-  single most common real pattern. That's a restatement of input provenance wearing output-consequence's
-  clothes, exactly the "policed inputs only" vacuity the three-part rule replaced. Fixed by requiring the
-  newly-opened material to also be consumed by a recipe or the breach — mirroring clause (a)'s "referenced
-  elsewhere" test exactly. Verified necessary by hand before writing the fix (traced the vacuous case),
-  then confirmed by the fixture itself (`docs/DECISIONS_LEDGER.md` D0092).
-- **The "chain of three decorative demands" fixture (the director's own emphasis: "if the checker stays
-  silent on it the checker is wrong") is what found the clause (b) gap.** A fixture built to exercise a
-  known failure mode surfaced a second, unrequested one nearby — the value of building the fixture the
-  director called most important first, not last.
-- **The checks compose usefully even where neither was specifically aimed.** Running the decorative-chain
-  CLI case incidentally tripped check 3 (terminal products) on the fixture's own unused recipe output,
-  unprompted — direct evidence for the "residual gap" reasoning in the checker's own docstring: a fake
-  chain built to dodge one check tends to trip another.
+  reason, surfaced while building the fixture meant to catch a different thing.** If a demand's numeric
+  capability grant is what causally satisfies the *next* demand's input-provenance requirement — the
+  normal shape of a hardness-escalator chain — that same grant "opens access" to that material too, so
+  clause (b) as first specified would pass trivially at every step of the single most common real
+  pattern. Fixed by requiring the newly-opened material to also be consumed by a recipe or the breach,
+  mirroring clause (a)'s own fix. Verified necessary by hand, then confirmed by the fixture itself
+  (`docs/DECISIONS_LEDGER.md` D0092).
+- **A mutation test can catch a bug in its own fixture, and that's the check working, not failing.**
+  Building the reference-integrity tests, the "FIXED" chain for fixture 7 referenced `ingot_iron` from a
+  recipe output and the breach but never added it to the materials registry — caught immediately by the
+  very check under test. Fixed once observed, not guessed at in advance (`docs/DECISIONS_LEDGER.md`
+  D0093).
+- **A residual a checker can't close is still worth building the checker around, as long as the gap
+  travels with it.** The two-hop decorative-verb case isn't fixed — closing it means recursively
+  verifying everything downstream is non-decorative, a materially larger problem than this rule's scope.
+  What changed this round is where the gap lives: from a docstring paragraph to the report's own printed
+  output (`RESIDUAL_NOTE`) plus a permanent, referentially-checked Anvil event — a green result can no
+  longer be misread as "everything downstream verified."
+- **Consistency between two schemas is a testable claim, not a description.** "One architecture at two
+  scales" (Anvil's event log, this chain) was true in spirit before this round and now true by direct
+  mirroring — the same typed-reference-table shape, the same "resolve first, skip everything else on
+  failure" behavior, checked by the same class of mutation test in both.
 
 ## What landed this round
 
-Full detail: `docs/DECISIONS_LEDGER.md` D0092.
+Full detail: `docs/DECISIONS_LEDGER.md` D0092 (the build), D0093 (this round's three follow-ups).
 
-`tools/economy_check/` — `schema.py` (97 lines), `check_tier_rule.py` (279 lines), `README.md`,
-`test_check_tier_rule.py` (255 lines, 19 mutation cases, all OBSERVED). CLI verified directly against a
-clean hand-built chain (exit 0) and the decorative-chain fixture (exit 1, correct FAILs). `tools/README.md`
-gained one entry for the new subdirectory. Uncommitted at the time of writing; committing alongside this
-report.
+`tools/economy_check/` — `schema.py` (128 lines), `check_tier_rule.py` (356 lines), `README.md`,
+`test_check_tier_rule.py` (375 lines, 34 mutation cases, all OBSERVED). New this round: reference
+integrity (`check_reference_integrity`, `schema.REFERENCE_FIELDS`/`iter_material_references`, mirroring
+`tools/anvil/schema.py` exactly), `RESIDUAL_NOTE` printed in every report alongside `SCOPE_NOTE`, and an
+Anvil `FINDING` event recording the two-hop gap (`source_class: artifact-instrument`). CLI re-verified
+directly against a clean chain and a broken-reference chain. Committed and pushed alongside this report.
 
 ## Gates
 
-All 9 structural gates + `schema_validator.py` + `data_codegen/generate.py --check` re-run and PASS after
-the build (`check_untracked_files` correctly FAILed pre-commit on the new, then-untracked files —
-expected, resolves on commit).
+All 9 structural gates + `schema_validator.py` + `data_codegen/generate.py --check` re-run and PASS.
+`tools/anvil/check_integrity.py` re-run after appending the FINDING: `PASS -- 5 event(s) checked,
+referentially sound.`
 
-**LOC ratio: instrument grew +631 this window (`tools/economy_check/`), game +0 — absolute ratio 4.347.**
-Still ADVISORY, game LOC (1,424) under the 2,000-line floor. Reported per instruction, not reacted to.
+**LOC ratio: instrument total 6,418 / game total 1,424, absolute ratio 4.507.** Trailing-10-commit
+window (`58fc97f`..HEAD): instrument +859, game +0. Still ADVISORY, game LOC under the 2,000-line floor.
+Reported per instruction, not reacted to.
 
-**Anvil: unchanged this round** — implementation 513 / test 420 / total 933, cap 1,000/2,000. No Anvil
-work this session; `tools/economy_check/` is a separate instrument and does not count against this cap.
+**Anvil: log grew by one FINDING event this round (5 total), the log-content cap does not apply to code**
+— implementation 513 / test 420 / total 933, cap 1,000/2,000, unchanged. `tools/economy_check/` is a
+separate instrument and does not count against this cap.
 
-**`tools/economy_check/` own split: 376 implementation / 255 test / 631 total.**
+**`tools/economy_check/` own split: 484 implementation / 375 test / 859 total** (up from 376/255/631 at
+D0092 — this round added 108 implementation / 120 test lines).
 
-**Commits this round: 1** (this build, landing with this report). **Unpushed: 1**, to be pushed with this
-report.
+**Commits this round: 2** (D0092's build, D0093's follow-ups). **Unpushed: 0**, pushed with this report.
 
 ## Claims
 
@@ -80,8 +93,8 @@ report.
 
 ## Blocked, and what it's waiting on
 
-- **`data/economy/`** — waits for you, explicitly, this round more than ever: the checker is now built
-  and mutation-tested, ready to validate the first real chain the moment it exists.
+- **`data/economy/`, D1-D6** — waits for you, explicitly, with you present — the checker is built,
+  mutation-tested, and its own known gap is on record, ready to validate the first real chain.
 - **`sim/run`/`sim/meta`'s shape** — waits for a real decision, unchanged.
 - Gate 10, item 2 (human-biased fuzzer), rope, chunk size (D0019), coordinate type scheme (D0020) —
   unchanged.

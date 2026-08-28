@@ -15,14 +15,22 @@ The six fixtures, matching the director's list exactly (docs/DECISIONS_LEDGER.md
   4. A terminal product -- a recipe output nothing consumes.
   5. A valid chain -- every check clean, the positive control proving this isn't just an always-fail.
   6. The addition -- a breach requiring a material no demand in the chain ever makes accessible.
+
+Plus, this round (docs/DECISIONS_LEDGER.md D0093):
+  7. Reference integrity -- an unresolved material id at each of the four reference sites, plus
+     duplicate demand/recipe ids -- tools/anvil/schema.py's REFERENCE_FIELDS class, applied here.
+  8. A witness (not a fixture to fix -- the director's explicit "leave it open"): a concrete,
+     executable demonstration of the two-hop decorative gap RESIDUAL_NOTE names in the checker's own
+     output. Documents current, accepted behavior; does not assert it should change.
 """
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_tier_rule import (check_breach_reachable, check_input_provenance,  # noqa: E402
-                              check_output_consequence, check_terminal_products, format_report,
-                              check_chain, SCOPE_NOTE)
+                              check_output_consequence, check_reference_integrity,
+                              check_terminal_products, format_report, check_chain, RESIDUAL_NOTE,
+                              SCOPE_NOTE)
 
 
 def mat(hardness=0.0, mass=1.0, verbs=None):
@@ -213,6 +221,12 @@ def fixture_5_valid_chain() -> None:
                      scope_present))
     print(f"[{'OBSERVED' if scope_present else 'NOT OBSERVED -- BRANCH UNTESTED'}] scope note in output")
 
+    residual_present = RESIDUAL_NOTE in text and "one hop" in text.lower()
+    RESULTS.append(("two-hop residual is stated in the checker's OUTPUT, not just its docstring",
+                     residual_present))
+    print(f"[{'OBSERVED' if residual_present else 'NOT OBSERVED -- BRANCH UNTESTED'}] residual note in "
+          f"output")
+
 
 # --- Fixture 6 (addition): breach requires an unreachable material ------------------------------------
 
@@ -231,11 +245,117 @@ def fixture_6_breach_unreachable() -> None:
           check_breach_reachable(reachable), {"steel_ingot": "pass"})
 
 
+# --- Fixture 7: reference integrity (the director's follow-up, D0093) ---------------------------------
+
+def _assert_errors(name: str, errors: list[str], expect_substring: str) -> None:
+    fired = any(expect_substring in e for e in errors)
+    RESULTS.append((name, fired))
+    status = "OBSERVED" if fired else "NOT OBSERVED -- BRANCH UNTESTED"
+    print(f"[{status}] {name} -- got {errors}")
+
+
+def fixture_7_reference_integrity() -> None:
+    materials = {"ore_iron": mat(1.0), "ingot_iron": mat(0.0)}
+    recipes = [recipe("smelt_iron", [req("ore_iron", 1)], [req("ingot_iron", 1)])]
+
+    broken_demand = make_chain(materials, [], [demand("D1", [req("ore_copper", 1)], {})], [])
+    _assert_errors("fixture7 BROKEN: demand.requires references an unknown material",
+                    check_reference_integrity(broken_demand), "unknown material 'ore_copper'")
+
+    broken_recipe_input = make_chain(materials, [recipe("r", [req("ore_missing", 1)], [], [])], [], [])
+    _assert_errors("fixture7 BROKEN: recipe.inputs references an unknown material",
+                    check_reference_integrity(broken_recipe_input), "unknown material 'ore_missing'")
+
+    broken_recipe_output = make_chain(materials, [recipe("r", [], [req("ingot_missing", 1)], [])], [], [])
+    _assert_errors("fixture7 BROKEN: recipe.outputs references an unknown material",
+                    check_reference_integrity(broken_recipe_output), "unknown material 'ingot_missing'")
+
+    broken_breach = make_chain(materials, [], [], [req("unobtainium_typo", 1)])
+    _assert_errors("fixture7 BROKEN: breach.requires references an unknown material",
+                    check_reference_integrity(broken_breach), "unknown material 'unobtainium_typo'")
+
+    dup_demand = make_chain(materials, [], [
+        demand("D1", [req("ore_iron", 1)], {}), demand("D1", [req("ore_iron", 1)], {}),
+    ], [])
+    _assert_errors("fixture7 BROKEN: duplicate demand id", check_reference_integrity(dup_demand),
+                    "demand id 'D1': duplicate")
+
+    dup_recipe = make_chain(materials, [
+        recipe("r1", [req("ore_iron", 1)], []), recipe("r1", [req("ore_iron", 1)], []),
+    ], [], [])
+    _assert_errors("fixture7 BROKEN: duplicate recipe id", check_reference_integrity(dup_recipe),
+                    "recipe id 'r1': duplicate")
+
+    fixed = make_chain(materials, recipes, [demand("D1", [req("ore_iron", 1)], {})],
+                        [req("ingot_iron", 1)])
+    fixed_errors = check_reference_integrity(fixed)
+    ok = fixed_errors == []
+    RESULTS.append(("fixture7 FIXED: every reference resolves, no duplicates", ok))
+    print(f"[{'OBSERVED' if ok else 'NOT OBSERVED -- BRANCH UNTESTED'}] fixture7 FIXED -- got "
+          f"{fixed_errors}")
+
+    broken_report = check_chain(broken_demand)
+    skipped = ("input_provenance" not in broken_report and broken_report["reference_integrity"])
+    RESULTS.append(("check_chain skips the four graph-query checks when references don't resolve",
+                     skipped))
+    print(f"[{'OBSERVED' if skipped else 'NOT OBSERVED -- BRANCH UNTESTED'}] skip-on-broken-reference -- "
+          f"got keys {sorted(broken_report.keys())}")
+
+    fixed_report = check_chain(fixed)
+    ran = "input_provenance" in fixed_report and "breach_reachable" in fixed_report
+    RESULTS.append(("check_chain runs the four graph-query checks once references resolve", ran))
+    print(f"[{'OBSERVED' if ran else 'NOT OBSERVED -- BRANCH UNTESTED'}] runs-on-clean-reference -- got "
+          f"keys {sorted(fixed_report.keys())}")
+
+    broken_text, broken_ok = format_report(broken_report)
+    reported = (not broken_ok and "unknown material 'ore_copper'" in broken_text
+                and "were NOT run" in broken_text)
+    RESULTS.append(("format_report names the bad reference and explains the skip, doesn't crash",
+                     reported))
+    print(f"[{'OBSERVED' if reported else 'NOT OBSERVED -- BRANCH UNTESTED'}] format_report on a broken "
+          f"reference")
+
+
+# --- Fixture 8: the two-hop decorative gap, a witness, not a fix (D0093 #2) ----------------------------
+
+def witness_two_hop_decorative_gap_documented_not_fixed() -> None:
+    """Does NOT assert this should change -- the director's explicit instruction is to leave it open.
+    This demonstrates, with a real chain, exactly the case docs/DECISIONS_LEDGER.md D0093 and
+    RESIDUAL_NOTE both describe: D1 grants a verb referenced by a recipe (a real, structural fact, so
+    clause (a) correctly passes it) whose output is required ONLY by D2 -- and D2 itself independently
+    FAILS output consequence (grants nothing referenced anywhere). D1's pass is one hop deep; nothing
+    here verifies that the second hop (D2) does anything meaningful, and D1 passes regardless.
+    """
+    materials = {"topsoil": mat(0.0), "copper": mat(2.0), "byproduct": mat(0.0)}
+    recipes = [recipe("fake_recipe", [req("copper", 1)], [req("byproduct", 1)], requires_verbs=["assay"])]
+    demands = [
+        demand("D1", [req("topsoil", 5)], {"cut_hardness": 2.0, "verbs": ["assay"]}),
+        demand("D2", [req("byproduct", 1)], {}),
+    ]
+    chain = make_chain(materials, recipes, demands, [])
+    report = check_chain(chain)
+
+    check("witness: D1 passes output consequence via the verb a recipe references (clause a, correctly)",
+          report["output_consequence"], {"D1": "pass"})
+    check("witness: D2 -- the demand D1's verb actually leads to -- independently fails on its own",
+          report["output_consequence"], {"D2": "fail"})
+    check("witness: byproduct is NOT flagged terminal, because D2 'requires' it -- even though D2 "
+          "itself fails everything", report["terminal_products"], {"byproduct": "pass"})
+
+    text, _ok = format_report(report)
+    residual_documented = RESIDUAL_NOTE in text
+    RESULTS.append(("the checker's own output names this exact gap alongside the pass that exhibits it",
+                     residual_documented))
+    print(f"[{'OBSERVED' if residual_documented else 'NOT OBSERVED -- BRANCH UNTESTED'}] residual note "
+          f"present alongside the witnessed gap")
+
+
 def main() -> int:
     for branch in (fixture_1_input_provenance, branch_d1_reports_na_not_pass,
                    branch_d2_gets_no_exemption, fixture_2_decorative_demand,
                    fixture_3_decorative_chain, fixture_4_terminal_product, fixture_5_valid_chain,
-                   fixture_6_breach_unreachable):
+                   fixture_6_breach_unreachable, fixture_7_reference_integrity,
+                   witness_two_hop_decorative_gap_documented_not_fixed):
         branch()
 
     failed = [name for name, ok in RESULTS if not ok]

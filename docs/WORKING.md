@@ -25,7 +25,20 @@ Built: `tools/economy_check/schema.py`, `check_tier_rule.py`, `README.md`, `test
 CLI verified directly against two hand-built chain files. 376 implementation / 255 test / 631 total LOC.
 No `data/economy/` content, no `core/`/`sim/` code touched. All gates re-run and pass.
 
-Stopped, as instructed — "I author the real rows against it."
+**Follow-up round, same day, three items, `docs/DECISIONS_LEDGER.md` D0093:**
+1. Reference integrity — `check_reference_integrity` + `schema.REFERENCE_FIELDS`, mirroring
+   `tools/anvil/schema.py`'s typed-reference discipline exactly (director's explicit "the two schemas
+   stay consistent" instruction). `check_chain` skips the four graph-query checks on a broken reference
+   rather than crashing. 12 new mutation cases, one of which caught a bug in its own fixture.
+2. The two-hop decorative gap named in the checker's output (`RESIDUAL_NOTE`, printed every run), not
+   just its docstring — demonstrated with a concrete witness, not just asserted. Left open, per
+   instruction — not fixed.
+3. Logged as an Anvil `FINDING` (`source_class: artifact-instrument`), `.anvil/log/2026-08-28T165338
+   .936688Z-a677726d.json` — `check_integrity.py` re-run, 5 events, referentially sound.
+
+`test_check_tier_rule.py` now 34/34 OBSERVED. LOC: 484 implementation / 375 test / 859 total.
+
+Stopped, as instructed — "I author the real rows against it," now with the director present next.
 
 ## External audit response — surviving run-structure specifications, 2026-08-27 — CLOSED
 

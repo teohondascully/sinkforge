@@ -12,6 +12,15 @@ first real chain the director authors gets checked against a rule that has alrea
 against its own failure modes, rather than discovering gaps by re-deriving the same failure the legacy
 game shipped.
 
+## Reference integrity, checked first
+
+Every material id a demand/recipe/breach names must resolve to a real entry in the chain's materials
+registry; demand and recipe ids must be unique. Mirrors `tools/anvil/schema.py`'s typed-reference table
+— the director's explicit instruction (`docs/DECISIONS_LEDGER.md` D0093) that the event-log schema and
+this one carry **identical** reference discipline, not merely analogous ones, since "one architecture at
+two scales" is only true if that holds. If a reference doesn't resolve, the four checks below are not
+run — reported as a named failure, not a crash.
+
 ## The three checks, plus one addition
 
 1. **Input provenance** — every demand (after D1) must require at least one material genuinely,
@@ -38,6 +47,20 @@ found in ruins. This instrument doesn't model it. **A PASS here says nothing abo
 in the checker's own output (`SCOPE_NOTE`, printed first in every report), not only in this file, so a
 reader of a passing result isn't relying on having read the docstring too.
 
+## The two-hop residual — open, and named in the output
+
+Output consequence verifies **one hop**: a verb/material counts as meaningfully referenced the moment a
+recipe or the breach uses it directly. It does **not** verify that recipe's own output, or a demand
+consuming that material, is itself non-decorative — a demand granting a verb whose only real consumer
+feeds a second, independently-decorative demand can still pass. Confirmed real, deliberately left open
+(`docs/DECISIONS_LEDGER.md` D0093 — closing it fully means recursively verifying everything downstream is
+non-decorative, arbitrarily deep, a materially larger problem than this rule's stated scope). **Stated in
+every report's output** (`RESIDUAL_NOTE`, printed alongside `SCOPE_NOTE`), not only here, and logged as
+an Anvil `FINDING` (`source_class: artifact-instrument`, `.anvil/log/`) so it travels with the checker
+rather than living only in a chat transcript. Demonstrated with a concrete, executable example —
+`test_check_tier_rule.py`'s `witness_two_hop_decorative_gap_documented_not_fixed` — not just asserted.
+When the real economy is authored, this is the finding to check the D-chain against by hand.
+
 ## Haul-mass is proven, not yet load-bearing
 
 `Material.mass_per_unit` and the `haul_mass` capability axis are real, checked fields — the "extractable
@@ -58,17 +81,20 @@ not this session's call.
 ## Public API
 
 - `schema.py` — `accumulate`, `material_reachable`, `accessible_for`, `meaningfully_referenced_materials`,
-  `BASELINE_CAPABILITY`.
-- `check_tier_rule.py` — `check_input_provenance`, `check_output_consequence`, `check_terminal_products`,
-  `check_breach_reachable`, `check_chain`, `format_report`, and a CLI (`python3 check_tier_rule.py
+  `iter_material_references`, `REFERENCE_FIELDS`, `BASELINE_CAPABILITY`.
+- `check_tier_rule.py` — `check_reference_integrity`, `check_input_provenance`,
+  `check_output_consequence`, `check_terminal_products`, `check_breach_reachable`, `check_chain`,
+  `format_report`, `SCOPE_NOTE`, `RESIDUAL_NOTE`, and a CLI (`python3 check_tier_rule.py
   <chain.json|chain.yaml>` — no default target, since no real chain file exists to point it at yet).
 
 ## Mutation testing
 
-`test_check_tier_rule.py`, run directly (`python3 tools/economy_check/test_check_tier_rule.py`) — 19
-cases across the 6 fixtures (the director's 5 plus the breach-reachability addition), every BROKEN case
-observed actually failing before its FIXED counterpart is trusted to pass, `tools/anvil/
-test_check_integrity.py`'s own discipline. All 19 OBSERVED as of this writing.
+`test_check_tier_rule.py`, run directly (`python3 tools/economy_check/test_check_tier_rule.py`) — 34
+cases across the 8 fixtures (the director's 5, the breach-reachability addition, reference integrity, and
+the two-hop-residual witness), every BROKEN case observed actually failing before its FIXED counterpart
+is trusted to pass, `tools/anvil/test_check_integrity.py`'s own discipline. All 34 OBSERVED as of this
+writing — including one case where the mutation test caught a bug in its own fixture (a recipe output
+referenced but never added to the materials registry), fixed once observed, not before.
 
 ## LOC
 
@@ -86,6 +112,6 @@ a separate instrument, no shared code or cap.
   material referenced only by *another demand's* `requires` does not count (see `schema.py`'s
   `meaningfully_referenced_materials` docstring for why that specific exclusion is load-bearing, not an
   oversight).
-- No referential-integrity validation (unknown material ids in a chain raise a plain `KeyError`, not a
-  named error). Deliberately out of scope — this checks the tier rule, not chain well-formedness; add a
-  real validator only if malformed real data actually shows up needing one.
+- Reference integrity checks material ids only — `Recipe.requires_verbs` and `Demand.grants.verbs` are an
+  open string namespace, not references into a typed registry, so there's nothing to resolve them
+  against. A typo'd verb name is silently just a different, unreferenced verb, not a caught error.
