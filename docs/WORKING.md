@@ -28,6 +28,51 @@ hit, within budget (4 commits).
    by moving it into the shared `test_base.gd` both already extend. 0 clusters now, both languages,
    across the actually-whole tree.
 
+## Director's follow-up round on the execution-dense queue, 2026-08-28 — CLOSED
+
+Four items from the director's response to the queue above. No hard stop.
+
+1. DONE (D0103). `move_and_resolve` at complexity 9 (against a 6.0 fence) — left alone, per instruction:
+   the remainder is the substep `while` loop's own control-flow shape, not reducible by pure mechanical
+   extraction without turning `break`-based loop control into a return-value contract, which is a design
+   decision. Recorded as a known, accepted outlier directly in the function's own docstring, with an
+   explicit acceptance condition (complexity comes down when the function is next touched for any other
+   reason) — not reopened now, since chasing the number itself is the thing these instruments exist to
+   prevent.
+2. DONE (D0105). The `tests/`-unscanned bug named as one consolidated Anvil `FINDING`
+   (`.anvil/log/2026-08-28T233251.702582Z-d3f72a5f.json`), citing three prior instances (D0026, D0091,
+   D0075) as the same law: a sweep bounded by its own author's model of the corpus cannot see outside
+   that model, and a green result from it is evidence only about the covered subset. Concrete
+   follow-through: every `quality_check` instrument's scan scope audited and tabulated
+   (`tools/quality_check/README.md`, "Scope, instrument by instrument") — `duplication.py`/
+   `function_length.py`/`complexity.py` all share `scan.all_functions()` so D0102's fix already closed
+   the gap for all three; `coupling.py`'s narrower `sim/`+`tools/` scope is a stated design decision, not
+   a hidden gap, with one latent (not live) non-recursive-glob gap named for the record.
+3. DONE (D0104). The D0098 FINDING's inaccuracy (it attributed D0059 defects #2 AND #3 to
+   `resolve_ceiling`; #2's actual fix lives in `move_and_resolve`, the caller) corrected via a real
+   superseding Anvil `FINDING` event (`.anvil/log/2026-08-28T233126.646482Z-23f40fb0.json`,
+   `--supersedes=` the original) — original event untouched, per the project's append-only discipline.
+4. DONE (D0106). Test code's place in the quality instruments, decided once: same self-calibrating IQR
+   methodology as production code, computed against test code's OWN population, reported as its own
+   labeled section — never pooled (would distort the fence for both), never a looser a priori number
+   (would be "a guess wearing a decision's clothes"), never exempted (would recreate a blind spot right
+   after D0102/D0105 closed one). `scan.is_test_func` classifies by this repo's own existing `tests/`/
+   `test_*.py` conventions. `function_length.py`/`complexity.py` restructured into four buckets each
+   (GDScript production/tests, Python production/test_*.py); frozen advisory guardrails stay
+   whole-Python-population, unsplit, since they're an absolute drift tripwire, not a distributional read.
+   Verified against the live tree: test code's own fences sit measurably above production code's on both
+   instruments (GDScript production length fence 19.5 vs. tests/ 25.0; complexity 6.0 vs. 6.0; Python
+   production length fence 50.0 vs. test_*.py 42.5; complexity 14.5 vs. 8.5) — confirms the pooling
+   concern was real. `test_quality_check.py` needed six lines of reference repair (the guardrail's result
+   key moved), not new cases — 41/41 OBSERVED, count unchanged by this restructure.
+
+Ratio (`check_loc_ratio.py`, re-measured, not recalled): absolute 5.430 (instrument 8,063 / game 1,485),
+still ADVISORY (game LOC under the 2,000-line floor). Game LOC moved (+61 over the trailing 10 commits)
+but only from refactor signature extraction (`_resolve_horizontal_cell`/`_try_climb`/
+`_resolve_substep_collision`/etc.), not economy content — stated plainly, not read as progress toward the
+target; the number comes down only once `data/economy/` produces machines, which is the director's next
+work, not this session's.
+
 ## tools/quality_check/ — four code-quality instruments, 2026-08-28 — CLOSED
 
 Director-requested, unrelated to `data/economy/`. Correctness gates existed; nothing measured modularity

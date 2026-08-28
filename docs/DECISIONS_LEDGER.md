@@ -3774,3 +3774,167 @@ Gates re-run and PASS.
 
 Reverse: revert this commit; `_flat_grid`'s two prior copies are recoverable verbatim from the prior
 commit if the scope-fix or the fixture move needs undoing independently.
+
+## D0103 · 2026-08-28 · `move_and_resolve`'s remaining complexity (9) recorded as a known, accepted outlier — not reopened
+
+Director's explicit instruction on D0101's partial-only resolution: correct to stop there, and reopening
+it now to chase a lower number "would be refactoring for the number, which is the thing the quality
+tools exist to prevent." Recorded, not re-litigated: a docstring note on `move_and_resolve` itself
+(`sim/body/vertical_resolve.gd`) states the accepted value (9, against the 6.0 fence), why it wasn't
+reduced further (the remaining complexity is the substep `while` loop's own control flow — early-exit
+`break`, the backout branch, the trailing catch-all — not safely reducible by pure mechanical extraction
+without converting `break`-based loop control into a return-value contract, a design decision D0101
+declined to make unilaterally), and the acceptance condition: complexity comes down as part of the next
+change that touches this function for any other reason, not deferred again past that point.
+
+Comment-only change, no logic touched — `godot --check-only` parse-clean, `test_body.gd` re-run, ALL
+PASS.
+
+Reverse: CHEAP — one comment block, `git revert` recovers it in full.
+
+## D0104 · 2026-08-28 · D0098's FINDING corrected via a superseding FINDING, per append-only discipline
+
+Director's explicit instruction: "append a correcting FINDING, do not edit the original, same
+append-only discipline as always." Filed `.anvil/log/2026-08-28T233126.646482Z-23f40fb0.json`,
+`--supersedes=4b27d7cb-8491-413c-8f42-98d9b6f0a1bc` (the original D0098 FINDING) — legal per
+`tools/anvil/schema.py`'s `SUPERSEDES_LEGAL_TARGETS` (`"FINDING": ("FINDING",)`). The original event is
+untouched, still in the log, still readable; the superseding relationship is what marks it corrected.
+
+**The correction itself, first stated in prose at D0101**: the original FINDING attributed BOTH D0059
+items 2 and 3 to `resolve_ceiling`. The world-bounds guard (item 3) genuinely lives there; the "back out
+the substep's own displacement on a failed stop" fix (item 2) lives in `move_and_resolve` (the caller),
+which owns the substep loop the backout has to happen inside — `resolve_ceiling` itself only returns
+whether it stopped and assigns nothing to `body.pos_y`. Does not change the original FINDING's core,
+already-verified claim (1 of D0059's 4 defects lives directly in `body.gd::_resolve_horizontal`, not all
+4 as the director's own initial framing had it) — a correction one level more precise, not a reversal.
+
+Verified referentially sound via `check_integrity.py` before this entry was written.
+
+Reverse: N/A — a `FINDING` event, append-only.
+
+## D0105 · 2026-08-28 · the sweep-blindness law, consolidated into one Anvil FINDING with a per-instrument coverage audit
+
+Director's framing: this pattern — a sweep bounded by its own author's model of the corpus, reporting
+green over a subset while implying whole-corpus coverage — is now confirmed recurring, not incidental,
+and belongs as ONE named, durable thing the next audit can check against, not five scattered ledger
+notes across three sessions.
+
+**Filed as a real Anvil `FINDING` event**, not only ledger prose (which is where the law was first named,
+D0091, with no Anvil event at the time) — `.anvil/log/2026-08-28T233251.702582Z-d3f72a5f.json`,
+`severity: high` (a confirmed-recurring class, not a single incident — and one instance is INSIDE the
+instrument suite built to catch exactly this shape), `confidence: high`, `source_class:
+artifact-instrument`. Four independent instances cited directly in the event's own evidence, not only
+transitively through D0091:
+
+1. **D0026** (2026-08-26): `no_engine_imports.py`'s hand-accumulated class-name list missed 276 of 282
+   real Node-derived classes — found by an audit against Godot's own `ClassDB` registry, not by the
+   gate's own author noticing.
+2. **D0091** (2026-08-27): two of this project's own run-language sweeps missed `CLAUDE.md`,
+   `docs/CLAIMS.md`, eight `sim/*/MODULE.md` files, and an `ARCHITECTURE.md` worked example — found by an
+   independent external audit reading the corpus cold (`docs/DECISIONS_LEDGER.md` D0087 names the fixes).
+   D0091 itself first named the general law, in prose, citing D0026 as instance one and this as instance
+   two.
+3. **D0075** (2026-08-27): `tools/anvil/test_check_integrity.py`'s own mutation-test fixtures
+   self-referenced without their author noticing, because the space of cases modeled at fixture-authoring
+   time never included self-reference as a candidate — the same law one level more abstract: the
+   "corpus" swept was a space of validation cases, not a set of files, but the shape (coverage bounded by
+   what the author thought to include) is identical.
+4. **D0102** (2026-08-28, this session): `tools/quality_check/scan.py`'s own `find_gd_files` — inside
+   the exact instrument suite this whole failure class motivated building — was `GAME_DIRS`-only, missing
+   `tests/` entirely, for four rounds. Found this time by checking the scanner's OWN docstring claim
+   against an independently-scoped peer scanner's actual behavior, not by an external cold read — a
+   narrower, cheaper correction method worth naming as a partial methodological improvement, even though
+   the underlying failure shape is identical to the prior three.
+
+**Practical consequence, stated in the event itself for the next audit**: prefer a corpus-wide mechanical
+check, or a comparison against an independently-scoped peer scanner (D0102's own fix method), over an
+enumerated list of "the files/classes/cases this probably needs to cover" whenever completeness matters
+— the enumeration IS the boundary that goes on to miss things.
+
+**Concrete follow-through: every quality_check instrument's scan scope, audited and tabulated**
+(`tools/quality_check/README.md`, "Scope, instrument by instrument"), not assumed from D0102's own fix
+alone. `duplication.py`/`function_length.py`/`complexity.py` all share `scan.all_functions()`, so
+D0102's fix already closed the gap for all three, not duplication.py alone — confirmed, not assumed, by
+reading each file's own import list. `coupling.py` is the one instrument with a genuinely narrower scope
+(`sim/`+`tools/` only) — but that narrowing is a stated design decision from the director's own original
+brief, not a hidden gap, and the table says so explicitly rather than flagging it as a fifth instance of
+the same bug. One latent (not live) gap named while auditing: `coupling._tools_edges` uses non-recursive
+`.glob` rather than `.rglob` for `tools/<module>/*.py` — currently equivalent (verified: zero `tools/*/`
+subdirectories hold any nested `.py` file today) but would silently diverge the day one does.
+
+**Which historical numbers are now known-suspect, stated precisely rather than blanket-distrusted**: every
+GDScript length/complexity distribution, fence, and outlier COUNT reported at D0096–D0101 describes the
+`GAME_DIRS`-only corpus, not the whole tree — real numbers, narrower population than their own prose
+implied. One specific claim was checked against the corrected corpus rather than assumed to survive:
+D0098's "`_resolve_horizontal` (24) is the single highest-complexity GDScript function" — verified still
+true against the whole-tree corpus (24 > `tests/fixture_body_fuzz_probe.gd:_check_tick`'s 21, the true
+whole-tree runner-up), not assumed safe because it happened to work out. Python-side numbers (the D0098
+guardrails, `PY_LENGTH_GUARDRAIL`/`PY_COMPLEXITY_GUARDRAIL`) are unaffected — `find_py_files`'s scope was
+never part of the bug.
+
+Reverse: N/A — a `FINDING` event and a README table, append-only / cheaply revertible respectively.
+
+## D0106 · 2026-08-28 · test code's scope in the quality instruments: same methodology, own population, never a pass
+
+Director's question, stated for a one-time decision rather than left implicit per-instrument: "do quality
+metrics apply to test code at the same thresholds, looser ones, or not at all? Test code is real code and
+its rot is real rot, but it has legitimately different shape. State the rule." Triggered directly by the
+complexity-21 outlier found at D0102 (`tests/fixture_body_fuzz_probe.gd::_check_tick`, later joined by
+`tests/test_body_acceptance.gd::_run_traverse` at the same 21 once the whole tree was measured) — a real
+finding in test infrastructure, correctly left unrefactored per the director's own instruction, but
+exposing that `function_length.py`/`complexity.py` had never made an explicit choice about whether test
+code belongs in the same statistical population as production code.
+
+**Rule: same self-calibrating IQR methodology, computed against test code's own population, reported as
+its own labeled section — never pooled with production code, never exempted, never given a looser a
+priori number.** Three options considered and rejected in favor of this one, for reasons each traceable
+to a standing project principle:
+- *Pool test and production code into one fence* — rejected: pooling distorts the fence for BOTH
+  populations, the identical problem `coupling.py`'s stub-module exclusion already solved for module
+  counts (D0098) — a diluting population produces a fence that describes neither population accurately.
+- *Give test code a looser, hand-picked threshold* — rejected: a threshold chosen without first looking
+  at test code's own distribution is exactly "a guess wearing a decision's clothes"
+  (`tools/quality_check/README.md`'s own framing for the whole project's dashboard-before-threshold
+  philosophy) — the same reasoning that ruled out an a priori production-code threshold at D0096 applies
+  identically to test code.
+- *Exempt test code from measurement entirely* — rejected on the director's own stated premise: "test
+  code is real code and its rot is real rot." Exempting it would silently recreate the exact blind spot
+  D0102/D0105 just spent this session closing — a scope gap invented on purpose immediately after fixing
+  one by accident.
+
+**Implementation**: `scan.is_test_func(f)` classifies a GDScript function by `tests/` as its path's top
+component, and a Python function by its file already matching this repo's own existing, uniform
+`test_*.py` naming (not a new convention — every mutation suite in this repo already follows it).
+`function_length.py` and `complexity.py` each split into four buckets (GDScript production, GDScript
+`tests/`, Python production, Python `test_*.py`), each with its own independently-computed IQR fence and
+outlier list, reported as four labeled sections rather than two. The frozen advisory guardrails
+(`PY_LENGTH_GUARDRAIL`/`PY_COMPLEXITY_GUARDRAIL`, D0098) stay a single whole-Python-population number,
+unsplit — deliberately, because they are an absolute drift tripwire against one fixed reference point, not
+a distributional read, and splitting them would add precision their stated purpose does not need.
+`duplication.py` is unaffected — it already scans `tests/` (fixed at D0102) and duplication has no
+meaningful production/test distinction (a duplicate is a duplicate regardless of which population either
+copy sits in). `coupling.py` is unaffected — `tests/` was never in its scope (`sim/`+`tools/` only, a
+deliberate design decision per D0105's table) and this decision doesn't change that.
+
+**Verified, not assumed**: `test_quality_check.py`'s mutation suite (41 cases, unchanged in count from
+before this round's restructure — the split changed `analyze()`'s output SHAPE, not the scenarios already
+under test) needed six lines of repair, not new cases: the guardrail moved from `result["py"]` to a new
+top-level `result["python_guardrail"]` key, breaking two existing assertions
+(`branch_function_length_guardrail`, `branch_complexity_guardrail`) that still pointed at the old path.
+Fixed and reran clean, all 41 OBSERVED — including, from prior rounds and unaffected by this one, both
+guardrails' independence from the dynamic fence and `find_gd_files`'s whole-tree parity. The live
+dashboard was re-run against the real tree after the restructure: GDScript production 90 functions (IQR
+fence 19.5 for length / 6.0 for complexity), GDScript `tests/` 175 functions (fence 25.0 / 6.0), Python
+production 119 functions (fence 50.0 / 14.5), Python `test_*.py` 78 functions (fence 42.5 / 8.5) — test
+code's own fences sit measurably above production code's on both instruments, confirming the pooling
+concern was real, not hypothetical: pooling would have suppressed real production-code outliers behind a
+fence inflated by test code's legitimately larger natural size, and flagged legitimate test-code shape as
+a false outlier against a fence calibrated on smaller production functions.
+
+`tools/quality_check/README.md` updated: instrument list, mutation-testing count, and the two
+now-stale CI-status sentences (originally accurate at D0096–D0097, made false by D0099's CI wiring
+and never revisited) — caught and fixed in the same pass rather than left as a known-stale doc next to
+new, accurate prose in the same file.
+
+Reverse: revert the four instrument-file restructures and `is_test_func`; `git checkout` the affected
+files to their pre-D0106 state.

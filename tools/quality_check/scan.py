@@ -91,6 +91,17 @@ class Func:
         return f"{self.path}:{self.start_line}:{self.name}"
 
 
+def is_test_func(f: "Func") -> bool:
+    """True if `f` belongs to this project's own existing test-code convention -- not a new one invented
+    here (`docs/DECISIONS_LEDGER.md` D0106): a GDScript function under `tests/`, or a Python function in
+    a file already named `test_*.py`, the naming this whole repo already uses uniformly for every
+    mutation-test suite (`test_check_tier_rule.py`, `test_quality_check.py`, `test_check_integrity.py`,
+    `test_check_untracked_files.py`) and every Godot suite (`tests/test_*.gd`)."""
+    if f.lang == "gd":
+        return f.path.parts[0] == "tests"
+    return f.path.name.startswith("test_")
+
+
 def gd_functions(rel_path: Path) -> list[Func]:
     text = (ROOT / rel_path).read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()

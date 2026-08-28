@@ -38,8 +38,8 @@ def run() -> tuple[str, dict]:
     coupling_result = coupling.analyze()
 
     dup_clusters = sum(len(dup_result[lang]["clusters"]) for lang in ("gd", "py"))
-    len_outliers = sum(len(len_result[lang]["outliers"]) for lang in ("gd", "py"))
-    cx_outliers = sum(len(cx_result[lang]["outliers"]) for lang in ("gd", "py"))
+    len_outliers = sum(len(len_result[bucket]["outliers"]) for bucket, *_ in function_length.BUCKETS)
+    cx_outliers = sum(len(cx_result[bucket]["outliers"]) for bucket, *_ in complexity.BUCKETS)
     coupling_outliers = sum(len(coupling_result[scope]["outliers"]) for scope in ("sim", "tools"))
 
     lines = [

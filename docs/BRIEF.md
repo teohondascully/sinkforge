@@ -4,92 +4,102 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-28. This round: the execution-dense queue (CI wiring, two behavior-preserving
-refactors, a full-tree duplication sweep) — closed, 4 commits, all CI-green, budget not hit.** Unrelated
-to `data/economy/`, untouched. `docs/DECISIONS_LEDGER.md` D0099–D0102.
+**Last updated: 2026-08-28. This round: the director's four-item follow-up on the execution-dense queue
+(a known-outlier record, a consolidated sweep-blindness FINDING with a coverage audit, a correcting
+FINDING, and the test-code scope rule) — closed, no hard stop.** Unrelated to `data/economy/`, untouched.
+`docs/DECISIONS_LEDGER.md` D0103–D0106.
 
 ---
 
 ## What landed
 
-1. **CI wiring (D0099).** `duplication.py` is now a real BLOCKING gate (0 clusters is the clean state; a
-   regression fails the build) via a new `run_cli(exit_fn=)` parameter on `scan.py`'s shared harness. The
-   other three instruments report as `continue-on-error` steps — GDScript length against the still-
-   enforced hard cap, Python length/complexity against the frozen advisory guardrails, coupling with
-   stubs excluded. 6 new mutation cases.
-2. **`_resolve_horizontal` refactor (D0100).** Complexity 24 → 13 worst-case, two Extract Methods
-   (`_resolve_horizontal_cell`, `_try_climb`), no logic changed. Behavior verified byte-identical: 7
-   suites ALL PASS before/after, and the full 1000×1500-tick fuzzer's `FUZZ_SUMMARY` byte-identical
-   across 1.5M ticks.
-3. **`vertical_resolve.gd`'s D0059 functions, checked and treated selectively (D0101).** `resolve_ceiling`
-   (6, exactly at the fence) and `resolve_floor` (7, holds no D0059 defect) left alone, stated why.
-   `grid_floor_backstop` 10 → 3 (fully resolved, two clean extractions). `move_and_resolve` 11 → 9
-   (partial — remaining complexity is the substep loop's own `break`-based control flow, not safely
-   extractable by pure mechanical means). A small correction to D0098's own FINDING recorded in the same
-   entry: the "back out a failed nudge" fix code actually lives in `move_and_resolve`, not
-   `resolve_ceiling` as that FINDING stated. Byte-identical again, same rigor.
-4. **Full-tree duplication sweep (D0102).** Found and fixed a real scope gap first: `scan.find_gd_files()`
-   was silently `GAME_DIRS`-only, missing `tests/` entirely, despite its own docstring claiming parity
-   with `check_size_limits.py` — false, fixed, now proven identical by a set-equality mutation test. The
-   sweep itself found one real cluster: `_flat_grid`, byte-identical between `test_body.gd` and
-   `test_heightfield.gd` — moved into the shared `test_base.gd` both already extend. 0 clusters, both
-   languages, across the genuinely whole tree now.
+1. **`move_and_resolve` recorded as a known, accepted complexity outlier (D0103).** Complexity 9 against
+   a 6.0 fence — left alone, per instruction: the remainder is the substep `while` loop's own
+   `break`-based control flow, not reducible by pure mechanical extraction without a design decision
+   (converting loop control into a return-value contract). Recorded directly in the function's own
+   docstring with an explicit acceptance condition — complexity comes down when the function is next
+   touched for other reasons, not chased now.
+2. **The sweep-blindness law, consolidated into one Anvil FINDING (D0105).** Named as one thing, not five
+   scattered notes: a sweep bounded by its own author's model of the corpus cannot see outside that
+   model, and a green result from it is evidence only about the covered subset. Four cited instances:
+   D0026 (`no_engine_imports.py`'s hand-picked class list missed 276/282 real classes), D0091 (two
+   run-language sweeps missed CLAUDE.md/docs/CLAIMS.md/eight MODULE.md files), D0075 (self-referencing
+   test fixtures), D0102 (`scan.find_gd_files()` itself, inside the exact instrument suite this failure
+   class motivated building). Concrete follow-through: every `quality_check` instrument's scan scope
+   audited and tabulated (`tools/quality_check/README.md`) — `duplication.py`/`function_length.py`/
+   `complexity.py` all share `scan.all_functions()`, so D0102's fix already closed the gap for all three;
+   `coupling.py`'s narrower `sim/`+`tools/` scope is a stated design decision, not a hidden gap, with one
+   latent non-recursive-glob gap named for the record.
+3. **D0098's FINDING corrected via a real superseding Anvil event (D0104).** The original attributed BOTH
+   D0059 defects #2 and #3 to `resolve_ceiling`; #2's actual "back out the failed nudge" fix lives in
+   `move_and_resolve` (the caller), which owns the substep loop the backout happens inside. Filed as a
+   `FINDING` with `--supersedes=` the original — original event untouched, append-only, per the project's
+   own standing discipline. Does not change the original's core claim (1 of D0059's 4 defects lives
+   directly in `_resolve_horizontal`, not all 4).
+4. **Test code's place in the quality instruments, decided once (D0106).** Same self-calibrating IQR
+   methodology as production code, computed against test code's OWN population, reported as its own
+   labeled section — never pooled (distorts the fence for both, the same problem `coupling.py`'s stub
+   exclusion solved), never a looser a priori number (a guess wearing a decision's clothes), never
+   exempted (recreates a blind spot right after D0102/D0105 closed one). `scan.is_test_func` classifies
+   by this repo's own existing `tests/`/`test_*.py` conventions — not a new one invented for this.
+   `function_length.py`/`complexity.py` restructured into four buckets each. Frozen advisory guardrails
+   stay whole-Python-population, unsplit, since they're an absolute drift tripwire, not a distributional
+   read.
 
-## Complexity, before → after (this round's targets only)
+## Test population split, verified against the live tree
 
-| function | before | after |
-|---|---|---|
-| `body.gd::_resolve_horizontal` | 24 | ~3 (dropped out of the outlier list) |
-| `body.gd::_resolve_horizontal_cell` (new) | — | 11 |
-| `body.gd::_try_climb` (new) | — | 13 |
-| `vertical_resolve.gd::resolve_ceiling` | 6 | 6 (left alone, not an outlier) |
-| `vertical_resolve.gd::grid_floor_backstop` | 10 | 3 |
-| `vertical_resolve.gd::move_and_resolve` | 11 | 9 |
-| `vertical_resolve.gd::resolve_floor` | 7 | 7 (left alone, no D0059 defect) |
+| population | length fence | complexity fence | n |
+|---|---|---|---|
+| GDScript production | 19.5 | 6.0 | 90 |
+| GDScript `tests/` | 25.0 | 6.0 | 175 |
+| Python production | 50.0 | 14.5 | 119 |
+| Python `test_*.py` | 42.5 | 8.5 | 78 |
 
-Worst-case GDScript complexity among this round's actual targets: 24 → 13. Every reduction verified
-behavior-preserving by full-fuzzer byte-identical comparison, not just "still green."
+Test code's own fences sit measurably above production code's on both instruments — confirms the pooling
+concern (item 4) was real, not hypothetical: pooling would have suppressed real production outliers
+behind a fence inflated by test code's legitimately larger natural size, and flagged legitimate test-code
+shape as a false outlier against a fence calibrated on smaller production functions.
 
 ## Full-tree duplication result
 
-**0 clusters, both languages**, across the corpus after the scope fix (196 GDScript / 162 Python
-functions considered — up from 87/162 once `tests/` was actually reachable). One real cluster found and
-fixed this round (`_flat_grid`); everything else clean.
+**0 clusters, both languages, unchanged.** 196 GDScript / 164 Python functions considered (re-run this
+round, no code-scope change since D0102).
 
 ## Instrument/game ratio
 
-**Instrument 8,021 / game 1,477, ratio 5.431.** Game LOC moved this round — 1,424 → 1,477 (+53) — but
-**that movement is this session's own refactor work (new extracted-function signatures and docstrings in
-`body.gd`/`vertical_resolve.gd`), not `data/economy/` content landing.** Worth distinguishing before
-reading the ratio as evidence the economy has started: it hasn't. The floor to watch once it does:
-1,477.
+**Instrument 8,063 / game 1,485, ratio 5.430.** Game LOC moved +61 over the trailing 10 commits — but
+that movement is refactor-signature extraction from the prior queue (`_resolve_horizontal_cell`/
+`_try_climb`/etc.), not `data/economy/` content, and is named honestly as such rather than read as
+progress toward the ratio target. The number does not come down until the economy produces machines —
+the director's own next work, not this session's. Then hold.
 
 ## Anvil and instrument LOC against caps
 
-- **Anvil: 513 / 1,000 implementation cap, unchanged** — no Anvil file touched this round, no cap
-  crossed (the named hard-stop condition never came close).
-- **`tools/quality_check/`: 948 implementation / 404 test / 1,352 total** (was 929/353/1,282 before this
-  queue) — the CI-wiring gate logic and the scope-fix mutation tests, all real, requested content.
+- **Anvil: 513 / 1,000 implementation cap, unchanged** — no Anvil implementation file touched this round
+  (two new `.anvil/log/*.json` event files were written — FINDING events, not code, and don't count
+  toward the code cap).
+- **`tools/quality_check/`: 990 implementation / 404 test / 1,394 total** (was 948/404/1,352 before this
+  round) — the four-bucket restructure and its docstrings, all real, requested content; test LOC
+  unchanged since item 4 needed six lines of reference repair, not new mutation cases.
 
 ## Anything that felt wrong even though it passed
 
-- **A FINDING I filed two rounds ago (D0098) had a small, real inaccuracy**, found only because THIS
-  round needed more precision than that one did: it attributed the "back-out-a-failed-nudge" fix to
-  `resolve_ceiling`; the actual fix code lives in `move_and_resolve`. Nothing broke and the FINDING's
-  core claim stands, but it's a reminder that "verified against the real source" is only as precise as
-  the question being asked at the time — worth naming rather than letting a two-rounds-old citation stand
-  uncorrected.
-- **The full-tree scope fix surfaced a genuinely higher complexity outlier than anything this round
-  touched**: `tests/fixture_body_fuzz_probe.gd:_check_tick` at complexity 21 — above both refactor
-  targets' pre-fix values combined would suggest. Explicitly out of this round's named scope (not
-  `_resolve_horizontal` or a D0059-holding function), so left untouched per instruction — but it's real,
-  it's in test infrastructure that gets run on every fuzz sweep, and it's now visible for the first time.
-  Named, not fixed.
-- **`move_and_resolve`'s partial-only resolution (11 → 9) was a judgment call I made autonomously**,
-  reading "STOP if it won't come down without behavior risk" as permitting a partial safe reduction
-  rather than requiring a full stop. I believe that's the right reading, but it's the one place this
-  round where I didn't reach a clean, fully-resolved number, and it's worth a second look rather than
-  treated as settled by this report alone.
+- **My own D0106 ledger entry, first draft, claimed the mutation suite "grew from 21 to 41 cases" this
+  round.** Checked against actual tool output (stashing this round's changes and re-running against HEAD)
+  before committing to it: the suite was already at 41 before this round started — the growth to 41
+  happened in the two prior commits (`c56ff1f`, `42e517f`), not this one. This round's actual mutation-
+  suite work was six lines of reference repair, not new cases. Caught and corrected before the entry was
+  ever committed, not after — worth naming because it's exactly the kind of unverified-count claim this
+  project's own standing rule ("verify a numeric claim against actual tool output") exists to catch, and
+  it would have shipped a small, false claim into a permanent ledger entry if not checked.
+- **`tools/quality_check/README.md` had two flatly false sentences** ("None exits nonzero on a finding;
+  none is wired into CI" / "Consumers: None yet. Not wired into CI.") left over from before D0099's CI
+  wiring landed two commits ago — stale documentation sitting untouched next to otherwise-accurate prose
+  in the same file. Not part of this round's assigned scope, but fixed in the same pass since I was
+  already editing this exact file for the scope-audit table and test-population sections; leaving a known
+  false claim in place while editing its neighbor would be the same "instrument cannot register its
+  subject" class this project treats as its dominant failure mode, applied to documentation instead of
+  code.
 
 ---
 
@@ -97,38 +107,40 @@ reading the ratio as evidence the economy has started: it hasn't. The floor to w
 
 - **`data/economy/`, D1 through D6** — unchanged, still the next substantial thing, authored with you
   present, checked against `tools/economy_check/` as it lands.
-- **`tests/fixture_body_fuzz_probe.gd:_check_tick`'s complexity (21)** — newly visible, not a named
-  target this round, your call whether it becomes one.
-- **`move_and_resolve`'s remaining complexity (9)** — a design decision (converting `break`-based loop
-  control into a return-value contract) would be needed to bring it further down; not made unilaterally.
+- **`move_and_resolve`'s remaining complexity (9)** — accepted per your instruction, condition recorded
+  in the function's own docstring; no action needed unless you want to revisit the acceptance condition
+  itself.
+- **`tests/fixture_body_fuzz_probe.gd:_check_tick` / `tests/test_body_acceptance.gd:_run_traverse`'s
+  complexity (21 each)** — named at D0105's coverage audit, not touched, your call whether either becomes
+  a target.
+- **`coupling.py`'s non-recursive `.glob` on `tools/<module>/*.py`** — a latent, currently-inert scope gap
+  named at D0105's audit table; would silently diverge the day a `tools/` module grows a nested `.py`
+  file. No action needed now, worth knowing about.
 - **`sim/run`/`sim/meta`'s actual shape** — still open, unchanged.
-- The Python function-length/complexity guardrails and GDScript's documented-ceiling framing (D0098) are
-  now visible in CI on every push — worth a glance once real data/economy/ content starts moving `sim/`.
 
 ## What was learned
 
-- **A scanner's own docstring claim is a testable assertion, not documentation** — `scan.find_gd_files()`
-  said "same scope as check_size_limits.py" for four rounds without that ever being checked against the
-  other scanner's actual behavior. Checking a claim like that costs one comparison; not checking it costs
-  a whole corpus's worth of blind spot.
-- **A behavior-preserving refactor's confidence should scale with the function's incident history, not
-  just its current test coverage.** Running the full 1000×1500-tick fuzzer twice (not just the fast
-  per-commit subset) for `_resolve_horizontal` specifically — because it's the exact function class that
-  already cost real time once — is proportionate caution, not excess: the fast subset alone would have
-  been "probably fine," the full sweep made it "verified, 1.5M ticks, byte-identical."
-- **Partial, honestly-reported complexity reductions are more useful than a clean number reached by going
-  further than the safety margin allows.** `grid_floor_backstop` resolved fully because its structure
-  allowed it; `move_and_resolve` didn't, and reporting 9 (not 6, not a forced lower number) is what keeps
-  this whole instrument's numbers trustworthy.
+- **A ledger entry's own numeric claim needs the same verification discipline as any other claim, even
+  when the number "obviously" moved.** The 21→41 mutation-count claim felt true (the file visibly grew
+  across this whole segment) but was wrong about WHEN — checked against actual `git stash` + rerun output
+  before it shipped, not assumed from narrative momentum.
+- **A restructure that changes a result dict's SHAPE (not its coverage) can leave a mutation suite's case
+  COUNT unchanged while still breaking every reference into it.** `function_length.py`/`complexity.py`'s
+  guardrail moving from `result["py"]["guardrail_hits"]` to a new top-level `result["python_guardrail"]`
+  key broke two existing assertions with zero new scenarios needed — worth distinguishing "the suite grew"
+  from "the suite's existing assertions needed updating" as two different, non-conflatable events.
+- **Fixing a stale doc sentence found by accident, while already in the file for an unrelated reason, is
+  worth the two extra minutes.** The false CI-status sentences in `tools/quality_check/README.md` would
+  have sat there indefinitely otherwise — nothing was scanning prose claims against actual CI config.
 
 ## Gates
 
 All 9 structural gates + `schema_validator.py` + `data_codegen/generate.py --check` + `tools/anvil/
-check_integrity.py` re-run and PASS at every commit. `test_quality_check.py` 41/41. Full Godot suite
-green in CI at every push (4/4 commits), including the full-fuzz-equivalent confidence this round added
-locally beyond CI's own fast-per-commit path.
+check_integrity.py` (9 events, referentially sound) + `duplication.py` (CI's blocking gate, 0 clusters)
+re-run and PASS. `test_quality_check.py` 41/41. `tests/test_body.gd` re-run ALL PASS after the
+`vertical_resolve.gd` docstring addition (comment-only, parse-checked clean, no logic touched).
 
-**Commits this round: 4. Unpushed: 0.** Budget: 4 of 12 commits used, well under the 1-hour allowance.
+**Commits this round: pending (about to commit). Unpushed before this round's commit: 0.**
 
 ## Claims
 
@@ -138,7 +150,6 @@ locally beyond CI's own fast-per-commit path.
 ## Blocked, and what it's waiting on
 
 - **`data/economy/`, D1-D6** — waits for you, explicitly, with you present.
-- **`_check_tick`'s complexity, `move_and_resolve`'s remaining 9** — waits for your read of this report.
 - **`sim/run`/`sim/meta`'s shape** — waits for a real decision, unchanged.
 - Gate 10, item 2 (human-biased fuzzer), rope, chunk size (D0019), coordinate type scheme (D0020) —
   unchanged.

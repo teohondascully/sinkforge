@@ -78,14 +78,14 @@ def branch_function_length_guardrail() -> None:
     one_mid = _py_func_of_length("mid", 20)
     result = function_length.analyze(nine_tiny + [one_mid])
     dynamic_flagged = any("mid" in q for q, _l in result["py"]["outliers"])
-    guardrail_flagged = any("mid" in q for q, _l in result["py"]["guardrail_hits"])
+    guardrail_flagged = any("mid" in q for q, _l in result["python_guardrail"]["hits"])
     check("function_length guardrail: a 20-line function among nine 2-line ones IS a dynamic-fence "
           "outlier (proves the dynamic fence still works on this fixture)", dynamic_flagged,
           detail=str(result["py"]["outliers"]))
     check("function_length guardrail: that SAME 20-line function is NOT a guardrail hit (20 < "
           f"{function_length.PY_LENGTH_GUARDRAIL}) -- the guardrail is a different, independent number, "
           "not a relabeling of the dynamic fence", not guardrail_flagged,
-          detail=str(result["py"]["guardrail_hits"]))
+          detail=str(result["python_guardrail"]["hits"]))
 
     eleven_at_guardrail = [_py_func_of_length(f"atg{i}", 45) for i in range(11)]
     result2 = function_length.analyze(eleven_at_guardrail)
@@ -95,7 +95,7 @@ def branch_function_length_guardrail() -> None:
     check(f"function_length guardrail: those SAME functions (45 > {function_length.PY_LENGTH_GUARDRAIL}) "
           "ARE guardrail hits -- the guardrail fires even when the dynamic fence, self-normalized to "
           "this uniform set, would not",
-          len(result2["py"]["guardrail_hits"]) == 11, detail=str(result2["py"]["guardrail_hits"]))
+          len(result2["python_guardrail"]["hits"]) == 11, detail=str(result2["python_guardrail"]["hits"]))
 
 
 # --- complexity -------------------------------------------------------------------------------------
@@ -147,14 +147,14 @@ def branch_complexity_guardrail() -> None:
     one_branchy = _py_func_with_ifs("branchy", 4)  # complexity 1 + 4 = 5
     result = complexity.analyze(nine_trivial + [one_branchy])
     dynamic_flagged = any("branchy" in q for q, _c in result["py"]["outliers"])
-    guardrail_flagged = any("branchy" in q for q, _c in result["py"]["guardrail_hits"])
+    guardrail_flagged = any("branchy" in q for q, _c in result["python_guardrail"]["hits"])
     check("complexity guardrail: a complexity-5 function among nine complexity-1 ones IS a "
           "dynamic-fence outlier (proves the dynamic fence still works on this fixture)", dynamic_flagged,
           detail=str(result["py"]["outliers"]))
     check("complexity guardrail: that SAME complexity-5 function is NOT a guardrail hit (5 < "
           f"{complexity.PY_COMPLEXITY_GUARDRAIL}) -- the guardrail is a different, independent number, "
           "not a relabeling of the dynamic fence", not guardrail_flagged,
-          detail=str(result["py"]["guardrail_hits"]))
+          detail=str(result["python_guardrail"]["hits"]))
 
     fourteen_at_guardrail = [_py_func_with_ifs(f"atg{i}", 14) for i in range(5)]  # complexity 1+14=15
     result2 = complexity.analyze(fourteen_at_guardrail)
@@ -164,7 +164,7 @@ def branch_complexity_guardrail() -> None:
     check(f"complexity guardrail: those SAME functions (15 > {complexity.PY_COMPLEXITY_GUARDRAIL}) ARE "
           "guardrail hits -- the guardrail fires even when the dynamic fence, self-normalized to this "
           "uniform set, would not",
-          len(result2["py"]["guardrail_hits"]) == 5, detail=str(result2["py"]["guardrail_hits"]))
+          len(result2["python_guardrail"]["hits"]) == 5, detail=str(result2["python_guardrail"]["hits"]))
 
 
 # --- duplication ------------------------------------------------------------------------------------

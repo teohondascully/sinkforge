@@ -9,10 +9,13 @@ measured modularity or duplication. The director's own framing for why: "the pre
 six near-identical copies of one function across fifty layers and nothing flagged it, because nothing
 was looking."
 
-**Dashboard, not a gate.** Every instrument here reports a distribution and flags statistical outliers
-relative to that distribution (`scan.iqr_outlier_fence`, the standard boxplot rule). None exits nonzero
-on a finding; none is wired into CI. Thresholds get proposed from what this prints, not decided ahead of
-seeing it — a threshold set without the data first is "a guess wearing a decision's clothes."
+**Dashboard first, one gate now.** Every instrument here reports a distribution and flags statistical
+outliers relative to that distribution (`scan.iqr_outlier_fence`, the standard boxplot rule). Thresholds
+got proposed from what this printed, not decided ahead of seeing it — a threshold set without the data
+first is "a guess wearing a decision's clothes." As of `docs/DECISIONS_LEDGER.md` D0099, `duplication.py`
+is wired into CI as a blocking gate (`scan.run_cli`'s `exit_fn=duplication.gate_exit`, 1 if any cluster in
+either language); `function_length.py`/`complexity.py`/`coupling.py` run in CI too but as
+`continue-on-error` advisory steps — they still exit 0 unconditionally, same as before.
 
     python3 tools/quality_check/dashboard.py
 
@@ -21,10 +24,10 @@ seeing it — a threshold set without the data first is "a guess wearing a decis
 1. **`function_length.py`** — distribution of function lengths, both languages. Complements (does not
    replace) `tools/layer_lint/check_size_limits.py`'s existing hard 50-line function cap, which was
    itself picked before this dashboard existed to show what the real distribution looks like.
-2. **`duplication.py`** — **the headline instrument.** Token-level, identifier-normalized, exact-match,
-   per function. Catches renamed copies (the actual legacy failure), not just literal text matches.
-   Deliberately does NOT normalize literals (numbers/strings) — see its own docstring for why that
-   specific choice matters for precision.
+2. **`duplication.py`** — **the headline instrument, and CI's blocking gate.** Token-level,
+   identifier-normalized, exact-match, per function. Catches renamed copies (the actual legacy failure),
+   not just literal text matches. Deliberately does NOT normalize literals (numbers/strings) — see its
+   own docstring for why that specific choice matters for precision.
 3. **`complexity.py`** — McCabe cyclomatic complexity per function. Python: exact, via `ast`. GDScript:
    approximate, via token counting (no real GDScript parser is available in pure Python) — stated as a
    real precision gap in the module docstring, not glossed over.
@@ -33,6 +36,14 @@ seeing it — a threshold set without the data first is "a guess wearing a decis
    one: `sim/`'s dominant coupling mechanism turned out to be GDScript's global `class_name` visibility,
    not `preload`/`load` (a real check against this tree found zero `res://`-based `sim/` references but
    13 `class_name` declarations) — see the module docstring for exactly what is and isn't closed.
+
+`function_length.py` and `complexity.py` each split production code from test code into separate,
+independently self-calibrated populations (`scan.is_test_func`, `docs/DECISIONS_LEDGER.md` D0106) — test
+code is real code and its rot is real rot, but pooling it with production code would distort the fence
+for both, since test code has a legitimately different natural shape (assertion-heavy, many named
+branch cases). Both instruments' frozen Python guardrails stay whole-population and unsplit — they are a
+single absolute drift tripwire, not a distributional read, so splitting them would be precision their own
+purpose does not need.
 
 ## Shared infrastructure (`scan.py`)
 
@@ -46,6 +57,21 @@ real run found that exact shape clustered as a duplicate across all four `main()
 duplication detector whose own source duplicated this logic across four files would be the tool
 disproving its reason to exist.
 
+## Scope, instrument by instrument — audited explicitly, not assumed
+
+`docs/DECISIONS_LEDGER.md` D0105: `duplication.py`'s GDScript scanner was silently `GAME_DIRS`-only for
+four rounds before D0102 fixed it — a sweep bounded by its own author's model of the corpus, the most
+reliable failure class this project has (`.anvil/log/2026-08-28T233251.702582Z-d3f72a5f.json`, naming
+this and three prior instances). This table exists so the next instrument built here does not repeat it
+silently — coverage stated, not assumed.
+
+| instrument | GDScript scope | Python scope | notes |
+|---|---|---|---|
+| `duplication.py` | whole tree except `legacy/` (`scan.find_gd_files`, fixed D0102) | `harness/`+`experiment/`+`tools/`, excl. `tools/scratch/` | Historical reports D0096–D0101 describe the narrower, `GAME_DIRS`-only (`core`/`sim`/`interface`/`view`/`shell`) corpus — `tests/` and `data/*/generated.gd` were invisible to every one of those runs. |
+| `function_length.py` | same as `duplication.py` (shares `scan.all_functions()`) | same | Same caveat: D0096–D0098's length distributions/fences/outlier counts were computed against the pre-D0102 corpus, not the whole tree. |
+| `complexity.py` | same as `duplication.py` | same | Same caveat, with one specific claim checked rather than assumed safe: D0098's "`_resolve_horizontal` (24) is the single highest-complexity GDScript function" happens to still hold against the corrected, whole-tree corpus (24 > `tests/fixture_body_fuzz_probe.gd:_check_tick`'s 21, the true whole-tree runner-up) — verified now, not assumed true because it worked out. The fence values and outlier *counts* from that round are still narrower-corpus numbers and are not whole-tree figures. |
+| `coupling.py` | `sim/` only, for edges (`_sim_path_edges`, `_sim_class_name_edges`) — deliberate, stated in this file's own module docstring, per the director's original brief ("module coupling: for `sim/` and `tools/` specifically"), not a hidden gap. `_class_name_declarations` itself scans the whole tree except `legacy/`, but only `sim/`-declared names produce edges. | `tools/`, one module directory deep, **non-recursive** (`.glob("*.py")`, not `.rglob`) — currently equivalent to recursive (verified: zero `tools/*/` subdirectories currently hold any nested `.py` file), but would silently diverge the day one does. Named here as a latent gap, not a live one. | The one instrument whose narrower scope is a stated design decision, not an accident — included in this table for completeness, not as a new finding. |
+
 ## Testability
 
 `function_length.analyze`, `complexity`'s functions, and `duplication.analyze` all accept an injectable
@@ -56,7 +82,7 @@ without risking it."
 
 ## Mutation testing
 
-`test_quality_check.py`, run directly (`python3 tools/quality_check/test_quality_check.py`) — 21 cases,
+`test_quality_check.py`, run directly (`python3 tools/quality_check/test_quality_check.py`) — 41 cases,
 covering an outlier being flagged and a uniform distribution flagging nothing (length), branch counting
 including that a nested function's complexity does not leak into its enclosing function's count
 (complexity), a renamed-copy pair being caught while a genuinely different function is not, trivial
@@ -67,9 +93,16 @@ exclusion is keyed on length too, not on the name alone) (duplication), and — 
 round — `class_name`-only coupling being caught, local-import-resolution correctly beating a same-named
 module in a different subdirectory (the real `anvil`/`economy_check` `schema.py` collision, reproduced
 synthetically), and a name matching multiple other subdirectories with no local match being left
-uncounted rather than guessed (coupling). All 21 OBSERVED. One assertion — the local-resolution-wins
-case — was independently confirmed to have real teeth by deliberately removing the guard it protects and
-observing the test correctly fail against the broken version, not just pass against the correct one.
+uncounted rather than guessed (coupling). Also covers `duplication.gate_exit`'s three branches (0
+clusters exits 0, a cluster in either language exits 1) and `run_cli`'s `exit_fn` dispatch (no `exit_fn`
+given defaults to 0, `exit_fn` given is actually called rather than ignored), the frozen Python guardrails
+firing independently of the dynamic per-run fence for both length and complexity (a fixture below the
+guardrail but above the fence, and the reverse — uniform data at the guardrail with no fence outliers),
+coupling's stub-module exclusion (named in `stubs`, absent from `modules`, real modules unaffected), and
+`find_gd_files` reaching `tests/` and matching `check_size_limits.py`'s own file set exactly (D0102). All
+41 OBSERVED. One assertion — the local-resolution-wins case — was independently confirmed to have real
+teeth by deliberately removing the guard it protects and observing the test correctly fail against the
+broken version, not just pass against the correct one.
 
 ## LOC, reported honestly against the director's own sizing instruction
 
@@ -95,8 +128,10 @@ with the reason recorded.
 
 ## Consumers
 
-None yet. Not wired into CI. `dashboard.py`'s output is this round's actual deliverable — read once,
-by the director, to see the real distribution before any threshold is proposed.
+`.github/workflows/harness.yml`'s `gates` job (`docs/DECISIONS_LEDGER.md` D0099): `duplication.py` runs
+as a blocking step (build fails on any cluster); `function_length.py`/`complexity.py`/`coupling.py` run
+as `continue-on-error` advisory steps, visible in CI output but never failing the build. `dashboard.py`
+itself has no CI consumer — it stays the read-the-whole-picture entry point for a human.
 
 ## Gotchas
 

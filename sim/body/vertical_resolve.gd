@@ -20,6 +20,14 @@ const V_SUBSTEP_PX: int = 2  ## Comfortably under one terrain cell (4px), so no 
 
 ## Vertical movement, substepped so a fast fall or jump cannot tunnel through a one-cell-thick floor or
 ## ceiling. Ceilings are grid-swept and hard; the ground plane is `Heightfield`, sub-pixel.
+##
+## KNOWN COMPLEXITY OUTLIER, accepted (`docs/DECISIONS_LEDGER.md` D0101/D0103), not chased further: 9,
+## against a 6.0 fence, after `_resolve_substep_collision` was already extracted from it. The remainder
+## is the substep `while` loop's own control flow (early-exit `break` on a stopped substep, the backout
+## branch, the trailing catch-all) -- not safely reducible by pure mechanical extraction without
+## converting `break`-based loop control into a return-value contract across a function boundary, which
+## is a design decision, not an Extract Method. ACCEPTANCE CONDITION: if this function is touched again
+## for any other reason, bringing its complexity down is part of that change, not deferred again.
 static func move_and_resolve(body: Body, grid: TileGrid) -> void:
 	var total: int = body.vel_y / Body.TICK_HZ
 	var dir: int = signi(total)
