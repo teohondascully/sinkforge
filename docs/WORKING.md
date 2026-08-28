@@ -39,6 +39,16 @@ No `data/economy/` content, no `core/`/`sim/` code touched. All gates re-run and
 `test_check_tier_rule.py` now 34/34 OBSERVED. LOC: 484 implementation / 375 test / 859 total.
 
 Stopped, as instructed — "I author the real rows against it," now with the director present next.
+Director's close on the checker: "done, mutation-proven, and CI-green before any real economy exists to
+launder it." Confirmed, this session: authoring `data/economy/` D1-D6 is design work reserved for the
+director; this instrument does not author content and does not resolve open design questions.
+
+**Parked, non-blocking, not started:** a `--json`/machine-readable output mode for
+`tools/economy_check/check_tier_rule.py`. Director's framing: "the bridge between this instrument and
+the log" — once `data/economy/` exists, a check run should be able to become a `MEASUREMENT` event
+(`tools/anvil/append.py`) rather than something read off a console, the same way `check_integrity.py`'s
+PASS/FAIL feeds this project's other gates. Build when there is real data to measure, not before — the
+current text `format_report` output stays the interface until then.
 
 ## External audit response — surviving run-structure specifications, 2026-08-27 — CLOSED
 
