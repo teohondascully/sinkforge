@@ -71,12 +71,29 @@ placeholder with no data behind it. **This clause is dormant against real data, 
 silence on a real chain today means "not yet exercised," never "verified." It starts enforcing the
 moment `data/economy/` populates those fields.
 
+## Machine-readable output (`--json`)
+
+`python3 check_tier_rule.py --json <chain>` prints `to_json_report`'s structured form instead of
+`format_report`'s prose — built (`docs/DECISIONS_LEDGER.md` D0094) so a real check run can become a
+`tools/anvil/append.py` `MEASUREMENT` event directly, rather than a number someone transcribes off a
+console by hand (the exact failure Anvil's provenance discipline exists to prevent). Per-check
+pass/fail as `checks: {input_provenance, output_consequence, terminal_products, breach_reachable}`
+(each a list of `{id, verdict, detail}`); the specific demands/materials implicated in any failure as a
+derived `failures` dict, one id-list per check; the residual gap and scope note as **structured fields**
+(`residual: {id, status, decision_ledger, anvil_finding_id, note}`, `scope: {id, note}`), not embedded
+prose. **`checks_run` is explicit** (`true`/`false`) — a broken-reference chain reports `checks_run:
+false` with `checks: null`, never a quietly-empty `checks: {}` that could be misread as "0 checks, all
+clean." **Not wired to the log** — this mode only shapes the data; nothing in this module calls
+`append.py`, and no `MEASUREMENT` event exists until `data/economy/` has real rows to measure and
+someone (a person or a future script) writes one.
+
 ## Consumers
 
 None yet. `data/economy/` doesn't exist. Intended consumer, once it does: whoever authors that content
-runs `python3 tools/economy_check/check_tier_rule.py <chain file>` against it directly, or a future gate
-wires this into CI the way `tools/schema_validator` is wired for `data/`'s other kinds — not decided,
-not this session's call.
+runs `python3 tools/economy_check/check_tier_rule.py [--json] <chain file>` against it directly, or a
+future gate wires this into CI the way `tools/schema_validator` is wired for `data/`'s other kinds — not
+decided, not this session's call. The `--json` output is intended, eventually, to feed a `MEASUREMENT`
+event — not built yet, deliberately, per the director's explicit "do not wire it to the log yet."
 
 ## Public API
 
@@ -84,17 +101,19 @@ not this session's call.
   `iter_material_references`, `REFERENCE_FIELDS`, `BASELINE_CAPABILITY`.
 - `check_tier_rule.py` — `check_reference_integrity`, `check_input_provenance`,
   `check_output_consequence`, `check_terminal_products`, `check_breach_reachable`, `check_chain`,
-  `format_report`, `SCOPE_NOTE`, `RESIDUAL_NOTE`, and a CLI (`python3 check_tier_rule.py
-  <chain.json|chain.yaml>` — no default target, since no real chain file exists to point it at yet).
+  `format_report`, `to_json_report`, `SCOPE_NOTE`, `RESIDUAL_NOTE`, `RESIDUAL_ANVIL_FINDING_ID`, and a
+  CLI (`python3 check_tier_rule.py [--json] <chain.json|chain.yaml>` — no default target, since no real
+  chain file exists to point it at yet).
 
 ## Mutation testing
 
-`test_check_tier_rule.py`, run directly (`python3 tools/economy_check/test_check_tier_rule.py`) — 34
-cases across the 8 fixtures (the director's 5, the breach-reachability addition, reference integrity, and
-the two-hop-residual witness), every BROKEN case observed actually failing before its FIXED counterpart
-is trusted to pass, `tools/anvil/test_check_integrity.py`'s own discipline. All 34 OBSERVED as of this
-writing — including one case where the mutation test caught a bug in its own fixture (a recipe output
-referenced but never added to the materials registry), fixed once observed, not before.
+`test_check_tier_rule.py`, run directly (`python3 tools/economy_check/test_check_tier_rule.py`) — 44
+cases across the 9 fixtures (the director's 5, the breach-reachability addition, reference integrity, the
+two-hop-residual witness, and the `--json` output mode), every BROKEN case observed actually failing
+before its FIXED counterpart is trusted to pass, `tools/anvil/test_check_integrity.py`'s own discipline.
+All 44 OBSERVED as of this writing — including three separate cases where the mutation test caught a bug
+in its own fixture (a recipe output referenced but never added to the materials registry), each fixed
+once observed, not before.
 
 ## LOC
 

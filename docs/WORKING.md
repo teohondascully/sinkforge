@@ -43,12 +43,22 @@ Director's close on the checker: "done, mutation-proven, and CI-green before any
 launder it." Confirmed, this session: authoring `data/economy/` D1-D6 is design work reserved for the
 director; this instrument does not author content and does not resolve open design questions.
 
-**Parked, non-blocking, not started:** a `--json`/machine-readable output mode for
-`tools/economy_check/check_tier_rule.py`. Director's framing: "the bridge between this instrument and
-the log" — once `data/economy/` exists, a check run should be able to become a `MEASUREMENT` event
-(`tools/anvil/append.py`) rather than something read off a console, the same way `check_integrity.py`'s
-PASS/FAIL feeds this project's other gates. Build when there is real data to measure, not before — the
-current text `format_report` output stays the interface until then.
+**Pulled forward the same day, `docs/DECISIONS_LEDGER.md` D0094:** the `--json` output mode above was
+parked as "build when there is data," then un-parked — director's reversal: it should exist BEFORE the
+real rows land, not after, same ordering as the checker itself preceding the economy. Built:
+`check_tier_rule.to_json_report`, structured per-check pass/fail + the specific demands/materials
+implicated in any failure + the residual gap and scope note as structured fields (not prose) +
+`--json` CLI flag. Explicitly NOT wired to `.anvil/log/` — no `append.py` call anywhere in this round's
+code, that wiring waits for real data to measure. `test_check_tier_rule.py` now 44/44 OBSERVED (two more
+self-caught fixture bugs, same class as D0093's). LOC: 566 implementation / 500 test / 1,066 total.
+
+**Baseline snapshot, `docs/DECISIONS_LEDGER.md` D0095**, director-requested before `data/economy/`
+content starts landing: `tools/economy_check/` 566/500/1,066. Instrument/game absolute ratio 4.652
+(6,625/1,424), game LOC unchanged at 1,424 all session. Anvil implementation 513/1,000 cap (51.3% used).
+`.anvil/log/` 5 events. Full detail and per-figure verification in the ledger entry, not repeated here.
+
+Stopped again, as instructed — "the next substantial thing is D1 through D6... comes to you as authored
+data with the checker already green on it, not as a design task."
 
 ## External audit response — surviving run-structure specifications, 2026-08-27 — CLOSED
 

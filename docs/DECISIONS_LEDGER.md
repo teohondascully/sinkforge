@@ -3183,3 +3183,94 @@ Reverse: revert `tools/economy_check/{schema.py,check_tier_rule.py,test_check_ti
 their D0092 state; the Anvil FINDING event is immutable per Anvil's own append-only design (D0092's
 `check_integrity.py`) and cannot be reversed by deletion — a correction, if ever needed, would be a new
 event, not an edit.
+
+## D0094 · 2026-08-28 · tools/economy_check/ — the --json output mode, pulled forward from "when there is data" to now
+
+D0093's WORKING.md note parked a `--json`/machine-readable output mode as non-blocking, "build when there
+is data to measure." The director reversed that timing this same session: it should exist BEFORE the
+real rows land, the same ordering principle as building the checker before the economy — "the first run
+should be able to emit a MEASUREMENT event directly... rather than someone reading a console and
+transcribing a number, which is exactly the hand-copied-number failure the provenance system exists to
+prevent." Built now; wiring to `.anvil/log/` (an actual `append.py` call) stays deferred — no
+`data/economy/` content exists yet to measure, and this round writes no Anvil events, only the data shape
+one would carry.
+
+**What was built.** `check_tier_rule.to_json_report(report) -> dict`: the same `report` `check_chain`
+already produces, restructured instead of printed as prose. Per the director's explicit spec:
+- **Per-check pass/fail** — `checks: {input_provenance, output_consequence, terminal_products,
+  breach_reachable}`, each a list of `{id, verdict, detail}`, the same triples `format_report` already
+  prints, just structured.
+- **The specific demands/materials implicated in any failure** — a derived `failures` dict, one id-list
+  per check, so a MEASUREMENT-authoring script doesn't have to filter `checks` itself.
+- **The residual-gap note as a structured field, not prose** — `residual: {id, status, decision_ledger,
+  anvil_finding_id, note}`. `anvil_finding_id` is `RESIDUAL_ANVIL_FINDING_ID`
+  (`a677726d-8984-4ec6-9e3e-ab44b850d841`, D0093's FINDING), a static citation constant, not a runtime
+  read of `.anvil/log/` — this module has no reason to depend on the log at check time, only to point at
+  it in output. If that FINDING is ever superseded, the constant needs updating by hand; noted in its own
+  comment so this doesn't silently go stale.
+- **The scope note** — `scope: {id, note}`, same lightweight structure as `residual`, for consistency.
+
+**The vacuous-empty-success trap, avoided deliberately.** A broken-reference chain reports `checks_run:
+false` plus `checks_not_run_reason`, `checks: null`, `failures: null` — never an empty `checks: {}` that
+could be misread as "0 checks, all clean." This is the same discipline `check_chain`'s own skip-on-broken-
+reference behavior already established (D0093); `to_json_report` had to re-earn it independently rather
+than inherit it, since JSON has no natural "not run" the way prose has a sentence for it.
+
+**CLI**: `check_tier_rule.py [--json] <chain>` — `--json` prints `json.dumps(to_json_report(...), indent=2,
+sort_keys=True)` instead of `format_report`'s text; exit codes unchanged (0/1/2). `sort_keys=True` for
+byte-stable output run to run on identical input, matching `tools/anvil/append.py`'s own convention.
+
+**Mutation-tested, `test_check_tier_rule.py`**: broken-reference payload shape (`checks_run=False`, not
+an empty dict — the specific case this section exists to prevent), JSON round-trip
+(`json.loads(json.dumps(x)) == x`), a chain with real failures naming the exact demand/material ids per
+check, a clean chain reporting `ok=True` with every failure list empty, the residual/scope structured
+fields' exact keys and values, and the `--json` CLI flag end to end through `main()` (clean chain exit 0,
+broken-reference chain exit 1, `--json` alone with no file still exits 2 with a usage message, and a
+plain-mode regression check confirming `--json`'s absence still prints prose not JSON). 10 new cases.
+**Two of them caught bugs in their own fixtures** (a recipe output referenced but not registered as a
+material, in both the reused fixture-3-shaped decorative chain and its own materials dict) — the same
+class of self-catch D0093 recorded once already, now recorded twice, which is itself worth noting: this
+project's mutation-testing discipline is catching fixture bugs at a rate that suggests the discipline is
+working as designed, not that the fixtures are unusually careless.
+
+**Numbers, verified not assumed.** `test_check_tier_rule.py`: 44/44 OBSERVED (up from 34). LOC:
+`schema.py` 128 (unchanged) / `check_tier_rule.py` 438 (+82) / `test_check_tier_rule.py` 500 (+125) = 566
+implementation / 500 test / 1066 total (up from 484/375/859 at D0093). All structural gates,
+`schema_validator.py`, `data_codegen --check`, and `tools/anvil/check_integrity.py` re-run and PASS. No
+`data/economy/` content, no `core/`/`sim/` code touched, no Anvil event written by this round's code (the
+CLI's `--json` mode prints to stdout only).
+
+Reverse: revert `tools/economy_check/{check_tier_rule.py,test_check_tier_rule.py,README.md}` to their
+D0093 state.
+
+## D0095 · 2026-08-28 · a clean baseline snapshot, measured before data/economy/ content lands
+
+Director's explicit ask, not a task: "the numbers right in front of me before we start adding economy
+content, because the economy is the first game-shaped work in a while and the ratio should start moving
+once it lands. I want to see the floor it moves from." Every figure below is `wc -l`/gate output read at
+writing time, none recalled from an earlier round's report — this project's own standing rule ("verify a
+numeric claim against actual tool output before writing it into a commit, doc, or report") applied to a
+report whose entire purpose is being a trustworthy floor.
+
+- **`tools/economy_check/` split**: 566 implementation (`schema.py` 128 + `check_tier_rule.py` 438) /
+  500 test (`test_check_tier_rule.py`) / **1,066 total.**
+- **Instrument/game ratio** (`check_loc_ratio.py`, run fresh): instrument (harness+experiment+tools+tests)
+  **6,625** / game (core+sim+interface+view+shell) **1,424** — **absolute ratio 4.652.** Trailing-10-commit
+  window (`caaa19f`..HEAD): instrument +1,066, game +0. Still ADVISORY — game LOC (1,424) under the
+  2,000-line floor where the velocity gate means anything.
+- **Anvil, implementation against its cap**: 513 implementation (`schema.py` 238 + `append.py` 96 +
+  `check_integrity.py` 133 + `.anvil/README.md` 46, docs counted with implementation per D0074 since it
+  isn't test code) / 1,000 cap — **51.3% used, 487 lines of headroom.** Test 420
+  (`test_check_integrity.py`). Total 933 / 2,000 total cap.
+- **`.anvil/log/` event count**: **5**, verified by reading every event's `type`/`source_class` directly
+  rather than inferred: 2 external-audit FINDINGs (D0070's round — the "contradictions unrepresentable"
+  and seven-types-insufficient findings), 1 DECISION (the Anvil-cap-split decision itself, D0074), 1
+  artifact-instrument FINDING (the self-referencing-fixture defect, D0075), 1 artifact-instrument FINDING
+  (this session's two-hop-gap finding, D0093). Confirmed by `check_integrity.py`: `PASS -- 5 event(s)
+  checked, referentially sound.`
+
+Game LOC (`core`+`sim`) is unchanged this whole session — 1,424, same as every prior round back to before
+the reversal. Nothing game-shaped has landed since the persistent-shaft reversal itself. This is the
+number the director asked to see move once `data/economy/` does.
+
+Reverse: N/A — a record entry, not an action with a cost to undo.

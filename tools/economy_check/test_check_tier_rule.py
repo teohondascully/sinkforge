@@ -22,15 +22,24 @@ Plus, this round (docs/DECISIONS_LEDGER.md D0093):
   8. A witness (not a fixture to fix -- the director's explicit "leave it open"): a concrete,
      executable demonstration of the two-hop decorative gap RESIDUAL_NOTE names in the checker's own
      output. Documents current, accepted behavior; does not assert it should change.
+
+Plus, this round (docs/DECISIONS_LEDGER.md D0094):
+  9. The --json output mode -- to_json_report's structure on a broken-reference chain, a chain with
+     real check failures, and a clean chain; plus the CLI's --json flag end to end, through main().
 """
+import contextlib
+import io
+import json
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_tier_rule import (check_breach_reachable, check_input_provenance,  # noqa: E402
                               check_output_consequence, check_reference_integrity,
-                              check_terminal_products, format_report, check_chain, RESIDUAL_NOTE,
-                              SCOPE_NOTE)
+                              check_terminal_products, format_report, check_chain,
+                              main as cli_main, to_json_report, RESIDUAL_NOTE,
+                              RESIDUAL_ANVIL_FINDING_ID, SCOPE_NOTE)
 
 
 def mat(hardness=0.0, mass=1.0, verbs=None):
@@ -350,12 +359,128 @@ def witness_two_hop_decorative_gap_documented_not_fixed() -> None:
           f"present alongside the witnessed gap")
 
 
+# --- Fixture 9: the --json output mode (D0094) ----------------------------------------------------
+
+def fixture_9_json_output() -> None:
+    materials = {"ore_iron": mat(1.0)}
+    broken = make_chain(materials, [], [demand("D1", [req("ore_copper", 1)], {})], [])
+    broken_payload = to_json_report(check_chain(broken))
+    ok = (broken_payload["ok"] is False and broken_payload["checks_run"] is False
+          and broken_payload["checks"] is None and broken_payload["failures"] is None
+          and broken_payload["reference_integrity"]["ok"] is False
+          and "unknown material 'ore_copper'" in broken_payload["reference_integrity"]["errors"][0])
+    RESULTS.append(("fixture9: broken-reference chain reports checks_run=False, not an empty checks "
+                     "dict", ok))
+    print(f"[{'OBSERVED' if ok else 'NOT OBSERVED -- BRANCH UNTESTED'}] fixture9 broken-reference JSON "
+          f"-- got {broken_payload}")
+    ok2 = json.loads(json.dumps(broken_payload)) == broken_payload
+    RESULTS.append(("fixture9: broken-reference payload round-trips through json.dumps/loads", ok2))
+    print(f"[{'OBSERVED' if ok2 else 'NOT OBSERVED -- BRANCH UNTESTED'}] fixture9 broken-reference "
+          f"JSON-serializable")
+
+    decorative_materials = {"topsoil": mat(0.0), "ore_a": mat(1.0), "ore_b": mat(2.0), "ore_c": mat(3.0),
+                             "ingot_a": mat(0.0)}
+    decorative_recipes = [recipe("refine_ore", [req("ore_a", 2)], [req("ingot_a", 1)],
+                                  requires_verbs=["drill"])]
+    decorative_demands = [
+        demand("D1", [req("topsoil", 1)], {"cut_hardness": 1.0, "verbs": ["drill"]}),
+        demand("D2", [req("ore_a", 2)], {"cut_hardness": 2.0}),
+        demand("D3", [req("ore_b", 2)], {"cut_hardness": 3.0}),
+    ]
+    decorative = make_chain(decorative_materials, decorative_recipes, decorative_demands, [])
+    decorative_payload = to_json_report(check_chain(decorative))
+    ok3 = (decorative_payload["ok"] is False and decorative_payload["checks_run"] is True
+           and decorative_payload["failures"]["output_consequence"] == ["D2", "D3"]
+           and decorative_payload["failures"]["terminal_products"] == ["ingot_a"])
+    RESULTS.append(("fixture9: a chain with real failures names the specific demands/materials "
+                     "implicated, per check", ok3))
+    print(f"[{'OBSERVED' if ok3 else 'NOT OBSERVED -- BRANCH UNTESTED'}] fixture9 failing-chain "
+          f"failures -- got {decorative_payload['failures']}")
+
+    clean = make_chain(_fixture_5_materials(), _fixture_5_recipes(), _fixture_5_demands(),
+                        [req("steel_ingot", 1)])
+    clean_payload = to_json_report(check_chain(clean))
+    ok4 = (clean_payload["ok"] is True and clean_payload["checks_run"] is True
+           and all(v == [] for v in clean_payload["failures"].values())
+           and clean_payload["reference_integrity"]["ok"] is True
+           and clean_payload["reference_integrity"]["errors"] == [])
+    RESULTS.append(("fixture9: a clean chain reports ok=True with every per-check failure list empty",
+                     ok4))
+    print(f"[{'OBSERVED' if ok4 else 'NOT OBSERVED -- BRANCH UNTESTED'}] fixture9 clean-chain JSON")
+
+    residual = clean_payload["residual"]
+    ok5 = (residual["id"] == "two_hop_decorative_gap" and residual["decision_ledger"] == "D0093"
+           and residual["anvil_finding_id"] == RESIDUAL_ANVIL_FINDING_ID
+           and residual["note"] == RESIDUAL_NOTE)
+    RESULTS.append(("fixture9: the residual gap is a structured field (id/ledger/finding-id/note), "
+                     "not embedded prose", ok5))
+    print(f"[{'OBSERVED' if ok5 else 'NOT OBSERVED -- BRANCH UNTESTED'}] fixture9 residual struct -- "
+          f"got {residual}")
+
+    scope = clean_payload["scope"]
+    ok6 = scope["note"] == SCOPE_NOTE and scope["id"] == "rig_demand_chain_only"
+    RESULTS.append(("fixture9: the scope note is present as a structured field too", ok6))
+    print(f"[{'OBSERVED' if ok6 else 'NOT OBSERVED -- BRANCH UNTESTED'}] fixture9 scope struct -- got "
+          f"{scope}")
+
+
+def branch_json_cli_flag() -> None:
+    with tempfile.TemporaryDirectory() as d:
+        clean_path = Path(d) / "clean.json"
+        clean = make_chain(_fixture_5_materials(), _fixture_5_recipes(), _fixture_5_demands(),
+                            [req("steel_ingot", 1)])
+        clean_path.write_text(json.dumps(clean), encoding="utf-8")
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            exit_code = cli_main(["--json", str(clean_path)])
+        parsed = json.loads(buf.getvalue())
+        ok = exit_code == 0 and parsed["ok"] is True and parsed["checks_run"] is True
+        RESULTS.append(("--json CLI flag on a clean chain: exit 0, stdout is parseable JSON", ok))
+        print(f"[{'OBSERVED' if ok else 'NOT OBSERVED -- BRANCH UNTESTED'}] --json clean CLI -- exit="
+              f"{exit_code}")
+
+        broken_path = Path(d) / "broken.json"
+        broken = make_chain({"ore_iron": mat(1.0)}, [], [demand("D1", [req("ore_copper", 1)], {})], [])
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+
+        buf2 = io.StringIO()
+        with contextlib.redirect_stdout(buf2):
+            exit_code2 = cli_main(["--json", str(broken_path)])
+        parsed2 = json.loads(buf2.getvalue())
+        ok2 = exit_code2 == 1 and parsed2["ok"] is False and parsed2["checks_run"] is False
+        RESULTS.append(("--json CLI flag on a broken-reference chain: exit 1, checks_run False in "
+                         "the JSON", ok2))
+        print(f"[{'OBSERVED' if ok2 else 'NOT OBSERVED -- BRANCH UNTESTED'}] --json broken CLI -- exit="
+              f"{exit_code2}")
+
+        buf3 = io.StringIO()
+        buf3_err = io.StringIO()
+        with contextlib.redirect_stdout(buf3), contextlib.redirect_stderr(buf3_err):
+            exit_code3 = cli_main(["--json"])
+        ok3 = exit_code3 == 2 and "usage:" in buf3_err.getvalue()
+        RESULTS.append(("--json CLI flag alone, no file argument, still reports usage error (exit 2)",
+                         ok3))
+        print(f"[{'OBSERVED' if ok3 else 'NOT OBSERVED -- BRANCH UNTESTED'}] --json no-file CLI -- "
+              f"exit={exit_code3}")
+
+        buf4 = io.StringIO()
+        with contextlib.redirect_stdout(buf4):
+            exit_code4 = cli_main([str(clean_path)])
+        text_out = buf4.getvalue()
+        ok4 = exit_code4 == 0 and SCOPE_NOTE in text_out and text_out.strip()[0] != "{"
+        RESULTS.append(("plain (non --json) mode is unaffected -- still prints prose, not JSON", ok4))
+        print(f"[{'OBSERVED' if ok4 else 'NOT OBSERVED -- BRANCH UNTESTED'}] plain-mode regression "
+              f"check -- exit={exit_code4}")
+
+
 def main() -> int:
     for branch in (fixture_1_input_provenance, branch_d1_reports_na_not_pass,
                    branch_d2_gets_no_exemption, fixture_2_decorative_demand,
                    fixture_3_decorative_chain, fixture_4_terminal_product, fixture_5_valid_chain,
                    fixture_6_breach_unreachable, fixture_7_reference_integrity,
-                   witness_two_hop_decorative_gap_documented_not_fixed):
+                   witness_two_hop_decorative_gap_documented_not_fixed, fixture_9_json_output,
+                   branch_json_cli_flag):
         branch()
 
     failed = [name for name, ok in RESULTS if not ok]

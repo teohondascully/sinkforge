@@ -3,7 +3,13 @@
 No engine, no sim, no `data/economy/` -- this reads a `chain` dict (schema.py) and reports, it never
 executes anything. Built against `tools/economy_check/test_check_tier_rule.py`'s synthetic fixtures only.
 
-    python3 tools/economy_check/check_tier_rule.py <chain.json|chain.yaml>
+    python3 tools/economy_check/check_tier_rule.py [--json] <chain.json|chain.yaml>
+
+`--json` prints `to_json_report`'s structured output instead of `format_report`'s prose -- built so a
+future check run can become a `tools/anvil/append.py` `MEASUREMENT` event directly (`docs/DECISIONS_
+LEDGER.md` D0094), rather than a number transcribed by hand off this same console. Not wired to Anvil
+here: this module writes nothing to `.anvil/log/`, and nothing here calls `append.py`. That wiring is
+separate, deferred work, waiting on `data/economy/` to have real rows to measure.
 
 ## Two things stated here AND in every report's output (not just this docstring, per the director's
 explicit instruction -- a green result that silently excludes something is exactly what an audit catches
@@ -109,6 +115,14 @@ RESIDUAL_NOTE = (
     "material, is itself non-decorative. A demand granting a verb consumed only by another demand that "
     "itself fails every check can still PASS below."
 )
+
+# The Anvil event carrying RESIDUAL_NOTE's evidence (docs/DECISIONS_LEDGER.md D0093). A static pointer,
+# not resolved by reading .anvil/log/ at runtime -- this instrument has no reason to depend on Anvil's
+# log at check time, only to CITE it in output for whoever later builds a MEASUREMENT event from a run.
+# If that FINDING is ever superseded (tools/anvil's own supersedes mechanism), update this constant to
+# the superseding event's id -- it is a citation, not a live query, and can go stale exactly like any
+# other citation in this codebase.
+RESIDUAL_ANVIL_FINDING_ID = "a677726d-8984-4ec6-9e3e-ab44b850d841"
 
 
 def check_reference_integrity(chain: dict) -> list[str]:
@@ -327,6 +341,67 @@ def format_report(report: dict) -> tuple[str, bool]:
     return "\n".join(lines), ok
 
 
+CHECK_KEYS = ("input_provenance", "output_consequence", "terminal_products", "breach_reachable")
+
+
+def to_json_report(report: dict) -> dict:
+    """Machine-readable form of `report` (check_chain's return value) -- everything format_report prints
+    as prose, as structured data instead, so a future MEASUREMENT event (tools/anvil/append.py) can cite
+    a check run directly rather than someone reading a console and transcribing a number by hand, exactly
+    the failure mode Anvil's provenance discipline exists to prevent. Building this does NOT wire it to
+    the log -- no MEASUREMENT event is written here, and no code in this module calls append.py. That
+    wiring is separate, deferred work, waiting on data/economy/ to exist (docs/DECISIONS_LEDGER.md D0094).
+
+    `checks_run` is explicit (True/False), never inferred from an empty `checks`/`failures` dict being
+    absent or empty -- an empty dict silently reading as "0 checked, clean" is exactly the vacuous-
+    success class this project's own retrospective is built around avoiding, so a broken-reference chain
+    reports `checks_run: false` plus a reason, never a quietly-empty `checks: {}`.
+    """
+    payload = {
+        "version": 1,
+        "scope": {"id": "rig_demand_chain_only", "note": SCOPE_NOTE},
+        "residual": {
+            "id": "two_hop_decorative_gap",
+            "status": "known_open_not_fixed",
+            "decision_ledger": "D0093",
+            "anvil_finding_id": RESIDUAL_ANVIL_FINDING_ID,
+            "note": RESIDUAL_NOTE,
+        },
+        "reference_integrity": {
+            "ok": not report["reference_integrity"],
+            "errors": list(report["reference_integrity"]),
+        },
+    }
+
+    if report["reference_integrity"]:
+        payload.update({
+            "checks_run": False,
+            "checks_not_run_reason": "chain does not resolve -- reference_integrity failed, the four "
+                                      "graph-query checks were not run",
+            "checks": None,
+            "failures": None,
+            "ok": False,
+        })
+        return payload
+
+    def rows(key: str) -> list[dict]:
+        return [{"id": item_id, "verdict": verdict, "detail": detail}
+                 for item_id, verdict, detail in report[key]]
+
+    def failing_ids(key: str) -> list[str]:
+        return [item_id for item_id, verdict, _detail in report[key] if verdict == "fail"]
+
+    failures = {key: failing_ids(key) for key in CHECK_KEYS}
+    payload.update({
+        "checks_run": True,
+        "checks_not_run_reason": None,
+        "checks": {key: rows(key) for key in CHECK_KEYS},
+        "failures": failures,
+        "ok": not any(failures.values()),
+    })
+    return payload
+
+
 def load_chain(path: Path) -> dict:
     text = path.read_text(encoding="utf-8")
     if path.suffix in (".yaml", ".yml"):
@@ -341,13 +416,20 @@ def load_chain(path: Path) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    if len(argv) != 1:
-        print("usage: check_tier_rule.py <chain.json|chain.yaml>", file=sys.stderr)
+    json_mode = "--json" in argv
+    positional = [a for a in argv if a != "--json"]
+    if len(positional) != 1:
+        print("usage: check_tier_rule.py [--json] <chain.json|chain.yaml>", file=sys.stderr)
         print("check_tier_rule: no data/economy/ chain file exists yet -- this CLI has no default "
               "target. Point it at a chain once one is authored.", file=sys.stderr)
         return 2
-    chain = load_chain(Path(argv[0]))
-    text, ok = format_report(check_chain(chain))
+    chain = load_chain(Path(positional[0]))
+    report = check_chain(chain)
+    if json_mode:
+        payload = to_json_report(report)
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0 if payload["ok"] else 1
+    text, ok = format_report(report)
     print(text)
     return 0 if ok else 1
 
