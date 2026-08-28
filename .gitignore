@@ -102,6 +102,20 @@ legacy/tools/*.uid
 # principle as everything else in this file.
 history/*.png.import
 
+# docs/archive/session-exhaust/ — the SAME category as history/ above (archived, session-coordination
+# review material; nothing in the live tree addresses it via res:// path — verified with a grep, not
+# assumed), missing its own .gdignore until now. Without one, `godot --import` kept trying to import 88
+# review screenshots (itm_review/, winch_review/) every run, and their tracked .import sidecars drifted
+# out of sync with the tree the moment the files were archived (moved from docs/handoff/ to their current
+# path without either landing a .gdignore or regenerating the sidecars) — found as ~90 files of unrelated
+# working-tree noise mid-round (docs/DECISIONS_LEDGER.md D0098), not the change that caused it. Fixed the
+# same way as history/: `docs/archive/session-exhaust/.gdignore` stops the scanner from touching the
+# directory at all, and this ignores the sidecars going forward. `**` (not a flat `*`) because the archive
+# has nested review subdirectories (winch_review/baseline/, winch_review/optionA/, ...), unlike history/'s
+# flat layout — a plain `*` would miss those. The 88 already-tracked, now-permanently-stale copies are
+# untracked with `git rm --cached` in the same commit, never `rm` — the files stay on disk.
+docs/archive/session-exhaust/**/*.png.import
+
 # Godot's per-machine ProjectSettings override + any local cert bundle it points at. Machine
 # state, never project state: nothing here may change how the game builds for anyone else.
 override.cfg

@@ -10,6 +10,21 @@
   real branch-counting pass, not a line-based approximation pretending to
   be one.
 
+`FUNC_LIMIT=50` is a CEILING, not a norm — reconciled explicitly, not left to silently disagree with
+`tools/quality_check/function_length.py`'s own IQR-fence read of the real distribution
+(`docs/DECISIONS_LEDGER.md` D0098). This run's real numbers: 85 GDScript functions, median 4 lines, p90
+18.6, IQR outlier fence 19.5 — the typical function in this codebase is nowhere near 50; 50 is a hard
+backstop for the pathological case, verified empirically to still hold at least one real function
+(`sim/body/vertical_resolve.gd:resolve_floor`, currently exactly 50) rather than picked with no headroom
+at all. Kept unchanged rather than lowered toward 19.5, on purpose: this gate is a blocking FAIL, and
+retroactively lowering it would force an immediate split of every function currently between 20 and 50
+lines — several of them (`_resolve_horizontal`, `_carve_caves`, `tick`, `_enforce_grid_bounds`,
+`move_and_resolve`, `grid_floor_backstop`, `generate`) working and tested, with no defect driving the
+change. The two numbers answer different questions — this one asks "has this function become
+unmaintainable," `function_length.py`'s fence asks "is this function unusual relative to the rest of
+this codebase's own distribution today" — and a function between the fence and the cap is not a
+violation of either question read correctly, only of conflating them.
+
 Function boundaries are found by indentation: a `func` line at indent N ends
 at its LAST line at indent > N, or EOF. A run of blank/comment lines is only
 attributed to the function if a deeper-indented real line follows it (proving

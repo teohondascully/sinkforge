@@ -34,9 +34,23 @@ exclusion + its risk statement (+29) and the harness's new home (+18) — both e
 round — added more back. Full accounting in D0097 and `tools/quality_check/README.md`'s LOC section.
 21/21 mutation cases OBSERVED (17 → 21, four new cases for the exclusion). All gates re-run and PASS.
 
-Not wired into CI. No thresholds set — that's the director's next call, from the real distributions
-(named outliers + a recommended guardrail line per metric, reported to the director directly this round,
-not repeated here).
+**Third round, same day, CLOSED (D0098).** Four follow-ups on D0097's report, plus one incidental fix.
+`FUNC_LIMIT=50` reconciled with the IQR fence as a documented ceiling, not lowered — lowering it would
+force an immediate split of several working, tested functions with no defect driving the change. A
+FINDING filed for the `_resolve_horizontal`/D0059 complexity correlation — checked against the real
+source first, found narrower than the director's own initial framing (1 of 4 defects directly in that
+function, not all 4), filed with the corrected scope rather than the stronger claim. Python advisory
+guardrails set (`PY_LENGTH_GUARDRAIL=42.5`, `PY_COMPLEXITY_GUARDRAIL=13.5`), frozen and independent of
+the self-calibrating fence — proven decoupled by mutation test, and the decoupling showed up for real
+within the same round when later edits moved the live fence to 47.5. Stub modules excluded from
+`coupling.py`'s corpus (named in the report, not hidden) — confirmed as the actual cause of `sim/`'s
+false "4 outliers": re-run with the exclusion drops it to 0. Incidental: `docs/archive/session-exhaust/`
+never had a `.gdignore` (unlike `history/`), so its 88 tracked `.import` sidecars drifted stale every
+`--import` run — fixed the same way as `history/`, sidecars untracked (files stay on disk).
+
+`tools/quality_check/` now 929 implementation / 353 test / 1,282 total (was 847/265/1,112), reported
+plainly, all real content. Still not wired into CI — the director's stated condition (thresholds decided,
+stub question settled) is now met, but wiring itself is a separate instruction not yet given.
 
 ## tools/economy_check/ — the tier-rule checker, 2026-08-28 — CLOSED
 

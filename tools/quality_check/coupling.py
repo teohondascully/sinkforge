@@ -34,6 +34,16 @@ cross-check, not something this instrument verifies.
   every `from schema import ...` in `economy_check` as a reference to `anvil`. A name matching MULTIPLE
   other subdirectories with no local match is ambiguous and is not counted, not guessed.
 
+**Stub modules are excluded from the corpus, named explicitly in the report** (`_split_stubs`,
+`docs/DECISIONS_LEDGER.md` D0098): a module directory with zero code files of its own scope's language
+can never be either endpoint of a real edge, so including it contributes nothing but a structural zero
+to fan-in/fan-out and, at scale, drags the IQR fence toward 0 -- verified at D0096/D0097, where 10 of 14
+`sim/` modules were exactly this (real, empty stub directories, not modules with real code and
+genuinely zero coupling) and alone made every nonzero fan-in/out read as an "outlier." Excluding them is
+a real, stated choice with a stated cost: a stub that gains its first file mid-session will not appear
+in this report until it has code, and the excluded list is printed every run specifically so that cost
+is visible, not silent.
+
 Carries a yield counter from day one (`dashboard.py`'s YIELD section, this file's own outlier count) --
 stated here, not only in the dashboard wrapper, so it is not exempted from the project's standing
 retire-what-never-fires rule by feeling virtuous.
@@ -50,6 +60,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scan import ROOT, iqr_outlier_fence, run_cli, summarize  # noqa: E402
 
 _CLASS_NAME_RE = re.compile(r'^\s*class_name\s+(\w+)', re.MULTILINE)
+
+
+def _split_stubs(root: Path, scope: str, all_modules: list[str], ext: str) -> tuple[list[str], list[str]]:
+    """(with_code, stubs) -- a stub is a module directory with zero *.ext files anywhere under it.
+    Named and reported explicitly, not silently dropped (`docs/DECISIONS_LEDGER.md` D0098): an IQR
+    fence computed over a corpus padded with modules that have no code at all is dominated by
+    structural zeros, not real coupling data -- verified at D0096/D0097 that 10 of 14 `sim/` modules had
+    zero `.gd` files, which alone was enough to drag that scope's fence to ~0 and flag any nonzero
+    fan-in/out as an "outlier." A stub can never appear as either endpoint of a real edge (there is no
+    file in it to scan for outgoing references, and nothing in it to be referenced by name), so removing
+    it from the corpus used for fan-in/fan-out and the outlier fence drops no real data -- only the
+    zero-padding."""
+    base = root / scope
+    with_code, stubs = [], []
+    for name in all_modules:
+        if any((base / name).rglob(f"*.{ext}")):
+            with_code.append(name)
+        else:
+            stubs.append(name)
+    return with_code, stubs
 
 
 def _sim_modules(root: Path) -> list[str]:
@@ -159,9 +189,10 @@ def analyze(root: Path | None = None) -> dict:
     parameter rather than hardcoding it."""
     root = ROOT if root is None else root
     result = {}
-    for scope, module_list, edge_fn in (("sim", _sim_modules, _sim_edges),
-                                          ("tools", _tools_modules, _tools_edges)):
-        modules = module_list(root)
+    for scope, module_list, edge_fn, ext in (("sim", _sim_modules, _sim_edges, "gd"),
+                                               ("tools", _tools_modules, _tools_edges, "py")):
+        all_modules = module_list(root)
+        modules, stubs = _split_stubs(root, scope, all_modules, ext)
         edges = edge_fn(root)
         fan_out = {m: len({d for s, d in edges if s == m}) for m in modules}
         fan_in = {m: len({s for s, d in edges if d == m}) for m in modules}
@@ -177,7 +208,7 @@ def analyze(root: Path | None = None) -> dict:
             if reasons:
                 outliers.append((m, reasons))
         result[scope] = {
-            "modules": modules, "fan_in": fan_in, "fan_out": fan_out,
+            "modules": modules, "stubs": sorted(stubs), "fan_in": fan_in, "fan_out": fan_out,
             "fan_in_stats": summarize(list(fan_in.values())),
             "fan_out_stats": summarize(list(fan_out.values())),
             "outliers": outliers,
@@ -199,6 +230,10 @@ def format_report(result: dict) -> str:
                 lines.append(f"    {m}: {', '.join(reasons)}")
         else:
             lines.append("  No module's fan-in or fan-out is an outlier against the rest of this scope.")
+        if r["stubs"]:
+            lines.append(f"  {len(r['stubs'])} stub module(s) excluded (zero code files, named so "
+                         f"nothing hides in the exclusion -- docs/DECISIONS_LEDGER.md D0098): "
+                         f"{', '.join(r['stubs'])}")
     return "\n".join(lines)
 
 

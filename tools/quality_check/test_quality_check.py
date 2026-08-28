@@ -62,6 +62,39 @@ def branch_function_length_outlier() -> None:
           detail=str(result2["gd"]["outliers"]))
 
 
+def _py_func_of_length(name: str, n: int) -> Func:
+    body = "\n".join(f"    x = {i}" for i in range(n - 2)) if n > 2 else ""
+    src = f"def {name}():\n" + (body + "\n" if body else "") + "    return x\n" if n >= 2 else f"def {name}():\n    pass\n"
+    return py_func_from(src)
+
+
+def branch_function_length_guardrail() -> None:
+    # A frozen guardrail must fire independently of the CURRENT run's own dynamic fence, not just
+    # happen to coincide with it -- proven by constructing a synthetic set where the two disagree.
+    nine_tiny = [_py_func_of_length(f"tiny{i}", 2) for i in range(9)]
+    one_mid = _py_func_of_length("mid", 20)
+    result = function_length.analyze(nine_tiny + [one_mid])
+    dynamic_flagged = any("mid" in q for q, _l in result["py"]["outliers"])
+    guardrail_flagged = any("mid" in q for q, _l in result["py"]["guardrail_hits"])
+    check("function_length guardrail: a 20-line function among nine 2-line ones IS a dynamic-fence "
+          "outlier (proves the dynamic fence still works on this fixture)", dynamic_flagged,
+          detail=str(result["py"]["outliers"]))
+    check("function_length guardrail: that SAME 20-line function is NOT a guardrail hit (20 < "
+          f"{function_length.PY_LENGTH_GUARDRAIL}) -- the guardrail is a different, independent number, "
+          "not a relabeling of the dynamic fence", not guardrail_flagged,
+          detail=str(result["py"]["guardrail_hits"]))
+
+    eleven_at_guardrail = [_py_func_of_length(f"atg{i}", 45) for i in range(11)]
+    result2 = function_length.analyze(eleven_at_guardrail)
+    check("function_length guardrail: eleven UNIFORM 45-line functions are NOT dynamic-fence outliers "
+          "(uniform data has no outliers relative to itself)", result2["py"]["outliers"] == [],
+          detail=str(result2["py"]["outliers"]))
+    check(f"function_length guardrail: those SAME functions (45 > {function_length.PY_LENGTH_GUARDRAIL}) "
+          "ARE guardrail hits -- the guardrail fires even when the dynamic fence, self-normalized to "
+          "this uniform set, would not",
+          len(result2["py"]["guardrail_hits"]) == 11, detail=str(result2["py"]["guardrail_hits"]))
+
+
 # --- complexity -------------------------------------------------------------------------------------
 
 def branch_complexity() -> None:
@@ -97,6 +130,38 @@ def branch_complexity() -> None:
     outer_c = complexity.py_complexity(py_with_nested.node)
     check("complexity (py): a nested def's own branches do not inflate the OUTER function's count",
           outer_c == 1, detail=f"got {outer_c}, expected 1 (outer has no branches of its own)")
+
+
+def _py_func_with_ifs(name: str, k: int) -> Func:
+    ifs = "".join(f"    if a{i}:\n        pass\n" for i in range(k))
+    return py_func_from(f"def {name}():\n{ifs}    return 0\n")
+
+
+def branch_complexity_guardrail() -> None:
+    # Same decoupling proof as function_length's guardrail, for complexity: the frozen guardrail must
+    # fire independently of this run's own dynamic fence, not just happen to coincide with it today.
+    nine_trivial = [_py_func_with_ifs(f"triv{i}", 0) for i in range(9)]
+    one_branchy = _py_func_with_ifs("branchy", 4)  # complexity 1 + 4 = 5
+    result = complexity.analyze(nine_trivial + [one_branchy])
+    dynamic_flagged = any("branchy" in q for q, _c in result["py"]["outliers"])
+    guardrail_flagged = any("branchy" in q for q, _c in result["py"]["guardrail_hits"])
+    check("complexity guardrail: a complexity-5 function among nine complexity-1 ones IS a "
+          "dynamic-fence outlier (proves the dynamic fence still works on this fixture)", dynamic_flagged,
+          detail=str(result["py"]["outliers"]))
+    check("complexity guardrail: that SAME complexity-5 function is NOT a guardrail hit (5 < "
+          f"{complexity.PY_COMPLEXITY_GUARDRAIL}) -- the guardrail is a different, independent number, "
+          "not a relabeling of the dynamic fence", not guardrail_flagged,
+          detail=str(result["py"]["guardrail_hits"]))
+
+    fourteen_at_guardrail = [_py_func_with_ifs(f"atg{i}", 14) for i in range(5)]  # complexity 1+14=15
+    result2 = complexity.analyze(fourteen_at_guardrail)
+    check("complexity guardrail: five UNIFORM complexity-15 functions are NOT dynamic-fence outliers "
+          "(uniform data has no outliers relative to itself)", result2["py"]["outliers"] == [],
+          detail=str(result2["py"]["outliers"]))
+    check(f"complexity guardrail: those SAME functions (15 > {complexity.PY_COMPLEXITY_GUARDRAIL}) ARE "
+          "guardrail hits -- the guardrail fires even when the dynamic fence, self-normalized to this "
+          "uniform set, would not",
+          len(result2["py"]["guardrail_hits"]) == 5, detail=str(result2["py"]["guardrail_hits"]))
 
 
 # --- duplication ------------------------------------------------------------------------------------
@@ -204,6 +269,27 @@ def branch_coupling_sim_path_and_class_name() -> None:
               fan_in_a == 2, detail=f"got {fan_in_a}, expected 2 (mod_b via class_name, mod_c via preload)")
 
 
+def branch_coupling_stub_exclusion() -> None:
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        _write(root, "sim/mod_a/mod_a.gd", "class_name TypeA\nfunc foo():\n\tpass\n")
+        _write(root, "sim/mod_b/mod_b.gd", "func bar():\n\tvar x = TypeA.new()\n")
+        (root / "sim" / "empty_stub_one").mkdir(parents=True)
+        (root / "sim" / "empty_stub_two").mkdir(parents=True)
+        result = coupling.analyze(root)
+        check("coupling: a module directory with zero .gd files is named in 'stubs', not silently "
+              "dropped", set(result["sim"]["stubs"]) == {"empty_stub_one", "empty_stub_two"},
+              detail=str(result["sim"]["stubs"]))
+        check("coupling: that same stub module does NOT appear in 'modules' (the corpus used for "
+              "fan-in/fan-out and the outlier fence)",
+              "empty_stub_one" not in result["sim"]["modules"]
+              and "empty_stub_two" not in result["sim"]["modules"],
+              detail=str(result["sim"]["modules"]))
+        check("coupling: a real module (mod_a, mod_b) still appears in 'modules', unaffected by the "
+              "stub exclusion", {"mod_a", "mod_b"} <= set(result["sim"]["modules"]),
+              detail=str(result["sim"]["modules"]))
+
+
 def branch_coupling_tools_import_resolution() -> None:
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
@@ -242,9 +328,11 @@ def branch_dashboard_runs_end_to_end() -> None:
 
 
 def main() -> int:
-    for branch in (branch_function_length_outlier, branch_complexity, branch_duplication,
+    for branch in (branch_function_length_outlier, branch_function_length_guardrail,
+                   branch_complexity, branch_complexity_guardrail, branch_duplication,
                    branch_duplication_main_exclusion,
                    branch_coupling_sim_path_and_class_name, branch_coupling_tools_import_resolution,
+                   branch_coupling_stub_exclusion,
                    branch_dashboard_runs_end_to_end):
         branch()
 
