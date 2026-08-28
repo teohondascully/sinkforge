@@ -24,7 +24,10 @@ import coupling  # noqa: E402
 import dashboard  # noqa: E402
 import duplication  # noqa: E402
 import function_length  # noqa: E402
+import scan  # noqa: E402
 from scan import Func, run_cli  # noqa: E402
+
+import check_size_limits  # noqa: E402 -- scan.py's own import already inserts tools/layer_lint/ onto sys.path
 
 RESULTS: list[tuple[str, bool]] = []
 
@@ -344,6 +347,25 @@ def branch_coupling_tools_import_resolution() -> None:
               detail=str(edges))
 
 
+# --- scan scope ---------------------------------------------------------------------------------------
+
+def branch_find_gd_files_reaches_whole_tree() -> None:
+    files = set(str(p) for p in scan.find_gd_files())
+    check("find_gd_files: reaches tests/ (D0102 -- was GAME_DIRS-only, missing it entirely)",
+          any(f.startswith("tests/") for f in files), detail=str([f for f in files if "test" in f][:3]))
+    check("find_gd_files: still excludes legacy/ (the one exclusion check_size_limits.py itself uses)",
+          not any(f.startswith("legacy/") for f in files))
+
+    # Real parity, not a hardcoded count that would go stale the moment any .gd file is added or
+    # removed anywhere in the tree: compute check_size_limits.py's OWN file list directly and assert
+    # the two scanners agree exactly, not just that scan.py's is a superset.
+    check_size_limits_files = set(str(p) for p in check_size_limits.find_gd_files())
+    check("find_gd_files: matches check_size_limits.py's own file list EXACTLY (same scope, not just "
+          "a superset that happens to include tests/)", files == check_size_limits_files,
+          detail=f"only in scan: {files - check_size_limits_files}, only in check_size_limits: "
+                 f"{check_size_limits_files - files}")
+
+
 # --- dashboard smoke test ----------------------------------------------------------------------------
 
 def branch_dashboard_runs_end_to_end() -> None:
@@ -361,6 +383,7 @@ def main() -> int:
                    branch_duplication_main_exclusion, branch_duplication_gate_exit,
                    branch_coupling_sim_path_and_class_name, branch_coupling_tools_import_resolution,
                    branch_coupling_stub_exclusion,
+                   branch_find_gd_files_reaches_whole_tree,
                    branch_dashboard_runs_end_to_end):
         branch()
 

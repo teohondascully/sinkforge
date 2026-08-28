@@ -3727,3 +3727,50 @@ after D0100's own split, matching the net +3 functions this item adds).
 
 Reverse: revert this commit; every changed function's pre-refactor body is recoverable verbatim from the
 prior commit.
+
+## D0102 · 2026-08-28 · full-tree duplication sweep — a real scope gap fixed, one real duplicate found and fixed
+
+Item 4 of the director's queue. Before sweeping, checked `scan.find_gd_files()`'s ACTUAL scope against
+its own docstring's claim ("same scope check_size_limits.py uses") rather than trusting the claim: false
+-- `find_gd_files` was `GAME_DIRS`-only (`core`/`sim`/`interface`/`view`/`shell`), while
+`check_size_limits.py` actually scans everything except `legacy/` (via `gd_files_excluding`). `tests/`
+(and `data/*/generated.gd`) were invisible to every quality_check instrument's GDScript corpus since
+D0096 -- a scanner claiming a scope it did not have, exactly the "instrument cannot register its
+subject" failure class named elsewhere in this project's own standing rules. Fixed by having
+`find_gd_files` call `gd_files_excluding` directly (`tools/layer_lint/gd_scan.py`), the same function
+`check_size_limits.py` itself calls -- not a superset, the EXACT same scope, proven by a new mutation
+test that computes both scanners' file lists and asserts set equality (41/41 cases now, was 38).
+`find_py_files` left unchanged: the only Python files outside its current scope are three archived,
+frozen scripts under `docs/archive/session-exhaust/`, the same "not live, not maintained" category as
+`legacy/`, correctly excluded from a code-quality sweep the same way `legacy/`'s `.gd` is.
+
+**The sweep itself: one real cluster, found and fixed.** `tests/test_body.gd:_flat_grid` and
+`tests/test_heightfield.gd:_flat_grid` — byte-identical after normalization, a pure `(floor_row, width)
+-> TileGrid` fixture builder with no dependency on either file's own local state. Unambiguous, not
+judgment-dense: both files already `extend "res://tests/test_base.gd"` (the shared suite base every
+`tests/test_*.gd` file already uses), so the fix was moving the one definition into `test_base.gd` and
+deleting both copies -- no call-site change needed anywhere, since GDScript resolves an unqualified call
+to a base-class method automatically. Checked for a third, non-identical near-copy before concluding
+this was the whole finding: several other files (`test_bounds_invariant.gd`, `test_reachability_sweep.gd`,
+`test_shaft_generator.gd`) define similarly-NAMED grid-fixture helpers, but the exact-match detector
+(deliberately not fuzzy-matching, per its own documented scope) did not cluster them -- read as
+genuinely different fixture shapes for different scenarios, not a second instance of this same gap.
+
+Post-fix: `duplication.py` reports 0 clusters, both languages, across the now-genuinely-whole tree.
+Godot parse-clean (`--check-only` on all three touched files); `test_body.gd` and `test_heightfield.gd`
+both re-run, ALL PASS. No `sim/`/`core/` file touched — this item's changes are entirely `tests/` and
+`tools/`.
+
+**Incidental, informational, not acted on this round**: including `tests/` roughly triples the
+GDScript function-length/complexity corpus (85 → 265 functions) and shifts every dynamic fence upward
+(length fence 19.5 → 25.5; complexity fence unchanged at 6.0 but the outlier count grew). The new single
+highest-complexity GDScript function in the whole tree is `tests/fixture_body_fuzz_probe.gd:_check_tick`
+at 21 -- higher than either of this round's own refactor targets ended up at. Not a target of this
+queue (only `_resolve_horizontal` and `vertical_resolve.gd`'s D0059-holding functions were named), so
+reported here for the record and left untouched, per the explicit "don't refactor beyond the named
+targets" instruction.
+
+Gates re-run and PASS.
+
+Reverse: revert this commit; `_flat_grid`'s two prior copies are recoverable verbatim from the prior
+commit if the scope-fix or the fixture move needs undoing independently.

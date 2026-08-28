@@ -14,14 +14,6 @@ func _initialize() -> void:
 	_finish("heightfield")
 
 
-func _flat_grid(floor_row: int, width: int) -> TileGrid:
-	var grid: TileGrid = TileGrid.new(width, floor_row + 5, 1)
-	for col: int in range(-2, width + 2):
-		for row: int in range(floor_row, floor_row + 3):
-			grid.set_material(Vector2i(col, row), &"hardrock")
-	return grid
-
-
 func _test_flat_floor_reads_flat_everywhere() -> void:
 	var grid: TileGrid = _flat_grid(10, 20)
 	var want: int = Fx.from_int(10 * CELL)

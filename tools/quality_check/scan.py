@@ -31,23 +31,25 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "layer_lint"))
 from check_size_limits import FUNC_NAME_RE, function_spans as gd_function_spans, indent_of  # noqa: E402
+from gd_scan import gd_files_excluding  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 
-GAME_DIRS = ("core", "sim", "interface", "view", "shell")
 INSTRUMENT_DIRS = ("harness", "experiment", "tools")
 SCRATCH_PREFIX = "tools/scratch"
+GD_EXCLUDED_TOP = {"legacy"}  ## same exclusion check_size_limits.py itself uses
 
 
 def find_gd_files() -> list[Path]:
-    """Every .gd file under the game dirs, legacy/ excluded -- same scope check_size_limits.py uses."""
-    out = []
-    for dirname in GAME_DIRS:
-        base = ROOT / dirname
-        if not base.is_dir():
-            continue
-        out.extend(sorted(p.relative_to(ROOT) for p in base.rglob("*.gd")))
-    return out
+    """Every .gd file in the repo except `legacy/` (`docs/DECISIONS_LEDGER.md` D0102) -- the SAME scope
+    `check_size_limits.py` actually uses (`gd_files_excluding`, `tools/layer_lint/gd_scan.py`), which this
+    function's own docstring claimed before D0102 but did not keep true: this scanner was previously
+    scoped to a fixed game-directory list (`core`/`sim`/`interface`/`view`/`shell`), missing `tests/`
+    (and `data/*/generated.gd`) entirely. Found running a full-tree duplication sweep for the first time
+    -- a scanner claiming a scope it does not have is exactly the "instrument cannot register its
+    subject" failure class this whole project's own disqualification ledger names, caught here rather
+    than shipped as a second false claim alongside the first."""
+    return sorted(gd_files_excluding(ROOT, GD_EXCLUDED_TOP))
 
 
 def find_py_files() -> list[Path]:

@@ -30,6 +30,20 @@ func _check(condition: bool, label: String) -> void:
 		printerr("  FAIL: %s" % label)
 
 
+## A flat `hardrock` floor at `floor_row`, `width` columns wide, with 2 columns of margin on either
+## side and 5 rows of headroom above. Moved here 2026-08-28 (`docs/DECISIONS_LEDGER.md` D0102) from
+## `test_body.gd`/`test_heightfield.gd`, which each defined an identical private copy independently --
+## `tools/quality_check/duplication.py`'s first whole-tree run found the two byte-for-byte after
+## normalization. Both suites already `extend` this file by path, so this needed no new call-site
+## change -- only the two duplicate definitions came out.
+func _flat_grid(floor_row: int, width: int) -> TileGrid:
+	var grid: TileGrid = TileGrid.new(width, floor_row + 5, 1)
+	for col: int in range(-2, width + 2):
+		for row: int in range(floor_row, floor_row + 3):
+			grid.set_material(Vector2i(col, row), &"hardrock")
+	return grid
+
+
 ## Canonical string signature of any Variant -- dictionary keys sorted so the signature is content-based
 ## and insertion-order-proof. Used to compare two captured states for exact equality without caring how
 ## either dictionary was built up.

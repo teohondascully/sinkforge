@@ -8,12 +8,10 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-## IN PROGRESS — director's execution-dense queue, 2026-08-28, budget 1hr/12 commits
+## CLOSED — director's execution-dense queue, 2026-08-28, budget 1hr/12 commits
 
-Autonomous, execution-dense (specs settled, not judgment-dense). Report at end, not per-task. Hard stops:
-any unproven movement-controller behavior change, any gate red not clearable in one attempt, a refactor
-needing a design decision instead of mechanical extraction, an instrument/Anvil cap crossing, three
-consecutive commits with no test moving red to green. Work in order:
+Autonomous, execution-dense (specs settled, not judgment-dense). All four items closed, no hard stop
+hit, within budget (4 commits).
 
 1. DONE (D0099). Wire the four quality instruments into CI at decided tiers — CI confirmed green.
 2. DONE (D0100). `_resolve_horizontal` refactor: complexity 24 → 13 worst-case, two Extract Methods,
@@ -23,11 +21,12 @@ consecutive commits with no test moving red to green. Work in order:
    loop's own control flow). `grid_floor_backstop` 10→3, fully resolved. Behavior byte-identical again
    (full fuzzer + 8 suites). A small correction to D0098's FINDING recorded (which function held which
    defect, one level more precise — doesn't change the FINDING's core claim).
-4. IN PROGRESS. Full-tree duplication sweep (not just `core/`/`tools/`) — fix unambiguous clusters, flag
-   judgment-dense ones for review rather than fixing.
-
-DON'T: touch `data/economy/`; refactor beyond the named complexity targets; lower a threshold to make
-something pass.
+4. DONE (D0102). Full-tree sweep required fixing a real scope gap first: `scan.find_gd_files()` was
+   `GAME_DIRS`-only, missing `tests/` entirely despite its own docstring claiming parity with
+   `check_size_limits.py`. Fixed (now genuinely the same scope, proven by a set-equality mutation test),
+   then swept: one real cluster (`_flat_grid`, `test_body.gd`/`test_heightfield.gd`), unambiguous, fixed
+   by moving it into the shared `test_base.gd` both already extend. 0 clusters now, both languages,
+   across the actually-whole tree.
 
 ## tools/quality_check/ — four code-quality instruments, 2026-08-28 — CLOSED
 
