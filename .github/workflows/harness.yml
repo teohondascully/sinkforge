@@ -129,6 +129,22 @@ jobs:
       - name: No untracked file exists outside the shipped .gitignore (QUALITY gate 27, D0063)
         run: python3 tools/layer_lint/check_untracked_files.py
 
+      # Phase 0a enforcement (D0149): the gate scripts above are themselves untested code the moment CI
+      # stops running their own mutation-test files by hand. This runs every one of them -- whichever
+      # scripts happen to exist under tools/test_*.py and tools/*/test_*.py, globbed fresh each run, never
+      # a hand list that can go stale the way BRIEF.md's own prose did (D0143/D0146/D0148). A gate script
+      # with no test file alongside it is simply not covered by this step; adding one is what brings it in.
+      - name: Gate mutation tests (tools/test_*.py, tools/*/test_*.py) — BLOCKING
+        run: |
+          set -e
+          shopt -s nullglob
+          files=(tools/test_*.py tools/*/test_*.py)
+          echo "Running ${#files[@]} gate mutation test file(s): ${files[*]}"
+          for f in "${files[@]}"; do
+            echo "=== $f ==="
+            python3 "$f"
+          done
+
       # tools/quality_check/ (docs/DECISIONS_LEDGER.md D0096-D0099). Duplication is the one instrument
       # that gates -- BLOCKING per D0099, since 0 clusters is this project's verified-clean state and a
       # regression is a fact about the tree a build should refuse. The other three are `continue-on-

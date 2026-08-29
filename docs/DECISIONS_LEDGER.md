@@ -5836,3 +5836,25 @@ a copy that can drift") — this is the same class of fix as D0143/D0146/D0147 a
 that still copied numbers by hand.
 
 **Reverse cost:** revert `docs/BRIEF.md`. No code changed.
+
+## D0149 · gate mutation tests wired into CI as a BLOCKING step, globbed live (D1) · 2026-08-29
+
+**Decided:** added one new step to `.github/workflows/harness.yml`'s `gates` job, globbing `tools/test_*.py
+tools/*/test_*.py` fresh each run (never a hand list of the 7 files that currently match, for the same
+reason `gate_status.py` reads QUALITY.md live rather than copying it) and running each one, `set -e` so any
+one file's nonzero exit fails the step. Marked BLOCKING (no `continue-on-error`), matching `duplication.py`'s
+own precedent — these are correctness tests for gate scripts, not a dashboard.
+
+**Verified, not assumed:** ran the exact shell block locally before wiring it in. 7 files currently match the
+glob (`tools/test_check_fork_completion.py`, `tools/test_gate_status.py`, `tools/anvil/
+test_check_integrity.py`, `tools/economy_check/test_check_tier_rule.py`, `tools/layer_lint/
+test_check_claim_references.py`, `tools/layer_lint/test_check_untracked_files.py`, `tools/quality_check/
+test_quality_check.py`) — **146 individual cases total (37+44+6+5+41+5+8), not the "50" this queue's own
+text estimated** (plausibly written before this round's two new files, `test_gate_status.py`/
+`test_check_claim_references.py`, existed). All 146 pass; block exits 0.
+
+**Alternative rejected:** a hand-enumerated step listing each of the 7 files by name — rejected for the same
+reason `gate_status.py` itself exists: an 8th test file added later would silently not run until someone
+remembered to add its line, exactly the drift this whole queue exists to close.
+
+**Reverse cost:** revert `.github/workflows/harness.yml`. No script changed.
