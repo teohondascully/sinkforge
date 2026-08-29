@@ -61,6 +61,10 @@ func _ready() -> void:
 	_camera = Camera2D.new()
 	add_child(_camera)
 	_camera.make_current()
+	_camera.zoom = Vector2(6.0, 6.0)  ## play_scene.gd never set this either (an open legibility gap,
+	## docs/WORKING.md's "camera zoom so the chamber fills more of the frame" item) -- 6x makes CELL's
+	## 4px cells ~24 screen-px, close enough to read a glimmer pocket's shape without the window mostly
+	## showing background
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
 
 
