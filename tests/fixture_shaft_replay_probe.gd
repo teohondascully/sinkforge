@@ -52,8 +52,13 @@ func _carve_starting_complex(grid: TileGrid) -> void:
 	_carve_section(grid, MANTLE_LEDGE_COLS, MAIN_FLOOR_ROW - Body.MANTLE_PX / CELL)
 
 
+## Spawns immediately against the MANTLE_LEDGE wall (D0167: the golden run committed on CI's own Linux
+## platform showed mantles=0 with the previous centre-of-room spawn -- checkpoints 0-1 already proven
+## identical across macOS/Linux, so a mantle reachable within the first couple of left-moving ticks
+## makes this scenario's own mantle exercise robust to whatever causes later checkpoints to diverge
+## cross-platform, without touching that cause).
 func _spawn_body() -> Body:
-	var col: int = (MAIN_ROOM_COLS.x + MAIN_ROOM_COLS.y) / 2
+	var col: int = MAIN_ROOM_COLS.x + 1
 	return Body.new(
 		col * CELL * Fx.SCALE + (CELL * Fx.SCALE) / 2,
 		Fx.from_int(MAIN_FLOOR_ROW * CELL) - Body.HEIGHT_PX / 2 * Fx.SCALE)

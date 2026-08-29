@@ -6534,3 +6534,25 @@ next commit for the corrected array.
 **Reverse cost:** revert the mismatch-print addition to `_test_matches_committed_golden_hashes`; revert
 `GOLDEN_HASHES` to the macOS-captured array this entry documents above (would immediately re-break real
 CI, so there is no reason to).
+
+## D0168 · D0167's own follow-up: CI's canonical golden run also never mantled -- spawn moved adjacent to the mantle ledge, not the noise · 2026-08-29
+
+CI's actual golden run (from `33273499103`, captured via D0167's own new diagnostic) showed `mantles=0`
+alongside the checkpoint-3 divergence -- this queue's own instruction requires the scenario to actually
+exercise mantle, and a canonical run that never does fails that requirement regardless of whether the
+hash-match assertion is fixed. Locally-confirmed root cause is NOT touched (`sim/terrain_gen/
+value_noise.gd`'s float math, per D0167 -- out of scope, an architecture question for the director, not
+a Part G fix). Instead: `_spawn_body()` moved from the room's centre column to immediately against the
+`MANTLE_LEDGE` wall (`MAIN_ROOM_COLS.x + 1`) -- checkpoints 0-1 of the PREVIOUS spawn were already proven
+identical across macOS and CI's Linux build (the divergence started at checkpoint 2), so a mantle that
+fires well inside that same early window should be robust to whatever causes the later divergence,
+without needing to understand or fix that cause. Confirmed locally (scratch instrumentation, not the
+committed fixture): `first_mantle=124` (tick 124, inside checkpoint 1's own window), `first_jump=1`,
+`first_dig=2`, `first_stepup=1406`. This changes every downstream tick's state, so the ENTIRE golden
+hash array must be recaptured -- pushed with the OLD (now-guaranteed-mismatching) array on purpose,
+using D0167's own new mismatch-print diagnostic to read CI's real sequence directly, exactly the
+mechanism D0167 built. See the immediately following commit for the corrected array and confirmation
+mantle now fires on CI's own canonical run.
+
+**Reverse cost:** revert `_spawn_body()` to the room-centre column; revert `GOLDEN_HASHES` to the D0167
+array (both in the same commit as this entry).
