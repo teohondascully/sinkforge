@@ -4,9 +4,49 @@ Not a log. Current stage, what's actually happening, and what would be lost if t
 right now. Updated as work happens. Resets when a stage closes — durable content moves to an ADR,
 a MODULE.md, or a claim first.
 
-**Last updated: 2026-08-28.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-08-29.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
+
+## CLOSED — D0122 fully closed (D0128), D0129 replay driver built against a synthetic trace, 2026-08-29
+
+Two director rulings executed, then the replay driver built (all three explicitly sequenced by the
+director as one continuous cycle).
+
+**D0128 — both D0122 residuals resolved on the director's own terms:**
+1. `grounded_no_floor`'s `DESIGN_TRADEOFF` bound raised 32→59 in `test_body_fuzz.gd`, WITH the cause
+   documented in the same commit — explicitly not the patch instinct, since D0127 already named every
+   admitted violation (the same D0059f pit-lip mechanism, now reachable at more player-carved locations).
+   Full 1000×1500 sweep re-run: `test_body_fuzz.gd` now ALL PASS.
+2. `bounds`'s water-mark-fix-specific +11.4% accepted as a real, attributed cost (dig-off A/B already
+   proved the attribution in D0127); noted in the ledger as the place a future investigation starts if it
+   ever moves again without a corresponding dig change.
+3. D0122 closed end to end in the ledger (D0128): root-caused, fixed at the input, regression fixture
+   permanent, both residuals resolved — nothing about the arc left open.
+4. Also corrected a stale "seed>=98" overclaim in `test_body_fuzz_fast.gd`'s own docstring, falsified
+   directly by D0127's data.
+
+**D0129 — the replay driver, built against a synthetic trace, real-human validation still owed:**
+Connects a recorded `reveal_scene.gd` session to `RevealMetric.compute`. `reveal_scene.gd`'s grid/spawn
+construction extracted to `tests/body/reveal_session_setup.gd` (`RevealSessionSetup`) so the live scene
+and an offline replay build the IDENTICAL session from `(site, seed)` — added to the recording's own
+header, previously absent and load-bearing. `tests/body/reveal_replay_driver.gd`
+(`RevealReplayDriver.parse_log`/`.replay`/`.compute_from_log`) rebuilds a session and replays its recorded
+inputs through the real `Body.tick()`, collecting only `dig_event_this_tick`/`dug_material_this_tick` per
+tick — honoring the anti-cheat property (no feature location, ever) by construction. `tests/body/
+replay_reveal_scene.gd` is the CLI front end.
+
+Proven, not assumed: a live session and its own replay match EXACTLY, 0/713 ticks mismatched. Explicitly
+NOT proven: claims/C004 itself — the trace used is agent-generated (scripted, deterministic), not real
+unscripted human play, which C004's own anti-cheat design specifically requires. The hands-on-keyboard
+`--play` session remains the open, owed next step.
+
+Built via two parallel forks (disjoint file ownership, both in the single shared working tree — no
+worktree isolation used, nothing to merge). A real gate failure (a 54-line function against the 50-line
+function-length fence) that neither fork's own narrower run surfaced was caught by this session's own
+full local gate sweep and fixed via a real extraction, not a suppression.
+
+Full detail, exact numbers, and reversal cost: `docs/DECISIONS_LEDGER.md` D0128/D0129.
 
 ## CLOSED — D0127: diagnosing (not fixing) `grounded_no_floor`'s residual and `bounds`'s rise, 2026-08-28
 

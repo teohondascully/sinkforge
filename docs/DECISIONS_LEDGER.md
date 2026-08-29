@@ -4863,3 +4863,77 @@ Reverse: the whole arc reverses by reverting D0125's `_handle_dig` change and D0
 change (the bound raise + docstrings) reverses independently by restoring `grounded_no_floor: 32` and
 would immediately go red against the live tree, which is the point -- the bound's correctness is now
 falsifiable, not assumed.
+
+## D0129 · 2026-08-29 · claims/C004's replay driver: a recorded reveal_scene.gd session now feeds RevealMetric.compute end to end, on a synthetic (agent-generated) trace -- real-human validation still owed
+
+`sim/body` closed sound (D0122-D0128); this is the build that was explicitly sequenced behind it.
+Director's instructions: connect a recorded `--play` session to `RevealMetric.compute`, honor the
+anti-cheat property (the driver may see only what a live tick would produce, never feature location), and
+be explicit that a synthetic trace proves the plumbing, not the reveal layer's real effect (the D0118
+tautology class, one level up: a synthetic trace PASSING must never read as the reveal layer being
+proven).
+
+**Extraction first, to avoid a real risk, not a hypothetical one.** `reveal_scene.gd`'s own grid/spawn
+construction (`_find_spawn_column`, `_carve_entry_shaft`) had to be reproducible EXACTLY by an offline
+replay, or a replay would silently diverge from what was actually recorded. Extracted into
+`tests/body/reveal_session_setup.gd` (`RevealSessionSetup.build(site_id, seed_value)`), used by both
+`reveal_scene.gd` and the new driver -- one definition of "what a reveal session's own starting state
+is," not two copies that could drift.
+
+**The recording format gained `site=`/`seed=` in its header** (`reveal_scene.gd`'s `_flush_recording`) --
+previously absent, and load-bearing: unlike `play_scene.gd`'s fixed `HostileChamber`, `reveal_scene.gd`'s
+grid varies by `(site, seed)`, so a replay without both fields cannot know what grid to rebuild.
+`RevealReplayDriver.parse_log` refuses (returns `null`, `push_error`s why) a log missing either field,
+rather than guessing a default that would replay against the wrong grid.
+
+**The driver (`tests/body/reveal_replay_driver.gd`, `RevealReplayDriver`):** `parse_log` reads a
+recording into `(site_id, seed_value, mode, Array[InputFrame])`; `replay` rebuilds the identical session
+via `RevealSessionSetup.build` and feeds each recorded `InputFrame` through the real `Body.tick()`,
+collecting `body.dig_event_this_tick`/`dug_material_this_tick` into `Array[RevealMetric.TickEvent]` --
+the exact two fields `RevealMetric`'s own docstring names as the anti-cheat surface. The driver never
+calls `grid.get_material()` to check where glimmer actually is, never looks ahead, and never receives
+agent-mode's own internal target-column decision (that lives in `reveal_scene.gd`, outside the recorded
+trace) -- it only ever sees `(move_dir, jump_pressed, jump_held, dig_pressed)` per tick, the same four
+fields a keyboard could have produced, honoring the property by construction rather than by convention.
+`tests/body/replay_reveal_scene.gd` is the CLI front end (`godot --headless --path . --script
+tests/body/replay_reveal_scene.gd -- --log=<path>`), which prints an explicit WARNING when a log's own
+`mode=agent` header says it is not real human play.
+
+**Proof of the actual plumbing claim, not just "it runs":** `tests/test_reveal_replay_driver.gd` builds
+one scripted session TWICE -- once driven live, once replayed from a log the live run itself wrote -- and
+asserts every tick's `(dig_event, dug_material)` matches EXACTLY (0/713 mismatched, measured). A replay
+reconstructing even a slightly different grid or spawn position would have diverged within a handful of
+ticks; it didn't. A second test proves `compute_from_log` (parse + replay + `RevealMetric.compute` in one
+call) exercises the real lift-computation branch, not just the `qualifying_reveals == 0` early return
+(measured against `reveal_test_dense`/seed=20260826, 713 total ticks, agent-scripted trace:
+`dig_events=6`, `qualifying_reveals=5`, `lift=0.0033`). Two negative tests confirm `parse_log` actually
+rejects a header missing `site=`/`seed=` and a malformed row, each mutation-tested (the field-count check
+and the site/seed-presence check both disabled in turn, each caught by exactly its own test, both
+reverted) -- one negative fixture needed a real fix during mutation-testing: the original malformed-row
+fixture used a row with ONE FEWER field than required, which crashes `parse_log`'s own out-of-bounds
+array read before the explicit size check ever runs, so the test passed even with the size check deleted
+entirely (for the wrong reason). Fixed to a row with one EXTRA field instead, which crashes nothing, so
+only the explicit check stands between it and silent acceptance.
+
+**Explicitly NOT claimed, per instruction:** this does not prove claims/C004. The trace above is
+agent-generated (a scripted, deterministic walk-and-dig, same shape as `reveal_scene.gd`'s own agent
+mode), not real unscripted human play -- `C004`'s own docstring requires the latter specifically, because
+a scripted policy that knows where to walk is exactly the circular measurement the metric's anti-cheat
+design exists to reject. This entry closes "does the plumbing work," not "is the reveal layer proven."
+Real-human validation (the hands-on-keyboard `--play` session, still not recorded by any session as of
+this entry) remains the open, owed next step for `C004` itself.
+
+Built with two parallel forks (disjoint file ownership: one debugged/mutation-tested the five driver
+files against a fresh Godot import cache -- their first "failure" was the new `class_name` types not yet
+registered, not a code bug; the other wired `tests/test_reveal_replay_driver.gd` into
+`.github/workflows/harness.yml`'s per-commit job and confirmed no stale doc referenced the two functions
+moved into `RevealSessionSetup`). Both worked directly in the single shared working tree, not isolated
+git worktrees -- nothing to merge, one source of truth throughout. A real gate failure neither fork's own
+narrower run surfaced (a 54-line function against the 50-line `check_size_limits.py` function-length
+fence) was caught by this session's own full local gate sweep before committing, not by either fork, and
+fixed by extracting the shared scripted-trace and log-writing logic both real-session tests needed
+anyway -- reducing duplication, not just satisfying the limit.
+
+Reverse: moderate. Delete the three new `tests/body/*.gd` files and `tests/test_reveal_replay_driver.gd`;
+revert `reveal_scene.gd`'s header/extraction changes (git history has the pre-extraction shape); drop the
+`harness.yml` step. `RevealMetric.compute` itself is untouched throughout.

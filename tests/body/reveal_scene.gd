@@ -16,8 +16,6 @@ extends Node2D
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
 const MAX_TICKS: int = 3000  ## agent-mode-only safety cap, matching play_scene.gd's own
-const SHALLOW_ROW_LIMIT: int = 30  ## how far down the scan looks for a "near-surface" glimmer pocket
-const APPROACH_OFFSET_COLS: int = 6  ## spawn this many columns left of the found pocket
 const WIDE_VIEW_ROW_CAP: int = 180  ## `--wide-view` (D0121): both reveal-test sites' topsoil_shale_end
 ## is 40m = 160 rows (TERRAIN_CELLS_PER_METER=4); a little margin past it, not the whole grid.
 
@@ -42,6 +40,8 @@ var _screenshot_path: String = ""
 var _target_glimmer_col: int = -1
 var _camera_zoom: float = 6.0
 var _wide_view: bool = false
+var _site_id: StringName = &""
+var _seed_value: int = 0
 
 
 func _ready() -> void:
@@ -64,11 +64,12 @@ func _ready() -> void:
 			## the body -- the body-following camera at zoom 6.0 shows ~28% of the topsoil band's own
 			## vertical extent in one frame, which is why the first density-contrast screenshots (D0109's
 			## round) read as nearly identical regardless of the real underlying count difference.
-	_grid = ShaftGenerator.generate(StrataData.get_site(site_id), seed_value)
-	var spawn_col: int = _find_spawn_column()
-	_carve_entry_shaft(spawn_col)
-	var spawn_row: int = Body.HEIGHT_PX / CELL / 2  # shallowest row whose top edge isn't already past row 0
-	_body = Body.new(spawn_col * CELL * Fx.SCALE + Body.WIDTH_PX / 2 * Fx.SCALE, Fx.from_int(spawn_row * CELL))
+	_site_id = site_id
+	_seed_value = seed_value
+	var session: Dictionary = RevealSessionSetup.build(site_id, seed_value)
+	_grid = session["grid"]
+	_body = session["body"]
+	_target_glimmer_col = session["target_glimmer_col"]
 	_camera = Camera2D.new()
 	add_child(_camera)
 	_camera.make_current()
@@ -86,35 +87,6 @@ func _ready() -> void:
 		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
 		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
-
-
-## `ShaftGenerator` output is solid rock/clay from row 0 down -- pure geology, no pre-existing opening
-## (the real game's fiction is a shaft the player already bored, which this scene doesn't model). Carves
-## a small, explicit entry pocket the width of the body, standing height only, so the scene has somewhere
-## to spawn a body without it starting embedded -- the same shape `tests/body/hostile_chamber.gd` uses
-## for its own SPAWN_START, scoped down to just enough headroom to stand.
-func _carve_entry_shaft(col: int) -> void:
-	var rows: int = Body.HEIGHT_PX / CELL + 2
-	for dc: int in range(0, 4):  # Body.WIDTH_PX/CELL cells wide
-		for row: int in rows:
-			_grid.excavate(Vector2i(col + dc, row))
-
-
-## First shallow (row < SHALLOW_ROW_LIMIT) glimmer cell found, scanning columns left to right --
-## deterministic given a deterministic grid, so the same (site, seed) always picks the same demo column.
-## Skips any candidate closer to the left edge than APPROACH_OFFSET_COLS: a spawn column clamped to 0
-## would start with the body's own CENTER (used for the col comparison below) already past a too-close
-## target, ending the approach on tick 1 with nothing dug -- found by actually running this scene, not
-## reasoned out in advance.
-func _find_spawn_column() -> int:
-	for col: int in _grid.width:
-		if col < APPROACH_OFFSET_COLS:
-			continue
-		for row: int in SHALLOW_ROW_LIMIT:
-			if _grid.get_material(Vector2i(col, row)) == &"glimmer":
-				_target_glimmer_col = col
-				return col - APPROACH_OFFSET_COLS
-	return _grid.width / 2  # no shallow glimmer this seed/site -- park in the middle rather than crash
 
 
 func _physics_process(_delta: float) -> void:
@@ -225,7 +197,10 @@ func _notification(what: int) -> void:
 
 
 ## Same format as play_scene.gd's own recording, plus dig_pressed in place of mantle_hold (this scene
-## has no mantle content to test). tick,move_dir,jump_pressed,jump_held,dig_pressed.
+## has no mantle content to test). tick,move_dir,jump_pressed,jump_held,dig_pressed. Unlike play_scene.gd
+## (always the same fixed `HostileChamber`), this scene's grid varies by `(site, seed)` -- both are
+## stored in the header comment (D0129) so `reveal_replay_driver.gd` can rebuild the exact grid a
+## recording was played against; `play_scene.gd`'s own recordings need no such field.
 func _flush_recording() -> void:
 	if _recording.is_empty():
 		return
@@ -239,7 +214,8 @@ func _flush_recording() -> void:
 	if f == null:
 		push_error("reveal_scene: could not open %s for writing (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return
-	f.store_line("# sinkforge reveal-scene input recording -- mode=%s ticks=%d" % [prefix, _recording.size()])
+	f.store_line("# sinkforge reveal-scene input recording -- mode=%s ticks=%d site=%s seed=%d" %
+		[prefix, _recording.size(), _site_id, _seed_value])
 	f.store_line("# tick,move_dir,jump_pressed,jump_held,dig_pressed")
 	for row: PackedStringArray in _recording:
 		f.store_line(",".join(row))
