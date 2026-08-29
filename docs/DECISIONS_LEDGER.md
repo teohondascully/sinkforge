@@ -5262,3 +5262,69 @@ horizontal_resolve.gd` 98 lines. Real headroom restored before the diagnosis nee
 
 Reverse: cheap. Fold the four functions back into `body.gd` verbatim, restore the two call-site edits;
 behaviorally identical either way, confirmed by the same test suite.
+
+## D0137 · 2026-08-29 · `resolve_floor` diagnosed to one exact mechanism — pre-existing, dig-amplified, NOT fixed, per explicit instruction
+
+Follow-up to D0135: `resolve_floor` is the dominant, previously-undiagnosed `grounded_no_floor` grounding
+path (84/91 of the whole population, D0132), and this session's own D0127/D0128 spent two ledger entries
+confident it was `grid_floor_backstop` instead. Traced the way D0123 traced the dig staircase: built
+`tests/diag_resolve_floor.gd`, a one-off diagnostic script (not a suite, not run by CI, matching
+`fixture_*.gd`'s own established convention) that replays the exact same seed/tick trajectories D0132's
+telemetry measured and, at every `resolve_floor`-attributed `grounded_no_floor` violation, independently
+RECOMPUTES `resolve_floor`'s own three heightfield samples and the columns each straddles by calling
+`Heightfield`'s own public static functions directly — `resolve_floor` and `vertical_resolve.gd` are
+untouched by this file and by this entire investigation, per explicit instruction (diagnose-and-report,
+not fix; this is `_resolve` logic, the highest-risk code in the module).
+
+**The mechanism, confirmed by direct measurement, not inferred:** `resolve_floor` samples the heightfield
+at three x-positions (left foot, right foot, centre) via `Heightfield.surface_y_at_x`, then takes
+`mini(s_left, s_right, s_centre)` as the landing surface. `surface_y_at_x` correctly returns `NO_FLOOR`
+(`2147483647`, an i32-max sentinel) when a sample's straddled columns disagree across a real gap — but
+`mini()` has no way to treat that sentinel as "this sample cannot vote"; it is just a very large integer,
+so it never wins the comparison against any real (smaller) height. The result: whenever AT LEAST ONE of
+the three foot samples finds real ground, `resolve_floor` positions the body's ENTIRE box there and
+`return`s `true` — even when the OTHER samples correctly reported open air beneath them, meaning part of
+the body's own footprint has nothing solid under it. Because `resolve_floor` returns `true`,
+`move_and_resolve`'s own `resolve_floor(body, grid) or grid_floor_backstop(body, grid)` short-circuits:
+`grid_floor_backstop` — D0059f's own documented backstop for exactly this "a wide body straddles a pit's
+own lip" geometry — never runs in these cases at all. `resolve_floor`'s three-sample design masks the same
+class of defect `grid_floor_backstop` exists to catch, via a different code path, before that backstop
+ever gets consulted.
+
+**ONE mechanism, not several — measured across both populations, not assumed identical:**
+
+| | dig-on (498-seed prefix) | dig-off (full 1000-seed sweep) | combined |
+|---|---|---|---|
+| occurrences | 55 | 29 | 84 |
+| `transition=false` (winning sample's straddled columns AGREE — a real, unambiguous floor, not a blend) | 55/55 | 29/29 | 84/84 |
+| at least one sample is `NO_FLOOR` | 55/55 | 29/29 | 84/84 |
+| `footprint_solid` pattern | always partial (never all-1 or all-0) | always partial | always partial |
+| winner | left 41 / right 14 / centre 0 | left 12 / right 17 / centre 0 | left 53 / right 31 / centre 0 |
+
+100% of 84 occurrences share the identical signature: a real, non-ambiguous floor at one sample point, an
+honestly-reported `NO_FLOOR` at one or two others, and a partially-solid footprint at the landing row. My
+own original hypothesis before measuring — that this was heightfield interpolation blending across a real
+column-height difference — is directly refuted: `transition` is `false` in all 84 cases. `centre` never
+wins, consistent with a body straddling a lip laterally (leading or trailing foot grounded, not the
+middle). This is one mechanism, precisely characterized, not "several partly-understood" ones.
+
+**Pre-existing, dig-amplified in frequency only, not in kind — confirmed directly, not assumed from D0127's
+own (differently-attributed) reasoning:** the dig-OFF population (dig entirely disabled) already shows 29
+occurrences of this exact mechanism, at `HostileChamber`'s own BUILT-IN flat-to-open terrain transitions
+(`PIT_START` and others) — this defect predates dig entirely. Dig-ON rises to 55 because digging sideways
+at ground level carves MORE flat-to-open transitions at the same `FLOOR_ROW` height, giving the same
+pre-existing resolve_floor gap more places to trigger — matching D0127's own original reasoning shape
+(exposure growth, not a new mechanism), now correctly attached to the mechanism that is actually
+responsible for it.
+
+**What this changes, stated plainly per D0135: nothing about the bound, nothing about the code.** `59`/`32`
+remain the measured, gating numbers. `resolve_floor`, `grid_floor_backstop`, and `_resolve_horizontal`
+remain untouched — this is diagnosis, not a fix, per explicit instruction; a fix to `mini()`'s own NO_FLOOR
+handling is real, high-risk `_resolve` logic and is not this entry's scope. **What DOES change: the bound's
+own justification moves from "measured, mechanism under active diagnosis" (D0135) to "measured, mechanism
+now fully characterized and reported" — still not yet a decision about whether or how to fix it.** That
+decision, if the director wants it, is a separate future piece of work against a now-precise, evidenced
+description of exactly what `resolve_floor` is doing, not a guess.
+
+Reverse: cheap. Delete `tests/diag_resolve_floor.gd`; nothing else references it, and it changed nothing
+in `sim/`.
