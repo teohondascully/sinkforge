@@ -103,6 +103,25 @@ def parse_gates(path: Path = QUALITY_MD) -> dict[int, dict[str, str]]:
     return gates
 
 
+ENV_EXPR_RE = re.compile(r"\$\{\{\s*env\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+
+
+def _resolve_env_expressions(name: str, job_env: dict) -> str:
+    """GitHub Actions expands `${{ env.KEY }}` in a step's own `name:` before reporting it via the API --
+    confirmed directly (F2, `docs/DECISIONS_LEDGER.md` D0162): `gh api .../jobs` reports "Download and
+    verify Godot 4.6.2-stable (...)" for the step whose tracked YAML says "Download and verify Godot
+    ${{ env.GODOT_VERSION }} (...)" verbatim. Reading the raw, unexpanded name and matching it against CI's
+    own (expanded) step names via a plain string key never matches -- this step was silently invisible to
+    CI-conclusion matching, always reporting UNKNOWN regardless of whether CI actually passed or failed on
+    it. Resolving known `env.KEY` expressions here, from the SAME job's own `env:` block, closes the gap
+    for every current and future step whose name embeds one -- not just the two Godot-download steps this
+    was found on."""
+    def repl(m: "re.Match[str]") -> str:
+        key = m.group(1)
+        return str(job_env.get(key, m.group(0)))
+    return ENV_EXPR_RE.sub(repl, name)
+
+
 def parse_workflow_steps(path: Path = WORKFLOW) -> list[dict]:
     """Every step in every job of the real workflow file, read fresh -- not a copy of CI's structure.
     `path` is parametrized (default: the real harness.yml) for the same reason as `parse_gates` above."""
@@ -111,11 +130,13 @@ def parse_workflow_steps(path: Path = WORKFLOW) -> list[dict]:
     wf = yaml.safe_load(path.read_text(encoding="utf-8"))
     steps = []
     for job_key, job in wf["jobs"].items():
+        job_env = job.get("env", {}) or {}
         for step in job.get("steps", []):
+            raw_name = step.get("name", "<unnamed step>")
             steps.append(
                 {
                     "job": job_key,
-                    "name": step.get("name", "<unnamed step>"),
+                    "name": _resolve_env_expressions(raw_name, job_env),
                     "run": (step.get("run") or "").strip(),
                     "coe": bool(step.get("continue-on-error", False)),
                 }

@@ -14,6 +14,15 @@ A2 -- a gate whose QUALITY.md evidence is a bare DIRECTORY citation (no filename
 A4  -- deleting a real step from harness.yml changes gate_status.py's own table (that gate's row flips to
       NO-CODE) with NO OTHER EDIT -- to gate_status.py, to QUALITY.md, to anything -- proving the tool
       re-derives its table from harness.yml's live structure rather than any cached or hand-copied form.
+
+F2  -- found during the queue #2 self-audit, `docs/DECISIONS_LEDGER.md` D0162: GitHub Actions EXPANDS a
+      `${{ env.KEY }}` expression in a step's own `name:` before reporting it via the API (confirmed
+      directly against a real run: harness.yml's tracked YAML says "...Godot ${{ env.GODOT_VERSION }}...",
+      `gh api .../jobs` reports "...Godot 4.6.2-stable..."). Reading the raw, unexpanded name and matching
+      it against CI's own (expanded) name via a plain string key NEVER matched -- this step was silently
+      invisible to CI-conclusion matching, always UNKNOWN regardless of whether CI actually passed or
+      failed on it. Not a false PASS (UNKNOWN is not a lie), but a real population gap in the CI-matching
+      mechanism this case proves is now closed.
 """
 import sys
 import tempfile
@@ -118,6 +127,28 @@ def branch_a4_deleting_a_workflow_step_changes_the_table() -> None:
           bool(links_after.get(other_gate)) == bool(links_before.get(other_gate)))
 
 
+def branch_f2_env_expression_in_step_name_resolves_before_matching() -> None:
+    """D0162: a step name containing `${{ env.KEY }}` must resolve against the SAME job's own `env:`
+    block, matching what GitHub Actions itself reports via the API -- an unresolved expression can never
+    match a real CI step name, permanently reporting UNKNOWN for that step regardless of its true
+    conclusion."""
+    resolved = gs._resolve_env_expressions(
+        "Download and verify Godot ${{ env.GODOT_VERSION }} (headless-capable Linux build)",
+        {"GODOT_VERSION": "4.6.2-stable"},
+    )
+    check("F2: a known env.KEY expression resolves to the job's own env value",
+          resolved == "Download and verify Godot 4.6.2-stable (headless-capable Linux build)",
+          f"got: {resolved!r}")
+
+    unknown = gs._resolve_env_expressions("Step using ${{ env.NOT_DECLARED }}", {"OTHER": "x"})
+    check("F2 negative control: an expression for an UNDECLARED key is left untouched, not blanked",
+          unknown == "Step using ${{ env.NOT_DECLARED }}", f"got: {unknown!r}")
+
+    plain = gs._resolve_env_expressions("A perfectly ordinary step name", {"GODOT_VERSION": "4.6.2-stable"})
+    check("F2 negative control: a name with no expression at all is unchanged",
+          plain == "A perfectly ordinary step name")
+
+
 def main() -> int:
     for branch in (
         branch_a1_skipped_never_promoted_to_pass,
@@ -125,6 +156,7 @@ def main() -> int:
         branch_a1_real_ci_conclusion_still_authoritative,
         branch_a2_bare_directory_citation_does_not_overmatch,
         branch_a4_deleting_a_workflow_step_changes_the_table,
+        branch_f2_env_expression_in_step_name_resolves_before_matching,
     ):
         branch()
 

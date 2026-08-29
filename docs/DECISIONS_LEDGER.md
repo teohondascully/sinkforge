@@ -6220,3 +6220,50 @@ decision is ever made.**
 
 **Reverse cost:** revert `tools/gate_status.py`; delete `tools/gate_status_ci.py`. `test_quality_check.py`
 untouched either way.
+
+## D0162 · F2 self-audit found a real population gap: `${{ env.KEY }}` in a step name was never resolved before matching against CI's own (expanded) name (queue #2 Part F) · 2026-08-29
+
+**Found by actively re-attacking the status tool, per Part F2's own instruction** ("try the skipped-step
+path again, a gate in QUALITY.md but not harness.yml, a harness step that errors vs fails vs skips"). Not
+a false PASS — the honest result of this gap was UNKNOWN, which is the tool's own correct answer when it
+cannot establish a fact, not a lie. Still a real gap: this step's true CI conclusion was never reachable at
+all, regardless of whether it actually passed or failed.
+
+**Confirmed directly against real data before writing this entry**, per the standing verify-before-writing
+rule: `harness.yml`'s own tracked text (`grep -n "Download and verify Godot" .github/workflows/harness.yml`)
+reads `- name: Download and verify Godot ${{ env.GODOT_VERSION }} (headless-capable Linux build)` at both
+line 206 (`tests` job) and line 309 (`fuzz_nightly` job) — the literal, unexpanded expression.
+`gh api repos/{owner}/{repo}/actions/runs/33269204405/jobs` (a real completed run, `headSha
+8a58b1e2724e2546a76a298e06af15e4b34dd1da`, `conclusion=success`) reports that SAME step, for job "godot test
+suites (determinism, conservation, movement acceptance)", as `'Download and verify Godot 4.6.2-stable
+(headless-capable Linux build)'` — GitHub Actions itself expands `${{ env.KEY }}` in a step's `name:`
+using the job's own `env:` block before ever reporting it via the API. `parse_workflow_steps()` was reading
+the raw, unexpanded YAML text as the step's name, so `ci_steps.get(s["name"])` could never match this step
+under any circumstance — a permanent, silent UNKNOWN for the Godot-download step in both jobs.
+
+**Fix:** `tools/gate_status.py` — added `ENV_EXPR_RE = re.compile(r"\$\{\{\s*env\.([A-Za-z_][A-Za-z0-9_]*)\s*
+\}\}")` and `_resolve_env_expressions(name, job_env)` (substitutes each matched `env.KEY` using
+`job_env.get(key, m.group(0))` — an expression for a key NOT in the job's own `env:` block is left
+untouched, never blanked, so an unrelated/typo'd expression fails loud via continued non-match rather than
+silently vanishing). `parse_workflow_steps()` now reads `job_env = job.get("env", {}) or {}` per job and
+calls `_resolve_env_expressions(raw_name, job_env)` for every step's name before storing it.
+
+**Verified, not assumed:** re-ran `parse_workflow_steps()` against the real, unmodified `harness.yml` —
+the parsed name for both jobs' Godot-download step now reads EXACTLY `'Download and verify Godot 4.6.2-
+stable (headless-capable Linux build)'`, an exact match against the real API's own reported name above.
+Added `branch_f2_env_expression_in_step_name_resolves_before_matching()` to `tools/test_gate_status.py`
+(a known key resolves; an undeclared key is left untouched, not blanked; a name with no expression at all
+is unchanged) — `tools/test_gate_status.py` now 11/11 OBSERVED (was 8/8). **Mutation-tested:** a scratch
+copy with `_resolve_env_expressions` replaced by `return name` (expansion disabled) makes the new F2 test
+case fail (`resolved != 'Download and verify Godot 4.6.2-stable (headless-capable Linux build)'`),
+confirming the test actually exercises the fix rather than passing vacuously; the real fix re-confirmed
+passing immediately after.
+
+**Scope check:** this closes the Godot-download step's own reachability; it does not prove every OTHER
+`${{ }}` expression form (e.g. `${{ matrix.foo }}`, `${{ github.* }}`) is handled — none of those appear
+in any step `name:` in this repo's current `harness.yml` as of this commit, so the fix is scoped to what's
+actually cited. A future step name using a non-`env.` expression would need the same treatment.
+
+**Reverse cost:** revert `tools/gate_status.py`'s two additions and `parse_workflow_steps()`'s three-line
+change; revert `tools/test_gate_status.py`'s new branch and its call-site line.
+
