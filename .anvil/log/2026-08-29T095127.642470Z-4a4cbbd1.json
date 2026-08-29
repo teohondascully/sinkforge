@@ -1,0 +1,22 @@
+{
+  "author": "claude-code-session-2026-08-29",
+  "commit": "d4d1b62a26ed6c962eac0fba16a294552487f4fd",
+  "confidence": "high",
+  "evidence": [
+    "sim/body/input_frame.gd -- five input fields declared: move_dir, jump_pressed, jump_held, mantle_hold, dig_pressed.",
+    "tests/body/play_scene.gd:124-125 records `input.mantle_hold` as the fifth value; line 181 writes header `# tick,move_dir,jump_pressed,jump_held,mantle_hold`.",
+    "tests/body/reveal_scene.gd:219 writes header `# tick,move_dir,jump_pressed,jump_held,dig_pressed`; its own comment at lines 199-200 states the substitution outright: 'Same format as play_scene.gd's own recording, plus dig_pressed in place of mantle_hold (this scene has no mantle content to test).'",
+    "tests/body/debug_scene_common.gd:13 -- `static func record_row(tick: int, move_dir: int, jump_pressed: bool, jump_held: bool, last_field: bool) -> PackedStringArray`. The fifth parameter is literally named `last_field`.",
+    "tests/body/reveal_replay_driver.gd -- the only validation on a data row is `if fields.size() != 5: push_error(...); return null`. The header check is `if \" site=\" in line and \" seed=\" in line`, and failure of that check (not any column check) is what rejects a play_scene log: `push_error('%s has no site=/seed= header -- cannot rebuild the grid it was played against')`.",
+    "Neither dialect is a complete replayable prefix: replaying either through Body.tick() supplies a hardcoded default for the field its dialect dropped, so a run that used the dropped input cannot be reproduced from its own recording."
+  ],
+  "id": "4a4cbbd1-2281-4abc-97b7-f86bc202ca8d",
+  "independent_of": [],
+  "invalidates": [],
+  "narrative": "Latent, not live -- filed with its trigger named so it is caught when it stops being latent. The trigger: `site=`/`seed=` reaching `play_scene.gd`. That is the more general world-identification mechanism (a seed rebuilds any world; `chamber=hostile_chamber` names one fixed chamber), it was already retrofitted onto reveal_scene once by D0129, and retrofitting it onto play_scene is a natural next step nobody would think to gate. On that day a `mantle_hold` column starts replaying as `dig_pressed`, silently, and the symptom is a diverged replay with no error -- the house failure class, where the validation that exists cannot register the thing it is nominally protecting. Found while writing ADR 0006's episode-log constraint, which is the value of writing a format constraint before the format sets rather than after. Not fixed: repairing the dialects touches four files and invalidates every recording already on disk, including whatever the pending hands-on-keyboard session for claims/C004 produces, which is a real decision with a real blast radius and outside the scope this ADR was given.",
+  "observation": "The two existing input-recording dialects each drop a DIFFERENT field of `InputFrame` while producing positionally identical five-column rows, and the only parser that reads them validates arity, not schema. `InputFrame` has five input fields (move_dir, jump_pressed, jump_held, mantle_hold, dig_pressed). `tests/body/play_scene.gd` writes `tick,move_dir,jump_pressed,jump_held,mantle_hold`; `tests/body/reveal_scene.gd` writes `tick,move_dir,jump_pressed,jump_held,dig_pressed`. Column five means a different thing in each. The shared writer both call, `tests/body/debug_scene_common.gd:13`, names its fifth parameter `last_field` -- agnostic by construction about which semantic field it is serialising. `RevealReplayDriver.parse_log` rejects malformed rows with `if fields.size() != 5`, a test BOTH dialects pass. What actually prevents a cross-dialect misparse today is unrelated: play_scene headers carry `chamber=hostile_chamber` and no `site=`/`seed=`, so the driver's world-identity check fails first. That is a guard by coincidence, not by design.",
+  "severity": "medium",
+  "source_class": "artifact-instrument",
+  "timestamp": "2026-08-29T09:51:27.642470+00:00",
+  "type": "FINDING"
+}

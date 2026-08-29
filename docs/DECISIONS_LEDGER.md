@@ -5390,3 +5390,121 @@ Each is a real, different behavior change to the highest-risk code in the module
 own explicit boundary this entry does not choose among them.
 
 Reverse: already executed — this entry documents a revert already done, not one still owed.
+
+---
+
+## D0140 · 2026-08-29 · the episode-log fork-context constraint written down before the format sets — ADR 0006, no log built
+
+**D0139 is deliberately skipped, not lost.** That number is already referenced by the uncommitted
+`resolve_floor` full-footprint fix attempt sitting in the working tree (`sim/body/vertical_resolve.gd`,
+`tests/test_vertical_resolve.gd`) and by `docs/WORKING.md`'s open-investigation section. It is reserved for
+whatever the director rules on that attempt's two hard-stop findings. Numbers are addresses; this one is
+spoken for before it is written.
+
+The director's ruling on Codex's foreclosure finding against D0134's canonical types. Codex rated forking
+`UNCLEAR` ("nothing in the two types prevents a separate log, but nothing enables a fork either"); the
+ruling turned that into a constraint on the not-yet-designed episode log rather than a change to the types:
+the log must carry the full replayable state prefix, not just the observation trace, "so the log is not
+designed to only-what-the-observation-holds and discover the gap after the format sets." Explicitly: "Do
+not build forking; just make sure the log design does not preclude it."
+
+Written as `docs/adr/0006-episode-log-replayable-prefix.md` rather than a ledger entry alone, because
+`docs/adr/README.md` makes an ADR *required* for a save-schema or determinism-strategy decision, and this is
+both. Nothing was built. No episode log exists; no type changed.
+
+**Two things the investigation found that the ruling did not anticipate, and that are the actual value of
+writing it now rather than later.**
+
+**First: the required format already exists, so the constraint is "extend this," not "design this."**
+`tests/body/reveal_replay_driver.gd` (D0129) already parses `(site, seed)` plus a per-tick input sequence and
+replays it through the real `Body.tick()` — already a replayable prefix in exactly the required sense. And
+`docs/ARCHITECTURE.md` §5 already decides the question on its own: "A second, incompatible input-replay
+format built for pre-interface testing would be a design leak; if one starts to look necessary, that is a
+sign to stop and reconsider rather than proceed." So an observation-trace episode log built beside the
+existing recording lineage would be the exact thing §5 names. The ADR records the episode log as that
+format's descendant.
+
+**Second: the existing format is already not a complete prefix, and its two dialects collide in a way
+arity-checking cannot see.** `InputFrame` has five input fields. `play_scene.gd` records
+`tick,move_dir,jump_pressed,jump_held,mantle_hold`; `reveal_scene.gd` records
+`tick,move_dir,jump_pressed,jump_held,dig_pressed`. Each drops a different field; both produce five
+positionally identical columns. The shared writer `debug_scene_common.gd:13` names its fifth parameter
+`last_field`, agnostic by construction about which semantic field it is writing.
+`RevealReplayDriver.parse_log` validates `fields.size() != 5`, which BOTH dialects satisfy — a play_scene
+recording is rejected today only because it carries `chamber=hostile_chamber` instead of `site=`/`seed=`, so
+the column-meaning collision is guarded by an unrelated field's absence. `site=`/`seed=` is the more general
+world identification and was already retrofitted onto one scene once (D0129); the day it reaches
+`play_scene.gd`, a `mantle_hold` column replays as `dig_pressed` silently. This is the house class again:
+arity is not schema, and a validation that cannot register the thing it nominally protects reads as a guard.
+
+**Deliberately not fixed here.** Repairing the dialects touches four files and invalidates every recording
+already on disk, including whatever the still-pending hands-on-keyboard session for `claims/C004` produces.
+That is a real decision with a real blast radius and it is not this ADR's, which was scoped to "do not
+preclude forking." Recorded as a known defect with a named trigger for when it stops being latent.
+
+**Also recorded as NOT demonstrated, because the ruling's language could be read as assuming it.**
+Replay-then-diverge rests on real-sim replay determinism, and that is unproven:
+`tests/test_replay_determinism.gd` proves the replay-and-hash mechanism against a `TrivialStub` its own
+docstring says is "NOT `sim/` and never will be." No test asserts the real `Body` + `TileGrid` replay
+bit-identically from a prefix. `TileGrid.state_signature()` exists and `RevealReplayDriver` replays against
+the real sim, but no gate ties them together. Named in the ADR as an unproven prerequisite rather than left
+for a future fork implementation to discover.
+
+Reverse: delete `docs/adr/0006-episode-log-replayable-prefix.md`. Nothing else changed; no code was touched.
+
+---
+
+## D0141 · 2026-08-29 · the control-plane slice's liftability blocker reported, not routed around — the ruling's premise was mis-transcribed from the audit it came from
+
+The director's second ruling on the Codex control-plane audit: "The builder reaches into a test helper for
+grid access instead of the canonical world interface, so the slice cannot be lifted to `interface/` cleanly
+— the 'simulation' is coupled to `tests/` internals. Fix the coupling now, while it is one reference: route
+grid access through the real world interface the sim already exposes... If the real world interface does not
+expose what the builder needs, that gap is itself a finding — report it rather than reaching around it."
+
+**The prescribed fix is not executable, and the branch the ruling itself pre-authorized is the correct one.
+Reported, not routed around.** Three separate factual corrections, each verified against the tree:
+
+1. **It is not a test helper.** `tests/control_plane/observation_builder.gd:37-38` calls
+   `Body._px_to_cell` — a private static on a `sim/` class (`sim/body/body.gd:132`), not anything in
+   `tests/`. Codex said this precisely and drew the opposite conclusion from the ruling's paraphrase: "the
+   slice has no test-internal dependency, but its eventual L2 placement needs a deliberate public sim
+   boundary." The mis-transcription inverts which side the coupling is on.
+2. **It is not grid access.** Grid access already goes through `TileGrid`'s genuine public API —
+   `is_solid()`, `get_material()`, `width`, `height`, none underscore-prefixed. The single coupling is a
+   fixed-point-position-to-terrain-cell conversion. (Checked and correct on its own terms, incidentally:
+   `_px_to_cell` divides by `CELL_PX * Fx.SCALE`, so feeding it `body.pos_x` in Fx units is right, despite
+   the `px` in the name.)
+3. **There is no "real world interface the sim already exposes" to route through.** `interface/` contains
+   one file, `MODULE.md`, whose own Public API section reads "None yet. This directory is a skeleton — no
+   code has been written." `sim/body/MODULE.md`'s Public API section reads "None yet." There is no public
+   pixel-to-cell converter anywhere in the codebase (`git grep` for any `to_cell`/`cell_at`/`world_to`
+   declaration: zero results).
+
+**"While it is one reference" is also the wrong scale, and the right scale is what makes the fix a real
+decision rather than a cleanup.** `Body._px_to_cell` has call sites in 21 files, 17 of them under `tests/`,
+including `tests/property_checks.gd`, `tests/test_body.gd`, and `tests/body/scripted_traverse.gd`. The
+control-plane builder's use of it is the established convention of this repo, not a lapse specific to this
+slice. Making the slice liftable means deciding where a *public* position-to-cell conversion lives — it is
+arguably a world/grid concept (`TileGrid`, or `Heightfield`, which owns `TERRAIN_CELL_PX`) rather than a
+body one, and `Body._px_to_cell` sits on `Body` for historical reasons — and that is a `sim/` change to the
+highest-risk module in the build, requiring its own entry and its own verification.
+
+**Reaching around it was the available shortcut and was rejected.** Re-typing
+`floor(px / (CELL_PX * Fx.SCALE))` inline in the builder would remove the private reference and satisfy the
+letter of the ruling while duplicating a load-bearing conversion into a second, unlinked site — the
+re-typed-code hazard this project has already been bitten by, and a strictly worse outcome than the honest
+private reference it replaces.
+
+**A second, independent reason to hold this round.** `sim/body/vertical_resolve.gd` currently carries
+uncommitted mid-investigation changes (the D0139 fix attempt, held pending a ruling on its two hard-stop
+findings). Editing `sim/body/body.gd` for an unrelated reason while that module's evidence is sitting dirty
+in the tree would muddy it. The liftability decision is not urgent; the collision arc's evidence is fragile.
+
+**What is actually true about liftability, stated as the finding:** the slice is exactly one private
+reference away from touching nothing but public API. That is a genuinely small and closable gap — but
+closing it is a `sim/` public-boundary decision, not a refactor of the slice, and "move to `interface/`
+later" stays aspirational until `interface/` has code in it at all. Nothing was changed in
+`tests/control_plane/`.
+
+Reverse: nothing to reverse — no code changed.

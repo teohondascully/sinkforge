@@ -8,6 +8,32 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## CLOSED THIS ROUND — the control-plane ruling's two items, one landed and one reported as a blocked premise (D0140/D0141)
+
+The director's ruling on the Codex control-plane audit gave two items. Both are answered; neither changed
+`tests/control_plane/`, which the audit found sound and the ruling did not ask to alter.
+
+- **Item 1 (episode-log fork context) — LANDED.** `docs/adr/0006-episode-log-replayable-prefix.md`, D0140.
+  The constraint is written down before the format sets, as instructed; no episode log was built and
+  nothing forks. Two things the investigation turned up that the ruling did not anticipate: the required
+  format already exists (`reveal_replay_driver.gd`'s `(site, seed)` + input-prefix lineage, which
+  `docs/ARCHITECTURE.md` §5 already makes mandatory by forbidding "a second, incompatible input-replay
+  format"), and that format is already not a complete prefix — its two dialects each drop a different
+  `InputFrame` field into positionally identical columns, guarded only by an unrelated header check.
+- **Item 2 (lift the `tests/` coupling) — REPORTED, NOT DONE, on the branch the ruling itself
+  pre-authorized.** D0141. The prescribed fix is not executable: the coupling is to `Body._px_to_cell`
+  (a `sim/` private, not a test helper), it is a coordinate conversion (not grid access — grid access is
+  already through `TileGrid`'s real public API), and there is no "real world interface the sim already
+  exposes" to route through, because `interface/` contains only a `MODULE.md` that says "no code has been
+  written." Reaching around it by re-typing the conversion inline was available and was rejected.
+
+**Two things need the director and are not decided here.** (1) A Codex finding the ruling did not address —
+CONSTRAINED restricts distance but not discovery, so it currently cannot measure the discoverability
+`docs/ARCHITECTURE.md` §5 says it exists to measure; disclosed in the slice's own comment as a deferral,
+but a ruling declaring the contract sound did not weigh it. Filed as an Anvil FINDING
+(`ed491e83`). (2) Where a *public* position-to-cell conversion should live, which is the actual liftability
+decision and is a `sim/` change to the highest-risk module.
+
 ## OPEN, MID-INVESTIGATION — D0139's Option-2 fix hit a SECOND hard stop; uncommitted, awaiting the director's ruling, 2026-08-29
 
 Working tree is DIRTY on purpose, not cleaned up: `sim/body/vertical_resolve.gd` carries an uncommitted
