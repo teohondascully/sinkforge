@@ -8,6 +8,64 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## OPEN, MID-INVESTIGATION — D0139's Option-2 fix hit a SECOND hard stop; uncommitted, awaiting the director's ruling, 2026-08-29
+
+Working tree is DIRTY on purpose, not cleaned up: `sim/body/vertical_resolve.gd` carries an uncommitted
+attempt (28 lines added: a new `_full_footprint_solid` static func plus its call site inside
+`resolve_floor`), and `tests/test_vertical_resolve.gd` (new, untracked, 6 passing unit tests, one of them
+mutation-tested and confirmed load-bearing) sits alongside it. **Do not discard these without reading this
+section first — they are mid-investigation evidence, not abandoned scratch work.**
+
+**The ruling this responds to (D0138's own follow-up):** the director correctly re-diagnosed D0138's dead
+end as a criterion problem, not a tie-break problem, and ruled Option 2 — `resolve_floor` must check
+full-footprint grid-solidity at the chosen landing row, the IDENTICAL condition
+`tests/property_checks.gd::grounded_implies_solid_beneath` verifies, before succeeding. Acceptance signal:
+`grounded_no_floor` should drop toward the ~4 that were `grid_floor_backstop`-sourced. Explicit hard stop
+if it doesn't. Explicit guard: golden traverse time MAY change this round (unlike D0138's), but any change
+must be manually verified tick-by-tick as a legitimate correction, not a broken grounding.
+
+**Implemented exactly as ruled.** `VerticalResolve._full_footprint_solid(body, grid, surface)`: computes
+`landing_row = Body._px_to_cell(surface)`, checks every column across the body's own current footprint
+width is `grid.is_solid()` at that row — duplicated from (not calling) `PropertyChecks
+.grounded_implies_solid_beneath`, since `sim/` cannot depend on `tests/`. Wired into `resolve_floor` right
+after the existing NO_FLOOR/too-far check. Mutation-tested (disabling the new check via `if false and ...`
+broke exactly the new partial-footprint-landing test, once that test's own grid setup was itself corrected
+— an earlier version of the test had the LEFT foot sample's own straddle poison itself to NO_FLOOR by
+accident, masking the mutation; fixed by widening the solid region so the sample always finds real ground,
+confirmed the mutation is now caught).
+
+**Two real findings, both reported to the director, neither acted on yet:**
+
+1. **The full 1000x1500 sweep's acceptance signal did NOT drop — this is the explicit hard stop.**
+   `grounded_no_floor` stayed at EXACTLY 59 (not toward ~4). Every other metric identical to baseline
+   (`bounds=805397`, `embedded=0`, `overflow=0`, `discontinuity=0`, `deadlock=0`). But the floor_source
+   attribution completely FLIPPED: 0/59 now `resolve_floor` (down from 55 pre-fix), 59/59 now
+   `grid_floor_backstop` (up from 4 pre-fix). `resolve_floor` correctly stopped grounding on partial
+   support every time; every one of those cases now falls through to `grid_floor_backstop`, which grounds
+   them the SAME wrong way via a different code path (`_topmost_solid_row` finds the shallowest solid cell
+   ANYWHERE across the footprint's columns and snaps the whole box there — the identical criterion flaw,
+   not a fix for it). This is the director's own explicitly anticipated "second bug" scenario, verbatim.
+
+2. **A separate real regression against `test_body_acceptance.gd`'s own HARD gate** (not an allowlisted
+   fuzzer metric): the scripted golden traverse now stalls at tick 133 (`stall_seconds` 0 -> 0.017s,
+   `traverse_time` 225 -> 237 ticks). Traced by hand, not assumed: `HostileChamber`'s RUBBLE zone (columns
+   80-88) has a real, AUTHORED 1-row/4px notch at columns 85-86 (solid at row 57, open at row 56 --
+   confirmed by direct grid dump) -- exactly the "1-3px sub-pixel rubble slopes" the heightfield's own
+   interpolation is documented to exist for smoothing over, NOT a real multi-column gap like D0137's
+   diagnosed pit-lip cases. The new exact-same-row full-footprint check cannot tell "legitimate small
+   terrain roughness" from "a real gap," so it now rejects a landing that should succeed. This is a real,
+   verified "legitimate grounding broken" case per the director's own stated verification protocol, not a
+   false alarm — genuinely ambiguous whether `grounded_implies_solid_beneath`'s own single-exact-row
+   definition is too strict for authored-rough terrain, a question for the director, not something to
+   silently loosen on this session's own authority.
+
+**Explicitly NOT done, per instruction: no attempt to loosen the check, add a tolerance band, revert, or
+otherwise resolve either finding unilaterally.** Both were reported to the director in full technical
+detail (tick traces, exact grid dumps, the mechanism in both cases) and the session is now waiting on a
+ruling. **A fresh session picking this up must read this section before touching `sim/body/
+vertical_resolve.gd` or `tests/test_vertical_resolve.gd` — the working tree's own dirty state is the
+investigation's own evidence, not something to clean up by reverting or committing without direction.**
+
 ## CLOSED — the director's own NO_FLOOR fix was PROVEN a mathematical no-op, reverted, hard stop honored, D0138, 2026-08-29
 
 Working tree clean; HEAD `dc322f6`, everything pushed. Director's ruling on D0137's diagnosis: fix the
