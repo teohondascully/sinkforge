@@ -8,6 +8,46 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## CLOSED — the bound-raise justification was falsified, resolve_floor diagnosed to one mechanism, D0135-D0137, 2026-08-29
+
+Working tree clean; HEAD `aba9793`, everything pushed. The director's own follow-up to the round below:
+D0132's telemetry didn't just refine an attribution, it FALSIFIED the reasoning D0128 used to justify
+raising the bound (32→59) — "we know what the excess is, it's the accepted D0059 case" was asserted, then
+disproven. Ordered response, all three parts done:
+
+**1. D0135 — Anvil FINDING + ledger entry, filed at HIGH severity, stated plainly, not softened.**
+`.anvil/log/2026-08-29T084009.244046Z-b497565f.json`. The bound-raise decision's own stated justification
+was wrong, caught by the instrument built to check it — not a subsequent audit, not new information. Bound
+stays 59; its status moved from "known mechanism" to "measured, mechanism under active diagnosis."
+
+**Prerequisite, its own commit before the diagnosis touched anything near it: `sim/body/body.gd` extracted
+(D0136).** It was at 399/400 lines. `_resolve_horizontal`/`_resolve_horizontal_cell`/`_try_climb`/
+`_try_step` moved to a new `sim/body/horizontal_resolve.gd` (`HorizontalResolve`, mirroring the existing
+`VerticalResolve` split), pure Extract Class, mutation-tested (forcing the new call site into a no-op broke
+real tests for real reasons). `body.gd`: 399 → 313 lines.
+
+**2. D0137 — `resolve_floor` diagnosed to ONE exact, fully-characterized mechanism, not fixed.** Built
+`tests/diag_resolve_floor.gd` (a one-off diagnostic, not CI-run, mirroring D0123's own instrumented-replay
+method) that independently recomputes `resolve_floor`'s own three heightfield samples from OUTSIDE —
+`resolve_floor`/`vertical_resolve.gd` untouched throughout, per explicit instruction. Result: `resolve_floor`'s
+`mini(s_left, s_right, s_center)` treats `Heightfield.NO_FLOOR` as a large-but-valid height rather than "this
+sample cannot vote" — one real-ground sample wins over the others' correctly-reported `NO_FLOOR`, resting
+the body's whole footprint on partial support and short-circuiting `grid_floor_backstop` (the documented
+backstop for exactly this geometry) via the `or` in `move_and_resolve`. Measured across all 84 occurrences
+(55 dig-on + 29 dig-off): 100% show `transition=false` (my own interpolation hypothesis, refuted directly)
+and a NO_FLOOR sample alongside a real one, every time. Confirmed pre-existing (29 occurrences with dig
+fully disabled) — dig only amplifies frequency by carving more flat-to-open transitions, not a new kind.
+
+**3. Bound status, restated per the director's own explicit framing: 59/32 are measurements, not yet a
+justified ceiling.** No fix made or proposed to `resolve_floor`/`grid_floor_backstop`/`_resolve_horizontal`
+— this was diagnose-and-report only, per explicit instruction, since this is the highest-risk code in the
+module. Whether/how to fix the NO_FLOOR-vs-real-height asymmetry in `mini()` is a real, separate, still-open
+future decision, now against a precise description instead of a guess.
+
+**Control-plane thread: still holds, unchanged.** The director is reviewing D0134's canonical types before
+any policy wiring — this round did not touch that thread at all, per the explicit "a dominant undiagnosed
+grounding path in the highest-risk module outranks new instrument architecture" ordering.
+
 ## CLOSED — Codex audit response: D0115 sweep, grounding-path telemetry, ledger corrections, control-plane canonical types, 2026-08-29
 
 Working tree clean; HEAD `abc2eae`, everything through it pushed to `origin/main`. This round answered an
