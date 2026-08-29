@@ -18,6 +18,10 @@ func _initialize() -> void:
 	_test_ruin_carves_a_chamber()
 	_test_generation_is_deterministic()
 	_test_different_seeds_diverge()
+	_test_glimmer_appears_in_reveal_test_dense()
+	_test_glimmer_never_appears_at_or_below_topsoil_end()
+	_test_shallow_clay_has_no_glimmer_at_all()
+	_test_dense_reveal_site_places_more_glimmer_than_sparse()
 	_finish("shaft_generator")
 
 
@@ -174,3 +178,44 @@ func _test_different_seeds_diverge() -> void:
 	var a: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, 1)
 	var b: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, 2)
 	_check(a.state_signature() != b.state_signature(), "different seeds generate different shafts")
+
+
+func _count_glimmer(grid: TileGrid) -> int:
+	var count: int = 0
+	for cell: Vector2i in grid.occupied_terrain_cells():
+		if grid.get_material(cell) == &"glimmer":
+			count += 1
+	return count
+
+
+func _test_glimmer_appears_in_reveal_test_dense() -> void:
+	var grid: TileGrid = ShaftGenerator.generate(StrataData.REVEAL_TEST_DENSE, 20260826)
+	_check(_count_glimmer(grid) > 0, "a full reveal_test_dense generation places at least one glimmer cell")
+
+
+func _test_glimmer_never_appears_at_or_below_topsoil_end() -> void:
+	var grid: TileGrid = ShaftGenerator.generate(StrataData.REVEAL_TEST_DENSE, 20260826)
+	var topsoil_end: int = int(StrataData.REVEAL_TEST_DENSE["layer_thresholds_m"]["topsoil_shale_end"]) * ShaftGenerator.TERRAIN_CELLS_PER_METER
+	var violations: int = 0
+	for cell: Vector2i in grid.occupied_terrain_cells():
+		if grid.get_material(cell) == &"glimmer" and cell.y >= topsoil_end:
+			violations += 1
+	_check(violations == 0, "no glimmer cell sits at or below topsoil_end (%d found)" % violations)
+
+
+func _test_shallow_clay_has_no_glimmer_at_all() -> void:
+	var grid: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, 20260826)
+	_check(_count_glimmer(grid) == 0,
+		"the real site (no `reveal` block) places zero glimmer -- the optional-field guard actually guards")
+
+
+func _test_dense_reveal_site_places_more_glimmer_than_sparse() -> void:
+	# Same seed, deliberately: this isolates density as the one variable, since determinism means any
+	# difference in output has to come from the `reveal` config, not from a different RNG draw sequence.
+	var sparse: TileGrid = ShaftGenerator.generate(StrataData.REVEAL_TEST_SPARSE, 20260826)
+	var dense: TileGrid = ShaftGenerator.generate(StrataData.REVEAL_TEST_DENSE, 20260826)
+	var sparse_count: int = _count_glimmer(sparse)
+	var dense_count: int = _count_glimmer(dense)
+	_check(dense_count > sparse_count,
+		"the dense reveal site places more glimmer than the sparse one at the same seed (dense=%d, sparse=%d)" %
+		[dense_count, sparse_count])

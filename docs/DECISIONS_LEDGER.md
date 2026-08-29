@@ -4038,3 +4038,38 @@ false).
 
 Reverse: cheap. Revert `InputFrame.dig_pressed`, `Body._dig_target_cell`/`_handle_dig`, the four new
 `tests/test_body.gd` cases, and the fuzzer's one added line.
+
+## D0111 · 2026-08-28 · reveal-layer placement checked against legacy before writing new generation code
+
+Director's explicit instruction, mid-build: query legacy first, same discipline stage 3's terrain port
+used. Read `legacy/src/core/{layered_world_gen,world_gen,fine_terrain,flora}.gd` before treating
+`_scatter_reveal_material` as final.
+
+**What's already reused, correctly.** `_scatter_reveal_material` calls `ShaftGenerator._grow_vein`, which
+is itself a faithful port of legacy's `_scatter_veins`/`_scatter_coal`/`_grow_vein`
+(`layered_world_gen.gd:723-790`) done in an earlier stage (D0017) — reusing it for the reveal feature is
+not new invention, it's the same algorithm serving a fourth material.
+
+**The closest-named legacy candidate, checked and rejected.** `_seed_lodes`/`_grow_lode`
+(`layered_world_gen.gd:791-843`): NOT a visible discoverable pocket. It writes to a separate hidden layer
+(`world.lodes`/`world.amounts`), only surfaced when mining an already-visible ore block ("mining an ore
+block writes a lode into that cell" — the function's own comment) — a bonus-richness economy mechanic,
+gated by the dead progression-based `SEAL_TOP`/L2 concept `docs/DECISIONS_LEDGER.md` D0017 already
+excluded from this port. Wrong for Reveal on two independent grounds, not one: it isn't itself visible
+(the opposite of what a reveal feature needs), and it IS economy meaning, which the brief's own
+instruction says this test must not carry. Confirms the brief's own anticipated finding-shape ("if it is
+not [reusable], say so") without needing the bounded-dig-area framing the brief offered — the actual
+mismatch is different and more specific than that.
+
+**Checked and confirmed irrelevant.** `_stamp_bazaar_ruin` (983): a single fixed-position surface
+structure stamp, not a scatter algorithm — confirms D0018's own note that `_place_ruins`/`_carve_disc`
+(already built, this port's actual ruin mechanism) has no legacy analog, correctly an original mechanism
+rather than a missed port. `_scatter_rubble` (642): decorates already-open cave floors with debris, the
+structural opposite of "buried behind solid rock" — wrong shape for Reveal's premise. `flora.gd`
+(saplings/trees) and `fine_terrain.gd` (fine-grid visual dual-grid molding, a different resolution-split
+concept this project's own `heightfield.gd`/ADR-0005 architecture already supersedes): unrelated.
+
+Net effect on the build: none. `_scatter_reveal_material` as already written is confirmed the correct
+reuse, not a premature one.
+
+Reverse: N/A — a research finding, no code changed by this entry.

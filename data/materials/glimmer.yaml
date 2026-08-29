@@ -1,0 +1,9 @@
+# Reveal-layer placeholder (docs/GDD.md §12, claims/C004): a deliberately inert discoverable feature,
+# not a real resource. No economy meaning attached -- this material exists to test whether uncovering
+# something raises subsequent dig activity, not to be mined, refined, or delivered to anything.
+# hardness matches clay's (topsoil layer, soft/fast digging) since the reveal test never leaves topsoil.
+id: glimmer
+layer: topsoil_shale
+kind: curio
+hardness: 1.0
+display_name: Glimmer

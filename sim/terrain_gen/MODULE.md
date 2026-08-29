@@ -73,3 +73,12 @@ per-tick phase order.
   a test that merely runs code that happens to contain them — an accretion blob is compact enough, and
   the relevant cells sparse enough, that a real generation run may never actually probe either guard.
 - **Ruin placement is deliberately minimal** (D0018): one carved-empty chamber, nothing inside it.
+- **Reveal-layer placeholder scatter** (`docs/GDD.md` §12, `claims/C004`, `docs/DECISIONS_LEDGER.md`
+  D0110/D0111): an optional `site["reveal"]` config, read only if present (`shallow_clay`, the real
+  site, deliberately does not carry one). Reuses `_grow_vein` (the same already-legacy-ported accretion
+  algorithm `_scatter_vein_material`/`_scatter_iron` already use), confined to topsoil rows only, unlike
+  the depth-weighted whole-grid acceptance curve those two use. **Determinism holds per-site, not across
+  sites at different density** — `data/strata/reveal_test_sparse.yaml`/`reveal_test_dense.yaml` are two
+  distinct sites, not one site with a runtime knob, specifically because a density sweep is a sweep over
+  generations, never a re-sample of one generation. Do not add a runtime density parameter to
+  `ShaftGenerator.generate` later without re-reading this note.

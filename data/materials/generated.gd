@@ -28,6 +28,13 @@ const RECORDS: Dictionary = {
 		"hardness": 5.0,
 		"display_name": "Deepstone",
 	},
+	"glimmer": {
+		"id": "glimmer",
+		"layer": "topsoil_shale",
+		"kind": "curio",
+		"hardness": 1.0,
+		"display_name": "Glimmer",
+	},
 	"hardrock": {
 		"id": "hardrock",
 		"layer": "stonereach",

@@ -51,6 +51,10 @@ static func generate(site: Dictionary, seed: int) -> TileGrid:
 	_scatter_vein_material(grid, rng, site["coal"], &"coal")
 	_scatter_iron(grid, rng, site["iron"], stonereach_end)
 	_place_ruins(grid, rng, site["ruin"])
+	# Optional (docs/GDD.md §12, claims/C004) -- absent from the real `shallow_clay` site on purpose, so
+	# this stays a test-only addition, not a commitment the real economy has to honor yet.
+	if site.has("reveal"):
+		_scatter_reveal_material(grid, rng, site["reveal"], topsoil_end)
 	return grid
 
 
@@ -182,6 +186,26 @@ static func _grow_vein(grid: TileGrid, rng: SplitRng, seed_cell: Vector2i, size:
 		placed += 1
 		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			frontier.append(cell + d)
+
+
+## Reveal-layer placeholder feature (docs/GDD.md §12, claims/C004): confined to topsoil rows only, unlike
+## `_scatter_vein_material`'s whole-grid depth-weighted acceptance curve -- mirrors `_scatter_iron`'s
+## bounded-range shape instead, since the reveal hypothesis (docs/GDD.md §8) is explicitly lateral
+## search, not a depth-gated one, so there is no acceptance-by-depth to model here. `attempts_per_col` is
+## scaled against `topsoil_end` (the band's own height), not the whole grid, same reasoning `_scatter_iron`
+## already uses for its own `span`. Density is the swept variable across the two reveal-test sites
+## (`data/strata/reveal_test_sparse.yaml`/`reveal_test_dense.yaml`) -- deterministic per `(site, seed)`
+## same as every other scatter here, but NOT stable across different `attempts_per_col` values: a density
+## sweep compares different generations, never the same generation re-sampled (docs/DECISIONS_LEDGER.md
+## D0109's density-sweep note).
+static func _scatter_reveal_material(grid: TileGrid, rng: SplitRng, cfg: Dictionary, topsoil_end: int) -> void:
+	if topsoil_end <= 0:
+		return
+	var attempts: int = _density_count(grid.width, topsoil_end, cfg["attempts_per_col"])
+	for _i: int in attempts:
+		var cx: int = rng.next_range(0, grid.width - 1)
+		var cy: int = rng.next_range(0, topsoil_end - 1)
+		_grow_vein(grid, rng, Vector2i(cx, cy), int(cfg["size_min"]), &"glimmer")
 
 
 ## One guaranteed empty chamber per shaft (D0018): a carved disc, no earlier than `min_depth_m`. Nothing

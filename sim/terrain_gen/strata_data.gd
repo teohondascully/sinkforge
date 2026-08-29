@@ -19,8 +19,16 @@ extends RefCounted
 
 const SHALLOW_CLAY: Dictionary = StrataRecords.RECORDS["shallow_clay"]
 
+## Test-only sites for the reveal-layer density sweep (docs/GDD.md §12, claims/C004) -- identical to
+## SHALLOW_CLAY except for their `reveal` block. Two distinct sites, not one site with a runtime density
+## knob, because a density sweep compares different generations (shaft_generator.gd's own docstring).
+const REVEAL_TEST_SPARSE: Dictionary = StrataRecords.RECORDS["reveal_test_sparse"]
+const REVEAL_TEST_DENSE: Dictionary = StrataRecords.RECORDS["reveal_test_dense"]
+
 const _SITES: Dictionary = {
 	&"shallow_clay": SHALLOW_CLAY,
+	&"reveal_test_sparse": REVEAL_TEST_SPARSE,
+	&"reveal_test_dense": REVEAL_TEST_DENSE,
 }
 
 

@@ -9,3 +9,4 @@ fields:
   coal: {required: true, type: dict}
   iron: {required: true, type: dict}
   ruin: {required: true, type: dict}
+  reveal: {required: false, type: dict}
