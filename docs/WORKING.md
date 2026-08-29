@@ -8,6 +8,72 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## PRE-COMPACTION CHECKPOINT, 2026-08-29 — two open threads, neither started; D0122-D0130 arc fully closed and pushed
+
+Working tree is clean; HEAD is `78b258f`, everything through it pushed to `origin/main`. CI: green through
+`f86ba1a` (confirmed). `78b258f` (D0130, pure Python tooling, no game code) was still `in_progress` on CI
+at the moment this checkpoint was written — verify it landed green before trusting it, don't assume from
+this note.
+
+**Closed this session, nothing pending:** D0122's full arc (D0125-D0128: per-column high/low-water-mark
+dig fix, permanent regression fixture, `grounded_no_floor` bound honestly re-baselined 32→59 with the
+dig-off proof in the same commit, `bounds`'s water-mark cost accepted as attributed). D0129: claims/C004's
+replay driver, proven against a synthetic trace (0/713 ticks mismatched live-vs-replayed), real-human
+`--play` validation still explicitly owed and stated as such everywhere (ledger, WORKING.md, BRIEF.md, the
+driver's own CLI warning). D0130: the fork-completion reconciliation tool (below).
+
+**Incident + new standing rule, mechanism now built but UNEXERCISED in real concurrent use:** two forks ran
+concurrently in one shared (non-worktree-isolated) tree; one reported `completed` with a full prose summary
+while its diff touched neither claimed file. Caught by hand, not by anything mechanical. Filed as an Anvil
+FINDING extending the sweep-blindness law into fork coordination (`.anvil/log/2026-08-29T074921.640759Z-
+ad065cf8.json`), saved to this session's own persistent memory
+(`subagent-completion-claim-is-unverified-green.md`), and closed with a real tool: `tools/
+check_fork_completion.py` + `tools/test_check_fork_completion.py` (5/5 cases independently re-run by this
+session, not just trusted from the building subagent's own report — D0130). `.claude/commands/wrap.md`
+gained two new leading steps: reconcile every fork's claim through this tool before trusting it, and show
+doc-edit reports as an actual `git diff`, never a prose summary. **Caveat a future session should not
+lose: the tool exists but nothing calls it automatically — it must be invoked by hand after every fork,
+same as the manual `git diff` check it replaces, just with a sharper answer once run.** Standing rule
+until this has actually been exercised a few times: prefer serial forks in a shared tree; concurrent forks
+are plausible again once the reconciliation step is a reflex, not a novelty.
+
+**Thread 1, OPEN, not started: "THE CONTROL PLANE" — model-agnostic agent evaluation.** A large design
+brief (full text is in this session's own conversation history, not yet copied into any tracked doc) for a
+six-role architecture (Policy/Adapter/Observation Builder/Observation Spec/Goal/Scorer, sim stays the fixed
+spine) enabling matched-seed baseline decomposition and counterfactual world-line forking later, while
+building only a minimal 3-policy slice now. Its own §9 required a response before any building — this
+session gave one, read `tests/body/play_scene.gd` + `tests/body/scripted_traverse.gd` directly (both
+found to violate 5 of the brief's 6 deferred properties — no canonical observation type, `ScriptedTraverse`
+takes raw `Body`/`TileGrid` engine objects directly and reads privileged landmark constants, `play_scene.gd`
+fuses the goal-check into the tick loop), and found that `docs/ARCHITECTURE.md` §2-§7 (L2 interface / L3
+harness / L4 experiment) ALREADY specifies almost this exact architecture, unbuilt — the brief is the next
+planned step, not a new direction. Answered all six of §9's questions in full (boundaries in own words,
+which properties the current path violates, where the plane lives — flagged a real gap: `interface`/
+`sim/commands` don't exist as code yet, so the brief's own slice doesn't say whether it builds on top of a
+still-unbuilt `interface` or continues bypassing it the way `tests/` currently does — the episode log
+should NOT reuse the Anvil schema, hardest seam is S2/fork-from-any-step because this codebase only hashes
+state today, never serializes it, and named two cathedral risks: the interface-doesn't-exist-yet gap above,
+and S3's full provenance schema being over-specified for a slice where 2 of 3 policies have no
+temperature/prompt/template to record at all). **Zero code written. Awaiting the director's reply per the
+brief's own explicit "do not begin the refactor until I have replied."**
+
+**Thread 2, OPEN, not started, mid-read when interrupted: the persistent-world design reversal.** A second
+large director brief (also only in conversation history, not yet in any tracked doc) reversing the
+2026-08-25 run-based roguelite pivot back to a persistent single shaft + rig-as-consumer — NOT the same as
+the already-closed 2026-08-27 reversal `docs/GDD.md` §9 already records; this is a newer, further one on
+top of it, with its own full §0-§8: a new §1 premise paragraph, locked decisions replacing/amending §7, a
+new §3 water-equilibrium section, an economy spine (D1-D6 verbs, two tier-2 materials, a heat-not-hardness
+tier-3 gate) for `tools/economy_check/`, honestly-stated open gaps, a full mechanical §6 edit list for
+`docs/GDD.md` (verbatim-keep / edit / retire per section, plus a full inlined §10 worked curve), and §7's
+four engineer-agent prompts to WRITE (not build) in priority order, sequenced so prompt 1 (a 10-minute
+Anvil-episode play test of the fuel/forge/hole-trick loop) ships before 2-4 consume real effort. This
+session read the current `docs/GDD.md` (343 lines) in full in preparation and made **zero edits to it or
+any other doc** before being interrupted by the fork-coordination incident, then the Control Plane brief.
+**Nothing from this thread has landed anywhere. A fresh session picking this up needs the brief's own full
+text (only in this conversation's history) before touching `docs/GDD.md` — re-read it from the transcript
+or ask the director to re-paste it; do not attempt the edit list from memory or a summary.**
+
+
 ## CLOSED — D0122 fully closed (D0128), D0129 replay driver built against a synthetic trace, 2026-08-29
 
 Two director rulings executed, then the replay driver built (all three explicitly sequenced by the
