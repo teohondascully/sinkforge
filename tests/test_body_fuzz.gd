@@ -25,30 +25,47 @@ extends "res://tests/test_base.gd"
 ##     correctly refuses to treat as a landing, at the cost of not being able to suppress the single-tick
 ##     geometric overlap itself.
 ##
-## `DESIGN_TRADEOFF` -- a deliberate choice with a stated cost and a real alternative, not a bug to fix:
-##   - `grounded_no_floor` <= 59 (raised from 32, D0122/D0127/D0128 -- see below for why this is a
-##     re-baseline, not the patch instinct this project otherwise refuses): `_grid_floor_backstop`
-##     (D0059f) deliberately rests a body on the TOPMOST solid row anywhere in its footprint when that is
-##     the only real ground available (a pit's own lip), rather than requiring the ENTIRE footprint to be
-##     supported before granting `on_floor`. The alternative (full-footprint support required) was
-##     available and is not what shipped -- it would make this count zero, at the cost of a body standing
-##     at ANY narrow ledge edge (not just a pit) needing to walk fully onto it before resting, and a
-##     pit-lip body specifically would just keep falling instead of resting at all, since nothing else
-##     supports it. D0061 has the full reasoning and the reversal cost. In play: a body standing at a lip
-##     with most of its own width still hanging over open air reads as grounded (can jump, doesn't fall)
-##     even though the FULL footprint isn't supported -- visually similar to the ledge-edge forgiveness
-##     coyote time already grants, not a new kind of wrongness a player would name, but worth stating
-##     plainly rather than leaving implicit.
-##   - **Why 59, not still 32, and why this is a re-baseline and not the patch instinct.** The dig
-##     mechanic (landed after D0061 set 32) lets a player carve new holes into previously-flat floor,
-##     which creates MORE locations reaching the exact same D0059f pit-lip condition -- not a new
-##     mechanism, not a varying-height defect, the identical `HostileChamber.FLOOR_ROW` height every
-##     single time, proven by a controlled dig-off A/B (D0127): with dig forced off, the full 1000x1500
-##     sweep returns to EXACTLY 32, the pre-dig number, not close to it. The patch instinct is raising a
-##     bound to hide an UNKNOWN excess; this is not that -- every one of the 59 violations is named and
-##     accounted for (the D0059f mechanism, now reachable at more player-carved locations), so a future
-##     reader does not need to re-derive this from scratch. If `grounded_no_floor` ever exceeds 59, THAT
-##     is a new regression, visible against a correct baseline instead of hidden under a stale one.
+## `DESIGN_TRADEOFF` -- named this way when 32 was raised to 59 (D0122/D0127/D0128), but the justification
+## given for that raise was ITSELF FALSIFIED shortly after, by an instrument built specifically to check
+## it (D0132/D0135) -- corrected here (D0150/queue D3) rather than left standing, since a comment stating a
+## falsified claim as settled fact is worse than no comment:
+##   - `grounded_no_floor` <= 59. **What D0128 claimed at the time:** the entire 32->59 excess was the
+##     already-accepted `_grid_floor_backstop` (D0059f) pit-lip trade-off (below), reachable at more
+##     locations now that dig exists -- "raise it, and in the same commit document that 59 = the D0059
+##     mechanism plus dig exposure" (the director's own contemporaneous ruling, quoted in D0135). **This was
+##     not true.** D0132's own per-violation telemetry measured the real split: only 4/59 (dig-on) and
+##     3/32 (dig-off) violations trace to `grid_floor_backstop` at all -- the named mechanism accounts for
+##     7 of 91 occurrences, not all of them (D0135, filed at HIGH severity as a falsified decision-
+##     rationale, not a prose imprecision).
+##   - **The actual dominant mechanism, diagnosed after the fact (D0137), not assumed:** `resolve_floor`
+##     samples the heightfield at three x-positions (left foot, right foot, centre) and takes
+##     `mini(s_left, s_right, s_centre)` as the landing surface -- but `Heightfield.NO_FLOOR` (an i32-max
+##     sentinel meaning "this sample cannot vote, the columns it straddles disagree across a real gap") is
+##     just a very large integer to `mini()`, so it never wins. Whenever AT LEAST ONE of the three samples
+##     finds real ground, `resolve_floor` grounds the body's ENTIRE footprint there and returns `true` --
+##     even when another sample correctly reported open air beneath it -- which short-circuits
+##     `move_and_resolve`'s own `resolve_floor(...) or grid_floor_backstop(...)` before the backstop below
+##     ever runs. Measured across all 84 non-`grid_floor_backstop` occurrences (55 dig-on + 29 dig-off):
+##     100% show a real, unambiguous floor at one sample and an honest `NO_FLOOR` at another, on a
+##     partially-solid footprint -- one exact, fully-characterized mechanism, not several partly-understood
+##     ones, and NOT heightfield interpolation blending (that hypothesis was directly refuted: `transition`
+##     is `false` in all 84 cases).
+##   - **Pre-existing, not dig-created -- confirmed, not assumed:** the dig-OFF population alone already
+##     shows 29 occurrences of this exact `resolve_floor` mechanism, at `HostileChamber`'s own BUILT-IN
+##     flat-to-open transitions. Dig only creates MORE locations reaching the same `FLOOR_ROW` height by
+##     carving new ones sideways -- the frequency rose, the mechanism did not change.
+##   - `_grid_floor_backstop` (D0059f) itself, for the minority of violations it DOES cause: deliberately
+##     rests a body on the TOPMOST solid row anywhere in its footprint when that is the only real ground
+##     available (a pit's own lip), rather than requiring the ENTIRE footprint to be supported before
+##     granting `on_floor` -- the alternative (full-footprint support required) would make this count zero,
+##     at the cost of a body standing at ANY narrow ledge edge needing to walk fully onto it before
+##     resting. D0061 has the full reasoning. This description is accurate on its own terms; what was wrong
+##     was claiming it explains the bulk of the bound.
+##   - **Current status, stated precisely (D0135): 59 is a MEASUREMENT, not yet a justified ceiling.** Its
+##     mechanism moved from "known, accepted" to "diagnosed, under active investigation" -- an attempted
+##     fix to `resolve_floor`'s own criterion exists and is not yet landed (`docs/DECISIONS_LEDGER.md`,
+##     D0139 and its own follow-ups, for the current state of that attempt). If `grounded_no_floor` ever
+##     exceeds 59, THAT is a new regression against this measured baseline, not a widening of this bound.
 ##
 ## An allowlist with a number attached is honest; a disabled check is not (the director's own words) --
 ## if either count grows on a future run, that is a new, real regression, not a widening of this bound.

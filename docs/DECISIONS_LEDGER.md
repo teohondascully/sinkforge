@@ -5936,3 +5936,31 @@ cleanly, isolated to exactly the one case it targets, seven others unaffected.
 
 **Reverse cost:** revert `.githooks/commit-msg`, `tools/check_trailers.sh`,
 `.github/workflows/harness.yml`; delete `tools/test_commit_msg_hook.sh`.
+
+## D0152 · test_body_fuzz.gd's own DESIGN_TRADEOFF comment corrected to match D0135/D0137 (D4, queue Part D) · 2026-08-29
+
+**Decided:** `tests/test_body_fuzz.gd`'s `DESIGN_TRADEOFF` doc-comment (the section above the `grounded_no_
+floor <= 59` constant) still told D0128's own original story — "every one of the 59 violations is named and
+accounted for (the D0059f mechanism, now reachable at more player-carved locations)" — a claim D0135 found
+was FALSIFIED (D0132's telemetry: only 4/59 dig-on violations trace to `grid_floor_backstop`/D0059f; the
+other 55 trace to a different, then-undiagnosed mechanism in `resolve_floor` itself, D0137). The comment sat
+in the tree, read by anyone opening this file, stating a falsified justification as settled fact.
+
+**Fixed: comment only, exactly as scoped — no bound changed (`59` and `RESIDUAL`'s `1` are byte-identical),
+no `sim/` file touched.** Rewritten to state, in order: what D0128 originally claimed and quoted the
+director's own ruling that accepted it; that D0132/D0135 found this false and by how much (4/59, not
+59/59); D0137's own diagnosed mechanism (`resolve_floor`'s `mini()` treating `NO_FLOOR` as a valid-but-large
+height rather than "cannot vote"), stated precisely enough that a reader does not need to re-open the ledger
+to understand WHY; that it's pre-existing and dig only raises frequency, not a new kind (29/32 dig-off,
+confirmed not assumed); `grid_floor_backstop`'s own real mechanism kept as accurate background, since it
+still causes the minority of violations it always did; and the current true status — 59 remains a
+measurement, an attempted `resolve_floor` fix exists and is not yet landed (pointing at D0139 for its
+current state, without asserting anything about its unresolved findings).
+
+**Verified, not assumed:** `git diff` shows only `##`-comment lines changed (no `const`/`func` line in the
+diff); `godot --check-only` shows a clean parse (no `Parse Error` in the grepped output, not just exit code,
+per this project's own standing caution that `--check-only` can exit 0 on a parse error); `test_body_fuzz_
+fast.gd` (which reads these same constants as its own shared source of truth) re-run and still ALL PASS.
+
+**Reverse cost:** revert `tests/test_body_fuzz.gd`. Purely descriptive; nothing depends on this comment's
+own wording being any particular way.
