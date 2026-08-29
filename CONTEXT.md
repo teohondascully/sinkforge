@@ -109,7 +109,8 @@ docs/archive/         superseded documents, headed and dated
 docs/BRIEF.md         this session's digest, incl. "What was learned" — findings, not a work log
 docs/WORKING.md       current state. not a log. resets when a stage closes
 docs/DECISIONS_LEDGER.md   append-only judgment calls, numbered, never edited after the fact
-history/              curated images, capped at 12. earns its place by illustrating a finding
+history/              curated images, policy-capped at 12 — currently 168, cull left as director-action.
+                      earns its place by illustrating a finding
 legacy/               the pre-pivot codebase. read-only. excluded from build.
 ```
 
@@ -122,7 +123,7 @@ legacy/               the pre-pivot codebase. read-only. excluded from build.
 The primary implementers here are agents with bounded context. These are architectural constraints, not style preferences.
 
 - **The 5-file rule.** Any task must be completable by reading five files totalling 1,500 lines or fewer. If a task needs more, the module boundaries are wrong. Report that rather than working around it.
-- **`MODULE.md` in every module**, 60 lines maximum: purpose, public API, invariants, dependencies, consumers, tick phase, and the three things that have bitten people here. Read the `MODULE.md` for dependencies, the implementation only for the module you are editing.
+- **`MODULE.md` in every module**, a 60-line TARGET (not enforced by any gate — `wc -l */MODULE.md` shows the real spread, several modules run well past it): purpose, public API, invariants, dependencies, consumers, tick phase, and the three things that have bitten people here. Read the `MODULE.md` for dependencies, the implementation only for the module you are editing.
 - **One concept per file. Filename equals concept.** No file named `utils`, `helpers`, `common`, or `manager`.
 - **No cross-module reach-in.** A module's internals are private. All access goes through its interface file.
 - **No global singletons.** No Godot autoloads in `sim/`. State is passed explicitly.

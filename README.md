@@ -49,8 +49,9 @@ carving, ore/coal/iron veins), `sim/body` (kinematics, collision, the sub-pixel 
 plane, step-up/mantle/corner-correction/coyote/jump-buffer), and the first real check in
 `sim/invariants` (a diagnostic guard on `sim/body`'s floor resolution, `docs/adr/0005`). All of it is
 engine-free GDScript, verified against a from-scratch reference wherever the algorithm mattered,
-mutation-tested throughout — 13 suites, 96 test functions, all green (`.github/workflows/harness.yml`
-runs every suite under the real, pinned engine on every push, not only locally).
+mutation-tested wherever it guards a real regression risk — every `tests/test_*.gd` suite, all green
+(`.github/workflows/harness.yml` runs each one under the real, pinned engine on every push, not only
+locally; see that file for the current count and list rather than a number here that would only drift).
 
 Scaffolded and not yet built: ten more `sim/` modules (`commands`, `run`, `meta`, `items`, `machines`,
 `behaviors`, `transport`, `fluid`, `economy`, `telemetry`) each have a `MODULE.md` stating their

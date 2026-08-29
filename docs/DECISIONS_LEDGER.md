@@ -6444,3 +6444,48 @@ assert non-emptiness independently is unrequested scope beyond what this closure
 fixture_shaft_replay_probe.gd`(`.uid`) and `tests/test_shaft_replay_determinism.gd`(`.uid`); revert
 `docs/QUALITY.md` gate 8's citation, `tests/test_replay_determinism.gd`'s docstring addition, and
 `.github/workflows/harness.yml`'s two edits.
+
+## D0166 · I1 drift sweep: the queue's own premises undercounted every one of its four targets, all four fixed (queue #2 Part I1) · 2026-08-29
+
+Each of the four items the queue named came with an assumed count; every single one was checked against
+the live tree rather than trusted, and every one turned out wider than assumed -- worth noting on its
+own, since it's the same "reported number understates the real population" shape this whole session keeps
+finding, just in prose this time instead of code.
+
+**"Capped at 12" pointers (E5/D0160 claimed two fixed, "three instances" was the queue's own premise):**
+a broader `grep -rn "capped at 12" --include="*.md" .` found FOUR real instances, not three -- E5 fixed
+`CLAUDE.md` and `history/README.md` (both correctly say "currently 168" now); `CONTEXT.md` line 112 and
+`docs/README.md` line 26 were still stale, unfixed, still claiming a flat "capped at 12" with no
+"currently 168" correction. Verified 168 is still the real count (`find history -type f \( -iname
+'*.png' -o ... \) | wc -l`) before writing it, not carried over from D0160's own number without
+re-checking. Both fixed to match `CLAUDE.md`'s own phrasing.
+
+**MODULE.md 60-line claim (queue's own premise: "four files exceed it"):** `CONTEXT.md`'s own "60 lines
+maximum" is asserted as if enforced; no gate checks it at all (`grep -rln "MODULE.md" tools/*.py` finds
+only `coupling.py`'s dependency-mapping use, nothing size-related). Real count: `wc -l */MODULE.md`
+across every non-legacy module shows SEVEN files over 60, not four -- `core` (98), `sim/terrain_gen`
+(84), `sim/body` (82), `sim/world` (70), `sim/meta` (70), `sim/run` (69), `sim/invariants` (62). Not
+fixed by adding a gate (a real gate-scope-widening decision, the same class H1 explicitly reserved for
+the director) -- fixed the FALSE claim of enforcement instead: "60 lines maximum" softened to "a 60-line
+TARGET (not enforced by any gate...)", pointing at the live `wc -l` command rather than re-typing a count
+of violators that will itself drift the next time a MODULE.md grows.
+
+**Test-suite count (`README.md`: "13 suites, 96 test functions"):** real count of `tests/test_*.gd`
+(excluding `test_base.gd`, the shared harness base, and this queue's own uncommitted `test_vertical_
+resolve.gd`, not yet wired into `harness.yml`) is 22 as of this queue's own start, now 22 again after
+this session's own Part G addition (`test_shaft_replay_determinism.gd`) -- either way, nowhere near 13.
+Did not re-count "96 test functions" precisely (no single unambiguous definition of "a test function"
+across `_test_*()` methods, `_check()` call sites, and sub-checks inside loops) and did not invent a
+number to replace it with. Fixed by REMOVING both hard-coded numbers entirely, replacing them with a
+pointer to `.github/workflows/harness.yml`'s own live step list -- the same "pure tool pointers, no hand-
+typed numbers" convention Part C (D0148) already applied to `BRIEF.md`/`wrap.md`.
+
+**"Read first" list total (`ONBOARDING.md`: "under 1,600 lines"):** `wc -l` across the exact six named
+files (`CONTEXT.md docs/GDD.md docs/ARCHITECTURE.md docs/QUALITY.md docs/CLAIMS.md claims/C003-cold-
+start-reaches-d1.md`) gives **1,669** -- 69 lines over the stated bound, an outright false claim, not a
+rounding matter. Fixed by removing the fixed number (same reasoning as the test-suite count above: any
+number typed here re-drifts the moment any of the six files grows) and pointing at `wc -l` directly for
+whoever wants the current figure.
+
+**Reverse cost:** revert `CONTEXT.md` (2 hunks), `docs/README.md`, `README.md`, `ONBOARDING.md` to their
+prior text (all in this same commit's own diff).

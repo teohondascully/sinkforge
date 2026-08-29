@@ -23,7 +23,9 @@ Two things about how to work with me. First: this repository is a portfolio arti
 5. `docs/CLAIMS.md` — the claim system
 6. `claims/C003-cold-start-reaches-d1.md` — the target (`C001` is `RETIRED`; see `docs/GDD.md` §9)
 
-Do not start work until you have read all six. They total under 1,600 lines and they are the entire specification.
+Do not start work until you have read all six — they are the entire specification, short enough to read
+in full (`wc -l` across the six if you want the current combined length; it will drift as they grow, so
+no fixed number is stated here).
 
 One framing note that matters: the GDD marks which of its sections are constraints and which are provisional reasoning about a game that does not exist yet. Treat that distinction seriously in both directions. Do not violate a constraint, and do not defend a hypothesis as though it were measured.
 
