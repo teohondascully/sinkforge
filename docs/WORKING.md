@@ -112,13 +112,19 @@ whenever. The hands-on-keyboard `--play` test stays explicitly open/owed, not cl
    camera shows ~28% of the topsoil band, a noisy local sample). Fixed with a new `--wide-view` capture
    mode, not a parameter change; `history/154-reveal-density-*.png` replaced in place with the corrected
    pair (same-round first draft superseded, not kept alongside it — 168 images, unchanged count).
-4. FINDING, NOT YET FIXED (D0122) — surfaced by this round's own gate diligence, not sought: running the
-   FULL (nightly-only) fuzzer for the first time since dig existed found a real, confirmed (A/B-verified)
-   regression — `embedded` 187 vs. a bound of 1, `grounded_no_floor` 95 vs. 32, a brand-new
-   `discontinuity` class at 4 (should be hard zero), all four returning to their EXACT established
-   baselines with dig disabled in a controlled re-run. Already on `main` (dig landed at `3181c30`),
-   invisible to the fast per-commit fuzzer, invisible to every gate CI actually runs. `sim/body` is this
-   project's own documented highest-risk module — flagged for the director rather than hastily patched.
+4. FINDING, DIAGNOSED, NOT YET FIXED (D0122/D0123) — surfaced by this round's own gate diligence, not
+   sought: running the FULL (nightly-only) fuzzer for the first time since dig existed found a real,
+   confirmed (A/B-verified) regression — `embedded` 187 vs. a bound of 1, `grounded_no_floor` 95 vs. 32, a
+   brand-new `discontinuity` class at 4 (should be hard zero), all four returning to their EXACT
+   established baselines with dig disabled in a controlled re-run. Already on `main` (dig landed at
+   `3181c30`), invisible to the fast per-commit fuzzer, invisible to every gate CI actually runs.
+   `discontinuity` root-caused by instrumented replay (D0123): dig is confirmed NOT mid-tick (it's the
+   tick's own last step); the real interaction is cross-tick — dig can leave jagged, sub-cell-scale solid
+   fragments a generated chamber never produces, later straddled by the body's own shifting footprint,
+   triggering a `_resolve_horizontal_cell` depenetration correction the fuzz probe's own
+   `_max_legit_displacement` never accounted for (a real, separate, non-design test-harness gap) on top of
+   a genuine `sim/body` design question (whether/how to bound depenetration distance or change what dig
+   leaves behind) — flagged for the director per their own instruction to stop rather than pick a fix.
 5. NOT STARTED. The replay driver (real recorded session → `RevealMetric`) — correctly sequenced after
    D0115/D0117, which is now closed, but this round's time went to the harness fix, the hunt, and (once
    discovered) triaging D0122 instead.

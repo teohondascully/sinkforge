@@ -4530,3 +4530,68 @@ finalizing a report) happened to include the deep sweep. Named plainly as a real
 can mean when the red gate isn't one CI ever runs automatically.
 
 Reverse: N/A — this entry records a confirmed finding, not a code change; no fix has been attempted.
+
+## D0123 · 2026-08-28 · D0122's `discontinuity` class diagnosed to the exact mechanism, by instrumented replay — not yet fixed
+
+Director's instruction: root-cause `discontinuity` first (the sharpest thread — always zero, now not), report
+what dig actually does to body state per tick before changing anything, confirm or kill the "dig mutates the
+grid mid-tick, the resolver was never written to handle the world changing underneath it" hypothesis from
+actual code, stop if the fix needs a design decision.
+
+**Tick order, read directly, not assumed: dig is NOT mid-tick.** `Body.tick()`'s own order is
+`_resolve_horizontal` → `move_and_resolve` (vertical) → `_handle_jump` → `_enforce_grid_bounds` →
+`_handle_dig`, last. A tick's own collision resolution never sees that same tick's own dig — the
+director's hypothesis, read literally, is not what the code does. The real interaction is CROSS-TICK: a
+dig on tick N can only affect resolution on tick N+1 or later, once the body's own footprint (which shifts
+every tick as it falls/moves) later intersects geometry that dig left behind.
+
+**One violation instrumented end to end (seed=497, tick=997 — one of D0122's own 4).** Root cause required
+replaying the fuzzer's EXACT structure, not just the one seed in isolation: `fixture_body_fuzz_probe.gd`
+builds ONE `TileGrid`, shared and dig-accumulating across ALL 1000 seeds in a single run (`the TileGrid is
+built ONCE, outside the seed loop` — a comment written before dig existed, when the grid was immutable and
+truly safe to reuse). A first replay attempt using a FRESH grid for seed=497 alone reproduced nothing at
+all — the terrain seed=497 actually saw had already been shaped by 497 prior seeds' worth of digging.
+Replaying all 498 seed-runs on one shared grid, matching the real fuzzer exactly, reproduced the violation.
+
+**What actually happened, printed directly from live body/grid state, not inferred:**
+1. tick=995: a real dig fires (`hardrock`, facing left) while the body is in free fall.
+2. tick=996: `vel_y` flips from a normal falling value to exactly `-23920640` — confirmed to be
+   `Body.JUMP_VELOCITY` (`JUMP_VELOCITY_PX_S=-365 * Fx.SCALE=65536`) to the last digit, i.e., a legitimate
+   coyote-time/jump-buffer jump firing, NOT a separate corruption. Position doesn't move yet (jump velocity
+   only gets integrated next tick).
+3. tick=997 (the violation): before the new jump velocity is even applied, `_resolve_horizontal` runs at
+   the body's still-falling position and finds the body's 5-col × 10-row footprint overlapping solid
+   material at exactly ONE cell — printed directly, not estimated: `(col=11, row=62)`, the body's own
+   bottom-left corner. Every other one of the ~50 cells in the footprint is open. The surrounding shape,
+   printed column by column, is jagged and asymmetric (col 9-10 solid only 2 rows down from the body's own
+   floor; col 11 solid 3 rows down; col 12 solid only 1 row down, one further than the body's own box) —
+   not the shape a smoothly-generated, never-mutated chamber produces anywhere else in this project's own
+   acceptance suite. `_resolve_horizontal_cell`'s depenetration branch fires once for that one cell and
+   pushes `pos_x` by 7.125px in a single tick — more than one whole cell (`CELL_PX`=4px) — the exact
+   discontinuity `_max_legit_displacement` then flags, since nothing in that function accounts for
+   `depenetrated_this_tick` at all.
+
+**Two separate, real gaps, not one — worth keeping distinct for whoever fixes either:**
+1. **A test-harness gap, not a `sim/body` bug.** `fixture_body_fuzz_probe.gd`'s own `_max_legit_displacement`
+   accounts for `stepped_up_this_tick`/`mantled_this_tick`/`corner_corrected_this_tick`/
+   `bounds_violation_this_tick` but never `depenetrated_this_tick` — depenetration is a real, by-design
+   correction (the whole point of `_resolve_horizontal_cell`'s embedding-recovery branch) that can
+   legitimately move the body up to a cell's width in one tick, and the fuzzer's own definition of
+   "legitimate" was simply incomplete. This alone does not touch `sim/body` and is not a design decision.
+2. **A `sim/body` question that IS one.** Even with the test oracle corrected, the underlying fact remains:
+   dig can leave jagged, sub-cell-scale solid fragments (a partial-height column excavated at one moment,
+   later straddled by a body whose OWN footprint has since shifted) that a hand-generated chamber never
+   produces, and `_resolve_horizontal`'s per-cell depenetration was never exercised against geometry that
+   irregular before. Whether the right fix is bounding depenetration's own per-tick distance, changing how
+   `_handle_dig` shapes what it excavates so it can't leave these fragments, or something else, is a design
+   decision about collision correctness in the project's own documented highest-risk module — not decided
+   here, per the director's explicit instruction to stop rather than pick one.
+
+**Not yet done:** the other 3 violations (seed=497 ticks 1022/1323, seed=507 tick=1304) were not each
+individually instrumented to the same depth — tick=1323's `dy=0` (a purely horizontal jump, body not
+airborne) is worth checking against the same or a different mechanism before generalizing this one
+instance's diagnosis to all four. `embedded` (187 vs. bound 1) and `grounded_no_floor` (95 vs. bound 32)
+were not traced at all yet; plausible they share this same root geometry (a body encountering dig-jagged
+fragments), not confirmed.
+
+Reverse: N/A — diagnosis only, no code changed by this entry.
