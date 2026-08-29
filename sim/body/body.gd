@@ -221,7 +221,7 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 
 	_integrate_horizontal(input)
 	pos_x += vel_x / TICK_HZ
-	_resolve_horizontal(grid, input)
+	HorizontalResolve.resolve(self, grid, input)
 
 	_integrate_vertical()
 	VerticalResolve.move_and_resolve(self, grid)
@@ -281,92 +281,6 @@ func _handle_jump(input: InputFrame) -> void:
 	elif vel_y < 0 and _was_jump_held and not input.jump_held:
 		vel_y = (vel_y * JUMP_CUT_MULT_NUM) / JUMP_CUT_MULT_DEN
 	_was_jump_held = input.jump_held
-
-
-## Auto step-up (1 tile) and mantle (2 tiles): raise the body by `lift` if the space it would occupy at
-## that height is clear. Both call this identically -- the only difference is which caller allows a
-## larger `lift` and under what input condition, per docs/ARCHITECTURE.md §9.
-## D0055: refuses a lift crossing row 0, BEFORE moving -- correcting after alone left the body
-## oscillating forever (measured: 258 ticks); falls through to the normal stop path instead.
-func _try_step(grid: TileGrid, lift: int) -> bool:
-	if _top_y() - lift < 0:
-		return false
-	if _box_blocked(grid, _left_x(), _top_y() - lift, _right_x(), _bottom_y() - lift):
-		return false
-	pos_y -= lift
-	on_floor = true
-	floor_source_this_tick = &"try_step"
-	vel_y = 0
-	return true
-
-
-## Iterates every blocked cell the body's own box overlaps and resolves each one via
-## `_resolve_horizontal_cell` -- the classification/step/mantle/depenetration logic itself now lives
-## there (extracted 2026-08-28, `docs/DECISIONS_LEDGER.md` D0100, to bring this function's own
-## cyclomatic complexity down from 24; a pure Extract Method, no logic reordered or changed).
-func _resolve_horizontal(grid: TileGrid, input: InputFrame) -> void:
-	var moving_right: bool = vel_x > 0
-	var lo: Vector2i = Vector2i(_px_to_cell(_left_x()), _px_to_cell(_top_y()))
-	var hi: Vector2i = Vector2i(_px_to_cell(_right_x() - 1), _px_to_cell(_bottom_y() - 1))
-	for cy: int in range(lo.y, hi.y + 1):
-		for cx: int in range(lo.x, hi.x + 1):
-			_resolve_horizontal_cell(grid, input, moving_right, cx, cy)
-
-
-## Ledge-vs-ceiling classifier: shallower in Y than in X, AND the blocking cell's centre is BELOW the
-## body's centre, means the body is clipping the TOP of a block under it -- a ledge to land on, not a
-## wall. The identical overlap shape with the cell ABOVE the body's centre is a ceiling clip, which is
-## NOT exempted -- `legacy/scenes/player.gd`'s own fixed bug (docs/ARCHITECTURE.md §9's design lineage)
-## was this classifier missing the second half of that comparison.
-##
-## The per-cell body of `_resolve_horizontal`, extracted 2026-08-28 (D0100) -- every `continue` in the
-## original doubly-nested loop becomes a `return` here, which is behaviorally identical since this is
-## called once per (cx, cy) with nothing after the call.
-func _resolve_horizontal_cell(grid: TileGrid, input: InputFrame, moving_right: bool, cx: int, cy: int) -> void:
-	var cell := Vector2i(cx, cy)
-	if not _blocked(grid, cell):
-		return
-	var cell_left: int = cx * CELL_PX * Fx.SCALE
-	var cell_top: int = cy * CELL_PX * Fx.SCALE
-	var cell_right: int = cell_left + CELL_PX * Fx.SCALE
-	var cell_bottom: int = cell_top + CELL_PX * Fx.SCALE
-	var left: int = _left_x(); var right: int = _right_x()
-	var top: int = _top_y(); var bottom: int = _bottom_y()
-	if left >= cell_right or right <= cell_left or top >= cell_bottom or bottom <= cell_top:
-		return
-	var ov_x: int = mini(right, cell_right) - maxi(left, cell_left)
-	var ov_y: int = mini(bottom, cell_bottom) - maxi(top, cell_top)
-	if ov_x > ov_y and (cell_top + cell_bottom) / 2 > pos_y:
-		return  # a ledge beneath the body -- the vertical resolve lands it, not a wall
-	var lift: int = bottom - cell_top
-	# D0059: a real ledge has more solid material continuing forward; an isolated single-cell
-	# obstruction (HostileChamber.JUMP_CORNER) does not -- stepping/mantling onto one anyway
-	# leaves nothing supporting most of the body's width, and `on_floor` reverts the same tick.
-	var extends_forward: bool = _blocked(grid, Vector2i(cx + (1 if moving_right else -1), cy))
-	if _try_climb(grid, input, extends_forward, lift):
-		return
-	pos_x += (cell_left - right) if moving_right else (cell_right - left)
-	depenetrated_this_tick = true
-	vel_x = 0
-
-
-## Attempts to climb over `lift`: step-up first (smaller, no input gate), then mantle (larger, requires
-## `input.mantle_hold`), falling back to flagging `edge_caught_this_tick` if step-up's own conditions
-## held but head clearance refused it. Extracted 2026-08-28 (D0100) from `_resolve_horizontal_cell`, a
-## pure Extract Method -- returns true iff a climb succeeded (caller should stop, this cell is
-## resolved), false otherwise (caller falls through to depenetration), exactly mirroring the original
-## `continue` (now `return true`) vs fall-through (now `return false`) control flow.
-func _try_climb(grid: TileGrid, input: InputFrame, extends_forward: bool, lift: int) -> bool:
-	if extends_forward and vel_x != 0 and lift <= STEP_UP_PX * Fx.SCALE and _try_step(grid, lift):
-		stepped_up_this_tick = true
-		return true
-	if extends_forward and vel_x != 0 and lift <= MANTLE_PX * Fx.SCALE and input.mantle_hold and _try_step(grid, lift):
-		mantled_this_tick = true
-		return true
-	if extends_forward and vel_x != 0 and lift <= STEP_UP_PX * Fx.SCALE:
-		edge_caught_this_tick = true  # should have been walkable; head clearance refused it
-	return false
-
 
 
 ## World boundary, not terrain (D0055) -- called last in `tick()`, reports (D0052) BEFORE correcting.

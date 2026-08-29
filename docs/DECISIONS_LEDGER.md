@@ -5217,3 +5217,48 @@ DOWN after that defect is fixed — this is explicitly left open, not pre-decide
 
 Reverse: not applicable — corrective annotation to the historical record, per the append-only ledger
 convention. D0128 itself remains unedited.
+
+## D0136 · 2026-08-29 · `sim/body/body.gd`'s horizontal collision resolver extracted to `horizontal_resolve.gd`, mirroring the existing vertical split — headroom for the resolve_floor diagnosis, no logic changed
+
+Prerequisite for the `resolve_floor` diagnosis this entry's own next work opens: `sim/body/body.gd` was at
+399/400 lines (`check_size_limits.py`'s `FILE_LIMIT`), one line of headroom, and the diagnosis needs to add
+instrumentation near `resolve_floor`'s own call site without fighting that gate mid-investigation. Done as
+its own commit, before the diagnosis touches anything near it, per explicit instruction.
+
+**A pure Extract Class, no logic reordered or changed.** `body.gd` already delegates the VERTICAL axis to
+`vertical_resolve.gd` (`VerticalResolve.move_and_resolve(self, grid)`, called from `tick()`); the HORIZONTAL
+axis's own four functions (`_resolve_horizontal`, `_resolve_horizontal_cell`, `_try_climb`, `_try_step`) had
+stayed inline in `body.gd` since D0100's own extraction only pulled them out of one one another, not out of
+the file. `sim/body/horizontal_resolve.gd` (new, `class_name HorizontalResolve`) now holds all four as
+`static func`s taking `body: Body` explicitly — the exact same pattern `vertical_resolve.gd` already uses
+(`body._left_x()`/`body._box_blocked(...)` called from outside `Body`; GDScript's underscore convention is
+a naming convention, not enforced access control, so this is mechanical, not a new kind of coupling).
+`body.gd`'s own `tick()` now calls `HorizontalResolve.resolve(self, grid, input)` in place of the old
+`_resolve_horizontal(grid, input)` call.
+
+**One direct external call site needed updating, found by grepping every reference before touching
+anything:** `tests/test_body.gd::_test_ceiling_is_not_treated_as_a_step_up_ledge()` called
+`body._resolve_horizontal(grid, walk)` directly (driving the resolver deterministically rather than via a
+multi-tick walk) — updated to `HorizontalResolve.resolve(body, grid, walk)`, the same call shape this
+session's own `tests/control_plane/test_observation_builder.gd` and `tests/test_floor_source_telemetry.gd`
+already use for `VerticalResolve`'s own functions. `sim/invariants/invariants.gd`'s own comment citing
+`body.gd::_try_step` updated to `horizontal_resolve.gd::_try_step` for accuracy — a stale qualified-path
+reference is exactly the kind of small correctness rot this project's own comment-provenance findings warn
+about, worth fixing while touching the area rather than leaving it to go stale further.
+
+**Verified behavior-preserving, not assumed.** Every body-collision-adjacent suite re-run and green:
+`test_body`, `test_body_acceptance` (golden `traverse_time` still exactly 225 ticks — byte-identical, not
+just passing), `test_bounds_invariant`, `test_cave_geometry`, `test_hostile_chamber`, `test_reachability_
+sweep`, `test_floor_source_telemetry`, `test_body_fuzz_fast`, `test_body_fuzz_regression_d0122` (same
+67,119-violation total at this seed/tick range), `test_replay_determinism`. **Mutation-tested per the
+standing rule**, on the extraction itself, not just the code it carries: forced `HorizontalResolve.resolve`
+into a no-op (`return` as its first statement) and confirmed `test_bounds_invariant` and `test_body_
+acceptance` both failed for real reasons (a body that never settles, a traverse time that never completes)
+— proving the new call site is genuinely load-bearing in `tick()`'s own path, not orphaned. Reverted;
+`git diff` showed zero change afterward.
+
+**Result:** `sim/body/body.gd` now 313 lines (down from 399 — 86 lines lighter), `sim/body/
+horizontal_resolve.gd` 98 lines. Real headroom restored before the diagnosis needs it, not a token amount.
+
+Reverse: cheap. Fold the four functions back into `body.gd` verbatim, restore the two call-site edits;
+behaviorally identical either way, confirmed by the same test suite.

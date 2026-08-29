@@ -123,7 +123,7 @@ class BoundsViolation:
 ## `grid_max_y`), not a `TileGrid` plus a cell size, for the same reason `check_floor_selection`'s
 ## callers hand over their own constants: this module has no reason to know `sim/body`'s pixel
 ## scale or `Heightfield`'s cell size, only the box comparison itself. Found live, not by design
-## review: a chained auto-step-up/mantle (`body.gd::_try_step`, no bound of its own) launched a real
+## review: a chained auto-step-up/mantle (`horizontal_resolve.gd::_try_step`, no bound of its own) launched a real
 ## `--play` session's body to y=-15.85px, well above row 0 -- `docs/DECISIONS_LEDGER.md` has the
 ## full root-cause trace. This is the diagnostic half of that fix: `body.gd` now also clamps the
 ## body back inside the grid every tick (the actual fix), and this check exists so a FUTURE

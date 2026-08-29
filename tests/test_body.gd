@@ -173,7 +173,7 @@ func _test_ceiling_is_not_treated_as_a_step_up_ledge() -> void:
 	var walk: InputFrame = InputFrame.new()
 	walk.move_dir = 1
 	var before_right: int = body._right_x()
-	body._resolve_horizontal(grid, walk)
+	HorizontalResolve.resolve(body, grid, walk)
 	var ceiling_left: int = Fx.from_int(12 * CELL)
 	_check(body._right_x() <= ceiling_left,
 		"a 1px-shallow overlap with a block ABOVE the body's centre still blocks horizontal movement " +
