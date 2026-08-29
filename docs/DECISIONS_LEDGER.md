@@ -4988,3 +4988,49 @@ independently.
 
 Reverse: cheap. Delete the two new files and the `wrap.md` step additions; the manual-vigilance status
 quo (the failure mode this closes) returns.
+
+## D0131 · 2026-08-29 · D0115's masking pattern swept across every subprocess-invoking test — two more instances found, one confirmed by an external audit
+
+An external Codex audit of the D0122/D0125-D0128 dig fix, requested by the director, confirmed the fix
+itself (no counterexample found to the water-mark rule, resolver untouched, regression fixture fails
+pre-fix and passes post-fix) but found the D0115 masking pattern (`docs/DECISIONS_LEDGER.md` D0115/D0116)
+still live in two places: `tests/test_bounds_invariant.gd`'s and `tests/test_cave_geometry.gd`'s own
+subprocess wrappers accept `exit_code == 0` and a passing occurrence-count without ever checking the
+probe's captured output for a `SCRIPT ERROR:` line — the exact gap D0117 closed for the fuzz wrappers
+(`test_body_fuzz.gd`, `test_body_fuzz_fast.gd`, `test_body_fuzz_regression_d0122.gd`) but never generalized.
+Director's instruction: treat Codex's two as a lower bound, not the full count, and sweep every remaining
+subprocess-invoking test.
+
+**The sweep.** `grep -rln "OS.execute\|OS.create_process" --include="*.gd" .` across the whole repo found
+seven `tests/*.gd` files that reference the pattern; one (`fixture_div_by_zero_probe.gd`) only mentions it
+in a comment (it is a probe, not an invoker). Of the six real invokers, three already carried the guard
+(the fuzz wrappers above) and three did not: Codex's two, plus a third this sweep found on its own —
+`tests/test_fixed_point.gd::_test_div_by_zero_logs_via_push_error()`, which checks only that the probe's
+output *contains* `Fx.div`'s exact push_error text, never that it is free of an unrelated `SCRIPT ERROR:`
+elsewhere in the same tiny script. `legacy/tools/check_shared_constants.gd` and
+`legacy/tools/check_hash_mixing.gd` also match the grep but are confirmed pre-pivot, non-CI-exercised code
+(`legacy/README.md`) — out of scope, not fixed.
+
+**The fix**, same shape in all three: immediately after building `combined` from the subprocess's captured
+output, `_check(not combined.contains("SCRIPT ERROR:"), ...)` before any occurrence-count or contains-text
+assertion runs — matching `test_body_fuzz.gd`'s own established pattern and citing the same D0117 finding.
+
+**Mutation-tested per the standing rule, all three, before trusting any of them.** For each fixed test, its
+own probe (`fixture_bounds_pressure_probe.gd`, `fixture_settle_violation_probe.gd`,
+`fixture_div_by_zero_probe.gd`) was temporarily given a called-function crash (`fixture_harness_crash_probe
+.gd`'s own established out-of-bounds-array technique — unwinds only the crashing function, exit code stays
+0, no hang) placed AFTER the probe's real expected behavior, so the pre-existing occurrence-count/contains
+checks would still see their expected value and PASS. In all three cases: exit code stayed 0, the old
+check still printed PASS, and the new SCRIPT ERROR guard was the only assertion that caught the injected
+crash — confirming it is load-bearing, not decorative. All three probes reverted to their exact prior
+state after (`git diff --stat` showed only the three intended wrapper files changed, zero probe diff).
+
+**What this does not close.** The audit's other two findings are handled separately, not here: the ledger
+overclaim corrections (`grounded_no_floor`'s "all N are the D0059 mechanism" and D0128's hardening of
+D0127's hedged bounds attribution) and the grounding-path telemetry gap are their own entries, not folded
+into this one, since this entry's subject is specifically the masking-pattern sweep the director asked to
+land first.
+
+Reverse: cheap. Delete the three `_check(not combined.contains("SCRIPT ERROR:"), ...)` insertions; the
+masking gap these three tests carried returns, exactly as it was before this session's own D0117 fix left
+it un-generalized.

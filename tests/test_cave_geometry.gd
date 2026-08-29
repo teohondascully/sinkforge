@@ -171,6 +171,11 @@ func _test_a_real_settle_rate_limits_the_guard_to_one_report() -> void:
 		output, true)
 	_check(exit_code == 0, "the probe subprocess itself exits cleanly (got %d)" % exit_code)
 	var combined: String = "\n".join(output)
+	# D0115/D0117: exit_code==0 is not enough on its own -- a mid-run SCRIPT ERROR could abort the
+	# 400-tick settle early, before or after the one report this test expects, and still land the
+	# count on exactly 1 by coincidence rather than by the rate-limit actually holding.
+	_check(not combined.contains("SCRIPT ERROR:"),
+		"the probe's own output contains no SCRIPT ERROR (docs/DECISIONS_LEDGER.md D0117)")
 	var occurrences: int = combined.count("ambiguous floor selection")
 	_check(occurrences == 1,
 		"a 400-tick settle on the ambiguous shelf logs the violation exactly ONCE, not once per tick -- got %d occurrences in the probe's own stderr (captured output: %s)" %

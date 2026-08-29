@@ -149,6 +149,11 @@ func _test_sustained_pressure_against_a_boundary_reports_exactly_once() -> void:
 		output, true)
 	_check(exit_code == 0, "the probe subprocess itself exits cleanly (got %d)" % exit_code)
 	var combined: String = "\n".join(output)
+	# D0115/D0117: exit_code==0 is not enough on its own -- a mid-run SCRIPT ERROR could abort the
+	# 200-tick pressure loop early, before it ever reaches the one occurrence this test expects, and
+	# a subsequent unrelated occurrence could still land the count on exactly 1 by coincidence.
+	_check(not combined.contains("SCRIPT ERROR:"),
+		"the probe's own output contains no SCRIPT ERROR (docs/DECISIONS_LEDGER.md D0117)")
 	var occurrences: int = combined.count("left the world")
 	_check(occurrences == 1,
 		"200 ticks of continuous leftward pressure against column 0 logs the violation exactly ONCE, not once per tick -- got %d occurrences (captured output: %s)" %

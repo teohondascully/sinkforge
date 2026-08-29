@@ -91,6 +91,11 @@ func _test_div_by_zero_logs_via_push_error() -> void:
 		output, true)
 	_check(exit_code == 0, "the probe subprocess itself exits cleanly (got %d)" % exit_code)
 	var combined: String = "\n".join(output)
+	# D0115/D0117: exit_code==0 plus the expected message present are not enough on their own -- a
+	# SCRIPT ERROR elsewhere in the probe after push_error() already ran would still leave this specific
+	# text in the output, silently masking an unrelated crash in the same tiny script.
+	_check(not combined.contains("SCRIPT ERROR:"),
+		"the probe's own output contains no SCRIPT ERROR (docs/DECISIONS_LEDGER.md D0117)")
 	_check(combined.contains("Fx.div: division by zero"),
 		"the probe's own stderr contains Fx.div's exact push_error message -- proves push_error actually ran, not just that div() returned 0 (captured output: %s)" %
 		combined)
