@@ -270,13 +270,28 @@ def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str]) -> tuple[st
         if not NEEDS_ENGINE_RE.search(s["run"]) and s["run"]:
             local = run_locally(s["run"])
 
-        ci_pass = ci_conclusion == "success" if ci_conclusion is not None else None
+        # "skipped"/"cancelled" mean GitHub Actions never ran this step -- almost always because an
+        # EARLIER step in the same job already failed and halted it. That is UNKNOWN, not FAIL: reporting
+        # every downstream step as failed because one upstream gate broke would itself be a false claim,
+        # the exact class this tool exists to prevent. Only "failure"/"timed_out" (the step ran and lost)
+        # count as a real fail; "success" is the only pass.
+        if ci_conclusion in ("skipped", "cancelled"):
+            ci_pass = None
+        elif ci_conclusion is not None:
+            ci_pass = ci_conclusion == "success"
+        else:
+            ci_pass = None
         local_pass = local == "PASS" if local is not None else None
 
         if ci_pass is not None and local_pass is not None and ci_pass != local_pass:
             details.append(
                 "%s: DISAGREE -- CI=%s, local=%s (likely a dirty working tree, not a CI regression)"
                 % (s["name"][:60], ci_conclusion, local)
+            )
+        elif ci_conclusion in ("skipped", "cancelled"):
+            details.append(
+                "%s: CI=%s (an earlier step in this job already failed)%s"
+                % (s["name"][:60], ci_conclusion, (", local=%s" % local) if local else "")
             )
         elif ci_conclusion is not None:
             details.append("%s: CI=%s%s" % (s["name"][:60], ci_conclusion, (", local=%s" % local) if local else ""))

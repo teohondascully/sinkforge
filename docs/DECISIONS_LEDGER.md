@@ -5679,3 +5679,37 @@ gate can still PASS under a healthy ratio; it does not merely always fail now.
 
 Reverse: restore `GAME_LOC_ADVISORY_FLOOR = 2000` and the branch that checked it. `docs/QUALITY.md`'s
 pointer to `tools/gate_status.py` (D0143) is unaffected either way.
+
+---
+
+## D0145 · 2026-08-29 · `gate_status.py` was conflating GitHub's "skipped" with "failed" — found by running it against the real red it was built to report on
+
+Discovered immediately after arming the LOC gate (D0144) and pushing: GitHub Actions skips every
+downstream step in a job once an earlier step in that same job fails, and reports those skipped steps'
+`conclusion` as `"skipped"`, not `"success"`. `gate_status.py`'s own `resolve_status` computed
+`ci_pass = (conclusion == "success")`, so `"skipped"` produced `ci_pass = False` — identical to a real
+failure. Feeding it the actual CI run at commit `6734e21` (red on gate 7 alone, per Item 1's own `gh run
+view` — every step after the LOC check in the `gates` job legitimately never ran) produced gates 1, 7, 13,
+15, 16, 22, 23, and 27 all showing FAIL, when only gate 7 had actually failed; seven of those eight never
+ran at all this round.
+
+This is the exact failure this tool exists to prevent, committed by the tool itself before its first real
+report — a table that cannot omit a failing gate is worthless if it also cannot distinguish "failed" from
+"never ran," since the false-FAIL rows would have told the director eight things were broken when one was.
+
+Fixed: `"skipped"`/`"cancelled"` now resolve to `ci_pass = None` (unknown from CI), reported as its own
+explicit annotation ("an earlier step in this job already failed") rather than folded into either PASS or
+FAIL, with `effective_pass` falling back to this same run's local re-execution to fill the gap. Re-run
+against the identical CI data: gate 7 is the only numbered-gate FAIL and the unnumbered-steps section's
+`unlinked_fail` list is empty — both correct, and both verified against `gh run view`'s own step-by-step
+output for that exact run before trusting the corrected table.
+
+One thing the correction surfaced as a genuine, accurate result rather than a bug: gates 1 and 27 still
+show FAIL after the fix, correctly — CI's own conclusion for the shared "File and function size limits"
+step is `success` (D0139's uncommitted 59-line fix never reached the pushed commit), while THIS session's
+local execution fails on it (the uncommitted fix sitting in the working tree right now), and the tool's
+own DISAGREE branch reports exactly that: "CI=success, local=FAIL... likely a dirty working tree, not a CI
+regression." That is real, known, D0139-attributable state, not a new defect.
+
+Reverse: revert the `ci_conclusion in ("skipped", "cancelled")` branches in `resolve_status`, restoring
+the earlier (wrong) two-state success/not-success read.
