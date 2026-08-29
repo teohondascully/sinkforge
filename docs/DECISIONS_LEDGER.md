@@ -5328,3 +5328,65 @@ description of exactly what `resolve_floor` is doing, not a guess.
 
 Reverse: cheap. Delete `tests/diag_resolve_floor.gd`; nothing else references it, and it changed nothing
 in `sim/`.
+
+## D0138 · 2026-08-29 · the literal NO_FLOOR-exclusion fix was PROVEN to be a mathematical no-op — reverted, nothing shipped, per the director's own explicit hard stop
+
+Director's ruling on D0137: fix the sentinel at its source — exclude `Heightfield.NO_FLOOR` samples before
+taking `resolve_floor`'s own minimum, so only when EVERY sample is `NO_FLOOR` does the query report "no
+floor." Acceptance signal: the full sweep's `grounded_no_floor` count should drop, ideally toward or below
+the pre-dig baseline of 32. Explicit hard stop if it does not: "the fix didn't address the mechanism and
+something is wrong with my reasoning or yours — stop and report."
+
+**Implemented exactly as specified.** `VerticalResolve._min_real_surface(s_left, s_right, s_center)`:
+collects the non-`NO_FLOOR` samples into a list, returns their minimum, or `NO_FLOOR` itself if the list is
+empty (all three were `NO_FLOOR`). `resolve_floor` calls this instead of the bare
+`mini(mini(s_left, s_right), s_center)`. Four unit tests (`tests/test_vertical_resolve.gd`, since deleted —
+see Reverse below) proved its own stated contract: real samples pick the minimum, `NO_FLOOR` samples in any
+position are excluded, all-`NO_FLOOR` returns `NO_FLOOR`.
+
+**Mutation-tested per the standing rule — and the mutation test itself is what caught this before the full
+sweep did.** Reverted `_min_real_surface` to a bare `mini(mini(s_left, s_right), s_center)` (the pre-fix
+formula) and re-ran the four unit tests: **all four still passed.** No test — not because the tests were
+weak, but because NO SUCH TEST CAN EXIST — distinguishes the two formulations. This is not an empirical
+observation from one run; it is a mathematical certainty: `Heightfield.NO_FLOOR` (`2147483647`, i32 max) is
+guaranteed larger than any real surface height this game can produce (`docs/ARCHITECTURE.md` §9's stated
+depth budget, 4096px, times `Fx.SCALE`, is nowhere near i32 max). A value that is already guaranteed to
+lose every `mini()` comparison it participates in changes nothing when it is additionally excluded from
+participating — the two formulations are provably identical for every possible input, not merely for the
+inputs this project's fuzzer happens to sample.
+
+**Confirmed against the real acceptance signal anyway, per explicit instruction not to skip the empirical
+step even with a proof in hand.** Golden `traverse_time` unchanged (225 ticks, byte-identical).
+`test_replay_determinism` unchanged (200/200 distinct checkpoint hashes, first mismatch -1). The D0122
+regression fixture's own 747,000-tick prefix: `violations=67119`, IDENTICAL to the pre-fix number. **The
+full 1000x1500 sweep: `grounded_no_floor=59`, `bounds=805397`, `embedded=0`, `overflow=0`,
+`discontinuity=0`, `deadlock=0` — every single metric byte-identical to the pre-fix baseline the Codex
+audit itself measured.** Not "didn't drop as much as hoped" — literally unchanged, exactly as the
+mutation-test proof predicted before the sweep ever ran.
+
+**This is the explicit hard stop, honored: nothing shipped.** `sim/body/vertical_resolve.gd` reverted to
+its exact pre-attempt state (`git checkout --`); `tests/test_vertical_resolve.gd` deleted (nothing else
+referenced it). Working tree confirmed clean against `HEAD` afterward. The director's own instruction —
+"do not propose or make any fix... beyond the floor-sample selection... stop and report" — is honored by
+reporting this as a dead end, not by silently pivoting to a different, broader fix on this session's own
+authority.
+
+**Why the literal fix couldn't work, restated for whoever reconsiders this: excluding `NO_FLOOR` from a
+`min()` computation only changes behavior for inputs where `NO_FLOOR` would otherwise have WON the
+comparison — and it can never win, being the largest representable value.** The real defect D0137 diagnosed
+is not that `NO_FLOOR` is mis-ranked; it is that `resolve_floor` treats "at least one of three samples
+found real ground" as sufficient evidence that the WHOLE footprint is supported. A fix that would actually
+change behavior has to change THAT criterion, not the tie-breaking arithmetic among samples that already
+never tie the way this fix assumed. Candidates, offered here for the director's own ruling, not decided or
+built:
+- Require ALL THREE samples real for `resolve_floor` to succeed at all; any single `NO_FLOOR` defers
+  entirely to `grid_floor_backstop` (the mechanism `move_and_resolve`'s own `or` already exists to catch
+  exactly this case, currently starved of the chance to run in 84/91 of the population).
+- Check full-footprint grid-solidity at the chosen landing row inline, mirroring
+  `grounded_implies_solid_beneath`'s own predicate, before `resolve_floor` is allowed to succeed.
+- Something else the director sees that this session has not considered.
+
+Each is a real, different behavior change to the highest-risk code in the module, and per the director's
+own explicit boundary this entry does not choose among them.
+
+Reverse: already executed — this entry documents a revert already done, not one still owed.
