@@ -5130,3 +5130,56 @@ should read this entry alongside them before repeating either claim.
 Reverse: not applicable — this is a corrective annotation to the historical record, appended per the
 project's own append-only ledger convention; nothing to revert but the two Anvil FINDING files themselves,
 which are immutable by the same convention.
+
+## D0134 · 2026-08-29 · THE CONTROL PLANE's canonical obs/action types, simulated inside `tests/` per the director's ruling — policies not wired yet, per the brief's own §9 gate
+
+Response to THE CONTROL PLANE brief's §9: the foundation gap this session's own reading of the brief
+flagged (`interface/` and `sim/commands` do not exist; the brief never said whether the minimal slice
+builds on the unpoliced `tests/` ground the current path already uses, or absorbs a minimal `interface/`
+first) got a director's ruling — build on `tests/`, label it explicitly as SIMULATING Boundary A, not
+honoring it in the real layer; do not absorb `interface/` into this slice, that is a separate later task
+against `docs/ARCHITECTURE.md`'s own existing plan. This entry is that first piece: the canonical obs/
+action types themselves, nothing wired to a Policy yet — the brief's own explicit rule ("do not begin the
+refactor until I have replied") plus this round's own explicit instruction ("I want to see the canonical
+obs/action types before the policies are wired — show me those first") both gate stopping exactly here.
+
+**`tests/control_plane/`, five new files, all labeled in their own header comments as simulating Boundary
+A, not the real thing:**
+- `canonical_observation.gd` — the type a Policy actually receives: body kinematics (pos/vel/on_floor/
+  facing, always fully known — proprioception, not vision) plus `visible_cells` (`Vector2i -> {solid,
+  material}`), scoped by whichever envelope produced it, plus the envelope's own name for provenance.
+- `canonical_action.gd` — RAW level only (`docs/ARCHITECTURE.md` §5's Semantic level — `goto`/`mine`/
+  `place`/`haul_to` — needs a harness-level translator that does not exist yet; out of scope until the
+  Raw-level seam itself is proven). `to_input_frame()` is the one place this becomes something `sim/body`
+  understands, kept OUT of `sim/body` itself (which must stay engine/interface-agnostic).
+- `observation_spec.gd` — names ORACLE (perfect info, unrestricted by design — a baseline comparison
+  point, not a leak) or CONSTRAINED (fogged; a Chebyshev radius around the body's own cell for THIS
+  slice's first concrete, testable rule — dig-based discoverability is a real refinement for whichever
+  later task promotes this into `interface/` proper, not built now). LANGUAGE is explicitly deferred per
+  ARCHITECTURE §5's own "never in CI" — an envelope with nothing to exercise it automatically would be an
+  unexercised stub, this project's own "gate that runs nowhere" finding.
+- `observation_builder.gd` — a PURE function of `(body, grid, spec)`, no policy argument (S4's own
+  explicit requirement: fairness/anti-cheat live in ONE shared place, not duplicated per-policy the way
+  `tests/body/scripted_traverse.gd`'s existing oracle policy reads `Body`/`TileGrid` and privileged
+  `HostileChamber` constants directly today). CONSTRAINED reads `grid.is_solid()`/`get_material()` ONLY
+  inside its own declared radius — never scans the full grid and filters after, which would still have
+  read the subject before the caveat applied, the exact shape D0109's anti-cheat contract forbids.
+- `test_observation_builder.gd` — proves the anti-cheat property directly: a cell outside a radius-3
+  CONSTRAINED observation is ABSENT (not merely marked unsolid), a radius-3 box away from any grid edge is
+  exactly 49 cells, ORACLE sees every cell of a known-size grid, and a `CanonicalAction` round-trips every
+  field through `to_input_frame()` unchanged.
+
+**Mutation-tested per the standing rule.** Forced the CONSTRAINED branch to take ORACLE's own unconditional
+full-grid scan (`if spec.envelope == ObservationSpec.ORACLE:` → `if true:`): the anti-cheat test and the
+cell-count test both failed correctly (`got 1600` instead of `49` for a 40x40 grid), confirming the guard
+is load-bearing, not decorative. Reverted; `git diff` shows zero change to the file afterward.
+
+**What this is NOT, stated here so nobody reads it as more than it is:** no `Policy` interface, no
+`Adapter`, no `Episode Log`, no `Goal`, no `Scorer` — none of THE CONTROL PLANE's other five roles are
+touched. `tests/body/play_scene.gd`/`scripted_traverse.gd` are untouched and still drive the real scene
+directly; nothing currently calls `ObservationBuilder` from anywhere outside its own test. This is
+deliberately the minimum that answers "show me the canonical types" and nothing past it — wiring three
+policies against this shape is the next piece, still gated on the director's own review of this entry.
+
+Reverse: cheap and total. Delete `tests/control_plane/` and its own new CI step; nothing else in the repo
+references it yet.

@@ -270,6 +270,9 @@ jobs:
       - name: test_floor_source_telemetry (grounding-path telemetry, D0132)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_floor_source_telemetry.gd
 
+      - name: test_observation_builder (THE CONTROL PLANE's canonical obs/action slice, simulating Boundary A, D0134)
+        run: bash tools/run_gd_test.sh ./godot res://tests/control_plane/test_observation_builder.gd
+
   # D0060: the deep companion to test_body_fuzz_fast above -- the full 1000-seed x 1500-tick sweep
   # (~114s measured), which is why it runs nightly rather than on every push/PR. Only fires on the
   # `schedule` trigger declared above; push/PR events skip this job entirely. Duplicates the Godot
