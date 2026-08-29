@@ -6874,3 +6874,16 @@ plainly, not newly introduced here.
 **Reverse cost:** CHEAP — delete `tools/check_corrections_freshness.py`, revert the `harness.yml` step,
 the `docs/QUALITY.md` gate-30 entry, and `docs/CORRECTIONS.md`'s one added sentence. No code outside these
 four files touched.
+
+## D0176 · QUALITY.md gate 3 documents `.py` size is not gated, and why — no code widened (queue #3 Part M1) · 2026-08-29
+
+**Applying the standing ruling from D0161** (queue #2 Part E), not re-deciding it: `check_size_limits.py`
+scans `.gd` files only and always has; widening it to `.py` is a real scope-expansion decision (which
+Python files start failing a gate that has never applied to them, whether test code needs a different
+fence per D0106's own established split) explicitly left for a dedicated future item there. This queue's
+own M1 instruction was to write that ruling into the normative doc itself rather than leave it findable
+only inside D0161's own entry — gate 3 (`docs/QUALITY.md`) now states the `.gd`-only scope and the
+scope-expansion reasoning directly, one addition, same citation style gate 7 already uses for D0147's
+"director's ruling" note. No script touched; `check_size_limits.py` unchanged.
+
+**Reverse cost:** revert the one addition to `docs/QUALITY.md` gate 3.

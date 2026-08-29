@@ -33,7 +33,12 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
 
 1. **Layer lint.** The dependency rules in `docs/ARCHITECTURE.md` §3 hold. Zero violations. Custom check in `tools/layer_lint`.
 2. **No engine imports in `core/` or `sim/`.** Grep-level, hard fail.
-3. **File size.** No file over 400 lines. Warn at 300.
+3. **File size.** No file over 400 lines. Warn at 300. **`.gd` only — `tools/layer_lint/check_size_limits.py`
+   has never scanned Python at any point in its history** (`docs/DECISIONS_LEDGER.md` D0161: found while
+   answering a queue item that assumed otherwise). Not extended to `.py` here — doing so is a real
+   scope-expansion decision (which Python files start failing a gate that's never gated them, whether test
+   code gets a different fence per D0106) deliberately left for a dedicated future item, not decided as a
+   side effect of documenting the gap.
 4. **Function size.** No function over 50 lines. Cyclomatic complexity ≤ 10.
 5. **No global singletons.** No autoloads in `sim/`.
 6. **`MODULE.md` present and current** in every module directory.
