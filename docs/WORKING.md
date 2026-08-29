@@ -8,6 +8,60 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## PRE-COMPACTION CHECKPOINT — external audit response, Phase 1 (Tier 1) COMPLETE, awaiting the director's ruling on item 3, 2026-08-29
+
+**Context a fresh session needs:** an independent cold-read audit (fresh model, no project history) found
+the enforcement layer itself was lying — `BRIEF.md` said all gates passed at a commit where CI was
+actually red, and the LOC-ratio gate had never once been able to fail. The director issued a three-item
+Phase 1 ("stop the lie"), each its own commit, each verified against tool output before being reported.
+All three are DONE and PUSHED. Do not redo any of them. Do not start Phase 2/Tier 2 — the director's
+closing instruction was explicit: "Then stop and wait for the director's ruling on item 3 before Phase 2."
+
+**Commits this round, in order** (`b71d6e9..c82c269`, all pushed to `origin/main`):
+- `c9457f5` — `tools/gate_status.py` built (D0143): enumerates `docs/QUALITY.md`'s 29 gates and
+  `.github/workflows/harness.yml`'s steps programmatically (no hand list), three link tiers, reproduces
+  an independent audit's own hand-derived split exactly (18/29 gates have code, 11 do not:
+  `5, 6, 9, 10, 12, 14, 17, 18, 19, 20, 21`). Mutation-tested against the real historical red run at
+  `8f6d540`, not a synthetic break.
+- `d9b3020` — `wrap.md` step 7, `QUALITY.md`'s gate-list intro, and `BRIEF.md`'s Gates section all point at
+  `tools/gate_status.py` now instead of hand-enumerating.
+- `6734e21` — the LOC-ratio gate armed (D0144): `check_loc_ratio.py`'s `GAME_LOC_ADVISORY_FLOOR=2000` (a
+  permanent off switch — game LOC has never exceeded 1665) deleted, not raised or narrowed. Runs red
+  immediately: instrument +560 lines vs game's +28 over 10 commits. **This is the CURRENT, LIVE, INTENDED
+  CI state — `origin/main`'s `gates` job is red on gate 7 alone, on purpose, per the director's own
+  explicit instruction not to suppress this.** A fresh session must not "fix" this without a ruling.
+- `c82c269` — `gate_status.py` fixed (D0145): it was conflating GitHub's `"skipped"` step conclusion
+  (every step after gate 7 in the same CI job never ran) with `"failed"`, which would have shown 7 gates
+  broken instead of 1. Found by running the tool against the real red it exists to report, before ever
+  reporting its output.
+
+**Verified final state, via `gh run view` on `c82c269` (the pushed HEAD), not from memory:** CI conclusion
+`failure`, and the *only* failing step in the whole workflow is "Instrument LOC must not exceed game LOC
+(QUALITY gate 7)." `authorship` and `godot test suites` jobs are both green. `tools/gate_status.py`'s own
+table at this commit: `FAIL gate numbers: [1, 7, 27]` — gates 1 and 27 are NOT a new regression; they
+report via a correctly-labeled DISAGREE (CI passes them at the committed tree; only THIS session's local,
+uncommitted D0139 files fail them locally) rather than a false CI failure.
+
+**What the director is waiting to rule on:** item 3's own open question, stated precisely so it isn't lost
+— arming the gate proved the *velocity* check (instrument growth vs game growth over 10 commits) is
+violated, which is NOT the same claim `docs/QUALITY.md` gate 7's own words make ("Instrument LOC ≤ game
+LOC" — an ABSOLUTE ratio, currently 6.4:1, never gated by this script at any point in its history). The
+director must decide: accept the currently-red velocity gate as honest and correct, or set a justified
+floor with a documented diagnosis. Do not decide this and do not touch `check_loc_ratio.py` again without
+that ruling landing first.
+
+**`AUDIT_RESPONSE_BRIEF.md` does not exist anywhere in this tree** (checked: full repo search, git log,
+`docs/`) — the director pasted its content and the underlying audit's content directly into chat mid-turn.
+A fresh session will not find either document on disk; if it needs the exact audit findings again, they
+are not recoverable from the repository, only from this conversation's own history.
+
+**D0139 remains completely untouched, exactly as the last checkpoint left it — still not this round's
+business.** `sim/body/vertical_resolve.gd` still carries D0139's uncommitted `_full_footprint_solid` fix
+attempt; `tests/test_vertical_resolve.gd`/`.uid` are still new and untracked. Two hard-stop findings from
+that investigation are still un-ruled (the mechanism-flip to `grid_floor_backstop`, and the rubble-notch
+regression). See the OVERNIGHT QUEUE section immediately below for that investigation's own full detail —
+it predates this round and nothing in this round changed it.
+
 ## OVERNIGHT QUEUE, 2026-08-29 — STOPPED ON A FALSE PREMISE. 4 of 5 items rest on state that does not exist.
 
 The queue's own context line: "the bound-diagnosis mechanism, the 4-case diagnosis, and the two
