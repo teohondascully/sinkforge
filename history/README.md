@@ -14,13 +14,23 @@ capturable the moment there is real art.
 **Added 2026-08-28, docs/GDD.md §12's reveal-layer test (`claims/C004`):** `153-the-glimmer-in-the-wall.png`
 (the reveal mechanism working — a freshly-dug column next to several `glimmer` pockets, distinct from
 both plain rock and dug space) and `154-reveal-density-sparse.png`/`154-reveal-density-dense.png` (the
-same seed's early frame under both test sites, since density is the swept variable and the contrast is
-the story). Fulfils this list's own "the first generated shaft" candidate — real `ShaftGenerator` output,
-not a hand-authored fixture. Captured via `tests/body/reveal_scene.gd`'s agent mode, not literal `--play`
-(no human at a keyboard was available to this session); the renderer code (`_draw()`) is identical
-regardless of input source, so the pixels are representative of what `--play` mode would show, but this
-is a real gap from the director's explicit "from --play, not agent mode" ask, stated plainly rather than
-glossed over.
+density contrast between the two test sites). Fulfils this list's own "the first generated shaft"
+candidate — real `ShaftGenerator` output, not a hand-authored fixture. Captured via
+`tests/body/reveal_scene.gd`'s agent mode, not literal `--play` (no human at a keyboard was available to
+this session); the renderer code (`_draw()`) is identical regardless of input source, so the pixels are
+representative of what `--play` mode would show, but this is a real gap from the director's explicit
+"from --play, not agent mode" ask, stated plainly rather than glossed over.
+
+**154's pair was replaced same-round, not kept alongside its first draft (D0121).** The original capture
+followed the body at zoom 6.0, which shows only ~28% of the topsoil band's own vertical extent in one
+frame — a small, noisy local sample, not a view of the aggregate ~4x count difference
+`test_shaft_generator.gd` actually measures (dense=312/sparse=78 glimmer cells, same seed). The director
+caught this directly ("the three frames look nearly identical... confirm the density range actually
+produces a visible difference"). Fixed by a capture-mode change (`reveal_scene.gd`'s new `--wide-view`),
+not a parameter change — the real density difference was already strong; only the crop was narrow. The
+two images at this path are the corrected wide-view pair; the original narrow-crop pair was overwritten,
+not kept as a fourth/fifth image, since it was this session's own same-round first draft, not a
+pre-existing curated asset.
 
 **Policy set 2026-08-25; STILL not applied as of 2026-08-28.** This directory holds 168 images (165
 pre-pivot plus this round's 3), still a diary, not the capped-12 argument this policy describes. Culling

@@ -7,8 +7,13 @@ extends SceneTree
 ## Suites extend this BY PATH (`extends "res://tests/test_base.gd"`), run their `_test_*` methods from
 ## `_initialize()`, then call `_finish()`.
 ##
-## Run a suite: godot --headless --path . --script res://tests/test_<subject>.gd
-## Exits 0 on all-pass, non-zero on any failure.
+## Run a suite: tools/run_gd_test.sh <godot-binary> res://tests/test_<subject>.gd
+## Exits 0 on all-pass, non-zero on any failure -- but NOT if invoked as a bare
+## `godot --headless --path . --script ...`: `_finish()` can print "ALL PASS" and exit 0 over a suite
+## that crashed mid-run (`docs/DECISIONS_LEDGER.md` D0115), because GDScript has no try/catch and a
+## runtime error inside a called `_test_*()` function is invisible to `_check()`'s own counters.
+## `tools/run_gd_test.sh` (D0116) is the real exit-0 guarantee this file's own bookkeeping cannot make
+## alone -- use it, not the bare invocation, for anything whose result will be trusted.
 
 var _failures: int = 0
 

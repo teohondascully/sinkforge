@@ -72,13 +72,20 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   a negative value, even one assigned from an identical expression one line earlier. This is a syntactic
   restriction, not a value-based one: never write `(-x) >> n` directly; assign the negated value to a
   variable first, then shift the variable.
-- **An unguarded runtime script error (division by zero, `null` dereference, etc.) inside a bare
-  `--headless --script` run does not crash the process or the test suite — it HANGS.** Nothing after the
-  error runs, including whatever `_check()`/`_finish()`/`quit()` calls would have reported the failure
-  and exited, and the bare SceneTree idles forever with no further output. Verified empirically (see the
-  commit that added `Fx.div`'s zero-guard). Any arithmetic in `core/` or `sim/` that could divide by a
-  caller-supplied value must guard it explicitly — `push_error()` logs without triggering this, a raw
-  `/` does not.
+- **An unguarded runtime script error's effect on a bare `--headless --script` run depends on exactly
+  where it happens, and the more common location is the more dangerous one, not the more obvious one
+  (`docs/DECISIONS_LEDGER.md` D0115/D0116, correcting this note's original, narrower claim).** Directly
+  inside `_initialize()` itself, it HANGS — nothing after the error runs, the bare SceneTree idles forever
+  with no further output, no exit code. But inside any function `_initialize()` CALLS (every real
+  `test_base.gd` suite's own `_test_*()` functions, since `_initialize()` is always just a flat list of
+  calls to them), it does neither: the crashing expression logs a `SCRIPT ERROR:` and evaluates to a
+  type-default value, execution continues from the very next line in the SAME function, and the suite can
+  finish normally — `_finish()` reached, `ALL PASS` printed, process exits 0 — having silently lost
+  whatever that one function's remaining `_check()` calls would have reported. Any arithmetic in `core/`
+  or `sim/` that could divide by a caller-supplied value must still guard it explicitly (`push_error()`
+  logs without triggering either mode, a raw `/` does not) — but for TEST suites specifically, trusting a
+  bare invocation's own exit code/printed summary is no longer enough either way; use
+  `tools/run_gd_test.sh` (D0116), which catches both.
 - **GDScript hex literals cannot represent values ≥ 2^63.** Any 64-bit constant with its top bit set
   (several of SplitMix64's) has to be written as its signed two's-complement decimal equivalent, computed
   externally — `python3 -c "print(x - (1<<64) if x >= (1<<63) else x)"` — not typed as hex.

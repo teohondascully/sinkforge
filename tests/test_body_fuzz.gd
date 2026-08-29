@@ -64,6 +64,13 @@ func _test_fuzz_finds_no_new_correctness_defects() -> void:
 		output, true)
 	_check(exit_code == 0, "the fuzz subprocess itself exits cleanly (got %d)" % exit_code)
 	var combined: String = "\n".join(output)
+	# D0117/D0120: exit_code==0 and a present summary line are NOT enough on their own -- the exact
+	# D0115/D0116 mechanism applies to `_check_tick()` too (a called function, inside this probe's own
+	# `_initialize()`), so a runtime error on some seed/tick would log SCRIPT ERROR, silently NOT count
+	# as a violation for that tick, and let the loop continue to a normal-looking FUZZ_SUMMARY and exit 0.
+	_check(not combined.contains("SCRIPT ERROR:"),
+		"the fuzz probe's own output contains no SCRIPT ERROR -- a mid-run crash on some seed/tick would" +
+		" otherwise silently undercount violations rather than fail loud (docs/DECISIONS_LEDGER.md D0117)")
 	var counts: Dictionary = {}
 	for kind: String in ["bounds", "floor_selection", "embedded", "grounded_no_floor", "overflow",
 			"discontinuity", "deadlock"]:

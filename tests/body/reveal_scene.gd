@@ -18,6 +18,8 @@ const CELL: int = Heightfield.TERRAIN_CELL_PX
 const MAX_TICKS: int = 3000  ## agent-mode-only safety cap, matching play_scene.gd's own
 const SHALLOW_ROW_LIMIT: int = 30  ## how far down the scan looks for a "near-surface" glimmer pocket
 const APPROACH_OFFSET_COLS: int = 6  ## spawn this many columns left of the found pocket
+const WIDE_VIEW_ROW_CAP: int = 180  ## `--wide-view` (D0121): both reveal-test sites' topsoil_shale_end
+## is 40m = 160 rows (TERRAIN_CELLS_PER_METER=4); a little margin past it, not the whole grid.
 
 const COLOR_BG: Color = Color(0.16, 0.16, 0.18)
 const COLOR_TERRAIN: Color = Color(0.42, 0.34, 0.24)
@@ -38,6 +40,8 @@ var _finished: bool = false
 var _screenshot_tick: int = -1
 var _screenshot_path: String = ""
 var _target_glimmer_col: int = -1
+var _camera_zoom: float = 6.0
+var _wide_view: bool = false
 
 
 func _ready() -> void:
@@ -53,6 +57,13 @@ func _ready() -> void:
 			site_id = StringName(arg.trim_prefix("--site="))
 		elif arg.begins_with("--seed="):
 			seed_value = int(arg.trim_prefix("--seed="))
+		elif arg.begins_with("--zoom="):
+			_camera_zoom = float(arg.trim_prefix("--zoom="))
+		elif arg == "--wide-view":
+			_wide_view = true  ## D0121: camera centers on the whole generated area (grid midpoint), not
+			## the body -- the body-following camera at zoom 6.0 shows ~28% of the topsoil band's own
+			## vertical extent in one frame, which is why the first density-contrast screenshots (D0109's
+			## round) read as nearly identical regardless of the real underlying count difference.
 	_grid = ShaftGenerator.generate(StrataData.get_site(site_id), seed_value)
 	var spawn_col: int = _find_spawn_column()
 	_carve_entry_shaft(spawn_col)
@@ -61,10 +72,19 @@ func _ready() -> void:
 	_camera = Camera2D.new()
 	add_child(_camera)
 	_camera.make_current()
-	_camera.zoom = Vector2(6.0, 6.0)  ## play_scene.gd never set this either (an open legibility gap,
-	## docs/WORKING.md's "camera zoom so the chamber fills more of the frame" item) -- 6x makes CELL's
-	## 4px cells ~24 screen-px, close enough to read a glimmer pocket's shape without the window mostly
-	## showing background
+	_camera.zoom = Vector2(_camera_zoom, _camera_zoom)  ## play_scene.gd never set this either (an open
+	## legibility gap, docs/WORKING.md's "camera zoom so the chamber fills more of the frame" item) --
+	## default 6x makes CELL's 4px cells ~24 screen-px, close enough to read a glimmer pocket's shape
+	## without the window mostly showing background. Overridable (`--zoom=`) since a density-contrast
+	## shot needs the opposite trade-off -- see `--wide-view` above.
+	if _wide_view:
+		# Centered on the DRAWN band's own midpoint (WIDE_VIEW_ROW_CAP), not the full grid height -- the
+		# full grid runs to max_depth_m's ~1024 rows, and _draw() only ever paints the first
+		# WIDE_VIEW_ROW_CAP of them in this mode. Centering on the true grid height pointed the camera at
+		# an empty, undrawn region far below the topsoil band, producing a blank screenshot -- found by
+		# actually looking at the captured image, not assumed correct from the math alone.
+		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
+		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
 
 
@@ -161,6 +181,8 @@ func _record_tick(input: InputFrame) -> void:
 
 
 func _update_camera() -> void:
+	if _wide_view:
+		return  # camera stays fixed on the grid midpoint, set once in _ready() -- not the body
 	_camera.position = Vector2(float(_body.pos_x) / float(Fx.SCALE), float(_body.pos_y) / float(Fx.SCALE))
 
 
@@ -169,8 +191,16 @@ func _draw() -> void:
 	var view_center_col: int = Body._px_to_cell(_body.pos_x)
 	var col_lo: int = maxi(0, view_center_col - 60)
 	var col_hi: int = mini(_grid.width, view_center_col + 60)
+	# 120-row cap only makes sense for the follow-the-body view -- `--wide-view` needs the WHOLE topsoil
+	# band drawn (D0121), since the density contrast it exists to show is spread across it, not just the
+	# top 120 of a band that runs 160 rows on both reveal-test sites. NOT the full grid height (up to
+	# 1024 rows for max_depth_m=256): the reveal layer only ever places below row 0 and above
+	# topsoil_end, so drawing past it would shrink the actually-relevant band to a sliver of a mostly
+	# irrelevant screenshot. WIDE_VIEW_ROW_CAP is topsoil_end(160) + margin, not read from the site
+	# config -- this scene already hardcodes plenty else about the two reveal-test sites specifically.
+	var row_cap: int = mini(_grid.height, WIDE_VIEW_ROW_CAP) if _wide_view else mini(_grid.height, 120)
 	for col: int in range(col_lo, col_hi):
-		for row: int in range(0, mini(_grid.height, 120)):
+		for row: int in range(0, row_cap):
 			var material: StringName = _grid.get_material(Vector2i(col, row))
 			if material == &"":
 				continue

@@ -4227,3 +4227,306 @@ future regression has this same blind spot — CI would see exit 0 and a printed
 actually crashed partway through. Worth a director look, not a same-session fix.
 
 Reverse: N/A — this entry records an observation, not a code change.
+
+## D0116 · 2026-08-28 · D0115 fixed: `tools/run_gd_test.sh`, TDD-verified against a real, reproducible crash
+
+Director's instruction, verbatim: "add a test that forces a mid-test crash and asserts the harness
+reports failure and exits nonzero. Until that test exists and is observed failing on the pre-fix harness,
+the fix is not trusted." This entry is that test existing, observed failing pre-fix, then passing post-fix.
+
+**Root cause, precisely — not the same as `core/MODULE.md`'s existing note, which this entry corrects.**
+That note claimed an unguarded runtime error inside a bare `--headless --script` run always hangs. Three
+scratch probes plus a real, exact reproduction of D0115's original scenario show that claim is only true
+in one specific place: **directly inside `_initialize()` itself.** There, an error genuinely hangs the
+process forever (no further output, no exit). But inside ANY function `_initialize()` calls — which is
+every real `_test_*()` function in every `test_base.gd` suite in this project, since `_initialize()` is
+always just a flat sequential list of calls to them — GDScript's actual behavior (confirmed empirically,
+not assumed) is: the crashing expression logs a `SCRIPT ERROR:`, evaluates to its type's default value,
+and execution continues from the very next line **in the same function**. No hang. No abort. No non-zero
+exit. `test_base.gd`'s `_check()`/`_finish()` never see it, because nothing ever calls `_check(false, ...)`
+for an error `_check` was never told about. This is the exact, precise mechanism behind D0115's `ALL PASS`
++ exit 0 over a genuine crash — and it means every real suite in this project (never raw logic directly in
+`_initialize()`, always `_test_*()` calls) is structurally exposed to the dangerous mode, not the hang.
+
+**The fix cannot live inside `test_base.gd` itself.** GDScript has no try/catch and no in-process API to
+detect that an engine-level runtime error occurred elsewhere in the same script (confirmed: no exception
+to catch, no error-count singleton, no hook). The only place that can see it is the raw process output —
+Godot writes `SCRIPT ERROR:` to stderr regardless of what the script itself does. So the fix is a wrapper,
+`tools/run_gd_test.sh`, invoked as `tools/run_gd_test.sh <godot-binary> <res://path/to/test_x.gd>` in
+place of the bare invocation everywhere (CI and local). It fails if: the process exits non-zero (existing
+correct behavior, unchanged), OR `SCRIPT ERROR:` appears anywhere in the combined output (the new check),
+OR the suite never printed its own `ALL PASS` line at all (crashed before reaching `_finish()`).
+
+**Why `SCRIPT ERROR:` specifically, not a broader `ERROR:` match.** Confirmed empirically that
+`push_error()`/`push_warning()` print `ERROR:`/`WARNING:`, never `SCRIPT ERROR:` — a real, load-bearing
+distinction, not a guess: `sim/invariants/invariants.gd` calls `push_error()` deliberately as normal,
+PASSING production behavior (`docs/ARCHITECTURE.md` §9, "log in release"), and `test_cave_geometry.gd`,
+`test_fixed_point.gd`'s `Fx.div` guard test, and `fixture_div_by_zero_probe.gd` all deliberately exercise
+and assert on that exact behavior as correct, expected output. Matching bare `ERROR:` would have turned
+every one of those legitimately-passing suites red. Verified directly (not assumed): `run_gd_test.sh`
+against `test_fixed_point.gd` (which prints a real `ERROR: Fx.div: division by zero` line as part of its
+own genuine PASS) exits 0 through the wrapper.
+
+**Verification, in the order the director required:**
+1. `tests/fixture_harness_crash_probe.gd` — new, permanent, deliberately crashes inside a called function
+   (matching every real suite's own shape), with a `_check()` before and a second, later, separate
+   `_test_*()` function's `_check()` after — proving the crash doesn't abort the whole suite either, just
+   silently drops the one function's remaining assertions.
+2. `tools/test_run_gd_test.sh` — the actual TDD artifact. Asserts, in order: (a) the PRE-FIX baseline
+   still reproduces (bare invocation on the crash probe exits 0, prints `ALL PASS`, and genuinely contains
+   a `SCRIPT ERROR:` in the same output) — kept as a live, permanent assertion, not a one-time note, so a
+   future Godot version changing this behavior is noticed, not assumed; (b) the wrapper catches the same
+   crash (non-zero exit, failure message names the SCRIPT ERROR class); (c) the wrapper does NOT
+   false-positive `test_fixed_point.gd`'s legitimate `push_error()` usage (negative control). All 7
+   assertions pass. Matches `tools/check_trailers.sh`'s own established pattern of a detector self-check
+   run fresh every time, not trusted from when the file was written.
+
+**Wired into CI**, not just documented as a local convention: every `run:` line in `.github/workflows/
+harness.yml`'s `tests` and `fuzz_nightly` jobs (18 suite invocations total) now goes through
+`tools/run_gd_test.sh` instead of a bare `./godot --headless --path . --script`, each job's own
+`tools/test_run_gd_test.sh` self-test step running first — no suite step is allowed to trust the wrapper
+before the wrapper has proven itself that run. Also caught, incidentally, while editing this file:
+`test_reveal_metric.gd` (built this same round, D0114) had never actually been added to CI at all — a
+real gap, fixed in the same pass. `core/MODULE.md`'s stale hang-only claim corrected in place, citing this
+entry. `tests/test_base.gd`'s own docstring updated to point at the wrapper rather than claim an exit-0
+guarantee it cannot make alone. `docs/QUALITY.md` gate 28 added, per the project's own "gate numbers are
+addresses, appended not inserted" convention for retroactive gates (matching gates 22/24/25/26/27's own
+precedent).
+
+Reverse: cheap for the wrapper alone (revert to bare invocations in CI + locally), but reintroduces
+D0115's exact blind spot — not recommended. The crash probe and self-test are pure additions, zero
+reverse cost.
+
+## D0117 · 2026-08-28 · sweep-blindness law (D0105) gains two new instances, one inside its own hunt
+
+Director's instruction: file D0115 (the harness) and the tail-pipe gate-check bug below under D0105's
+consolidated sweep-blindness law, and run a deliberate hunt across the whole repository for the same
+masking pattern rather than trust the two incidental catches as complete coverage.
+
+**Instance 5 (of D0105's list): `test_base.gd`'s own bookkeeping is a sweep bounded by what `_check()` is
+told about** — D0115/D0116. A crash `_check()` was never called about is invisible to it by construction,
+the same shape as D0105's own four cited instances (a scan bounded by its author's model of the corpus
+cannot see outside that model).
+
+**Instance 6: my own gate-verification process, in this exact round.** `python3 tools/quality_check/
+duplication.py | tail -N; echo "EXIT=$?"` reported `EXIT=0` for a script that had actually exited 1 —
+`$?` after a pipeline is the LAST command's exit code (`tail`'s, effectively always 0), not
+`duplication.py`'s. This ran across every gate I re-checked earlier in this same session before I
+happened to re-verify without the pipe and found a real, unrelated duplication-gate failure it had been
+silently hiding. Filed here rather than treated as a one-off typo: it is the identical class,
+freshly self-inflicted, inside the exact session that was simultaneously finding it in the test harness.
+
+**The hunt.** Every `.sh`/`.githooks/*` file, every Python `subprocess` call site under `tools/`, and
+every GDScript `OS.execute` call site, audited specifically for this pattern. Two more real instances,
+both fixed (D0119, D0120); everything else checked clean, listed here so "audited" means something
+concrete rather than a claim with no population behind it.
+
+**Instance 7: `.githooks/pre-commit`'s base-class namespace gate silently no-op'd for 119 commits.** The
+pivot (`4758d5a`, "move the pre-pivot codebase to legacy/, read-only") moved `check_base_namespace.sh` to
+`legacy/tools/` and nothing recreated it at the path the hook still checks. The hook's own defensive
+guard, `[ -x tools/check_base_namespace.sh ] || [ -r tools/check_base_namespace.sh ]`, was false, so the
+entire block did nothing — no warning, no error, a clean commit either way. Same family as instances 5-6
+(a gate whose absence reads as compliance), different mechanism (a missing file, not a mis-captured exit
+code). `git log --oneline 4758d5a..HEAD | wc -l` = 119 commits landed with this protection off. Fixed:
+D0119.
+
+**Instance 8: the fuzz probes' own "did it crash mid-run?" check could not see a non-hanging crash.**
+`test_body_fuzz_fast.gd`/`test_body_fuzz.gd` both spawn `fixture_body_fuzz_probe.gd` via `OS.execute`,
+check `exit_code == 0`, and check a `FUZZ_SUMMARY` line is present — flagged by the hunt as plausible,
+then CONFIRMED by actual reproduction, not left as a hypothesis: a crash injected into `_check_tick()`
+(called from `_initialize()`'s own seed/tick loop, the identical D0116 mechanism) still exited 0, still
+printed a complete-looking `FUZZ_SUMMARY`, and every existing `_check()` — including all five
+violation-kind-count assertions — reported PASS. The project's most safety-critical instrument, silently
+blind to exactly the class of defect it exists to catch. Fixed: D0120.
+
+**Checked, clean — the negative population, not just the two hits:** `tools/check_trailers.sh` and
+`.githooks/commit-msg` (exit codes and `grep -q` consumed directly, no intervening pipe; `check_trailers.sh`
+already runs its own positive/negative control every invocation). `.githooks/pre-commit`'s mojibake gate
+(an explicit `-1` sentinel for "could not read," checked before the numeric comparison). Every Python
+`subprocess.run` under `tools/` (`check=True` where a git failure should raise, or an explicit
+`returncode != 0` check that raises — `check_loc_ratio.py:_run_git`, `anvil/append.py`). `duplication.py`'s
+own `gate_exit()` (derives its exit code directly from cluster counts, no separate staleness-prone
+bookkeeping — the earlier masking was entirely in the shell usage around it, not the script). The other
+`OS.execute` call sites (`test_fixed_point.gd`, `test_bounds_invariant.gd`, `test_cave_geometry.gd`) — all
+check `exit_code == 0` AND grep for specific substantive content (an exact message, an occurrence count),
+not a generic summary line alone; safer than the fuzz probes, though not independently proven immune to
+the same class.
+
+**One low-confidence note, not treated as a finding:** `check_working_freshness.py` returns 0 when
+`docs/WORKING.md` doesn't exist or `git log` has no HEAD date — plausibly a deliberate, sensible
+bootstrap-state design (nothing to report before the file exists) rather than a bug. Named for awareness,
+not claimed broken.
+
+Reverse: N/A — this entry records findings, not a code change on its own (D0116/D0119/D0120 are the code
+changes for the instances found).
+
+## D0119 · 2026-08-28 · `check_base_namespace.sh` re-ported to `tests/test_base.gd`, fixing a real bug found while porting
+
+Fix for D0117's instance 7. Ported `legacy/tools/check_base_namespace.sh` (which guarded the pre-pivot
+`tools/check_base.gd` and its ~100 subclasses, all now legacy-only — confirmed via `grep -rl`, zero
+non-legacy subclasses) to a new `tools/check_base_namespace.sh` targeting `tests/test_base.gd`, the only
+base class in the post-pivot tree meaningfully extended by path more than once (19 real subclasses).
+`.githooks/pre-commit`'s own reference needed no code change — it already pointed at the right filename,
+just the wrong-since-the-pivot target file; creating the file at that path is what re-arms the guard.
+Its stale comment (still describing `tools/check_base.gd`) corrected in place, and a note added stating
+plainly that this exact block went silently inert once already, so its own silence is the failure mode to
+watch for, not a thing to assume past.
+
+**A real bug found while porting, fixed before trusting the port — not present in this form in the
+legacy original, or at least never triggered there.** The first-draft extraction regex allowed leading
+whitespace, so a LOCAL variable inside a function body (`test_base.gd`'s own `_flat_grid()` declares
+`var grid: TileGrid = ...`) was extracted as a "base member," and every subclass with its own unrelated
+local `var grid` inside some other function (8 of them, real, immediately) false-positived as a
+collision. Column-0-anchored the regex (this codebase never indents a real class-level member) — fixes
+the confirmed case. Left named, not fixed: an inner `class` block's own method (`fixture_body_fuzz_probe.gd`,
+`test_replay_determinism.gd` both have one) is still indented but is a member of the INNER class, not the
+outer subclass, and nothing currently distinguishes the two — inert today (0 collisions on the real tree),
+not proven safe against a future inner-class method sharing a base member's name.
+
+**Verified, in order:** ran clean on the real tree after the fix (19/19 subclasses, 0 collisions). The
+script's own baked-in positive/negative control (built from a real base member, ported unchanged from the
+legacy original's own design) passes every run. Additionally mutation-tested against a real external
+fixture: a temp file declaring `var _failures: int = 0` under `extends "res://tests/test_base.gd"`,
+passed as an explicit target — correctly flagged, exit 1. Wired into `.github/workflows/harness.yml`'s
+`gates` job (not just the local hook) for the same reason `check_trailers.sh` already duplicates there:
+`--no-verify` is routine here and skips every local hook.
+
+Reverse: cheap. Revert the hook's guard condition to always-false, or delete the new script — reopens
+D0117's instance 7.
+
+## D0120 · 2026-08-28 · fuzz probes gain a `SCRIPT ERROR:` guard, confirmed by real injection
+
+Fix for D0117's instance 8. Added one `_check()` to `test_body_fuzz_fast.gd` and `test_body_fuzz.gd`,
+identical in both: the fuzz subprocess's captured combined output must not contain `SCRIPT ERROR:`, same
+marker `tools/run_gd_test.sh` (D0116) checks, same reasoning — a crash inside `_check_tick()` (or
+anything it calls) does not hang and does not set a non-zero exit; it silently drops that one tick's
+violation count and the loop continues.
+
+**Verified by actual reproduction, not left as the hunt's own "plausible, not confirmed."** Injected a
+one-line crash into `fixture_body_fuzz_probe.gd`'s `_check_tick()` (`([] as Array[int])[0]`, gated to a
+single specific seed/tick so it fires exactly once per run), re-ran `test_body_fuzz_fast.gd`, and
+confirmed: `exit_code == 0` (PASS), the `FUZZ_SUMMARY` line present and well-formed (PASS), all five
+violation-kind-count assertions reporting zero (PASS) — every pre-existing check silently green — and
+ONLY the new `SCRIPT ERROR:` check caught it (FAIL, correctly failing the suite). Reverted the injection
+immediately after confirming; `fixture_body_fuzz_probe.gd` diffed byte-identical against its pre-mutation
+state before moving on. Fast fuzzer re-confirmed clean (`ALL PASS`) on the reverted fixture.
+
+Not done: the same guard for `fixture_div_by_zero_probe.gd`'s and other `OS.execute`-based probes'
+call sites (`test_fixed_point.gd`, `test_bounds_invariant.gd`, `test_cave_geometry.gd`) — D0117 found
+those already check exit code AND a specific substantive string, which is a narrower miss surface than the
+fuzz probes' generic summary-line check, and none was confirmed vulnerable by actual reproduction the way
+the fuzz probes were. Named as a smaller, unconfirmed residual rather than silently left uncovered.
+
+Reverse: trivial (delete the two added `_check()` calls) — reopens D0117's instance 8, confirmed real by
+reproduction above, not hypothetical.
+
+## D0118 · 2026-08-28 · a second, distinct failure class named: a test that computes its own oracle
+
+Director: "worth one line in the record too. That is a distinct failure from sweep-blindness: a test that
+cannot fail because it computes its own oracle from the thing it tests." Consolidated here, the same way
+D0105 consolidated sweep-blindness into one named thing rather than leaving it as scattered notes.
+
+**The shape.** A test's "expected" value is derived by calling the function under test (or an equivalent
+expression that shares its own bug), rather than from independent arithmetic, a hand computation, or a
+constant known some other way. Such a test cannot fail on the exact class of bug it exists to catch — if
+the function's formula is wrong, the test's own expectation is wrong in the same way, and the two agree.
+This is a distinct mechanism from sweep-blindness (D0105/D0117): sweep-blindness is about a scan whose
+own model of the corpus is too narrow to see part of it; this is about an ASSERTION whose own reference
+value is not independent of the thing being asserted. A green result from either looks identical from the
+outside — that is what makes both dangerous, not what makes them the same bug.
+
+**Three real, shipped instances, same day:** D0112 (`_dig_target_cell`'s first-draft tests derived the
+expected target cell by calling `_dig_target_cell()` itself — could not have caught its own off-by-one),
+D0113 (the companion single-row-dig bug, same test file, same root cause), D0114 (`RevealMetric`'s
+first-draft test suite's boundary-window bug and threshold bug — the fix there was to derive expected
+cells/values via independent arithmetic instead). All three were found only by actually running the real
+scene/instrument end to end (`docs/DECISIONS_LEDGER.md`'s own standing discipline), never by the
+tautological unit tests themselves — the fuzzer and the run-the-scene step are what actually caught the
+dig bugs, not the unit suite that shipped alongside them. Worth naming plainly: a unit test whose expected
+value is not independently derived is theater, not coverage, for the specific bug class it would need to
+catch.
+
+**How to apply going forward.** When writing a test's expected value, ask: does deriving this require
+calling the function under test, or any expression that would carry the same bug if the function had one?
+If yes, find an independent source (hand computation, a known constant, a differently-implemented check)
+before trusting the test as a guard, not after it has already shipped once.
+
+Reverse: N/A — naming, not a code change.
+
+## D0121 · 2026-08-28 · `--wide-view`: the density screenshots read weak because the crop, not the density, was narrow
+
+Director, on the first density-contrast pair (`154-reveal-density-sparse.png`/`154-reveal-density-dense.png`):
+"the three sparse-vs-dense frames look nearly identical in feature count... confirm the density range
+actually produces a visible difference across its extremes... widen the sweep until the endpoints are
+obviously different to the eye... report the actual feature counts per density level."
+
+**Diagnosed before touching either parameter file.** The real per-density counts were already correct and
+already a strong contrast: `test_shaft_generator.gd`'s own passing test measures dense=312/sparse=78
+glimmer cells at the same seed — a genuine ~4x difference. The screenshots not showing it was a CAPTURE
+bug, not a density-range problem: `reveal_scene.gd`'s camera follows the body at zoom 6.0, and the body
+starts near the very top of a 160-row topsoil band (`topsoil_shale_end: 40m * TERRAIN_CELLS_PER_METER(4)`)
+— at 1920x1080 and 4px cells, zoom 6.0 shows roughly 45 of those 160 rows in one frame (~28%), a small,
+effectively-random local sample of where attempts happened to land, not a view of the aggregate difference
+the real counts describe. Confirmed the mechanism, not just asserted it, by actually re-reading both
+original screenshots side by side: 4 visible glimmer clusters (sparse) vs. 5 (dense) — consistent with two
+small, noisy local samples of populations that really do differ ~4x in aggregate, not with a broken density
+parameter.
+
+**Fix: a new `--wide-view` capture mode, not a parameter change.** `reveal_scene.gd` gains `--zoom=`
+(overrides the fixed 6.0) and `--wide-view` (camera fixed on the drawn band's own midpoint instead of
+following the body; `_draw()`'s row cap becomes `WIDE_VIEW_ROW_CAP`(180, just past `topsoil_end`) instead
+of the follow-camera mode's 120). First attempt centered the camera on the FULL grid height (up to ~1024
+rows for `max_depth_m`=256) and produced a blank screenshot — the camera pointed at an empty, undrawn
+region far below the topsoil band. Caught by actually looking at the captured image, not assumed correct
+from the math; fixed to center on the DRAWN band's own midpoint instead.
+
+Reverse: cheap. The two new cmdline args are additive; deleting them returns to the original follow-camera
+behavior exactly.
+
+## D0122 · 2026-08-28 · FINDING, confirmed by A/B: the dig mechanic causes a real fuzzer regression — not yet fixed
+
+Discovered incidentally, verifying gates before this round's final report, not sought deliberately: running
+the FULL (nightly-only, not CI-per-commit) fuzzer (`tests/test_body_fuzz.gd`, 1000 seeds x 1500 ticks) for
+the first time since D0110 added the dig mechanic produced 3 real assertion failures against bounds this
+project has held stable for a long time:
+
+| violation kind | expected (pre-existing bound) | got, WITH dig enabled | got, dig DISABLED (control) |
+|---|---|---|---|
+| `embedded` (D0059 RESIDUAL) | <= 1 | **187** | 1 (exact match) |
+| `grounded_no_floor` (D0061 DESIGN_TRADEOFF) | <= 32 | **95** | 32 (exact match) |
+| `discontinuity` (hard zero, never allowlisted) | 0 | **4** | 0 (exact match) |
+| `bounds` (reported, not gated) | ~18k (this control run) | **722,655** | 18,218 |
+
+**Causation, not correlation — proven by controlled A/B, not inferred from timing.** Re-ran the identical
+1000x1500 sweep with exactly one line changed: `fixture_body_fuzz_probe.gd`'s `_random_input()` forcing
+`input.dig_pressed = false` instead of the real `rng.next_float() < 0.5`. Every count returned to its
+established baseline EXACTLY — not approximately, not "close to," the literal same numbers this project's
+own D0059/D0060/D0061 history already established before dig existed. The mutation was reverted
+immediately after confirming (diffed byte-identical against the pre-test backup). The fast per-commit
+fuzzer (`test_body_fuzz_fast.gd`, 100 seeds x 500 ticks) does NOT catch this — it passed clean throughout
+this whole build round — because its much smaller seed/tick range apparently doesn't happen to hit the
+triggering conditions; this is exactly why the project keeps a deep, nightly-only sweep as a SEPARATE
+instrument (D0060's own stated reason: "a fuzzer that takes four minutes will get disabled within a
+month") rather than trusting the fast one alone.
+
+**Not root-caused and not fixed in this entry.** `sim/body` is this project's own documented
+highest-risk module ("nothing past it gets built until this module is green against \[its] suite" —
+`sim/body/MODULE.md`); a hasty fix to its collision/floor-selection logic risks a worse regression than
+the one being chased, and this specific defect (dig interacting badly with movement resolution under
+adversarial random input) is new territory the module's existing acceptance suite was never built to
+anticipate. Flagged here as a real, confirmed, currently-shipped defect on `main` — dig was committed and
+pushed earlier this same round (`3181c30`) — rather than attempted under this round's own time budget.
+Plausible mechanism, NOT verified: digging can remove a body's supporting floor or adjacent wall inside
+the same tick it's read for collision/floor-selection purposes, a timing/ordering interaction
+`_handle_dig`'s "horizontal resolve, then dig" tick order (D0110) may not have accounted for — stated as a
+hypothesis for whoever investigates next, not a diagnosis.
+
+**Why this doesn't retroactively fail this round's own hard stops.** The build round's stated stop
+conditions ("determinism regression, gate red") were checked against the gates that actually ran during
+that round — the fast fuzzer, which stayed green throughout, consistent with CI's own per-commit scope.
+This defect was invisible to every gate that runs on a normal commit; it surfaced only because this
+session's own post-round diligence (re-running gates, including ones CI doesn't run per-commit, before
+finalizing a report) happened to include the deep sweep. Named plainly as a real gap in what "gate red"
+can mean when the red gate isn't one CI ever runs automatically.
+
+Reverse: N/A — this entry records a confirmed finding, not a code change; no fix has been attempted.

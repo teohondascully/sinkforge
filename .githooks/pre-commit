@@ -46,9 +46,18 @@ fi
 # rule applied a second time rather than relearned a second time.
 #
 # It costs nothing (pure text, no engine) and it catches a failure that is invisible where you would look
-# for it: a member added to `tools/check_base.gd` breaks a SUBCLASS, so `--check-only` on the file you
-# edited is clean, and `godot --script` exits 0 on a load failure so the runner scores the broken layer as
-# a PASS. One of those cost a 275-second sweep to find.
+# for it: a member added to `tests/test_base.gd` breaks a SUBCLASS (any `test_*.gd` suite), so
+# `--check-only` on the file you edited is clean, and `godot --script` exits 0 on a load failure so a bare
+# invocation scores the broken suite as a PASS (`docs/DECISIONS_LEDGER.md` D0115/D0116's own class, from
+# a different angle: a parse-level failure invisible to the runner rather than a runtime one).
+#
+# THIS EXACT GUARD SILENTLY NO-OP'D FOR 119 COMMITS (docs/DECISIONS_LEDGER.md D0117/D0119): the pivot
+# moved `check_base_namespace.sh` to `legacy/tools/` and nothing recreated it at this path, so
+# `[ -x ... ] || [ -r ... ]` below was false and this whole block did nothing, silently, with no warning
+# anywhere. Re-ported at `tools/check_base_namespace.sh`, now targeting `tests/test_base.gd` (the new
+# codebase's own actively-subclassed base; `tools/check_base.gd` was purely a legacy/ concern and has zero
+# non-legacy subclasses). If this block ever goes quiet again, that silence is exactly the failure mode —
+# check the file exists at this path before assuming a clean run means anything.
 #
 # Runs on any staged `.gd`, in either direction -- the new member can be in the base or in the layer.
 if git diff --cached --name-only --diff-filter=ACM -- '*.gd' | grep -q .; then

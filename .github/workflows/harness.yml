@@ -93,6 +93,9 @@ jobs:
       - name: Install schema validator dependency
         run: pip install pyyaml
 
+      - name: No test suite redeclares a tests/test_base.gd member (D0117/D0119) — --no-verify skips the local hook, not CI
+        run: sh tools/check_base_namespace.sh
+
       - name: Layer dependency lint (ARCHITECTURE §3)
         run: python3 tools/layer_lint/layer_lint.py
 
@@ -159,9 +162,18 @@ jobs:
   #
   # Each suite is its own step on purpose: a failure names the exact suite in the Actions UI
   # without needing to open a log and find the right line, and one suite hanging (the
-  # documented core/MODULE.md hazard: an unguarded runtime error in a bare --headless --script
-  # run does not crash, it hangs with no exit code) times out that one step via timeout-minutes
+  # documented core/MODULE.md hazard: an unguarded runtime error directly inside _initialize()
+  # itself does not crash, it hangs with no exit code) times out that one step via timeout-minutes
   # rather than silently consuming the whole job's budget.
+  #
+  # Every suite below runs through tools/run_gd_test.sh, not a bare `./godot --script` — a SECOND,
+  # different, and more dangerous failure mode than the hang above (docs/DECISIONS_LEDGER.md
+  # D0115/D0116): a runtime error inside a CALLED function (every real _test_*() function, since
+  # _initialize() is always just a flat list of calls to them) does NOT hang and does NOT set a
+  # non-zero exit code — GDScript logs a SCRIPT ERROR and keeps going, so test_base.gd's own
+  # "ALL PASS" can print, and the process can exit 0, over a suite that silently lost part of its
+  # own coverage mid-run. The self-test step above proves the wrapper catches this before any
+  # step below is allowed to rely on it.
   tests:
     name: godot test suites (determinism, conservation, movement acceptance)
     runs-on: ubuntu-latest
@@ -188,53 +200,66 @@ jobs:
       - name: Import project (populate .godot/ cache)
         run: ./godot --headless --path . --import
 
+      # D0115/D0116: test_base.gd's own PASS/FAIL bookkeeping can print "ALL PASS" and exit 0 even
+      # after a real mid-suite crash — GDScript has no try/catch, so a runtime error inside any
+      # called function (every real _test_*() function) is invisible to _check()/_finish()'s own
+      # counters. tools/run_gd_test.sh is the fix (reads raw output for a SCRIPT ERROR: line, on
+      # top of the exit code); this step proves the fix against a real, reproducible crash BEFORE
+      # any step below is allowed to trust it — the director's own bar: "until that test exists and
+      # is observed failing on the pre-fix harness, the fix is not trusted."
+      - name: tools/run_gd_test.sh self-test (D0115/D0116 — must run before every suite below trusts it)
+        run: bash tools/test_run_gd_test.sh ./godot
+
       - name: test_fixed_point
-        run: ./godot --headless --path . --script res://tests/test_fixed_point.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_fixed_point.gd
 
       - name: test_split_rng
-        run: ./godot --headless --path . --script res://tests/test_split_rng.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_split_rng.gd
 
       - name: test_entity_id_pool
-        run: ./godot --headless --path . --script res://tests/test_entity_id_pool.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_entity_id_pool.gd
 
       - name: test_replay_determinism (QUALITY gate 8)
-        run: ./godot --headless --path . --script res://tests/test_replay_determinism.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_replay_determinism.gd
 
       - name: test_tile_grid
-        run: ./godot --headless --path . --script res://tests/test_tile_grid.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_tile_grid.gd
 
       - name: test_world_materials
-        run: ./godot --headless --path . --script res://tests/test_world_materials.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_world_materials.gd
 
       - name: test_value_noise
-        run: ./godot --headless --path . --script res://tests/test_value_noise.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_value_noise.gd
 
       - name: test_shaft_generator
-        run: ./godot --headless --path . --script res://tests/test_shaft_generator.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_shaft_generator.gd
 
       - name: test_heightfield
-        run: ./godot --headless --path . --script res://tests/test_heightfield.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_heightfield.gd
 
       - name: test_body
-        run: ./godot --headless --path . --script res://tests/test_body.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_body.gd
 
       - name: test_hostile_chamber
-        run: ./godot --headless --path . --script res://tests/test_hostile_chamber.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_hostile_chamber.gd
 
       - name: test_cave_geometry
-        run: ./godot --headless --path . --script res://tests/test_cave_geometry.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_cave_geometry.gd
 
       - name: test_body_acceptance (QUALITY gate 11 — movement acceptance suite)
-        run: ./godot --headless --path . --script res://tests/test_body_acceptance.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_acceptance.gd
 
       - name: test_bounds_invariant (QUALITY gate 24 — body never leaves the grid)
-        run: ./godot --headless --path . --script res://tests/test_bounds_invariant.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_bounds_invariant.gd
 
       - name: test_reachability_sweep (QUALITY gate 25 — full reachable extent, not just the scripted route)
-        run: ./godot --headless --path . --script res://tests/test_reachability_sweep.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_reachability_sweep.gd
 
       - name: test_body_fuzz_fast (QUALITY gate 26 — goalless input fuzzer, fast per-commit subset)
-        run: ./godot --headless --path . --script res://tests/test_body_fuzz_fast.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz_fast.gd
+
+      - name: test_reveal_metric (claims/C004's own dig-rate-lift instrument, D0114)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_metric.gd
 
   # D0060: the deep companion to test_body_fuzz_fast above -- the full 1000-seed x 1500-tick sweep
   # (~114s measured), which is why it runs nightly rather than on every push/PR. Only fires on the
@@ -265,5 +290,8 @@ jobs:
       - name: Import project (populate .godot/ cache)
         run: ./godot --headless --path . --import
 
+      - name: tools/run_gd_test.sh self-test (D0115/D0116 — must run before the suite below trusts it)
+        run: bash tools/test_run_gd_test.sh ./godot
+
       - name: test_body_fuzz (full sweep, D0060 allowlist)
-        run: ./godot --headless --path . --script res://tests/test_body_fuzz.gd
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz.gd

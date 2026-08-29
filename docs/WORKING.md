@@ -82,6 +82,51 @@ design decision surfacing rather than a parameter, touching `data/economy/` or t
 None hit. D0115 (test-harness finding) is exactly the "design decision surfacing" case — recorded and
 left for the director rather than resolved under this round's authorization.
 
+## Director's response to the reveal-layer report — D0115 fix, sweep-blindness hunt, density fix, 2026-08-28 — CLOSED
+
+Director prioritized, in order: (1) fix D0115, the harness's own trustworthiness, before anything else —
+"the most important thing in this report"; (2) a deliberate hunt across the whole repo for the same
+exit-code/pass-fail masking pattern, not just the two incidental catches; (3) the density-contrast
+screenshots read too weak — confirm the range is real, widen if not, report actual counts; (4) the
+replay driver, downstream of a trustworthy harness; (5) the `history/` 165-image cull, as its own pass,
+whenever. The hands-on-keyboard `--play` test stays explicitly open/owed, not closed by any of this.
+
+1. DONE (D0116). `tools/run_gd_test.sh` — wraps every suite invocation, fails on a `SCRIPT ERROR:` line
+   regardless of exit code. Root cause precisely determined (not assumed): a crash directly in
+   `_initialize()` hangs; a crash in any function it calls (every real suite's own shape) silently
+   continues past it instead. `tests/fixture_harness_crash_probe.gd` + `tools/test_run_gd_test.sh` prove
+   the pre-fix bug, then the fix, then a negative control — the director's own explicit TDD bar, met.
+   Wired into `.github/workflows/harness.yml` (18 suite invocations); `test_reveal_metric.gd` was also
+   found never wired into CI at all and fixed in the same pass. `core/MODULE.md`'s stale hang-only claim
+   corrected. `docs/QUALITY.md` gate 28 added.
+2. DONE (D0117/D0119/D0120). The hunt: audited every `.sh`/hook/Python-subprocess/GDScript-`OS.execute`
+   call site. Two more real instances found and FIXED, not just noted: `.githooks/pre-commit`'s
+   base-namespace gate had silently no-op'd for 119 commits since the pivot moved its target file to
+   `legacy/` (re-ported to `tests/test_base.gd`, a real bug found and fixed while porting, wired into CI
+   too); the fuzz probes' own crash-detection couldn't see a non-hanging crash in `_check_tick()` — fixed
+   with the same `SCRIPT ERROR:` guard, confirmed by actual injection (every pre-existing check stayed
+   green; only the new one caught it). D0118 separately consolidated the tautological-test-oracle class
+   (D0112/D0113/D0114) as its own named failure, distinct from sweep-blindness.
+3. DONE (D0121). Density screenshots re-diagnosed: the real counts were already a strong ~4x contrast
+   (dense=312/sparse=78, `test_shaft_generator.gd`) — the CAPTURE was the bug (a body-following zoom-6
+   camera shows ~28% of the topsoil band, a noisy local sample). Fixed with a new `--wide-view` capture
+   mode, not a parameter change; `history/154-reveal-density-*.png` replaced in place with the corrected
+   pair (same-round first draft superseded, not kept alongside it — 168 images, unchanged count).
+4. FINDING, NOT YET FIXED (D0122) — surfaced by this round's own gate diligence, not sought: running the
+   FULL (nightly-only) fuzzer for the first time since dig existed found a real, confirmed (A/B-verified)
+   regression — `embedded` 187 vs. a bound of 1, `grounded_no_floor` 95 vs. 32, a brand-new
+   `discontinuity` class at 4 (should be hard zero), all four returning to their EXACT established
+   baselines with dig disabled in a controlled re-run. Already on `main` (dig landed at `3181c30`),
+   invisible to the fast per-commit fuzzer, invisible to every gate CI actually runs. `sim/body` is this
+   project's own documented highest-risk module — flagged for the director rather than hastily patched.
+5. NOT STARTED. The replay driver (real recorded session → `RevealMetric`) — correctly sequenced after
+   D0115/D0117, which is now closed, but this round's time went to the harness fix, the hunt, and (once
+   discovered) triaging D0122 instead.
+6. NOT STARTED. The `history/` 165-image pre-pivot cull — explicitly the director's own call, whenever.
+
+HARD STOPS: none of the ORIGINAL four hit. D0122 is a new, different thing — not a stop this round
+crossed, a live defect this round's own diligence uncovered on a round already closed and pushed.
+
 ## Director's follow-up round on the execution-dense queue, 2026-08-28 — CLOSED
 
 Four items from the director's response to the queue above. No hard stop.
