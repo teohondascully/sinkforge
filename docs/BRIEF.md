@@ -67,11 +67,20 @@ recording on disk, including whatever `claims/C004`'s pending session produces.
 
 ## Gates
 
-All `layer_lint` gates PASS **except two, both pre-existing and both traced to the uncommitted D0139 work,
-not to this round**: `check_size_limits` FAILs on `sim/body/vertical_resolve.gd::resolve_floor()` at 59 lines
-(limit 50) — verified PASS at HEAD, where it is 49 — and `check_untracked_files` FAILs on
-`tests/test_vertical_resolve.gd`. Both clear the moment D0139 is ruled on. `schema_validator.py`,
-`data_codegen --check`, `check_working_freshness.py`, `anvil/check_integrity.py` (15 events, +2 this round)
+**Run `python3 tools/gate_status.py` for the current, real gate table — this section is a pointer to it,
+not a copy of it.** A hand-enumerated prose summary here is exactly the failure an external audit found:
+a prior version of this section said "all gates PASS" at a commit where CI was actually red
+(`docs/DECISIONS_LEDGER.md` D0142, D0143). The tool enumerates `docs/QUALITY.md`'s 29 gates and every CI
+step programmatically and reports NO-CODE / ADVISORY / PASS / FAIL per gate, plus a section for real CI
+checks tied to no gate number — it cannot go stale the way this paragraph can.
+
+As of `tools/gate_status.py`'s own last real run against pushed HEAD (`b71d6e9`, CI conclusion `success`):
+18/29 gates have linked enforcing code, 11 do not (gates 5, 6, 9, 10, 12, 14, 17, 18, 19, 20, 21 — matches
+an independent audit's own hand-derived count exactly). Zero FAIL, zero ADVISORY among the 29 at that
+commit. Two gates known to be red locally right now trace to the still-open, uncommitted D0139 investigation
+(`sim/body/vertical_resolve.gd::resolve_floor()` at 59 lines against a 50 limit; an untracked test file) —
+not to anything in this round, and not visible in CI since that work was never pushed. `schema_validator.py`,
+`data_codegen --check`, `check_working_freshness.py`, `anvil/check_integrity.py` (15 events)
 — all PASS. No `sim/` or `core/` file was touched this round.
 
 **Commits this round: 1, pushed.**

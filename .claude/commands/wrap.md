@@ -25,6 +25,8 @@ Run the end-of-session checklist, in this order:
    needs to know to avoid repeating a mistake or losing a result, it doesn't belong here.
 6. Regenerate `docs/BRIEF.md` — this must be the last file write before reporting, not an arbitrary
    session boundary, since anything written after would make the brief stale on arrival.
-7. Run every gate (`tools/layer_lint/*.py`, `tools/schema_validator/schema_validator.py`,
-   `tools/data_codegen/generate.py --check`) and confirm the current state, not from memory.
+7. Run `python3 tools/gate_status.py` and confirm the current state from its output, not from memory or
+   a hand-enumerated list of scripts. (`docs/DECISIONS_LEDGER.md` D0143 — a hand list here is exactly the
+   drift an external audit found: this step used to name three specific tool paths, itself a subset of
+   what CI actually runs, and would not have shown the blocking duplication-gate failure D0142 fixed.)
 8. Report to the director.

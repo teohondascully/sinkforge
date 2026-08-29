@@ -19,7 +19,14 @@ Two things are added that the prior program lacked, and both target the specific
 
 ## 1. The gates
 
-Every gate is CI-enforced. A PR that fails any gate does not merge. No gate is lowered to make CI green; that rule is itself a gate.
+The numbered list below is the declared contract. It is not the current status — an external audit found
+gates declared here with no enforcing code at all, and this document is exactly the kind of hand-typed
+claim that drifts. **Run `python3 tools/gate_status.py` for the real, current answer to "is gate N
+enforced right now"**: it enumerates this list programmatically, cross-references it against
+`.github/workflows/harness.yml`, and reports NO-CODE, ADVISORY, PASS, or FAIL per gate — never a prose
+assertion. `docs/DECISIONS_LEDGER.md` D0143.
+
+Every gate below is intended to be CI-enforced. A PR that fails any gate does not merge. No gate is lowered to make CI green; that rule is itself a gate.
 
 ### Structure
 
