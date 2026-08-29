@@ -5638,3 +5638,44 @@ Does not gate anything itself (exit code 0 always) — a report, per the audit's
 build new instruments; whether/how its output gets wired into CI as its own check is a separate decision.
 
 Reverse: `git rm tools/gate_status.py`. No other file changed by this entry.
+
+---
+
+## D0144 · 2026-08-29 · the LOC-ratio gate armed — a health metric that had never once been able to fail, per the external audit's item 3
+
+`tools/layer_lint/check_loc_ratio.py` (`docs/QUALITY.md` gate 7) carried a `GAME_LOC_ADVISORY_FLOOR = 2000`:
+below 2000 lines of game code, the script always returned 0 regardless of its own computed verdict. Game
+LOC has never exceeded 1665 at any point this project has measured it (this entry's own run: 1665), so the
+floor was not a calibration decision anyone weighed against real numbers — it was a permanent off switch
+with a threshold-shaped number attached, and "Instrument LOC may not exceed game LOC. Enforced in CI." has
+been true of the code's INTENT since it was written and false of its BEHAVIOR the entire time.
+
+**Armed by deleting the floor, not by raising it or narrowing what it checks.** Per the audit's own explicit
+instruction: "Either make it gate... or delete the gate... No middle state... Do NOT lower a threshold,
+re-add an advisory floor, or narrow the definition to make it pass." The removal is the entire diff:
+`GAME_LOC_ADVISORY_FLOOR`'s declaration and the branch that checked it against `game_total`. Nothing else in
+the file changed; the underlying velocity computation (`violates_velocity`) is unmodified, pre-existing
+logic.
+
+**Run, immediately after arming, honest and red:** `instrument grew 560 lines against game's 28 over the
+last 10 commits, more than 2x` — exit 1. Not fixed. Not suppressed. Not narrowed.
+
+**A precision the audit's own framing invites conflating, stated so the record does not repeat it:** this
+script has only ever gated on trailing-window VELOCITY (instrument growth vs. game growth over
+`WINDOW_COMMITS` commits) — never on the ABSOLUTE ratio `docs/QUALITY.md` gate 7's own words describe
+("Instrument LOC ≤ game LOC"). Arming the floor did not turn the absolute ratio (6.4, printed every run,
+still purely informational) into a second gating condition; it currently fails anyway, because the velocity
+condition it has always checked happens to also be violated right now. That the gate is red is not evidence
+the absolute-ratio question — is 6.4:1 an acceptable ratio for this project, at this stage — has been
+answered. It has not. That is the director's ruling to make, per the audit's own instruction ("do not
+resolve the failure... surface the decision").
+
+No mutation test was added for this change. The diff is a pure deletion of a short-circuit around
+pre-existing, unmodified logic — the smallest possible surface for a new defect — and building a permanent
+`test_check_loc_ratio.py` is new-instrument scope the audit's own Tier 1 explicitly excludes ("Do not build
+new instruments"). A quick algebraic check before trusting the arm: `violates_velocity` is not vacuously
+true — `instrument_growth=100, game_growth=500` would give `False` (100 > 50 but not 100 > 1000) — so the
+gate can still PASS under a healthy ratio; it does not merely always fail now.
+
+Reverse: restore `GAME_LOC_ADVISORY_FLOOR = 2000` and the branch that checked it. `docs/QUALITY.md`'s
+pointer to `tools/gate_status.py` (D0143) is unaffected either way.

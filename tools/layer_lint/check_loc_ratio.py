@@ -26,16 +26,24 @@ the identical fetch-depth comment for the same failure shape hitting `tools/chec
 before this gate existed.
 
 FAIL when instrument growth exceeds game growth by more than RATIO_LIMIT, gated by GROWTH_FLOOR so a
-handful of added lines in a quiet week can't trip it on ratio alone. ADVISORY (never blocking, exit 0
-regardless of the verdict) while current game LOC is under GAME_LOC_ADVISORY_FLOOR: below that the
-absolute numbers are too small for a ratio to mean anything, so the floor itself is written down here
-rather than left an implicit side effect of small numbers, per the threshold-before-measurement
-discipline this project applies to claims (docs/CLAIMS.md §10b).
+handful of added lines in a quiet week can't trip it on ratio alone.
 
-The absolute (all-time) ratio is still computed and printed every run -- purely informational, feeds
-docs/BRIEF.md's "LOC ratio" line by hand, never gates the exit code. Losing that number entirely would
-have hidden exactly the state this gate's predecessor caught (instrument outpacing game in absolute
-terms); it just isn't grounds for a FAIL on its own anymore.
+**Armed 2026-08-29 (`docs/DECISIONS_LEDGER.md` D0144), per an external audit's finding: this was the
+project's stated health metric ("Instrument LOC may not exceed game LOC... Enforced in CI",
+`docs/QUALITY.md` gate 7) and had never once been able to fail** -- the `GAME_LOC_ADVISORY_FLOOR` below
+used to force ADVISORY (exit 0 unconditionally) whenever game LOC was under 2000, and game LOC has never
+exceeded 1665 at any point this project has measured it, so the floor was not a calibration, it was a
+permanent off switch with a number attached. Removed rather than raised or justified, per the audit's own
+explicit instruction not to narrow scope to make a failing check pass.
+
+**What "armed" actually gates, stated precisely because it is not the same claim `docs/QUALITY.md` gate 7
+makes:** this script has only ever gated on trailing-window VELOCITY (instrument growth vs. game growth
+over the last WINDOW_COMMITS commits), never on the ABSOLUTE ratio gate 7's own words describe
+("Instrument LOC ≤ game LOC"). The absolute ratio is still computed and printed every run, still purely
+informational -- arming the advisory floor did not turn it into a second gating condition, because doing
+that is a design decision (what should the real enforced condition be?) this change does not make. It
+currently fails anyway, because the velocity condition it has always checked is also currently violated;
+that is not evidence the absolute-ratio question has been answered too.
 """
 from __future__ import annotations
 
@@ -53,7 +61,6 @@ CODE_EXTENSIONS = (".gd", ".py", ".sh")
 WINDOW_COMMITS = 10
 RATIO_LIMIT = 2.0
 GROWTH_FLOOR = 50
-GAME_LOC_ADVISORY_FLOOR = 2000
 
 
 def _run_git(args: list[str]) -> str:
@@ -157,13 +164,6 @@ def main() -> int:
         instrument_growth > GROWTH_FLOOR
         and instrument_growth > RATIO_LIMIT * max(game_growth, 0)
     )
-
-    if game_total < GAME_LOC_ADVISORY_FLOOR:
-        verdict = "would FAIL" if violates_velocity else "would PASS"
-        print(f"check_loc_ratio: ADVISORY -- game LOC ({game_total}) is under the "
-              f"{GAME_LOC_ADVISORY_FLOOR}-line floor where this ratio means anything. "
-              f"Velocity check {verdict} but is not gating this run.")
-        return 0
 
     if violates_velocity:
         print(f"check_loc_ratio: FAIL -- instrument grew {instrument_growth} lines against game's "
