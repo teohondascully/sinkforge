@@ -6133,3 +6133,30 @@ parked-instrument citations were handled (D0153-D0155).
 
 **Reverse cost:** `git mv` each of the nine back to `docs/`, then remove its own added 4-line header (or
 just `git revert` this commit).
+
+## D0159 · WORKING.md reset to 84 lines; full history through 2026-08-29 archived (E4, queue Part E) · 2026-08-29
+
+**Decided:** `docs/WORKING.md` had grown to 1332 lines — entirely historical CLOSED rounds back to the
+acceptance-suite stage (D0032/D0033), against its own header's explicit "resets when a stage closes" and
+CI's own `check_size_limits.py` WARN-at-300 convention (applied to docs informally, though this gate is
+GDScript/Python-scoped, not `.md`-scoped, so nothing actually enforced this). Copied verbatim (not `git
+mv` — a fresh snapshot copy, since the new file's own git history starts here rather than inheriting
+`docs/WORKING.md`'s prior log, which is the correct semantic for an archived point-in-time record) to
+`docs/archive/working/WORKING-2026-08-29.md` (new subdirectory, dated filename, per the queue's own
+instruction), with a one-paragraph header stating what it is and that the genuinely open items were
+restated, not lost.
+
+**New `docs/WORKING.md`, 84 lines** (was 1332): the standard header, a pointer to the archive, a compact
+report of this queue's own progress so far (Parts A-E1-E4, each with its landed ledger entry number), and
+three still-open threads carried forward without loss of the load-bearing detail: D0139's uncommitted
+`resolve_floor` investigation (both hard-stop findings restated compactly, full detail pointer given), the
+persistent-world GDD reversal (still needs the brief re-supplied), and the standing director-reserved items
+(`data/economy/`, `history/` cull, the hands-on-keyboard `--play` session, plus the parked control-plane
+slice's own dropped Codex finding, with the exact `git show` command to recover its Anvil FINDING JSON now
+that `.anvil/` itself is parked).
+
+**Verified:** `wc -l docs/WORKING.md` = 84; `check_working_freshness.py` re-run, PASS (states 2026-08-29,
+matches `HEAD`'s own commit date).
+
+**Reverse cost:** `git checkout HEAD~1 -- docs/WORKING.md` restores the 1332-line version; the archived copy
+can stay regardless (it's additive, not a replacement of anything that existed before this commit).
