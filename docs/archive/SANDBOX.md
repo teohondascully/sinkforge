@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** Its own header already states "Status: PROPOSED, NOT BUILT (2026-08-16)" — nothing described here was ever built. Kept for provenance.
+
+---
+
 # THE SANDBOX — a contact sheet, not a second game
 
 > **Status: PROPOSED, NOT BUILT (2026-08-16).** Nothing described here exists yet. `tools/sandbox.gd`,

@@ -6097,3 +6097,39 @@ step (removed here, staged correctly, verified via `git status` showing `M ` not
 
 **Reverse cost:** not applicable — corrective entry, per the append-only ledger convention. `e852f3a` and
 `42ddc7c` remain unedited.
+
+## D0158 · nine legacy docs archived; DECISIONS.md NOT archived — its own normative doc explicitly forbids it (E3, queue Part E) · 2026-08-29
+
+**Decided:** moved (not deleted — `git mv`, full history preserved) nine of the ten files the queue named to
+`docs/archive/`, each with a dated `> **ARCHIVED 2026-08-29 (queue Part E3).**` header stating specifically
+why: `A_PLUS_STATUS.md` (the PRE-PIVOT engineering programme's own tracker — names `world_renderer.gd`/
+`main.gd`/`factory_sim.gd`, all frozen under `legacy/`; distinct from the current, active `docs/
+A_PLUS_PROGRAM.md`), `ENGINEERING.md` and `HARNESS_LAYERS.md` (both describe the pre-pivot "119 registered
+check layers" harness, not this project's current 29-gate one), `CAPTURE_MANIFEST.md` (its own header claims
+a generating script, `tools/capture_manifest.sh`, that does not exist anywhere in this tree — confirmed by
+`find` before archiving, not assumed — and `harness.yml`'s own header separately records the capture-manifest
+workflow "did not port"), `BITS.md`/`LODE.md`/`CONTENT_CATALOG_PLAN.md` (each already self-marked "Edited
+2026-08-25 for the run-based pivot"), `SANDBOX.md` (already self-marked "PROPOSED, NOT BUILT"),
+`VISUAL_TRIAGE.md` (a dated evidence ledger from a specific past pass, superseded by `docs/WORKING.md`/
+`docs/PRIORITY.md` for current visual work).
+
+**`docs/DECISIONS.md` — the tenth file the queue named — was NOT archived and its normative-table entry was
+NOT removed.** Checked before touching it, per the standing rule to verify against tool output before
+acting: root `ONBOARDING.md` (a normative doc, un-superseded) states explicitly, in its own §0.4: **"`docs/
+DECISIONS.md` stays and is normative. It is the most valuable document in the repository... Do not archive
+it."** And `docs/README.md`'s own normative table lists it at line 19 — ONBOARDING.md separately records
+that omitting it there was "a real gap, not a stylistic choice." `docs/DECISIONS.md` is also actively cited,
+right now, by real CI-enforced tooling: `tools/check_trailers.sh` ("`docs/DECISIONS.md` records this as a
+locked rule") and `tools/layer_lint/check_project_settings.py` ("Enforcement tripwire #1"), both currently
+green gates. **This is a direct conflict between the queue's own instruction and an existing, explicit,
+un-superseded normative-doc instruction — not an ambiguity to resolve unilaterally.** Reported to the
+director rather than executed; the nine files with no such conflict were archived as specified.
+
+**Verified no dangling functional reference from the nine moves:** none of the nine appears in `harness.yml`,
+`CLAUDE.md`, or `CONTEXT.md`; `docs/README.md`'s own normative table did not list any of the nine either (so
+no table edit was needed for them). Citations from other docs (`docs/DECISIONS_LEDGER.md`'s own historical
+entries, `history/README.md`) are prose, not paths a script reads — left as-is, consistent with how E1's
+parked-instrument citations were handled (D0153-D0155).
+
+**Reverse cost:** `git mv` each of the nine back to `docs/`, then remove its own added 4-line header (or
+just `git revert` this commit).

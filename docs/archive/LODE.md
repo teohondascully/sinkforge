@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** Already marked "Edited 2026-08-25 for the run-based pivot" in its own header. The lode migration it describes has since shipped (see `docs/WORKING.md`'s "Lode migration" entry, phase 1); this document is the design record predating that build, not a current spec. Kept for provenance.
+
+---
+
 # THE LODE — ore lives in the wall, and mining stops being a trap
 
 > **Edited 2026-08-25** for the run-based pivot: sections specific to persistent-world design were

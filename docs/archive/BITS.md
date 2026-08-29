@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** Already marked "Edited 2026-08-25 for the run-based pivot" in its own header; superseded further by the persistent-world reversal thread now in `docs/WORKING.md` (unlanded as of this move). Kept for provenance.
+
+---
+
 # THE BIT SET — picks that differ in SHAPE, and rock that has a grain
 
 > **Edited 2026-08-25** for the run-based pivot: sections specific to persistent-world design were

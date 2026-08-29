@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** Describes "119 registered check layers" — the pre-pivot codebase's own verification harness, frozen read-only under `legacy/`. The current harness is `docs/QUALITY.md`'s 29 numbered gates plus `tools/gate_status.py`'s live table. Kept for provenance.
+
+---
+
 # How this project is verified
 
 Sinkforge is a Godot 4 game with an unusually large test surface: 119 registered check layers across

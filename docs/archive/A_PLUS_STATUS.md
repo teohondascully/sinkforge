@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** The pre-pivot engineering programme's own status tracker — its disposition table names `world_renderer.gd`, `main.gd`, `factory_sim.gd`, all pre-pivot files now frozen read-only under `legacy/`. Not the same document as the current, active `docs/A_PLUS_PROGRAM.md`. Kept for provenance: a reader tracing why the legacy codebase's own quality work closed the way it did needs this.
+
+---
+
 # Engineering programme — status
 
 A bounded quality programme run over this repository before further feature work. Six areas, fixed order,

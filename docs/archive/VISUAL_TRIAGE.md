@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** An evidence ledger from a specific visual-triage pass, dated to its own findings. Current visual/legibility work is tracked in `docs/WORKING.md` and `docs/PRIORITY.md`. Kept for provenance.
+
+---
+
 # Visual triage: making Sinkforge playable to look at
 
 An evidence ledger, not a licence for a wholesale art rewrite, a new UI framework, or a threshold

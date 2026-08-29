@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** "How to add a harness layer" for the pre-pivot codebase's own check-layer system, frozen read-only under `legacy/`. The current project has no equivalent registration step; see `docs/QUALITY.md` for how a gate is added now. Kept for provenance.
+
+---
+
 # How to add a harness layer
 
 Until this file existed the honest answer to "how do I add a layer?" was *copy the nearest one and hope*,

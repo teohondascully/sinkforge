@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** Already marked "Edited 2026-08-25 for the run-based pivot" in its own header. Cites `docs/DECISIONS.md` extensively as a live planning document would; `docs/DECISIONS.md` itself remains normative and un-archived (`ONBOARDING.md`'s own explicit instruction), only this planning document is superseded. Kept for provenance.
+
+---
+
 # One catalog, one schema, one owner per fact
 
 > **Edited 2026-08-25** for the run-based pivot: sections specific to persistent-world design were

@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-08-29 (queue Part E3).** Its own header claims `bash tools/capture_manifest.sh` regenerates this file — that script does not exist anywhere in this tree (confirmed before archiving, not assumed); `.github/workflows/harness.yml`'s own header separately records that the capture-manifest workflow "did not port" across the pivot. Already dead before this move, not made dead by it. Kept for provenance.
+
+---
+
 # CAPTURE MANIFEST
 
 **Generated. Do not edit.** `bash tools/capture_manifest.sh` rewrites it;
