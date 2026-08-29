@@ -23,24 +23,6 @@ var TICKS_PER_SEED: int = DEFAULT_TICKS_PER_SEED
 var DIG_DISABLED: bool = false
 
 
-func _spawn_body() -> Body:
-	var col: int = HostileChamber.SPAWN_START + 2
-	return Body.new(
-		col * CELL * Fx.SCALE + (CELL * Fx.SCALE) / 2,
-		Fx.from_int(HostileChamber.FLOOR_ROW * CELL) - Body.HEIGHT_PX / 2 * Fx.SCALE)
-
-
-func _random_input(rng: SplitRng) -> InputFrame:
-	var input: InputFrame = InputFrame.new()
-	input.move_dir = rng.next_range(-1, 1)
-	input.jump_pressed = rng.next_float() < 0.5
-	input.jump_held = rng.next_float() < 0.5
-	input.mantle_hold = rng.next_float() < 0.5
-	var dig_roll: bool = rng.next_float() < 0.5
-	input.dig_pressed = dig_roll and not DIG_DISABLED
-	return input
-
-
 ## The two columns and heights `Heightfield.surface_y_at_x` would blend between for `x_fx` -- this
 ## REPRODUCES its own column-selection math rather than extracting it, so this file adds zero coupling
 ## to `heightfield.gd`'s own internals; if that math ever changes, this diagnostic script goes stale
@@ -98,9 +80,9 @@ func _initialize() -> void:
 	var diagnosed: int = 0
 	for seed: int in range(NUM_SEEDS):
 		var rng: SplitRng = SplitRng.new(seed)
-		var body: Body = _spawn_body()
+		var body: Body = FuzzDriverCommon.spawn_body()
 		for tick: int in range(TICKS_PER_SEED):
-			body.tick(_random_input(rng), grid)
+			body.tick(FuzzDriverCommon.random_input(rng, DIG_DISABLED), grid)
 			if body.floor_source_this_tick == &"resolve_floor" and not PropertyChecks.grounded_implies_solid_beneath(body, grid):
 				_diagnose(body, grid, seed, tick)
 				diagnosed += 1

@@ -5508,3 +5508,49 @@ later" stays aspirational until `interface/` has code in it at all. Nothing was 
 `tests/control_plane/`.
 
 Reverse: nothing to reverse — no code changed.
+
+---
+
+## D0142 · 2026-08-29 · CI's duplication gate was RED from this session's own `diag_resolve_floor.gd` — two exact clusters extracted to `FuzzDriverCommon`, behavior proven byte-identical
+
+`tools/quality_check/duplication.py` is a blocking CI step (`.github/workflows/harness.yml:141`, D0099).
+It was exiting 1 with two clusters, both introduced by `tests/diag_resolve_floor.gd` (D0137, committed
+this session in `aba9793`): `_spawn_body` and `_random_input`, byte-identical to
+`tests/fixture_body_fuzz_probe.gd`'s own. Found by an overnight-queue quality sweep, not by CI reporting
+it — worth noting on its own, since the gate had been red since `aba9793` and no one had looked.
+
+**Extracted to `tests/body/fuzz_driver_common.gd` (`FuzzDriverCommon.spawn_body`/`random_input`), which is
+the precedent this exact gate already set once**: `DebugSceneCommon` exists because `duplication.py`
+caught `reveal_scene.gd` duplicating `play_scene.gd` (D0116), and the note there applies verbatim here —
+the second file was deliberately modeled on the first, which is precisely the case the gate exists to
+catch, so the fix is real deduplication rather than a new exclusion.
+
+**The one judgment call, and why it does not conflict with D0137's stated intent.**
+`diag_resolve_floor.gd`'s own header says it "REPRODUCES its own column-selection math rather than
+extracting it, so this file adds zero coupling." That intent is about the SUBJECT under diagnosis — the
+floor-resolution math the file exists to observe without perturbing — not about harness setup. Nothing in
+`FuzzDriverCommon` touches `Heightfield`, `VerticalResolve`, or any quantity either driver measures; it
+holds a spawn position and an input draw. The zero-coupling property D0137 was protecting is intact.
+
+**Behavior proven unchanged, not argued unchanged.** `tests/test_body_fuzz_fast.gd` run before and after,
+output diffed: **byte-identical** (`violations=868`, `bounds=868`, every gated category 0). The dig draw
+order inside `random_input` is load-bearing — `dig_disabled` overrides only the RESULT of the draw, never
+whether the draw happens, so a dig-on/dig-off A/B is not confounded by a shifted rng stream (D0127) — and
+that ordering is preserved verbatim, with the reasoning moved into the extracted function rather than left
+behind in a file that no longer contains the code it describes.
+
+**Note on the A/B's own validity, since the working tree is dirty:** `sim/body/vertical_resolve.gd`
+carries D0139's uncommitted, un-ruled fix attempt. Both runs were taken WITH that change present, so the
+absolute numbers above describe the dirty tree, not HEAD. That is intentional and does not weaken the
+comparison: the confound is held identical across both arms, and the quantity under test is the DELTA
+from the extraction, which is zero. No attempt was made to stash or revert the D0139 evidence to get
+cleaner absolute numbers.
+
+**One real failure on the way, recorded because it is a standing hazard, not a one-off.** The first
+post-extraction run failed with `Parse Error: Identifier "FuzzDriverCommon" not declared in the current
+scope` — a new `class_name` global is not visible until Godot re-imports the project
+(`.godot/global_script_class_cache.cfg`). `godot --headless --import` fixed it. The harness caught this
+loudly rather than silently undercounting, which is D0115/D0117's `SCRIPT ERROR` detection working as
+designed: the run reported `bounds=0` and FAILED, instead of reporting a clean zero-violation sweep.
+
+Reverse: `git revert` this commit; `FuzzDriverCommon` has no other consumers.

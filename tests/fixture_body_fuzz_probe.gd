@@ -35,28 +35,6 @@ const DEADLOCK_TICKS: int = 300  ## consecutive identical (pos,vel,on_floor) tup
 const POSITION_SANITY_PX: int = 1_000_000  ## far past any real chamber; catches wraparound/overflow
 
 
-func _spawn_body() -> Body:
-	var col: int = HostileChamber.SPAWN_START + 2
-	return Body.new(
-		col * CELL * Fx.SCALE + (CELL * Fx.SCALE) / 2,
-		Fx.from_int(HostileChamber.FLOOR_ROW * CELL) - Body.HEIGHT_PX / 2 * Fx.SCALE)
-
-
-func _random_input(rng: SplitRng) -> InputFrame:
-	var input: InputFrame = InputFrame.new()
-	input.move_dir = rng.next_range(-1, 1)
-	input.jump_pressed = rng.next_float() < 0.5
-	input.jump_held = rng.next_float() < 0.5
-	input.mantle_hold = rng.next_float() < 0.5
-	## `dig_pressed` is real input surface now, and this fuzzer's whole reason to exist is exercising the
-	## input space undirected, not just the subset that existed when it was first written. The draw
-	## itself always happens, even under `--no-dig` -- only the RESULT is overridden, so disabling dig
-	## doesn't shift every later rng draw this tick by one and confound the A/B with a second variable.
-	var dig_roll: bool = rng.next_float() < 0.5
-	input.dig_pressed = dig_roll and not DIG_DISABLED
-	return input
-
-
 ## The largest displacement a single tick can LEGITIMATELY produce, using the body's own per-tick event
 ## flags as ground truth for which teleports actually fired -- not a single flat cap, which would either
 ## miss real bugs (too generous) or false-positive on ordinary mantles (too tight).
@@ -166,10 +144,10 @@ func _initialize() -> void:
 	var violations: int = 0
 	for seed: int in range(NUM_SEEDS):
 		var rng: SplitRng = SplitRng.new(seed)
-		var body: Body = _spawn_body()
+		var body: Body = FuzzDriverCommon.spawn_body()
 		var state: _RunState = _RunState.new(body)
 		for tick: int in range(TICKS_PER_SEED):
-			body.tick(_random_input(rng), grid)
+			body.tick(FuzzDriverCommon.random_input(rng, DIG_DISABLED), grid)
 			violations += _check_tick(body, grid, grid_w, grid_h, state, seed, tick)
 	print("FUZZ_SUMMARY seeds=%d ticks_per_seed=%d total_ticks=%d violations=%d dig_disabled=%s" %
 		[NUM_SEEDS, TICKS_PER_SEED, NUM_SEEDS * TICKS_PER_SEED, violations, DIG_DISABLED])
