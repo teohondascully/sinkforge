@@ -8,6 +8,36 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## CLOSED — the director's own NO_FLOOR fix was PROVEN a mathematical no-op, reverted, hard stop honored, D0138, 2026-08-29
+
+Working tree clean; HEAD `dc322f6`, everything pushed. Director's ruling on D0137's diagnosis: fix the
+sentinel at its source (exclude `Heightfield.NO_FLOOR` from `resolve_floor`'s own `mini()`), with the bound
+DROPPING as the acceptance signal, and an explicit hard stop if it didn't: "something is wrong with my
+reasoning or yours — stop and report."
+
+**Implemented exactly as specified, mutation-tested BEFORE the full sweep — and the mutation test is what
+caught it.** `VerticalResolve._min_real_surface`: exclude `NO_FLOOR` samples, take min of the remainder,
+`NO_FLOOR` only if all three were. Reverting it back to a bare `mini(mini(a,b),c)` and re-running its own
+four unit tests: **all four still passed — no test can distinguish the two formulations, because none
+exists.** `NO_FLOOR` (i32 max) already loses every `mini()` comparison it's ever part of; excluding an
+already-guaranteed loser changes nothing, for any input, provably — not an empirical sample, a mathematical
+certainty confirmed by trying to break it and failing.
+
+**Confirmed against the real sweep anyway, per instruction not to skip the empirical step.** Golden
+traverse unchanged (225 ticks), determinism unchanged, D0122 fixture's own violation count unchanged
+(67,119). **The full 1000x1500 sweep: every single metric byte-identical to the pre-fix baseline**
+(`grounded_no_floor=59`, `bounds=805397`, `embedded=0`, `overflow=0`, `discontinuity=0`, `deadlock=0`) —
+not "didn't drop enough," literally unchanged.
+
+**Hard stop honored: reverted, nothing shipped.** `sim/body/vertical_resolve.gd` back to its exact
+pre-attempt state; the new unit test file deleted; nothing was committed before the revert, so the tree is
+clean against `HEAD`, not just clean now. Full explanation plus real candidates for what WOULD change
+behavior (require all-three-real before `resolve_floor` succeeds; check full-footprint solidity inline) —
+offered for the director's own ruling, not decided or built here. D0138.
+
+**Control-plane thread: still holds, still waiting on the director's review of D0134.** This round did not
+touch it, per the standing ordering.
+
 ## CLOSED — the bound-raise justification was falsified, resolve_floor diagnosed to one mechanism, D0135-D0137, 2026-08-29
 
 Working tree clean; HEAD `aba9793`, everything pushed. The director's own follow-up to the round below:
