@@ -6059,3 +6059,41 @@ question is the actual design decision this queue's own hard stops forbid taking
 description string at all (`grep` for "description" in that script: no match) — re-run anyway, still PASS.
 
 **Reverse cost:** revert `project.godot`, one line.
+
+## D0157 · corrective: the E1 commit (e852f3a) never actually staged its own harness.yml fix or its own ledger entries · 2026-08-29
+
+**What happened, stated plainly:** the E1 parking commit's own staging command was
+`git add -A tools/economy_check tools/anvil .anvil tests/control_plane .github/workflows/harness.yml
+docs/DECISIONS_LEDGER.md` — `tools/economy_check` had already been fully removed from disk by an earlier,
+separate `git rm --cached` in the same session, so that pathspec matched nothing, and git's own behavior
+for `git add` given ANY pathspec that matches nothing is to abort the ENTIRE invocation with a `fatal:`
+error rather than stage the other, valid paths and skip the bad one. The subsequent `git status` output
+that looked like confirmation (` M .github/workflows/harness.yml`, ` M docs/DECISIONS_LEDGER.md`) was
+misread — the leading space in porcelain format means NOT staged, only modified in the working tree; only
+the paths already staged by the earlier separate `git rm --cached` calls (the three directory deletions)
+actually made it into `e852f3a`. Confirmed directly: `git show --stat e852f3a` and `git show e852f3a --
+.github/workflows/harness.yml` / `-- docs/DECISIONS_LEDGER.md` both show neither file touched at all,
+despite that commit's own message claiming both changes.
+
+**Consequence, checked against real CI, not assumed:** `gh run list` shows `e852f3a`'s own CI run
+(`33268154153`) was `cancelled`, not `failure` — superseded by the next push before its `tests` job could
+reach the now-dangling `res://tests/control_plane/test_observation_builder.gd` step (this workflow's own
+`concurrency: cancel-in-progress: true`). It never actually ran red, but the NEXT commit (`42ddc7c`, E2's
+"roguelite" fix, which incidentally picked up the pending `docs/DECISIONS_LEDGER.md` changes via its own
+`git add ... docs/DECISIONS_LEDGER.md` — explaining that commit's own "96 insertions" being D0153-D0156
+combined, not D0156 alone) still carried the SAME dangling harness.yml reference, uncorrected, and its own
+CI run (`33268194765`) was caught still `in_progress` — about to fail on the same missing-file step — at
+the moment this was discovered. Fixed immediately, in this commit, before that run could complete.
+
+**Why this matters beyond the one gap:** this is the exact failure class the whole Phase 1 audit response
+exists to catch — declared state (a commit message asserting a change) diverging from the actual tree —
+caught here by re-reading `git show`/`gh run list` output directly rather than trusting the commit
+message or the porcelain status line's visual shape, per the standing rule to verify a claim against real
+tool output. `.githooks/commit-msg`'s own D0151 ledger-header rule (this same session) would not have
+caught this specific gap — it fires on `core/`/`sim/` changes, and none of these commits touch either.
+
+**Fixed, same commit as this entry:** `.github/workflows/harness.yml`'s dangling `test_observation_builder`
+step (removed here, staged correctly, verified via `git status` showing `M ` not ` M` before committing).
+
+**Reverse cost:** not applicable — corrective entry, per the append-only ledger convention. `e852f3a` and
+`42ddc7c` remain unedited.
