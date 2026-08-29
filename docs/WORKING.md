@@ -8,6 +8,59 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## OVERNIGHT QUEUE, 2026-08-29 — STOPPED ON A FALSE PREMISE. 4 of 5 items rest on state that does not exist.
+
+The queue's own context line: "the bound-diagnosis mechanism, the 4-case diagnosis, and the two
+control-plane fixes are already done." **None of the first two is true, and the third is half true.**
+Verified against the tree, not from memory:
+
+| Premise | Actual state | Evidence |
+|---|---|---|
+| bound-diagnosis mechanism built | **does not exist** | `git grep -liE "bound.?diagnos\|diagnos.?bound\|bound_diag"` over `tools/ tests/ sim/ core/` → zero files. `tools/` has no such entry. |
+| `grounded_no_floor` fixed to 4 | **is 59** | `tests/test_body_fuzz.gd:68`: `const DESIGN_TRADEOFF: Dictionary = {"grounded_no_floor": 59}` |
+| resolve_floor fix applied | **uncommitted, un-ruled** | `git status`: `M sim/body/vertical_resolve.gd` still dirty, unchanged since the checkpoint |
+| two control-plane fixes done | **one landed, one reported blocked** | D0140 landed (ADR 0006); D0141 reported item 2 as not executable |
+
+**Disposition, item by item:**
+
+1. **STOPPED — no retrofit exists to have surfaced anything.** Cannot report an all-clear (there is no
+   scan) and cannot report an undiagnosed bound (nothing ran). Reporting "all bounds diagnosed" here
+   would be a green with no instrument behind it.
+2. **STOPPED — cannot confirm what did not happen.** `grounded_no_floor` is 59, not 4; the fix that was
+   to move it is uncommitted and sitting on two un-ruled hard-stop findings. A full 1000×1500 sweep would
+   re-measure a baseline nothing has changed since (this session has touched only docs and `tests/`), at
+   ~an hour of compute, to confirm a number already measured. Declined as waste, not as difficulty.
+3. **STOPPED — would require fabricating a measurement.** The specified entry narrates "bound 32 pre-dig,
+   59 wrongly attributed, **4 correctly fixed**." The third stage never occurred. Writing it into the
+   append-only ledger would put an invented number into the permanent record, against the standing rule
+   that a numeric claim is verified against tool output before it is written. The arc close-out is
+   writable the moment D0139 is ruled on and a real post-fix number exists.
+4. **DONE, and it found a live CI failure.** See D0142 below.
+5. **ANSWERED as far as it can be.** No mechanism exists to audit, so the useful deliverable is the
+   population one would have to cover — see below.
+
+**Item 5's answer without the mechanism: the fuzz suite holds 2 of roughly 8 non-zero bounds.**
+In the fuzz suite: `RESIDUAL = {"embedded": 1}` and `DESIGN_TRADEOFF = {"grounded_no_floor": 59}`
+(`tests/test_body_fuzz.gd:67-68`). Outside it, and invisible to anything fuzz-scoped:
+`GOLDEN_TRAVERSE_TICKS = 225` plus its ±5% tolerance (`tests/test_body_acceptance.gd:14,129`),
+`MAX_TICKS = 3000` at three sites (`test_body_acceptance.gd:8`, `body/play_scene.gd:38`,
+`body/reveal_scene.gd:18`), `Body.FLOOR_SCAN_ROWS = 48` (ADR 0005, a measured window width), and
+`tools/economy_check/check_tier_rule.py`'s `RESIDUAL_NOTE`/`RESIDUAL_ANVIL_FINDING_ID`. So a mechanism
+scoped to the fuzzer would cover ~25% of its stated subject — the exact "check that covers less than its
+subject" shape the queue named. **Worth noting for whoever builds it:** `check_tier_rule.py` already
+carries a residual bound with an Anvil FINDING id attached to it. That is a working precedent for
+"a bound that names what it admits," already in the tree, and it is not in the fuzz suite either.
+
+## CLOSED THIS ROUND — CI's duplication gate was red, from this session's own commit (D0142)
+
+`tools/quality_check/duplication.py` is a **blocking** CI step (`.github/workflows/harness.yml:141`) and
+was exiting 1 with two clusters, both introduced by `tests/diag_resolve_floor.gd` (D0137, committed this
+session as `aba9793`). Red since `aba9793`; found by this queue's sweep, not by anyone reading CI.
+Extracted `_spawn_body`/`_random_input` to `tests/body/fuzz_driver_common.gd`, the same response this same
+gate already produced once (`DebugSceneCommon`, D0116). Behavior proven byte-identical by a before/after
+diff of `test_body_fuzz_fast.gd` (`violations=868`, every gated category 0), with the dirty
+`vertical_resolve.gd` held constant across both arms. `duplication.py` now exits 0.
+
 ## CLOSED THIS ROUND — the control-plane ruling's two items, one landed and one reported as a blocked premise (D0140/D0141)
 
 The director's ruling on the Codex control-plane audit gave two items. Both are answered; neither changed
