@@ -5896,3 +5896,43 @@ working tree left exactly as found, untouched by this entry.
 
 **Reverse cost:** revert `tools/run_gd_test.sh`, `tools/test_run_gd_test.sh`; delete `tests/
 fixture_harness_crash_probe_engine_error.gd`(`.uid`). Nothing else depends on this fix yet.
+
+## D0151 · ledger-header rule tightened to a genuinely NEW D0NNN number; assisted-by/reviewed-by/generated-by added to the trailer pattern (D3, queue Part D) · 2026-08-29
+
+**Decided, two independent fixes:**
+
+1. **`.githooks/commit-msg`'s core/sim-ledger-entry rule used to accept the ledger FILE merely appearing in
+   the staged diff** — a rename or typo fix INSIDE an existing entry satisfied it with no new judgment call
+   recorded at all, since the ledger is append-only and a real entry is always a new numbered header, never
+   an edit to an old one. First attempt (checking for an added `+## D0[0-9]+` LINE in the diff) was itself
+   insufficient and caught by this entry's OWN mutation test: editing the TEXT of an existing header (same
+   number, e.g. "## D0001 . initial entry" -> "## D0001 . renamed entry") still produces a line matching
+   that shape without introducing any genuinely new number. Fixed properly: compares the set of `## D0NNN`
+   numbers present in the STAGED file (`git show :docs/DECISIONS_LEDGER.md`) against the set present in
+   HEAD's own version (`git show HEAD:...`) via `comm -13` — only a number in the staged set that HEAD's set
+   does not have counts as a real new entry.
+2. **Trailer pattern broadened**: `assisted-by:`/`reviewed-by:`/`generated-by:` added alongside
+   `co-authored-by:` in both `.githooks/commit-msg` and `tools/check_trailers.sh` (kept identical per that
+   file's own "the two must not drift apart" comment) — the same class of trailer under a label
+   `co-authored-by` does not cover. `check_trailers.sh`'s own history-wide scan (the `--grep` flags inside
+   its `for ref in ...` loop, a SEPARATE hardcoded list from the shared `$PATTERN` variable) also needed the
+   three new forms added directly — found by reading the whole file rather than assuming the one `$PATTERN`
+   var covered every check in it.
+
+**New test, `tools/test_commit_msg_hook.sh`** (bash, matching `tools/test_run_gd_test.sh`'s own convention
+for testing a bash tool): 8 cases against disposable scratch git repos — the ledger-header rule (positive:
+rename-only REFUSED; negative: genuine new header ALLOWED; No-Ledger-Entry trailer ALLOWED; unrelated file
+touched, rule does not apply) and the three new trailer forms (each REFUSED) plus a clean-message control.
+Wired into CI as its own step in the `authorship` job, right after `check_trailers.sh` (BLOCKING, not the
+D0149 Python glob — this is a `.sh` test, that glob is Python-only by design).
+
+**Mutation-tested the hard way, not just written and trusted:** the FIRST version of this test showed all
+8/8 PASS against a mutant with the OLD loose (file-presence-only) rule restored — investigated rather than
+accepted, and traced to a genuine bug in the test itself (case 1 passed the hook's raw exit code directly to
+`check` without first converting "REFUSED is what I want" into an ok/not-ok flag, the same conversion every
+other case in the file already did correctly). Fixed the test, re-ran the mutation: it then caught the FIRST
+attempt at the real fix too (the added-line-only regex, described above) before catching the loose baseline
+cleanly, isolated to exactly the one case it targets, seven others unaffected.
+
+**Reverse cost:** revert `.githooks/commit-msg`, `tools/check_trailers.sh`,
+`.github/workflows/harness.yml`; delete `tools/test_commit_msg_hook.sh`.

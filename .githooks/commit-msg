@@ -13,7 +13,10 @@
 # This is the ordinary path, not the enforcement: --no-verify skips it. The harness layer is what holds.
 
 msg_file="$1"
-PATTERN='^[[:space:]]*(co-authored-by:|[a-z][a-z-]*-session:|generated with \[)'
+# D0151: assisted-by/reviewed-by/generated-by added alongside co-authored-by -- the same class of trailer
+# under a different label a tool might use instead. tools/check_trailers.sh carries the identical pattern;
+# the two must not drift apart (that file's own comment says so).
+PATTERN='^[[:space:]]*(co-authored-by:|assisted-by:|reviewed-by:|generated-by:|[a-z][a-z-]*-session:|generated with \[)'
 
 if grep -qiE "$PATTERN" "$msg_file"; then
 	echo "commit-msg: REFUSED — this message carries a co-author or tool-generation trailer." >&2
@@ -32,11 +35,29 @@ fi
 # no judgment call in it (a rename, a formatting pass, a comment fix), the override trailer says so
 # explicitly rather than the commit silently having none — the override is visible in the log, which is
 # the point; a silent gap and a stated one are not the same failure.
+#
+# D0151: the file merely APPEARING in the diff used to be enough -- a typo fix or a rename INSIDE an
+# existing entry satisfied this check with no new judgment call recorded at all, since the ledger is
+# append-only and a real entry is always a NEW numbered header, never an edit to an old one. Requires a
+# `## D0NNN` header NUMBER present in the STAGED file that was NOT present in HEAD's own version --
+# checking for an added "+## D0NNN" LINE in the diff is not enough on its own: editing the text of an
+# EXISTING header (same number, e.g. "## D0001 . initial entry" -> "## D0001 . renamed entry") also
+# produces an added line matching that shape, without introducing any number that wasn't already there.
 if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^(core|sim)/'; then
-	if ! git diff --cached --name-only --diff-filter=ACMR | grep -qx 'docs/DECISIONS_LEDGER.md'; then
+	new_header=0
+	if git diff --cached --name-only --diff-filter=ACMR | grep -qx 'docs/DECISIONS_LEDGER.md'; then
+		old_numbers="$(git show HEAD:docs/DECISIONS_LEDGER.md 2>/dev/null | grep -oE '^## D0[0-9]+' | sort -u)"
+		staged_numbers="$(git show :docs/DECISIONS_LEDGER.md 2>/dev/null | grep -oE '^## D0[0-9]+' | sort -u)"
+		if comm -13 <(printf '%s\n' "$old_numbers") <(printf '%s\n' "$staged_numbers") | grep -q .; then
+			new_header=1
+		fi
+	fi
+	if [ "$new_header" -ne 1 ]; then
 		if ! grep -qiE '^[[:space:]]*no-ledger-entry:' "$msg_file"; then
-			echo "commit-msg: REFUSED — this commit touches core/ or sim/ with no new" >&2
-			echo "  docs/DECISIONS_LEDGER.md entry in the same commit." >&2
+			echo "commit-msg: REFUSED — this commit touches core/ or sim/ with no NEW" >&2
+			echo "  '## D0NNN' header added to docs/DECISIONS_LEDGER.md in the same commit." >&2
+			echo "  Editing an EXISTING entry (a rename, a typo fix) does not count -- the ledger is" >&2
+			echo "  append-only, so a real entry is always a new numbered header." >&2
 			echo "  If this change is a real judgment call, add the ledger entry and commit again." >&2
 			echo "  If it genuinely has none (rename, formatting, comment-only), add a trailer:" >&2
 			echo "    No-Ledger-Entry: <why this needed no judgment call>" >&2

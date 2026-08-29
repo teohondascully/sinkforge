@@ -66,6 +66,9 @@ jobs:
       - name: Check commit authorship
         run: bash tools/check_trailers.sh
 
+      - name: .githooks/commit-msg mutation tests (D0151) — BLOCKING
+        run: bash tools/test_commit_msg_hook.sh
+
   # docs/QUALITY.md gates 1-7, 13, 15-16, 22-23 — the structural gates docs/ONBOARDING.md
   # Task 0.6 requires before any real code, so a violation is caught the moment it's
   # introduced rather than discovered as an inherited mess later. Every script here

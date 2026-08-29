@@ -26,7 +26,9 @@ fails=0
 # the forms worth refusing, kept deliberately generic. naming one tool's trailers would make this a rule
 # about a string rather than about authorship, and the next tool would walk straight through it. this is
 # the same pattern `.githooks/commit-msg` refuses, and the two must not drift apart.
-PATTERN='^[[:space:]]*(co-authored-by:|[a-z][a-z-]*-session:|generated with \[)'
+# D0151: assisted-by/reviewed-by/generated-by added -- the same class of trailer under a label
+# co-authored-by does not cover.
+PATTERN='^[[:space:]]*(co-authored-by:|assisted-by:|reviewed-by:|generated-by:|[a-z][a-z-]*-session:|generated with \[)'
 
 check() {  # check <ok:0|1> <label>
 	if [ "$1" -eq 0 ]; then
@@ -58,6 +60,16 @@ else
 fi
 printf '%s\n' "a message with no trailer at all" | grep -qiE "$PATTERN"
 [ $? -ne 0 ]; check $? "...and does NOT fire on a clean one (negative control)"
+
+# D0151: the three added forms each get their own positive control -- a pattern with an alternation that
+# LOOKS like it covers a form but doesn't (a missing colon, a wrong anchor) reports the identical clean
+# verdict a genuinely clean history does, so each addition is proven to fire before being trusted.
+for form in "Assisted-By: Some Tool <noreply@example.invalid>" \
+            "Reviewed-By: Some Tool <noreply@example.invalid>" \
+            "Generated-By: Some Tool <noreply@example.invalid>"; do
+	printf '%s\n' "$form" | grep -qiE "$PATTERN"
+	check $? "the detector fires on '${form%%:*}:' (D0151 positive control)"
+done
 
 # --- the scan has to have something to scan ---
 # a shallow clone is the vacuity trap here and it is not hypothetical: `actions/checkout` fetches depth 1 by
@@ -124,6 +136,9 @@ dirty=""
 for ref in $(git for-each-ref --format='%(refname)' refs/heads refs/remotes refs/tags); do
 	n="$(git log -E -i --format='%H' \
 		--grep='^[[:space:]]*co-authored-by:' \
+		--grep='^[[:space:]]*assisted-by:' \
+		--grep='^[[:space:]]*reviewed-by:' \
+		--grep='^[[:space:]]*generated-by:' \
 		--grep='^[[:space:]]*[a-z][a-z-]*-session:' \
 		--grep='generated with \[' "$ref" 2>/dev/null | wc -l | tr -d ' ')"
 	[ "$n" -eq 0 ] && continue
