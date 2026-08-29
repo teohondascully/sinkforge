@@ -143,6 +143,11 @@ def main() -> int:
     else:
         print(f"check_loc_ratio: absolute ratio = {instrument_total / game_total:.3f} "
               "(instrument / game) -- informational, does not gate")
+        print(f"check_loc_ratio: why it's >1 -- tools/ and tests/ were built ahead of game content by "
+              f"design (docs/ONBOARDING.md Task 0 requires the structural gates before there is game code "
+              f"for them to check); it falls only when game LOC ({game_total} now) grows, not when "
+              f"instrument LOC shrinks -- concretely, data/economy/ producing machines and content, per "
+              f"docs/QUALITY.md gate 7's own 'the next unit of work is game.'")
 
     window_start = resolve_window_start()
     if window_start is None:

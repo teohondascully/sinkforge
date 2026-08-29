@@ -59,7 +59,11 @@ CI runs the claims. A change that breaks one fails the build and names it. Desig
 Two rules that follow from this, and they are the most important process rules in the repository:
 
 - **No harness surface without a claim it serves.** Every check must trace to a claim ID. This is the direct fix for the failure mode that produced the previous codebase, where instrumentation grew 90% in five days while the game grew 9%.
-- **Instrument LOC may not exceed game LOC.** Enforced in CI. When it does, the next unit of work is game.
+- **Instrument LOC growth may not outpace game LOC growth.** A trailing-window velocity check
+  (`docs/QUALITY.md` gate 7, `tools/layer_lint/check_loc_ratio.py`), enforced in CI. The absolute
+  instrument/game ratio is reported alongside it, not itself a gate — see gate 7's own text for why that
+  distinction is load-bearing, not a downgrade. When the velocity check fails, the next unit of work is
+  game.
 
 Format and workflow: `docs/CLAIMS.md`.
 

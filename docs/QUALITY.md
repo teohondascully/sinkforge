@@ -13,7 +13,8 @@ Most of its content was right and is carried forward here, in some cases verbati
 Two things are added that the prior program lacked, and both target the specific failure that produced the previous codebase, where instrumentation grew 90% in five days while the game grew 9%:
 
 - Every harness layer must trace to a claim.
-- Instrument LOC may not exceed game LOC.
+- Instrument LOC growth may not outpace game LOC growth (a trailing-window velocity check, not an
+  absolute-totals gate — gate 7 below states the distinction, added `docs/DECISIONS_LEDGER.md` D0147).
 
 ---
 
@@ -36,7 +37,16 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
 4. **Function size.** No function over 50 lines. Cyclomatic complexity ≤ 10.
 5. **No global singletons.** No autoloads in `sim/`.
 6. **`MODULE.md` present and current** in every module directory.
-7. **Instrument LOC ≤ game LOC.** `harness/ + experiment/ + tools/ + tests/` may not exceed `core/ + sim/ + interface/ + view/ + shell/`. When the ratio inverts, the next unit of work is game.
+7. **Instrument LOC growth may not outpace game LOC growth.** A trailing-10-commit velocity check —
+   `harness/ + experiment/ + tools/ + tests/`'s net line growth may not exceed 2x `core/ + sim/ + interface/
+   + view/ + shell/`'s, once growth clears a floor. `tools/layer_lint/check_loc_ratio.py`. **The ABSOLUTE
+   instrument/game ratio is reported alongside this check's own output as a metric, never gated on its
+   own** (`docs/DECISIONS_LEDGER.md` D0147, director's ruling on the external audit's item 3) — an
+   external audit found this gate's own prose ("Instrument LOC ≤ game LOC... Enforced in CI") describing
+   the absolute ratio while the only code that ever existed to enforce it (`check_loc_ratio.py`) has only
+   ever gated on the velocity condition above, at any point in its history; the absolute ratio being
+   >1 from the first commit of real code onward is not, on its own, evidence of anything this gate exists
+   to catch. When the velocity check fails, the next unit of work is game.
 
 ### Correctness
 

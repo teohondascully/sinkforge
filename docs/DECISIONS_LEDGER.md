@@ -5784,3 +5784,34 @@ numeric/behavioral claim is verified against real tool output before acting on i
 **Reverse cost:** revert `tools/gate_status.py`, `tools/layer_lint/check_claim_references.py`, and delete
 `tools/test_gate_status.py`/`tools/layer_lint/test_check_claim_references.py`. Nothing else depends on any
 of these five changes yet.
+
+## D0147 · applied the director's ruling on item 3: velocity stays a gate, absolute ratio is metric-only · 2026-08-29
+
+**Decided:** per the director's own ruling (Phase 1 item 3, this queue's Part B): the velocity check
+(`check_loc_ratio.py`, armed D0144) stays a real, currently-honestly-red gate -- it is NOT touched, weakened,
+or given a floor. The ABSOLUTE instrument/game ratio stops being described as a gate anywhere: struck the
+"gate"/"Enforced in CI" language for it in `docs/QUALITY.md` (the intro bullet and gate 7's own text) and
+`CONTEXT.md`, replaced with an explicit statement that the absolute ratio is reported alongside the velocity
+check as a metric, never a second enforced condition. `check_loc_ratio.py`'s own output gained one new line
+diagnosing why the ratio is >1 (tools/tests were built ahead of game content by `docs/ONBOARDING.md` Task
+0's own required order) and what would reduce it (game LOC growth, concretely `data/economy/`).
+
+**Verified, not assumed:** re-ran `check_loc_ratio.py` after the edit -- absolute ratio is **6.646** right
+now (instrument 11,065 / game 1,665), not the "6.4" this queue's own prose estimated; the velocity check
+still correctly FAILs (instrument +824 vs game's +28 over the trailing 10 commits, unchanged mechanism,
+D0144's own arm untouched).
+
+**Alternative rejected:** giving the absolute ratio its own justified floor and re-arming it as a second
+gate -- this is exactly what the director's ruling did not ask for; B1's own text is explicit ("the ABSOLUTE
+ratio stops being called a gate... Under verdict.py the absolute ratio is a metric-with-reason, not a
+gate"). Not built.
+
+**Found, not fixed, out of scope for this item:** `check_loc_ratio.py`'s own pre-existing FAIL message
+("Per docs/CLAIMS.md, the next unit of work is game") misattributes that phrase to `docs/CLAIMS.md` --
+`docs/CLAIMS.md` does not contain it (`git grep` confirms); the phrase actually originates from
+`docs/QUALITY.md` gate 7's and `CONTEXT.md`'s own pre-existing prose. Not fixed here (this item's scope was
+the gate-language strike and the new diagnosis line, not an unrelated citation bug); the new diagnosis line
+this entry adds cites `docs/QUALITY.md` gate 7 instead, deliberately not repeating the same misattribution.
+
+**Reverse cost:** revert the three doc edits (`docs/QUALITY.md`, `CONTEXT.md`) and the one new print line in
+`check_loc_ratio.py`. The velocity gate's own mechanism (D0144) is untouched by this entry either way.
