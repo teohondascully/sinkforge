@@ -10,10 +10,17 @@ caught mechanically rather than relying on someone noticing later.
 
 ## PRE-COMPACTION CHECKPOINT, 2026-08-29 — two open threads, neither started; D0122-D0130 arc fully closed and pushed
 
-Working tree is clean; HEAD is `78b258f`, everything through it pushed to `origin/main`. CI: green through
-`f86ba1a` (confirmed). `78b258f` (D0130, pure Python tooling, no game code) was still `in_progress` on CI
-at the moment this checkpoint was written — verify it landed green before trusting it, don't assume from
-this note.
+Working tree is clean; HEAD is `228c52a`, everything through it pushed to `origin/main`. CI verified green
+through `228c52a` (run `33242005374`: authorship/godot-suites/structural-gates all ✓). `78b258f` (D0130)'s
+own isolated run (`33241930115`) shows `cancelled`, not green — this repo's harness workflow runs
+`concurrency: group: harness-${{ github.ref }}, cancel-in-progress: true`, so pushing the checkpoint commit
+right behind it cancelled D0130's own run before it finished. That is NOT the same as D0130 being
+unverified: `228c52a`'s own run checks out the full tree through that commit, D0130's files included, and
+that run passed. Also worth recording: `a80c730` (D0128)'s own run (`33240224793`) shows `failure` — the
+same recurring `check_working_freshness` date-rollover gap already documented above (WORKING.md said
+2026-08-28, HEAD was dated 2026-08-29) — fixed forward in the very next commit (`f86ba1a`), whose own run
+is green. Isolated per-commit CI status on this branch is not reliable evidence by itself once a fast
+sequence of pushes starts cancelling runs; the tip commit's own run is what to trust.
 
 **Closed this session, nothing pending:** D0122's full arc (D0125-D0128: per-column high/low-water-mark
 dig fix, permanent regression fixture, `grounded_no_floor` bound honestly re-baselined 32→59 with the
