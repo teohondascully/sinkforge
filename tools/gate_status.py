@@ -301,9 +301,13 @@ def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str]) -> tuple[st
 
 def main() -> int:
     gates = parse_gates()
-    if sorted(gates) != list(range(1, 30)):
-        print("gate_status: FATAL -- parsed %d gate headers from QUALITY.md, expected exactly 1-29, got %s"
-              % (len(gates), sorted(gates)), file=sys.stderr)
+    # Contiguous 1..N, not a hardcoded total -- QUALITY.md's own gate count grows over the project's
+    # life (D0175 added gate 30), and a fixed literal here would FATAL on every future addition the
+    # same way it did the moment gate 30 landed. What this still catches: a gap or a duplicate number,
+    # which a truly contiguous 1..N could never produce.
+    if sorted(gates) != list(range(1, len(gates) + 1)):
+        print("gate_status: FATAL -- parsed %d gate headers from QUALITY.md, not a contiguous 1..%d, got %s"
+              % (len(gates), len(gates), sorted(gates)), file=sys.stderr)
         return 2
 
     steps = parse_workflow_steps()
@@ -329,7 +333,7 @@ def main() -> int:
 
     rows = []
     counts = {"code": 0, "no_code": 0}
-    for n in range(1, 30):
+    for n in range(1, len(gates) + 1):
         g = gates[n]
         gate_steps = links[n]
         if not gate_steps:
@@ -347,8 +351,9 @@ def main() -> int:
         for d in details:
             print("           - %s" % d)
     print()
-    print("gate_status: %d/29 gates have linked enforcing code, %d/29 do not (NO-CODE)"
-          % (counts["code"], counts["no_code"]))
+    total = len(gates)
+    print("gate_status: %d/%d gates have linked enforcing code, %d/%d do not (NO-CODE)"
+          % (counts["code"], total, counts["no_code"], total))
     no_code_list = [n for n, _, status, _, _ in rows if status == "NO-CODE"]
     print("gate_status: NO-CODE gate numbers: %s" % no_code_list)
     fail_list = [n for n, _, status, _, _ in rows if status == "FAIL"]

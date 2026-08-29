@@ -6999,3 +6999,46 @@ not the whole 1,221-line document.
 **Reverse cost:** CHEAP for every fix — each is a small, independent prose edit in its own file; revert
 any subset without affecting the others. `docs/adr/0005` and the ARCHITECTURE.md/ADR historical narrative
 were deliberately left unedited, so there is nothing to reverse there.
+
+## D0178 · D0175's own gate 30 broke `gate_status.py`, caught by running the tool at wrap time, not by any test — two hardcoded `29`/`30` literals fixed, both mutation-tested (queue #3 wrap) · 2026-08-29
+
+**Found by actually running the gate-status tool as part of this queue's own wrap, not assumed clean.**
+`python3 tools/gate_status.py` FATALed immediately: `parsed 30 gate headers from QUALITY.md, expected
+exactly 1-29`. D0175 (this same queue, Part L2) added QUALITY.md gate 30 without checking whether anything
+downstream hardcoded the prior total of 29 — it did, in two places, neither caught by
+`tools/test_gate_status.py`'s own 11 cases (none of them exercise the gate-count itself, only per-gate
+classification logic).
+
+**Two distinct hardcoded literals, both real, found by grepping the whole file for `29`/`30` rather than
+stopping at the first hit:**
+1. `main()`'s own FATAL guard: `sorted(gates) != list(range(1, 30))` — a literal total, not derived.
+2. A second, separate instance six lines into the row-building loop: `for n in range(1, 30):` — building
+   `rows` from a hardcoded range meant gate 30 parsed correctly (`parse_gates()` returned all 30, confirmed
+   directly) but was silently absent from every printed row and from the `code`/`no_code` counts, which
+   would have UNDER-reported the real gate population by one forever, not FATALed — a quieter, worse
+   failure than the FATAL the first fix produced, and the reason grepping the whole file mattered rather
+   than patching the first hit and moving on.
+
+**Fix:** both replaced with `len(gates)`-derived bounds — `range(1, len(gates) + 1)` in both places, and
+the FATAL message and the `%d/%d` output line (which also hardcoded `/29`) both made to print the real
+denominator dynamically. This is the same "never a hand-maintained number, always a live derivation"
+property this tool's own docstring already argues for everywhere else — the two literals fixed here were
+the one place the tool didn't yet apply its own stated design principle to itself.
+
+**Mutation-tested, not just run once.** The contiguity check's own logic verified in isolation against
+three cases: 30 contiguous gates (must NOT fatal — confirmed), a gap (30 gates missing #15 — confirmed
+FATAL), a duplicate (14 twice, 30 missing — confirmed FATAL). `tools/test_gate_status.py`'s existing
+11/11 cases re-run clean after the fix. Real tool re-run against the actual tree: gate 30 now appears
+correctly (`PASS`, real linked code — `tools/check_corrections_freshness.py --check`), total now
+`19/30 have linked code, 11/30 do not` (the 11 NO-CODE gates unchanged from before D0175; only the
+denominator and the numerator for gate 30 itself moved).
+
+**Docstring prose citing the old "18 of 29"/"15 of 29" split (lines 21, 28, 32, 43) left untouched** — that
+prose is a historical calibration record ("evidence this two-tier design works... not a promise it always
+will"), describing the specific measurement that validated the tool's own linking-tier design when it was
+built, not a live claim this queue's gate-30 addition falsifies. Same reasoning as leaving `docs/adr/0005`
+and the ARCHITECTURE.md historical narrative untouched at D0177 — rewriting a calibration record to match
+a later, unrelated change would misrepresent what was actually measured at the time.
+
+**Reverse cost:** CHEAP — three one-line changes plus one comment, all in `tools/gate_status.py`; revert
+independently of D0175 (which does not need to be reverted for this fix to make sense on its own).
