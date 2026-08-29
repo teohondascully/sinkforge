@@ -6783,3 +6783,48 @@ wrong scene) and a new History row recording this queue's finding: capture path 
 **Reverse cost:** revert `tests/body/reveal_replay_driver.gd`, `tests/test_reveal_replay_driver.gd`,
 `tests/body/recordings/README.md`, `claims/C004-reveal-raises-dig-persistence.md` in this same commit, and
 delete `tests/body/recordings/reveal_agent_2026-08-29T21-34-03.log`; this entry stays (append-only).
+
+## D0174 · `docs/CORRECTIONS.md` origin-tracing re-verified complete — no chain found stopping short (queue #3 Part L1) · 2026-08-29
+
+**The check, not assumed from D0170's own account.** D0170 (queue #2) built `docs/CORRECTIONS.md` from
+one grep pass (`grep -n "^## D0" docs/DECISIONS_LEDGER.md | grep -iE "correct|supersed|falsif|corrective|
+reversed|wrong|mistake|error found|retract"`) plus manual reading, and stated plainly it was "not
+exhaustive by construction." This item re-runs that same grep against the ledger as it stands now (after
+D0171/D0172/D0173) and finds the same 18 entries — D0035, D0044, D0050, D0051, D0061, D0068, D0070, D0104,
+D0109, D0112, D0128, D0133, D0135, D0152, D0157, D0161, D0167, D0170 — confirming none of this queue's own
+new entries (D0171/D0172/D0173) match the pattern, so the candidate set has not silently grown stale.
+
+**Every one of the 18 checked against the doc's own rule** ("a correction earns a place here only if it
+names the entry it corrects... where a correction's own chain runs deeper... that deeper origin is traced
+explicitly"), specifically hunting for a SECOND hop the doc's current text doesn't cite:
+
+- **D0044 → D0043**: read D0043 in full — a fresh design decision (Invariants floor-selection guard scope
+  choices), not itself a restatement of any earlier entry. D0043 IS the origin. No gap.
+- **D0050 → D0006**: read D0006 in full — the original `split()` design decision and its own (wrong)
+  verification claim. D0006 IS the origin. No gap.
+- **D0051 → D0042/D0046**: D0046's own header states it directly ("the D0042 ... figure ... re-measured
+  post-D0045") — D0042 is already the acknowledged origin of the figure; D0046 is a restatement, not a
+  second distinct claim. No gap.
+- **D0068 → D0062**: read D0068 in full — its own text opens "What was claimed (this session, in D0062...
+  )," i.e. D0068 already names its true origin directly. No gap.
+- **D0104 → D0098**: read both in full. D0098 attributes two D0059-numbered DEFECTS to `resolve_ceiling`;
+  D0104 corrects the LOCATION claim specifically. The location claim (which function each defect lives
+  in) was made fresh at D0098, not restated from D0059 (D0059 only identifies the defects, not their
+  function-level location) — D0098 IS the origin of the claim being corrected. No gap.
+- **D0112 → D0110**: read D0110 in full — the original dig-mechanic decision, not a restatement. D0110 IS
+  the origin. No gap.
+- **D0152, D0157, D0161, D0167**: each corrects a single, self-contained prior claim (a stale code
+  comment, one specific commit's own contents, this same queue's own instruction, one specific golden-hash
+  capture) with no earlier ledger entry making the same claim before it. Origin = the entry itself. No gap.
+- **D0059 → D0061 → D0127/D0128 → D0133/D0135 → D0137**: already traced in full by D0170's own dedicated
+  section — re-read, still accurate, not re-derived here.
+- **D0070**: the claim it corrects ("contradictions unrepresentable") lived in `incoming/
+  ANVIL_ARCHITECTURE.md`, an untracked doc, not a numbered ledger entry — there is no earlier ledger origin
+  to cite because the claim never had one; "an earlier claim" (the doc's current wording) is accurate, not
+  a citation gap.
+
+**Result: no chain found stopping short of its true origin.** This is a verification with a negative
+result, reported per the standing discipline that a checked-and-clean finding is worth recording, not
+just a fix. `docs/CORRECTIONS.md` itself is unchanged by this entry — nothing needed correcting.
+
+**Reverse cost:** none — no file other than this ledger entry changed.
