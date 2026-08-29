@@ -30,9 +30,21 @@ class ParsedLog:
 	var inputs: Array[InputFrame] = []
 
 
+## `reveal_scene.gd`'s own five columns, in order -- the D0140 fix (queue #3 Part K): the OLD check here
+## validated `fields.size() != 5` alone, which `play_scene.gd`'s own five-column dialect (`mantle_hold` in
+## place of `dig_pressed`) ALSO satisfies -- arity is not schema. Confirmed still true before fixing, not
+## assumed: `play_scene.gd` currently has no `site=`/`seed=` header, so today's cross-dialect read is
+## accidentally blocked by an unrelated field's absence, not by design (`docs/DECISIONS_LEDGER.md` D0140's
+## own "the day it reaches play_scene.gd" warning). This constant is the schema check that doesn't depend
+## on that accident.
+const EXPECTED_COLUMN_HEADER: String = "# tick,move_dir,jump_pressed,jump_held,dig_pressed"
+
+
 ## Parses a `reveal_scene.gd` recording. Returns `null` (with a `push_error`) if the header is missing
-## `site=`/`seed=` -- both required to reconstruct the grid, per the docstring above -- or if any data row
-## doesn't have exactly 5 fields. Tolerant of the mode field (`play` or `agent`); both share one format.
+## `site=`/`seed=` -- both required to reconstruct the grid, per the docstring above -- if the column-
+## header comment line doesn't name EXACTLY `EXPECTED_COLUMN_HEADER`'s five columns in this order (D0140's
+## own fix, queue #3), or if any data row doesn't have exactly 5 fields. Tolerant of the mode field
+## (`play` or `agent`); both share one format.
 static func parse_log(path: String) -> ParsedLog:
 	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if f == null:
@@ -41,6 +53,7 @@ static func parse_log(path: String) -> ParsedLog:
 	var result: ParsedLog = ParsedLog.new()
 	var found_site: bool = false
 	var found_seed: bool = false
+	var found_column_header: bool = false
 	while not f.eof_reached():
 		var line: String = f.get_line()
 		if line.is_empty():
@@ -52,6 +65,12 @@ static func parse_log(path: String) -> ParsedLog:
 				result.mode = line.split("mode=")[1].split(" ")[0]
 				found_site = true
 				found_seed = true
+			elif line.begins_with("# tick,"):
+				if line != EXPECTED_COLUMN_HEADER:
+					push_error("RevealReplayDriver: %s declares columns %s, not this format's own %s -- refusing to replay a different dialect's log even though its rows have the same field COUNT" %
+						[path, line, EXPECTED_COLUMN_HEADER])
+					return null
+				found_column_header = true
 			continue
 		var fields: PackedStringArray = line.split(",")
 		if fields.size() != 5:
@@ -66,6 +85,9 @@ static func parse_log(path: String) -> ParsedLog:
 	f.close()
 	if not (found_site and found_seed):
 		push_error("RevealReplayDriver: %s has no site=/seed= header -- cannot rebuild the grid it was played against" % path)
+		return null
+	if not found_column_header:
+		push_error("RevealReplayDriver: %s has no '%s' column-header comment line -- cannot confirm this is this format's own dialect, not just a same-length one" % [path, EXPECTED_COLUMN_HEADER])
 		return null
 	return result
 

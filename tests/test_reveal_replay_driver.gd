@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_compute_from_log_runs_end_to_end()
 	_test_parse_log_rejects_a_header_missing_site_or_seed()
 	_test_parse_log_rejects_a_malformed_row()
+	_test_parse_log_rejects_a_different_dialect_with_matching_field_count()
 	_finish("reveal_replay_driver")
 
 
@@ -97,6 +98,26 @@ func _test_parse_log_rejects_a_header_missing_site_or_seed() -> void:
 	f.close()
 	var parsed: RevealReplayDriver.ParsedLog = RevealReplayDriver.parse_log(log_path)
 	_check(parsed == null, "a header missing site=/seed= is rejected, not silently replayed against a wrong default grid")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(log_path))
+
+
+## D0140's own scenario, reproduced directly: `play_scene.gd`'s five-column dialect (`mantle_hold` in
+## the fifth column, not `dig_pressed`) IF it ever also gained a `site=`/`seed=` header -- same field
+## COUNT as this format's own, which is exactly why an arity-only check couldn't see the difference
+## (queue #3 Part K's own fix). Confirmed BEFORE this fix landed that the old check silently accepted
+## this file and replayed `mantle_hold=true` as `dig_pressed=true` -- this test is the permanent guard
+## against that regression recurring.
+func _test_parse_log_rejects_a_different_dialect_with_matching_field_count() -> void:
+	var log_path: String = "user://test_reveal_replay_dialect_%d.log" % Time.get_ticks_usec()
+	var f: FileAccess = FileAccess.open(log_path, FileAccess.WRITE)
+	f.store_line("# sinkforge input recording -- mode=play site=%s seed=%d ticks=1" % [SITE_ID, SEED_VALUE])
+	f.store_line("# tick,move_dir,jump_pressed,jump_held,mantle_hold")  # play_scene.gd's own dialect
+	f.store_line("0,1,false,false,true")
+	f.close()
+	var parsed: RevealReplayDriver.ParsedLog = RevealReplayDriver.parse_log(log_path)
+	_check(parsed == null,
+		"a differently-named fifth column (mantle_hold, not dig_pressed) is rejected even with a matching " +
+		"field count and a valid site=/seed= header -- arity alone must never be schema")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(log_path))
 
 

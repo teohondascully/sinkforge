@@ -6723,3 +6723,63 @@ existing one; whether the calibration constant re-tune is a five-minute measurem
 question. Flagged for the director's own scoping — a genuine design cycle, not a queue-scale task.
 
 **Reverse cost:** none — this is a diagnosis, no code changed.
+
+## D0173 · `RevealReplayDriver.parse_log` now validates the column-header line by NAME, not just field count — D0140's own latent risk closed, capture path proven end-to-end (queue #3 Part K) · 2026-08-29
+
+**The gap, confirmed still live before touching anything.** D0140 named it and deliberately deferred it:
+`play_scene.gd` writes `tick,move_dir,jump_pressed,jump_held,mantle_hold`; `reveal_scene.gd` writes
+`tick,move_dir,jump_pressed,jump_held,dig_pressed`. Both are exactly 5 columns. The old
+`RevealReplayDriver.parse_log` (`tests/body/reveal_replay_driver.gd`) validated only `fields.size() != 5`
+— arity, not schema — so a `play_scene.gd`-shaped log would parse cleanly and silently replay its
+`mantle_hold` column as `dig_pressed`. Read the code directly before writing this entry, not assumed from
+D0140's own text: as of this session `play_scene.gd` still has no `site=`/`seed=` header, so the two-
+dialect collision is currently blocked by an unrelated field's absence, not by design — exactly the
+accident D0140 itself warned would stop protecting the day `play_scene.gd` grows that header. Latent, not
+exploitable today, but not something to leave for the day it becomes exploitable either.
+
+**The fix.** Added `const EXPECTED_COLUMN_HEADER` and a new branch in `parse_log` that requires the `#
+tick,...` comment line to match it exactly, plus a `found_column_header` gate alongside the existing
+`found_site`/`found_seed` gates — a log missing this line, or carrying a differently-named fifth column,
+is now rejected with a `push_error` naming both the file's own header and the expected one, same failure
+style as the existing site/seed check.
+
+**Mutation-tested twice, not once.** First pass (ad hoc): constructed a scratch log reproducing D0140's
+exact scenario (`play_scene.gd`'s header shape, `mantle_hold` column) and confirmed the OLD code accepted
+it silently while the NEW code rejected it. Second pass (permanent): added
+`_test_parse_log_rejects_a_different_dialect_with_matching_field_count` to
+`tests/test_reveal_replay_driver.gd` (the tracked, CI-run suite), then reverted the real driver file to
+its pre-fix behavior (backed up first this time — the first mutation attempt accidentally clobbered the
+real tracked file via a script that mutated the wrong copy, caught only because the file changed on disk
+unexpectedly; recovered by re-reading the mutated state and re-applying the two missing blocks by hand,
+confirmed via `git diff --stat` and a `grep -c` count) and confirmed the new test fails against the
+reversion, then restored the fix and confirmed the full suite passes again.
+
+**The capture path, proven with a real run, not synthesized data.** Ran
+`godot --headless --path . tests/body/reveal_scene.tscn -- --site=reveal_test_dense --seed=20260826`
+directly (agent mode, since no human was available to supply `--play` input) and committed its actual
+output: `tests/body/recordings/reveal_agent_2026-08-29T21-34-03.log` (15 ticks). Replayed it through
+`tests/body/replay_reveal_scene.gd`:
+
+```
+REPLAY_METRIC site=reveal_test_dense seed=20260826 mode=agent total_ticks=15 dig_events=8 qualifying_reveals=0 lift=n/a
+```
+
+`qualifying_reveals=0` is the honest and expected result for this specific raw run — it has no idle
+padding around any reveal, so nothing here qualifies for `RevealMetric.WINDOW_TICKS`(300)-wide before/after
+windows; the padded-trace case (a reveal with a full qualifying window on both sides) is separately
+proven, with a real non-zero lift computed, by `tests/test_reveal_replay_driver.gd`'s own
+`_test_compute_from_log_runs_end_to_end`. Together: scene → recorded log → replay driver → `RevealMetric`
+is proven to round-trip on a REAL run of the actual capture scene, and the arithmetic path that produces a
+lift value is separately proven on a shaped trace. Nothing here fakes or forces a human session — no
+value was populated for claims/C004 itself, only the pipeline underneath it.
+
+**Docs corrected to match.** `tests/body/recordings/README.md` previously documented only the
+`play_scene.gd` dialect (itself a live instance of the exact confusion D0140 names) — rewritten to
+document both dialects explicitly, side by side, so a future reader can't repeat that mistake.
+`claims/C004-reveal-raises-dig-persistence.md` gets a corrected `--play` scene citation (it named the
+wrong scene) and a new History row recording this queue's finding: capture path proven, not a measurement
+— still blocked on the one thing this work cannot produce, an actual unscripted human `--play` session.
+
+**Reverse cost:** revert `tests/body/reveal_replay_driver.gd`, `tests/test_reveal_replay_driver.gd`,
+`tests/body/recordings/README.md`, `claims/C004-reveal-raises-dig-persistence.md` in this same commit, and
+delete `tests/body/recordings/reveal_agent_2026-08-29T21-34-03.log`; this entry stays (append-only).

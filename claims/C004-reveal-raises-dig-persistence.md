@@ -34,9 +34,9 @@ is authored on the assumption that exploration alone sustains interest.
 
 ## Falsifiable form
 
-Under recorded human play (`tests/body/play_scene.gd`-shaped `--play` mode, real physical-key input, no
-scripted policy — a scripted digger with any awareness of feature placement would make this claim
-circular, see "What this claim does not measure" below), across several sessions against both the sparse
+Under recorded human play (`tests/body/reveal_scene.gd --play`, real physical-key input, no scripted
+policy — a scripted digger with any awareness of feature placement would make this claim circular, see
+"What this claim does not measure" below), across several sessions against both the sparse
 and dense reveal-test terrain sites (`data/strata/reveal_test_sparse.yaml`,
 `data/strata/reveal_test_dense.yaml`), the mean dig-event rate in the 300-tick (5s) window immediately
 after a reveal event exceeds the mean dig-event rate in the 300-tick window immediately before it, pooled
@@ -92,3 +92,4 @@ against either reveal-test site yet.
 | Date | Commit | Data version | Value | Status | Note |
 |---|---|---|---|---|---|
 | 2026-08-28 | — | — | not measured | BLOCKED | Claim authored alongside the reveal-layer terrain/dig build (`docs/GDD.md` §12). Blocked on recorded human play sessions, which this build does not itself produce. |
+| 2026-08-29 | — | — | not measured | BLOCKED | Capture path proven, not a measurement (queue #3 Part K, `docs/DECISIONS_LEDGER.md` D0173): `reveal_scene.gd`'s own recording round-trips through `RevealReplayDriver`+`RevealMetric` end to end against a real, committed example (`tests/body/recordings/reveal_agent_2026-08-29T21-34-03.log`); the D0140 two-dialect gap in `parse_log`'s own validation (arity, not column name) is fixed and mutation-tested. Still blocked on the one thing this work cannot produce: an actual unscripted human `--play` session. |
