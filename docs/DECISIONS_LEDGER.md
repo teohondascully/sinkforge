@@ -4738,3 +4738,71 @@ in aggregate at nightly scale.
 
 Reverse: cheap. Delete the file and its two CI/doc references; the nightly job alone still exists as a
 (slower) safety net.
+
+## D0127 · 2026-08-28 · `grounded_no_floor`'s residual and `bounds`'s rise both isolated by a dig-off A/B — neither is a new bug, both attributed precisely — not fixed, per instruction
+
+Director's instruction, after D0125/D0126: `grounded_no_floor` (59) sits above the pre-dig D0061 bound
+(32); `bounds` (805,397) rose 11% from D0124's own 722,655. Trace both with a controlled dig-off re-run
+of the full sweep, the same mechanism D0122 already used once to confirm dig's own causation — do not fix
+either, report which population each belongs to.
+
+**The tool.** `fixture_body_fuzz_probe.gd` gains a standing `--no-dig` flag (`DIG_DISABLED`) instead of a
+one-off mutation: `_random_input` still DRAWS the dig-roll float every tick under `--no-dig`, only the
+RESULT is overridden to false, so the rest of a tick's own random sequence is bit-identical whether dig
+is on or off — the A/B varies exactly one thing. Verified non-disruptive first: `test_body_fuzz_fast.gd`
+and `test_body_fuzz_regression_d0122.gd` both re-run and produced byte-identical violation counts to
+before this change (`dig_disabled=false` in both summary lines).
+
+**`grounded_no_floor`: dig-off = 32, an EXACT match to the pre-dig baseline.** Rules out a pre-existing
+bug in `grounded_implies_solid_beneath` predating this session — with dig removed, the count returns to
+exactly what it was before dig ever existed, not "close to" it.
+
+**But the 27-violation excess (59 dig-on vs. 32 dig-off) is NOT a new, distinct dig-created defect
+either — confirmed by geometry, not assumed.** All 91 violations across BOTH sweeps (32 dig-off + 59
+dig-on) sit at the exact same `pos_y=14417920` — the body's feet resting at `HostileChamber.FLOOR_ROW`
+(row 60: `pos_y=220px` center, `_bottom_y()=240px`, `240/TERRAIN_CELL_PX(4)=60=FLOOR_ROW`). A genuinely
+new dig-created staircase fragment (the D0122/D0123 class `extend_terrain_dig_extent` closes) would show
+UP AT WHATEVER ROW a given seed happened to dig unevenly — varying heights across seeds. One single,
+fixed height across every occurrence in both conditions is the signature of `_grid_floor_backstop`'s own
+already-documented, already-ACCEPTED D0059f/D0061 design trade-off: a body resting with only PART of its
+footprint over solid ground at a pit/ledge lip. `pos_x` is widely scattered (23 distinct columns dig-off,
+47 dig-on) — this chamber has several built-in flat-to-open transitions at `FLOOR_ROW` height
+(`PIT_START`, and others), and dig ADDS MORE reachable transitions at the SAME height by carving new
+holes into what was previously uninterrupted flat `FLOOR_ROW` ground when the player digs sideways at
+ground level. **Attribution: dig-caused exposure GROWTH to an already-accepted trade-off, not a new
+mechanism, and not something `extend_terrain_dig_extent`'s own fix could have addressed — that fix
+closes a WITHIN-column vertical gap; this is a cross-column, horizontal partial-footprint-support case at
+one fixed row, a different axis of the geometry entirely.**
+
+**Not the same thread as the untraced dy=0 horizontal discontinuity.** Checked directly: seed=497 (site
+of D0123/D0124's own never-traced purely-horizontal discontinuity, tick=1323) appears in NEITHER the
+dig-on nor the dig-off `grounded_no_floor` seed lists (dig-on: 16,30,53,59,107,118,138,140,156,190,205,
+221,229,247,260,266,314,322,323,356,365,379,386,404,405,406; dig-off: 16,138,229,242,260,297,322,406,
+416,744,772,857,925,940,969). Different mechanism, different location, unrelated. (The seed SETS between
+dig-on and dig-off are themselves largely disjoint, not a subset relationship — expected, not a red flag:
+once dig actually excavates real terrain from some tick onward, that seed's entire future trajectory
+diverges from its dig-off counterpart, so which seeds happen to wander into the `FLOOR_ROW` lip differs
+between the two conditions even though the underlying mechanism triggering it does not.)
+
+**`bounds`: dig-off = 18,157, essentially the pre-dig baseline (18,218 — the small remaining gap is the
+A/B method's own draw-preservation quirk, not dig's absence: `--no-dig` still consumes a dig-roll draw
+per tick that the true pre-dig-mechanic code never made, shifting later draws slightly versus a genuine
+pre-dig build).** Confirms the attribution directly, per the director's own explicit test: dig (the
+mechanic itself, independent of which `_handle_dig` variant) drives the bounds increase — NOT something
+else this session touched, since disabling only dig's behavior (nothing else changed) returns the count
+to baseline. `bounds` at oracle-fix-only (dig-on, pre-water-mark, D0124's own number) was 722,655; this
+session's water-mark fix adds a further +82,742 (+11.4%) on top of that. Plausible, not yet independently
+verified mechanism: the water-mark fix intentionally excavates MORE per dig (a column's full historical
+extent, not just the current touch), removing more supporting ground near the map's own edges, letting a
+body fall further/faster into now-hollow terrain and hit the grid boundary more often — offered as the
+most parsimonious explanation of a real, measured, dig-attributable effect, not proven by a second
+isolating experiment this cycle.
+
+**Not fixed, per explicit instruction — both are rulings, not fixes.** `grounded_implies_solid_beneath`
+and `_resolve_horizontal` both untouched. Reported for the director to rule on: whether the D0061 bound
+should be re-baselined now that its cause is understood (more reachable lips, same mechanism) rather than
+patched, and whether the water-mark fix's own `bounds` contribution is acceptable as a known, understood
+cost of correctly excavating a column's full extent.
+
+Reverse: cheap. `--no-dig` is inert by default (`DIG_DISABLED = false`); delete the flag and its
+docstring to fully revert, no behavior change to any existing suite.

@@ -4,91 +4,66 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-28. This round: the director's ruling on `_handle_dig` executed — per-column
-high/low-water mark, full sweep re-run, first nightly-escape regression fixture.**
-`docs/DECISIONS_LEDGER.md` D0125–D0126. **Headline: D0122's regression is fixed and verified —
-`discontinuity` back to 0, `embedded`/`grounded_no_floor` both moved — but one residual is left open,
-not smoothed over: read "Anything that felt wrong" below.**
+**Last updated: 2026-08-28. This round: diagnosing (not fixing) D0125's own two residuals via a
+controlled dig-off A/B.** `docs/DECISIONS_LEDGER.md` D0127. **Headline: neither residual is a new bug —
+`grounded_no_floor`'s excess is the same already-accepted pit-lip trade-off, now reachable at more
+locations because dig can carve new lips; `bounds`'s rise is confirmed dig-attributable, with the
+water-mark fix itself adding a further, plausible-but-unproven 11.4% on top.**
 
 ---
 
-## The one that matters most: D0122 closed — `discontinuity` 3→0, `embedded` 187→0
+## The one that matters most: both residuals isolated by geometry, not guessed at
 
-Per the director's ruling (whole-column dig, refuse-if-would-strand, and fragment cleanup all rejected —
-per-column high/low-water mark chosen: a column's dig history is tracked as `[min_row, max_row]` ever
-dug, and every touch re-excavates the FULL span, making a within-column gap structurally impossible).
-`TileGrid.extend_terrain_dig_extent` (D0125) is the new state, folded into `state_signature()` so
-determinism replay still covers it; `Body._handle_dig` excavates its merged range. `_resolve_horizontal`
-untouched, per the explicit instruction. Full 1000×1500 sweep, everything else held identical to the
-prior D0124 re-run:
+Built a standing `--no-dig` flag on the fuzz probe (D0127) — draws the same random dig-roll every tick,
+only overrides the result, so the A/B varies exactly one thing. Full 1000×1500 sweep, dig forced off:
 
-| kind | pre-dig | after dig + oracle fix | after this fix |
+| kind | pre-dig baseline | dig-off (this round) | dig-on (D0125) |
 |---|---|---|---|
-| `discontinuity` | 0 | 3 | **0** |
-| `embedded` | 1 | 187 | **0** |
-| `grounded_no_floor` | 32 | 95 | **59** |
-| `bounds` (reported) | 18,218 | 722,655 | **805,397** |
+| `grounded_no_floor` | 32 | **32 (exact match)** | 59 |
+| `bounds` (reported) | 18,218 | **18,157 (~match)** | 805,397 |
 
-Both `embedded` and `grounded_no_floor` moved substantially — not just `discontinuity` — confirming the
-same staircase geometry was the (largest) shared root cause, per the explicit instruction not to declare
-victory on `discontinuity` alone.
+**`grounded_no_floor`'s 27-violation excess is not a new dig-created defect.** All 91 violations across
+both conditions rest at the exact same height (`HostileChamber.FLOOR_ROW`) — the signature of the
+already-documented, already-accepted D0059f/D0061 pit-lip trade-off (partial-footprint support), not a
+varying-height staircase fragment the water-mark fix would have needed to close. Dig just adds more
+reachable lips at that one height by carving holes into previously-flat floor. Confirmed unrelated to the
+untraced dy=0 discontinuity (seed=497 appears in neither seed list).
+
+**`bounds`'s rise is confirmed dig-attributable, not an artifact of something else this session
+touched** — disabling only dig's behavior returns the count to baseline. The water-mark fix's own further
++82,742 (722,655→805,397) on top of dig's baseline increase is plausible (excavating more per dig removes
+more supporting ground near map edges) but not independently proven this cycle.
 
 ## What landed
 
-1. **D0125 — the fix, verified before trusted.** New unit tests (`test_tile_grid.gd`: first-touch
-   identity, gap-closing merge both directions, overlap, per-column isolation, signature sensitivity)
-   and one integration test (`test_body.gd`, two direct `_handle_dig` calls at different `pos_y` in the
-   same column). Mutation-tested twice — inverting the merge's `mini`/`maxi` (caught, exactly the
-   merge-behavior checks failed) and reverting `_handle_dig` to touch-only excavation (caught by both the
-   integration test and, independently, the regression fixture below at the exact D0124 count). Re-ran
-   `test_shaft_generator.gd`/`test_replay_determinism.gd` after the `state_signature()` change — clean,
-   200/200 checkpoint hashes identical.
-2. **D0126 — the first nightly-escape-to-per-commit regression fixture.** `discontinuity`'s reproducing
-   case needs the shared grid's dig history accumulated across seeds 0-497 (a fresh-grid replay of
-   seed=497 alone reproduces nothing — the load-bearing detail from D0123's own diagnosis), so
-   `tests/test_body_fuzz_regression_d0122.gd` replays exactly that prefix (~53s) rather than a
-   hand-built minimal case. Now QUALITY gate 29, wired into the per-commit CI job. Passes clean against
-   the fix; mutation-tested against the pre-fix behavior, catches it exactly (`discontinuity=3`).
-3. **Mid-cycle correction, same-day:** the first push's `extend_dig_extent` tripped
-   `check_coordinate_naming.py` (D0020) — a CI-only gate not run locally before that push (public
-   function returning `Vector2i` must name its grid in the function name). Renamed to
-   `extend_terrain_dig_extent`, pure mechanical fix (`No-Ledger-Entry:` trailer, not a judgment call),
-   re-verified locally and via CI before moving on.
+1. **D0127 — the `--no-dig` diagnostic flag**, verified non-disruptive first (`test_body_fuzz_fast.gd`
+   and `test_body_fuzz_regression_d0122.gd` both re-run, byte-identical counts to before the change).
+2. **Both residuals from the D0125 report traced to a specific, evidenced population, neither fixed** —
+   per explicit instruction: both are rulings (re-baseline a bound? accept a cost?), not fixes
+   (`grounded_implies_solid_beneath` and `_resolve_horizontal` both untouched).
+3. **Not started this round:** the replay driver. The two traces above were the round's whole point per
+   your own explicit ordering ("outranks new work, same principle as last round") — both are now
+   diagnosed, so it's next, not started here.
 
 ## Anything that felt wrong even though it passed
 
-- **`grounded_no_floor` (59) is still above the pre-dig D0061 `DESIGN_TRADEOFF` bound (32)** — real,
-  roughly double the old baseline, and NOT root-caused this cycle. The bound in `test_body_fuzz.gd` was
-  deliberately left unedited rather than bumped to fit — bumping it without understanding the residual
-  would be exactly the resolver-patch instinct the director's own ruling rejected for `_handle_dig`
-  itself. This is an open question for you: raise the bound with a real explanation, or trace the
-  residual further. Does not block anything currently gated (`test_body_fuzz.gd` is nightly-only).
-- **`bounds` rose 722,655 → 805,397 (+11%)**, unrelated to anything this cycle's fix should plausibly
-  touch (it tracks the body's box leaving the grid entirely, not column dig extent). Reported because
-  it's real, not traced — no working hypothesis yet.
-- **CI caught a gate the local run hadn't** (the coordinate-naming check) — worth naming: the standard
-  pre-commit gate list I ran locally this cycle didn't include `check_coordinate_naming.py`; it should
-  be added to that checklist so this doesn't cost a second push next time.
+Nothing new this round — both open items from the D0125 report are now precisely attributed (see above),
+neither hiding a surprise.
 
 ## Gates
 
-All layer_lint gates (including `check_coordinate_naming.py`, now confirmed both locally and in CI),
-`schema_validator.py`, `data_codegen --check`, `anvil/check_integrity.py`, `duplication.py` (0 clusters,
-237 GDScript / 164 Python functions), `check_untracked_files.py`, `check_working_freshness.py`,
-`check_base_namespace.sh`, `check_trailers.sh` — all PASS. All 18 CI-scoped per-commit Godot suites PASS
-(one more than last brief — the new D0126 regression fixture). The full nightly fuzzer
-(`test_body_fuzz.gd`, not CI-scoped, not run by CI this cycle) is expected RED against its own stale
-`grounded_no_floor<=32` bound — see "Anything that felt wrong" above; not itself re-run this cycle since
-the direct probe invocation already produced the real counts.
+All layer_lint gates (including `check_coordinate_naming.py`, now on the standard local checklist),
+`schema_validator.py`, `data_codegen --check`, `anvil/check_integrity.py`, `duplication.py`,
+`check_untracked_files.py`, `check_working_freshness.py`, `check_base_namespace.sh`, `check_trailers.sh`
+— all PASS. `test_body_fuzz_fast.gd` and `test_body_fuzz_regression_d0122.gd` re-confirmed green against
+the `--no-dig` addition. The two full-sweep diagnostic runs (dig-on already reported last round, dig-off
+this round) were direct probe invocations, not routed through `test_body_fuzz.gd`'s own gate — that
+gate's stale `grounded_no_floor<=32` bound is still red pending your ruling from last round, unchanged.
 
-Instrument/game LOC ratio: **5.735 absolute** (instrument 9,290 / game 1,620), still ADVISORY (game LOC
-under the 2,000-line floor). Trailing 10 commits: instrument +1,227, game +135 — mostly this cycle's own
-test/fixture additions (`test_tile_grid.gd`, `test_body.gd`, `test_body_fuzz_regression_d0122.gd`), not
-economy content; stated plainly, not read as progress toward the eventual target.
+Instrument/game LOC ratio: not re-measured this round (no `core/`/`sim/` change — the only code change is
+`tests/fixture_body_fuzz_probe.gd`'s new flag); last measured 5.735 absolute, still ADVISORY.
 
-**Commits this round: 2 (`d08f6e0`, `8e04c97`), well within the 12-commit budget. ~1hr budget: on
-schedule, one hard stop away from crossed (the coordinate-naming gate failure was clearable in one
-attempt — a rename — not a design escalation).**
+**Commits this round: 1 so far (the `--no-dig` flag + D0127), well within budget.**
 
 ## Claims
 
@@ -97,11 +72,12 @@ attempt — a rename — not a design escalation).**
 
 ## Blocked, and what it's waiting on
 
-- **`grounded_no_floor`'s residual (59 vs. the old 32 bound)** — new this round: waits on you, whether
-  to re-baseline the bound or trace it further.
-- **The replay driver** — correctly sequenced after `sim/body` being defect-free at the fuzzer's own
-  full-sweep scale, which is now materially closer (`discontinuity`/`embedded` both closed) but not
-  fully there (`grounded_no_floor`'s residual, `bounds`'s unexplained rise).
+- **`grounded_no_floor`'s D0061 bound** — waits on you: re-baseline now that the growth is understood
+  (same mechanism, more reachable locations), or leave as a live signal.
+- **`bounds`'s water-mark-fix-specific +11.4%** — waits on you: accept as a known cost of excavating a
+  column's full extent, or worth a closer look.
+- **The replay driver** — now correctly sequenced: both `sim/body` residuals from last round are
+  diagnosed, neither is a live unknown-shape defect. Next, time permitting.
 - **`history/`'s 165-image pre-pivot cull** — waits on you, unchanged.
 - **The hands-on-keyboard `--play` test** — stays open and owed, unchanged.
 - **`data/economy/`, D1-D6** — unchanged.

@@ -8,6 +8,29 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## CLOSED — D0127: diagnosing (not fixing) `grounded_no_floor`'s residual and `bounds`'s rise, 2026-08-28
+
+Director's follow-up on D0125's own two "felt wrong even though it passed" items. Both isolated by a
+controlled dig-off A/B (new `--no-dig` flag on `fixture_body_fuzz_probe.gd`, D0127), neither fixed, per
+explicit instruction (both are rulings, not fixes).
+
+1. **`grounded_no_floor`: dig-off = 32, an exact match to the pre-dig baseline.** Rules out a
+   pre-existing bug predating this session. The 27-violation excess under dig-on is NOT a new,
+   distinct dig-created defect either — every one of 91 violations (32 dig-off + 59 dig-on) rests at the
+   exact same height, `HostileChamber.FLOOR_ROW`, the signature of the already-accepted D0059f/D0061
+   pit-lip trade-off, not a varying-height staircase fragment. Dig simply adds more reachable lips at
+   that same height (carving new holes into previously-flat floor) on top of the chamber's own several
+   built-in transitions. Not the same thread as the untraced dy=0 discontinuity (seed=497) — that seed
+   appears in neither the dig-on nor dig-off `grounded_no_floor` seed lists.
+2. **`bounds`: dig-off = 18,157, essentially the pre-dig baseline (18,218).** Confirms dig itself (not
+   something else this session touched) drives the increase. This session's own water-mark fix adds a
+   further +82,742 (+11.4%) on top of D0124's dig-on-only 722,655 — plausible (more excavated per dig
+   removes more supporting ground near the map edges) but not independently proven this cycle.
+
+Full reasoning, exact seed lists, and the `pos_y=14417920` arithmetic: `docs/DECISIONS_LEDGER.md` D0127.
+Open for the director: whether to re-baseline the D0061 bound now that its growth is understood, and
+whether the water-mark fix's own `bounds` contribution is an acceptable known cost.
+
 ## CLOSED — D0122/D0123's dig-mechanic fix, D0125/D0126, 2026-08-28, budget 1hr/12 commits
 
 Director's ruling on the `_handle_dig` design question (three alternatives rejected — whole-column dig

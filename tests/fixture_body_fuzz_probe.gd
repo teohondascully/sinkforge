@@ -26,6 +26,10 @@ const DEFAULT_TICKS_PER_SEED: int = 1500
 ## disabled within a month" (the director's own words) applies to every commit, not just this file.
 var NUM_SEEDS: int = DEFAULT_NUM_SEEDS
 var TICKS_PER_SEED: int = DEFAULT_TICKS_PER_SEED
+## D0127: `--no-dig` forces every tick's `dig_pressed` to false, for isolating whether a violation class
+## is dig-caused or pre-existing -- the same controlled A/B D0122 already used once to confirm dig's own
+## causation, now a standing flag instead of a one-off mutation.
+var DIG_DISABLED: bool = false
 const DEADLOCK_TICKS: int = 300  ## consecutive identical (pos,vel,on_floor) tuples despite varying
                                   ## random input -- a real freeze, not a body legitimately resting
 const POSITION_SANITY_PX: int = 1_000_000  ## far past any real chamber; catches wraparound/overflow
@@ -44,9 +48,12 @@ func _random_input(rng: SplitRng) -> InputFrame:
 	input.jump_pressed = rng.next_float() < 0.5
 	input.jump_held = rng.next_float() < 0.5
 	input.mantle_hold = rng.next_float() < 0.5
-	input.dig_pressed = rng.next_float() < 0.5  ## added with the dig mechanic itself, not after --
 	## `dig_pressed` is real input surface now, and this fuzzer's whole reason to exist is exercising the
-	## input space undirected, not just the subset that existed when it was first written
+	## input space undirected, not just the subset that existed when it was first written. The draw
+	## itself always happens, even under `--no-dig` -- only the RESULT is overridden, so disabling dig
+	## doesn't shift every later rng draw this tick by one and confound the A/B with a second variable.
+	var dig_roll: bool = rng.next_float() < 0.5
+	input.dig_pressed = dig_roll and not DIG_DISABLED
 	return input
 
 
@@ -145,6 +152,8 @@ func _initialize() -> void:
 			NUM_SEEDS = int(arg.trim_prefix("--seeds="))
 		elif arg.begins_with("--ticks="):
 			TICKS_PER_SEED = int(arg.trim_prefix("--ticks="))
+		elif arg == "--no-dig":
+			DIG_DISABLED = true
 	var grid: TileGrid = HostileChamber.build()
 	var grid_w: int = grid.width * CELL * Fx.SCALE
 	var grid_h: int = grid.height * CELL * Fx.SCALE
@@ -156,6 +165,6 @@ func _initialize() -> void:
 		for tick: int in range(TICKS_PER_SEED):
 			body.tick(_random_input(rng), grid)
 			violations += _check_tick(body, grid, grid_w, grid_h, state, seed, tick)
-	print("FUZZ_SUMMARY seeds=%d ticks_per_seed=%d total_ticks=%d violations=%d" %
-		[NUM_SEEDS, TICKS_PER_SEED, NUM_SEEDS * TICKS_PER_SEED, violations])
+	print("FUZZ_SUMMARY seeds=%d ticks_per_seed=%d total_ticks=%d violations=%d dig_disabled=%s" %
+		[NUM_SEEDS, TICKS_PER_SEED, NUM_SEEDS * TICKS_PER_SEED, violations, DIG_DISABLED])
 	quit(0)
