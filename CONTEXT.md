@@ -1,6 +1,6 @@
 # CONTEXT
 
-**Read this first, every session, before anything else.** If you read only one file in this repository, read this one. It is kept under 250 lines deliberately. If it grows past that, something belongs in `docs/` instead.
+**Read this first, every session, before anything else.** If you read only one file in this repository, read this one. It is kept short deliberately — `wc -l CONTEXT.md` is the number, not a figure written here to go stale; if it's grown noticeably, something belongs in `docs/` instead.
 
 ---
 

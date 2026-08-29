@@ -6887,3 +6887,115 @@ scope-expansion reasoning directly, one addition, same citation style gate 7 alr
 "director's ruling" note. No script touched; `check_size_limits.py` unchanged.
 
 **Reverse cost:** revert the one addition to `docs/QUALITY.md` gate 3.
+
+## D0177 · Re-swept `docs/archive/AUDIT_COLD_READ_2026-08-29.md`'s measured-FALSE table: 8 real drifts fixed, 3 design contradictions flagged not resolved, ~15 already moot (queue #3 Part M2) · 2026-08-29
+
+**Method:** read the audit's "## 4 · Drift and rot" table and its surrounding contradiction-pair bullets
+in full, checked each claim against the CURRENT tree (not trusted from the audit's own text, which
+describes the tree as of its own pin), and sorted every row into fixed / flagged-for-director /
+already-moot. Nothing here re-runs the audit's own 670-claim pass; this is a targeted re-check of the
+rows the audit itself printed.
+
+**Fixed (8), each verified false before editing, delete-and-point preferred over retyping a number that
+would just drift again:**
+
+1. **`tools/README.md`** — `quality_check/` said "gates nothing yet. Not wired into CI." Read
+   `.github/workflows/harness.yml` directly: all four instruments run in CI; `duplication.py` is
+   BLOCKING (D0099), the other three are `continue-on-error: true` by explicit director instruction —
+   corrected to state that split precisely, not just "it's wired now."
+2. **`docs/QUALITY.md` §6** — the permitted-root-file list named six files; the real root also has
+   `CLAUDE.md`, `CONTRIBUTING.md`, `.editorconfig` (`git ls-files` at root, confirmed), none of them
+   stray. List corrected to name all nine.
+3. **`CONTEXT.md` line 3** — "kept under 250 lines deliberately" against an actual 280 (`wc -l`).
+   Corrected to point at `wc -l CONTEXT.md` itself rather than retype a number this exact drift shows
+   will keep going stale.
+4. **`project.godot`'s `config/description`** — still the retired run-based-roguelite pitch ("before the
+   shaft floods... the rig that outlives every run. Down is free; up is powered"), current design is the
+   persistent-shaft model (`docs/GDD.md` §1, "second pivot... back to a persistent single shaft," revised
+   2026-08-27). Replaced with GDD §1's own premise language, not invented copy. Confirmed no gate reads
+   this string (`grep description tools/layer_lint/check_project_settings.py` — no match).
+5. **`tests/README.md` + all four of `tests/{unit,property,scenario,golden}/README.md`** — described an
+   organization (tests sorted into these four subdirectories) that was never adopted; each holds only its
+   own README, zero test files (`ls tests/unit tests/property tests/scenario tests/golden`, confirmed).
+   Also claimed a "conservation-of-matter property test" that does not exist — gate 9 is one of
+   `tools/gate_status.py`'s own already-known NO-CODE gates, not a new finding, just a stale claim this
+   file repeated. Corrected `tests/README.md` to state the real flat structure and point at
+   `docs/QUALITY.md`'s gate list / `gate_status.py` instead of hand-maintaining a mapping; each
+   subdirectory README gets one added line marking it unused, pointing back.
+6. **`docs/BRANCHING.md`** — a real, current, well-written document (git branching discipline) with no
+   status header and no row in `docs/README.md`'s normative table — exactly the audit's complaint,
+   confirmed still true. Given a `**Status:** normative. **Last revised:**` header matching every other
+   normative doc's own convention (date from `git log -1 --format=%ad -- docs/BRANCHING.md`: 2026-08-22,
+   not guessed), and a row added to `docs/README.md`'s table.
+7. **`docs/ARCHITECTURE.md`'s §9 heightfield narrative** and **`sim/invariants/MODULE.md`** — both still
+   cite `body.gd::_resolve_floor()` as the function's location. Confirmed the real location:
+   `sim/body/vertical_resolve.gd::resolve_floor()` (`grep -n "func resolve_floor" sim/`), moved there at
+   **D0059**, not "D0060" as the audit itself states (checked directly: the split is inside D0059's own
+   entry text, "Also split `sim/body/body.gd` into `sim/body/body.gd` + `sim/body/vertical_resolve.gd`" —
+   the audit's own citation was off by one entry). **Not retyped throughout** — the ARCHITECTURE.md
+   passage and the ADR-0005 citations it summarizes are a historical narrative dated 2026-08-26, describing
+   the code's shape AT THE TIME of that correction, before D0059's later move; rewriting `_resolve_floor()`
+   to `vertical_resolve.gd::resolve_floor()` inside that narrative would be rewriting history the same way
+   editing a ledger entry would be. Instead: one correction note appended after the narrative in
+   ARCHITECTURE.md, and one inline parenthetical in MODULE.md, both pointing at the real current location
+   without touching the historical prose. **`docs/adr/0005-heightfield-local-window.md` itself left
+   completely untouched** — it is the historical decision record these two point back to, same
+   append-only reasoning as the ledger.
+
+**Flagged for the director, not resolved (design decisions, explicitly out of this queue's scope):**
+
+- `docs/GDD.md` §5 table vs §7 prose: two different currency models (verbs from artifacts + rig from
+  material, vs. "material buys verbs through rig demands"). Still present, still contradictory — checked
+  directly, not assumed stale.
+- `docs/GDD.md` §13 vs `docs/adr/0002`: feeder "costs fuel" vs. internal lifts being free. Still present.
+- Iron's placement: three different answers across `docs/GDD.md` §10, `shaft_generator.gd:153-165`, and
+  the material's own `data/materials/ore_iron.yaml` (Stonereach / hand-scraped hour 1 / deepstone-only).
+  Still present; also, hardness has no consumer in `sim/` at all (`_handle_dig` excavates any material)
+  — a design question about whether hardness should gate digging, not a bug to silently fix.
+- `docs/ARCHITECTURE.md` §9's collider-shape table ("Capsule or rounded AABB") vs. the actual flat AABB in
+  code. **Not touched**, deliberately: `body.gd`'s own docstring (lines 14-16) already discloses this
+  divergence explicitly and explains why (a flat contact edge for the heightfield's single-surface-height
+  query) — this is a known, reasoned, already-disclosed choice, not a silent drift, and collision-shape
+  changes are named OUT of scope for this queue specifically. Whether ARCHITECTURE.md's table should be
+  updated to match, or a formal ADR written, is the director's call.
+
+**Checked and found already moot or already resolved (no action taken):**
+
+- `.anvil/` no longer exists as a directory at all — the audit's `.anvil/README.md` "Two real events now"
+  complaint has nothing left to be stale about.
+- Nine of the ten "normative-table-omits-these" legacy docs the audit named
+  (A_PLUS_STATUS/ENGINEERING/HARNESS_LAYERS/CAPTURE_MANIFEST/BITS/SANDBOX/LODE/VISUAL_TRIAGE/
+  CONTENT_CATALOG_PLAN) no longer exist as files at all (`ls docs/<name>.md`, confirmed one by one) — the
+  tenth, BRANCHING.md, is fixed above.
+- `CONTRIBUTING.md` already carries a clear "Stale as of the 2026-08-25 pivot" banner at its own top —
+  the audit's complaint about its unrewritten pre-pivot content is already disclosed, not silent.
+- `CONTEXT.md`'s "WORKING.md under 150 lines" claim: `docs/WORKING.md` is 106 lines right now (queue #2's
+  own wrap reset it) — this claim is currently TRUE, not false; no action needed.
+- `docs/QUALITY.md` §1's "Every gate is CI-enforced" already reads "Every gate below is **intended to
+  be** CI-enforced" — already softened before this queue, not the audit's quoted bare claim.
+- `docs/QUALITY.md` gate 7's "Enforced in CI" claim about the ABSOLUTE instrument/game ratio: already
+  corrected (D0147, cited directly in the gate's own text).
+- `ONBOARDING.md`'s `.git/info/exclude` passage (audit: "instructs using .git/info/exclude... the exact
+  pattern gate 27 exists to fail"): read in full — it is a historical "Correction, 2026-08-25" narrative
+  describing files ALREADY excluded at that time, explicitly telling a reader not to casually re-track
+  them and to bring any promotion decision to the director — not a forward instruction to create new
+  local-only exclusions. Does not conflict with gate 27 (D0062/D0063), which polices new/undeclared
+  exclusions going forward; this passage is about a specific past inventory, not a standing instruction.
+- `docs/BRIEF.md`'s missing "What was learned" section (five docs cite it by that exact name; the current
+  BRIEF.md has no section with that title): confirmed still true, but BRIEF.md is regenerated wholesale
+  at every session's `/wrap` per its own documented process — the natural fix is this queue's own
+  upcoming wrap adding a correctly-named section, not a standalone M2 edit to a file about to be
+  regenerated anyway.
+- Historical, point-in-time claims that cannot be "fixed" because they describe a specific past state,
+  not a standing one: `docs/BRIEF.md`'s "All gates PASS" at a specific old SHA; the old BRIEF's
+  `resolve_floor` 49→59 line-count claim; the "D0139 assigned before the entry existed" clock issue.
+  All three are already correctly read as history, not live drift.
+
+**Not re-checked, stated plainly:** the audit's other sections (§1-3, §5) and its 38 contradiction pairs
+beyond the four spot-checked above were not exhaustively re-verified row by row in this pass — this entry
+covers the "## 4 · Drift and rot" table plus the contradiction-pair bullets it lists, per M2's own scope,
+not the whole 1,221-line document.
+
+**Reverse cost:** CHEAP for every fix — each is a small, independent prose edit in its own file; revert
+any subset without affecting the others. `docs/adr/0005` and the ARCHITECTURE.md/ADR historical narrative
+were deliberately left unedited, so there is nothing to reverse there.

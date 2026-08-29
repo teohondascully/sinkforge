@@ -415,6 +415,13 @@ thresholds, or site configs. It rate-limits its own logging at the caller (`sim/
 per distinct (column, floor) pair rather than once per tick, so a real occurrence stays legible instead
 of burying itself in repetition.
 
+**Correction, 2026-08-29 (queue #3 Part M2):** the paragraphs above cite `body.gd::_resolve_floor()` as
+it was at the time of ADR-0005 and this correction (2026-08-26). `D0059` later split `sim/body/body.gd`
+into `sim/body/body.gd` + `sim/body/vertical_resolve.gd`; the function now lives at
+`sim/body/vertical_resolve.gd::resolve_floor()`, called from `body.gd` via `VerticalResolve.move_and_
+resolve`. Left as originally written rather than retyped throughout — same reasoning as leaving the
+ledger and ADR-0005 itself untouched — this note is the pointer, not a rewrite of history.
+
 Keep the existing forgiveness set on top of this, unchanged: capsule collider, auto step-up, corner
 correction, shortest-axis depenetration, coyote time and jump buffer.
 

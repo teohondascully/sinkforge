@@ -11,8 +11,12 @@ harness already produced.
   the staleness gate. `docs/QUALITY.md` gate 22, `docs/adr/0004-data-codegen.md`.
 - `quality_check/` — four code-quality instruments correctness gates never covered: function-length
   distribution, cross-language duplication (the headline one — the actual legacy failure), cyclomatic
-  complexity, and module fan-in/fan-out. Reports distributions and IQR outliers; gates nothing yet. Not
-  wired into CI.
+  complexity, and module fan-in/fan-out. All four run in CI (`.github/workflows/harness.yml`); only
+  `duplication.py` blocks (D0099 — 0 clusters is this project's verified-clean state, a regression is a
+  fact a build should refuse), the other three are `continue-on-error: true` by the director's own
+  explicit instruction — real dashboards, not gates. Corrected here 2026-08-29 (queue #3 Part M2) — this
+  file previously said "gates nothing yet. Not wired into CI," which stopped being true once duplication
+  became a blocking step.
 - `report/` — turns run artifacts (`telemetry.jsonl`, `result.json`) into human-readable output.
   Empty until `harness/driver` produces something to report on.
 - `scratch/` — gitignored. Scratch work lives here and only here. If a script here turns out to be

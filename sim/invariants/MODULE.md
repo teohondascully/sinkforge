@@ -29,7 +29,8 @@ economy has declared as a legitimate sink).
 `interface`, at minimum — violations surface as part of the telemetry/
 rejection surface `observe()`/`apply()` expose. `body` is the first real
 sim-internal caller (`_resolve_floor`'s floor-selection check, docs/adr/0005,
-D0043) — it reports into this module but never reads a result back to change
+D0043 — the function moved to `sim/body/vertical_resolve.gd::resolve_floor()` at D0059, after this
+note was written) — it reports into this module but never reads a result back to change
 its own behavior, so "nothing in `sim/` reads its output back" still holds in
 the sense that matters (no gameplay decision depends on a violation), even
 though it's no longer literally true that no sim module calls in. Emits via

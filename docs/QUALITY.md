@@ -176,7 +176,7 @@ The portfolio surface is part of the product.
 - `main` equals `origin/main`. Clean working tree.
 - No forgotten worktrees. No unreviewed divergent branches. Every branch declares owner, purpose, base, and expiry.
 - Work returns to canonical main before the next slice. No long-lived feature branches.
-- **The repository root contains only: `CONTEXT.md`, `README.md`, `ONBOARDING.md`, `LICENSE`, `project.godot`, `.gitignore`, and directories.** Generated captures, scratch scripts, patch files, and working artifacts never land at root. This is not cosmetic; the previous root's working tree had ~96 stray, already-gitignored capture and sidecar files sitting in it, and it was the first thing a reviewer would have seen.
+- **The repository root contains only: `CLAUDE.md`, `CONTEXT.md`, `README.md`, `ONBOARDING.md`, `CONTRIBUTING.md`, `LICENSE`, `project.godot`, `.gitignore`, `.editorconfig`, and directories.** Generated captures, scratch scripts, patch files, and working artifacts never land at root. This is not cosmetic; the previous root's working tree had ~96 stray, already-gitignored capture and sidecar files sitting in it, and it was the first thing a reviewer would have seen. List corrected 2026-08-29 (queue #3 Part M2) — an external audit found three real root files (`CLAUDE.md`, `CONTRIBUTING.md`, `.editorconfig`) this line had never named, none of them stray.
 - No tracked ignored files. No absolute local paths in tracked files.
 - Tracked media has an intentional rationale, documented. Clone size is documented in `README.md`.
 - **Scratch work is untracked and lives in `tools/scratch/`, which is gitignored.** If a scratch script is worth keeping, it becomes a real tool with a claim ID and moves out.

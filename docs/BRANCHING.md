@@ -1,5 +1,7 @@
 # Branching
 
+**Status:** normative. **Last revised:** 2026-08-22.
+
 `main` is the only long-lived branch, and it is the only branch that is ever canonical. Everything else
 is temporary by construction.
 
