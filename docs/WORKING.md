@@ -28,11 +28,12 @@ hit, within budget (4 commits).
    by moving it into the shared `test_base.gd` both already extend. 0 clusters now, both languages,
    across the actually-whole tree.
 
-## Micro-loop finding + reveal-layer test, 2026-08-28 — IN PROGRESS
+## Micro-loop finding + reveal-layer test, 2026-08-28 — CLOSED
 
 Director's design finding, landed via brief: the rig-as-consumer macro-loop has no micro-loop underneath
 it (three want-layers: Reveal, Flow, Pressure — `docs/GDD.md` §12). Reveal is the only one in scope this
-round; Flow and Pressure are named, confidence-marked, and unbuilt. Queue, in order:
+round; Flow and Pressure are named, confidence-marked, and unbuilt. No hard stop hit. Budget: one hour /
+24 commits; closed at ~50 minutes, 6 commits.
 
 1. DONE (D0107). `docs/GDD.md` §12 landed (inserted, old §12/§13 renumbered to §13/§14 — zero external
    cross-reference risk, verified by grep before deciding). Pointers added at §3, §8, §10. `CONTEXT.md`
@@ -41,16 +42,45 @@ round; Flow and Pressure are named, confidence-marked, and unbuilt. Queue, in or
    per the director's own reframe (dig-rate lift after a reveal, never feature location) after my
    original read flagged the brief's first formulation as circular against
    `docs/EXPERIENCE_EVALUATION.md`'s own Readiness Gate 6.
-3. IN PROGRESS. The dig mechanic itself (does not exist anywhere in `sim/` before this round — verified,
-   not assumed, in the brief-response), the reveal-feature terrain extension (reusing
-   `ShaftGenerator._scatter_vein_material`'s existing density-parameterized shape), a new debug scene,
-   and the dig-rate-lift metric with mutation tests.
-4. PENDING. Screenshots (play-mode reveal + density contrast + debug-render-quality record), `history/`
-   curation, gates, commit, report.
+3. DONE (D0110/D0111/D0112/D0113). Dig mechanic built (horizontal-only, edge-triggered, whole-column,
+   no hardness gate — D0110); legacy `layered_world_gen.gd` checked first per the director's explicit
+   ask, its vein/pocket placement reused via `ShaftGenerator`'s existing `_grow_vein`, its persistent-
+   world-tied structure correctly NOT ported wholesale (D0111); two real bugs found only by actually
+   running `tests/body/reveal_scene.gd` end to end, neither caught by that commit's own first-draft unit
+   tests — a right-facing target-cell off-by-one (D0112) and a single-row dig that couldn't be walked
+   through a 10-cell body (D0113), both fixed, both tests rewritten to stop deriving their own expected
+   values from the function under test.
+4. DONE (D0114/D0115). `tests/body/reveal_metric.gd`'s `RevealMetric.compute` (dig-events-per-session +
+   before/after dig-rate window around a qualifying reveal, explicit anti-cheat docstring per D0109) —
+   its own first-draft test suite had 2 test-authoring bugs (a strict inequality at an exact boundary, an
+   under-sized array denying the second reveal a full window), both fixed, both root-caused as test bugs
+   before touching `compute()` (D0114). The window-boundary guard mutation-tested clean (D0114) — which
+   surfaced a real, unrelated FINDING about the shared test harness itself: a mid-test `SCRIPT ERROR`
+   crash still exits 0 and still prints `ALL PASS` (D0115), flagged for the director rather than fixed
+   here (touches `tests/test_base.gd`, shared by every suite in the project — a real design decision
+   about shared infrastructure, not a parameter this round owns).
+5. DONE. Three screenshots captured (`history/153-the-glimmer-in-the-wall.png`,
+   `154-reveal-density-sparse.png`, `154-reveal-density-dense.png`) via `reveal_scene.gd`'s agent mode,
+   not literal `--play` — no human keyboard was available to this session, flagged plainly in
+   `history/README.md` rather than glossed over. `history/`'s unapplied cap-of-12 policy (set 2026-08-25)
+   is still unapplied as of this round (168 images total); the 3 additions were made without a swap-one-
+   out, flagged in `history/README.md` rather than either silently violating the policy or unilaterally
+   executing the 165-image pre-pivot cull, which is not this session's call.
+6. NOT BUILT, honestly scoped out rather than rushed: a replay-driver reading a real recorded
+   `tests/body/recordings/*.log` session into a `RevealMetric.TickEvent` array (the piece that would let
+   `claims/C004` run against a real session instead of only synthetic test data). Stopped here at ~50
+   minutes with a complete, tested, mutation-tested instrument rather than starting a second chunk of
+   work with its own bug-discovery risk this late in the budget. Clear next step, not a gap glossed over.
+7. DONE, incidental. `tools/quality_check/duplication.py` (blocking gate) caught a real exact-shape
+   duplicate cluster between `reveal_scene.gd` and the pre-existing `play_scene.gd` it was modeled on
+   (`_record_tick`, `_notification`) — fixed by extracting the shared logic into a new
+   `tests/body/debug_scene_common.gd`, not by excluding or loosening the gate. Full non-nightly test
+   suite (17 suites, fast fuzzer included) re-confirmed green after the refactor.
 
 HARD STOPS (director's, unchanged): determinism regression, gate red not clearable in one attempt, a
 design decision surfacing rather than a parameter, touching `data/economy/` or the flow/pressure layers.
-Budget: one hour or 24 commits.
+None hit. D0115 (test-harness finding) is exactly the "design decision surfacing" case — recorded and
+left for the director rather than resolved under this round's authorization.
 
 ## Director's follow-up round on the execution-dense queue, 2026-08-28 — CLOSED
 

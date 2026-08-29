@@ -156,10 +156,8 @@ func _scripted_approach_input() -> InputFrame:
 
 
 func _record_tick(input: InputFrame) -> void:
-	_recording.append(PackedStringArray([
-		str(_tick_count), str(input.move_dir), str(input.jump_pressed), str(input.jump_held),
-		str(input.dig_pressed),
-	]))
+	_recording.append(DebugSceneCommon.record_row(
+		_tick_count, input.move_dir, input.jump_pressed, input.jump_held, input.dig_pressed))
 
 
 func _update_camera() -> void:
@@ -193,8 +191,7 @@ func _finish_and_quit() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		_flush_recording()
-		get_tree().quit(0)
+		DebugSceneCommon.finish_and_quit(_flush_recording, get_tree())
 
 
 ## Same format as play_scene.gd's own recording, plus dig_pressed in place of mantle_hold (this scene

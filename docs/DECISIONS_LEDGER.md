@@ -4158,3 +4158,72 @@ needs to mean "the whole vertical span of that cell's own column," which is a di
 word and was the actual gap.
 
 Reverse: cheap. Revert `_handle_dig` to D0112's single-row version.
+
+## D0114 · 2026-08-28 · `RevealMetric.compute`'s own test suite: two test-authoring bugs, then mutation-tested clean
+
+`tests/body/reveal_metric.gd` (`RevealMetric.compute`, the D0109-corrected claims/C004 instrument) shipped
+with a first-draft test suite (`tests/test_reveal_metric.gd`) that failed 2 of 15 assertions on first run
+— both were bugs in the TEST, not in `compute()`, confirmed before touching either.
+
+**Bug 1: strict inequality at an exact boundary.** `_test_a_real_lift_is_computed_correctly` asserted
+`result["lift"] > 0.9`. The hand-computed before-rate (0.1000) and after-rate (1.0000) sub-assertions
+immediately above it both passed, meaning the underlying subtraction (`1.0 - 0.1 = 0.9`) was already
+confirmed correct — the assertion itself was wrong, comparing the computed value against its own exact
+value with a strict `>`. Fixed by loosening to `> 0.85` (still well above float noise, still proves a
+real positive lift, no longer coincides with the exact expected value).
+
+**Bug 2: insufficient array margin for the second reveal.** `_test_multiple_reveals_are_averaged` placed
+`reveal_b` at tick `w*3` (`w = WINDOW_TICKS`) inside an array sized `total = w*4`. `compute()`'s own
+after-window exclusion (`t + WINDOW_TICKS >= total_ticks`) correctly evaluates `3w + w = 4w >= 4w` as
+true and excludes `reveal_b` — the array gave it zero after-margin, not a full window. Fixed by sizing
+`total = w*4 + 1`, matching what the test's own comment already claimed ("room for two qualifying
+reveals with full windows each") but the arithmetic hadn't actually delivered.
+
+Both are the same class this session already named twice today (D0112, D0113): a test whose own
+construction is wrong gets misread as a bug in the thing under test. Caught here only because both
+sub-assertions immediately preceding the failing one had already independently confirmed the correct
+numbers — worth preserving that pattern (assert the intermediate values, not just the final one) in any
+future metric test.
+
+**Mutation-tested the guard, not just re-passed the suite** (standing rule: a new guard is untrusted
+until something is broken and the tests catch it). Two boundary mutations against
+`if t - WINDOW_TICKS < 0 or t + WINDOW_TICKS >= total_ticks: continue`:
+- `<` → `<=` on the before-boundary: `_test_a_real_lift_is_computed_correctly` (reveal at `t == WINDOW_TICKS`
+  exactly, previously qualifying) failed with `qualifying_reveals` dropping to 0. Caught.
+- `>=` → `>` on the after-boundary: `_test_reveal_too_close_to_end_is_excluded`'s exact boundary case
+  (`t == total - WINDOW_TICKS`) crashed with an out-of-bounds array read inside `compute()`'s own
+  after-window loop, rather than silently passing through as a qualifying reveal — a louder signal than
+  a clean FAIL line, but still a real, unambiguous failure. Caught. (The run's *final* summary line still
+  printed `ALL PASS` despite this crash — that is a separate, real finding about the shared test harness,
+  not about this guard; recorded on its own as D0115 rather than folded in here.)
+
+Both mutations reverted immediately after confirming failure; `tests/body/reveal_metric.gd` diffed
+byte-identical against its pre-mutation state before moving on.
+
+## D0115 · 2026-08-28 · test harness FINDING: a mid-test `SCRIPT ERROR` crash still exits 0 and still prints `ALL PASS`
+
+Surfaced as a side effect of D0114's own mutation testing, not sought out deliberately. Godot's own
+runtime error (an out-of-bounds `Array` read, triggered by the `>=`→`>` mutation above) aborted
+`_test_reveal_too_close_to_end_is_excluded` mid-function — its two `_check()` calls never ran, so neither
+a PASS nor a FAIL line was ever emitted for them. `_initialize()` (`tests/test_base.gd`) caught nothing:
+it kept calling the remaining test functions, and `_finish()` printed `ALL PASS (reveal_metric)` at the
+end regardless. The process's own exit code was `0`. Two SCRIPT ERROR lines are visible in the raw
+console output, but nothing in the harness's own PASS/FAIL bookkeeping or exit code registers that
+anything went wrong — a live instance of this session's own recurring "instrument cannot register its
+subject" class (the harness's subject here is *did every check run*, and a crash removes a check from
+that population without the harness noticing the population shrank).
+
+**Deliberately not fixed here.** `tests/test_base.gd` is the shared base class for every `test_*.gd` suite
+in the project, not a file this build round owns; deciding how it *should* behave on an uncaught runtime
+error (skip and count the enclosing test function as a FAIL? track a global error count via
+`Engine.get_singleton("...")` or a custom error handler? something else?) is a real design decision about
+shared test infrastructure, not a parameter — matching this build's own explicit hard-stop list ("a
+design decision surfacing rather than a parameter"). Flagged here and in this round's report rather than
+patched under that authorization's scope.
+
+**Why this matters beyond this one file:** every `test_*.gd` suite in the project shares this base class,
+so any test with an unguarded array/dictionary access that could go out of range on a mutant or a genuine
+future regression has this same blind spot — CI would see exit 0 and a printed `ALL PASS` on a run that
+actually crashed partway through. Worth a director look, not a same-session fix.
+
+Reverse: N/A — this entry records an observation, not a code change.
