@@ -75,7 +75,7 @@ None yet.
   only the body's CURRENT footprint at the moment of the touch; a later dig at a DIFFERENT vertical offset
   in the SAME column (without the body ever occupying the rows in between during a dig) left a jagged
   sub-cell fragment `_resolve_horizontal` was never exercised against — the fuzzer's `discontinuity`
-  violations. Fixed by `_handle_dig` excavating `TileGrid.extend_dig_extent`'s own merged, per-column
+  violations. Fixed by `_handle_dig` excavating `TileGrid.extend_terrain_dig_extent`'s own merged, per-column
   high/low-water mark (D0125) instead of just its own touch range, so a column is always one contiguous
   open span from the lowest row ever dug there to the highest. Deliberately does NOT touch
   `_resolve_horizontal` itself — the resolver was correct for the geometry it was designed against; the

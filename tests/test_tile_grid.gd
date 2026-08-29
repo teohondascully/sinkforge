@@ -8,9 +8,9 @@ func _initialize() -> void:
 	_test_excavate_reveals_wall_not_material()
 	_test_occupied_terrain_cells_sorted_and_excludes_air()
 	_test_state_signature_stable_and_sensitive()
-	_test_extend_dig_extent_first_touch_is_just_that_touch()
-	_test_extend_dig_extent_merges_across_touches_closing_the_gap()
-	_test_extend_dig_extent_is_per_column()
+	_test_extend_terrain_dig_extent_first_touch_is_just_that_touch()
+	_test_extend_terrain_dig_extent_merges_across_touches_closing_the_gap()
+	_test_extend_terrain_dig_extent_is_per_column()
 	_test_state_signature_sensitive_to_dig_extent()
 	_finish("tile_grid")
 
@@ -87,9 +87,9 @@ func _test_state_signature_stable_and_sensitive() -> void:
 ## D0125. A column's first-ever touch has no history to merge against -- the returned range must be
 ## exactly the touch itself, unchanged. This is the backward-compatible case every existing dig test
 ## (`test_body.gd`) already exercises; asserting it here pins the contract at the `TileGrid` level too.
-func _test_extend_dig_extent_first_touch_is_just_that_touch() -> void:
+func _test_extend_terrain_dig_extent_first_touch_is_just_that_touch() -> void:
 	var grid: TileGrid = TileGrid.new(10, 20, 1)
-	var extent: Vector2i = grid.extend_dig_extent(3, 5, 8)
+	var extent: Vector2i = grid.extend_terrain_dig_extent(3, 5, 8)
 	_check(extent == Vector2i(5, 8), "first touch to a column returns exactly that touch's own range, got %s" % [extent])
 
 
@@ -97,33 +97,33 @@ func _test_extend_dig_extent_first_touch_is_just_that_touch() -> void:
 ## into one contiguous span covering both, regardless of which touch happened first -- a low touch then
 ## a high one, and the reverse. This is the property that makes the D0122/D0123 staircase structurally
 ## impossible: the caller (`Body._handle_dig`) excavates the returned range, not just its own touch.
-func _test_extend_dig_extent_merges_across_touches_closing_the_gap() -> void:
+func _test_extend_terrain_dig_extent_merges_across_touches_closing_the_gap() -> void:
 	var low_then_high: TileGrid = TileGrid.new(10, 20, 1)
-	low_then_high.extend_dig_extent(4, 10, 12)
-	var merged_a: Vector2i = low_then_high.extend_dig_extent(4, 15, 17)
+	low_then_high.extend_terrain_dig_extent(4, 10, 12)
+	var merged_a: Vector2i = low_then_high.extend_terrain_dig_extent(4, 15, 17)
 	_check(merged_a == Vector2i(10, 17),
 		"low touch then high touch merges to the full span with the gap closed, got %s" % [merged_a])
 
 	var high_then_low: TileGrid = TileGrid.new(10, 20, 1)
-	high_then_low.extend_dig_extent(4, 15, 17)
-	var merged_b: Vector2i = high_then_low.extend_dig_extent(4, 10, 12)
+	high_then_low.extend_terrain_dig_extent(4, 15, 17)
+	var merged_b: Vector2i = high_then_low.extend_terrain_dig_extent(4, 10, 12)
 	_check(merged_b == Vector2i(10, 17),
 		"high touch then low touch merges to the same full span regardless of order, got %s" % [merged_b])
 
 	var overlapping: TileGrid = TileGrid.new(10, 20, 1)
-	overlapping.extend_dig_extent(4, 10, 14)
-	var merged_c: Vector2i = overlapping.extend_dig_extent(4, 12, 16)
+	overlapping.extend_terrain_dig_extent(4, 10, 14)
+	var merged_c: Vector2i = overlapping.extend_terrain_dig_extent(4, 12, 16)
 	_check(merged_c == Vector2i(10, 16), "overlapping touches merge to their union, got %s" % [merged_c])
 
 
 ## Column-scoped, not grid-wide (director's own explicit ruling: adjacent-column disagreement is legal
 ## geometry `_resolve_horizontal` already handles) -- a touch to one column must not extend another's.
-func _test_extend_dig_extent_is_per_column() -> void:
+func _test_extend_terrain_dig_extent_is_per_column() -> void:
 	var grid: TileGrid = TileGrid.new(10, 20, 1)
-	grid.extend_dig_extent(4, 10, 12)
-	var other: Vector2i = grid.extend_dig_extent(5, 50, 52)
+	grid.extend_terrain_dig_extent(4, 10, 12)
+	var other: Vector2i = grid.extend_terrain_dig_extent(5, 50, 52)
 	_check(other == Vector2i(50, 52), "a different column's touch is unaffected by another column's extent, got %s" % [other])
-	var same_col_again: Vector2i = grid.extend_dig_extent(4, 20, 22)
+	var same_col_again: Vector2i = grid.extend_terrain_dig_extent(4, 20, 22)
 	_check(same_col_again == Vector2i(10, 22),
 		"column 4's own extent still merges correctly after an unrelated column was touched, got %s" % [same_col_again])
 
@@ -136,11 +136,11 @@ func _test_state_signature_sensitive_to_dig_extent() -> void:
 	var a: TileGrid = TileGrid.new(10, 20, 1)
 	var b: TileGrid = TileGrid.new(10, 20, 1)
 	_check(a.state_signature() == b.state_signature(), "two fresh grids with no dig history match")
-	a.extend_dig_extent(4, 10, 12)
+	a.extend_terrain_dig_extent(4, 10, 12)
 	_check(a.state_signature() != b.state_signature(), "state_signature changes when dig history differs")
-	b.extend_dig_extent(4, 15, 17)  # gives b SOME history at col 4, but not the same range as a
+	b.extend_terrain_dig_extent(4, 15, 17)  # gives b SOME history at col 4, but not the same range as a
 	_check(a.state_signature() != b.state_signature(), "state_signature differs when dig extents at the same column differ")
-	a.extend_dig_extent(4, 15, 17)
-	b.extend_dig_extent(4, 10, 12)
+	a.extend_terrain_dig_extent(4, 15, 17)
+	b.extend_terrain_dig_extent(4, 10, 12)
 	_check(a.state_signature() == b.state_signature(),
 		"state_signature matches once both grids reach the same merged extent, regardless of touch order")

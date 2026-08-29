@@ -4652,14 +4652,14 @@ only the within-column gap was the illegal shape. Explicit instruction: do not t
 resolver.
 
 **The fix.** `TileGrid` (`sim/world/tile_grid.gd`) gains `_dig_extent: Dictionary` (`col: int ->
-Vector2i(min_row, max_row)`) and `extend_dig_extent(col, touch_top, touch_bottom) -> Vector2i`, which
+Vector2i(min_row, max_row)`) and `extend_terrain_dig_extent(col, touch_top, touch_bottom) -> Vector2i`, which
 merges a touch into the column's own historical extent and returns the merged range. State lives in
 `TileGrid`, not on `Body` or a side table, because a shaft's grid is exactly what determinism already
 replays — a side table elsewhere would be new, unreplayed state. `state_signature()` now includes
 `_dig_extent`, sorted by column: dig history is real state affecting future gameplay and isn't derivable
 from `_blocks` alone, so a signature omitting it could match on blocks while silently diverging on dig
 history (the "instrument cannot register its subject" class this project keeps finding).
-`Body._handle_dig` (`sim/body/body.gd`) now excavates `extend_dig_extent`'s returned merged range instead
+`Body._handle_dig` (`sim/body/body.gd`) now excavates `extend_terrain_dig_extent`'s returned merged range instead
 of just its own current touch — the only change to the mechanic; `_resolve_horizontal` untouched, per the
 ruling.
 
@@ -4668,7 +4668,7 @@ gap-closing merge in both touch orders, overlap, per-column isolation, signature
 integration test in `tests/test_body.gd`
 (`_test_dig_gap_between_two_touches_in_the_same_column_is_closed`, two direct `_handle_dig` calls at
 different `pos_y` in the same column, asserting the full span between them is cleared). Mutation-tested
-twice: inverting `extend_dig_extent`'s `mini`/`maxi` merge — caught, 4 of 10 new checks failed, all and
+twice: inverting `extend_terrain_dig_extent`'s `mini`/`maxi` merge — caught, 4 of 10 new checks failed, all and
 only the merge-behavior ones; reverting `_handle_dig` to excavate only its own touch range instead of the
 merged extent — caught by the new integration test (`40 still solid`) and, separately, by the new
 regression fixture below (`discontinuity=3`, matching D0124's own count exactly). Re-ran

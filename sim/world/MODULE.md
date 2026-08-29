@@ -42,7 +42,7 @@ phases — not itself one of the fixed tick phases.
   (`Array[Vector2i]`, sorted, block cells only — named and typed this way, not the bare `Array` it
   returned before D0026's resolution audit, so a caller sees "terrain" without reading the doc comment),
   `.state_signature()` (canonical, for determinism checks; includes dig history, see below).
-  `.extend_dig_extent(col, touch_top, touch_bottom)` (D0125) — per-column high/low-water mark. Merges
+  `.extend_terrain_dig_extent(col, touch_top, touch_bottom)` (D0125) — per-column high/low-water mark. Merges
   this touch into column `col`'s own historical [min,max] dug extent and returns the merged range, which
   the caller (`Body._handle_dig`) excavates in full. Column-scoped: two adjacent columns disagreeing is
   legal geometry, only a gap strictly within one column was the illegal shape this closes.
@@ -64,7 +64,7 @@ phases — not itself one of the fixed tick phases.
   it directly. `docs/adr/0004-data-codegen.md` has the contract, `docs/DECISIONS_LEDGER.md` D0021 the
   original gap this resolves. Drift is now a build failure (`generate.py --check`), not a hand-sync task.
 - **`_dig_extent` tracks DUG history only, not "everything currently open."** A column can have a
-  natural, generation-time opening (a cave) far from anywhere the player has dug; `extend_dig_extent`
+  natural, generation-time opening (a cave) far from anywhere the player has dug; `extend_terrain_dig_extent`
   deliberately never merges the two. It lives here, not on `Body` or anywhere else, because a shaft's
   `TileGrid` is exactly what determinism already replays — a side table anywhere else would be new,
   unreplayed state (`docs/DECISIONS_LEDGER.md` D0125).

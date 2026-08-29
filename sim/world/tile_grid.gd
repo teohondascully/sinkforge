@@ -80,7 +80,7 @@ func excavate(terrain_cell: Vector2i) -> void:
 ## about. State lives here, in `TileGrid`, not on `Body` or anywhere else outside it, because a shaft's
 ## grid is exactly the thing determinism already replays -- a side table anywhere else would be new,
 ## unreplayed state (`docs/DECISIONS_LEDGER.md` D0125).
-func extend_dig_extent(col: int, touch_top: int, touch_bottom: int) -> Vector2i:
+func extend_terrain_dig_extent(col: int, touch_top: int, touch_bottom: int) -> Vector2i:
 	var merged: Vector2i = Vector2i(touch_top, touch_bottom)
 	if _dig_extent.has(col):
 		var existing: Vector2i = _dig_extent[col]
