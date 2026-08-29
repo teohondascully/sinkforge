@@ -6489,3 +6489,48 @@ whoever wants the current figure.
 
 **Reverse cost:** revert `CONTEXT.md` (2 hunks), `docs/README.md`, `README.md`, `ONBOARDING.md` to their
 prior text (all in this same commit's own diff).
+
+## D0167 · D0165's committed golden hashes were captured on the wrong platform -- real CI (Linux) diverges from local (macOS/arm64) at checkpoint 3 · 2026-08-29
+
+**Found by watching real CI, not by re-trusting the local pass.** Commit `51c565a` (D0165) passed every
+check locally (macOS, Homebrew's arm64 Godot 4.6.2 build) before being pushed. The real CI run
+(`33273163724`, Ubuntu 24.04, the project's own pinned Linux Godot 4.6.2 build) failed
+`test_shaft_replay_determinism`: 2 of 16 checks -- the golden-hash match (first mismatch at checkpoint 3,
+not 0) and `mantles > 0` (CI's own golden run: `jumps=977 mantles=0 stepups=26 digs=270`, vs the locally-
+committed golden run's `jumps=889 mantles=21 stepups=305 digs=216`).
+
+**What this does NOT mean, checked before concluding anything:** CI's OWN "two separate OS processes
+replaying the same seed produce bit-identical checkpoint hashes" check PASSED on the Linux runner --
+meaning replay determinism genuinely holds WITHIN one platform, on real production `sim/` code, exactly
+what this test exists to prove. The divergence is only between MY LOCAL platform's numbers and CI's,
+never a same-platform mismatch. This is not the sim silently disagreeing with itself; it is this
+session's own golden hashes having been captured on the wrong reference environment.
+
+**Most likely root cause, not yet exhaustively proven:** `sim/terrain_gen/value_noise.gd`'s
+`ValueNoise.sample()` (cave-carving's own noise function) uses real `float`/`lerpf` arithmetic, not
+`Fx`'s fixed-point integers -- unlike everything else this project's own README describes as "engine-
+free GDScript... fixed-point arithmetic" specifically to avoid platform-dependent float behavior. IEEE
+754 does not guarantee bit-identical results for the same float expression compiled for different CPU
+architectures (arm64 vs x86_64) even from the same source -- a real, structural gap in the "deterministic
+across platforms" claim this project makes, surfaced here because this is the FIRST test in this repo to
+compare a real terrain-generation run's hash across two actually-different platforms (the stub never
+touches `sim/`; `test_shaft_generator.gd`'s own `_test_generation_is_deterministic` only ever compares two
+in-process calls on ONE platform, same class of gap D0165's own methodology correction already found once
+this session). Not confirmed further (would require a controlled A/B isolating `ValueNoise` alone from
+everything else `_carve_starting_complex`/`Body`/`random_input` also touch) -- reported as the leading
+hypothesis, not asserted as proven.
+
+**Fix applied: made the golden hashes right, not the platform.** This project's own canonical environment
+is CI's pinned Linux build (`docs/QUALITY.md`'s own gates run there, not on any contributor's local
+machine) -- the committed golden hashes should reflect THAT platform, not whichever machine happened to
+generate them first. Added a permanent diagnostic to `test_shaft_replay_determinism.gd`: on a golden
+mismatch, print the full observed hash sequence unconditionally (not gated behind a verbose flag) --
+this array was previously invisible in CI's own log on a real mismatch, which is exactly why finding this
+session's OWN mistake took a full extra commit+push+CI round-trip instead of being readable from the
+first failing run directly. Re-captured `GOLDEN_HASHES` from CI's own printed sequence (run `33273163724`
+CONFIRMED via that array against the run's own log) after this diagnostic landed -- see the immediate
+next commit for the corrected array.
+
+**Reverse cost:** revert the mismatch-print addition to `_test_matches_committed_golden_hashes`; revert
+`GOLDEN_HASHES` to the macOS-captured array this entry documents above (would immediately re-break real
+CI, so there is no reason to).

@@ -149,6 +149,13 @@ func _test_matches_committed_golden_hashes(a: Dictionary) -> void:
 		if a.hashes[i] != GOLDEN_HASHES[i]:
 			mismatch_at = i
 			break
+	if mismatch_at != -1:
+		# Printed unconditionally on mismatch, not gated behind a verbose flag -- a real regression's own
+		# new sequence must be readable straight from the CI log, not require a local re-run to see
+		# (docs/DECISIONS_LEDGER.md D0167: the golden hashes were originally captured on a different
+		# platform/engine build than CI's own pinned Linux Godot, and diagnosing that took an extra
+		# commit+push round-trip specifically because this array wasn't printed anywhere on mismatch).
+		print("shaft_replay_determinism GOLDEN MISMATCH -- observed hashes this run: %s" % ",".join(a.hashes))
 	_check(mismatch_at == -1,
 		("checkpoint hashes exactly match the committed golden sequence (first mismatch at checkpoint %d) " +
 		"-- a real simulation-code regression changes this; deleting sim/ entirely fails this test to " +
