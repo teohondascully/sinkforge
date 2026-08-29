@@ -150,31 +150,53 @@ func _box_blocked(grid: TileGrid, left: int, top: int, right: int, bottom: int) 
 	return false
 
 
-## The one cell horizontally adjacent to the body's leading edge, in `facing`'s direction, at the body's
-## own vertical centre row. Horizontal-only and single-cell on purpose (docs/DECISIONS_LEDGER.md D0110)
-## -- the reveal-layer test this exists for is scoped to lateral search (docs/GDD.md §8/§12), and a
-## single well-defined target avoids the aim-direction design question a vertical/diagonal dig would
-## raise (which key means "down," does it compete with mantle_hold's up-key) without a stated answer yet.
+## The column of cells horizontally adjacent to the body's leading edge, in `facing`'s direction --
+## `_handle_dig` excavates the WHOLE column spanning the body's own height (D0113), this returns just its
+## x plus the body's centre row for bounds-checking and reporting. Horizontal-only on purpose
+## (docs/DECISIONS_LEDGER.md D0110) -- the reveal-layer test this exists for is scoped to lateral search
+## (docs/GDD.md §8/§12), and a single well-defined direction avoids the aim-direction design question a
+## vertical/diagonal dig would raise (which key means "down," does it compete with mantle_hold's up-key)
+## without a stated answer yet.
+##
+## `_right_x()`/`_left_x()` are the box's edges over a HALF-OPEN [left,right) range, same as
+## `_box_blocked`'s own `right - 1`/`bottom - 1` convention (docs/DECISIONS_LEDGER.md D0112) -- a body
+## resting with its right edge exactly on a cell boundary has `_px_to_cell(_right_x())` already equal to
+## the cell just ahead of it (not one it occupies), so `+ facing` on that value overshoots by one cell.
+## The left edge doesn't need the same `- 1`: floor's rounding already gives the leftmost occupied cell
+## there, correctly, with no adjustment.
 func _dig_target_cell() -> Vector2i:
-	var edge_x: int = _right_x() if facing > 0 else _left_x()
-	var cx: int = _px_to_cell(edge_x) + facing
+	var cx: int = _px_to_cell(_right_x() - 1) + 1 if facing > 0 else _px_to_cell(_left_x()) - 1
 	var cy: int = _px_to_cell(pos_y)
 	return Vector2i(cx, cy)
 
 
-## Excavates the dig target if it's a real, in-bounds, solid cell. A press against air or the grid edge
-## is not an event -- `dig_event_this_tick` stays false, matching `stepped_up_this_tick`'s "only true
-## when it actually happened" convention rather than "the button was pressed."
+## Excavates the dig target COLUMN across the body's OWN full height, not just its centre row -- a
+## single-row notch cannot be walked through by a body several cells tall, so "the adjacent column" has
+## to mean the whole vertical span the body itself occupies (docs/DECISIONS_LEDGER.md D0113, found only
+## by actually driving a scripted approach into this mechanic and watching it get stuck forever one
+## column short, blocked by the rows above and below the single one it had cleared). A press against a
+## column that's already fully open is not an event; a partially-open column still counts once any new
+## cell clears. `dug_material_this_tick` reports `glimmer` if the column held it anywhere, else the first
+## real material found -- the reveal signal takes priority over which row happened to report first.
 func _handle_dig(grid: TileGrid) -> void:
-	var cell: Vector2i = _dig_target_cell()
-	if not grid.in_bounds(cell):
+	var target: Vector2i = _dig_target_cell()
+	if not grid.in_bounds(target):
 		return
-	var material: StringName = grid.get_material(cell)
-	if material == &"":
-		return
-	grid.excavate(cell)
-	dig_event_this_tick = true
-	dug_material_this_tick = material
+	var top_row: int = _px_to_cell(_top_y())
+	var bottom_row: int = _px_to_cell(_bottom_y() - 1)
+	var reported_material: StringName = &""
+	for row: int in range(top_row, bottom_row + 1):
+		var cell: Vector2i = Vector2i(target.x, row)
+		if not grid.in_bounds(cell):
+			continue
+		var material: StringName = grid.get_material(cell)
+		if material == &"":
+			continue
+		grid.excavate(cell)
+		if reported_material == &"" or material == &"glimmer":
+			reported_material = material
+	dig_event_this_tick = reported_material != &""
+	dug_material_this_tick = reported_material
 
 
 ## One fixed 60Hz tick. Order: horizontal integrate+move+collide, vertical integrate+move+collide.

@@ -57,10 +57,17 @@ None yet.
 ## Gotchas
 
 - None yet, beyond the carry-weight/`items` coupling noted above.
-- **Digging exists now** (`docs/DECISIONS_LEDGER.md` D0110, `docs/GDD.md` §12's Reveal want-layer): a
-  new `InputFrame.dig_pressed` field, handled by `Body._handle_dig`, excavates the ONE cell adjacent to
-  the body's leading edge in `facing`'s direction, at the body's own vertical centre row. Deliberately
-  horizontal-only, single-cell, one tick per press, no hardness gate — the smallest thing that could test
-  the Reveal hypothesis, not R4's eventual tool-tier/hardness system, which does not exist yet.
-  `dig_event_this_tick`/`dug_material_this_tick` are the same "per-tick telemetry, read by the caller,
-  not auto-cleared" shape every other event flag here already uses.
+- **Digging exists now** (`docs/DECISIONS_LEDGER.md` D0110/D0112/D0113, `docs/GDD.md` §12's Reveal
+  want-layer): a new `InputFrame.dig_pressed` field, handled by `Body._handle_dig`, excavates the ONE
+  COLUMN adjacent to the body's leading edge in `facing`'s direction, across the body's OWN full height
+  (not just its centre row — a single-row notch can't be walked through by a body several cells tall,
+  D0113's own real bug). Deliberately horizontal-only, one column, one tick per press, no hardness gate —
+  the smallest thing that could test the Reveal hypothesis, not R4's eventual tool-tier/hardness system,
+  which does not exist yet. `dig_event_this_tick`/`dug_material_this_tick` are the same "per-tick
+  telemetry, read by the caller, not auto-cleared" shape every other event flag here already uses;
+  `dug_material_this_tick` reports `glimmer` if the column held it anywhere, else the first real material.
+  **Two real bugs shipped in the first commit, both found only by actually running
+  `tests/body/reveal_scene.gd` end to end, neither caught by that commit's own unit tests**: an off-by-one
+  in the right-facing target column (D0112) and the single-row-not-full-column gap (D0113) — worth
+  reading both entries before touching this mechanic again, since the pattern (a test that derives its
+  expected value from the function under test) is easy to repeat by accident.

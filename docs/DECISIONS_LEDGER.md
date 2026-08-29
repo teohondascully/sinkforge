@@ -4073,3 +4073,88 @@ Net effect on the build: none. `_scatter_reveal_material` as already written is 
 reuse, not a premature one.
 
 Reverse: N/A — a research finding, no code changed by this entry.
+
+## D0112 · 2026-08-28 · `_dig_target_cell`'s real off-by-one, found only by actually running the scene, corrected
+
+The dig mechanic committed at D0110 had a real bug in its right-facing case, undetected by that commit's
+own mutation tests because those tests were self-referential: they derived the "expected" target cell by
+calling `body._dig_target_cell()` itself, so a wrong formula would just excavate whatever cell it named
+and every assertion would still read PASS. Found only once `tests/body/reveal_scene.gd` (this round's
+debug scene) was actually run end to end: the scripted approach policy walked into a wall, dug once, and
+then sat permanently stuck for the full 3000-tick safety cap with `vel_x=0` forever after — a real
+symptom, not a hypothesis, confirmed via a standalone tick-by-tick trace before touching the fix.
+
+**The bug.** `_right_x()`/`_left_x()` bound a half-open `[left, right)` pixel range, the same convention
+`_box_blocked` already uses (`_px_to_cell(right - 1)`, not `_px_to_cell(right)`). The old formula computed
+`_px_to_cell(edge_x) + facing` symmetrically for both directions. For a body resting with its right edge
+exactly on a cell boundary (routine — most resting positions in this codebase's own test fixtures land
+exactly on boundaries), `_px_to_cell(_right_x())` is ALREADY the cell just ahead of the body, not one it
+occupies — so `+ facing` overshoots by one cell, skipping the actually-adjacent cell entirely. The left
+case never had this problem: floor's rounding already gives the leftmost OCCUPIED cell at that edge,
+correctly, with no adjustment needed.
+
+**Fix.** `_px_to_cell(_right_x() - 1) + 1` when facing right (mirrors `_box_blocked`'s own `- 1`
+convention exactly); `_px_to_cell(_left_x()) - 1` when facing left, unchanged from before.
+
+**Tests rewritten, not just re-passed.** `tests/test_body.gd`'s two adjacency tests
+(`_test_dig_excavates_the_adjacent_cell_in_facing_direction`, `_test_dig_respects_facing_left`) now derive
+the expected target cell independently — plain arithmetic on the test's own known construction parameters
+(`spawn_col`, `Body.WIDTH_PX`), never a call into `_dig_target_cell()` or any other `body.gd` method for
+the horizontal component. Verified this rewrite has real teeth the old version didn't: reverted to the
+buggy formula, reran — 3 of the (now-independent) assertions FAIL, correctly, where the old
+self-referential version would have shown all green on the identical buggy code. Restored, reran clean.
+
+**Regression check.** `test_body_acceptance.gd` re-run byte-identical (`traverse_time` still exactly 225
+ticks against golden) — the fix only changes `_dig_target_cell`'s output, a function `ScriptedTraverse`
+never calls. `tests/body/reveal_scene.gd`'s scripted approach re-run after the fix (see this round's
+build report for the result).
+
+**The general lesson, named because it is the same failure class this whole session has been finding
+elsewhere under different names:** a test that computes its own expected value by calling the function it
+is testing cannot fail on a wrong formula, only on a formula that changed. This is `instrument-cannot-
+register-its-subject` one level more specific — not a scan missing files, a UNIT TEST whose oracle and
+subject are the same code path. The fix in general: derive the expected value from information the test
+already has independently (construction parameters, a different established formula like
+`_box_blocked`'s), never from the function under test.
+
+Reverse: cheap. Revert the formula and the two rewritten test functions to their D0110 state.
+
+## D0113 · 2026-08-28 · a single-row dig can't be walked through a 10-cell-tall body — dig now clears the whole column
+
+Found the same way as D0112, in the same debugging session: after fixing the off-by-one, the reveal
+scene's scripted approach STILL sat permanently stuck (`vel_x=0` forever, `on_floor=false`, no bounds
+violation) despite `dig_event_this_tick=true` firing once. A fine-grained per-tick trace showed the dig
+fired and reported a real material, but the body's own `vel_x` never left zero even while still airborne
+— ruling out a collision-driven zeroing and pointing at the dig itself not actually opening a passable
+gap. Root cause, confirmed by inspection: `_handle_dig` (D0110) only cleared ONE cell, at the body's own
+CENTRE row. `Body.HEIGHT_PX / CELL_PX = 10` cells tall — clearing one of ten rows leaves nine rows of the
+adjacent column still solid, which still blocks the body's own box exactly as before. The single-cell
+target was never wrong as a COLUMN choice (D0112 fixed that part correctly); it was never enough
+VERTICAL clearance for anything to actually walk through, in either direction.
+
+**Fix.** `_handle_dig` now excavates the target column across the body's own full height
+(`_px_to_cell(_top_y())` to `_px_to_cell(_bottom_y() - 1)`, the same half-open-range convention D0112
+already established), not just the one row `_dig_target_cell()` names. `dig_event_this_tick` is true if
+ANY cell in that column was cleared (a partially-open column still counts); `dug_material_this_tick`
+reports `glimmer` if the column held it anywhere, else the first real material found -- the reveal
+signal takes priority over which row happened to be checked first, since "did this dig reveal the test
+feature" is the actual question the reveal metric needs answered, not "what was at exactly the centre
+row."
+
+**Verified, not just re-passed.** `tests/test_body.gd`'s full suite re-run clean (the existing tests'
+single explicitly-set solid cell in an otherwise-air column meant column-vs-cell made no observable
+difference there — worth stating plainly rather than claiming these tests exercise the new multi-row
+behavior, since they don't). `test_body_acceptance.gd` re-run byte-identical again (`traverse_time` still
+exactly 225 ticks — `ScriptedTraverse` never presses dig). The actual proof is `tests/body/reveal_scene.gd`
+itself: a fine-grained trace now shows `vel_x` ramping to full `RUN_SPEED` by tick 11 and the body
+crossing multiple real `glimmer` reveals as it advances, where before it sat at `vel_x=0` forever from
+tick 0.
+
+**Named for what it is, not softened:** this is a second real bug in the same feature, in the same round,
+found by the same discipline (actually running the scene rather than trusting unit tests that only checked
+the target cell's own identity). D0110's original "single-cell" framing described a real design choice
+(one column, not a multi-column dig radius) that was correct; it did not anticipate that "one cell" also
+needs to mean "the whole vertical span of that cell's own column," which is a different axis of the same
+word and was the actual gap.
+
+Reverse: cheap. Revert `_handle_dig` to D0112's single-row version.
