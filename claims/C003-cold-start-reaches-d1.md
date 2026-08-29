@@ -10,8 +10,10 @@ first_failed_at: never
 scenario: scenarios/cold_start_to_d1.yaml
 blocked_on: nearly everything. No save/load code exists anywhere in the repository. No `interface/`,
   no `harness/`, no `sim/commands` beyond a skeleton `MODULE.md`. `data/economy/` (the D1 demand itself)
-  does not exist. Determinism is proven only against `core/` plus a stub sim, never through a real
-  session. See "Why this is blocked on nearly everything" below.
+  does not exist. Determinism is now proven through a real `sim/terrain_gen`+`sim/body` run (gate 8),
+  but only WITHIN a single platform — cross-platform bit-identical replay has a known, diagnosed,
+  unfixed gap (`docs/DECISIONS_LEDGER.md` D0171/D0172). See "Why this is blocked on nearly everything"
+  below.
 ---
 
 ## Claim
@@ -74,12 +76,16 @@ Verified directly, not assumed, during the review that preceded this claim's fil
   through; `sim/commands/MODULE.md` states the shape and nothing else exists.
 - **No `data/economy/`.** There is nothing for a bot to play toward yet — this is next session's
   explicit scope (`docs/WORKING.md`), not started.
-- **Determinism is unproven at the scale this needs.** `replay_determinism_test` is proven only against
-  `core/` plus a trivial stub sim. Nothing has shown determinism holds through `sim/world` +
-  `sim/terrain_gen` + `sim/body` combined over a realistic session, let alone through
-  `machines`/`transport`/`fluid`/`economy`, none of which have a line of code yet. Any future claim about
-  checkpoint fidelity — including this one's own re-loadability requirement — inherits that gap until it
-  is closed.
+- **Determinism is proven within a platform, not yet across platforms, and not through the whole stack.**
+  `tests/test_shaft_replay_determinism.gd` (`docs/QUALITY.md` gate 8) now proves a real `sim/world` +
+  `sim/terrain_gen` + `sim/body` run replays bit-identical across two independent OS processes on the
+  same seed — closing the gap this bullet used to describe. Two gaps remain, real and diagnosed, not
+  closed: (1) `sim/terrain_gen`'s cave-carving noise uses real floats, not fixed-point, so cross-platform
+  (e.g. macOS vs. the project's own Linux CI) bit-identical replay is NOT yet proven for anything that
+  touches generated terrain (`docs/DECISIONS_LEDGER.md` D0171, diagnosis D0172 — a real design cycle, not
+  scheduled); (2) nothing has shown determinism through `machines`/`transport`/`fluid`/`economy`, none of
+  which have a line of code yet. Any future claim about checkpoint fidelity — including this one's own
+  re-loadability requirement — inherits both gaps until they're closed.
 
 This is not a near-term claim. It is filed now so the eventual work has a stated target rather than
 accumulating toward one that was never written down — the same reasoning `docs/CLAIMS.md` §6 gives for

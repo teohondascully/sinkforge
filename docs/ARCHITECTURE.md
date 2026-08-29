@@ -132,7 +132,9 @@ Separately, and more fundamentally: whether `run` names a real concept at all on
 - Generational-index entity IDs.
 - Fixed tick phase order: `input → body → machines → transport → items → fluid → economy → invariants → telemetry`.
 
-`replay_determinism_test`: run a 20,000-tick recorded input log twice from one seed, hash full state every 100 ticks, assert identical. Exists from day one.
+`replay_determinism_test`: run a 20,000-tick recorded input log twice from one seed, hash full state every 100 ticks, assert identical. Exists from day one — the real subject is now `tests/test_shaft_replay_determinism.gd` (a full `ShaftGenerator`+`TileGrid`+`Body` run, `docs/QUALITY.md` gate 8), not the original stub.
+
+**Known, standing exception to the rule above: `sim/terrain_gen/value_noise.gd`'s cave-carving noise uses real `float` arithmetic, not fixed-point** — a real gap between this section's own stated rule and what's actually shipped, diagnosed and tracked, not fixed (`docs/DECISIONS_LEDGER.md` D0171/D0172). Determinism is proven WITHIN a single platform/build (same seed, two independent processes, bit-identical); it is NOT yet proven bit-identical ACROSS platforms (macOS vs. Linux) for anything that touches generated terrain, because IEEE 754 float arithmetic doesn't guarantee that. The fix (converting `ValueNoise` to `Fx`) is a real design cycle — it changes generated terrain for every existing seed — scoped in D0172, not yet decided.
 
 ### Invariants, asserted continuously
 

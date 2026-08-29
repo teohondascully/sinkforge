@@ -47,8 +47,13 @@ per-tick phase order.
 - `StrataData` (`strata_data.gd`) — reads `data/strata/generated.gd`, codegen'd from
   `data/strata/*.yaml`. `.get_site(id)`, `.exists(id)`. Same mechanism as `sim/world/materials.gd` —
   `docs/adr/0004-data-codegen.md`.
-- `ValueNoise` (`value_noise.gd`) — deterministic engine-free 2D noise, `.sample(x, y, seed) -> float`
-  in roughly [-1, 1]. Not terrain_gen-specific in principle, but has no other consumer yet.
+- `ValueNoise` (`value_noise.gd`) — engine-free 2D noise, `.sample(x, y, seed) -> float` in roughly
+  [-1, 1]. Deterministic WITHIN a platform (same seed, same build → same output); NOT yet proven
+  bit-identical ACROSS platforms — it uses real `float` arithmetic, the one place in `sim/` that departs
+  from the fixed-point rule `docs/ARCHITECTURE.md`'s own Determinism section states, and IEEE 754 doesn't
+  guarantee identical results for the same expression across CPU architectures. Real, measured, diagnosed
+  gap, not fixed (`docs/DECISIONS_LEDGER.md` D0171/D0172 — converting to `Fx` is a real design cycle, not
+  yet scheduled). Not terrain_gen-specific in principle, but has no other consumer yet.
 
 ## Gotchas
 

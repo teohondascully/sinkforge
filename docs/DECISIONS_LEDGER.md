@@ -6634,3 +6634,92 @@ section ("What this page is not") states this limit directly rather than implyin
 method can't back.
 
 **Reverse cost:** delete `docs/CORRECTIONS.md`; revert `docs/README.md`'s one added row.
+
+## D0171 · THE determinism crack: `sim/terrain_gen/value_noise.gd`'s float-based cave noise is not proven cross-platform bit-identical — canonical reference entry, fix deferred (queue #3 Part J) · 2026-08-29
+
+**Consolidates D0167/D0168/D0169's own already-verified findings into one canonical entry for every doc
+correction this queue makes to point at** — those entries record the finding as it was found, mid-repair;
+this one states it as a standing fact for anyone reading a doc that cites determinism.
+
+**The crack, stated precisely.** `docs/ARCHITECTURE.md`'s own "### Determinism" section states the rule:
+"Fixed-point (i32, 16 fractional bits) for all state-affecting positions and velocities. No `sin`/`cos`/
+`pow`... on state-affecting paths." `sim/terrain_gen/value_noise.gd`'s `ValueNoise.sample()` (the cave-
+carving noise function `ShaftGenerator._carve_caves` calls) violates this: it uses real `float` arithmetic
+(`lerpf`, `_corner_value`'s `float(h) / float(0xFFFFFFFF)`) to decide which cells become caves — cave
+placement is definitely state (it's baked into the committed `TileGrid`, read by every tick after
+generation), so this is a state-affecting path using float math the rule explicitly forbids.
+
+**The evidence, exactly as measured (D0165/D0167), not re-derived:** `tests/test_shaft_replay_
+determinism.gd`'s own golden run, same seed (20260826), same code, two different platforms —
+macOS/arm64 (Homebrew Godot 4.6.2, local) and Ubuntu 24.04/x86_64 (the project's own pinned Linux Godot
+4.6.2 build, real CI run `33273163724`) — produced IDENTICAL checkpoint hashes for the first two
+checkpoints (ticks 1-200, entirely inside a hand-excavated start room untouched by generation noise),
+then diverged starting checkpoint 3 (tick ~201-300, once the body's own path reached real generation
+content). Critically: **CI's own same-seed, same-platform, two-INDEPENDENT-PROCESS check still passes** —
+determinism holds perfectly WITHIN one platform/architecture. The crack is specifically cross-platform,
+not a general nondeterminism bug.
+
+**Not exhaustively proven root cause, stated honestly:** the leading hypothesis (float rounding/FMA
+differences between arm64 and x86_64 for the same source expression, which IEEE 754 does not guarantee
+identical) is well-supported by the evidence above but has not been isolated via a controlled A/B that
+tests `ValueNoise.sample()` alone against nothing else. Reported at this confidence level, not overstated.
+
+**The fix is explicitly OUT OF SCOPE for this queue and the one before it, per director instruction —
+this entry documents the crack, not a repair.** Converting `ValueNoise` to `Fx` fixed-point would change
+generated terrain output for every existing seed (every committed golden hash in `test_shaft_generator.gd`
+and `test_shaft_replay_determinism.gd`, and any future save/replay built against current seeds) — a real
+design cycle requiring the director's own scoping, not a queue-scale fix. D0172 (this same commit) files
+the diagnosis for that decision.
+
+**Current honest state, for any doc that cites determinism:** the sim is deterministic WITHIN a single
+platform/build (proven: `core/`, `sim/world`, `sim/body`, and now, via gate 8, a full generation+replay
+run of `sim/terrain_gen`+`sim/body` combined, D0165). It is NOT yet proven bit-identical ACROSS platforms
+for anything that touches `sim/terrain_gen`'s own noise-based generation — a real, open, diagnosed gap.
+Every doc this queue touches (`docs/ARCHITECTURE.md`, `README.md`, `claims/C003-cold-start-reaches-d1.md`)
+is corrected to state exactly this, pointing here, in the same commit as this entry.
+
+**Reverse cost:** revert the doc edits in this same commit; this entry itself stays (append-only) even if
+reverted, since it records a real, confirmed fact regardless of documentation state.
+
+## D0172 · ValueNoise float→Fx conversion — diagnosis for the director's own scoping, not a fix (queue #3 Part J2) · 2026-08-29
+
+**What converting `sim/terrain_gen/value_noise.gd` to fixed-point would touch, read directly from the
+code, not guessed:**
+
+- **`ValueNoise.sample(x: float, y: float, seed: int) -> float`** (`sim/terrain_gen/value_noise.gd`) — the
+  function itself: `_corner_value` (hashes a lattice corner to a float in [-1,1] via `float(h) /
+  float(0xFFFFFFFF)`), `_smooth` (a cubic smoothstep, `t*t*(3-2t)`, on a float `t`), `lerpf` (float linear
+  interpolation), all would need `Fx`-equivalent replacements. `FASTNOISELITE_SD_CALIBRATION: float =
+  0.574` (a calibration CONSTANT tuned against `float` noise's own measured standard deviation) would
+  need re-deriving against whatever the fixed-point version's own output distribution turns out to be —
+  not a mechanical swap, a re-tune.
+- **Every caller.** `ShaftGenerator._carve_caves` (`sim/terrain_gen/shaft_generator.gd`) is the only
+  production caller (`grep -n "ValueNoise" sim/ tests/` — confirmed, one call site in `sim/`, plus test
+  files exercising it directly). Its own `cave_cfg` fields (`frequency`, `threshold_top`, `threshold_deep`,
+  `x_stretch`, all `float`s in `data/strata/*.yaml`) feed `sample()` directly and would need the same
+  fixed-point treatment or an explicit float-to-Fx boundary conversion at the call site.
+- **Every existing committed seed's terrain output changes.** `tests/test_shaft_generator.gd`'s own
+  determinism/reference tests (`_test_caves_carve_something`, `_test_caves_never_carve_above_min_depth`,
+  `_test_generation_is_deterministic`, `_test_different_seeds_diverge`) don't hard-code cave LOCATIONS,
+  only properties (something carved, nothing above min depth, same-seed-matches, different-seeds-diverge)
+  — these would very likely still pass structurally, but **`tests/test_shaft_replay_determinism.gd`'s own
+  committed `GOLDEN_HASHES` (D0169) would need full regeneration** the moment cave placement changes at
+  all, since the hash includes real generated terrain the body may walk through.
+- **Any future recorded session or save file** built against current seeds before this conversion lands
+  would not replay identically after it — a real compatibility break for anything captured in the
+  meantime, including whatever the director's own `--play` session (Part K, this same queue) produces.
+- **Scope estimate, read from the file, not measured by building it:** `value_noise.gd` is small (under
+  100 lines total) and has exactly one production call site — the CODE change itself is likely modest.
+  The cost is almost entirely in RE-VALIDATION (re-tuning the calibration constant against real fixed-
+  point output statistics, re-generating every golden hash, re-confirming the strata data's own tuned
+  thresholds still produce comparable cave density/distribution) and in the COMPATIBILITY question above,
+  not in the arithmetic itself.
+
+**Not decided here, and not this session's to decide:** whether the fix is worth doing now (before any
+real session/save content exists to break) or deferred until after `data/economy/` content exists and
+compatibility costs more to pay later; whether fixed-point noise needs a different algorithm entirely
+(some value-noise formulations don't translate cleanly to integer math) or just a literal rescale of the
+existing one; whether the calibration constant re-tune is a five-minute measurement or a real research
+question. Flagged for the director's own scoping — a genuine design cycle, not a queue-scale task.
+
+**Reverse cost:** none — this is a diagnosis, no code changed.

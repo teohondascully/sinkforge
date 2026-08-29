@@ -65,8 +65,12 @@ own front matter.
 
 ## The architecture, and why
 
-The simulation is a pure, deterministic, engine-free library. Everything else — Godot's renderer, a
-human player, a scripted agent — is a client of it, through one interface:
+The simulation is a pure, engine-free library, deterministic within a single platform/build — proven
+bit-identical across two independent processes on the same seed, not yet proven bit-identical ACROSS
+platforms for anything touching generated terrain, since `sim/terrain_gen`'s cave-carving noise uses real
+floats rather than the fixed-point math everywhere else in the stack uses (`docs/DECISIONS_LEDGER.md`
+D0171, diagnosis D0172; the fix is a real design cycle, not yet scheduled). Everything else — Godot's
+renderer, a human player, a scripted agent — is a client of it, through one interface:
 
 ```
 L4  experiment   claims, sweeps, ablations, reports
