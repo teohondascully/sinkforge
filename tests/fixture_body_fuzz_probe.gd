@@ -44,6 +44,9 @@ func _random_input(rng: SplitRng) -> InputFrame:
 	input.jump_pressed = rng.next_float() < 0.5
 	input.jump_held = rng.next_float() < 0.5
 	input.mantle_hold = rng.next_float() < 0.5
+	input.dig_pressed = rng.next_float() < 0.5  ## added with the dig mechanic itself, not after --
+	## `dig_pressed` is real input surface now, and this fuzzer's whole reason to exist is exercising the
+	## input space undirected, not just the subset that existed when it was first written
 	return input
 
 

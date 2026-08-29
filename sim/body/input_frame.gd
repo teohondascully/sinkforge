@@ -11,3 +11,6 @@ var move_dir: int = 0        ## -1 left, 0 none, +1 right
 var jump_pressed: bool = false  ## true only on the tick the button transitioned to held
 var jump_held: bool = false     ## true for every tick the button is down
 var mantle_hold: bool = false   ## toward-and-up held, docs/ARCHITECTURE.md §9's mantle trigger
+var dig_pressed: bool = false   ## true only on the tick the button transitioned to held, same edge-
+                                 ## triggered shape as jump_pressed -- one dig per press, not a hold-to-
+                                 ## clear-a-wall auto-repeat (docs/DECISIONS_LEDGER.md D0110)

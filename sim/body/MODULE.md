@@ -57,3 +57,10 @@ None yet.
 ## Gotchas
 
 - None yet, beyond the carry-weight/`items` coupling noted above.
+- **Digging exists now** (`docs/DECISIONS_LEDGER.md` D0110, `docs/GDD.md` §12's Reveal want-layer): a
+  new `InputFrame.dig_pressed` field, handled by `Body._handle_dig`, excavates the ONE cell adjacent to
+  the body's leading edge in `facing`'s direction, at the body's own vertical centre row. Deliberately
+  horizontal-only, single-cell, one tick per press, no hardness gate — the smallest thing that could test
+  the Reveal hypothesis, not R4's eventual tool-tier/hardness system, which does not exist yet.
+  `dig_event_this_tick`/`dug_material_this_tick` are the same "per-tick telemetry, read by the caller,
+  not auto-cleared" shape every other event flag here already uses.

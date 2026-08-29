@@ -3997,3 +3997,44 @@ surface, and the number should move with a recorded reason, same as any other th
 
 Reverse: cheap — one constant, `tests/reveal_metric.gd`'s `WINDOW_TICKS` (or wherever it lands once
 written).
+
+## D0110 · 2026-08-28 · the dig mechanic's shape, decided rather than silently defaulted
+
+Flagged in the brief-response before building (`sim/body` had no player-driven excavation anywhere —
+`InputFrame` had four fields, none a dig action; `Body.tick()` never called `TileGrid.excavate()`; every
+existing `excavate()` call site was generation-time or fixture-construction code, never per-input-tick).
+The director accepted this as correct and said "build it" without further specification, so the default I
+proposed in that response is what's implemented, stated here as a real decision rather than an unstated
+default:
+
+- **Target cell: the one cell horizontally adjacent to the body's leading edge, in `facing`'s direction,
+  at the body's own vertical centre row.** Horizontal-only, not vertical/diagonal. Alternative
+  considered: also support digging straight down (common in SteamWorld Dig/Terraria/Motherload).
+  Rejected for this round specifically because `docs/GDD.md` §8's own open question — the one Reveal is
+  the first test of — is framed as LATERAL search ("new material kinds forcing search sideways as much as
+  down"), so horizontal-only is sufficient to test the hypothesis and adding vertical dig would raise a
+  second open question (which key means "down," whether it competes with `mantle_hold`'s existing
+  toward-and-up binding) with no test-relevant payoff this round.
+- **Edge-triggered, one dig per press, one tick cost.** `InputFrame.dig_pressed` mirrors `jump_pressed`'s
+  existing "true only on the tick the button transitioned to held" shape. Alternative considered: hold-to-
+  dig with a multi-tick progress cooldown (a more game-like "digging takes a moment" feel). Rejected for
+  this round: it is a second, independent design parameter (how many ticks) with no data yet to set it
+  from, and edge-triggered digging is sufficient to test whether reveal pulls at all — cooldown pacing is
+  a tuning question for if/when this layer is kept, not a blocker to the first cheap test.
+- **No hardness gate.** R4's tool-tier system does not exist. The reveal-test terrain is confined to
+  topsoil ("soft, fast digging" per `docs/GDD.md` §11), so an unrestricted MVP dig does not misrepresent
+  what topsoil digging should eventually feel like; it would misrepresent Stonereach/Deep Works, which
+  this test does not touch.
+
+Mutation-tested before trusting: `_handle_dig`'s two guards (in-bounds, solid-material) both flagged
+FAIL when temporarily removed (`tests/test_body.gd`'s "against air"/"off the grid edge" cases), confirmed
+back to PASS on the real implementation. The existing input fuzzer's `_random_input` updated to draw
+`dig_pressed` too (`tests/fixture_body_fuzz_probe.gd`) — leaving a new input field permanently unfuzzed
+would be exactly the sweep-blindness class D0105 just consolidated, applied to input-space coverage
+instead of file coverage. Fast fuzzer (100 seeds x 500 ticks) and the full acceptance suite both re-run
+clean after the change (acceptance suite byte-identical: `traverse_time` still exactly 225 ticks against
+golden, confirming digging is fully inert for `ScriptedTraverse`-driven runs since `dig_pressed` defaults
+false).
+
+Reverse: cheap. Revert `InputFrame.dig_pressed`, `Body._dig_target_cell`/`_handle_dig`, the four new
+`tests/test_body.gd` cases, and the fuzzer's one added line.

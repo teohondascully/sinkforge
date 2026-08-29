@@ -98,6 +98,12 @@ var corner_corrected_this_tick: bool = false
 var edge_caught_this_tick: bool = false
 var depenetrated_this_tick: bool = false
 var bounds_violation_this_tick: bool = false; var floor_selection_violation_this_tick: bool = false  ## NOT rate-limited, unlike the push_error reports
+var dig_event_this_tick: bool = false  ## true iff `input.dig_pressed` this tick actually excavated a
+## cell (a press against air or out of bounds is not an event) -- the caller's ground truth for a
+## dig-rate metric that must never look at cells the player hasn't dug (docs/DECISIONS_LEDGER.md D0110)
+var dug_material_this_tick: StringName = &""  ## the material that WAS at the excavated cell, empty
+## unless dig_event_this_tick is true this same tick -- lets a caller classify a dig as "revealed the
+## test feature" without body.gd knowing anything about what a "reveal" means to any metric
 
 
 func _init(start_x: int, start_y: int) -> void:
@@ -144,6 +150,33 @@ func _box_blocked(grid: TileGrid, left: int, top: int, right: int, bottom: int) 
 	return false
 
 
+## The one cell horizontally adjacent to the body's leading edge, in `facing`'s direction, at the body's
+## own vertical centre row. Horizontal-only and single-cell on purpose (docs/DECISIONS_LEDGER.md D0110)
+## -- the reveal-layer test this exists for is scoped to lateral search (docs/GDD.md §8/§12), and a
+## single well-defined target avoids the aim-direction design question a vertical/diagonal dig would
+## raise (which key means "down," does it compete with mantle_hold's up-key) without a stated answer yet.
+func _dig_target_cell() -> Vector2i:
+	var edge_x: int = _right_x() if facing > 0 else _left_x()
+	var cx: int = _px_to_cell(edge_x) + facing
+	var cy: int = _px_to_cell(pos_y)
+	return Vector2i(cx, cy)
+
+
+## Excavates the dig target if it's a real, in-bounds, solid cell. A press against air or the grid edge
+## is not an event -- `dig_event_this_tick` stays false, matching `stepped_up_this_tick`'s "only true
+## when it actually happened" convention rather than "the button was pressed."
+func _handle_dig(grid: TileGrid) -> void:
+	var cell: Vector2i = _dig_target_cell()
+	if not grid.in_bounds(cell):
+		return
+	var material: StringName = grid.get_material(cell)
+	if material == &"":
+		return
+	grid.excavate(cell)
+	dig_event_this_tick = true
+	dug_material_this_tick = material
+
+
 ## One fixed 60Hz tick. Order: horizontal integrate+move+collide, vertical integrate+move+collide.
 ## Matches `docs/ARCHITECTURE.md` §4's phase order at body's own scope (input already read into
 ## `input`; body never polls a device).
@@ -155,6 +188,8 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	depenetrated_this_tick = false
 	bounds_violation_this_tick = false
 	floor_selection_violation_this_tick = false
+	dig_event_this_tick = false
+	dug_material_this_tick = &""
 
 	_integrate_horizontal(input)
 	pos_x += vel_x / TICK_HZ
@@ -171,6 +206,8 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	# integration reflects the jump.
 	_handle_jump(input)
 	_enforce_grid_bounds(grid)
+	if input.dig_pressed:
+		_handle_dig(grid)
 
 	_coyote_ticks_left = COYOTE_TICKS if on_floor else maxi(0, _coyote_ticks_left - 1)
 	_jump_buffer_ticks_left = maxi(0, _jump_buffer_ticks_left - 1)

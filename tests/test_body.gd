@@ -30,6 +30,10 @@ func _initialize() -> void:
 	_test_ceiling_is_not_treated_as_a_step_up_ledge()
 	_test_ground_accel_reaches_top_speed_in_8_ticks()
 	_test_variable_jump_cut_on_release()
+	_test_dig_excavates_the_adjacent_cell_in_facing_direction()
+	_test_dig_against_air_is_not_an_event()
+	_test_dig_respects_facing_left()
+	_test_dig_out_of_bounds_is_not_an_event()
 	_finish("body")
 
 
@@ -210,3 +214,64 @@ func _test_variable_jump_cut_on_release() -> void:
 	var want: int = (v_with_gravity * Body.JUMP_CUT_MULT_NUM) / Body.JUMP_CUT_MULT_DEN
 	_check(absi(body.vel_y - want) <= 2,
 		"releasing jump while rising cuts vel_y toward 40%% (got %d, want ~%d)" % [body.vel_y, want])
+
+
+func _test_dig_excavates_the_adjacent_cell_in_facing_direction() -> void:
+	var grid: TileGrid = _flat_grid(TEST_FLOOR_ROW, 20)
+	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
+	for i: int in range(60):
+		body.tick(_idle_input(), grid)
+	_check(body.on_floor, "settled before the dig test begins")
+	var target: Vector2i = body._dig_target_cell()
+	grid.set_material(target, &"hardrock")
+	var dig: InputFrame = InputFrame.new()
+	dig.dig_pressed = true
+	body.tick(dig, grid)
+	_check(body.dig_event_this_tick, "a dig press against a real solid cell fires a dig event")
+	_check(body.dug_material_this_tick == &"hardrock",
+		"the reported dug material matches what was actually there (got %s)" % body.dug_material_this_tick)
+	_check(not grid.is_solid(target), "the target cell is actually excavated after the dig")
+
+
+func _test_dig_against_air_is_not_an_event() -> void:
+	var grid: TileGrid = _flat_grid(TEST_FLOOR_ROW, 20)
+	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
+	for i: int in range(60):
+		body.tick(_idle_input(), grid)
+	var target: Vector2i = body._dig_target_cell()
+	_check(not grid.is_solid(target), "sanity: the target cell starts as air for this test")
+	var dig: InputFrame = InputFrame.new()
+	dig.dig_pressed = true
+	body.tick(dig, grid)
+	_check(not body.dig_event_this_tick, "a dig press against air is not an event")
+
+
+func _test_dig_respects_facing_left() -> void:
+	var grid: TileGrid = _flat_grid(TEST_FLOOR_ROW, 20)
+	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
+	for i: int in range(60):
+		body.tick(_idle_input(), grid)
+	body.facing = 1
+	var right_target: Vector2i = body._dig_target_cell()
+	body.facing = -1
+	var left_target: Vector2i = body._dig_target_cell()
+	grid.set_material(left_target, &"hardrock")
+	grid.set_material(right_target, &"hardrock")
+	var dig: InputFrame = InputFrame.new()
+	dig.dig_pressed = true
+	body.tick(dig, grid)
+	_check(not grid.is_solid(left_target), "facing left digs the LEFT-adjacent cell")
+	_check(grid.is_solid(right_target), "facing left leaves the right-adjacent cell (the wrong side) untouched")
+
+
+## Calls `_handle_dig` directly rather than through `tick()`, so the out-of-bounds check under test is
+## isolated from `_enforce_grid_bounds`'s own world-edge clamping (which runs earlier in the tick and
+## would otherwise fight over what "the body's position" even means near an edge).
+func _test_dig_out_of_bounds_is_not_an_event() -> void:
+	var grid: TileGrid = TileGrid.new(5, 20, 1)
+	var body: Body = Body.new(0, Fx.from_int(TEST_SPAWN_ROW * CELL))
+	body.facing = -1
+	var target: Vector2i = body._dig_target_cell()
+	_check(not grid.in_bounds(target), "sanity: the dig target is off-grid for this fixture (got %s)" % target)
+	body._handle_dig(grid)
+	_check(not body.dig_event_this_tick, "a dig press off the grid edge is not an event")
