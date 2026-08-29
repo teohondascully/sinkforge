@@ -5554,3 +5554,87 @@ loudly rather than silently undercounting, which is D0115/D0117's `SCRIPT ERROR`
 designed: the run reported `bounds=0` and FAILED, instead of reporting a clean zero-violation sweep.
 
 Reverse: `git revert` this commit; `FuzzDriverCommon` has no other consumers.
+
+---
+
+## D0143 · 2026-08-29 · declared state made a tool output — `tools/gate_status.py`, item 2 of the external audit's Tier 1 response
+
+An external cold-read audit (a fresh model, no project history, every number measured) found the reporting
+layer itself was lying: `BRIEF.md` said every gate passed at a commit where CI was actually red (the
+duplication gate, D0142), and `docs/QUALITY.md` gate 7 says "Enforced in CI" for a script that has never
+once been able to fail. The audit's own single highest-leverage recommendation: build one script that
+enumerates gates from CI itself and emits a verdict table nobody typed. This entry is that script.
+
+**The instruction's own hard requirement — "enumerate gates FROM CI ITSELF... NOT from a hand-maintained
+list. If it reads a hand-list, it has failed" — is in real tension with a second requirement in the same
+brief: NO-CODE gates must appear as rows, never be omitted.** A gate with zero enforcing code, by
+definition, appears in no CI step; a scan that only reads CI structurally cannot produce a row for
+something CI never mentions. Resolved by treating `docs/QUALITY.md`'s own numbered gate list (1-29) as the
+row axis — read programmatically from the file at runtime, never copied into the script's own source as a
+static table, which is the actual property that distinguishes it from the hand-list the instruction bans:
+a hand-maintained list is one a human edits inside the tool and can forget to sync; a live parse of
+QUALITY.md's own headers cannot drift from QUALITY.md, because it IS QUALITY.md, re-read every run.
+`.github/workflows/harness.yml` is parsed the same way for the CI side.
+
+**Three link tiers, in decreasing strength, each mechanical and none hand-typed per gate:**
+1. Explicit `(QUALITY gate N)` citation in a CI step's own name (15 of 29 gates).
+2. A backtick-quoted path from the GATE'S OWN QUALITY.md prose (e.g. gate 1: "Custom check in
+   `tools/layer_lint`"; gate 28: "`tools/run_gd_test.sh` wraps every suite invocation"), found as a
+   substring inside a step's `run:` command. This is what correctly finds gates 1 and 28 as HAVING code —
+   a citation-only scan would have misreported both as NO-CODE, exactly the false-absence class this tool
+   exists to prevent, one level removed.
+3. The gate's own TITLE, normalized, found verbatim inside a step's NAME (not its job name, not its run
+   command) — catches gate 2, whose title is near-identical to its step's name but carries no numeric
+   citation and no backtick path in its QUALITY.md body.
+
+**A fourth tier was built, tested, and deleted.** Keyword overlap between a gate's title and step text
+linked gates 17 and 20 on one shared word each ("claim", "adr") — false positives that disagreed with an
+independent read of the same tree. Tiers 1-3 alone reproduce that independent audit's own hand-derived
+split exactly: **18 of 29 gates with linked code, 11 without — gates 5, 6, 9, 10, 12, 14, 17, 18, 19, 20,
+21.** That agreement is real validation of the three-tier design and the reason the fourth was cut rather
+than tuned: a heuristic this tool cannot make precise is worse than an honest NO-CODE.
+
+**A second, more important blind spot, found only by asking the instruction's own test question
+literally ("with CI red, does the table show the red row?") before trusting the design:** `docs/QUALITY.md`'s
+29 numbered gates never cite `tools/quality_check/duplication.py` by number at all — the exact BLOCKING
+check whose red run made this whole exercise necessary (D0142, this same tree, five commits earlier). A
+table scoped only to the 29 numbered gates would have been structurally blind to precisely the failure
+Phase 1 exists to fix, reproducing the audit's own critique of `wrap.md` step 7 (a hand-enumerated subset
+of CI) one layer down, inside the tool built to replace it. Fixed by adding a second output section: every
+CI step with a real `run:` command that no gate could claim, shown with its own real status, unclassified
+into infra-vs-check (that classification would itself be a hand list) — 11 such steps exist today,
+including the duplication gate (currently PASS, per D0142) and the two other real blocking checks
+`docs/QUALITY.md`'s 29 gates never number: commit-authorship/no-trailer, and `test_base.gd` member
+redeclaration.
+
+**Status resolution, and a related discovery.** `continue-on-error: true` in the parsed workflow (a
+structural fact, not inferred) → ADVISORY. Every non-engine step is re-executed locally, right now, for a
+real fresh exit code; every step is ALSO checked against CI's own latest conclusion at HEAD via `gh api`.
+The two are shown side by side rather than either replacing the other — while building this, gates
+1/3/4/27 initially showed local FAIL against a currently-green CI, because this session's working tree
+still carries D0139's held, uncommitted fix (`check_size_limits`/`check_untracked_files` correctly fail
+against a dirty tree). Silently trusting local execution over CI would have made this very tool
+misdiagnose its own author's dirty tree as a CI regression — so a DISAGREE row is reported explicitly
+instead of picking one source, with CI treated as the primary verdict (it is what ran against the tree
+everyone else sees).
+
+**Mutation-tested against a real historical red, not a synthetic break.** Fed the actual CI job/step
+JSON from the run at commit `8f6d540` (confirmed red in this round's Item 1, `gh run view` conclusion
+`failure`) through this script's own `resolve_status`: the duplication row reports FAIL, and is present in
+the unlinked-steps section rather than silently absent. This is the audit's own prescribed test
+("with CI red, does the table show the red row?"), run for real rather than argued.
+
+**One known, reported limitation, not silently fixed.** `docs/QUALITY.md` gate 4 bundles two claims —
+function length (50-line cap, enforced, blocking) and cyclomatic complexity (≤10, advisory-only,
+`continue-on-error`) — into one gate number. This tool's per-gate-number granularity reports gate 4 as a
+clean PASS via its length half, because the complexity script is not cited by number, named by path in
+gate 4's own text, or title-matched to any step. The complexity check is NOT invisible to this tool
+(it appears in the unlinked-steps section, correctly marked ADVISORY) but gate 4's own row currently
+overstates its completeness. Left unfixed: correcting it means either giving `docs/QUALITY.md` two gate
+numbers where it currently has one, or teaching this tool to split a gate's own claim into sub-claims —
+both are scope beyond "build a status tool," not decided here.
+
+Does not gate anything itself (exit code 0 always) — a report, per the audit's own instruction not to
+build new instruments; whether/how its output gets wired into CI as its own check is a separate decision.
+
+Reverse: `git rm tools/gate_status.py`. No other file changed by this entry.
