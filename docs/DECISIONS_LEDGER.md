@@ -5815,3 +5815,24 @@ this entry adds cites `docs/QUALITY.md` gate 7 instead, deliberately not repeati
 
 **Reverse cost:** revert the three doc edits (`docs/QUALITY.md`, `CONTEXT.md`) and the one new print line in
 `check_loc_ratio.py`. The velocity gate's own mechanism (D0144) is untouched by this entry either way.
+
+## D0148 · BRIEF.md's Gates/Claims sections reduced to pure tool pointers, Ratio split out (D0146/D0147's own C1) · 2026-08-29
+
+**Decided:** `docs/BRIEF.md`'s "Gates" section still carried a hand-typed paragraph of specific numbers
+("18/29... Zero FAIL, zero ADVISORY... commit b71d6e9") behind its own pointer sentence — already stale
+(current state: `FAIL gate numbers: [7]`, not zero). Deleted that paragraph entirely; the section is now
+the command alone plus why. Split "Claims" into two: aggregate counts point at
+`check_claim_references.py`'s own live output (D0146 gave it a real population/proven print this round);
+per-claim BLOCKED/PASSING/RETIRED status has no summarizing tool, so the section says so and points at
+`claims/*.md` frontmatter directly rather than inventing one. Added a "Ratio" section pointing at
+`check_loc_ratio.py` directly (previously the ratio's own state lived buried inside the Gates paragraph).
+
+**`wrap.md` step 7 checked, not edited — already compliant.** It already reads "Run `python3 tools/
+gate_status.py` and confirm the current state from its output, not from memory or a hand-enumerated list of
+scripts" (landed in D0143's own round) — no hand-enumeration remains to delete.
+
+**Why:** the queue's own framing ("no generator — the tool's live output IS the status; a copy in prose is
+a copy that can drift") — this is the same class of fix as D0143/D0146/D0147 applied to the one place left
+that still copied numbers by hand.
+
+**Reverse cost:** revert `docs/BRIEF.md`. No code changed.
