@@ -5077,3 +5077,56 @@ as confirmation the instrument works, not as the correction itself.
 Reverse: cheap. Delete `floor_source_this_tick`, its three assignments, its tick()-start reset, the printed
 field in the fuzz probe's violation line, and `tests/test_floor_source_telemetry.gd`; the causal blind spot
 returns exactly as the audit found it.
+
+## D0133 · 2026-08-29 · Codex audit correction: D0127/D0128's "one shared mechanism" claim was wrong, not just unproven; the water-mark bounds attribution's hedge is restored — originals untouched, corrections appended
+
+An external (Codex) audit of the D0122 dig fix, requested by the director, confirmed the fix itself (no
+counterexample to the water-mark rule, resolver untouched, regression fixture fails pre-fix/passes
+post-fix) but found two ledger overclaims. Per the director's explicit instruction — "Correct two ledger
+overclaims, as appending FINDINGs, originals untouched" — D0127 and D0128 above are left exactly as
+written; both corrections are recorded here and as Anvil FINDING events, not as edits to either entry.
+
+**Correction 1: "all 91 grounded_no_floor violations share the `_grid_floor_backstop`/D0059f mechanism"
+was overstated, and D0132's own telemetry now shows it is not merely unproven but actually wrong for most
+of the population.** D0127/D0128 both name `_grid_floor_backstop` as THE mechanism, based solely on every
+violation sitting at `pos_y=14417920` (`HostileChamber.FLOOR_ROW` height) — same height, taken as proof of
+one code path. The audit correctly named this as correlation, not proof: the harness recorded position and
+predicate failure, never which resolver actually set `on_floor = true`. D0132 built exactly that telemetry;
+the real split, measured directly (not assumed) after building it:
+- dig-on (498-seed/1500-tick reproducing prefix, 59 violations): 55 `resolve_floor`, 4 `grid_floor_backstop`.
+- dig-off (full 1000-seed/1500-tick sweep, 32 violations): 29 `resolve_floor`, 3 `grid_floor_backstop`.
+- Combined, both populations: 84/91 `resolve_floor`, 7/91 `grid_floor_backstop` — the OPPOSITE of "one
+  shared mechanism," and specifically the opposite of the mechanism previously named. The dominant
+  contributor across both conditions is the heightfield ground-plane resolver (`resolve_floor`) disagreeing
+  with the grid-solidity predicate (`grounded_implies_solid_beneath`) at `FLOOR_ROW`-height transitions —
+  a different, so-far-unnamed edge case, not primarily D0059f's pit-lip case as previously claimed.
+- **Restated, corrected attribution: 59 (dig-on) / 32 (dig-off) remain the correct, measured bounds — those
+  numbers are unaffected. All events share `FLOOR_ROW` height, confirmed. The grounding TRANSITION is now
+  instrumented (D0132) and shows the population is NOT one mechanism: `resolve_floor` dominates roughly
+  9:1 over `grid_floor_backstop` in both conditions. Same-height was never proof of same-code-path; it now
+  demonstrably is not the same code path for most occurrences.**
+- Anvil FINDING: `.anvil/log/2026-08-29T082101.373601Z-1b569c4f.json`.
+
+**Correction 2: D0128 hardened D0127's own explicitly hedged bounds attribution into an unqualified
+"accepted... real, attributed consequence" with no new evidence added between the two entries —
+provenance decay, restored here.** D0127's own words: the water-mark fix's specific +82,742 (+11.4%)
+contribution on top of dig's own baseline bounds increase is "Plausible, not yet independently verified
+mechanism... offered as the most parsimonious explanation... not proven by a second isolating experiment
+this cycle." D0128, one entry later, restates this as "confirmed dig-attributable... accept as a real,
+attributed consequence," dropping the hedge. The dig-off A/B genuinely confirms dig-the-mechanic's own
+baseline contribution (18,157 dig-off vs. 805,397 dig-on) — but it cannot isolate the water-mark fix's own
+specific slice on top of that, since dig-off has no water-mark excavation to compare against. That
+specific gap is real and still open; D0128's own severity ruling ("bounds is reported-not-gated... proving
+the exact causal step gates nothing and changes no decision") stands unchanged — this correction restores
+the hedge to the historical record, it does not reopen the decision or change what gates.
+- Anvil FINDING: `.anvil/log/2026-08-29T082115.567359Z-b9f39d55.json`.
+
+**What this changes and what it does not.** Neither correction reopens D0122 (closed, D0128) or moves the
+`grounded_no_floor`/`bounds` bounds (`test_body_fuzz.gd`'s `DESIGN_TRADEOFF`/`RESIDUAL` constants,
+unchanged). Both corrections are to the CAUSAL PROSE two prior entries wrote around numbers that remain
+correct, not to the numbers or the decisions built on them. A future session re-reading D0127/D0128 alone
+should read this entry alongside them before repeating either claim.
+
+Reverse: not applicable — this is a corrective annotation to the historical record, appended per the
+project's own append-only ledger convention; nothing to revert but the two Anvil FINDING files themselves,
+which are immutable by the same convention.
