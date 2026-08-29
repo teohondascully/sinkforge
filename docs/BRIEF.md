@@ -6,7 +6,7 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 
 **Last updated: 2026-08-29. This round: two consecutive 5-hour autonomous queues (director away), 19
 commits total, everything pending Codex re-verification on return — nothing here is self-certified.**
-`docs/DECISIONS_LEDGER.md` D0162-D0177.
+`docs/DECISIONS_LEDGER.md` D0162-D0178.
 **Headline: an architecture rule the project wrote for itself — "no float math on state-affecting
 paths" — was quietly broken by the one noise function nobody had cross-platform-tested until this round
 built the test.**
@@ -59,7 +59,7 @@ pointing at one canonical ledger entry (D0171) instead of re-explaining the crac
    one as wrong, including the deepest chain in the ledger (D0059 → D0137, six weeks, five corrections)
    traced to its true origin, closing a citation gap an external audit specifically flagged.
 
-**Queue #3** (Parts J/K/L/M, D0171-D0177):
+**Queue #3** (Parts J/K/L/M, D0171-D0178):
 5. The determinism honesty sweep above (Part J).
 6. A real, if currently latent, two-dialect risk in the reveal-metric replay pipeline fixed:
    `RevealReplayDriver.parse_log` validated column count, not column names, so a differently-shaped log
@@ -93,6 +93,12 @@ pointing at one canonical ledger entry (D0171) instead of re-explaining the crac
   It flagged the two entries that only ever *mention* the page as if they were corrections needing
   inclusion. Dogfooded before trusting it, per standing discipline; not caught by writing the gate, only by
   running it against the real tree.
+- **Adding gate 30 broke `gate_status.py` immediately, and its own test suite didn't catch it.** Two
+  separate hardcoded `range(1, 30)` literals assumed the gate count would always be 29 — one FATALed
+  loudly the moment the tool was actually run at wrap time; the other, found only by grepping the whole
+  file rather than stopping at the first hit, would have silently under-counted gate 30 forever instead of
+  erroring. `tools/test_gate_status.py`'s 11 cases all exercise per-gate classification, none exercise the
+  gate-count itself — a real gap in what "mutation-tested" had actually covered. Fixed (D0178).
 - **`docs/BRIEF.md` itself was stale across two full queues.** This file's last real update predates queue
   #2 entirely (D0140/D0141, the control-plane ruling round). "Regenerate this last, every session" is the
   file's own stated rule; it wasn't followed for two consecutive 5-hour queues until this wrap. No process

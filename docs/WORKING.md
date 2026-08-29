@@ -15,9 +15,12 @@ under 150 lines.
 
 ## CLOSED (pending Codex re-verify) — 5-hour autonomous queue #3, director still away, 2026-08-29
 
-Parts J/K/L/M all landed, 8 commits, well inside the 5-hour/30-commit budget. **Nothing certified closed —
+Parts J/K/L/M all landed, 9 commits, well inside the 5-hour/30-commit budget. **Nothing certified closed —
 Codex verifies all three queues (this one plus both from #2) on the director's return.** Evidence in
-`docs/DECISIONS_LEDGER.md` D0171-D0177; each item its own commit.
+`docs/DECISIONS_LEDGER.md` D0171-D0178; each item its own commit. **D0178, found at wrap time:** D0175's
+own gate 30 broke `gate_status.py` (two hardcoded 29/30 literals) — the tool FATALed the moment it was
+actually run as part of this same wrap, not caught by its own 11-case test suite. Fixed, mutation-tested,
+same commit pattern as everything above.
 
 - **Part J** (D0171/D0172) — swept ~19 files' determinism/fixed-point claims; 5 real overclaims corrected
   to honest state (`ARCHITECTURE.md`, `README.md`, `claims/C003`, `sim/terrain_gen/MODULE.md`, `CONTEXT.md`
