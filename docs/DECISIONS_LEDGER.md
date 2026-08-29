@@ -6181,3 +6181,42 @@ curated file" rule (cited by the file itself) makes an under-informed cull the w
 autonomously.
 
 **Reverse cost:** revert `CLAUDE.md` and `history/README.md`, two lines each.
+
+## D0161 · E6's own premise was wrong — check_size_limits.py does not cover .py files at all; gate_status.py split anyway, test_quality_check.py given a named exemption (E6, queue Part E) · 2026-08-29
+
+**Found, not assumed:** the queue's own E6 premise ("Size gate covers `tools/**/*.py`") is false. Read
+`tools/layer_lint/check_size_limits.py`'s own docstring and code directly: it scans `.gd` files ONLY
+(`gd_scan.py`'s `gd_files_excluding`) — no Python file has ever been in this gate's scope, at any point in
+its history. This is narrower than `docs/QUALITY.md` gate 3's own declared text ("No file over 400 lines.
+Warn at 300." — no language restriction in the policy's own words), the same class of gap as gate 7's own
+absolute-ratio claim (D0147): a gate's declared scope and its enforced scope diverging, an external audit's
+own recurring finding this session. **Not fixed here** — widening `check_size_limits.py` to cover Python
+would be a real scope-expansion decision (which Python files start failing a gate that's never gated them,
+whether test code gets a different fence per D0106's own established split) beyond E6's own ask, itself
+worth a dedicated future item, not a silent side effect of this one.
+
+**What E6 actually asked for regardless of the gate's real scope — checking which `tools/**/*.py` files
+exceed 400 lines and splitting them — still answered directly:** `wc -l` over every file found two:
+`tools/gate_status.py` at **431** lines (this session's own build, D0143/D0146/D0149) and `tools/
+quality_check/test_quality_check.py` at **404**.
+
+**`gate_status.py` split.** Extracted `git_head`/`fetch_ci_state`/`run_locally` (the CI/git/subprocess
+plumbing — genuinely separable from the parsing/linking logic that stays, a real Extract Module, not a
+line-count dodge) to a new `tools/gate_status_ci.py` (74 lines). `gate_status.py` now 371 lines.
+**Verified, not assumed:** `tools/test_gate_status.py` re-run, 8/8 still OBSERVED; the real tool re-run
+against `HEAD`, table unchanged; `duplication.py` re-run, 0 clusters (no new clone introduced by the
+split); the full `tools/test_*.py`/`tools/*/test_*.py` glob (5 files) re-run together, all PASS.
+
+**`test_quality_check.py` given a NAMED, DATED exemption instead of a split, per E6's own third option
+("if any remain that are genuinely mid-refactor, a NAMED dated exemption, not a silent skip").** Reasoning
+stated plainly rather than silently skipped: it is a TEST file, not production code, already covers four
+distinct instruments (function length, complexity, duplication, coupling) with real mutation cases per
+D0106's own established test-code-gets-its-own-fence convention; splitting a passing, comprehensive
+mutation-test suite purely to duck a line count no gate currently enforces for Python carries real
+regression risk for a cosmetic-only benefit. **Exemption: `tools/quality_check/test_quality_check.py`,
+404 lines, dated 2026-08-29, reason: comprehensive test coverage for four instruments, no gate currently
+enforces Python file size, revisit if it grows meaningfully past this point or if E6's own gate-widening
+decision is ever made.**
+
+**Reverse cost:** revert `tools/gate_status.py`; delete `tools/gate_status_ci.py`. `test_quality_check.py`
+untouched either way.

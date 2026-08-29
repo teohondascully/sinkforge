@@ -74,11 +74,11 @@ script does not make for itself. It does not fix, arm, or silence any gate it re
 """
 from __future__ import annotations
 
-import json
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+from gate_status_ci import NEEDS_ENGINE_RE, fetch_ci_state, git_head, run_locally
 
 ROOT = Path(__file__).resolve().parents[1]
 QUALITY_MD = ROOT / "docs" / "QUALITY.md"
@@ -204,66 +204,6 @@ def link_gates(gates: dict[int, dict], steps: list[dict]) -> tuple[dict[int, lis
     # than an honest NO-CODE, which is the whole property this tool exists to protect.
 
     return links, kind
-
-
-def git_head() -> str:
-    return subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
-    ).stdout.strip()
-
-
-def fetch_ci_state(head_sha: str) -> tuple[str | None, str, dict[str, str]]:
-    """Returns (overall_conclusion_or_None, human_note, {step_name: conclusion}) for the latest completed
-    CI run at `head_sha`, via `gh` -- never a hand-typed record of what CI last did."""
-    try:
-        listing = subprocess.run(
-            [
-                "gh", "run", "list", "--branch", "main", "--limit", "20", "--json",
-                "databaseId,headSha,conclusion,status,workflowName,createdAt",
-            ],
-            cwd=ROOT, capture_output=True, text=True, timeout=30,
-        )
-        if listing.returncode != 0:
-            return None, "gh run list failed: %s" % listing.stderr.strip()[:200], {}
-        runs = json.loads(listing.stdout)
-    except Exception as e:  # noqa: BLE001 -- report, never crash the whole table over one network call
-        return None, "gh run list errored: %r" % e, {}
-
-    matches = [r for r in runs if r["headSha"] == head_sha and r["status"] == "completed"]
-    if not matches:
-        return None, "no completed CI run found for HEAD %s" % head_sha[:12], {}
-    matches.sort(key=lambda r: r["createdAt"], reverse=True)
-    run = matches[0]
-
-    step_conclusions: dict[str, str] = {}
-    try:
-        jobs_raw = subprocess.run(
-            ["gh", "api", "repos/{owner}/{repo}/actions/runs/%d/jobs" % run["databaseId"]],
-            cwd=ROOT, capture_output=True, text=True, timeout=30,
-        )
-        if jobs_raw.returncode == 0:
-            for job in json.loads(jobs_raw.stdout).get("jobs", []):
-                for step in job.get("steps", []):
-                    step_conclusions[step["name"]] = step.get("conclusion") or step.get("status") or "unknown"
-    except Exception as e:  # noqa: BLE001
-        return run["conclusion"], "run found but per-step fetch errored: %r" % e, {}
-
-    note = "run %d, conclusion=%s, sha=%s" % (run["databaseId"], run["conclusion"], head_sha[:12])
-    return run["conclusion"], note, step_conclusions
-
-
-NEEDS_ENGINE_RE = re.compile(r"\bgodot\b", re.I)
-
-
-def run_locally(cmd: str) -> str:
-    """Actually executes a step's own `run:` command right now. Returns PASS/FAIL/SKIPPED(reason)."""
-    try:
-        proc = subprocess.run(
-            ["bash", "-c", cmd], cwd=ROOT, capture_output=True, text=True, timeout=120
-        )
-        return "PASS" if proc.returncode == 0 else "FAIL (exit %d)" % proc.returncode
-    except Exception as e:  # noqa: BLE001
-        return "SKIPPED (local exec errored: %r)" % e
 
 
 def classify_step(s: dict, ci_steps: dict[str, str]) -> tuple[str, str]:
