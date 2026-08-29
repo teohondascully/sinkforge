@@ -8,61 +8,67 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-## PRE-COMPACTION CHECKPOINT, 2026-08-29 — two open threads, neither started; D0122-D0130 arc fully closed and pushed
+## CLOSED — Codex audit response: D0115 sweep, grounding-path telemetry, ledger corrections, control-plane canonical types, 2026-08-29
 
-Working tree is clean; HEAD is `228c52a`, everything through it pushed to `origin/main`. CI verified green
-through `228c52a` (run `33242005374`: authorship/godot-suites/structural-gates all ✓). `78b258f` (D0130)'s
-own isolated run (`33241930115`) shows `cancelled`, not green — this repo's harness workflow runs
-`concurrency: group: harness-${{ github.ref }}, cancel-in-progress: true`, so pushing the checkpoint commit
-right behind it cancelled D0130's own run before it finished. That is NOT the same as D0130 being
-unverified: `228c52a`'s own run checks out the full tree through that commit, D0130's files included, and
-that run passed. Also worth recording: `a80c730` (D0128)'s own run (`33240224793`) shows `failure` — the
-same recurring `check_working_freshness` date-rollover gap already documented above (WORKING.md said
-2026-08-28, HEAD was dated 2026-08-29) — fixed forward in the very next commit (`f86ba1a`), whose own run
-is green. Isolated per-commit CI status on this branch is not reliable evidence by itself once a fast
-sequence of pushes starts cancelling runs; the tip commit's own run is what to trust.
+Working tree clean; HEAD `abc2eae`, everything through it pushed to `origin/main`. This round answered an
+external (Codex) audit of the D0122 dig fix plus the director's own ruling on THE CONTROL PLANE §9, in the
+director's stated order — D0115 sweep first, then telemetry, then ledger corrections, then the
+control-plane slice — and stopped exactly where each explicit gate said to stop.
 
-**Closed this session, nothing pending:** D0122's full arc (D0125-D0128: per-column high/low-water-mark
-dig fix, permanent regression fixture, `grounded_no_floor` bound honestly re-baselined 32→59 with the
-dig-off proof in the same commit, `bounds`'s water-mark cost accepted as attributed). D0129: claims/C004's
-replay driver, proven against a synthetic trace (0/713 ticks mismatched live-vs-replayed), real-human
-`--play` validation still explicitly owed and stated as such everywhere (ledger, WORKING.md, BRIEF.md, the
-driver's own CLI warning). D0130: the fork-completion reconciliation tool (below).
+**1. D0115 masking-pattern sweep (D0131, commit `16a5621`).** Codex found the D0115/D0117 masking gap
+(`exit_code==0` + a passing check without ever grepping the probe's own output for `SCRIPT ERROR:`) still
+live in `test_bounds_invariant.gd` and `test_cave_geometry.gd`; grepping every `OS.execute`/
+`OS.create_process` site in `tests/*.gd` (the only CI-exercised scope — `legacy/tools/*.gd` matches too but
+is confirmed dead pre-pivot code) found a third instance Codex didn't name, `test_fixed_point.gd`'s
+div-by-zero probe test. Fixed identically in all three; mutation-tested by injecting a called-function
+crash AFTER each probe's own expected behavior (so the pre-existing occurrence-count check alone would
+still have passed) and confirming only the new guard caught it, then reverting each probe clean.
 
-**Incident + new standing rule, mechanism now built but UNEXERCISED in real concurrent use:** two forks ran
-concurrently in one shared (non-worktree-isolated) tree; one reported `completed` with a full prose summary
-while its diff touched neither claimed file. Caught by hand, not by anything mechanical. Filed as an Anvil
-FINDING extending the sweep-blindness law into fork coordination (`.anvil/log/2026-08-29T074921.640759Z-
-ad065cf8.json`), saved to this session's own persistent memory
-(`subagent-completion-claim-is-unverified-green.md`), and closed with a real tool: `tools/
-check_fork_completion.py` + `tools/test_check_fork_completion.py` (5/5 cases independently re-run by this
-session, not just trusted from the building subagent's own report — D0130). `.claude/commands/wrap.md`
-gained two new leading steps: reconcile every fork's claim through this tool before trusting it, and show
-doc-edit reports as an actual `git diff`, never a prose summary. **Caveat a future session should not
-lose: the tool exists but nothing calls it automatically — it must be invoked by hand after every fork,
-same as the manual `git diff` check it replaces, just with a sharper answer once run.** Standing rule
-until this has actually been exercised a few times: prefer serial forks in a shared tree; concurrent forks
-are plausible again once the reconciliation step is a reflex, not a novelty.
+**2. Grounding-path telemetry (D0132, commit `db09326`).** Codex's real, unfixed gap: the fuzz harness
+recorded a `grounded_no_floor` violation's position but never which of `resolve_floor`/
+`grid_floor_backstop`/`try_step` last set `on_floor=true`, so D0127/D0128's "one shared mechanism" claim
+rested on shared HEIGHT alone. Added `Body.floor_source_this_tick`, purely additive (no bound or grounding
+logic touched), mutation-tested (stripping all three assignments broke exactly the three real assertions
+in the new `test_floor_source_telemetry.gd`, nothing else). First real run already mattered: the 498-seed
+dig-on population split 55 `resolve_floor` / 4 `grid_floor_backstop`; the full dig-off population split 29/3
+— 84/91 combined is `resolve_floor`, the OPPOSITE of "one shared mechanism." `sim/body/body.gd` is now at
+399/400 lines (`FILE_LIMIT`) — one line of headroom; the next change there needs to extract something
+before adding.
 
-**Thread 1, OPEN, not started: "THE CONTROL PLANE" — model-agnostic agent evaluation.** A large design
-brief (full text is in this session's own conversation history, not yet copied into any tracked doc) for a
-six-role architecture (Policy/Adapter/Observation Builder/Observation Spec/Goal/Scorer, sim stays the fixed
-spine) enabling matched-seed baseline decomposition and counterfactual world-line forking later, while
-building only a minimal 3-policy slice now. Its own §9 required a response before any building — this
-session gave one, read `tests/body/play_scene.gd` + `tests/body/scripted_traverse.gd` directly (both
-found to violate 5 of the brief's 6 deferred properties — no canonical observation type, `ScriptedTraverse`
-takes raw `Body`/`TileGrid` engine objects directly and reads privileged landmark constants, `play_scene.gd`
-fuses the goal-check into the tick loop), and found that `docs/ARCHITECTURE.md` §2-§7 (L2 interface / L3
-harness / L4 experiment) ALREADY specifies almost this exact architecture, unbuilt — the brief is the next
-planned step, not a new direction. Answered all six of §9's questions in full (boundaries in own words,
-which properties the current path violates, where the plane lives — flagged a real gap: `interface`/
-`sim/commands` don't exist as code yet, so the brief's own slice doesn't say whether it builds on top of a
-still-unbuilt `interface` or continues bypassing it the way `tests/` currently does — the episode log
-should NOT reuse the Anvil schema, hardest seam is S2/fork-from-any-step because this codebase only hashes
-state today, never serializes it, and named two cathedral risks: the interface-doesn't-exist-yet gap above,
-and S3's full provenance schema being over-specified for a slice where 2 of 3 policies have no
-temperature/prompt/template to record at all). **Zero code written. Awaiting the director's reply per the
-brief's own explicit "do not begin the refactor until I have replied."**
+**3. Ledger corrections (D0133, commit `ea506de`) — D0127/D0128 left untouched, corrections appended, per
+explicit instruction.** Two Anvil FINDINGs filed
+(`.anvil/log/2026-08-29T082101.373601Z-1b569c4f.json`, `.anvil/log/2026-08-29T082115.567359Z-b9f39d55.json`)
+plus a ledger entry: (a) the "all 91 violations share one mechanism" claim was not merely unproven as Codex
+found, D0132's own telemetry shows it is actively wrong for 84/91 of the population — restated as measured
+bounds (59/32, unchanged) plus "same height, not same code path, now measured and mostly NOT the named
+mechanism"; (b) D0128 silently hardened D0127's own explicit "plausible, not yet independently verified"
+hedge on the water-mark fix's own bounds contribution into an unqualified "accepted... attributed
+consequence" — hedge restored, `bounds` still reported-not-gated, no decision reopened.
+
+**4. THE CONTROL PLANE canonical obs/action types (D0134, commit `abc2eae`) — stopped exactly at the
+explicit gate.** Director's ruling on the foundation gap this session's own §9 response flagged: build the
+minimal slice on `tests/` ground (not a real, not-yet-built `interface/`), label it explicitly as SIMULATING
+Boundary A. `tests/control_plane/`: `CanonicalObservation`, `CanonicalAction` (Raw level only — Semantic
+`goto`/`mine`/`place`/`haul_to` deferred), `ObservationSpec` (Oracle/Constrained envelopes — Language
+deferred, ARCHITECTURE §5's own "never in CI"), and a pure `ObservationBuilder` (no policy argument, per
+S4). Anti-cheat property (CONSTRAINED never reads a cell outside its own radius) proven directly and
+mutation-tested (forcing CONSTRAINED to take ORACLE's own full-grid branch broke both relevant assertions).
+**Zero Policy/Adapter/Episode-Log/Goal/Scorer code written — this round's own explicit instruction was "show
+me the canonical types before the policies are wired," and this is exactly where it stops.** Next action on
+this thread: awaiting the director's review of these types before any policy gets wired against them.
+
+**Incident from the prior round, status unchanged — still the standing rule.** The fork-completion
+reconciliation tool (`tools/check_fork_completion.py`, D0130) exists but nothing calls it automatically; no
+forks were spawned this round (everything done directly), so it was not exercised again. Still: serial
+forks only in a shared tree until the reconciliation step is a reflex, not a novelty.
+
+**Thread 2, OPEN, not started, untouched this round: the persistent-world design reversal.** A large
+director brief (full text only in this conversation's own history, not yet in any tracked doc) reversing
+the 2026-08-25 run-based roguelite pivot back to a persistent single shaft + rig-as-consumer — not the same
+as the already-closed 2026-08-27 reversal `docs/GDD.md` §9 already records. `docs/GDD.md` (343 lines) was
+read in full in an earlier round; **zero edits made to it or any other doc.** A fresh session picking this
+up needs the brief's own full text re-supplied (re-read from the transcript, or ask the director to
+re-paste it) before touching `docs/GDD.md` — do not attempt its edit list from memory or a summary.
 
 **Thread 2, OPEN, not started, mid-read when interrupted: the persistent-world design reversal.** A second
 large director brief (also only in conversation history, not yet in any tracked doc) reversing the
