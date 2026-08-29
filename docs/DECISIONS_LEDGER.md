@@ -6267,3 +6267,41 @@ actually cited. A future step name using a non-`env.` expression would need the 
 **Reverse cost:** revert `tools/gate_status.py`'s two additions and `parse_workflow_steps()`'s three-line
 change; revert `tools/test_gate_status.py`'s new branch and its call-site line.
 
+## D0163 · F1 self-audit found a real structural gap in D0149's own CI wiring: the gate-mutation-tests glob only reached one directory level deep (queue #2 Part F) · 2026-08-29
+
+**Found by re-attacking D0149's own mechanism, per Part F1's own instruction** ("does this fix verify a
+population or fire on a constructed case"). The BLOCKING step wired in D0149 used a bash array glob:
+`files=(tools/test_*.py tools/*/test_*.py)` — this reaches `tools/test_*.py` (depth 0) and `tools/*/
+test_*.py` (depth 1) but NOT `tools/*/*/test_*.py` or deeper. Currently masked by coincidence: as of this
+commit, the corpus has 5 files, none nested past depth 1, so the old glob and a genuinely recursive scan
+happen to return the identical set — the gap is real but has never yet been observed to bite.
+
+**Confirmed the gap directly, not assumed:** created a synthetic two-levels-deep probe,
+`tools/layer_lint/nested_probe/test_probe.py` (a trivial `main()` printing `"nested probe: OBSERVED"`,
+exit 0). Ran the OLD glob logic (`shopt -s nullglob; files=(tools/test_*.py tools/*/test_*.py)`) against
+the tree with the probe present — count stayed at **5**, the probe absent from the list. Ran `find tools
+-name 'test_*.py' | sort` against the same tree — count **6**, the probe included. Deleted the probe
+directory immediately after (`rm -rf tools/layer_lint/nested_probe`; confirmed clean via `git status
+--porcelain tools/layer_lint/` — no output).
+
+**Fix:** `.github/workflows/harness.yml`'s BLOCKING step (both occurrences this queue touches this workflow
+in — the `tests` job) rewritten from the bash-array glob to `find tools -name 'test_*.py' | sort` piped
+into `while IFS= read -r f; do echo "=== $f ==="; python3 "$f"; count=$((count + 1)); done < <(find tools
+-name 'test_*.py' | sort)`, retaining `set -e` fail-fast (a non-zero exit from any `python3 "$f"` still
+aborts the step immediately, same as before).
+
+**Bash-version snag, fixed:** the first attempt used `mapfile -t files < <(find ...)` — failed locally
+(`bash: line 2: mapfile: command not found`) because this machine's default `/bin/bash` is 3.2.x (macOS's
+frozen pre-GPLv3 build; `mapfile`/`readarray` are bash-4+-only builtins). Rewritten using the portable
+`while IFS= read -r f; do ... done < <(...)` form, which uses only process substitution (available since
+early bash 2.x) — confirmed working in this machine's bash 3.2 directly; GitHub Actions' Ubuntu runners
+default to a modern bash (5.x) for `run:` steps, so the same script runs unchanged there.
+
+**Verified, not assumed:** re-ran the new step logic locally against the real (unmutated) tree — all 6
+real `tools/**/test_*.py` files (`tools/gate_status.py`'s own test, `tools/test_check_fork_completion.py`,
+`tools/layer_lint/test_check_claim_references.py`, `tools/layer_lint/test_check_untracked_files.py`,
+`tools/quality_check/test_quality_check.py`, plus the probe while it was present) all report PASS in
+sequence, ending `Ran 6 gate mutation test file(s).` with the probe present and `Ran 5 gate mutation test
+file(s).` with it removed — the count tracks the real population, not a hand-typed number.
+
+**Reverse cost:** revert `.github/workflows/harness.yml`'s one step back to the bash-array glob form.

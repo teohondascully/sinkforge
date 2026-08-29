@@ -137,16 +137,16 @@ jobs:
       # scripts happen to exist under tools/test_*.py and tools/*/test_*.py, globbed fresh each run, never
       # a hand list that can go stale the way BRIEF.md's own prose did (D0143/D0146/D0148). A gate script
       # with no test file alongside it is simply not covered by this step; adding one is what brings it in.
-      - name: Gate mutation tests (tools/test_*.py, tools/*/test_*.py) — BLOCKING
+      - name: Gate mutation tests (every tools/**/test_*.py, any depth) — BLOCKING
         run: |
           set -e
-          shopt -s nullglob
-          files=(tools/test_*.py tools/*/test_*.py)
-          echo "Running ${#files[@]} gate mutation test file(s): ${files[*]}"
-          for f in "${files[@]}"; do
+          count=0
+          while IFS= read -r f; do
             echo "=== $f ==="
             python3 "$f"
-          done
+            count=$((count + 1))
+          done < <(find tools -name 'test_*.py' | sort)
+          echo "Ran $count gate mutation test file(s)."
 
       # tools/quality_check/ (docs/DECISIONS_LEDGER.md D0096-D0099). Duplication is the one instrument
       # that gates -- BLOCKING per D0099, since 0 clusters is this project's verified-clean state and a
