@@ -6160,3 +6160,24 @@ matches `HEAD`'s own commit date).
 
 **Reverse cost:** `git checkout HEAD~1 -- docs/WORKING.md` restores the 1332-line version; the archived copy
 can stay regardless (it's additive, not a replacement of anything that existed before this commit).
+
+## D0160 · "capped at 12" pointers fixed to state the real count; the cull itself left as director-action (E5, queue Part E) · 2026-08-29
+
+**Decided:** `CLAUDE.md` and `history/README.md`'s own opening line both stated "capped at 12" in present
+tense, as if that were the current state — while `history/README.md`'s own body (added 2026-08-28) already
+says plainly the cap is policy, not applied, and the directory holds 168 images. Verified directly (`find
+history -maxdepth 1 -iname "*.png" -o -iname "*.jpg" | wc -l` = **168**, matching the body text exactly).
+Fixed the two headline lines to say "policy-capped at 12 — currently 168" instead of stating the target as
+though it were already true, pointing at `history/README.md`'s own fuller explanation.
+
+**The cull itself was NOT attempted, per the queue's own explicit fallback ("if unsure, fix the pointers and
+flag the cull as director-action") and this repository's own repeated, unchanged stance on it**:
+`history/README.md`'s body already states this is "a real, judgment-heavy curation decision... and a
+potentially destructive one at this scale," deliberately left undone across at least three prior sessions
+(`docs/WORKING.md`'s own archived history shows this flagged unchanged on 2026-08-25, -27, -28). Nothing
+about this round changes that judgment — 165 of the 168 images are pre-pivot content this session has no
+basis to individually evaluate for continued relevance, and `docs/DECISIONS.md`'s locked "never destroy a
+curated file" rule (cited by the file itself) makes an under-informed cull the wrong kind of mistake to risk
+autonomously.
+
+**Reverse cost:** revert `CLAUDE.md` and `history/README.md`, two lines each.

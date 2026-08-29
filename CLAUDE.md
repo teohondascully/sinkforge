@@ -24,7 +24,9 @@ Auto-loaded every session, including after compaction. Its only job is to point 
 `docs/DECISIONS_LEDGER.md` (append-only judgment calls), `docs/BRIEF.md` (this session's digest, with a
 "What was learned" section — findings, not a work log), `docs/WORKING.md` (current state), `docs/adr/`
 (architecture decisions), `docs/TASTE_QUEUE.md` (feel/visual judgment calls), `history/` (curated
-images, capped at 12 — an image earns its place by illustrating a finding, not by marking a date).
+images, policy-capped at 12 — currently 168, the cap set 2026-08-25 and not yet applied; an image earns
+its place by illustrating a finding, not by marking a date. `history/README.md` has the real count and
+why the cull is the director's own call, not automatic).
 
 ## Standing rules
 

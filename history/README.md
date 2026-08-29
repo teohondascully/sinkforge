@@ -1,9 +1,10 @@
 # history
 
-Curated images, capped at 12. An image earns its place by illustrating a finding, not by marking a
-date. When a thirteenth is worth keeping, one comes out, and the swap is a line in `docs/BRIEF.md`'s
-"What was learned" section (`docs/DECISIONS_LEDGER.md` if the swap is itself a judgment call worth
-logging, e.g. changing the selection criterion).
+Curated images, policy-capped at 12 — **currently 168** (the cap was set 2026-08-25 and has not been
+applied since; see "Policy set..." below for why). An image earns its place by illustrating a finding,
+not by marking a date. When a thirteenth is worth keeping, one comes out, and the swap is a line in
+`docs/BRIEF.md`'s "What was learned" section (`docs/DECISIONS_LEDGER.md` if the swap is itself a
+judgment call worth logging, e.g. changing the selection criterion).
 
 Candidates worth watching for as they become available: the debug renderer showing the heightfield
 resolving a rubble slope, the hostile chamber, a collision/stall heatmap, the claim board once claims
