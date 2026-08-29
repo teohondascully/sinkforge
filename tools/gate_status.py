@@ -87,12 +87,15 @@ WORKFLOW = ROOT / ".github" / "workflows" / "harness.yml"
 GATE_LINE_RE = re.compile(r"^(\d+)\. \*\*(.+?)\*\*\.?[ \t]*(.*)$", re.M)
 CITE_RE = re.compile(r"QUALITY gates?\s+(\d+)(?:-(\d+))?", re.I)
 BACKTICK_RE = re.compile(r"`([^`]+)`")
+FILE_EXT_RE = re.compile(r"\.(py|gd|sh)$")
 
 
-def parse_gates() -> dict[int, dict[str, str]]:
+def parse_gates(path: Path = QUALITY_MD) -> dict[int, dict[str, str]]:
     """Every numbered gate in `docs/QUALITY.md`'s own "## 1. The gates" section, read fresh from the file
-    -- not a copy of this list living inside this script."""
-    text = QUALITY_MD.read_text(encoding="utf-8")
+    -- not a copy of this list living inside this script. `path` is parametrized (default: the real
+    QUALITY.md) so `tools/test_gate_status.py` can prove the tool re-derives its table from a mutated
+    copy without any other edit, never a copy of QUALITY.md's structure baked into this script."""
+    text = path.read_text(encoding="utf-8")
     gates: dict[int, dict[str, str]] = {}
     for m in GATE_LINE_RE.finditer(text):
         n, title, body = m.groups()
@@ -100,11 +103,12 @@ def parse_gates() -> dict[int, dict[str, str]]:
     return gates
 
 
-def parse_workflow_steps() -> list[dict]:
-    """Every step in every job of the real workflow file, read fresh -- not a copy of CI's structure."""
+def parse_workflow_steps(path: Path = WORKFLOW) -> list[dict]:
+    """Every step in every job of the real workflow file, read fresh -- not a copy of CI's structure.
+    `path` is parametrized (default: the real harness.yml) for the same reason as `parse_gates` above."""
     import yaml
 
-    wf = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    wf = yaml.safe_load(path.read_text(encoding="utf-8"))
     steps = []
     for job_key, job in wf["jobs"].items():
         for step in job.get("steps", []):
@@ -134,6 +138,17 @@ def link_gates(gates: dict[int, dict], steps: list[dict]) -> tuple[dict[int, lis
                     kind[n] = "cited (QUALITY gate %d)" % n
 
     # Tier 2: a backtick-quoted path from the GATE'S OWN QUALITY.md text, found inside a step's run command.
+    # A citation ending in a code extension (.py/.gd/.sh) names one specific FILE and is matched as a plain
+    # substring -- unambiguous. A citation with no extension (e.g. gate 1's "Custom check in
+    # `tools/layer_lint`") names a DIRECTORY, not a file, and is deliberately NOT matched as a blanket
+    # substring against every step whose run: command lives under it: tools/layer_lint/ alone also holds
+    # check_size_limits.py, check_loc_ratio.py, check_untracked_files.py and five more, each its own
+    # separately-numbered gate with its own specific citation elsewhere in this same document. Matching the
+    # bare directory string re-attached gate 7's (and gates 3/4/23/27's) own steps to gate 1 too -- gate 1
+    # showed FAIL because gate 7's real LOC failure was living, unrelated, inside gate 1's own evidence list.
+    # A directory-only citation is instead evidence only for the one script conventionally named after its
+    # own directory (tools/layer_lint/layer_lint.py) -- the "primary" check the directory-only prose is
+    # naming -- never for every other, differently-purposed script that merely happens to live alongside it.
     for n, g in gates.items():
         if links[n]:
             continue
@@ -141,24 +156,25 @@ def link_gates(gates: dict[int, dict], steps: list[dict]) -> tuple[dict[int, lis
             p for p in BACKTICK_RE.findall(g["body"]) if "/" in p or p.endswith((".py", ".gd", ".sh"))
         ]
         found: list[dict] = []
-        matched_path = None
+        all_paths: list[str] = []
         for p in candidate_paths:
-            for s in steps:
-                if p and p in s["run"]:
-                    found.append(s)
-                    matched_path = p
+            if FILE_EXT_RE.search(p):
+                matched = [s for s in steps if p in s["run"]]
+            else:
+                dirname = p.rstrip("/").rsplit("/", 1)[-1]
+                primary_re = re.compile(r"(^|/)%s\.(py|gd|sh)\b" % re.escape(dirname))
+                matched = [s for s in steps if primary_re.search(s["run"])]
+            if matched:
+                found.extend(matched)
+                all_paths.append(p)
         if found:
             seen = set()
             uniq = []
-            all_paths = []
             for s in found:
                 key = (s["job"], s["name"])
                 if key not in seen:
                     seen.add(key)
                     uniq.append(s)
-            for p in candidate_paths:
-                if any(p in s["run"] for s in steps):
-                    all_paths.append(p)
             links[n] = uniq
             kind[n] = "path match (QUALITY.md names %s)" % ", ".join("`%s`" % p for p in all_paths)
 
@@ -250,66 +266,74 @@ def run_locally(cmd: str) -> str:
         return "SKIPPED (local exec errored: %r)" % e
 
 
+def classify_step(s: dict, ci_steps: dict[str, str]) -> tuple[str, str]:
+    """Returns (status, detail_line) for one step. status is one of PASS/FAIL/SKIPPED/UNKNOWN.
+
+    CI's own reported conclusion is authoritative whenever CI reported ANYTHING for this step name at
+    all. Local re-execution is informational ONLY -- shown in the detail line as a freshness cross-check
+    -- and must never be allowed to supply the step's own status when CI marks it "skipped" or
+    "cancelled". That promotion was this tool's own defect (A1, found the same way D0145 was: running it
+    against a real red run and checking the table against `gh run view` by hand): `duplication.py` is a
+    BLOCKING step that CI skipped because an earlier step in the same job already failed, so CI never
+    actually exercised it against the committed tree at all -- but this same session's local re-run of it
+    happened to PASS, and the old code's `effective_pass = ci_pass if ci_pass is not None else local_pass`
+    let that local PASS silently become the gate's own top-line verdict. A gate CI did not run must never
+    read as passing."""
+    ci_conclusion = ci_steps.get(s["name"])
+    local = None
+    if not NEEDS_ENGINE_RE.search(s["run"]) and s["run"]:
+        local = run_locally(s["run"])
+
+    if ci_conclusion in ("skipped", "cancelled"):
+        reason = "an earlier step in this job already failed" if ci_conclusion == "skipped" else "run was cancelled"
+        local_note = (
+            ", local=%s (informational only -- CI itself never exercised this step)" % local
+            if local is not None else ""
+        )
+        return "SKIPPED", "%s: CI=%s (%s)%s" % (s["name"][:60], ci_conclusion, reason, local_note)
+
+    if ci_conclusion is not None:
+        ci_pass = ci_conclusion == "success"
+        local_pass = local == "PASS" if local is not None else None
+        if local_pass is not None and local_pass != ci_pass:
+            return (
+                "PASS" if ci_pass else "FAIL",
+                "%s: DISAGREE -- CI=%s, local=%s (likely a dirty working tree, not a CI regression)"
+                % (s["name"][:60], ci_conclusion, local),
+            )
+        return (
+            "PASS" if ci_pass else "FAIL",
+            "%s: CI=%s%s" % (s["name"][:60], ci_conclusion, (", local=%s" % local) if local else ""),
+        )
+
+    # No CI data at all for this step name (e.g. it never ran in the fetched CI run) -- only in this
+    # case does local execution get to speak for the step at all.
+    if local is not None:
+        return ("PASS" if local == "PASS" else "FAIL"), "%s: local=%s (no CI conclusion available)" % (
+            s["name"][:60], local,
+        )
+    return "UNKNOWN", "%s: no run: command, nothing executed" % s["name"][:60]
+
+
 def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str]) -> tuple[str, list[str]]:
-    """CI's own conclusion at HEAD is the primary source of truth -- it is what actually ran against the
-    committed tree everyone else sees. Local re-execution is a secondary freshness check, shown alongside
-    it always, never in its place: a dirty working tree (uncommitted changes sitting on top of HEAD, as
-    this repository's own D0139 investigation deliberately keeps) makes local execution diverge from
-    what CI reported, and silently trusting local over CI would misreport a gate that is actually green
-    at HEAD as red, over local state nobody else can see. When the two disagree, that disagreement is
-    the finding, not something to resolve by picking one."""
+    """Rolls up each linked step's own classify_step() verdict into the gate's single status, worst-first:
+    FAIL (a real failure anywhere) beats SKIPPED (CI never exercised some evidence) beats UNKNOWN (no
+    data at all) beats PASS. A gate is never reported PASS on the strength of a step CI did not run."""
     if any(s["coe"] for s in gate_steps):
         return "ADVISORY", ["continue-on-error: true in harness.yml"]
 
     details = []
-    any_fail = False
-    any_unknown = False
+    statuses = []
     for s in gate_steps:
-        ci_conclusion = ci_steps.get(s["name"])
-        local = None
-        if not NEEDS_ENGINE_RE.search(s["run"]) and s["run"]:
-            local = run_locally(s["run"])
+        status, detail = classify_step(s, ci_steps)
+        details.append(detail)
+        statuses.append(status)
 
-        # "skipped"/"cancelled" mean GitHub Actions never ran this step -- almost always because an
-        # EARLIER step in the same job already failed and halted it. That is UNKNOWN, not FAIL: reporting
-        # every downstream step as failed because one upstream gate broke would itself be a false claim,
-        # the exact class this tool exists to prevent. Only "failure"/"timed_out" (the step ran and lost)
-        # count as a real fail; "success" is the only pass.
-        if ci_conclusion in ("skipped", "cancelled"):
-            ci_pass = None
-        elif ci_conclusion is not None:
-            ci_pass = ci_conclusion == "success"
-        else:
-            ci_pass = None
-        local_pass = local == "PASS" if local is not None else None
-
-        if ci_pass is not None and local_pass is not None and ci_pass != local_pass:
-            details.append(
-                "%s: DISAGREE -- CI=%s, local=%s (likely a dirty working tree, not a CI regression)"
-                % (s["name"][:60], ci_conclusion, local)
-            )
-        elif ci_conclusion in ("skipped", "cancelled"):
-            details.append(
-                "%s: CI=%s (an earlier step in this job already failed)%s"
-                % (s["name"][:60], ci_conclusion, (", local=%s" % local) if local else "")
-            )
-        elif ci_conclusion is not None:
-            details.append("%s: CI=%s%s" % (s["name"][:60], ci_conclusion, (", local=%s" % local) if local else ""))
-        elif local is not None:
-            details.append("%s: local=%s (no CI conclusion available)" % (s["name"][:60], local))
-        else:
-            details.append("%s: no run: command, nothing executed" % s["name"][:60])
-
-        # Primary verdict is CI's, when CI has one; local fills the gap only when CI does not.
-        effective_pass = ci_pass if ci_pass is not None else local_pass
-        if effective_pass is False:
-            any_fail = True
-        elif effective_pass is None:
-            any_unknown = True
-
-    if any_fail:
+    if "FAIL" in statuses:
         return "FAIL", details
-    if any_unknown:
+    if "SKIPPED" in statuses:
+        return "SKIPPED", details
+    if "UNKNOWN" in statuses:
         return "UNKNOWN", details
     return "PASS", details
 
@@ -322,12 +346,24 @@ def main() -> int:
         return 2
 
     steps = parse_workflow_steps()
+    real_steps = [s for s in steps if s["run"]]
     links, kind = link_gates(gates, steps)
     head = git_head()
     ci_conclusion, ci_note, ci_steps = fetch_ci_state(head)
 
     print("gate_status: commit=%s" % head)
     print("gate_status: CI %s" % ci_note)
+    print(
+        "gate_status: population = the UNION of docs/QUALITY.md's %d numbered gates and "
+        "harness.yml's %d real CI step(s) (a run: command, not infra like checkout/setup) -- "
+        "neither source can hide a gate from this table. A gate can appear with no CI step (a "
+        "NO-CODE row below); a CI step can run and block the build while citing no gate number "
+        "(its own section further down). Fully CI-first enumeration cannot produce the NO-CODE "
+        "rows by construction: a gate with zero enforcing code, by definition, is cited by NO step "
+        "in harness.yml, so scanning CI alone would silently omit it rather than reporting it "
+        "missing -- QUALITY.md's own numbered list is read live, at runtime, because it is the only "
+        "place the total declared population of %d is written down at all." % (len(gates), len(real_steps), len(gates))
+    )
     print()
 
     rows = []
@@ -356,8 +392,11 @@ def main() -> int:
     print("gate_status: NO-CODE gate numbers: %s" % no_code_list)
     fail_list = [n for n, _, status, _, _ in rows if status == "FAIL"]
     advisory_list = [n for n, _, status, _, _ in rows if status == "ADVISORY"]
+    skipped_list = [n for n, _, status, _, _ in rows if status == "SKIPPED"]
     print("gate_status: FAIL gate numbers: %s" % fail_list)
     print("gate_status: ADVISORY gate numbers: %s" % advisory_list)
+    print("gate_status: SKIPPED gate numbers (CI has not exercised these since an earlier step in "
+          "the same job failed -- not a known PASS, not a known FAIL): %s" % skipped_list)
 
     # A gate NUMBER is not the only way a check can go missing from a status table: a real CI step can
     # run and block the build while citing no QUALITY.md gate at all. QUALITY.md's own 29 never mention
@@ -382,7 +421,9 @@ def main() -> int:
         for d in details:
             print("             - %s" % d)
     unlinked_fail = [s["name"] for s in unlinked if resolve_status([s], ci_steps)[0] == "FAIL"]
+    unlinked_skipped = [s["name"] for s in unlinked if resolve_status([s], ci_steps)[0] == "SKIPPED"]
     print("gate_status: unnumbered steps currently FAIL: %s" % unlinked_fail)
+    print("gate_status: unnumbered steps currently SKIPPED: %s" % unlinked_skipped)
     return 0
 
 

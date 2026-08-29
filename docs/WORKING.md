@@ -8,6 +8,45 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## IN PROGRESS — 5-HOUR AUTONOMOUS QUEUE, director away, 2026-08-29
+
+Director is away and cannot run Codex until they return, so this queue is scoped to Codex-diagnosed fixes
+(specified, not judgment-dense) plus low-risk moves. Budget: 5 hours or 30 commits. Each numbered item its
+own commit with pasted tool-output evidence. **Codex verifies the whole batch on return before anything
+closes — this session does not certify its own work.**
+
+**HARD STOPS (report and hold, do not act):** collision logic / `resolve_floor` / `grid_floor_backstop` /
+fuzz population; `data/economy/`; deleting any instrument not on the Part E1 list; if the status tool's
+CI-first enumeration proves infeasible, report why rather than forcing it; any design decision; a
+determinism regression; an unexplained gate red; 5 hours or 30 commits, whichever first.
+
+- **Part A — fix the status tool (Codex found three defects), highest priority.** A1 (skipped CI steps
+  were promoted to a local PASS/FAIL), A2 (gate 1's false attribution via a directory-blanket path match),
+  A3 (state the population is a union of QUALITY.md ∪ harness.yml, explain why CI-first alone can't
+  produce NO-CODE rows), A4 (two contract closures, each proven with a test: empty scenarios/harness
+  corpus → VOID not PASS; deleting a harness.yml step changes the table with no other edit).
+- **Part B — apply the director's LOC ruling.** Velocity check stays a real, currently-red gate. Strike
+  "gate" language for the ABSOLUTE ratio in QUALITY.md/CONTEXT.md; keep it as a reported metric with a
+  one-line diagnosis of why it's 6.4 and what would reduce it.
+- **Part C — BRIEF.md stops lying, the lean way.** Delete hand-typed Gates/ratio/claims sections; replace
+  each with a one-line pointer at the relevant tool. Same for wrap.md step 7.
+- **Part D — Phase 0a enforcement (low-risk, specified).** D1 wire the gate mutation tests into CI. D2 fix
+  the `ERROR:` masked-crash sibling in `run_gd_test.sh` (matches `SCRIPT ERROR:` but not an engine
+  `ERROR:`), TDD'd against a real crash-injection fixture, same shape as D0115. D3 commit-msg hook requires
+  a NEW `D0NNN` header when the ledger is touched. D4 fix the falsified justification comment at
+  `test_body_fuzz.gd:28-52` to match D0135 (comment only, no bound/collision change).
+- **Part E — parking and drift.** E1 park (remove from tree, git preserves history) the three unwired
+  instruments: `economy_check`, `anvil`/`.anvil/`, the control-plane slice — one ledger entry each, DO NOT
+  delete anything not on this list. E2 `project.godot` description drops "roguelite". E3 archive ten
+  legacy docs to `docs/archive/` with dated headers, move not delete. E4 reset WORKING.md itself to under
+  150 lines once this queue closes. E5 fix the "capped at 12" `history/` pointer to the real count. E6
+  re-check the size gate after E1's removals.
+
+**Required final report:** per part, what landed with evidence; the fixed status table; the D2
+crash-injection proof; what was removed from the tree and its preserving sha (E1); the CI conclusion and
+why (the velocity gate red is expected and correct); what's flagged as director-action (branch protection
+especially — main is currently unprotected); anything that felt wrong even though it passed.
+
 ## PRE-COMPACTION CHECKPOINT — external audit response, Phase 1 (Tier 1) COMPLETE, awaiting the director's ruling on item 3, 2026-08-29
 
 **Context a fresh session needs:** an independent cold-read audit (fresh model, no project history) found

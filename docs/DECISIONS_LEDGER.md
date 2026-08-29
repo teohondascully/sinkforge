@@ -5713,3 +5713,74 @@ regression." That is real, known, D0139-attributable state, not a new defect.
 
 Reverse: revert the `ci_conclusion in ("skipped", "cancelled")` branches in `resolve_status`, restoring
 the earlier (wrong) two-state success/not-success read.
+
+## D0146 · gate_status.py's own three real defects fixed (A1-A2), plus two contract closures (A3-A4) · 2026-08-29
+
+**Decided:** a director-run Codex re-audit of `tools/gate_status.py` (D0143/D0145) found three further real
+defects in the tool itself, plus asked for two contract closures, before the tool can be trusted enough for
+the director to close item 2. All five fixed and proven against real/synthetic data, not asserted:
+
+- **A1 — a CI-skipped step's local re-execution was silently promoted into the gate's own PASS/FAIL.**
+  `resolve_status`'s old `effective_pass = ci_pass if ci_pass is not None else local_pass` treated
+  `ci_conclusion in ("skipped","cancelled")` (already mapped to `ci_pass=None`) identically to "CI has no
+  data at all" — so `duplication.py`, a BLOCKING gate CI never actually ran this round (an earlier step in
+  its job already failed), was reading PASS off this session's own local re-run. Confirmed live before the
+  fix: gates 13/15/16/22/23/27 and the unnumbered `duplication.py`/`project.godot` steps all showed PASS
+  purely from local promotion. Fixed via a new per-step `classify_step()` that never lets local speak when
+  CI reported "skipped"/"cancelled" — those now resolve to a new, distinct `SKIPPED` status (own summary
+  line, own detail annotation "informational only -- CI itself never exercised this step"), rolled up
+  worst-first (FAIL > SKIPPED > UNKNOWN > PASS). Re-run against the same real CI data: gates 13/15/16/22/23/
+  27 and the two unnumbered steps now correctly show SKIPPED; `FAIL gate numbers: [7]` only (was `[1, 7,
+  27]`, of which 1 and 27 were the false rows).
+- **A2 — a bare-directory QUALITY.md citation over-matched every co-located script.** Gate 1's own evidence
+  ("Custom check in `tools/layer_lint`") is a directory, not a file; Tier 2's plain substring match attached
+  ALL nine `tools/layer_lint/*.py` scripts to gate 1, including gate 7's own `check_loc_ratio.py` — so gate
+  1 showed FAIL from gate 7's real, unrelated failure living inside its own evidence list. Fixed: a citation
+  ending in `.py`/`.gd`/`.sh` still matches by substring (unambiguous, unchanged); a bare directory citation
+  now matches ONLY a step whose run: command names `<dirname>.py`/`.gd`/`.sh` (the script conventionally
+  named after its own directory — here, `layer_lint.py`), never any other differently-numbered script that
+  merely lives alongside it. Re-run: gate 1 links to exactly one step now; the audit's own reproduced
+  18/29-code, 11/29-NO-CODE split (gate numbers `5,6,9,10,12,14,17,18,19,20,21`) is unchanged by this
+  narrowing — confirmed by direct comparison, not assumed.
+- **A3 — the tool's own output did not state its population is a union of two sources.** Added a header
+  line naming the union explicitly (`docs/QUALITY.md`'s 29 gates ∪ harness.yml's real CI steps) and stating
+  precisely why fully CI-first enumeration cannot work: a NO-CODE gate, by definition, is cited by no step,
+  so a CI-only scan would omit it rather than report it missing. No structural merge was needed — the
+  existing "unnumbered steps" section already IS the harness.yml side of the union; this only names it as
+  such where a reader can see it.
+- **A4 — two contract closures, both proven with a test, not asserted:**
+  1. `tools/layer_lint/check_claim_references.py` now reports **VOID, not PASS**, when its population
+     (scenarios/*.yaml + harness/**/*.gd check-registering files) is zero — the ACTUAL live state of this
+     repository right now (`scenarios/` holds only a README; `harness/` has zero `func run(` files), which
+     the pre-fix code read as an unqualified PASS. `run()`/`load_claims()`/`check_scenarios()`/
+     `check_harness_layers()` all parametrized to take an explicit `root: Path` (previously a hardcoded
+     module global), enabling `tools/layer_lint/test_check_claim_references.py` (6 cases: empty-both-dirs,
+     dirs-exist-but-nothing-qualifies [the real live case], real-population-clean, real-population-
+     violating, harness-only-population, cap-violation-independent-of-population) to run against disposable
+     scratch trees. Mutation-tested by hand: disabling the `population == 0` branch flips exactly the two
+     VOID-expecting cases to NOT OBSERVED, all four others unaffected.
+  2. `tools/gate_status.py`'s `parse_gates`/`parse_workflow_steps` parametrized to take an explicit `path:
+     Path` (previously hardcoded to the real `QUALITY_MD`/`WORKFLOW` globals), enabling
+     `tools/test_gate_status.py` to prove that **deleting one real step from a mutated copy of harness.yml,
+     with no other edit, flips exactly that gate's row to NO-CODE** (gate 7 tested; an unrelated gate's own
+     link count confirmed unaffected as a negative control) — proof the tool re-derives its table from
+     harness.yml's live structure, not any cached or hand-copied form. 8 cases total, including negative
+     controls for A1 (real CI conclusion stays authoritative) and A2 (gate 7's own citation is unaffected).
+     A1 and A2 also hand-mutation-tested against scratch copies of the module outside the repo (not
+     committed): disabling each fix independently flips its own test case to NOT OBSERVED, confirming both
+     are real regression detectors, not tests that pass by construction.
+
+**Alternative considered and rejected:** treating A1's fix as "SKIPPED collapses into UNKNOWN" (reusing the
+existing bucket) rather than a new distinct status — rejected because "CI explicitly did not exercise this"
+and "no CI data exists at all" are different findings with different remedies (the first says "re-run CI
+past this point"; the second says "this step's name never appeared in the fetched run"), and collapsing
+them would re-hide exactly the kind of distinction this tool exists to preserve.
+
+**Why:** Codex's own re-audit is the mechanism that found all three defects — this session's own diligence
+(running the tool against real, current data and checking the table by hand against what should be true)
+independently reproduced and confirmed each one before touching the fix, per the standing rule that a
+numeric/behavioral claim is verified against real tool output before acting on it.
+
+**Reverse cost:** revert `tools/gate_status.py`, `tools/layer_lint/check_claim_references.py`, and delete
+`tools/test_gate_status.py`/`tools/layer_lint/test_check_claim_references.py`. Nothing else depends on any
+of these five changes yet.

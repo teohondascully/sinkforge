@@ -34,6 +34,16 @@ harness/aggregate/ is exempt — it serves the whole corpus and defends no
 single claim. A file exempted this way must say so explicitly with
 `# claim: EXEMPT (ADR-0001)` — an unmarked file is a gap, not a pass, so
 exemption cannot be silent.
+
+VOID, not PASS, on an empty corpus (added 2026-08-29, `docs/DECISIONS_LEDGER.md` D0146, the audit
+queue's own A4): `scenarios/` has held only a README since before this gate existed and `harness/**/*.gd`
+has zero files matching `func run(` right now, so `check_scenarios`/`check_harness_layers` both iterate
+zero files and return zero errors -- vacuously, not because a real corpus was checked and found clean.
+The old `main()` read that as an unqualified PASS, the exact "instrument cannot register its subject"
+shape this project's own memory names as its dominant failure class: a bare "0 errors" cannot be told
+apart from "0 things existed to error." Population (scenario files + qualifying harness files) is now
+counted and printed explicitly; PASS is reported only when that population is nonzero AND clean. The
+active-claim cap still gates unconditionally either way, since it does not depend on this corpus at all.
 """
 import re
 import sys
@@ -61,9 +71,9 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     return fields
 
 
-def load_claims() -> dict[str, dict[str, str]]:
+def load_claims(root: Path = ROOT) -> dict[str, dict[str, str]]:
     """claim id -> its frontmatter fields, for every file in claims/."""
-    claims_dir = ROOT / "claims"
+    claims_dir = root / "claims"
     if not claims_dir.is_dir():
         return {}
     out = {}
@@ -87,15 +97,34 @@ def check_active_claim_cap(claims: dict[str, dict[str, str]]) -> list[str]:
     return []
 
 
-def check_scenarios(proven: set[str], all_ids: set[str]) -> list[str]:
-    scenarios_dir = ROOT / "scenarios"
-    errors = []
+def find_scenario_files(root: Path = ROOT) -> list[Path]:
+    scenarios_dir = root / "scenarios"
     if not scenarios_dir.is_dir():
-        return errors
-    for path in sorted(scenarios_dir.glob("*.yaml")):
+        return []
+    return sorted(scenarios_dir.glob("*.yaml"))
+
+
+def find_harness_layer_files(root: Path = ROOT) -> list[Path]:
+    """Every harness/**/*.gd file that registers a check layer (contains a top-level `func run(`) --
+    the same population check_harness_layers() below walks, extracted so main()/run() can COUNT it
+    without duplicating the registration heuristic."""
+    harness_dir = root / "harness"
+    if not harness_dir.is_dir():
+        return []
+    out = []
+    for path in sorted(harness_dir.rglob("*.gd")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if re.search(r'^\s*func run\s*\(', text, re.MULTILINE):
+            out.append(path)
+    return out
+
+
+def check_scenarios(proven: set[str], all_ids: set[str], root: Path = ROOT) -> list[str]:
+    errors = []
+    for path in find_scenario_files(root):
         text = path.read_text(encoding="utf-8", errors="replace")
         m = SCENARIO_CLAIM_RE.search(text)
-        rel = path.relative_to(ROOT)
+        rel = path.relative_to(root)
         if not m:
             errors.append(f"{rel}: no top-level `claim: C###` key")
             continue
@@ -108,17 +137,11 @@ def check_scenarios(proven: set[str], all_ids: set[str]) -> list[str]:
     return errors
 
 
-def check_harness_layers(proven: set[str], all_ids: set[str]) -> list[str]:
-    harness_dir = ROOT / "harness"
+def check_harness_layers(proven: set[str], all_ids: set[str], root: Path = ROOT) -> list[str]:
     errors = []
-    if not harness_dir.is_dir():
-        return errors
-    for path in sorted(harness_dir.rglob("*.gd")):
+    for path in find_harness_layer_files(root):
         text = path.read_text(encoding="utf-8", errors="replace")
-        registers_a_check = bool(re.search(r'^\s*func run\s*\(', text, re.MULTILINE))
-        if not registers_a_check:
-            continue  # a support file, not a registered check layer itself
-        rel = path.relative_to(ROOT)
+        rel = path.relative_to(root)
         m = GD_CLAIM_RE.search(text)
         if not m:
             errors.append(f"{rel}: registers a check (func run()) but has no `# claim: C###` comment")
@@ -134,38 +157,41 @@ def check_harness_layers(proven: set[str], all_ids: set[str]) -> list[str]:
     return errors
 
 
-def main() -> int:
-    claims = load_claims()
+def run(root: Path = ROOT) -> int:
+    claims = load_claims(root)
     all_ids = set(claims)
     proven = proven_claim_ids(claims)
-    scenarios_dir_exists = (ROOT / "scenarios").is_dir()
-    harness_dir_exists = (ROOT / "harness").is_dir()
-
     cap_errors = check_active_claim_cap(claims)
+    errors = cap_errors + check_scenarios(proven, all_ids, root) + check_harness_layers(proven, all_ids, root)
 
-    if not scenarios_dir_exists and not harness_dir_exists:
-        print("check_claim_references: neither scenarios/ nor harness/ exist yet — nothing to check "
-              "for claim references, but the corpus cap still applies.")
-        if cap_errors:
-            print(f"check_claim_references: FAIL — {len(cap_errors)} violation(s)")
-            for e in cap_errors:
-                print(f"  FAIL  {e}")
-            return 1
-        print("check_claim_references: PASS (vacuously on references — nothing to check yet)")
-        return 0
-
-    errors = cap_errors + check_scenarios(proven, all_ids) + check_harness_layers(proven, all_ids)
+    scenario_files = find_scenario_files(root)
+    harness_layer_files = find_harness_layer_files(root)
+    population = len(scenario_files) + len(harness_layer_files)
 
     print(f"check_claim_references: {len(all_ids)} known claim id(s) in claims/, "
           f"{len(proven)} proven (first_failed_at populated)")
+    print(f"check_claim_references: population = {len(scenario_files)} scenarios/*.yaml + "
+          f"{len(harness_layer_files)} harness/**/*.gd check-registering file(s) = {population}")
+
     if errors:
         print(f"check_claim_references: FAIL — {len(errors)} violation(s)")
         for e in errors:
             print(f"  FAIL  {e}")
         return 1
 
+    if population == 0:
+        print("check_claim_references: VOID — zero scenarios and zero harness check-layers exist to "
+              "carry a claim reference right now; a PASS would assert a corpus was checked and found "
+              "clean, when nothing was checked at all. The active-claim cap is still enforced above, "
+              "unconditionally.")
+        return 0
+
     print("check_claim_references: PASS")
     return 0
+
+
+def main() -> int:
+    return run(ROOT)
 
 
 if __name__ == "__main__":
