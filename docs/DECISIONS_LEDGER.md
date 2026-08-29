@@ -6596,3 +6596,41 @@ queue named (no resolve-logic changes, no design decisions).
 real CI); revert `GOLDEN_HASHES` to D0167's array (would also immediately re-break CI, since D0168's
 spawn change is not reverted). Reversing either alone breaks the other; revert both D0168 and this entry
 together if reverting at all.
+
+## D0170 · docs/CORRECTIONS.md generated -- a projection over the ledger's own correction links, the D0059→D0137 chain traced in full (queue #2 Part I2) · 2026-08-29
+
+**A projection, not a new instrument, per the queue's own explicit framing.** `docs/CORRECTIONS.md` built
+by grepping `docs/DECISIONS_LEDGER.md` for entries whose own text says "corrects," "correction,"
+"FALSIFIED," "was wrong," or "superseding" -- `grep -n "^## D0" docs/DECISIONS_LEDGER.md | grep -iE
+"correct|supersed|falsif|corrective|reversed|wrong|mistake|error found|retract"` found 18 candidate
+entries; read each in full before including it, since a grep hit on "correction" doesn't by itself
+confirm the entry names an earlier one as wrong (several are just entries ABOUT the concept of
+correction, e.g. D0104's own append-only-discipline explanation, included because it does cite a real
+supersedes relationship, D0098→D0104).
+
+**The chain the queue specifically asked to trace, done in full:** the audit flagged D0133/D0135
+(correcting D0127/D0128) for citing only `_grid_floor_backstop`/D0059f directly, not D0061 -- the entry
+that FIRST corrected D0060's own conflated framing (splitting `RESIDUAL` from `DESIGN_TRADEOFF`, the
+distinction D0127/D0128/D0133/D0135 all inherit). Traced explicitly, read every entry in the chain
+directly rather than trusting a prior summary of it: **D0059** (four defects root-caused, `_grid_
+floor_backstop`/D0059f established as accepted trade-off) → **D0060** (allowlist, one undifferentiated
+bucket) → **D0061 corrects D0060** (splits residual from trade-off, the first time this distinction
+exists) → **D0127/D0128** (dig raises 32→59, attributed to "the SAME" D0059f mechanism, D0127 citing the
+pre-dig bound as "D0061" by number) → **D0133/D0135 correct D0127/D0128** (D0132's own telemetry: 84/91
+violations are actually `resolve_floor`, not `_grid_floor_backstop`; the "same mechanism" claim was
+FALSIFIED, not merely unproven) → **D0137** (the real mechanism, diagnosed: `resolve_floor`'s `mini()`
+of three heightfield samples never lets `NO_FLOOR`'s sentinel win). Confirmed directly: D0133/D0135 DO
+cite D0059f by name; neither re-cites D0061's own distinct act. `docs/CORRECTIONS.md`'s own "deepest
+chain" section closes that citation gap by tracing it here, rather than editing D0133/D0135 themselves
+(append-only; the gap is closed by a NEW document reading the chain, not by touching either entry).
+
+**Wired into the doc index:** added a row to `docs/README.md`'s own normative table, directly after
+`DECISIONS_LEDGER.md`'s own row, since `CORRECTIONS.md` is a direct derivative of it.
+
+**Not exhaustive by construction, stated plainly:** this is a snapshot from one grep pass plus manual
+reading, not a live query -- a future correction not matching this session's own keyword list (or a
+future reader's more careful re-read) could surface entries this pass missed. The file's own closing
+section ("What this page is not") states this limit directly rather than implying completeness the
+method can't back.
+
+**Reverse cost:** delete `docs/CORRECTIONS.md`; revert `docs/README.md`'s one added row.
