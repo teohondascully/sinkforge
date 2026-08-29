@@ -13,11 +13,13 @@ the acceptance-suite stage — moved verbatim to `docs/archive/working/WORKING-2
 detail behind anything below; nothing was deleted, only relocated, per this file's own header requiring
 it stay under 150 lines.
 
-## IN PROGRESS — 5-hour autonomous queue, director away, 2026-08-29
+## CLOSED (pending Codex re-verify) — 5-hour autonomous queue, director away, 2026-08-29
 
-Codex-diagnosed fixes plus low-risk moves, scoped because the director cannot run Codex until they
-return. Full queue text: `docs/archive/working/WORKING-2026-08-29.md`'s own top section. Landed so far,
-each its own commit, each with pasted tool-output evidence in `docs/DECISIONS_LEDGER.md`:
+All of Parts A-E landed, 14 commits, well inside the 5-hour/30-commit budget. **Codex verifies the whole
+batch on the director's return before anything closes for real — this session does not certify its own
+work**, per the queue's own explicit instruction. Full queue text and this round's own report:
+`docs/archive/working/WORKING-2026-08-29.md`'s own top section. Each item its own commit, each with
+pasted tool-output evidence in `docs/DECISIONS_LEDGER.md`:
 
 - **Part A** (D0146) — `tools/gate_status.py`'s three real defects fixed (skipped-CI-promoted-to-PASS;
   gate 1's directory-blanket false attribution; population-union framing) plus two contract closures
@@ -38,13 +40,21 @@ each its own commit, each with pasted tool-output evidence in `docs/DECISIONS_LE
   CI run actually failed on it. E2 (D0156) project.godot description no longer says "roguelite." **E3
   (D0158) archived nine of the ten named legacy docs — `docs/DECISIONS.md` was NOT archived: `ONBOARDING.md`
   explicitly forbids it ("stays and is normative... Do not archive it") and it's cited by two live CI
-  gates. Reported to the director as a direct conflict, not resolved unilaterally.** E4 (this entry) —
-  this reset. E5/E6 next.
+  gates. Reported to the director as a direct conflict, not resolved unilaterally.** E4 (D0159) WORKING.md
+  reset to 84 lines. E5 (D0160) "capped at 12" pointers fixed to state the real count (168); the cull
+  itself left as director-action, unchanged from three prior sessions' own stance. E6 (D0161) — the
+  queue's own premise was wrong (`check_size_limits.py` never covered `.py` files at all, GDScript-only,
+  a real finding in its own right); answered the actual ask anyway — `gate_status.py` (431 lines) split
+  into `gate_status.py`+`gate_status_ci.py` (371+74); `test_quality_check.py` (404) given a named, dated
+  exemption instead of a split, reasoned explicitly.
 
-**Verified, not assumed, after Part E1's removals:** `check_loc_ratio.py`'s velocity gate — red since
-D0144 armed it — now genuinely PASSes (instrument -1424 lines vs game's +28 over the trailing 10
-commits). Real CI run `33268265063` at `63c9fc1`: `conclusion=success`, every gate green, confirmed via
-`gh run view` and `tools/gate_status.py`'s own table (`FAIL gate numbers: []`).
+**Verified, not assumed, at the final commit (`b572a5c`):** real CI run `33268950458`, `conclusion=success`.
+`tools/gate_status.py`'s own table: `FAIL gate numbers: []`, `ADVISORY gate numbers: []`, `SKIPPED gate
+numbers: []`, `unnumbered steps currently FAIL: []` — every gate and every unnumbered CI step green.
+`check_loc_ratio.py`'s velocity gate — red since D0144 armed it — now genuinely PASSes (instrument -1424
+lines from Part E1's parking, vs game's +28). **`main` is unprotected** (`gh api .../branches/main/
+protection` → 404 "Branch not protected") — flagged for the director, the single biggest gap this round
+did not close (a permission the director holds, not this session).
 
 **Still open from this queue's own hard stops, unchanged:** `data/economy/`; any change to
 `resolve_floor`/`grid_floor_backstop`/collision logic (see D0139 below); any design decision.
