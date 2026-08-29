@@ -5183,3 +5183,37 @@ policies against this shape is the next piece, still gated on the director's own
 
 Reverse: cheap and total. Delete `tests/control_plane/` and its own new CI step; nothing else in the repo
 references it yet.
+
+## D0135 · 2026-08-29 · the bound-raise justification was FALSIFIED, not refined — 32→59 was accepted on a mechanism claim D0132's own telemetry has since disproven
+
+Sharper and more important than D0133's own correction, per the director's explicit instruction not to
+soften this into "the attribution was refined": D0128's ruling to raise `grounded_no_floor` from 32 to 59
+was not just described with an imprecise mechanism — it was JUSTIFIED, as a decision, by an explicit claim
+that the entire excess was the already-accepted `_grid_floor_backstop`/D0059f pit-lip trade-off, reachable
+at more locations now that dig exists. The director's own contemporaneous ruling accepting the raise:
+"Bumping a bound is the patch instinct when you do not know what the excess is ... You proved exactly what
+it is ... Raise it, and in the same commit document that 59 = the D0059 mechanism plus dig exposure." The
+decision to raise without further investigation rested on that claim being true.
+
+**It was not true.** D0132's own telemetry — built specifically to check this — measured the real split:
+55/59 dig-on and 29/32 dig-off `grounded_no_floor` violations trace to `resolve_floor`, only 4/59 and 3/32
+to `grid_floor_backstop`. The named mechanism accounts for 7 of 91 occurrences, not all 91. The bound-raise
+justification was a false claim, caught by the instrument built to verify it — not a subsequent audit,
+not a change of mind, not new information arriving later. The instrument that would have shown this at the
+time did not exist yet; it exists now, and it says the reasoning was wrong.
+
+**Anvil FINDING, filed at high severity specifically because this is a decision-rationale failure, not a
+prose imprecision:** `.anvil/log/2026-08-29T084009.244046Z-b497565f.json`. Distinct from D0133's own two
+FINDINGs (which correct the ledger's factual claim and D0128's hedge-decay respectively) — this one names
+the sharper failure: a decision's stated justification is falsifiable and was falsified, and the record
+should say so plainly because a future session weighing "we know what the excess is" as a reason to accept
+a bound-raise should be able to find this exact prior instance where that argument turned out to be wrong.
+
+**What does NOT change: the bound stays 59.** What changes is its own justification's status — from
+"known, accepted mechanism" to **"empirically measured, mechanism now under active diagnosis."** 59 is a
+measurement, not yet a justified ceiling. If the `resolve_floor` diagnosis this entry's own follow-up work
+opens (next entry) finds a real, fixable defect rather than accepted behavior, the bound may need to come
+DOWN after that defect is fixed — this is explicitly left open, not pre-decided here.
+
+Reverse: not applicable — corrective annotation to the historical record, per the append-only ledger
+convention. D0128 itself remains unedited.
