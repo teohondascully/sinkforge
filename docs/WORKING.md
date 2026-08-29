@@ -28,6 +28,30 @@ hit, within budget (4 commits).
    by moving it into the shared `test_base.gd` both already extend. 0 clusters now, both languages,
    across the actually-whole tree.
 
+## Micro-loop finding + reveal-layer test, 2026-08-28 — IN PROGRESS
+
+Director's design finding, landed via brief: the rig-as-consumer macro-loop has no micro-loop underneath
+it (three want-layers: Reveal, Flow, Pressure — `docs/GDD.md` §12). Reveal is the only one in scope this
+round; Flow and Pressure are named, confidence-marked, and unbuilt. Queue, in order:
+
+1. DONE (D0107). `docs/GDD.md` §12 landed (inserted, old §12/§13 renumbered to §13/§14 — zero external
+   cross-reference risk, verified by grep before deciding). Pointers added at §3, §8, §10. `CONTEXT.md`
+   updated.
+2. DONE (D0108/D0109). `claims/C004-reveal-raises-dig-persistence.md` filed BLOCKED — metric corrected
+   per the director's own reframe (dig-rate lift after a reveal, never feature location) after my
+   original read flagged the brief's first formulation as circular against
+   `docs/EXPERIENCE_EVALUATION.md`'s own Readiness Gate 6.
+3. IN PROGRESS. The dig mechanic itself (does not exist anywhere in `sim/` before this round — verified,
+   not assumed, in the brief-response), the reveal-feature terrain extension (reusing
+   `ShaftGenerator._scatter_vein_material`'s existing density-parameterized shape), a new debug scene,
+   and the dig-rate-lift metric with mutation tests.
+4. PENDING. Screenshots (play-mode reveal + density contrast + debug-render-quality record), `history/`
+   curation, gates, commit, report.
+
+HARD STOPS (director's, unchanged): determinism regression, gate red not clearable in one attempt, a
+design decision surfacing rather than a parameter, touching `data/economy/` or the flow/pressure layers.
+Budget: one hour or 24 commits.
+
 ## Director's follow-up round on the execution-dense queue, 2026-08-28 — CLOSED
 
 Four items from the director's response to the queue above. No hard stop.

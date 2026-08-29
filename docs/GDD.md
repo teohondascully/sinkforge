@@ -4,7 +4,7 @@
 
 This document holds the design state. It is deliberately explicit about what is decided, what is open, what is dead, and what has already been ruled out and why. That last category matters most: several of the dead ideas are the obvious first answer to a real problem, and without a record they get reinvented within weeks.
 
-**Confidence, stated so that readers know which parts are load-bearing.** §§1 to 4, 7, 9, 10 and 13 are constraints and hold regardless of what gets built. §5 and §6 are the current best reasoning about a factory that does not exist yet: they are provisional, and the first playable session should be expected to revise them. Where any section makes a claim about how the game will play, it should eventually be replaced by a claim file with a measured value. Until then it is a hypothesis with a paragraph of argument behind it, and it should not be defended as though it were a measurement.
+**Confidence, stated so that readers know which parts are load-bearing.** §§1 to 4, 7, 9, 10 and 14 are constraints and hold regardless of what gets built. §5, §6, and §12 are the current best reasoning about a factory and a moment-to-moment loop that do not exist yet: they are provisional, and the first playable session should be expected to revise them. Where any section makes a claim about how the game will play, it should eventually be replaced by a claim file with a measured value. Until then it is a hypothesis with a paragraph of argument behind it, and it should not be defended as though it were a measurement.
 
 ---
 
@@ -64,6 +64,8 @@ An independent source-derived analysis in the prior repository reached the same 
 **That diagnosis was right, and the fix that followed it was wrong by one word: the old game did not fail because it was persistent, it failed because its products were terminal.** The run-based structure supplied the missing demand, but it did so by deleting the factory every few minutes rather than by giving the factory somewhere to send its output. That is a fix that happens to work, not the actual cause treated.
 
 **The rig is the consumer.** It sits at the top, wants specific material in specific quantity, and answers "then what?" the way Factorio's science packs do — a demand that always wants more, and wants new kinds as the player goes deeper. Nothing has to be lost to make that demand real; it has to be satisfied.
+
+That answers the demand side. It does not, by itself, answer what pulls play in the minutes between demands being satisfied — see §12.
 
 ---
 
@@ -186,7 +188,7 @@ Decided. Treat as requirements.
 
 Do not architect around a specific answer. Each must be expressible as configuration or data. If switching would require touching logic, that is a design leak and should be reported.
 
-**Whether lateral variety survives losing re-rolled geology.** §1 claims "the terrain is the factory" independent of runs, and that claim is true — but part of what made it a *differentiator* was that procedural geology used to reshuffle on every run. One persistent shaft rolls its geology once. Lateral variety now has to come from the un-mined extent of the one world — new material kinds forcing search sideways as much as down — rather than from re-rolled terrain. Whether that sustains interest the way the old differentiator did is unverified. This is the largest open question the reversal itself introduces, and it should be treated as one rather than assumed away.
+**Whether lateral variety survives losing re-rolled geology.** §1 claims "the terrain is the factory" independent of runs, and that claim is true — but part of what made it a *differentiator* was that procedural geology used to reshuffle on every run. One persistent shaft rolls its geology once. Lateral variety now has to come from the un-mined extent of the one world — new material kinds forcing search sideways as much as down — rather than from re-rolled terrain. Whether that sustains interest the way the old differentiator did is unverified. This is the largest open question the reversal itself introduces, and it should be treated as one rather than assumed away. §12's Reveal layer is the first concrete, testable proposal against this question — not a resolution, a hypothesis with a cheap test attached; see `claims/C004-reveal-raises-dig-persistence.md`.
 
 **Surface rig form.** A vertical factory built upward, mirroring the shaft, versus a small fixed deck with slots. The upward version is more distinctive, gives the game a silhouette (a growing tower above, a growing scar below), and uses the same puzzle language as the shaft with inverted economics: on the rig you have power, so up is cheap. It is also a second layout system, and its machine set must stay small, perhaps six.
 
@@ -242,7 +244,7 @@ This is the product. Everything else serves it.
 
 **That moment, discovering that a hole is a conveyor belt, is the single most important thing this design can produce.** It cannot happen if routing is a purchasable machine. Free excavated routing is therefore not a convenience, it is the core. Never place a tutorial prompt near it.
 
-The first logistics failure follows immediately and is self-inflicted: fuel and ore down the same hole, jamming the intake. Visible in the world as a physical pile, with an obvious fix.
+The first logistics failure follows immediately and is self-inflicted: fuel and ore down the same hole, jamming the intake. Visible in the world as a physical pile, with an obvious fix. (This is the Flow want-layer's first description, before it had that name — see §12.)
 
 **Rules that fall out of this:**
 
@@ -287,7 +289,23 @@ Three layers authored well beats seven gestured at.
 
 ---
 
-## 12. Automation progression
+## 12. The micro-loop: three want-layers underneath the macro-goal
+
+**Finding, 2026-08-28: the design had a macro-loop and no micro-loop underneath it, and that gap — not anything in §§1-7 — is why an otherwise-correct rig-as-consumer structure would still not have been fun to play.** "Feed the rig" fires as a transaction: minutes apart, satisfying only at the moment of delivery. Between deliveries nothing pulls the player toward any particular next action over another, because nothing renews on a shorter cadence than the macro-goal itself. This does not revise §§1-7 — the rig is still the consumer, R1-R4 still hold — it names what those rules leave silent: a want, unlike a transaction, resolves and regenerates on its own cadence, independent of how far off the next delivery is, so there is always a small live question in front of the player. The macro-goal's job shrinks to giving those small wants a direction; it does not have to generate the wanting itself, any more than the ender dragon generates Minecraft's minute-to-minute pull. §3 diagnosed the previous design's actual defect correctly (terminal products, not persistence) and the rig-as-consumer fix was right as far as it went; this is the same kind of one-step-further correction, not a reversal.
+
+**Pull-cadence reference points, not new parent genres.** §2 fixes two parent genres, factory and idle, for what this game takes and refuses mechanically. Minecraft and Factorio are cited below only for their pull CADENCE — how often a small want resolves and re-forms — not as a third genre to synthesize from. Compare: Minecraft's want ("what's in that cave / one more iron / night is coming") renews every 30-90 seconds on exploration, crafting, and threat. Factorio's ("that line's backed up / if I just fix this ratio") renews on watching an imperfect system. Sinkforge's, as designed through §7, renews only on "haul enough to satisfy the rig" — minutes apart, with a dead stretch between. §2's two-parent-genre decision is unchanged; this section is about tempo, not taxonomy.
+
+**Three want-layers, stated with the confidence each currently deserves — hypotheses, like §5 and §6, not measurements:**
+
+- **Reveal** ("what's behind this wall") — **cheapest, and the one under test now.** Procedural geology means every dig can expose something. This is §8's own largest open question ("whether lateral variety survives losing re-rolled geology... new material kinds forcing search sideways as much as down") given a concrete, testable form for the first time — see `claims/C004-reveal-raises-dig-persistence.md`. The terrain generator and debug renderer already exist; this needs content variety in generation and a reason to keep digging into the unknown, not a new system.
+- **Flow** ("that's jammed, fix it") — **reframes, rather than solves, the throughput-survives-deletion question §6 leaves open.** §10 already describes this layer's first instance without naming it: "fuel and ore down the same hole, jamming the intake... Starved, jammed, and running are three distinct animations. Starved is the most important animation in the game." If gravity-routing can jam and back up, the satisfaction is in fixing the jam NOW, not in the factory surviving to the end of anything — so a persistent shaft's lack of a reset costs this layer nothing it depended on. Unbuilt: no routing-contention model exists yet beyond one hole into one intake.
+- **Pressure** ("push deeper, or shore up") — **open, and the one most likely to be built wrong by default.** Water as a live threat, R3's mechanism, makes each stretch a small push-or-consolidate decision — Minecraft's nightfall, structurally. It only works with RHYTHM: arrives, gets dealt with, recedes, grants a calm stretch. Constant undifferentiated pressure is not tension, it is nagging, and it drowns the other two layers' claim on the player's attention. Whether water pulses or grinds is genuinely undecided — do not resolve it by building the grind version because it is simpler to implement. Unbuilt, and not scoped by this section.
+
+**Why Reveal goes first and alone.** It is the one layer testable with what already exists — the terrain generator, `SplitRng`-seeded and deterministic, and the debug renderer — with no dependency on Flow or Pressure existing first. If digging-to-discover does not pull even with programmer-art placeholders, that is learned before a single demand is authored against the assumption that it does. Flow and Pressure stay hypotheses, named and confidence-marked, until it is their turn.
+
+---
+
+## 13. Automation progression
 
 ```
 hands
@@ -313,7 +331,7 @@ Electricity does not appear for hours, and possibly never.
 
 ---
 
-## 13. What must remain true regardless
+## 14. What must remain true regardless
 
 - Embodied movement through the world.
 - Vertical descent as the main structural progression.

@@ -3938,3 +3938,62 @@ new, accurate prose in the same file.
 
 Reverse: revert the four instrument-file restructures and `is_test_func`; `git checkout` the affected
 files to their pre-D0106 state.
+
+## D0107 · 2026-08-28 · the micro-loop finding lands in `docs/GDD.md` §12, inserted not renumbered-around
+
+Director-authored design finding: the rig-as-consumer macro-loop has no micro-loop underneath it, and a
+game whose only pull is a transaction minutes apart would not have been fun even with the structure
+correct. Full reasoning is the director's own brief (this session's chat transcript, not a tracked
+file); this entry covers only the doc-placement and scope judgment calls made landing it.
+
+**Where the new section goes, and why not renumbered from the top.** Checked before deciding, not
+assumed: `git grep -n "GDD.md.*§\|GDD §"` across the whole repo shows §§1-11 cross-referenced from
+`CONTEXT.md`, `ONBOARDING.md`, `docs/ARCHITECTURE.md`, `docs/CLAIMS.md`, `docs/DECISIONS_LEDGER.md`,
+`docs/QUALITY.md`, `sim/*/MODULE.md`, `sim/terrain_gen/shaft_generator.gd`, `sim/world/tile_grid.gd`, and
+`claims/*.md` — dozens of hits. §§12-13 (old numbering) have zero external references, confirmed by the
+same grep. New content becomes §12 ("The micro-loop: three want-layers underneath the macro-goal"); old
+§12 ("Automation progression") becomes §13; old §13 ("What must remain true regardless") becomes §14.
+This is the only renumbering scheme that touches zero cross-references outside `GDD.md` itself — a
+full top-down renumber would have required auditing and fixing every one of those external citations
+under a one-hour budget, real risk of missing one silently (`GDD.md`'s own confidence-header sentence,
+listing which sections are load-bearing by number, was updated in the same commit precisely because it
+is exactly this kind of internal cross-reference that's easy to miss).
+
+Reverse: cheap. Move the new section's text, restore old numbering, revert the four pointer-sentence
+insertions at §3/§8/§10 and the confidence-header edit.
+
+## D0108 · 2026-08-28 · Reveal-layer claim (C004) filed as `balance`, with an explicitly stated proxy
+
+`docs/CLAIMS.md` §5 requires a stated proxy for any claim that gestures at engagement, decomposed into
+`structural`, `balance`, or `legibility` — there is no `engagement` kind. "Does discovering a feature
+raise subsequent dig activity" fits none of the four kinds' definitions precisely (it isn't reachability,
+movement feel, or screen-legibility). Filed as `balance` — closest of the three sanctioned decomposition
+targets, in the same family as strategy-diversity/throughput questions that are also behavioral patterns
+read from play rather than fixed-geometry telemetry — with the claim file's own Metric section stating
+the proxy explicitly per §5's requirement, rather than leaving the kind selection unexplained.
+
+Alternative considered: `feel`. Rejected — `docs/CLAIMS.md` §5 defines `feel` specifically as "movement
+quality, latency, stall, agility... measured from raw-input telemetry against fixed geometry." Dig
+persistence is a behavioral-continuation pattern, not a movement-quality measurement, and the geometry
+here is generated (swept by density), not fixed — a real mismatch with `feel`'s stated scope, not just a
+close call.
+
+Reverse: cheap, edit the claim file's front matter.
+
+## D0109 · 2026-08-28 · the reveal metric measures dig-event timing only, never feature location — director's correction, implemented
+
+The director rejected the brief's original operationalization ("bias toward unrevealed features") after
+my own read flagged it as circular (`docs/EXPERIENCE_EVALUATION.md` Readiness Gate 6: an actor whose
+policy can see unrevealed-feature location is `INVALID` by that gate's own definition), and replaced it
+with dig-events-per-session plus the change in dig rate in a window before versus after a reveal.
+Implemented exactly as specified, with one parameter decided that the director's message left open: the
+window width. **300 ticks (5 seconds at the fixed 60Hz tick rate) before and after each qualifying
+reveal event, non-overlapping (a reveal within 5s of session start/end is excluded from the pooled
+average, not padded with a partial window).** Chosen as a plausible "immediate reaction to a discovery"
+timescale and stated here explicitly as a judgment call rather than left as an unexplained magic number
+in code — if the first real measurement shows the window is clearly too short or too long relative to
+how sessions actually play out, that is exactly the kind of finding this cheap first test exists to
+surface, and the number should move with a recorded reason, same as any other threshold in this project.
+
+Reverse: cheap — one constant, `tests/reveal_metric.gd`'s `WINDOW_TICKS` (or wherever it lands once
+written).

@@ -15,6 +15,7 @@ Three things follow that are easy to miss and expensive to get wrong:
 - **The terrain is the factory.** The shape you dig is the routing, independent of whether the shaft resets — an aquifer where you wanted your main chute, ore forty meters further than the last vein. What no longer holds: geology used to reshuffle every run and no longer does, since there is one shaft now. Lateral variety instead has to come from the un-mined extent of that one world; whether that's enough is an open question (`docs/GDD.md` §8).
 - **No global multipliers. Ever.** Factory games are ratio puzzles; idle games are number puzzles. Every upgrade is a new capability or a changed constraint, never a rate multiplied. See `docs/GDD.md` §2 and §5.
 - **Down is free, up is powered.** The central asymmetry. R1 below.
+- **The rig-as-consumer macro-loop needs a micro-loop underneath it.** Feeding the rig is a transaction, minutes apart; nothing was renewing interest between deliveries. Three want-layers (Reveal, Flow, Pressure) are the proposed fix — Reveal is the first one under test. `docs/GDD.md` §12.
 
 It is also, and equally, a **measurement instrument for game design**. The game is playable end to end with no renderer, so that automated agents can play it thousands of times and produce falsifiable evidence about whether the design works. Both halves are the product. Neither is a wrapper around the other.
 
