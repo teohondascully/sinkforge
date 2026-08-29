@@ -13,6 +13,17 @@ the acceptance-suite stage — moved verbatim to `docs/archive/working/WORKING-2
 detail behind anything below; nothing was deleted, only relocated, per this file's own header requiring
 it stay under 150 lines.
 
+## IN PROGRESS — 5-hour autonomous queue #2, director still away, 2026-08-29
+
+Director's two rulings from queue #1's report applied first (Part 0), then a self-audit of queues #1/#2's
+own repair work (Part F — "does this fix verify a population or fire on a constructed case"), then Phase
+2 items (Part G: gate 8 tests the real sim, additive-only, reading state never altering resolve logic;
+Part H: diagnosis-only `.py` size-gate report, not extended; Part I: drift cleanup + a generated
+`docs/CORRECTIONS.md`). **Nothing certified closed — Codex verifies both queues' whole batch on the
+director's return.** Hard stops unchanged: collision logic/`resolve_floor`/`grid_floor_backstop`/fuzz
+population, `data/economy/`, any resolve-logic change in G1, extending the size gate in H1, any design
+decision, 5 hours/30 commits.
+
 ## CLOSED (pending Codex re-verify) — 5-hour autonomous queue, director away, 2026-08-29
 
 All of Parts A-E landed, 14 commits, well inside the 5-hour/30-commit budget. **Codex verifies the whole
