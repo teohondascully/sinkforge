@@ -13,15 +13,43 @@ own CLOSED sections — moved verbatim to `docs/archive/working/WORKING-2026-08-
 behind anything below; nothing was deleted, only relocated, per this file's own header requiring it stay
 under 150 lines.
 
-## IN PROGRESS — 5-hour autonomous queue #3, director still away, 2026-08-29
+## CLOSED (pending Codex re-verify) — 5-hour autonomous queue #3, director still away, 2026-08-29
 
-Corrects the ValueNoise crack to honest documented state (Part J — NOT the fix, that's a director-scoped
-design cycle), prepares the human `--play` capture path so the moment the director sits at the keyboard
-it records cleanly (Part K), finishes `docs/CORRECTIONS.md`'s own origin-chain completeness (Part L),
-and closes the size-gate ruling plus remaining audit drift (Part M). **Nothing certified closed — Codex
-verifies all three queues on the director's return.** Hard stops: collision/`resolve_floor`/
-`grid_floor_backstop`/fuzz population, `data/economy/`, the `ValueNoise` float→Fx fix itself (design
-cycle, out of scope), faking/forcing a human session, any design decision, 5 hours/30 commits.
+Parts J/K/L/M all landed, 8 commits, well inside the 5-hour/30-commit budget. **Nothing certified closed —
+Codex verifies all three queues (this one plus both from #2) on the director's return.** Evidence in
+`docs/DECISIONS_LEDGER.md` D0171-D0177; each item its own commit.
+
+- **Part J** (D0171/D0172) — swept ~19 files' determinism/fixed-point claims; 5 real overclaims corrected
+  to honest state (`ARCHITECTURE.md`, `README.md`, `claims/C003`, `sim/terrain_gen/MODULE.md`, `CONTEXT.md`
+  ×2), citing one canonical crack entry (D0171: `ValueNoise`'s float math isn't cross-platform bit-
+  identical, proven within-platform only) and a director-scoping fix diagnosis (D0172) — the fix itself
+  stays out of scope, per the queue's own hard stop.
+- **Part K** (D0173) — the D0140 two-dialect gap in `RevealReplayDriver.parse_log` (arity-only validation,
+  latent but real) fixed: now validates the column-header line by name. Mutation-tested twice — including
+  recovering cleanly from an accidental overwrite of the real tracked file mid-mutation-test, caught by a
+  system reminder, restored and re-verified. Capture path proven end-to-end against a real, committed
+  `reveal_scene.gd` run (`tests/body/recordings/reveal_agent_2026-08-29T21-34-03.log`), not synthesized —
+  `claims/C004` still correctly BLOCKED, only the pipeline underneath it is now proven.
+- **Part L** (D0174/D0175) — re-verified `docs/CORRECTIONS.md`'s origin-tracing: re-ran D0170's own grep
+  (18 candidates, unchanged), checked every chain against the doc's own origin rule, found no gap (a null
+  result, reported). Then gave it a `--check` freshness gate (`tools/check_corrections_freshness.py`,
+  QUALITY gate 30) — a coverage check, not full regeneration (the prose itself needs judgment, per
+  D0170). Dogfooding the gate found and fixed a real bug in it (its own filename false-positived against
+  its keyword pattern) plus a real citation gap (the page never named D0170, its own generating entry).
+- **Part M** (D0176/D0177) — M1: `QUALITY.md` gate 3 now documents `.py` size isn't gated, applying
+  D0161's own standing ruling, no code widened. M2: re-swept the cold-read audit's measured-FALSE table —
+  8 real drifts fixed (`tools/README.md`, `QUALITY.md` §6's root-file list, `CONTEXT.md`'s line-count
+  claim, `project.godot`'s stale pre-pivot description, `tests/README.md` + its 4 subdirectory READMEs'
+  fictional structure, `docs/BRANCHING.md` finally given a status header and a `docs/README.md` row, and
+  a stale `_resolve_floor` location citation in `ARCHITECTURE.md`/`sim/invariants/MODULE.md` — corrected
+  with a pointer note, not a retype, since the ADR it summarizes is historical and stays untouched); 3
+  design contradictions (GDD currency model, fuel model, iron placement) flagged for the director, not
+  resolved; the rest already moot (`.anvil/` gone, 9 of 10 orphaned legacy docs gone, several claims
+  already fixed by earlier queues).
+
+**Verified on real CI, not assumed:** `godot test suites` job green on every commit this queue pushed;
+the only red is `check_loc_ratio.py`'s velocity gate — expected, same reason as queue #2 (a docs/tooling-
+heavy queue under a hard stop forbidding `data/economy/` work). `main` still unprotected, unchanged.
 
 ## CLOSED (pending Codex re-verify) — 5-hour autonomous queue #2, director away, 2026-08-29
 
