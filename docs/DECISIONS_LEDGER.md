@@ -4636,3 +4636,105 @@ inflated by this particular gap. Whatever explains them (very likely the same ja
 D0123 found, unconfirmed) is a `sim/body`-adjacent question independent of this fix, not resolved by it.
 
 Reverse: cheap. One `if` block; delete it to reopen D0122's original oracle gap.
+
+## D0125 · 2026-08-28 · `_handle_dig` fixed to a per-column high/low-water mark, per the director's ruling — `discontinuity` back to 0, `embedded`/`grounded_no_floor` both moved substantially
+
+Director's ruling (full reasoning in D0123's own entry and this session's transcript, summarized here for
+the record): of three candidate fixes — whole-column dig, refuse-if-would-strand, fragment cleanup — none
+chosen. Whole-column dig destroys "hole-as-conveyor," the core mechanic; refuse-if-would-strand is an
+invisible rule the player can't see the reason for; fragment cleanup is the resolver-patch instinct moved
+one layer over, reacting to illegal geometry instead of making it unformable. **Per-column high/low-water
+mark** chosen instead: digging a column opens everything between the highest and lowest row ever dug there,
+so a gap strictly WITHIN one column is structurally impossible. Adjacent-column disagreement (a staircase
+BETWEEN columns) stays legal — that's ordinary contiguous geometry `_resolve_horizontal` already handles;
+only the within-column gap was the illegal shape. Explicit instruction: do not touch `_resolve_horizontal`
+— it was correct for the geometry it was designed against; the defect was the illegal input, not the
+resolver.
+
+**The fix.** `TileGrid` (`sim/world/tile_grid.gd`) gains `_dig_extent: Dictionary` (`col: int ->
+Vector2i(min_row, max_row)`) and `extend_dig_extent(col, touch_top, touch_bottom) -> Vector2i`, which
+merges a touch into the column's own historical extent and returns the merged range. State lives in
+`TileGrid`, not on `Body` or a side table, because a shaft's grid is exactly what determinism already
+replays — a side table elsewhere would be new, unreplayed state. `state_signature()` now includes
+`_dig_extent`, sorted by column: dig history is real state affecting future gameplay and isn't derivable
+from `_blocks` alone, so a signature omitting it could match on blocks while silently diverging on dig
+history (the "instrument cannot register its subject" class this project keeps finding).
+`Body._handle_dig` (`sim/body/body.gd`) now excavates `extend_dig_extent`'s returned merged range instead
+of just its own current touch — the only change to the mechanic; `_resolve_horizontal` untouched, per the
+ruling.
+
+**Verification before trusting it.** New unit tests in `tests/test_tile_grid.gd` (first-touch identity,
+gap-closing merge in both touch orders, overlap, per-column isolation, signature sensitivity) and a new
+integration test in `tests/test_body.gd`
+(`_test_dig_gap_between_two_touches_in_the_same_column_is_closed`, two direct `_handle_dig` calls at
+different `pos_y` in the same column, asserting the full span between them is cleared). Mutation-tested
+twice: inverting `extend_dig_extent`'s `mini`/`maxi` merge — caught, 4 of 10 new checks failed, all and
+only the merge-behavior ones; reverting `_handle_dig` to excavate only its own touch range instead of the
+merged extent — caught by the new integration test (`40 still solid`) and, separately, by the new
+regression fixture below (`discontinuity=3`, matching D0124's own count exactly). Re-ran
+`test_shaft_generator.gd` and `test_replay_determinism.gd` after the `state_signature()` change: both
+green, no regression (200/200 checkpoint hashes identical across two runs from the same seed).
+
+**Acceptance gate: full 1000×1500 sweep, everything else held identical to D0124's own re-run:**
+
+| violation kind | pre-dig baseline | after dig + oracle fix (D0124) | after water-mark fix (this run) |
+|---|---|---|---|
+| `discontinuity` | 0 | 3 | **0** |
+| `embedded` | 1 | 187 | **0** |
+| `grounded_no_floor` | 32 | 95 | **59** |
+| `bounds` (reported, not gated) | 18,218 | 722,655 | **805,397** |
+
+`discontinuity` is back to 0 — the acceptance gate. `embedded` and `grounded_no_floor` both moved
+substantially (187→0, 95→59), confirming the director's hypothesis that the same staircase geometry was
+at least a large part of their root cause too, not a second, distinct bug — per the explicit instruction
+not to declare victory on `discontinuity` alone.
+
+**Two things that didn't fully resolve, reported rather than smoothed over, per the director's own ask
+for "anything that felt wrong even though it passed":**
+- `grounded_no_floor` (59) is still above the pre-dig D0061 `DESIGN_TRADEOFF` bound (32) — real, ~2x the
+  old baseline, unexplained. Left untouched: the D0061 bound in `test_body_fuzz.gd` was NOT edited this
+  cycle (bumping an acceptance threshold without root-causing the residual would repeat exactly the
+  resolver-patch instinct the ruling rejected for `_handle_dig`), so `test_body_fuzz.gd` (nightly-only,
+  not a per-commit gate) will currently report this as a fresh violation of the old bound. Flagged for the
+  director rather than resolved here — whether the right move is a new, honestly-measured bound, or a
+  further trace, is a call outside the scope of this cycle's ruling.
+- `bounds` rose from 722,655 to 805,397 — an 11% increase with no fix in this cycle that should plausibly
+  touch it (bounds tracks the body's box leaving the grid entirely, unrelated to dig's own column extent).
+  Reported, not gated (as it already wasn't), and not traced this cycle.
+
+Reverse: moderate. Revert `_handle_dig` to excavate `[touch_top, touch_bottom]` directly (the mutation
+tested above) and drop the `_dig_extent` field/method from `TileGrid`; reopens the D0122/D0123 staircase.
+
+## D0126 · 2026-08-28 · the first nightly-escape-to-per-commit regression fixture, `test_body_fuzz_regression_d0122.gd`, per the agreed mechanism
+
+The process decision from D0122's own report: when a nightly sweep finds a violation class the per-commit
+sweep structurally cannot reach, the minimal reproducing case becomes a permanent per-commit fixture —
+targeted growth, not a uniform widening of `test_body_fuzz_fast.gd`'s own 100-seed/500-tick window (cost:
+the full sweep's own ~114s, defeating the fast suite's purpose).
+
+**Why seeds 0-497, not seed=497 alone.** `fixture_body_fuzz_probe.gd` builds ONE `TileGrid`, outside the
+seed loop, dig-accumulating across every seed run in sequence — a fresh-grid replay of seed=497 alone was
+tried while diagnosing D0123 and reproduced nothing; only replaying all 498 seed-runs (0-497) on the same
+shared grid, matching the real fuzzer's own accumulation structure, reproduced the violation. That was the
+load-bearing detail of the whole D0123 diagnosis, so the regression fixture replays the identical prefix
+via `fixture_body_fuzz_probe.gd --seeds=498 --ticks=1500` rather than a hand-constructed minimal case,
+which risks losing exactly the subtlety a synthetic case simplifies away.
+
+**Scope: `discontinuity` only, not the full allowlist.** `test_body_fuzz.gd`'s own D0060/D0061 bounds on
+`embedded`/`grounded_no_floor` are about a different, already-characterized residual at the FULL 1000-seed
+scale; asserting them here at a 498-seed prefix would just be a second, smaller copy of that gate, not a
+regression test for what D0122 actually found. `discontinuity` is asserted hard zero, matching this
+project's own "zero tolerance ... no known, accepted exception" framing for that specific violation kind.
+
+**Cost, measured directly:** ~53s (498 seeds × 1500 ticks vs. the full sweep's own 1000 × 1500 in ~114s,
+roughly linear). Added to the per-commit `tests` job in `.github/workflows/harness.yml`, `docs/QUALITY.md`
+gate 29.
+
+**Verified against both sides.** Passes clean against the D0125 fix (`discontinuity=0` across the 498-seed
+prefix, 747,000 ticks). Mutation-tested against the pre-fix behavior (reverting `_handle_dig` to
+touch-only excavation): fails with `discontinuity=3`, matching D0124's own full-sweep count for this exact
+prefix exactly — confirms this fixture would have caught D0122 on the commit that introduced it, not just
+in aggregate at nightly scale.
+
+Reverse: cheap. Delete the file and its two CI/doc references; the nightly job alone still exists as a
+(slower) safety net.

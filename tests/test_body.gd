@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_test_dig_clears_the_whole_body_height_column()
 	_test_dig_reports_glimmer_over_other_material_in_the_same_column()
 	_test_dig_out_of_bounds_is_not_an_event()
+	_test_dig_gap_between_two_touches_in_the_same_column_is_closed()
 	_finish("body")
 
 
@@ -365,3 +366,33 @@ func _test_dig_reports_glimmer_over_other_material_in_the_same_column() -> void:
 	_check(body.dug_material_this_tick == &"glimmer",
 		"a column with glimmer anywhere in it reports glimmer, not whichever row happened to be checked first (got %s)" %
 		body.dug_material_this_tick)
+
+
+## D0122/D0123/D0125 end-to-end: two digs to the SAME column at different vertical body positions, never
+## occupying the rows between during a dig -- D0123's own reproducing mechanism for the staircase.
+func _test_dig_gap_between_two_touches_in_the_same_column_is_closed() -> void:
+	var grid: TileGrid = TileGrid.new(20, 100, 1)
+	var spawn_col: int = 10
+	var body: Body = Body.new(spawn_col * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
+	var half_width_cells: int = Body.WIDTH_PX / CELL / 2
+	var target_col: int = spawn_col + half_width_cells
+	for row: int in range(0, 100):
+		grid.set_material(Vector2i(target_col, row), &"hardrock")
+	body.pos_y = Fx.from_int(10 * CELL)
+	body._handle_dig(grid)
+	_check(body.dig_event_this_tick, "sanity: first touch fires a dig event")
+	var first_top: int = Body._px_to_cell(body._top_y())
+	var first_bottom: int = Body._px_to_cell(body._bottom_y() - 1)
+	body.pos_y = Fx.from_int(60 * CELL)
+	body._handle_dig(grid)
+	_check(body.dig_event_this_tick, "sanity: second touch fires a dig event")
+	var second_top: int = Body._px_to_cell(body._top_y())
+	var second_bottom: int = Body._px_to_cell(body._bottom_y() - 1)
+	_check(first_bottom < second_top - 1,
+		"sanity: touches leave a real gap before the merge is checked (%d, %d)" % [first_bottom, second_top])
+	var gap_violations: int = 0
+	for row: int in range(first_top, second_bottom + 1):
+		if grid.is_solid(Vector2i(target_col, row)):
+			gap_violations += 1
+	_check(gap_violations == 0,
+		"the full span from first touch's top to second touch's bottom is cleared, no fragment left (%d still solid)" % gap_violations)

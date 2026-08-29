@@ -258,6 +258,9 @@ jobs:
       - name: test_body_fuzz_fast (QUALITY gate 26 — goalless input fuzzer, fast per-commit subset)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz_fast.gd
 
+      - name: test_body_fuzz_regression_d0122 (QUALITY gate 29 — D0122's nightly escape, now a per-commit case)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz_regression_d0122.gd
+
       - name: test_reveal_metric (claims/C004's own dig-rate-lift instrument, D0114)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_metric.gd
 

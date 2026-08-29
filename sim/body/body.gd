@@ -170,22 +170,25 @@ func _dig_target_cell() -> Vector2i:
 	return Vector2i(cx, cy)
 
 
-## Excavates the dig target COLUMN across the body's OWN full height, not just its centre row -- a
-## single-row notch cannot be walked through by a body several cells tall, so "the adjacent column" has
-## to mean the whole vertical span the body itself occupies (docs/DECISIONS_LEDGER.md D0113, found only
-## by actually driving a scripted approach into this mechanic and watching it get stuck forever one
-## column short, blocked by the rows above and below the single one it had cleared). A press against a
-## column that's already fully open is not an event; a partially-open column still counts once any new
-## cell clears. `dug_material_this_tick` reports `glimmer` if the column held it anywhere, else the first
-## real material found -- the reveal signal takes priority over which row happened to report first.
+## Excavates the dig target COLUMN across its own FULL HISTORICAL dig extent, not just the body's
+## current height -- a single-row notch cannot be walked through by a body several cells tall
+## (docs/DECISIONS_LEDGER.md D0113), and a column dug at two different body-heights without ever being
+## dug in between leaves a gap the body's own later, differently-positioned footprint can straddle
+## (D0122/D0123's staircase). `TileGrid.extend_dig_extent` (D0125) is the fix: it folds this touch into
+## the column's own historical [min,max] and returns the merged range, so a column is always one
+## contiguous open span from the lowest row ever dug there to the highest -- never re-computed from the
+## body's own current height alone. A press against a column that's already fully open is not an event;
+## a partially-open column still counts once any new cell clears. `dug_material_this_tick` reports
+## `glimmer` if the excavated range held it anywhere, else the first real material found.
 func _handle_dig(grid: TileGrid) -> void:
 	var target: Vector2i = _dig_target_cell()
 	if not grid.in_bounds(target):
 		return
-	var top_row: int = _px_to_cell(_top_y())
-	var bottom_row: int = _px_to_cell(_bottom_y() - 1)
+	var touch_top: int = _px_to_cell(_top_y())
+	var touch_bottom: int = _px_to_cell(_bottom_y() - 1)
+	var extent: Vector2i = grid.extend_dig_extent(target.x, touch_top, touch_bottom)
 	var reported_material: StringName = &""
-	for row: int in range(top_row, bottom_row + 1):
+	for row: int in range(extent.x, extent.y + 1):
 		var cell: Vector2i = Vector2i(target.x, row)
 		if not grid.in_bounds(cell):
 			continue

@@ -71,3 +71,12 @@ None yet.
   in the right-facing target column (D0112) and the single-row-not-full-column gap (D0113) — worth
   reading both entries before touching this mechanic again, since the pattern (a test that derives its
   expected value from the function under test) is easy to repeat by accident.
+- **A third real bug, this one requiring cross-tick replay to reproduce (D0122/D0123)**: dig excavates
+  only the body's CURRENT footprint at the moment of the touch; a later dig at a DIFFERENT vertical offset
+  in the SAME column (without the body ever occupying the rows in between during a dig) left a jagged
+  sub-cell fragment `_resolve_horizontal` was never exercised against — the fuzzer's `discontinuity`
+  violations. Fixed by `_handle_dig` excavating `TileGrid.extend_dig_extent`'s own merged, per-column
+  high/low-water mark (D0125) instead of just its own touch range, so a column is always one contiguous
+  open span from the lowest row ever dug there to the highest. Deliberately does NOT touch
+  `_resolve_horizontal` itself — the resolver was correct for the geometry it was designed against; the
+  defect was the illegal input, not the resolver (`docs/DECISIONS_LEDGER.md` D0125's full reasoning).
