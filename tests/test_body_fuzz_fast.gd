@@ -8,8 +8,10 @@ extends "res://tests/test_base.gd"
 ## Every violation type is asserted HARD zero here, INCLUDING `embedded` and `grounded_no_floor` --
 ## `test_body_fuzz.gd`'s own D0060 allowlist entries are unreachable within this smaller window (measured
 ## directly: 0/0 on this exact seed/tick range, since the known residual's specific occurrences --
-## seed=605 tick=844 for `embedded`; seed>=98 at ticks past 500 for `grounded_no_floor` -- fall outside
-## seeds 0-99 or past tick 500). This is not a looser bound reached by luck: any NEW occurrence inside
+## seed=605 tick=844 for `embedded`; every `grounded_no_floor` occurrence, at ticks past 500 regardless
+## of seed (D0127's own dig-off isolation found seeds as low as 16, correcting an earlier "seed>=98"
+## overclaim here -- the property this suite's window actually depends on, tick > 500, still held) --
+## fall outside seeds 0-99 or past tick 500). This is not a looser bound reached by luck: any NEW occurrence inside
 ## this narrower, more heavily-trodden window (the seeds/ticks every commit actually exercises) is real
 ## regression evidence, not the known residual, so zero tolerance stays correct and MORE valuable here,
 ## not less.

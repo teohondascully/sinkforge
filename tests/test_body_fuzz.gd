@@ -26,17 +26,29 @@ extends "res://tests/test_base.gd"
 ##     geometric overlap itself.
 ##
 ## `DESIGN_TRADEOFF` -- a deliberate choice with a stated cost and a real alternative, not a bug to fix:
-##   - `grounded_no_floor` <= 32: `_grid_floor_backstop` (D0059f) deliberately rests a body on the
-##     TOPMOST solid row anywhere in its footprint when that is the only real ground available (a pit's
-##     own lip), rather than requiring the ENTIRE footprint to be supported before granting `on_floor`.
-##     The alternative (full-footprint support required) was available and is not what shipped -- it
-##     would make this count zero, at the cost of a body standing at ANY narrow ledge edge (not just a
-##     pit) needing to walk fully onto it before resting, and a pit-lip body specifically would just keep
-##     falling instead of resting at all, since nothing else supports it. D0061 has the full reasoning and
-##     the reversal cost. In play: a body standing at a lip with most of its own width still hanging over
-##     open air reads as grounded (can jump, doesn't fall) even though the FULL footprint isn't supported
-##     -- visually similar to the ledge-edge forgiveness coyote time already grants, not a new kind of
-##     wrongness a player would name, but worth stating plainly rather than leaving implicit.
+##   - `grounded_no_floor` <= 59 (raised from 32, D0122/D0127/D0128 -- see below for why this is a
+##     re-baseline, not the patch instinct this project otherwise refuses): `_grid_floor_backstop`
+##     (D0059f) deliberately rests a body on the TOPMOST solid row anywhere in its footprint when that is
+##     the only real ground available (a pit's own lip), rather than requiring the ENTIRE footprint to be
+##     supported before granting `on_floor`. The alternative (full-footprint support required) was
+##     available and is not what shipped -- it would make this count zero, at the cost of a body standing
+##     at ANY narrow ledge edge (not just a pit) needing to walk fully onto it before resting, and a
+##     pit-lip body specifically would just keep falling instead of resting at all, since nothing else
+##     supports it. D0061 has the full reasoning and the reversal cost. In play: a body standing at a lip
+##     with most of its own width still hanging over open air reads as grounded (can jump, doesn't fall)
+##     even though the FULL footprint isn't supported -- visually similar to the ledge-edge forgiveness
+##     coyote time already grants, not a new kind of wrongness a player would name, but worth stating
+##     plainly rather than leaving implicit.
+##   - **Why 59, not still 32, and why this is a re-baseline and not the patch instinct.** The dig
+##     mechanic (landed after D0061 set 32) lets a player carve new holes into previously-flat floor,
+##     which creates MORE locations reaching the exact same D0059f pit-lip condition -- not a new
+##     mechanism, not a varying-height defect, the identical `HostileChamber.FLOOR_ROW` height every
+##     single time, proven by a controlled dig-off A/B (D0127): with dig forced off, the full 1000x1500
+##     sweep returns to EXACTLY 32, the pre-dig number, not close to it. The patch instinct is raising a
+##     bound to hide an UNKNOWN excess; this is not that -- every one of the 59 violations is named and
+##     accounted for (the D0059f mechanism, now reachable at more player-carved locations), so a future
+##     reader does not need to re-derive this from scratch. If `grounded_no_floor` ever exceeds 59, THAT
+##     is a new regression, visible against a correct baseline instead of hidden under a stale one.
 ##
 ## An allowlist with a number attached is honest; a disabled check is not (the director's own words) --
 ## if either count grows on a future run, that is a new, real regression, not a widening of this bound.
@@ -53,7 +65,7 @@ func _initialize() -> void:
 ## is a regression to root-cause; a `DESIGN_TRADEOFF` count moving is a change in how often the traded-off
 ## scenario actually occurs, worth noting but not automatically a defect.
 const RESIDUAL: Dictionary = {"embedded": 1}
-const DESIGN_TRADEOFF: Dictionary = {"grounded_no_floor": 32}
+const DESIGN_TRADEOFF: Dictionary = {"grounded_no_floor": 59}  ## D0122/D0127/D0128: raised from 32
 
 
 func _test_fuzz_finds_no_new_correctness_defects() -> void:
@@ -93,5 +105,5 @@ func _test_fuzz_finds_no_new_correctness_defects() -> void:
 			[kind, counts[kind], RESIDUAL[kind]])
 	for kind: String in DESIGN_TRADEOFF:
 		_check(counts[kind] <= DESIGN_TRADEOFF[kind],
-			"'%s' violations stay within the documented D0061 DESIGN TRADE-OFF bound (got %d, bound %d) -- see this run's own stdout above; a count ABOVE the bound means the traded-off scenario is occurring more than measured, worth a fresh look at whether the trade-off still holds" %
+			"'%s' violations stay within the documented D0061/D0128 DESIGN TRADE-OFF bound (got %d, bound %d) -- see this run's own stdout above; a count ABOVE the bound means the traded-off scenario is occurring more than measured, worth a fresh look at whether the trade-off still holds" %
 			[kind, counts[kind], DESIGN_TRADEOFF[kind]])

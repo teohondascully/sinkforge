@@ -4806,3 +4806,60 @@ cost of correctly excavating a column's full extent.
 
 Reverse: cheap. `--no-dig` is inert by default (`DIG_DISABLED = false`); delete the flag and its
 docstring to fully revert, no behavior change to any existing suite.
+
+## D0128 · 2026-08-29 · D0122 CLOSED — root-caused, fixed at the input, regression fixture landed, both residuals correctly re-baselined, neither hidden
+
+D0122 opened as a FINDING (nightly-only, confirmed by A/B) five entries ago. This entry closes it: every
+open thread from that finding now has a stated, verified resolution, not a partial fix left to linger.
+
+**Root cause (D0123):** dig is the tick's own last step, never mid-tick relative to the tick that placed
+it; the real interaction is cross-tick -- a dig excavating only the body's current footprint at the
+moment of the touch, later straddled by the same body revisiting the same column at a different vertical
+offset, leaves a jagged sub-cell fragment `_resolve_horizontal` was never exercised against.
+
+**Fixed at the input, not the resolver (D0125):** `TileGrid.extend_terrain_dig_extent` tracks each
+column's own historical high/low-water mark; `Body._handle_dig` excavates the merged range, making a
+within-column gap structurally impossible. `_resolve_horizontal` untouched throughout, per the director's
+own explicit ruling that the resolver was correct for the geometry it was designed against -- the defect
+was the illegal input digging could produce, not the resolver's handling of legal geometry.
+
+**Acceptance gate met, full 1000x1500 sweep:** `discontinuity` 3->0. `embedded` 187->0 (below even the
+pre-dig baseline of 1). `grounded_no_floor` 95->59.
+
+**Regression fixture landed (D0126):** `tests/test_body_fuzz_regression_d0122.gd`, QUALITY gate 29, in
+the per-commit suite -- the specific hole that let dig ship broken for a full session before the nightly
+sweep caught it is closed; this exact class cannot recur silently again.
+
+**Both residuals diagnosed (D0127) and correctly resolved, neither patched over and neither left
+hanging:**
+- `grounded_no_floor`'s 59 (vs. the pre-dig 32) is the SAME `_grid_floor_backstop`/D0059f pit-lip
+  trade-off, proven by a controlled dig-off A/B to return to exactly 32 with dig disabled, and by every
+  one of 91 violations across both conditions resting at the identical height
+  (`HostileChamber.FLOOR_ROW`) -- dig creates more player-carved locations reaching the same accepted
+  condition, not a new defect. Director's ruling: raise the bound to 59, WITH the cause documented in the
+  same commit (this entry, plus `test_body_fuzz.gd`'s own updated docstring) -- explicitly not the patch
+  instinct, because every admitted violation is now named, not hidden behind an unexplained widening. If
+  `grounded_no_floor` ever exceeds 59, that is visible as a real regression against a correct baseline.
+- `bounds` (reported, not gated) rose from the pre-dig 18,218 to 805,397 -- confirmed dig-attributable by
+  the same dig-off A/B (returns to ~18,157 with dig disabled), with this session's own water-mark fix
+  itself contributing a further +82,742 (+11.4%) on top of dig's own baseline increase. Director's
+  ruling: accept as a real, attributed consequence of intentionally excavating a column's full historical
+  extent per dig (removes more supporting ground near the map's own edges) -- proving the exact causal
+  step gates nothing and changes no decision, since `bounds` is reported-not-gated. Noted here as the
+  place a future investigation starts if `bounds` ever moves again WITHOUT a corresponding dig-mechanic
+  change -- that would no longer be explained by this entry.
+
+**What was NOT touched, and why that is itself part of the closure:** `_resolve_horizontal`,
+`grounded_implies_solid_beneath`. Both were explicit hard stops across this whole arc -- the collision
+resolver was never the defect, and the grounded-floor predicate was never wrong; only the DEMAND on both
+changed (dig creating more of an already-legal or already-accepted shape), and demand growth is answered
+by understanding and re-baselining, not by changing the code that was already correct for what it does.
+
+D0122-D0128, seven entries, one arc: found, diagnosed, ruled, fixed, gated permanently, and the two
+honest residuals resolved on their own terms rather than smoothed into either "still broken" or "silently
+loosened." Nothing about this arc remains open.
+
+Reverse: the whole arc reverses by reverting D0125's `_handle_dig` change and D0126's fixture; D0128's own
+change (the bound raise + docstrings) reverses independently by restoring `grounded_no_floor: 32` and
+would immediately go red against the live tree, which is the point -- the bound's correctness is now
+falsifiable, not assumed.
