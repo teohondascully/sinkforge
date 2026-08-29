@@ -5964,3 +5964,98 @@ fast.gd` (which reads these same constants as its own shared source of truth) re
 
 **Reverse cost:** revert `tests/test_body_fuzz.gd`. Purely descriptive; nothing depends on this comment's
 own wording being any particular way.
+
+## D0153 · tools/economy_check/ parked — removed from the tree, no subject yet (E1, queue Part E) · 2026-08-29
+
+**Decided:** `tools/economy_check/check_tier_rule.py` validates a `data/economy/` demand chain that does not
+exist anywhere in this repository — confirmed directly (`ls data/` shows `machines/ materials/ progression/
+recipes/ strata/`, no `economy/`), not assumed. Removed from the tree entirely: `check_tier_rule.py`,
+`schema.py`, `test_check_tier_rule.py`, `README.md`. **Not deleted — git preserves it in full at
+`4ec12bb0d642e88abc88a521e64ef2707c975125` (the commit immediately before this one)**: `git checkout
+4ec12bb -- tools/economy_check/` restores it exactly. Revisit when `data/economy/` is built (the
+director's own reserved work, per `docs/WORKING.md`'s repeated "`data/economy/`, D1-D6 — unchanged, yours").
+
+**Verified no dangling reference before removing:** `git grep` for `economy_check` outside its own directory
+found only comment/docstring citations in `tools/quality_check/{coupling,duplication,test_quality_check}.py`
+(explaining a filename-collision test fixture, synthetically reproduced, not a real read of this
+directory) — none functional, none broken by removal. No `harness.yml` step references it.
+
+**Effect on the instrument/game LOC ratio (verified, not assumed):** contributed to a real drop —
+`check_loc_ratio.py` now shows the trailing-10-commit velocity as **-1424** instrument lines (was +824
+before this round's Part E), the gate now genuinely PASSes rather than the honestly-red state D0144 armed
+it into.
+
+**Reverse cost:** `git checkout 4ec12bb0d642e88abc88a521e64ef2707c975125 -- tools/economy_check/`.
+
+## D0154 · tools/anvil/ + .anvil/ parked — removed from the tree, no subject yet (E1, queue Part E) · 2026-08-29
+
+**Decided:** the Anvil append-only event log (`tools/anvil/append.py`/`check_integrity.py`/`schema.py`,
+`.anvil/log/` — 16 FINDING/DECISION/MEASUREMENT events accumulated across this session and prior ones) has
+no automated consumer and no CI wiring — confirmed by `grep -i anvil .github/workflows/harness.yml`
+returning nothing. Events are filed by hand (`python3 tools/anvil/append.py ...`) and read by hand (a human
+or session grepping `.anvil/log/`); nothing in the tree currently reads or gates on them programmatically.
+Removed entirely: `tools/anvil/{append,check_integrity,schema,test_check_integrity}.py`,
+`.anvil/README.md`, and all 16 event files under `.anvil/log/`. **Not deleted — git preserves every event
+in full at `4ec12bb0d642e88abc88a521e64ef2707c975125`**; `git checkout 4ec12bb -- tools/anvil .anvil`
+restores the entire log exactly, event-for-event.
+
+**The one real cost, stated plainly rather than hidden:** `docs/DECISIONS_LEDGER.md` cites specific
+`.anvil/log/*.json` paths as evidence in multiple prior entries (D0105, D0130, D0133, D0135, and others). A
+fresh clone's working tree will no longer have those files sitting at those paths — the citations still
+resolve via `git show 4ec12bb:.anvil/log/<file>` (or any later commit up to and including this repository's
+own history), but a casual reader browsing the tree, not the history, will find nothing there. This is the
+tradeoff "parking" always carries and is named here rather than glossed over.
+
+**Verified no dangling reference before removing:** `git grep` for `anvil` outside its own directories found
+only comment/docstring citations (`tools/check_fork_completion.py`, `tools/layer_lint/
+test_check_untracked_files.py`, `tools/quality_check/{coupling,duplication,test_quality_check}.py` — all
+citing precedent or a synthetic fixture, none a functional read) plus one unrelated hit
+(`legacy/scenes/sfx.gd:847`, "the anvil note" — a blacksmith's anvil in a sound-design comment, confirmed by
+reading it, nothing to do with this system). No `harness.yml` step references either path.
+
+**Reverse cost:** `git checkout 4ec12bb0d642e88abc88a521e64ef2707c975125 -- tools/anvil .anvil`.
+
+## D0155 · tests/control_plane/ (THE CONTROL PLANE's canonical obs/action slice, D0134) parked — removed from the tree, no subject yet (E1, queue Part E) · 2026-08-29
+
+**Decided:** `tests/control_plane/` (`CanonicalObservation`, `CanonicalAction`, `ObservationSpec`,
+`ObservationBuilder`, D0134) was built explicitly labeled as SIMULATING Boundary A — `interface/` (the real
+boundary it would eventually sit behind) contains only a `MODULE.md` stating "no code has been written." No
+Policy, Adapter, Episode-Log, Goal, or Scorer has ever been wired against it (D0134's own explicit stopping
+point). Removed entirely: `canonical_action.gd`, `canonical_observation.gd`, `observation_spec.gd`,
+`observation_builder.gd`, `test_observation_builder.gd` (each with its `.uid`). **Not deleted — git preserves
+it in full at `4ec12bb0d642e88abc88a521e64ef2707c975125`**; `git checkout 4ec12bb -- tests/control_plane`
+restores it exactly.
+
+**Worth noting for the director specifically, not smoothed over: this was the LEAST "unwired" of the three
+E1 items in one concrete sense.** Unlike `economy_check`/`anvil` (neither had any CI step referencing them
+at all), `tests/control_plane/test_observation_builder.gd` WAS an active, passing, BLOCKING CI step in
+`harness.yml`'s `tests` job right up until this entry. "Unwired" here means "no real downstream consumer
+in the game" (no Policy/Adapter/interface built on it), not "untested" — its own test suite was green.
+Removing its harness.yml step in the same commit was necessary (a dangling `res://tests/control_plane/
+test_observation_builder.gd` reference would otherwise fail CI on a missing file), done here, not left for
+a later surprise.
+
+**Also removed in the same commit:** the `.github/workflows/harness.yml` step "test_observation_builder
+(THE CONTROL PLANE's canonical obs/action slice, simulating Boundary A, D0134)" — its subject no longer
+exists in the tree. `yaml.safe_load` confirms the workflow file still parses after the edit.
+
+**Reverse cost:** `git checkout 4ec12bb0d642e88abc88a521e64ef2707c975125 -- tests/control_plane`, then
+restore the removed harness.yml step from the same commit.
+
+## D0156 · project.godot's description no longer says "roguelite" (E2, queue Part E) · 2026-08-29
+
+**Decided:** `project.godot`'s `config/description` called Sinkforge "a 2D side-view roguelite" — the exact
+framing the persistent-world GDD reversal thread (`docs/WORKING.md`, still open, un-landed as of this
+session) is actively contesting, and a stale genre label in a config file a fresh clone reads first is
+worse than no label. Replaced "roguelite" with "factory game" — not invented here, the literal, already-
+normative phrase `CONTEXT.md:9` uses to describe this project right now: "Sinkforge is a factory game with
+a persistent underground shaft and an idle game's progression curve." **Scoped narrowly, on purpose:** only
+the one contested word changed; the rest of the sentence (permanent surface rig, hauling material before
+flooding, "the rig that outlives every run") is a real, accurate, uncontested description of current
+mechanics and was left alone — rewriting the whole description to resolve the persistent-world-vs-runs
+question is the actual design decision this queue's own hard stops forbid taking unilaterally.
+
+**Verified:** `check_project_settings.py` (the CI gate covering `project.godot`) does not assert on the
+description string at all (`grep` for "description" in that script: no match) — re-run anyway, still PASS.
+
+**Reverse cost:** revert `project.godot`, one line.
