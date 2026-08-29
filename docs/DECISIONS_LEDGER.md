@@ -4595,3 +4595,44 @@ were not traced at all yet; plausible they share this same root geometry (a body
 fragments), not confirmed.
 
 Reverse: N/A — diagnosis only, no code changed by this entry.
+
+## D0124 · 2026-08-28 · the oracle fix, landed and re-run: `depenetrated_this_tick` fixed 1 of 4 discontinuities, `embedded`/`grounded_no_floor` untouched — as it structurally had to
+
+Director's instruction: land the D0118-class oracle fix (the fuzz probe's `_max_legit_displacement` never
+modeled a real, by-design event) as its own commit, no `sim/body` change, then re-run the full 1000×1500
+sweep and report the real new counts before any `sim/body` change is considered.
+
+**The fix.** `fixture_body_fuzz_probe.gd`'s `_max_legit_displacement` gains a `depenetrated_this_tick`
+branch, adding one cell width (`Body.CELL_PX * Fx.SCALE`) to `max_x` — matching the director's own stated
+expectation ("depenetration up to a cell width is legitimate"), the same pattern every other tracked event
+flag already uses in this function.
+
+**Re-run results, full 1000×1500 sweep, everything else held identical:**
+
+| violation kind | before oracle fix | after oracle fix | true pre-dig baseline |
+|---|---|---|---|
+| `discontinuity` | 4 | **3** | 0 |
+| `embedded` | 187 | **187** (unchanged) | 1 |
+| `grounded_no_floor` | 95 | **95** (unchanged) | 32 |
+| `bounds` (reported, not gated) | 722,655 | **722,655** (unchanged) | 18,218 |
+
+**Only one of the four discontinuities was the unmodeled-depenetration class — identified exactly, not
+estimated:** seed=507/tick=1304 (`dx=212992`, ~3.25px) fell under the new allowance (`425984`, ~6.5px) and
+no longer flags. The other three (seed=497, ticks 997/1022/1323) still exceed the new allowance too
+(`dx=466944/1236992/1261568` — the largest is ~4.8 cells, nearly 3x the new allowance) — D0123's own
+diagnosis of tick=997 already anticipated this precisely (7.125px measured against a 6.5px allowance,
+predicted short by ~0.6px before this re-run confirmed it). These three are real, not an oracle artifact.
+
+**`embedded` and `grounded_no_floor` were structurally guaranteed to be unaffected, not just observed to
+be — worth stating why, not just that.** Neither is computed from `_max_legit_displacement` at all:
+`embedded` is `Body._box_blocked` (does the body's CURRENT box overlap solid material, full stop);
+`grounded_no_floor` is `PropertyChecks.grounded_implies_solid_beneath` (is `on_floor` true with the row
+directly below not fully solid). Both are pure per-tick geometric predicates over the body's own present
+state — neither has any notion of "displacement," "legitimate," or a prior tick to compare against. The
+director's own hypothesis ("some fraction of the 187/95 may be the same unmodeled depenetration") does not
+hold structurally: an oracle fix scoped to `_max_legit_displacement` could only ever move the
+`discontinuity` count, never the other two. Their real size — 187 and 95 — is the real size; nothing was
+inflated by this particular gap. Whatever explains them (very likely the same jagged dig-fragment geometry
+D0123 found, unconfirmed) is a `sim/body`-adjacent question independent of this fix, not resolved by it.
+
+Reverse: cheap. One `if` block; delete it to reopen D0122's original oracle gap.

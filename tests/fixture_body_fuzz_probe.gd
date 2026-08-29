@@ -62,6 +62,16 @@ func _max_legit_displacement(body: Body) -> Vector2i:
 		max_y += Body.STEP_UP_PX * Fx.SCALE
 	if body.mantled_this_tick:
 		max_y += Body.MANTLE_PX * Fx.SCALE
+	if body.depenetrated_this_tick:
+		# D0122/D0123/D0124: `_resolve_horizontal_cell`'s embedding-recovery push is real, by-design
+		# behavior this oracle never modeled at all -- the gap that turned a legitimate correction into a
+		# false "discontinuity". One cell width, matching the director's own stated expectation
+		# ("depenetration up to a cell width is legitimate") -- NOT verified sufficient: D0123's own
+		# instrumented seed=497/tick=997 trace measured a real depenetration push of ~7.125px against a
+		# one-cell allowance of 4px (plus this tick's own ~2.5px base move = 6.5px total), still short by
+		# ~0.6px. Left as the director's own stated bound rather than silently widened further, so the
+		# re-run's own numbers -- not a guess -- show whether one cell actually covers the real range.
+		max_x += Body.CELL_PX * Fx.SCALE
 	if body.bounds_violation_this_tick:
 		max_y += POSITION_SANITY_PX * Fx.SCALE  ## a correction can reposition arbitrarily; that tick's
 		max_x += POSITION_SANITY_PX * Fx.SCALE  ## own violation is already flagged separately
