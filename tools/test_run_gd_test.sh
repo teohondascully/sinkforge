@@ -17,6 +17,11 @@
 #   3. The negative control: a real, legitimately-passing suite that deliberately calls `push_error()` as
 #      part of its own normal behavior (`tests/test_fixed_point.gd`) still exits 0 through the wrapper --
 #      the fix must not turn every push_error()-using suite red.
+#   4-6. D0149's own sibling defect, same bar, same shape: a masked crash that prints a bare `ERROR:` (not
+#      `SCRIPT ERROR:`) from an unguarded native call (`Array.remove_at()` out of range,
+#      `tests/fixture_harness_crash_probe_engine_error.gd`) -- pre-fix baseline reproduces, the fix
+#      catches it and names the right class, and a second real push_error()-using suite
+#      (`tests/test_cave_geometry.gd`) stays green.
 #
 # Needs Godot (unlike tools/check_trailers.sh) -- this is a `tests/`-adjacent gate, not a pure-repository-
 # text one, so it is not wired into the fast `gates` CI job; it runs in the `tests` job instead, once,
@@ -70,6 +75,36 @@ control_exit=$?
 check $? "negative control: test_fixed_point.gd (deliberately calls push_error as PASSING behavior) still exits 0 through the wrapper (got $control_exit)"
 printf '%s\n' "$control_out" | grep -q "run_gd_test: PASS"
 check $? "negative control: the wrapper's own PASS line is printed for it"
+
+# --- 4-6. D0149's own sibling: an ENGINE-level bare ERROR: (Array.remove_at() out-of-range), same shape
+# as steps 1-3 above but for tests/fixture_harness_crash_probe_engine_error.gd ---
+engine_raw_out="$("$GODOT_BIN" --headless --path . --script res://tests/fixture_harness_crash_probe_engine_error.gd 2>&1)"
+engine_raw_exit=$?
+[ "$engine_raw_exit" -eq 0 ]
+check $? "D0149 pre-fix baseline: the bare invocation exits 0 despite the engine-level ERROR: (got $engine_raw_exit)"
+printf '%s\n' "$engine_raw_out" | grep -q "^ALL PASS"
+check $? "D0149 pre-fix baseline: the bare invocation still prints ALL PASS despite the crash"
+printf '%s\n' "$engine_raw_out" | grep -q "^ERROR: The calculated index"
+check $? "D0149 pre-fix baseline: a real engine-level ERROR: is genuinely present in that same run's output"
+if [ "$engine_raw_exit" -ne 0 ]; then
+	echo "  NOTE  the D0149 pre-fix baseline no longer reproduces (exit $engine_raw_exit) -- either this" >&2
+	echo "        Godot version changed Array.remove_at()'s own error-continuation behavior, or the" >&2
+	echo "        fixture regressed. Either way, the assertions below need re-verifying." >&2
+fi
+
+engine_wrapped_out="$(bash tools/run_gd_test.sh "$GODOT_BIN" res://tests/fixture_harness_crash_probe_engine_error.gd 2>&1)"
+engine_wrapped_exit=$?
+[ "$engine_wrapped_exit" -ne 0 ]
+check $? "D0149 fix: tools/run_gd_test.sh exits non-zero on the engine-level ERROR: (got $engine_wrapped_exit)"
+printf '%s\n' "$engine_wrapped_out" | grep -q "run_gd_test: FAIL.*engine-level ERROR"
+check $? "D0149 fix: the wrapper's own failure message names the engine-level-ERROR class, not a generic failure"
+
+engine_control_out="$(bash tools/run_gd_test.sh "$GODOT_BIN" res://tests/test_cave_geometry.gd 2>&1)"
+engine_control_exit=$?
+[ "$engine_control_exit" -eq 0 ]
+check $? "D0149 negative control: test_cave_geometry.gd (deliberately calls push_error as PASSING behavior) still exits 0 through the wrapper (got $engine_control_exit)"
+printf '%s\n' "$engine_control_out" | grep -q "run_gd_test: PASS"
+check $? "D0149 negative control: the wrapper's own PASS line is printed for it"
 
 echo
 if [ "$fails" -eq 0 ]; then

@@ -5858,3 +5858,41 @@ reason `gate_status.py` itself exists: an 8th test file added later would silent
 remembered to add its line, exactly the drift this whole queue exists to close.
 
 **Reverse cost:** revert `.github/workflows/harness.yml`. No script changed.
+
+## D0150 · tools/run_gd_test.sh's masked-crash sibling: a plain ERROR: (not SCRIPT ERROR:) from an engine-level native-call failure (D2, queue Part D) · 2026-08-29
+
+**Decided:** `tools/run_gd_test.sh` (D0115/D0116) only ever checked for `SCRIPT ERROR:` -- a bare `ERROR:`
+line from an unguarded ENGINE-level native call (not a GDScript expression evaluation) passed straight
+through, silently, for the exact same reason D0115 named: `_check()`/`_finish()`'s own counters cannot see
+it, and the process continues to a real `ALL PASS`/exit 0. Confirmed empirically before writing the fix
+(three scratch probes, not guessed):
+
+- `Array.remove_at(99)` on a 3-element array prints `ERROR: The calculated index 99 is out of bounds...`
+  followed by `   at: remove_at (core/variant/array.cpp:512)` — no `SCRIPT ERROR:` prefix at all, execution
+  continuing normally in the SAME function afterward (more silent than the original SCRIPT ERROR: case,
+  which at least unwinds the function it occurred in).
+- A deliberate `push_error()` call ALSO prints a bare `ERROR:` first line, with its own `at: push_error
+  (core/variant/variant_utility.cpp:1024)` line — so "a bare ERROR: line exists" cannot be the trigger; the
+  codebase calls `push_error()` on purpose in several real, passing suites (`test_fixed_point.gd`,
+  `test_cave_geometry.gd`). The discriminator that actually works: the `at:` line's own FUNCTION NAME —
+  `push_error`/`push_warning` for a deliberate log call, anything else (here `remove_at`) for a real crash.
+
+**Fixed:** `run_gd_test.sh` gained a second detector — `grep -A1 "^ERROR: "` paired with the following `at:`
+line, FAIL if that function name is not `push_error` — plus its own positive/negative controls (checked
+fresh every run, same pattern as the existing `SCRIPT ERROR:` controls). New permanent fixture,
+`tests/fixture_harness_crash_probe_engine_error.gd`, sibling to `fixture_harness_crash_probe.gd`, using the
+queue's own specified `Array.remove_at(99)`. `tools/test_run_gd_test.sh` extended with 7 new assertions
+(steps 4-6): the pre-fix baseline reproduces (bare invocation exits 0, prints ALL PASS, the real ERROR: is
+present), the fix catches it and names the right class, and a SECOND real push_error()-using suite
+(`test_cave_geometry.gd`, distinct from the existing `test_fixed_point.gd` control) stays green.
+
+**Verified against real, non-synthetic suites, not just the two fixtures:** ran all 20 suites in
+`harness.yml`'s `tests` job locally through the fixed wrapper. Two showed FAIL (`test_body_acceptance`,
+`test_observation_builder`, both "never printed ALL PASS") — traced by `git stash`-ing D0139's own
+uncommitted, dirty `sim/body/vertical_resolve.gd` and re-running: both pass clean with it stashed. Confirmed
+this is D0139's own already-documented, already-reported regression (the golden-traverse stall
+`docs/WORKING.md` names), NOT caused by this fix — restored the stash immediately after confirming, D0139's
+working tree left exactly as found, untouched by this entry.
+
+**Reverse cost:** revert `tools/run_gd_test.sh`, `tools/test_run_gd_test.sh`; delete `tests/
+fixture_harness_crash_probe_engine_error.gd`(`.uid`). Nothing else depends on this fix yet.
