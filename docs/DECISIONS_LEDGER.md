@@ -4937,3 +4937,54 @@ anyway -- reducing duplication, not just satisfying the limit.
 Reverse: moderate. Delete the three new `tests/body/*.gd` files and `tests/test_reveal_replay_driver.gd`;
 revert `reveal_scene.gd`'s header/extraction changes (git history has the pre-extraction shape); drop the
 `harness.yml` step. `RevealMetric.compute` itself is untouched throughout.
+
+## D0130 · 2026-08-29 · fork-completion reconciliation made mechanical (`tools/check_fork_completion.py`), per the FINDING it closes
+
+Extends the sweep-blindness law (D0105) into fork/subagent coordination for the first time (Anvil FINDING,
+`.anvil/log/2026-08-29T074921.640759Z-ad065cf8.json`): a background fork reported `status: completed` with
+a detailed prose summary describing three finished tasks against two target files; `git diff` showed
+neither file had actually changed. Caught only because the orchestrating session happened to check the
+diff by hand. Director's ruling, verbatim: "A report about a change is not the change. The tree is the
+change." Built as the mechanical reconciliation `/wrap` should already have been doing, per explicit
+instruction, rather than continuing to rely on the director or the orchestrator noticing by eye.
+
+**The tool.** `tools/check_fork_completion.py::find_missing(claimed, base, cwd)` diffs `git diff --name-
+only <base>` unioned with `git ls-files --others --exclude-standard` (untracked new files — `git diff`
+alone never lists them, by design) against a claimed-files list; reports exactly which claimed files are
+absent from the real diff, not just a boolean. Placed at `tools/` top level, matching `tools/
+check_trailers.sh`'s own precedent (session/process hygiene, not code correctness, no existing `tools/*/`
+subdirectory fits) — and, like `check_trailers.sh`, deliberately given NO `docs/QUALITY.md` gate number:
+it checks a fork's own claim, not the tree's correctness, and nothing CI-run makes "a fork's claimed file
+list" an artifact to check against. Scope stated in its own docstring: it can only tell you a claimed file
+was untouched, never that a touched file's content is actually the claimed work — the same limited scope
+`check_untracked_files.py` and every gate in this directory has, named rather than overclaimed.
+
+**A real bug found while smoke-testing the tool against this repo's own tree, before trusting it — in
+exactly the direction that would have defeated its own purpose**: `git diff` never lists untracked paths.
+A fork that CREATES a new file rather than modifying an existing one was wrongly reported as having
+touched nothing, a false negative that would have made the checker itself part of the failure class it
+exists to catch. Fixed by unioning in `git ls-files --others --exclude-standard`; kept as its own named
+test case (`_test_new_file_counts_as_touched`), not fixed silently.
+
+**Verification, per the standing "mutation-test a new guard" rule.** `tools/test_check_fork_completion.py`,
+5 cases against disposable scratch git repos (matching `tools/layer_lint/test_check_untracked_files.py`'s
+own established pattern): a no-op fork (both claimed files untouched — the positive control, the real
+incident's own shape), an honest completion, a partial completion, the untracked-new-file case above, and
+an unclaimed change elsewhere that must not mask a real miss. All 5 independently re-run and OBSERVED by
+this session, not only reported by the fork that built it. The guard itself (`find_missing` forced to
+always return `[]`) was mutation-tested and correctly broke 3 of the then-relevant cases; reverted.
+
+**`.claude/commands/wrap.md` gained two new leading steps** (old steps renumbered, content unchanged):
+step 1 requires running this tool against every fork's claimed files before trusting anything it landed
+this session; step 2 requires doc-edit reports to show the actual `git diff`, never a prose summary that
+edits happened — the director's own explicit second instruction, since a summary is declared state and
+declared state drifts, the same reason this whole project is event-sourced.
+
+**Built by a single subagent, not concurrent forks** — per this session's own newly-adopted rule
+(this entry's own subject: serial forks only in a shared working tree until a mechanism exists). Verified
+directly by this session before committing, per that same rule, rather than trusting the subagent's own
+completion report — the files existed, the diff matched the claim, and the test suite re-ran clean
+independently.
+
+Reverse: cheap. Delete the two new files and the `wrap.md` step additions; the manual-vigilance status
+quo (the failure mode this closes) returns.
