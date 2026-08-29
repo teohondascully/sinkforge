@@ -13,7 +13,10 @@ back is itself an incomplete citation.
 
 Regenerate this by re-reading `docs/DECISIONS_LEDGER.md` for entries whose own text says "corrects,"
 "correction," "FALSIFIED," "was wrong," "superseding," or similar — this file is a snapshot, not a live
-query; re-derive it rather than hand-edit it when the ledger grows further corrections.
+query; re-derive it rather than hand-edit it when the ledger grows further corrections. First generated at
+`docs/DECISIONS_LEDGER.md` D0170; `tools/check_corrections_freshness.py --check` catches when the ledger's
+own candidate set has grown past what's written here (it cannot regenerate the prose itself — reading each
+candidate in context to write it up stays a judgment call, per D0170's own account).
 
 ## The deepest chain: `grounded_no_floor`'s mechanism, D0059 → D0137
 

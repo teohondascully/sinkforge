@@ -6828,3 +6828,49 @@ result, reported per the standing discipline that a checked-and-clean finding is
 just a fix. `docs/CORRECTIONS.md` itself is unchanged by this entry — nothing needed correcting.
 
 **Reverse cost:** none — no file other than this ledger entry changed.
+
+## D0175 · `docs/CORRECTIONS.md` gets a `--check` freshness gate, mutation-tested, wired as QUALITY gate 30 (queue #3 Part L2) · 2026-08-29
+
+**Not full regeneration, stated up front.** The queue asked for CORRECTIONS.md to "regenerate from the
+ledger with a `--check` freshness gate, same pattern as the status tool... only if the generation is
+clean; don't force it." Checked against `docs/data_codegen/generate.py`'s own gate-22 pattern (write
+nothing, fail if output would differ) before building anything: that pattern needs a MECHANICAL generation
+step, and D0170's own account of building this page states plainly that filtering a raw keyword-grep hit
+down to "does this entry actually name an earlier one as wrong" requires reading each candidate in full —
+a judgment call, not a template fill. Forcing a fake full-regenerate would mean writing that judgment out
+of the tool while pretending it's still there. The honest, achievable subset: a coverage check — does
+every ledger entry matching the same keyword pattern have its own D-number appearing somewhere in
+CORRECTIONS.md's text — built as `tools/check_corrections_freshness.py` (`--check` mode: exit 1 on any
+gap), same shape as `tools/layer_lint/check_working_freshness.py` (QUALITY gate 23), not gate 22's.
+
+**Dogfooded against the real tree before trusting it, and it found a real bug in itself.** First run
+reported 2 false positives: D0170 and this very entry (D0174), both flagged as "missing" corrections. Root
+cause: the keyword regex matches the substring "correct" inside the literal filename "CORRECTIONS.md,"
+so ANY ledger entry that merely mentions the page by name false-positives as a correction candidate — an
+emergent collision that couldn't have existed before D0170 created the file being named. Fixed by
+stripping literal `(docs/)?CORRECTIONS\.md` references from each header line before the keyword match.
+Confirmed the fix: re-ran, dropped to 1 false-neg-free candidate (D0170 itself — a real keyword hit, "the
+ledger's own correction links," not a filename artifact) still flagged missing, because CORRECTIONS.md's
+own text never actually cited D0170 by number despite describing exactly what it did. That's a real,
+legitimate gap (the page's own provenance wasn't stated), not a tool bug — closed by adding one sentence
+to CORRECTIONS.md's intro naming D0170 as its own generating entry, not by special-casing the script.
+Re-ran: clean, 18 candidates, zero missing.
+
+**Mutation-tested properly, not just run once.** Backed up the real `docs/CORRECTIONS.md` first (learned
+from Part K's own near-miss, D0173), then deleted one real citation (`D0044` → `DXXXX`) and confirmed the
+gate correctly reports `DRIFT: ... D0044` and exits 1; restored from the backup and confirmed a clean
+re-run plus `git diff docs/CORRECTIONS.md` shows only the intended one-sentence addition, nothing from the
+mutation.
+
+**Wired into CI as QUALITY gate 30**, appended (not inserted near an existing number, same reason gate 22
+and 24 both state — gate numbers are addresses several scripts cite by number in their own docstrings).
+`.github/workflows/harness.yml` step placed next to gate 23's own freshness check (`check_working_
+freshness.py`), the same doc-freshness family.
+
+**Known blind spot, carried forward from D0170 unchanged:** a future correction whose header line doesn't
+use one of this pattern's keywords is invisible to this gate too — the same limit D0170 already stated
+plainly, not newly introduced here.
+
+**Reverse cost:** CHEAP — delete `tools/check_corrections_freshness.py`, revert the `harness.yml` step,
+the `docs/QUALITY.md` gate-30 entry, and `docs/CORRECTIONS.md`'s one added sentence. No code outside these
+four files touched.
