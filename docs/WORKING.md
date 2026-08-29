@@ -13,6 +13,16 @@ own CLOSED sections — moved verbatim to `docs/archive/working/WORKING-2026-08-
 behind anything below; nothing was deleted, only relocated, per this file's own header requiring it stay
 under 150 lines.
 
+## IN PROGRESS — 5-hour autonomous queue #3, director still away, 2026-08-29
+
+Corrects the ValueNoise crack to honest documented state (Part J — NOT the fix, that's a director-scoped
+design cycle), prepares the human `--play` capture path so the moment the director sits at the keyboard
+it records cleanly (Part K), finishes `docs/CORRECTIONS.md`'s own origin-chain completeness (Part L),
+and closes the size-gate ruling plus remaining audit drift (Part M). **Nothing certified closed — Codex
+verifies all three queues on the director's return.** Hard stops: collision/`resolve_floor`/
+`grid_floor_backstop`/fuzz population, `data/economy/`, the `ValueNoise` float→Fx fix itself (design
+cycle, out of scope), faking/forcing a human session, any design decision, 5 hours/30 commits.
+
 ## CLOSED (pending Codex re-verify) — 5-hour autonomous queue #2, director away, 2026-08-29
 
 Parts 0/F/G/H/I all landed, 10 commits, well inside the 5-hour/30-commit budget. **Codex verifies the
