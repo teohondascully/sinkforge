@@ -8,6 +8,45 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## CLOSED — D0122/D0123's dig-mechanic fix, D0125/D0126, 2026-08-28, budget 1hr/12 commits
+
+Director's ruling on the `_handle_dig` design question (three alternatives rejected — whole-column dig
+destroys the core mechanic, refuse-if-would-strand is an invisible rule, fragment cleanup is a
+resolver-patch — per-column high/low-water mark chosen) executed per the one-hour, ordered cycle. No
+hard stop hit. 2 commits (the fix itself, plus a same-cycle follow-up rename forced by a CI gate the
+local run hadn't checked).
+
+1. DONE (D0125). `TileGrid.extend_terrain_dig_extent` (renamed from `extend_dig_extent` mid-cycle —
+   `check_coordinate_naming.py`, D0020, correctly caught the un-prefixed public Vector2i-returning
+   function name; CI-only gate, not run locally before the first push) merges a dig touch into its
+   column's own historical [min,max] and returns the union; `Body._handle_dig` now excavates that
+   merged range instead of just its own current touch. `_resolve_horizontal` untouched, per the ruling.
+   New unit tests (`test_tile_grid.gd`) and one integration test (`test_body.gd`,
+   `_test_dig_gap_between_two_touches_in_the_same_column_is_closed`) mutation-tested twice (the merge
+   logic's `mini`/`maxi`, and `_handle_dig`'s own wiring) — both mutants caught, both reverted clean.
+2. ACCEPTANCE GATE MET. Full 1000×1500 sweep: `discontinuity` 3→**0**. `embedded` 187→**0**,
+   `grounded_no_floor` 95→**59** — both moved substantially, confirming the shared staircase root cause
+   per the director's explicit "do not declare victory on discontinuity alone." `bounds` (reported, not
+   gated) 722,655→805,397 — an unexplained 11% rise, not traced this cycle.
+3. DONE (D0126). First nightly-escape-to-per-commit regression fixture,
+   `tests/test_body_fuzz_regression_d0122.gd` (QUALITY gate 29): replays the minimal known-reproducing
+   prefix (seeds 0-497 on one shared grid, matching the fuzzer's own accumulation structure — a
+   fresh-grid replay of seed=497 alone reproduces nothing) and asserts `discontinuity==0`. ~53s. Passes
+   clean against the fix; mutation-tested against the pre-fix behavior (`discontinuity=3`, matching
+   D0124's own count exactly).
+4. Both commits pushed, CI green on both (the second push fixed the coordinate-naming gate the first
+   one tripped).
+
+**Two things reported, not smoothed over (the director's own ask for "anything that felt wrong even
+though it passed"):** `grounded_no_floor` (59) sits above the pre-dig D0061 `DESIGN_TRADEOFF` bound (32)
+in `test_body_fuzz.gd` — real, unexplained, ~2x the old baseline. The bound was deliberately NOT edited
+this cycle (would repeat the resolver-patch instinct the ruling rejected for `_handle_dig`); this is an
+open question for the director, not resolved here. `bounds`'s own rise (722,655→805,397) is similarly
+unexplained and untraced. Neither blocks anything currently gated (`test_body_fuzz.gd` is nightly-only).
+
+Still open, unchanged from before this cycle: the replay driver (real session → `RevealMetric`), the
+`history/` 165-image pre-pivot cull, and the hands-on-keyboard `--play` test — none blocking, all owed.
+
 ## CLOSED — director's execution-dense queue, 2026-08-28, budget 1hr/12 commits
 
 Autonomous, execution-dense (specs settled, not judgment-dense). All four items closed, no hard stop
@@ -112,8 +151,9 @@ whenever. The hands-on-keyboard `--play` test stays explicitly open/owed, not cl
    camera shows ~28% of the topsoil band, a noisy local sample). Fixed with a new `--wide-view` capture
    mode, not a parameter change; `history/154-reveal-density-*.png` replaced in place with the corrected
    pair (same-round first draft superseded, not kept alongside it — 168 images, unchanged count).
-4. FINDING, DIAGNOSED, NOT YET FIXED (D0122/D0123) — surfaced by this round's own gate diligence, not
-   sought: running the FULL (nightly-only) fuzzer for the first time since dig existed found a real,
+4. FINDING, DIAGNOSED, FIXED — see "CLOSED — D0122/D0123's dig-mechanic fix, D0125/D0126" at the top of
+   this file. (D0122/D0123) — surfaced by this round's own gate diligence, not sought: running the FULL
+   (nightly-only) fuzzer for the first time since dig existed found a real,
    confirmed (A/B-verified) regression — `embedded` 187 vs. a bound of 1, `grounded_no_floor` 95 vs. 32, a
    brand-new `discontinuity` class at 4 (should be hard zero), all four returning to their EXACT
    established baselines with dig disabled in a controlled re-run. Already on `main` (dig landed at
