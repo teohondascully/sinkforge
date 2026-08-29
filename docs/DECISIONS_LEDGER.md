@@ -6357,3 +6357,90 @@ fix, since Part F's own ask was to find lies in the status tool's own logic, not
 
 **Reverse cost:** re-add the `economy_check/` bullet to `tools/README.md` (its old text is in this entry
 and in git history at the parking commit).
+
+## D0165 · gate 8's real subject: a live ShaftGenerator+TileGrid+Body sim, replayed across two OS processes, golden hashes committed (queue #2 Part G) · 2026-08-29
+
+**What was built.** `tests/fixture_shaft_replay_probe.gd` (a `SceneTree` script, run as its own OS
+process): generates a real `ShaftGenerator.generate(StrataData.SHALLOW_CLAY, seed)` `TileGrid`, hand-
+excavates a small three-room start (`_carve_starting_complex` -- a flat main room plus a 1-tile step-up
+ledge and a 2-tile mantle ledge DIRECTLY adjacent to it, same convention `tests/body/hostile_chamber.gd`
+already uses to author geometry, world data not resolve logic), spawns a real `Body`, and drives it
+20,000 ticks with `tests/body/fuzz_driver_common.gd`'s own shared `random_input()` (seeded from `seed`,
+independent stream via `SplitRng.split`). Hashes `body.state_signature() + grid.state_signature()` every
+100 ticks (200 checkpoints). `Body.state_signature()` (`sim/body/body.gd`, 8 lines, additive/read-only,
+exactly the allowance this queue's own hard stop permitted) covers the physically meaningful state that
+determines future ticks (`pos_x/pos_y/vel_x/vel_y/facing/on_floor/_coyote_ticks_left/
+_jump_buffer_ticks_left/_was_jump_held`) -- excludes the three `Invariants`-report-rate-limiting bookkeeping
+vars, which gate stderr output, not future simulation state. `TileGrid.state_signature()` already existed,
+unused until now (its own docstring already said "used by the shaft-determinism check").
+`tests/test_shaft_replay_determinism.gd` runs the fixture as three real subprocesses (same seed twice,
+seed+1 once -- NOT six, an earlier draft ran one full 20,000-tick subprocess per assertion and blew the
+2-minute default harness timeout; refactored so all four checks share the same three runs) and asserts:
+same-seed cross-process bit-identical hashes; seed+1 diverges by checkpoint 0; the run matches 200
+COMMITTED golden hashes; the golden run's own summary shows jumps/mantles/stepups/digs all > 0 (the same
+"a check that never varies would pass vacuously" principle `test_replay_determinism.gd`'s own
+`_test_stub_state_actually_varies` already established).
+
+**Real numbers, verified by actually running it, not guessed:** golden run (seed 20260826) --
+`jumps=889 mantles=21 stepups=305 digs=216` across 20,000 ticks. Two separate `OS.execute`d processes of
+the same seed: 200/200 checkpoint hashes identical, first mismatch `-1` (none). seed 20260827 (control):
+first checkpoint hash differs from seed 20260826's from checkpoint 0. Each of the three real subprocess
+runs takes ~22s; the full `tools/run_gd_test.sh` invocation (engine startup + all three) measured at
+`70.72s user 0.48s system 99% cpu 1:11.60 total` -- a real, bounded CI cost, not a guess.
+
+**Geometry note, corrected once already:** the mantle ledge was originally CHAINED after the step ledge
+(MAIN -> STEP -> MANTLE in sequence) -- confirmed by running it that way first: `mantles=0` across the
+full 20,000-tick run, because the step FROM the intermediate ledge to the mantle ledge is only 1 tile
+locally, never the full 2-tile lift `_try_climb` requires for a mantle. Fixed by placing MANTLE_LEDGE and
+STEP_LEDGE both DIRECTLY adjacent to MAIN_ROOM (different directions), each exposing its own full riser
+in one step from the main floor -- re-run confirmed `mantles=21`.
+
+**Wiring:** `docs/QUALITY.md` gate 8's own citation now reads `test_shaft_replay_determinism`, not the
+stub. `test_replay_determinism.gd`'s own docstring updated to state plainly it is no longer gate 8's
+subject, kept as a standing mechanism check. `.github/workflows/harness.yml`: the old step retagged
+("hash-and-replay mechanism check, not QUALITY gate 8's own subject"), a new step added
+(`test_shaft_replay_determinism (QUALITY gate 8 — ...)`) after `test_hostile_chamber`.
+
+**The closure proof itself was WRONG the first time -- caught before it was reported, not after.** The
+queue's own instruction: "deleting sim/ must turn this test red (the stub-based one didn't) -- prove it."
+First attempt: `mv sim sim.bak`, then `godot --headless --import` to force Godot to notice the change --
+and BOTH the stub AND the new test came back ALL PASS, golden hashes and all, with `sim/` supposedly gone.
+Investigated rather than trusted: `.godot/global_script_class_cache.cfg`'s own `ShaftGenerator` entry
+now read `"path": "res://sim.bak/terrain_gen/shaft_generator.gd"` -- the `--import` step had simply
+RE-DISCOVERED the exact same code under its renamed path and re-linked every class to it. Renaming a
+directory WITHIN the project tree is not deletion to Godot's own resource scanner; this was this
+session's own instance of the house failure class its memory already names ("instrument cannot register
+its subject") -- a control that could not actually discriminate, caught here before it became a false
+"proven!" ledger claim rather than after.
+
+**Fixed methodology, and a second real finding along the way.** Moved `sim/` entirely OUTSIDE the project
+directory (not renamed within it), re-ran `--import` -- confirmed via the cache file directly that
+`ShaftGenerator`/`Body`/`TileGrid` were now genuinely gone, no stale entries. Re-ran both tests: **BOTH**
+now failed, `test_replay_determinism.gd` included -- because `tests/test_base.gd` itself (the shared
+harness base EVERY test file extends) has its own `_flat_grid()` helper that constructs a real `TileGrid`,
+so deleting all of `sim/` breaks the shared harness for every test using it, not just tests whose own
+subject is `sim/`. This does not discriminate what the queue asked this proof to discriminate. **Corrected
+closure proof:** moved only `sim/terrain_gen/`, `sim/body/`, `sim/invariants/`, and `tests/body/
+fuzz_driver_common.gd` outside the project (leaving `sim/world/tile_grid.gd` in place, satisfying
+`test_base.gd`'s own shared dependency), re-ran `--import`, confirmed via the cache that `ShaftGenerator`/
+`Body` were gone while `TileGrid` remained. Re-ran both tests: `test_replay_determinism.gd` stayed
+**ALL PASS** (exit 0); `test_shaft_replay_determinism.gd` went **16 FAILURE(S)** (exit 1) -- the fixture
+subprocess itself failed to parse (`ShaftGenerator`/`Body` unresolvable), correctly cascading into
+`0` checkpoint hashes, `0` jumps/mantles/stepups/digs, and every downstream check reporting FAIL. This is
+the actual, valid, discriminating proof the queue asked for. Restored all four moved paths immediately
+after; `git status --porcelain` confirmed the tree matched its pre-experiment state exactly (the two
+pre-existing uncommitted D0139 files untouched) before proceeding.
+
+**One residual, honestly noted, not fixed:** in that same red run, the "two separate OS processes produce
+identical hashes" check itself reported PASS even with both hash arrays empty (`mini(0,0)` never iterates,
+so "no mismatch found" is vacuously true over zero elements) -- the overall test still correctly failed
+(16 other assertions did catch the empty-population case), so this did not change the verdict, but it is
+itself a small instance of the same "guard that cannot be false on an empty population" class this
+project's memory names. Not fixed here: the adjacent, non-vacuous checks already cover the population-
+empty case for this exact scenario, and widening every pairwise-comparison check in this file to also
+assert non-emptiness independently is unrequested scope beyond what this closure proof needed.
+
+**Reverse cost:** revert `sim/body/body.gd`'s `state_signature()` addition; delete `tests/
+fixture_shaft_replay_probe.gd`(`.uid`) and `tests/test_shaft_replay_determinism.gd`(`.uid`); revert
+`docs/QUALITY.md` gate 8's citation, `tests/test_replay_determinism.gd`'s docstring addition, and
+`.github/workflows/harness.yml`'s two edits.

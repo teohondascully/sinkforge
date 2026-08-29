@@ -8,6 +8,14 @@ extends "res://tests/test_base.gd"
 ## `replay_determinism_test` exists once `sim/` and `harness/` do -- this file's stub is throwaway
 ## scaffolding for that day, not a foundation to build on.
 ##
+## **That day arrived (D0165, queue #2 Part G): `docs/QUALITY.md` gate 8's own subject is now
+## `tests/test_shaft_replay_determinism.gd`** -- a real `ShaftGenerator`+`TileGrid`+`Body` sim run,
+## replayed across two separate OS processes. This file stays as a standing MECHANISM check for the
+## hash-and-replay plumbing itself (does re-running the SAME recorded input from the SAME seed twice
+## produce identical hashes at all), not as gate 8's own evidence -- confirmed by direct test, not
+## assumed: moving `sim/` out of the project tree entirely leaves this file GREEN (it never touches
+## `sim/`) while the real test goes RED, exactly the contrast this queue asked for.
+##
 ## The stub exercises all three `core/` primitives together (a handful of particles with `Fx`
 ## position/velocity, spawned and despawned through an `EntityIdPool`, perturbed each tick by a
 ## `SplitRng` stream) so the replay check has real, varied, non-trivial state to hash -- not because the

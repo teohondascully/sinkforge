@@ -113,6 +113,16 @@ func _init(start_x: int, start_y: int) -> void:
 	pos_y = start_y
 
 
+## Canonical state signature -- the physically meaningful per-tick state that determines everything
+## the sim computes on FUTURE ticks (`docs/DECISIONS_LEDGER.md` D0165's real shaft-replay-determinism
+## check). Excludes `_last_violation_col`/`_last_violation_row`/`_had_bounds_violation`: those gate
+## `Invariants`' own stderr rate-limiting, not any future simulation output.
+func state_signature() -> String:
+	return "%d,%d,%d,%d,%d,%s,%d,%d,%s" % [
+		pos_x, pos_y, vel_x, vel_y, facing, on_floor,
+		_coyote_ticks_left, _jump_buffer_ticks_left, _was_jump_held]
+
+
 func _left_x() -> int:
 	return pos_x - (WIDTH_PX * Fx.SCALE) / 2
 

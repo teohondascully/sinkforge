@@ -238,7 +238,7 @@ jobs:
       - name: test_entity_id_pool
         run: bash tools/run_gd_test.sh ./godot res://tests/test_entity_id_pool.gd
 
-      - name: test_replay_determinism (QUALITY gate 8)
+      - name: test_replay_determinism (hash-and-replay mechanism check, not QUALITY gate 8's own subject -- see test_shaft_replay_determinism below)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_replay_determinism.gd
 
       - name: test_tile_grid
@@ -261,6 +261,9 @@ jobs:
 
       - name: test_hostile_chamber
         run: bash tools/run_gd_test.sh ./godot res://tests/test_hostile_chamber.gd
+
+      - name: test_shaft_replay_determinism (QUALITY gate 8 — real ShaftGenerator+TileGrid+Body sim, two-process replay)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_shaft_replay_determinism.gd
 
       - name: test_cave_geometry
         run: bash tools/run_gd_test.sh ./godot res://tests/test_cave_geometry.gd

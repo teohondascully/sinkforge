@@ -50,7 +50,11 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
 
 ### Correctness
 
-8. **Determinism.** `replay_determinism_test` green.
+8. **Determinism.** `test_shaft_replay_determinism` green -- a real `ShaftGenerator`+`TileGrid`+`Body`
+   sim run (jumps/mantles/digs), replayed bit-identical across two separate OS processes, checked
+   against committed golden hashes (`docs/DECISIONS_LEDGER.md` D0165). `test_replay_determinism`'s own
+   stub remains a standing mechanism check for the hash-and-replay plumbing itself, not this gate's
+   subject.
 9. **Conservation.** Property test: over 10,000 random ticks with fuzzed commands, total material is conserved modulo declared sinks.
 10. **No softlock.** From any reachable state, the player can reach the surface.
 11. **Movement acceptance suite** green against the hostile chamber. See `docs/ARCHITECTURE.md` §9.
