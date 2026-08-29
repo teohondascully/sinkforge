@@ -105,6 +105,7 @@ static func grid_floor_backstop(body: Body, grid: TileGrid) -> bool:
 	body.pos_y = Fx.from_int(top_row * Body.CELL_PX) - (Body.HEIGHT_PX * Fx.SCALE) / 2
 	body.vel_y = 0
 	body.on_floor = true
+	body.floor_source_this_tick = &"grid_floor_backstop"
 	return true
 
 
@@ -189,5 +190,5 @@ static func resolve_floor(body: Body, grid: TileGrid) -> bool:
 			body._last_violation_row = chosen_row
 	body.pos_y = surface - (Body.HEIGHT_PX * Fx.SCALE) / 2
 	body.vel_y = 0
-	body.on_floor = true
+	body.on_floor = true; body.floor_source_this_tick = &"resolve_floor"
 	return true

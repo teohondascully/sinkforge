@@ -5034,3 +5034,46 @@ land first.
 Reverse: cheap. Delete the three `_check(not combined.contains("SCRIPT ERROR:"), ...)` insertions; the
 masking gap these three tests carried returns, exactly as it was before this session's own D0117 fix left
 it un-generalized.
+
+## D0132 · 2026-08-29 · grounding-path telemetry (`Body.floor_source_this_tick`), closing the causal blind spot an external audit named — instrument, not a fix
+
+The same Codex audit (D0131's own subject) found a real gap the fuzz harness could not answer: it records
+a `grounded_no_floor` violation's position and predicate failure, but never which of `resolve_floor`,
+`grid_floor_backstop`, or `try_step` last set `on_floor = true` that tick — so D0127/D0128's "all 91
+violations share the `_grid_floor_backstop`/D0059f mechanism" rested on shared HEIGHT alone, which the
+audit correctly named as correlation, not proof. Director's instruction: add the telemetry, do not change
+the bound or the grounding logic — instrument, don't fix.
+
+**The three call sites, found by grepping every `on_floor = true` assignment.** `vertical_resolve.gd::
+resolve_floor` (the heightfield ground-plane resolver, the normal landing/rest path), `vertical_resolve.gd
+::grid_floor_backstop` (D0059f's grid-solidity pit-lip backstop), and `body.gd::_try_step` (step-up/mantle
+lift). A new field, `Body.floor_source_this_tick: StringName`, reset to empty at the top of every `tick()`
+(matching every sibling `_this_tick` flag's own convention) and set to the calling site's own name at each
+of the three assignments — empty means neither fired this tick, so `on_floor`'s value, if true, carried
+over unchanged from an earlier tick. `fixture_body_fuzz_probe.gd`'s own `grounded_no_floor`
+`FUZZ_VIOLATION` line now prints `floor_source=%s`. Purely additive: no assertion, bound, or grounding
+function's own logic changed.
+
+**Mutation-tested per the standing rule**, both the production code and the new suite's own assertions
+against it (`tests/test_floor_source_telemetry.gd`, 4 cases: airborne/empty, normal landing/resolve_floor,
+auto-step-up/try_step, a direct embedded-box call/grid_floor_backstop): stripping all three assignments
+made exactly the three real assertions fail (the airborne/empty case correctly still passed, since removing
+a true-setter cannot fake an already-empty value) and left every other suite (`test_body`, `test_body_
+acceptance`, `test_cave_geometry`, `test_bounds_invariant`, `test_hostile_chamber`, `test_tile_grid`,
+`test_body_fuzz_fast`, `test_body_fuzz_regression_d0122`) green before and after, confirmed by direct
+re-run, not assumed from the diff alone.
+
+**`sim/body/body.gd` is now at 399/400 lines (`FILE_LIMIT`), one line of headroom** — trimmed the new
+field's own comment from three lines to two specifically to leave that margin; the very next change
+touching this file needs to extract something before adding, not after. Worth naming here rather than
+letting a future session discover it only when `check_size_limits.py` goes red without warning.
+
+**What the first real run already shows, and why it is reported here rather than left for a later
+session to re-derive:** the 498-seed/1500-tick reproducing prefix's own 59 dig-on `grounded_no_floor`
+violations split 55 `resolve_floor` / 4 `grid_floor_backstop` — the opposite of "all one mechanism." This
+number is the direct subject of the D0127/D0128 correction entry immediately following; recorded here only
+as confirmation the instrument works, not as the correction itself.
+
+Reverse: cheap. Delete `floor_source_this_tick`, its three assignments, its tick()-start reset, the printed
+field in the fuzz probe's violation line, and `tests/test_floor_source_telemetry.gd`; the causal blind spot
+returns exactly as the audit found it.

@@ -97,6 +97,8 @@ var mantled_this_tick: bool = false
 var corner_corrected_this_tick: bool = false
 var edge_caught_this_tick: bool = false
 var depenetrated_this_tick: bool = false
+var floor_source_this_tick: StringName = &""  ## D0132: which call set on_floor=true THIS tick --
+## "resolve_floor"/"grid_floor_backstop"/"try_step", empty if none did this tick (read-only telemetry).
 var bounds_violation_this_tick: bool = false; var floor_selection_violation_this_tick: bool = false  ## NOT rate-limited, unlike the push_error reports
 var dig_event_this_tick: bool = false  ## true iff `input.dig_pressed` this tick actually excavated a
 ## cell (a press against air or out of bounds is not an event) -- the caller's ground truth for a
@@ -211,6 +213,7 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	corner_corrected_this_tick = false
 	edge_caught_this_tick = false
 	depenetrated_this_tick = false
+	floor_source_this_tick = &""
 	bounds_violation_this_tick = false
 	floor_selection_violation_this_tick = false
 	dig_event_this_tick = false
@@ -292,6 +295,7 @@ func _try_step(grid: TileGrid, lift: int) -> bool:
 		return false
 	pos_y -= lift
 	on_floor = true
+	floor_source_this_tick = &"try_step"
 	vel_y = 0
 	return true
 

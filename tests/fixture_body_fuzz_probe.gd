@@ -119,7 +119,13 @@ func _check_tick(body: Body, grid: TileGrid, grid_w: int, grid_h: int, state: _R
 		print("FUZZ_VIOLATION type=embedded seed=%d tick=%d pos=(%d,%d)" % [seed, tick, body.pos_x, body.pos_y])
 		violations += 1
 	if not PropertyChecks.grounded_implies_solid_beneath(body, grid):
-		print("FUZZ_VIOLATION type=grounded_no_floor seed=%d tick=%d pos=(%d,%d)" % [seed, tick, body.pos_x, body.pos_y])
+		# D0132: floor_source names which call last set on_floor=true THIS tick ("none" if on_floor's
+		# true value carried over from an earlier tick untouched) -- lets a reader tell whether every
+		# occurrence shares one grounding path (real evidence of one mechanism), not just a height,
+		# which same-height alone does not establish.
+		var source: String = str(body.floor_source_this_tick) if body.floor_source_this_tick != &"" else "none"
+		print("FUZZ_VIOLATION type=grounded_no_floor seed=%d tick=%d pos=(%d,%d) floor_source=%s" %
+			[seed, tick, body.pos_x, body.pos_y, source])
 		violations += 1
 	if absi(body.pos_x) > POSITION_SANITY_PX * Fx.SCALE or absi(body.pos_y) > POSITION_SANITY_PX * Fx.SCALE:
 		print("FUZZ_VIOLATION type=overflow seed=%d tick=%d pos=(%d,%d)" % [seed, tick, body.pos_x, body.pos_y])
