@@ -9,10 +9,6 @@ harness already produced.
 - `schema_validator/` — validates `data/` against per-kind schemas. `docs/QUALITY.md` gate 13.
 - `data_codegen/` — generates `data/<kind>/generated.gd` from `data/<kind>/*.yaml`; `--check` mode is
   the staleness gate. `docs/QUALITY.md` gate 22, `docs/adr/0004-data-codegen.md`.
-- `economy_check/` — the corrected three-part rig-demand tier rule (input provenance, output
-  consequence, terminal products, plus breach reachability), checked as a pure graph query over
-  synthetic fixtures, ahead of any real `data/economy/` content. Not yet wired into CI — no real data to
-  check yet.
 - `quality_check/` — four code-quality instruments correctness gates never covered: function-length
   distribution, cross-language duplication (the headline one — the actual legacy failure), cyclomatic
   complexity, and module fan-in/fan-out. Reports distributions and IQR outliers; gates nothing yet. Not

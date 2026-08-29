@@ -6305,3 +6305,55 @@ sequence, ending `Ran 6 gate mutation test file(s).` with the probe present and 
 file(s).` with it removed — the count tracks the real population, not a hand-typed number.
 
 **Reverse cost:** revert `.github/workflows/harness.yml`'s one step back to the bash-array glob form.
+
+## D0164 · Part F self-audit, remaining findings — one real doc drift fixed, three checked and closed as non-issues, one wording note left as-is (queue #2 Part F) · 2026-08-29
+
+Consolidates the rest of Part F's own instruction ("does this fix verify a population or fire on a
+constructed case") applied to the D0153-D0155 parking, D0150's ERROR-wrapper, and D0149/D0163's own
+self-test naming — beyond the two real fixes already logged as D0162/D0163.
+
+**Real drift found and fixed:** re-ran the D0153-D0155 parking's own population check broader than its
+original targeted form — `git grep -il -e economy_check -e "tools/anvil" -e control_plane -- .`, ALL file
+types, case-insensitive, not just the original's narrower scope. `tools/README.md` line 12 still described
+`economy_check/` as a live subdirectory of `tools/` ("the corrected three-part rig-demand tier rule...").
+It is not — parked in D0153, confirmed absent via `find tools -maxdepth 1 -type d`. This is the exact
+subject of the parking claim, found by its own re-verification, so fixed here rather than deferred to
+Part I: removed the stale bullet. Checked the same file for `anvil`/`control_plane` mentions — none.
+
+**Checked, confirmed harmless, left as-is:** the same grep's other five hits (`tools/layer_lint/
+test_check_untracked_files.py`, `tools/quality_check/README.md`, `tools/quality_check/coupling.py`,
+`tools/quality_check/duplication.py`, `tools/quality_check/test_quality_check.py`) all cite `anvil`/
+`economy_check` only as historical, illustrative examples of a real past schema.py naming collision this
+project's own local-first import resolution was built to handle — accurate design-rationale comments, not
+functional references (no import, no path check requiring either directory to still exist). Confirmed by
+reading each cited line directly, not inferred from the match alone.
+
+**D0150's ERROR-wrapper population, checked further:** `printerr()` calls do not print an `ERROR:` prefix
+or an `at:` trailer at all (confirmed fresh: a scratch `_initialize()` calling `printerr()` prints only the
+raw message, nothing else) — neither of `run_gd_test.sh`'s two text detectors can see a `printerr()` call,
+by construction. Checked whether this is a live gap: `grep -rn "printerr(" sim/ core/` returns **zero**
+hits in the current live tree (every other hit is under `legacy/`, already out of scope). The one live
+`.gd` usage, `tests/test_base.gd` (the harness's own per-assertion failure reporter), calls `printerr()`
+AND `quit(1)` on the same failure path — caught by the detector's OTHER leg (`the process itself exits
+nonzero`), not the text match. **Net: not a live gap today, but a real one waiting** — a future script
+that used `printerr()` as its sole failure signal without also exiting nonzero would be silently invisible
+to `run_gd_test.sh`. Not fixed here (no such script exists to fix against, and inventing a defensive check
+for a hypothetical usage is exactly the kind of scope this session's standing rules warn against);
+recorded here so a future session adding a `printerr()`-only failure path knows to route it through a
+nonzero exit too, or extend the detector.
+
+**Residual, honestly not fully proven:** whether a bare `ERROR:` line can EVER appear with no following
+`at:` line — every constructed case this session (a native validated-call failure, a deliberate
+`push_error()`) printed one. Reasoned, not proven: both shapes route through Godot's own shared internal
+error-printing mechanism, which is very likely to append `at:` unconditionally as part of its own fixed
+format regardless of call site — but this rests on how Godot's C++ engine internals behave across every
+possible error site, which this repo cannot exhaustively enumerate from GDScript-level testing alone.
+Flagged rather than asserted as closed.
+
+**Cosmetic-only, not fixed:** the `tests` job's self-test step reads "must run before every suite below
+trusts it" (line 34); `fuzz_nightly`'s reads "must run before the suite below trusts it" (line 126) — "every"
+vs "the". No functional effect (neither string is matched against anything); left as a wording note, not a
+fix, since Part F's own ask was to find lies in the status tool's own logic, not proofread step names.
+
+**Reverse cost:** re-add the `economy_check/` bullet to `tools/README.md` (its old text is in this entry
+and in git history at the parking commit).
