@@ -138,6 +138,24 @@ static func _has_deferred_floor_below(body: Body, grid: TileGrid, lo_col: int, h
 	return false
 
 
+## Mirrors `tests/property_checks.gd::grounded_implies_solid_beneath`'s own full-footprint check --
+## DUPLICATED, not called: `sim/` cannot depend on `tests/` (that predicate is deliberately TEST-ONLY,
+## a signal for the harness to catch a violation after the fact, never a shipped correction path --
+## this is the opposite direction, the RESOLVER establishing the same condition before it ever creates
+## a violating state). `landing_row` is the row `surface` would place the body's own `_bottom_y()` at,
+## checked BEFORE `resolve_floor` commits to the move. If this drifts out of sync with
+## `grounded_implies_solid_beneath`'s own logic, keep both in mind together -- they must describe the
+## same property (D0139).
+static func _full_footprint_solid(body: Body, grid: TileGrid, surface: int) -> bool:
+	var landing_row: int = Body._px_to_cell(surface)
+	var left_col: int = Body._px_to_cell(body._left_x())
+	var right_col: int = Body._px_to_cell(body._right_x() - 1)
+	for col: int in range(left_col, right_col + 1):
+		if not grid.is_solid(Vector2i(col, landing_row)):
+			return false
+	return true
+
+
 ## The ground plane: sample the heightfield under both feet and the centre, rest on whichever is
 ## highest (smallest Fx `y`) -- matches `legacy/scenes/player.gd`'s `_follow_slope` sampling rule,
 ## adapted to a continuous heightfield instead of an authored ramp overlay. `NO_FLOOR` at all three
@@ -152,6 +170,16 @@ static func resolve_floor(body: Body, grid: TileGrid) -> bool:
 	var s_center: int = Heightfield.surface_y_at_x(grid, body.pos_x, scan_from, Body.FLOOR_SCAN_ROWS)
 	var surface: int = mini(mini(s_left, s_right), s_center)
 	if surface == Heightfield.NO_FLOOR or body._bottom_y() < surface:
+		body.on_floor = false
+		return false
+	# D0139: the three-sample `surface` above is a PROXY for "is the whole footprint supported" --
+	# D0137/D0138 found it can be wrong (any one real sample lets the whole box land, even when the
+	# other samples correctly saw open air). `_full_footprint_solid` checks the ACTUAL property
+	# `tests/property_checks.gd::grounded_implies_solid_beneath` verifies, at the row `surface` is
+	# about to place the body on -- resolving_floor now ESTABLISHES that invariant instead of
+	# approximating it, so a partial-footprint landing defers to `grid_floor_backstop` instead of
+	# ever existing as a violating state.
+	if not _full_footprint_solid(body, grid, surface):
 		body.on_floor = false
 		return false
 	# Diagnostic only -- does not change which floor gets picked. docs/adr/0005 measured this
