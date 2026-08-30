@@ -345,6 +345,12 @@ jobs:
 
       - name: test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_spawn_bounds.gd
+      - name: test_seams (rock grain lifted to sim, its float rates now exact integers — D0227)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_seams.gd
+      - name: test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_view_lifts.gd
+      - name: test_settings (the split halves share one bindings map; persist=false writes nothing)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_settings.gd
 
   # D0060: the deep companion to test_body_fuzz_fast above -- the full 1000-seed x 1500-tick sweep
   # (~114s measured), which is why it runs nightly rather than on every push/PR. Only fires on the
