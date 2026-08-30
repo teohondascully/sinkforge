@@ -334,11 +334,14 @@ jobs:
       - name: test_corner_consent (an instant translation needs the body already moving — D0213)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_corner_consent.gd
 
-      - name: test_interface (L2 is a door: observe() is pure, an Observation is a copy — D0214)
+      - name: test_interface (L2 is a door — observe() is pure, an Observation is a copy, D0214)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_interface.gd
 
-      - name: test_score (the lifted score: seamless loop, deterministic beds, depth-driven mix — D0215)
+      - name: test_score (the lifted score — seamless loop, deterministic beds, depth-driven mix, D0215)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_score.gd
+
+      - name: test_particles (the cosmetic layer is capped, retires, and cannot move the sim — D0216)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_particles.gd
 
       - name: test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_spawn_bounds.gd

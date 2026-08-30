@@ -14,7 +14,14 @@ either side would have looked healthy throughout.
 
 Reports the members, never just a total, so a failure can be acted on without re-deriving it.
 
-Exit 0 clean, 1 on any suite that no CI step runs.
+D0217 widened it to also PARSE the workflow rather than only grep it, because a regex over a file that
+does not parse still finds every string it is looking for. Two step names written with an unquoted
+colon ("test_interface (L2 is a door: observe() is pure...)") made `harness.yml` invalid YAML; GitHub
+ran ZERO jobs and reported the push as an ordinary red, while this gate read the same file with a regex
+and passed. A workflow that cannot be loaded runs no gate at all, so it is the one failure that must
+never be discoverable only from CI.
+
+Exit 0 clean, 1 on any suite that no CI step runs -- or on a workflow that does not parse.
 """
 
 import pathlib
@@ -22,8 +29,9 @@ import re
 import subprocess
 import sys
 
+import yaml
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / ".github" / "workflows" / "harness.yml"
 
 # `test_base.gd` is the shared base class every suite extends, not a suite: it declares no `_test_*`
 # entry point and running it would exercise nothing. Named here rather than filtered by a heuristic on
@@ -31,9 +39,20 @@ WORKFLOW = ROOT / ".github" / "workflows" / "harness.yml"
 NOT_A_SUITE = {"test_base.gd"}
 
 
-def main() -> int:
-    if not WORKFLOW.is_file():
-        print(f"check_suite_coverage: FAIL - {WORKFLOW} not found; refusing to report a verdict")
+# `--root` exists ONLY so `test_check_suite_coverage.py` can run this gate against a scratch repository
+# whose workflow is deliberately broken. A mutation test that edited the real `harness.yml` and then
+# crashed would leave the tree broken, which is a worse failure than the one it is testing for.
+def main(argv: list[str]) -> int:
+    root = ROOT
+    if "--root" in argv:
+        root = pathlib.Path(argv[argv.index("--root") + 1]).resolve()
+    workflow = root / ".github" / "workflows" / "harness.yml"
+    return check(root, workflow)
+
+
+def check(root: pathlib.Path, workflow: pathlib.Path) -> int:
+    if not workflow.is_file():
+        print(f"check_suite_coverage: FAIL - {workflow} not found; refusing to report a verdict")
         return 1
 
     # TRACKED suites, not files on disk. CI runs against a checkout, so an untracked suite is not
@@ -43,7 +62,7 @@ def main() -> int:
     # that case, and it is deliberately uncommitted mid-investigation.)
     try:
         listing = subprocess.run(
-            ["git", "-C", str(ROOT), "ls-files", "tests/test_*.gd"],
+            ["git", "-C", str(root), "ls-files", "tests/test_*.gd"],
             capture_output=True, text=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError) as exc:
         print(f"check_suite_coverage: FAIL - could not list tracked suites ({exc}); refusing to report a verdict")
@@ -56,7 +75,21 @@ def main() -> int:
         print("check_suite_coverage: FAIL - found no tests/test_*.gd at all; the scan is broken, not the tree")
         return 1
 
-    text = WORKFLOW.read_text(encoding="utf-8")
+    text = workflow.read_text(encoding="utf-8")
+    # PARSE FIRST. The regex below is deliberately kept for the set comparison -- a step's command is
+    # free-form shell and pulling suite names out of a parsed tree would mean re-implementing that --
+    # but it must never be the only thing that reads this file. See D0217 in the docstring above.
+    try:
+        yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        where = getattr(exc, "problem_mark", None)
+        at = f" at line {where.line + 1}, column {where.column + 1}" if where is not None else ""
+        print(f"check_suite_coverage: FAIL - {workflow.name} is not valid YAML{at}: "
+              f"{getattr(exc, 'problem', exc)}")
+        print("  A workflow that does not parse runs NO jobs at all -- every gate below is unchecked, "
+              "and CI reports it as an ordinary failure. Most common cause: an unquoted ': ' inside a "
+              "step `name:`.")
+        return 1
     in_ci = set(re.findall(r"res://tests/(test_[a-z0-9_]+\.gd)", text))
 
     unrun = sorted(on_disk - in_ci)
@@ -76,4 +109,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

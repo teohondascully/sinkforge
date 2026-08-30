@@ -8842,3 +8842,114 @@ of its own queue**, and `visuals.gd` is blocked on machines and items rather tha
 is not an argument against the non-negotiable; it is the reason the batch cannot be worked as a batch,
 and it is recorded so the next session does not rediscover it by starting a lift that cannot compile.
 `docs/NEEDS_DIRECTOR.md` P005 carries the ruling this needs.
+
+---
+
+## D0216 · Chips on a break, a draught on a breach — the hollow tell gets its visual half · 2026-08-30
+**Decided:** `legacy/scenes/particles.gd` comes across as `view/fx/particles.gd`, **unchanged**, wired
+into `tests/body/reveal_scene.gd` through `DebugSceneCommon.step_mining_feedback`.
+
+**Why this one and not the other five unblocked files.** D0215's classification found six LIFT files
+with no unsatisfied legacy dependency: `art`, `particles`, `light_layer`, `settings`, `seams`, `score`.
+Reading them showed most would arrive as **dead code**: `art.gd` is a sprite loader for an
+`assets/sprites/` this build does not have (and Q1 is a live art question); `light_layer.gd` is a canvas
+for light math that lives in a coordinator that does not exist; `seams.gd` is the rock-grain system for
+`docs/BITS.md`, which is not in this tree, and nothing would call it. `particles.gd` was the exception:
+`sim/mining` already reports `broke_this_tick`, `broke_cells`, `broke_material` and `breach_this_tick`
+every tick, so the cues had real events to hang on. **"No unsatisfied dependency" and "has a consumer"
+are different questions, and only the second one makes a lift worth doing.**
+
+**Two cues, deliberately different in character.** A BREAK throws chips of the broken material's own
+colour outward from every cell that went — it confirms the hit and says what the rock was made of. A
+BREACH gets a slow, nearly weightless DRAUGHT drifting into the opened void, not more chips: this is the
+visual half of the hollow tell (`sim/mining/hollow_tell.gd` is the audible half's source), and the whole
+point of that cue is that it reads as air moving, so it must not look like debris.
+
+**The wiring lives in `DebugSceneCommon`, not in `view/fx`.** `Particles` stays a dumb emitter that takes
+pixels and colours, which is exactly what made it liftable unchanged; the translation from `Mining`'s
+flags and `MaterialLook`'s palette into bursts needs both of those types, and a `view/` file may read
+`interface` and `core` only.
+
+**The test that matters is not the emitter's.** The cap and the retirement are checked, but the two that
+would have been expensive to get wrong are: (1) **a busy particle layer cannot move the sim** — 400 ticks
+with `randf()` thrashing between every tick end byte-identical to 400 without, with a control proving the
+comparison can fail, which is the behavioural half of `no_engine_imports.py` scoping `POLICED_DIRS` to
+`core/` and `sim/`; and (2) **a real break actually reaches the layer** through the same call the scene
+makes — 27 particles from one bite. Without (2) the scene could be wired to a flag that never fires and
+every unit check would still be green.
+
+---
+
+## D0217 · A regex read a workflow that could not parse, and said PASS · 2026-08-30 · corrects D0201's gate
+**Decided:** `tools/layer_lint/check_suite_coverage.py` (QUALITY gate 31) now `yaml.safe_load`s
+`.github/workflows/harness.yml` before doing anything else, and `tools/layer_lint/test_check_suite_coverage.py`
+is its permanent mutation test.
+
+**Found by causing it.** Two CI step names in D0214's commit were written with an unquoted colon —
+`- name: test_interface (L2 is a door: observe() is pure, ...)` — which makes the rest of the line a
+second mapping value and the whole file invalid YAML. GitHub ran **zero jobs** on `36417e0` and reported
+it as an ordinary red push. Gate 31 read the same bytes locally with `re.findall`, found every
+`res://tests/test_*.gd` it was looking for, and printed PASS.
+
+**A regex over a file that does not parse still finds every string it is looking for.** That is the whole
+finding, and it is this project's own dominant class with a new subject: the instrument could not
+register its subject, and the failure arrived as a quiet green. It is worse than an ordinary blind spot
+because of what the file IS — a workflow that cannot load runs no gate at all, so every OTHER gate's
+verdict for that commit was also unchecked, and nothing anywhere said so.
+
+**The mutation test asserts the old behaviour too, not just the new.** Alongside the two positives (an
+unquoted colon; an unrelated indentation error, so the branch is not fitted to one message) and the
+negative control (a valid workflow passes — checked FIRST, because the positives prove nothing if a
+correct file also fails), it asserts directly that **`re.findall` still matches `res://tests/test_alpha.gd`
+through both broken files**. That is the claim in the docstring made checkable rather than described.
+
+**`--root` was added to the gate for this test alone**, so the mutation runs against a scratch repository.
+A mutation test that edits the real `harness.yml` and then crashes leaves the tree broken, which is a
+worse failure than the one being tested for.
+
+**What this does not fix:** the workflow is still the only place a suite's CI invocation is written, and
+gate 31 still pulls suite names out of it with a regex, because a step's `run:` is free-form shell. The
+parse is a precondition on that regex, not a replacement for it.
+
+---
+
+## D0218 · "No automated checks on documents" was stated in three normative docs while three ran in CI · 2026-08-30
+**Decided:** the claim is repaired in all three places rather than removed, and the LINE is stated instead
+of the absolute: **a gate may check that two artifacts AGREE; it may not check whether prose is true.**
+
+**The drift, re-measured rather than inherited.** The 2026-08-29 cold-read audit listed this as one of
+its contradiction pairs. Re-running it against today's tree: `docs/README.md` asserts "**No** automated
+checks on documents. No count validation, no drift detection, no link auditing", and `docs/QUALITY.md`
+§ and `ONBOARDING.md` state it as a prohibition. Meanwhile CI runs three: gate 23
+(`check_working_freshness.py`, `WORKING.md` not older than `HEAD`), gate 30
+(`check_corrections_freshness.py`, `CORRECTIONS.md` not behind the ledger's own correction links), and
+gates 15-16 (`check_claim_references.py`, which parses `claims/*.md` and enforces an active-claim cap).
+
+**Why the rule survives and only the absolute goes.** The prohibition is not superstition — the prior
+repository built count validation, drift detection and link auditing, and they became a maintenance
+surface that consumed it. What separates the three shipped gates from that is not scale, it is subject:
+each checks a RELATIONSHIP BETWEEN TWO ARTIFACTS that no human can hold across sessions (a file's date
+against a commit's, a projection against its source, a claim against its citation). None of them reads a
+sentence and decides whether it is true. Stating the line makes the rule enforceable; stating the
+absolute made it false and therefore ignorable.
+
+**The rest of that audit row, re-measured, is already repaired and is recorded so nobody re-fixes it.**
+`history/` is exactly **168** images and all three pointers now say so; `project.godot`'s description was
+corrected to the persistent-shaft design; `tools/README.md` no longer claims `quality_check` is unwired;
+`tests/README.md` no longer describes suites that do not exist; `CONTEXT.md` replaced its own line-count
+claim with "`wc -l CONTEXT.md` is the number, not a figure written here to go stale", which is the right
+shape for every count in prose; `BRIEF.md` has its "What was learned" section. **`.anvil/` is gone
+entirely**, so its own stale row is moot.
+
+**Two rows are still false and are NOT fixed here.** `docs/WORKING.md` is 190 lines against
+`CONTEXT.md`'s stated 150 — trimmed this session from 215 to 168 and then grown again by this run's own
+entries, which is the cap doing exactly what it is for. And the `MODULE.md` 60-line maximum is now
+violated by **10 of 10** modules, two of them this session's; parked as `docs/NEEDS_DIRECTOR.md` P006
+rather than resolved, because both honest answers (raise the number and enforce it, or spend an hour
+deleting prose someone wrote on purpose) cost something a session cannot weigh.
+
+**Also added to `docs/README.md`'s normative table**, which claims "if not listed, not normative" and was
+missing three entries: `MILESTONES.md`, `NEEDS_DIRECTOR.md` (new this session) and
+`LEGACY_MIGRATION_MAP_2026-08-29.md`. `README.md` itself is deliberately absent, with a line saying why:
+a table cannot list itself without telling a reader who has not found it yet that they should have read
+it first.

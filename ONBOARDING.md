@@ -201,7 +201,7 @@ The claim gate is also a real hazard in the other direction: it invites claim-as
 
 **Do not silently drop branching.** The prior splitter was the only branching mechanism and was documented as intentionally ungated core-loop infrastructure. Under hole-as-conveyor, two carved chutes may be a splitter and no machine is needed. That may well be right, but it is a decision I want to make explicitly, not a capability that disappears in a refactor.
 
-**Do not build automated checks on documents.** No count validation, no drift detection, no link auditing. The prior repository built all three and they became their own maintenance surface. Humans review documents.
+**Do not build automated checks on documents.** No count validation, no drift detection, no link auditing. The prior repository built all three and they became their own maintenance surface. Humans review documents. **Three gates are already exceptions** (D0218, and `docs/QUALITY.md` carries the rule): 23 on `WORKING.md`'s date, 30 on `CORRECTIONS.md`'s lag, 15-16 on `claims/*.md`. Each checks that two artifacts agree, never that prose is true.
 
 **Do not resolve the open design questions yourself.** `docs/GDD.md` §8 — current as of the 2026-08-27 reversal: whether lateral variety survives losing re-rolled geology, rig form, machine retrieval (now a local question, not a run-ending one), branching. Build so each is a data file, and ask me when a choice is forced. (Stage 6 above and `docs/GDD.md` §8 record my current provisional lean on rig form and R1 scope — leans, not decisions; hold me to confirming them before they harden into architecture.)
 

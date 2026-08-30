@@ -167,7 +167,7 @@ trimmed back to the limit rather than split, and the pattern repeated a fourth t
 - `docs/README.md` lists the normative set. If a document is not in it, it is not normative.
 - Superseded documents get a dated header and move to `docs/archive/`. They are not deleted; the code often still reflects them, and an agent reading old code needs to find out why it exists.
 - Historical process documents do not pollute the public surface.
-- **Do not build automated checks that count things in documents.** The prior repository did this and it is exactly the meta-instrumentation that consumed it. Docs are reviewed by humans.
+- **Do not build automated checks that count things in documents.** The prior repository did this and it is exactly the meta-instrumentation that consumed it. Docs are reviewed by humans. **The three exceptions already in CI are named here rather than left to contradict this line** (D0218): gate 23 fails if `WORKING.md` is older than `HEAD`, gate 30 fails if `CORRECTIONS.md` has fallen behind the ledger's correction links, and gates 15-16 parse `claims/*.md` for a reference and a cap. Each checks whether two artifacts AGREE, which a human cannot hold across sessions; none checks whether prose is true, which is the thing that consumed the prior repository. That is the line.
 
 ---
 

@@ -63,6 +63,7 @@ var _mining: Mining = Mining.new()  ## D0195: the cursor-aim mining verb (Slice 
 ## tree, and a `Node` built there would never be freed, leaking into the ObjectDB warning at exit that
 ## `tools/run_gd_test.sh` reads as a bare ERROR.
 var _score: Score = null
+var _particles: Particles = Particles.new()  ## D0216: chips on a break, a draught on a breach
 var _mine_down: bool = false  ## `--mine-down`: agent mode sinks a shaft instead of walking to glimmer
 var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the reticle from
 var _spawn_row: int = 0  ## the row the body started on -- `--mine-down`'s descent is measured against it
@@ -156,6 +157,7 @@ func _physics_process(delta: float) -> void:
 	# own live session and `test_reveal_replay_driver.gd` says so.
 	_mining.mine(_grid, _body.pos_x, _body.pos_y, Vector2i(input.aim_col, input.aim_row),
 		input.mine_held and input.has_aim)
+	DebugSceneCommon.step_mining_feedback(_particles, _mining, _look, CELL, delta)
 	_last_input = input
 	_record_tick(input)
 	_tick_count += 1
@@ -352,6 +354,7 @@ func _draw() -> void:
 	# Drawn last so the reach ring and reticle sit over the terrain and the body rather than under them.
 	MiningOverlay.draw(self, _grid, _mining, _body.pos_x, _body.pos_y,
 		_last_input.has_aim, Vector2i(_last_input.aim_col, _last_input.aim_row))
+	_particles.draw(self)  ## D0216: last, so chips and the draught sit over the terrain they came from
 
 
 func _finish_and_quit() -> void:

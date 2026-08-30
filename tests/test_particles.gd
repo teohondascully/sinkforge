@@ -11,9 +11,11 @@ extends "res://tests/test_base.gd"
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_particles.gd
 
-const FLOOR_ROW: int = 20
-const GRID_W: int = 40
-const GRID_H: int = 30
+const FLOOR_ROW: int = 40  ## deep enough that the control run's jump has real headroom: the body's apex is
+## ~71px and it is 40px tall, so a shallower floor puts its head through the top of the world
+const GRID_W: int = 80  ## wide enough that the oscillating drive below never reaches a wall --
+## a bounds clamp would be real sim work triggered by the test's own fixture, not by its subject
+const GRID_H: int = 60
 const TICKS: int = 400
 
 
@@ -21,6 +23,7 @@ func _initialize() -> void:
 	_test_the_cap_actually_caps()
 	_test_particles_retire_and_the_layer_empties()
 	_test_a_busy_particle_layer_cannot_move_the_sim()
+	_test_a_real_break_actually_reaches_the_particle_layer()
 	_finish("particles")
 
 
@@ -83,3 +86,34 @@ func _run(with_particles: bool, jump_at: int = -1) -> String:
 			p.chip(Vector2(float(t), 8.0), Color.RED, float(t) * 0.01)
 			p.advance(1.0 / float(Body.TICK_HZ))
 	return body.state_signature() + "||" + grid.state_signature()
+
+
+## D0216's wiring, end to end. The three checks above prove the emitter works; this proves the PATH does
+## -- that `sim/mining`'s own break flags reach `DebugSceneCommon.step_mining_feedback` and come out as
+## particles. Without it the scene could be wired to a flag that never fires and every unit check would
+## still be green, which is this project's own recurring failure rather than a hypothetical.
+func _test_a_real_break_actually_reaches_the_particle_layer() -> void:
+	var grid: TileGrid = TileGrid.new(GRID_W, GRID_H, 1)
+	for col: int in range(0, GRID_W):
+		for row: int in range(FLOOR_ROW, GRID_H):
+			grid.set_material(Vector2i(col, row), &"clay")
+	var body: Body = Body.new(
+		Fx.from_int(GRID_W * Heightfield.TERRAIN_CELL_PX / 2),
+		Fx.from_int(FLOOR_ROW * Heightfield.TERRAIN_CELL_PX) - (Body.HEIGHT_PX * Fx.SCALE) / 2)
+	var mining: Mining = Mining.new()
+	var particles: Particles = Particles.new()
+	var look: MaterialLook = MaterialLook.new()
+	var target: Vector2i = Vector2i(Body._px_to_cell(body.pos_x), FLOOR_ROW)
+	var breaks: int = 0
+	for _i: int in Mining.ticks_to_break(&"clay") * 4:
+		body.tick(InputFrame.new(), grid)
+		mining.mine(grid, body.pos_x, body.pos_y, target, true)
+		if mining.broke_this_tick:
+			breaks += 1
+		DebugSceneCommon.step_mining_feedback(particles, mining, look, Heightfield.TERRAIN_CELL_PX, 0.0)
+		if breaks > 0:
+			break
+	_check(breaks > 0, "control: the cell really did break (%d breaks)" % breaks)
+	_check(particles.size() > 0,
+		"and the break reached the particle layer through the same call the scene makes (%d particles)" %
+		particles.size())

@@ -176,3 +176,38 @@ entities this build does not have.
 **One thing that is already ruled and worth re-reading before option 3.** `docs/WORKING.md` records the
 Q1 finding that **the palette reads at 16px but the FLECK does not**, and that `terrain_painter.gd` is
 "not portable as written". That is 438 of the 1,540, and it needs an art pass, not a port.
+
+---
+
+## P006 · The MODULE.md 60-line cap is violated by every module that has one
+
+**Status:** open · **Cost to apply:** ~1 hour, or one sentence · **Raised by:** this session, 2026-08-30
+
+`CONTEXT.md`'s five-file rule states a 60-line maximum for a `MODULE.md`. Measured across every tracked
+one: **10 of 10 exceed it.**
+
+```
+core/MODULE.md              98      sim/mining/MODULE.md        77
+sim/terrain_gen/MODULE.md   91      sim/world/MODULE.md         70
+sim/body/MODULE.md          82      sim/meta/MODULE.md          70
+sim/run/MODULE.md           69      interface/MODULE.md         65
+sim/invariants/MODULE.md    63      sim/commands/MODULE.md      61
+```
+
+The cold-read audit flagged this on 2026-08-29 with four files over; it is now ten, and two of the ten
+(`interface`, `commands`) are this session's own — written at 65 and 61 because the gotchas they carry
+are load-bearing and trimming them would have deleted the reason each file exists. **Recorded rather
+than quietly complied with or quietly ignored**, because both of those are how a rule becomes decoration.
+
+**A rule no instance obeys is not a cap, it is a comment.** The two honest resolutions:
+
+1. **Raise it to a number the tree can meet** — 100 clears every current file with headroom — and add it
+   to `check_size_limits.py`, which already walks `.md`-adjacent structure and would make it real.
+2. **Keep 60 and mean it**, which means a trimming pass over ten files and accepting that a module's
+   gotchas move somewhere else. `core/MODULE.md` at 98 is the test case: read it and decide whether the
+   38 lines over budget are worth keeping.
+
+**Why this is yours.** Either answer costs something the session cannot weigh: option 1 relaxes a
+deliberate constraint on how much a module is allowed to explain about itself, option 2 spends an hour
+deleting prose that somebody wrote on purpose. What is not defensible is the current state, where the
+number exists and nothing checks it.

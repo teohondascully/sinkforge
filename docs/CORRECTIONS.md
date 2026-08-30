@@ -237,6 +237,62 @@ clean checkout, or the dirty-tree difference is measured before it is characteri
 `tools/capture_moments.sh` already refuses to let a dirty tree pass as reproducible (D0198); "go play it"
 had no equivalent.
 
+## D0206 corrects D0137's remedy, and supersedes D0139 — the criterion, not the caller
+
+**What was claimed:** D0137 diagnosed `resolve_floor`'s ground plane as the source of the embedding, and
+D0139 built the remedy: make `resolve_floor` refuse a landing that does not have full-footprint support.
+
+**Measured:** the flaw moved rather than closing. `grounded_no_floor` stayed at exactly **59** while the
+attribution flipped — `resolve_floor` 55 to 0, `grid_floor_backstop` 4 to 59. The count could not tell a
+fix from a relocation, so the SET was diffed: all **805,456** violations byte-identical in seed, tick and
+position, with only the source field changing hands.
+
+**The error, precisely.** The diagnosis was right and the remedy was aimed at one CALLER of a shared
+criterion, while the other caller kept using the old one. A criterion two paths both depend on cannot be
+fixed in one of them; that is what "the flaw just relocates" means mechanically. D0206's fix is
+`footprint_surface_y`, the single height either path may ground at.
+
+**The remedy that generalises:** when a count does not move, diff the SET before believing either story.
+D0213 was held to the same test and passed it differently — one line removed, zero added.
+
+## D0212 corrects D0209 — "the player asked for it" was the wrong test
+
+**What was claimed:** D0209 gated the auto step-up on being recently grounded and explicitly EXEMPTED the
+mantle, reasoning that it "already requires `input.mantle_hold`, so it is a thing the player asks for
+rather than something that happens to them."
+
+**Measured, from the director's own session:** three mantles at the identical cell (217, 33), the body
+travelling UPWARD past the movement course's perch, yanked **17.4 / 26.8 / 24.7 px in ONE tick** — up to
+1605 px/s, nearly 3x terminal velocity. It bypassed the jump and made a section built to demand a precise
+landing free. The director's word for it was "glitch".
+
+**The error, precisely.** `mantle_hold` is toward-and-UP held, and holding up while jumping is not a
+request to climb. The gate I reasoned about was a gate on INTENT; what the flag actually reports is a key
+state a player has every reason to be holding for other reasons. **An input flag is not consent unless
+the input means only one thing.**
+
+**The remedy:** the same `recently_grounded` precondition as its sibling. D0213 later found the third
+instance of the class and gated it on MOTION instead, because a ceiling is only ever contacted airborne —
+so the shared principle is consent, not grounding.
+
+## D0217 corrects D0201's gate — a regex read a workflow that could not parse
+
+**What was claimed:** gate 31 (`check_suite_coverage.py`, built in D0201) certifies that every tracked
+`tests/test_*.gd` is actually run by CI, by matching `res://tests/test_*.gd` in `.github/workflows/harness.yml`.
+
+**Measured:** two step names written with an unquoted colon made that workflow invalid YAML. GitHub ran
+**zero jobs** on the commit and reported it as an ordinary red push; the gate read the same bytes locally,
+found every suite it was looking for, and printed **PASS**.
+
+**The error, precisely.** A regex over a file that does not parse still finds every string it is looking
+for. The gate was built to compare two SETS and never asked whether the file it was reading was a
+workflow at all — and this file is the one where that matters most, because a workflow that cannot load
+runs no gate, so every OTHER gate's verdict for that commit was also unchecked and nothing said so.
+
+**The remedy:** parse before matching, and a permanent mutation test
+(`tools/layer_lint/test_check_suite_coverage.py`, 5/5 branches observed) that asserts both the new
+behaviour AND that the old regex-only version passes on the broken files.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,

@@ -79,6 +79,28 @@ every remaining lift needs.
 **Chosen by measuring, not by slice order.** The map puts it in Slice 4 behind a renderer; its entire
 interface with the game turned out to be one float (`set_depth(t, delta)`), so it needed neither.
 
+## DONE THIS RUN — particles on real mining events (D0216), and a gate that could not see a broken workflow (D0217)
+
+**`view/fx/particles.gd`, lifted unchanged, wired to `sim/mining`'s own flags.** A break throws chips of
+the broken material's colour; a breach gets a slow draught into the void — the visual half of the hollow
+tell. Chosen over the other five dependency-free LIFT files because it was the only one with a CONSUMER:
+`art.gd` needs sprites that do not exist, `light_layer.gd` needs light math in a coordinator that does
+not exist, `seams.gd` needs a `docs/BITS.md` that is not in this tree. **"No unsatisfied dependency" and
+"has a consumer" are different questions.**
+
+**Two tests carry it, and neither is about the emitter.** A busy particle layer cannot move the sim (400
+ticks with `randf()` thrashing between every one, byte-identical, with a control proving the comparison
+can fail) — the behavioural half of `no_engine_imports.py` policing only `core/` and `sim/`. And a real
+break reaches the layer through the same call the scene makes: 27 particles from one bite.
+
+**D0217, found by causing it.** Two CI step names written with an unquoted colon made `harness.yml`
+invalid YAML. **GitHub ran zero jobs on `36417e0`** and reported it as an ordinary red; gate 31 read the
+same bytes with a regex, found every `res://tests/test_*.gd`, and printed PASS. A regex over a file that
+does not parse still finds every string it is looking for — and a workflow that cannot load leaves every
+OTHER gate's verdict unchecked too. Gate 31 now parses first, and
+`tools/layer_lint/test_check_suite_coverage.py` is its permanent mutation test (5/5 branches observed,
+including a direct assertion that the old regex-only version passes on both broken files).
+
 ## THE PRESENTATION BATCH IS MOSTLY BLOCKED — read `docs/NEEDS_DIRECTOR.md` P005
 
 Classifying all 21 code files in the 63-file LIFT set by the legacy types they use **in code with

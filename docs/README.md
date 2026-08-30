@@ -27,7 +27,14 @@ Read in this order. These describe what is true now and what must remain true.
 | `BRANCHING.md` | Why `main` is the only long-lived branch, the linear-history workflow, and how to recover archived refs. Existed since 2026-08-22 but was missing from this table — a real gap, not a stylistic omission (queue #3 Part M2). | Before opening any branch, or recovering one from `refs/archive/`. |
 | `../history/` | Not a document, but curated: images, policy-capped at 12 — currently 168, the cap not yet applied (cull is director-action). An image earns its place by illustrating a finding, not by marking a date — when a thirteenth is worth keeping, one comes out, and the swap is a line in `BRIEF.md`'s "What was learned." | When the visual record of a finding matters for the method story. |
 
+| `MILESTONES.md` | One row per milestone: the capture, the commit it was produced against, and what the pair is meant to show. The rationale for fixed-camera before/after pairs lives here, not in `WORKING.md`. | Before capturing a milestone, or when comparing two of them. |
+| `NEEDS_DIRECTOR.md` | The parked queue: diagnoses with proposed remedies that a session stopped on rather than plowed through, because the call is the director's. Nothing in it has been applied. | Picking a run up cold, before `WORKING.md`; and whenever a session parks something. |
+| `LEGACY_MIGRATION_MAP_2026-08-29.md` | The pinned-hash file-level verdict on every legacy file (LIFT/MERGE/REBUILD/KEEP/DEAD/SKIP), plus the slice plan and the five director rulings. Dated in its own name because it describes two specific commits. | Before porting anything out of `legacy/`, or citing what a slice contains. |
+
 Plus `adr/` — numbered decision records. An ADR is normative from the moment it merges.
+
+`README.md` itself is not listed above: the table cannot be an entry in its own table without saying that
+a reader who has not yet found it should have read it first.
 
 ---
 
@@ -49,5 +56,5 @@ Two archived documents are worth knowing about specifically:
 - Every document has a status in its header: normative, archived, or ADR.
 - A document that mixes durable and superseded content gets edited, not archived wholesale. Archiving a file to avoid editing it loses the durable half.
 - Superseding a document means adding it to `archive/` with a dated header and removing it from the table above, in the same commit.
-- **No automated checks on documents.** No count validation, no drift detection, no link auditing. The prior repository built all three and they became a maintenance surface of their own. Documents are reviewed by humans.
+- **Almost no automated checks on documents, and the exceptions are named rather than pretended away.** No count validation, no drift detection, no link auditing: the prior repository built all three and they became a maintenance surface of their own, so documents are reviewed by humans. **Three gates do read documents**, and this line said none did until 2026-08-30 (`docs/DECISIONS_LEDGER.md` D0218) — gate 23 (`check_working_freshness.py`) fails if `WORKING.md` is older than `HEAD`, gate 30 (`check_corrections_freshness.py`) fails if `CORRECTIONS.md` has fallen behind the ledger's own correction links, and gates 15-16 (`check_claim_references.py`) parse `claims/*.md` and enforce a cap on active claims. Each of the three checks a RELATIONSHIP a human cannot hold in their head across sessions, which is the line: a gate may check that two artifacts agree, not that prose is true.
 - If this directory exceeds roughly a dozen normative documents, something has been written that belongs in a claim, an ADR, or a `MODULE.md` instead.

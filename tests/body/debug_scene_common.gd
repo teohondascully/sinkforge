@@ -82,3 +82,30 @@ static func finish_and_quit(flush: Callable, tree: SceneTree) -> void:
 static func depth_fraction(body_row: int, spawn_row: int, grid_rows: int) -> float:
 	var span: int = maxi(1, grid_rows - spawn_row)
 	return clampf(float(body_row - spawn_row) / float(span), 0.0, 1.0)
+
+
+## D0216. Turns one tick of `sim/mining`'s own event flags into particle bursts. It lives here rather
+## than in `view/fx/particles.gd` for the same reason `depth_fraction` does: a `view/` file may read
+## `interface` and `core` and nothing else (`tools/layer_lint/layer_lint.py`), and this needs `Mining`'s
+## flags and `MaterialLook`'s palette. `Particles` itself stays a dumb emitter that takes pixels and
+## colours, which is what made it liftable unchanged.
+##
+## Two events, deliberately different in character, because they are cues for different things:
+##   * a BREAK throws chips of the broken material's own colour, outward from each cell that went. It
+##     confirms the hit landed and says what it was made of.
+##   * a BREACH is the hollow tell's visual half (`sim/mining/hollow_tell.gd` is the audible half's
+##     source). A slow, nearly weightless DRAUGHT drifting into the opened void, not more chips --
+##     the point of the cue is that it reads as air moving, so it cannot look like debris.
+static func step_mining_feedback(particles: Particles, mining: Mining, look: MaterialLook,
+		cell_px: int, delta: float) -> void:
+	particles.advance(delta)
+	if not mining.broke_this_tick:
+		return
+	for cell: Vector2i in mining.broke_cells:
+		var at: Vector2 = Vector2(float(cell.x) + 0.5, float(cell.y) + 0.5) * float(cell_px)
+		var tint: Color = look.cell_color(mining.broke_material, cell.x, cell.y)
+		particles.chip(at, tint, randf_range(-PI, PI))
+	if mining.breach_this_tick and mining.broke_cells.size() > 0:
+		var lead: Vector2i = mining.broke_cells[0]
+		var at: Vector2 = Vector2(float(lead.x) + 0.5, float(lead.y) + 0.5) * float(cell_px)
+		particles.draught(at, look.cell_color(mining.broke_material, lead.x, lead.y), Vector2(0.0, 1.0), 6)
