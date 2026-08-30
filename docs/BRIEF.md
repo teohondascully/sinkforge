@@ -4,150 +4,97 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-30. This round: the third teleport closed, then Slice 2 — `interface/` exists, the
-build makes a sound, and mining throws chips. 11 commits, `c953117`..HEAD.
-`docs/DECISIONS_LEDGER.md` D0213-D0223, `docs/adr/0007-l2-interface.md`.**
+**Last updated: 2026-08-30. This round: gate hygiene and the last unblocked lifts, under a new
+PR workflow. 5 commits across 2 PRs. `docs/DECISIONS_LEDGER.md` D0224-D0232.**
 
-**Headline: the instant-translation class is closed at its third and last instance, and L2 is real.
-`interface/` and `sim/commands/` stop being skeletons, which was the literal blocker on the presentation
-batch. But the batch itself is mostly blocked by the run's own non-negotiable — measured, not guessed —
-and `docs/NEEDS_DIRECTOR.md` is a new file carrying seven parked items. Read it before this one. Gate 7 is
-green for the first time in weeks, which is what unmasked ten BLOCKING checks that had been reporting
-`skipped` behind it.**
+**Headline: a REQUIRED CI check had never evaluated a single dependency edge.** `layer_lint` printed
+PASS on every commit for weeks while reporting, in its own output, `0 references checked` — it matched
+`res://` paths against a codebase that couples entirely through `class_name` globals. **38 edges resolve
+now and none is a violation**, so the boundaries genuinely hold; that is a measurement where there was an
+assumption. The last ~586 liftable lines came over and **the batch is genuinely dry.** `docs/NEEDS_DIRECTOR.md`
+is down to **6 items** and one of them, P010, is an operating rule you need before your next merge.
 
 ---
 
 ## What was learned
 
-### A gate that cannot pass is a deletion, not a gate
+### A caveat in a docstring does not travel with a verdict
 
-The brief asked for the corner nudge to be gated the way step-up and mantle were: on being grounded.
-`resolve_ceiling` is reached only while moving upward, `move_and_resolve` clears `on_floor` before any
-substep, and `_handle_jump` zeroes coyote on launch — so every corner correction that has ever fired ran
-at `on_floor=false, coyote=0`. Applying that gate and re-running measured the consequence rather than
-arguing it: **`corner_correction_success_rate` went from 100% to 0.** A ceiling is only ever contacted
-airborne. What the three instances of the class actually share is the CONSENT half — `_try_climb` has
-required `vel_x != 0` all along, and this was the one instant translation in the module with no motion
-condition of any kind. **The right generalisation was one clause over from the one that was proposed, and
-only a mutation test could tell them apart.**
+`layer_lint.py` carried an explicit paragraph saying it could not see `class_name` coupling and that a
+PASS from it must not be read as "the dependency graph holds". That paragraph was **correct, prominent,
+and worth nothing**: the gate sat in CI as a required check named "structural gates (layer boundaries,
+…)", printed PASS, and had never once evaluated an edge. Nobody reads a tool's docstring at the moment
+they read its verdict. **The fix is not a better caveat — it is putting the number in the output**, so
+every run now prints the edges it actually resolved and the 14 it deliberately does not judge.
 
-### A regex over a file that does not parse still finds every string it is looking for
+### The insight was already in the repository, in the tool next door
 
-Two CI step names written with an unquoted colon made `harness.yml` invalid YAML. **GitHub ran zero jobs**
-on that commit and reported it as an ordinary red push; gate 31 read the same bytes locally, found every
-`res://tests/test_*.gd`, and printed PASS. Worse than an ordinary blind spot because of what the file IS:
-a workflow that cannot load runs no gate, so every OTHER gate's verdict for that commit was also
-unchecked, and nothing anywhere said so. The gate parses first now, and its mutation test asserts the old
-regex-only version still matches through both broken files — the claim made checkable, not described.
+`tools/quality_check/coupling.py` had made this exact discovery earlier and written it down: a real check
+against this tree found "**ZERO res://-based sim/ references but 13 class_name declarations**", so it
+unions path edges with `class_name` edges. One tool knew the codebase's dominant coupling mechanism was
+invisible to path scanning; the gate whose entire job was policing that coupling never got the memo.
+**Two instruments over one subject, and only one of them was told.**
 
-### The fuzzer is only as wide as the geometry it is pointed at
+### The conversion that looks obviously equivalent
 
-D0213's consent invariant reports **0 in the fuzzer with the defect present and 0 with it fixed**, so its
-green means nothing. Isolated rather than assumed: wiring the same line to `bounds_violation_this_tick`
-prints 922, so the count path works and the CONDITION is never reached. The first explanation written
-down was wrong — it blamed the input distribution, and the shaft replay running the identical goalless
-driver falsifies that by hitting the case twice. **The cause is the WORLD:** `HostileChamber` fires
-`corner_corrected_this_tick` **0 times in 50,000 ticks**, because D0055's hand-placed corner tile stopped
-being reachable once the held-jump bug it was fitted against was fixed, and nobody re-placed it.
+`seams.gd` could only enter `sim/` if its float rates became integers — `sim/` is deterministic by
+contract and a float comparison is what differs between machines. The obvious form, `v < int(0.18 *
+65535)`, **disagrees with the original on exactly 3 inputs out of 196,608** — one per rate, invisible to
+any sample, and it would have silently re-grained one plane of every world. Caught by sweeping the whole
+domain instead of sampling, and the wrong form is kept in the suite as a control that must keep failing.
 
-### "No unsatisfied dependency" and "has a consumer" are different questions
+### Branch protection made the merge button load-bearing
 
-Six of the migration map's 63 LIFT files reference no missing legacy type. Reading them: `art.gd` loads
-sprites from a directory that does not exist, `light_layer.gd` is a canvas for light math living in a
-coordinator that does not exist, `seams.gd` needs a `docs/BITS.md` not in this tree. Lifting any of them
-lands dead code. Two had real consumers — `score.gd` (its entire interface with the game is one float) and
-`particles.gd` (`sim/mining` already reports break and breach every tick) — and those are the two that came
-over.
+The authorship gate failed the first PR on a clean history: GitHub's synthetic merge commit is a second
+committer identity. Pinning the job to the PR's real head fixes that. **What it cannot fix:** a
+merge-commit or a squash-merge through the UI writes `noreply@github.com` permanently into `main`, and
+the gate reads `git log --all`, so authorship would then fail on **every commit afterwards** with no
+remedy short of a history rewrite. **Merge by rebase.** Verified: `main` still has one committer identity.
 
-### The claims I did not verify were the ones about work I was declining to do
+### Two of my own defects reached CI, both the same shape
 
-Every number in this round was checked against tool output — except the paragraph in
-`docs/NEEDS_DIRECTOR.md` P007 explaining what was being left undone, which was written from reading. Both
-of its claims were wrong, and **both ran the same direction: each made the deferred work sound cheaper and
-safer than it is.** `test_reveal_spawn_bounds` does not generate each grid twice, it calls
-`ShaftGenerator.generate` **517 times, 149.3ms each, 77.2s of its 81.1s** — and the free half of that
-saving is a different half from the one needing a ruling. The fuzz probe's seeds are not independent by
-design either: `HostileChamber.build()` runs once *above* the loop and every seed shares the object.
-**A parked item is a claim — the director schedules against "cheap, no ruling needed".**
-
-### Corroboration inside one window is one measurement, not three
-
-Checking whether that shared world bites, I measured **1,544 dig presses and 0 excavations** over 6 seeds
-x 500 ticks and wrote it up as a dead code path (D0222). It is not. At the configurations that ship, gate
-26 (100x500) excavates **1 time in 50,000 ticks** and gate 29 (498x1500) **107 in 747,000** — at ~1 event
-per 25,000 presses, a 3,000-tick window is *expected* to be empty, so the null discriminated nothing.
-**Two corroborations did not save it**: the constant solid-cell count and the identical `--no-dig` A/B
-were the same 3,000 ticks reporting the same absence. And the refutation was already in the ledger —
-D0127 measured `bounds` at **805,397 dig-on against 18,157 dig-off**, which no dead path produces, in an
-entry I contradicted without re-reading. **Before a zero becomes a claim, state the rate that would make
-that zero unsurprising.** Corrected in D0223.
-
-**What survives is the better finding.** The per-commit fuzzer's entire mining exposure is **one
-excavation**, so nothing dig-caused is meaningfully gated per commit — a sharper argument for P004 than
-the false one, and it needs nothing to be broken. And the seeds are **not** independent: seed 45 digs a
-cell at tick 349 and seeds 46-99 inherit it, so P007's sharding proposal is inexact *today*, not fragile
-later.
-
-### A milestone pair is only a pair if every knob was held
-
-`MILESTONES.md` says the point of fixing resolution, camera and seed is that only the CONTENT differs.
-Two of those three were held. The bite radius and the tick were not: Slice 1's `delve` is bite 0 at tick
-940, Slice 2's would have been bite 2 at tick 216, because D0200 moved the bite default and the scripted
-run now finishes at 228 instead of 991 — which is also why the `delve` shutter silently wrote no file.
-**The overrides for this existed; what was missing is that the DEFAULTS also form a pair.** The pair is
-not claimed, and how to build it is written down instead.
+A coordinate-naming violation in the file I had just written (I ran the gate set *before* writing it), and
+an `ImportError` from inlining a function whose caller lived in another directory. **Both are "the corpus
+I checked was smaller than the corpus that matters"** — a stale gate run, and a grep scoped to the file I
+was editing. Now mirrored: the whole gates job, 27 checks, run locally before every push.
 
 ---
 
 ## Gates
 
-**All 36 suites pass locally**, including the four new ones (`test_corner_consent`, `test_interface`,
-`test_score`, `test_particles`). Golden re-captured from CI's Linux build, run `33331589523`.
-
-**Gate 7 (LOC velocity) is GREEN, for the first time in weeks.** I expected the opposite and said so
-before measuring: four new suites and a gate mutation test should have made it worse. They did — but
-`interface/`, `sim/commands/`, `view/audio/` and `view/fx/` are GAME code, and game LOC went 2,362 ->
-3,075 while instrument went +1,186. **1.66x against a 2x limit.** Gate 7's own message is "the next unit
-of work is game, not another check", and it is green because that is what this round was.
-
-The absolute ratio is still 4.49 and still informational; it falls only when game LOC grows.
-**D0207's finding is untested by this run and still stands:** gate 7 aborting the job made ten BLOCKING
-checks report `skipped`, and with gate 7 passing they now run — which is how the duplication gate (D0221)
-surfaced at all, after being masked for as long as gate 7 was red.
-
-## Claims
-
-`python3 tools/layer_lint/check_claim_references.py` reports VOID — zero scenarios exist to carry a
-reference. **`claims/C004` still untouched on purpose**: whether a session qualifies is your judgment.
+**All 38 suites pass**, including four new ones. **Gate 7 (LOC velocity) is GREEN and the lifts are why**:
+instrument +1,624 against game +1,249 over the window, **1.30x under a 2x limit**, game LOC 3,075 → 3,760.
+The gate fixes alone measured **2.24x and FAILED** — which is why the two themes had to ship together, and
+worth knowing before you plan a gates-only run.
 
 ## The decisions this round is waiting on
 
-**`docs/NEEDS_DIRECTOR.md` is new and is where these live now**, with the numbers and a proposed remedy
-for each. Seven items: P001 (ratchet the fuzz `bounds` count at 922 rather than leaving it ungated), P002
-(promote the recorded-session replay from scratch to a real CI test — makes every recording you make
-binding), P003 (the size gate lints gitignored files locally and none in CI), **P004 (point the fuzzer at
-a generated shaft — the chamber poses neither the corner mechanic nor its defect, and the per-commit
-fuzzer's whole mining exposure is measured at ONE excavation in 50,000 ticks)**, **P005 (the
-presentation batch — three options, and only option 3 changes how the game looks)**, P006 (the MODULE.md
-60-line cap is violated by 10 of 10 modules, two of them this session's), **P007 (the determinism suite
-is 93% string-building — `TileGrid.state_signature()` formats 28 million strings to checkpoint 60,000
-ticks; the fix is a running hash, and it touches the determinism contract itself)**.
+**`docs/NEEDS_DIRECTOR.md`, 6 items.** Closed and deleted this round: P002, P003, P005, P006, and P007's
+two free sub-items.
 
-Carried, unchanged: **`grounded_no_floor`'s residual** (now 46, down from 59 — full support vs perching is
-still a feel call, not a bug); **Slice 1.5's bite radius**, `--bite=0/1/2/3`, `docs/TASTE_QUEUE.md` T004;
-**the body/world proportion**.
+- **P010 — read this before your next merge.** Rebase only; merge-commit and squash both poison
+  authorship permanently. You may prefer to disable those two buttons in repository settings.
+- **P008** — the layer lint resolves `class_name` edges but cannot judge 14 that cross a sim module
+  boundary, because `sim/world` has no `world.gd` and the convention says it should. Three ways to
+  answer, cheapest being to amend §3 to match what the code already does.
+- **P009** — `light_layer.gd` was lifted as ruled, and it is banked value for the parked coordinator,
+  which is the criterion you declined option 2 by. The two decisions ought to agree.
+- **P001, P004, P007** unchanged: the fuzz ratchet, the fuzzer's world, and the determinism-contract
+  running hash. All still entangled, all still yours.
+
+Carried, unchanged: **`grounded_no_floor`'s residual** (46); **Slice 1.5's bite radius**, `docs/TASTE_QUEUE.md`
+T004; **the body/world proportion**; the **persistent-world GDD reversal** whose text exists only in
+pre-compaction history.
 
 ## Blocked, and what it's waiting on
 
-- **D0193 / the bounds invariant's magnitude** — yours, gate 24's subject. The full sweep's `bounds` count
-  is **1,179,015 of 1.5M ticks** and gated by nothing; P001 proposes the ratchet.
-- **The fuzzer still never sets `mine_held`** — named four times now, still its own unit of work.
-- **Line of sight** — still not ported; a player can mine through one tile of rock.
-- **The `ValueNoise` cross-platform float gap** (D0171/D0172), **three GDD contradictions** (D0177), **the
-  persistent-world GDD reversal** (text exists only in pre-compaction history), **`data/economy/` D1-D6**,
-  **`history/`'s 168-image cull** — all unchanged, all yours.
+- **The coordinator rebuild is the keystone and it is the next thing we do together.** ~1,540 lines of
+  world rendering unblock at once and it is the only route to changing how the game looks. Everything this
+  run could reach without it has now been reached.
+- **`data/economy/` D1-D6**, **line of sight**, the **`ValueNoise` float gap** (D0171/D0172), **three GDD
+  contradictions** (D0177), **`history/`'s 168-image cull** — all unchanged, all yours.
 
 ## Taste queue
 
-**4 open**, unchanged. T001 (`ore_copper` reads silver), T002 (band tint at 0.10), T003 (mining times,
-partly re-framed by T004), T004 (the bite radius). **T004 no longer gates Slice 2 — Slice 2 shipped.**
+**4 open**, unchanged. T001 (`ore_copper` reads silver), T002 (band tint at 0.10), T003 (mining times),
+T004 (the bite radius).

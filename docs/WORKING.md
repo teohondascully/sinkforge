@@ -8,83 +8,54 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-**Reset this round:** D0206-D0212 compressed to their results in the ledger; this file now carries only
-what a future session needs that the ledger does not already say better. New this round:
-**`docs/NEEDS_DIRECTOR.md`**, the parked queue — read it FIRST if you are the director picking this up.
+**THE WORKFLOW CHANGED THIS RUN.** `main` is branch-protected: no direct push, work goes through a PR,
+and three checks are required to merge. **Merge by REBASE, never merge-commit or squash** — either of
+those writes `noreply@github.com` permanently into `main` and the authorship gate then fails on every
+later commit, with no remedy short of a history rewrite. `docs/NEEDS_DIRECTOR.md` P010, D0231.
 
-## DONE THIS RUN — D0213 to D0223, grouped below into six
+**Reset this round:** D0213-D0223 are compressed to their results in the ledger. The parked queue
+`docs/NEEDS_DIRECTOR.md` is down to **6 items** — read it FIRST if you are the director picking this up.
 
-Full accounts in `docs/DECISIONS_LEDGER.md`. What a future session needs to know:
+## DONE THIS RUN — D0224 to D0232, two PRs
 
-**D0213 — the third and last instant translation, closed.** `resolve_ceiling`'s corner nudge took its
-direction from `body.facing` whenever `vel_x` was zero, so a body jumping STRAIGHT UP under an overhang
-was moved **+6.00px sideways in one tick**, 360 px/s against a 150 px/s run speed. **The gate is MOTION,
-not grounding, and that is measured**: `resolve_ceiling` runs only while moving upward, so every corner
-correction that has ever fired ran at `on_floor=false, coyote=0` — applying the two climbs'
-`recently_grounded` gate takes `corner_correction_success_rate` from **100% to 0**. A ceiling is only
-contacted airborne; a grounded gate there is a deletion, not a gate. What the three instances share is
-CONSENT: `_try_climb` has required `vel_x != 0` all along.
+**D0224 — the layer lint had never evaluated an edge.** A REQUIRED CI check printed PASS for weeks while
+its own output read `22 files scanned, 0 res://*.gd references checked`. It matched only `res://` paths
+against a codebase that couples entirely through `class_name` globals, so every "the boundaries hold"
+claim rested on nothing. **38 edges resolve now, 0 violations** — the boundaries do hold, measured.
+Plant-proven on the real tree (a `TileGrid` reference in `view/controls.gd` is caught; removing it
+returns PASS). It exits 2 rather than passing if it ever resolves zero edges again. **Its own docstring
+warned about the blindness and that protected nothing** — a caveat does not travel with a verdict, so
+the edge counts are printed on every run now. Sibling reach-in over `class_name` edges is parked (P008):
+applying it reports 14 violations that are all ordinary structure.
 
-Proven not to relocate at set level: full 1000x1500 sweeps either side, **one violation removed, zero
-added**, all 46 `grounded_no_floor` lines byte-identical. All four director sessions still replay 0 bad
-ticks. New instruments: `Invariants.check_translation_consent` (names no path, so a fourth instance trips
-it without an edit) and `tests/test_corner_consent.gd`.
+**D0225/D0226 — two gates made honest.** The size gate linted 8 gitignored scratch files locally and 0 in
+CI; `git check-ignore` now gives both one population (94 → 86). The `MODULE.md` 60-line rule that 10 of
+18 files broke and nothing read is 100 and enforced — `core/MODULE.md` at 98 has two lines of headroom.
 
-**The fuzzer is blind to that class, and the reason generalises.** It reports 0 with the defect present
-AND absent, because `HostileChamber` fires `corner_corrected_this_tick` **0 times in 50,000 ticks** —
-D0055's hand-placed corner has been unreachable since the bug it was fitted against was fixed. The real
-witness is the shaft replay (a shaft is walls, and every wall contact zeroes `vel_x`): **corner_unconsented
-2 -> 0**, now asserted per commit. Remedy parked as P004.
+**D0227 — the last unblocked lifts, batch now genuinely dry.** `seams`, `art`, `light_layer`, `settings`.
+Game LOC 3,075 → 3,760. `settings.gd` (455) split at its own seam to clear a 400-line gate. `seams`'
+float→integer conversion is proven exact over the **entire domain, 196,608 comparisons, 0 disagreements**,
+with the naive form kept as a control that must keep failing. **Three of four have no consumer** and
+`light_layer` may contradict the ruling that lifted it (P009).
 
-**D0214 — L2 exists (ADR 0007).** `Interface.observe(Envelope) -> Observation` / `apply(Command) -> Result`.
-The blocker on the whole presentation batch: layer lint gives `view` only `interface` and `core`. **The
-one decision everything follows from is that `observe()` COPIES** — handing back the grid would be cheaper
-and would silently delete the envelope, so the suite attempts the reach-around and asserts it fails. One
-envelope dimension, three deliberately ABSENT. Nothing persists, so its shape is cheap to change.
+**D0228 — every director recording is now a regression test** (P002's ruling): 6 sessions, 9,718 ticks,
+0 bad / 0 airborne / 0 unconsented, with a climb-count positive control so a replay that did nothing
+cannot pass. **D0229/D0230** — `test_reveal_spawn_bounds` 81.1s → 61.3s, and the local battery is a
+tracked tool that reads the `tests` job (38 suites) rather than grepping the file (39, the extra being
+the 1.5M-tick nightly sweep).
 
-**D0215/D0216 — the build makes a sound, and mining throws chips.** `view/audio/score.gd` (three beds
-mixed by depth; the whole port is one line, a `Settings` global becoming an injected `music_db`) and
-`view/fx/particles.gd` (chips on a break, a draught on a breach — the hollow tell's visual half). Both
-chosen by measuring rather than by slice order.
+**D0231/D0232 — what branch protection broke.** The authorship gate cannot pass a PR: GitHub's synthetic
+merge commit is a second committer identity. Fixed by pinning the job to the PR's head. See the warning
+at the top of this file for the part that is not fixable in the gate.
 
-**D0217 — a regex read a workflow that could not parse, and said PASS.** Two step names with unquoted
-colons made `harness.yml` invalid YAML; **GitHub ran zero jobs** and reported an ordinary red, while gate
-31 found every suite it was looking for. It parses first now, with a permanent 5/5 mutation test.
+**Two defects of mine reached CI and are worth the lesson.** A coordinate-naming violation in `seams.gd`,
+because I ran the gate set BEFORE writing the file and never after; and an `ImportError` from inlining
+`references_in`, whose caller lives in `coupling.py` — reachability scoped to the one file I was editing.
+Both now covered by mirroring the whole gates job locally (27 checks) before pushing.
 
-**D0221 — three duplication clusters, three different answers.** The BLOCKING gate surfaced at all only
-because gate 7 went GREEN (game LOC 2,362 -> 3,075 against instrument +1,186, 1.66x under a 2x limit), so
-the ten checks D0207 found reporting `skipped` behind it finally ran. `Command.move`/`mine` was REAL duplication and is deduplicated (two constructors
-differing only in which payload field they set are one constructor with an argument).
-`test_score::_built` colliding with `test_replay_determinism::_sorted_ids` was a MISSING TEST — `_built`
-gained the `music_db` parameter it should have had, which is the one line that differs from legacy and
-had no coverage at all. And `interface::_init` vs `tile_grid::_init` **collide by arithmetic, not by
-copying**: a plain constructor of arity N normalises to `ID = ID` repeated N times, so every one collides
-with every other. That got a named exclusion, mutation-tested in three failure directions plus a control.
-
-**D0218/D0219/D0220 — three smaller ones with the same shape.** "No automated checks on documents" was
-stated in three normative docs while three ran in CI (repaired by stating the LINE: a gate may check that
-two artifacts agree, never that prose is true). The `delve` capture fired at tick 940 on a run that now
-ends at 228, so it silently wrote no file — and Slice 1's and Slice 2's `delve` shots are **not a
-comparable pair**, because the bite default moved and nobody re-derived the tick. And the capture tool
-left one recording behind per moment; twelve reached two commits before it started cleaning up after
-itself.
-
-**D0222 — the parked items' own numbers were the unmeasured ones.** P007 named two sub-items "cheap, no
-ruling needed" from reading rather than measuring; both were wrong, both in the direction that made the
-deferred work sound safer. `test_reveal_spawn_bounds` calls `ShaftGenerator.generate` **517 times, 149.3
-ms each, 77.2s of its 81.1s** — four passes over the same 128 pairs, and the free half of the saving is a
-different half from the one that needs a ruling. And the fuzz probe's seeds are **not** independent by
-design: `HostileChamber.build()` runs once above the loop and all seeds share the object. Checking whether
-that bites found the real thing, in two layers.
-
-**D0223 — and the first layer was wrong.** D0222 read a 6-seed sample of **1,544 dig presses, 0
-excavations** as a dead code path. It is not: gate 26 (100x500) excavates **1 time in 50,000 ticks**,
-gate 29 (498x1500) **107 times in 747,000**. At ~1 event per 25,000 presses a 3,000-tick window is
-*expected* to be empty, so the null discriminated nothing — and D0127 already held the refutation
-(`bounds` 805,397 dig-on vs 18,157 dig-off), unread. **Corroboration inside one window is one
-measurement, not three.** What survives is better than the false version: **the per-commit fuzzer's whole
-mining exposure is one excavation**, so nothing dig-caused is gated per commit; and the seeds are **not**
-independent — seed 45 digs a cell and seeds 46-99 inherit it, so P007's sharding is inexact *today*.
+**One thing worth knowing: `coupling.py` had already made D0224's discovery.** Its docstring records that
+a real check found "ZERO res://-based sim/ references but 13 class_name declarations", and it unions both
+edge kinds. The insight was in the repository the whole time, in a neighbouring tool.
 
 ## THE PRESENTATION BATCH IS MOSTLY BLOCKED — read `docs/NEEDS_DIRECTOR.md` P005
 

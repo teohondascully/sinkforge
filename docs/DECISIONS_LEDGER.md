@@ -9349,3 +9349,90 @@ The class carries one assertion the three copies did not: **an empty run is a FA
 stopped being collected would otherwise print `0/0 branches observed` and exit 0 -- the same quiet green
 that made `layer_lint.py` worth fixing in the first place (D0224), reproduced inside the very files
 written to prove it fixed.
+
+## D0228 · Every director recording is now a regression test · 2026-08-30 · closes NEEDS_DIRECTOR P002, director's ruling
+**Decided:** `tools/scratch/trace_lift.gd` was gitignored, ran nowhere, and had already caught three real
+defects (D0209, D0212, D0213's verification). Every claim made from it rested on a session choosing to
+run it by hand. It is now `tests/test_recorded_sessions.gd` and runs in CI over every
+`tests/body/recordings/play_*.log`.
+
+**The ruling it encodes: a recording is BINDING until the director retires it.** A failure here is the
+intended outcome, and the question it poses -- is the recording wrong or is the game? -- is a director
+call, not a reason to delete a log.
+
+**Measured before any assertion was written**, because a floor guessed in advance is a floor fitted to
+nothing: **6 sessions, 9,718 ticks, 0 bad ticks, 0 airborne climbs, 0 unconsented corner nudges.**
+
+**Both hard-learned header rules came over.** The air-control ratio is read from the log's OWN header and
+never from `Body.AIR_CONTROL_NUM` -- the corpus carries 3/5, 4/5 AND 5/5, so this is live, and reading
+today's default once produced 858 bad ticks on a session that replays perfectly clean at the ratio it was
+recorded under. And `chamber=` is believed only in a log that also carries `air_control=`: one commit
+introduced both, so in an older log the field is not missing, it is WRONG.
+
+**The positive control is the assertion that matters.** Every other check is a zero-count, and a replay
+that silently did nothing satisfies all of them. So the suite asserts **16 climb events across the
+corpus** first: if the harness stops driving the body, that line fails while the three zeros still pass.
+
+**One ordering decision worth its own note.** For a log whose `chamber=` cannot be believed, candidate
+worlds are tried with the NAMED world LAST. Not an optimisation dressed as a principle: in a pre-D0209
+log that field is a hardcoded literal, so it is the one candidate known to carry no information.
+`play_2026-08-30T15-46-21.log` (855 bad ticks in the world it names, 0 in the one it was played on) now
+finds its clean attribution first and never replays the wrong world -- which matters because replaying it
+emitted **hundreds of `push_error` lines into CI output**, and a suite that floods a green run with ERROR
+lines teaches everyone reading it to skip them. Measured after the change: 0 ERROR lines.
+
+**Stated as a limit, not glossed:** for two of the three pre-D0209 logs BOTH worlds replay clean, so those
+sessions are checked for "some world replays this cleanly" rather than "the world it was played in does".
+
+## D0229 · The free half of P007, measured rather than estimated · 2026-08-30
+**Decided:** `test_reveal_spawn_bounds` made **517** `ShaftGenerator.generate` calls at **149.3 ms** each
+-- 77.2s of its 81.1s, four passes over the same 128 `(site, seed)` pairs. The two READ-ONLY passes are
+merged into one. **Measured after: 81.1s -> 61.3s**, against a predicted ~19s.
+
+**Only the read-only half.** Both merged passes call `find_spawn` and mutate nothing. The other two go
+through `RevealSessionSetup.build`, which CARVES, and sharing one carved grid between the walk and jump
+tests rests on "neither run mutates the grid" holding forever, inside the suite that guards bounds
+violations. That stays parked (P007) rather than folded in because it looks similar.
+
+**One assertion added while merging**: the count of seeds that actually have a pocket (`122 of 128`). The
+gap check compares a sentinel when no seed has one, and would have passed having compared nothing.
+
+## D0230 · The local battery is a tracked tool, because the trap is in how everyone writes it · 2026-08-30
+**Decided:** `tools/run_local_battery.sh` runs exactly the suites CI runs per commit. The obvious way to
+write this by hand -- grep `harness.yml` for `res://tests/test_*.gd` -- also matches `test_body_fuzz.gd`,
+which lives in the `fuzz_nightly` job behind `if: github.event_name == 'schedule'` and sweeps 1.5M ticks.
+One session ran it on every local battery, about four minutes a time.
+
+Measured: parsing the YAML and reading the `tests` job's steps gives **38 suites**; grepping the file
+gives **39**, the extra being exactly that sweep. Parsing is safe to rely on now because D0217 made
+workflow validity a gate.
+
+**Tracked rather than left in scratch, and that is the whole decision.** A private script fixes it for one
+session; the next session writes the same grep. And the counterpart failure is why the list is not
+hardcoded here: a suite added to CI and not to this file would be silently unrun locally -- the same
+two-population defect D0225 removed from the size gate. One source, read twice. It also refuses to report
+success if it parses zero suites, since a battery that runs nothing must not print green.
+
+## D0233 · The tool written to stop a quiet green shipped as one · 2026-08-30 · corrects D0230
+**Decided:** `run_local_battery.sh` was written with `mapfile -t SUITES < <(...)`. **macOS ships bash
+3.2, where `mapfile` does not exist.** Run on this machine it printed `mapfile: command not found`,
+executed **zero suites**, and the pipeline it was called in still reported success. A battery that runs
+nothing and looks fine is precisely the failure the file's own header is about, reproduced inside the
+fix for it, and it would have been committed if the run had been reported instead of executed.
+
+**Two changes, and the second is the one that generalises.** A `while IFS= read -r` loop replaces
+`mapfile`. And the zero-suite guard that already existed is now the reason the class is *loud*: it is not
+politeness, it is the only thing standing between a broken parse and a green report. Worth stating plainly
+because the temptation with a guard like that is to treat it as belt-and-braces.
+
+**A second, quieter hazard removed on the way.** The YAML parser lived in a Python heredoc nested inside
+a shell heredoc, both conventionally terminated by `PY`; the outer one swallowed the inner and the shell
+died on a parse error. It is now `tools/list_ci_suites.py`, a real file. It also refuses an unparseable
+workflow explicitly -- `yaml.safe_load` returns `None` for an empty file and `None.get` is a traceback
+rather than a verdict.
+
+**And the numbers moved while I was writing about them.** D0230 recorded 37 suites against a whole-file
+grep's 38. Adding `test_recorded_sessions` to CI in the same run made it **38 against 39**; the
+difference is still exactly `test_body_fuzz.gd`. Corrected in the ledger, the tool, `NEEDS_DIRECTOR` and
+`WORKING` -- a count is only true against the tree that produced it, and this one had a shelf life of
+about twenty minutes.

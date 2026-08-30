@@ -164,8 +164,8 @@ re-capture from CI Linux. Worth doing, and worth doing deliberately.
 **Its two sub-items are DONE and are not waiting on you** (D0229, D0230). The read-only worldgen
 passes in `test_reveal_spawn_bounds` are merged -- **the suite went 81.1s -> 61.3s, measured, against a
 predicted ~19s** -- and the local-battery trap is closed by `tools/run_local_battery.sh`, which parses
-the workflow and reads the `tests` job's own steps (37 suites) instead of grepping the file for
-`res://tests/test_*.gd` (38, the extra being the schedule-only 1.5M-tick sweep). What remains here is
+the workflow and reads the `tests` job's own steps (38 suites) instead of grepping the file for
+`res://tests/test_*.gd` (39, the extra being the schedule-only 1.5M-tick sweep). What remains here is
 only the running-hash change to `state_signature()`, which is the determinism contract itself.
 
 **The aliasing half stays parked and the reason is unchanged:** sharing one CARVED grid between the walk
