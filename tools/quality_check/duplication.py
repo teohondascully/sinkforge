@@ -32,6 +32,7 @@ Carries a yield counter from day one (`dashboard.py`'s YIELD section, this file'
 stated here, not only in the dashboard wrapper, so it is not exempted from the project's standing
 retire-what-never-fires rule by feeling virtuous.
 """
+import re
 import sys
 from pathlib import Path
 
@@ -69,6 +70,38 @@ def _is_trivial_main_dispatch(f) -> bool:
     return f.lang == "py" and f.name == "main" and f.length <= MAIN_BOILERPLATE_MAX_LINES
 
 
+# A body of nothing but `<field> = <identifier>` and nothing else. Anchored, so a call, an operator, an
+# index or a literal on the right disqualifies it -- `_grid = grid` matches, `_grid = grid.dup()` and
+# `total = a + b` do not.
+_ASSIGNMENT_ONLY_RE = re.compile(r"^\s*[A-Za-z_]\w*\s*=\s*[A-Za-z_]\w*\s*$")
+
+
+def _is_plain_constructor(f) -> bool:
+    """True for a GDScript `_init` whose body is nothing but assignments of its own parameters to
+    fields. D0221, and the same trade `_is_trivial_main_dispatch` above already makes once: a named,
+    bounded exclusion for a shape whose collisions carry NO information, in exchange for keeping the
+    general detector at full sensitivity.
+
+    The shape collides by arithmetic, not by copying. After identifier normalisation a constructor of
+    arity N is the token sequence `ID = ID` repeated N times -- so EVERY plain constructor of the same
+    arity in the codebase is byte-identical to every other, always, in any project. Found live:
+    `interface/interface.gd::_init` (three collaborators) and `sim/world/tile_grid.gd::_init` (width,
+    height, seed) were reported as a cluster of 2 the day the first one was written. They share no
+    layer, no subject and no history; there is nothing to deduplicate, and the only fix available
+    without this exclusion is to contort one of them into a different shape, which is gaming a gate
+    rather than answering it.
+
+    Risk, stated per D0097's own convention rather than left implicit: a constructor that genuinely WAS
+    copy-pasted between two classes is now invisible to this detector. Accepted, and narrower than it
+    sounds -- a copy-pasted constructor whose body is only field assignments is a copy of nothing but
+    its own signature, which `tools/layer_lint/` and code review both see. Anything with a default, a
+    call, a computation or a branch in it stays fully compared."""
+    if f.lang != "gd" or f.name != "_init":
+        return False
+    body = [ln for ln in f.source.splitlines()[1:] if ln.strip() and not ln.strip().startswith("#")]
+    return bool(body) and all(_ASSIGNMENT_ONLY_RE.match(ln) for ln in body)
+
+
 def analyze(functions=None) -> dict:
     functions = all_functions() if functions is None else functions
     result = {}
@@ -77,6 +110,8 @@ def analyze(functions=None) -> dict:
         groups: dict[tuple, list] = {}
         for f in functions:
             if f.lang != lang or f.length < MIN_LINES:
+                continue
+            if _is_plain_constructor(f):
                 continue
             if _is_trivial_main_dispatch(f):
                 continue

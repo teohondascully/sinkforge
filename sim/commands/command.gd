@@ -35,15 +35,21 @@ var cell: Vector2i = Vector2i.ZERO  ## MINE only, terrain-cell coordinates
 ## Named constructors rather than a public `_init` with optional arguments: a `Command.new()` with every
 ## payload defaulted is a command with no kind, and there is no valid one. These cannot produce that.
 static func move(frame: InputFrame) -> Command:
-	var c: Command = Command.new()
-	c.kind = Kind.MOVE
-	c.input = frame
-	return c
+	return _of(Kind.MOVE, frame, Vector2i.ZERO)
 
 
 static func mine(target: Vector2i) -> Command:
+	return _of(Kind.MINE, null, target)
+
+
+## Both constructors funnel through here, which is not ceremony: written out separately they were
+## byte-identical after identifier normalisation and `tools/quality_check/duplication.py` (D0099, a
+## BLOCKING gate) reported them as a cluster of 2 -- correctly. Two constructors that differ only in
+## which payload field they set ARE one constructor with an argument.
+static func _of(k: Kind, frame: InputFrame, target: Vector2i) -> Command:
 	var c: Command = Command.new()
-	c.kind = Kind.MINE
+	c.kind = k
+	c.input = frame
 	c.cell = target
 	return c
 

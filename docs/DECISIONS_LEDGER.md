@@ -9010,3 +9010,51 @@ created" and left all three pre-existing agent logs in place.
 purpose and any future labelled agent capture, and it would make the directory's own two-dialect rule
 (D0140) harder to reason about, not easier. The byproduct belongs to the run that made it, so the run
 cleans it up.
+
+---
+
+## D0221 · Three duplication clusters, three different answers — and only one was duplication · 2026-08-30
+**Decided:** the BLOCKING duplication gate (D0099) went red on this round's new files with three
+clusters. Each got a different answer, because each was a different thing.
+
+**Cluster 1 was real duplication and is deduplicated.** `Command.move` and `Command.mine` were
+byte-identical after identifier normalisation. The gate was right: **two constructors that differ only in
+which payload field they set ARE one constructor with an argument.** Both now funnel through `Command._of`
+and are two lines each, below the size floor.
+
+**Cluster 2 was a missing test, and fixing the test dissolved it.** `test_score.gd::_built` collided with
+`test_replay_determinism.gd::_sorted_ids` — two unrelated three-statement declare-mutate-return
+skeletons. Rather than reshape one to dodge the collision, `_built` gained the parameter it should always
+have had: `music_db`. **That is the ONE line that differs from `legacy/scenes/score.gd`, and until now it
+had no coverage at all.** The new check asserts injecting -12.0 moves the output by exactly -12.0 dB, and
+that the DEFAULT of 0.0 means no attenuation rather than silence — a default written as -80.0 would look
+like a successful lift and produce nothing.
+
+**Cluster 3 could not be answered in the code, and got a named exclusion instead.**
+`interface/interface.gd::_init` (three collaborators) and `sim/world/tile_grid.gd::_init` (width, height,
+seed) share no layer, no subject and no history. **They collide by ARITHMETIC, not by copying**: after
+identifier normalisation a constructor of arity N is `ID = ID` repeated N times, so every plain
+constructor of the same arity in any codebase is byte-identical to every other. There is nothing to
+deduplicate, and the only fix available without an exclusion is to contort one of them into a different
+shape — **gaming a gate rather than answering it**, which is worse than the finding.
+
+So `_is_plain_constructor` joins `_is_trivial_main_dispatch`, the same trade the file already makes once:
+a named, narrow exclusion for a shape whose collisions carry no information, in exchange for keeping the
+general detector at full sensitivity. It is anchored to a GDScript `_init` whose body is nothing but
+`<field> = <identifier>` — a call, an operator, an index or a literal on the right disqualifies it.
+
+**Risk stated, per D0097's convention:** a constructor genuinely copy-pasted between two classes is now
+invisible here. Narrower than it sounds — a copy-pasted body that is only field assignments is a copy of
+nothing but its own signature.
+
+**Mutation-tested in all three failure directions plus a control**, in
+`tools/quality_check/test_quality_check.py` (45/45 cases): the exclusion holds for two plain constructors;
+the SAME shape under a name other than `_init` is still caught; an `_init` with a CALL in it is still
+compared; and a genuinely duplicated pair is still clustered, so none of the first three can be passing on
+a detector that has stopped working.
+
+**One more thing this made visible.** The gate scans the filesystem, so `tools/scratch/probe_corner.gd`
+(gitignored, never in a CI checkout) clustered with the tracked suite it was promoted into. That is
+`docs/NEEDS_DIRECTOR.md` P003 exactly — the same gate name reporting on two different populations
+depending on where it runs. The scratch file is deleted rather than worked around; its content lives on
+as `tests/test_corner_consent.gd`.

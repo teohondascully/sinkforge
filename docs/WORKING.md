@@ -51,6 +51,16 @@ chosen by measuring rather than by slice order.
 colons made `harness.yml` invalid YAML; **GitHub ran zero jobs** and reported an ordinary red, while gate
 31 found every suite it was looking for. It parses first now, with a permanent 5/5 mutation test.
 
+**D0221 — three duplication clusters, three different answers.** The BLOCKING gate surfaced at all only
+because gate 7 went GREEN (game LOC 2,362 -> 3,075 against instrument +1,186, 1.66x under a 2x limit), so
+the ten checks D0207 found reporting `skipped` behind it finally ran. `Command.move`/`mine` was REAL duplication and is deduplicated (two constructors
+differing only in which payload field they set are one constructor with an argument).
+`test_score::_built` colliding with `test_replay_determinism::_sorted_ids` was a MISSING TEST — `_built`
+gained the `music_db` parameter it should have had, which is the one line that differs from legacy and
+had no coverage at all. And `interface::_init` vs `tile_grid::_init` **collide by arithmetic, not by
+copying**: a plain constructor of arity N normalises to `ID = ID` repeated N times, so every one collides
+with every other. That got a named exclusion, mutation-tested in three failure directions plus a control.
+
 **D0218/D0219/D0220 — three smaller ones with the same shape.** "No automated checks on documents" was
 stated in three normative docs while three ran in CI (repaired by stating the LINE: a gate may check that
 two artifacts agree, never that prose is true). The `delve` capture fired at tick 940 on a run that now
@@ -92,35 +102,28 @@ mutation-tested bounds controls; gate 31 now reconciles the sets and prints memb
 wide, the body is 8.3% of that and 33% of the screen's height at zoom 6. Shrinking the body and widening
 the world are the same fix from two ends, and no mining change reaches either.
 
-## STANDING — carried forward, none of it closed by Slice 1.5
+## STANDING — carried forward, unchanged by this round
 
-**D0193 — the bounds invariant has no magnitude. The director's call, gate 24's subject.** It fired at
-0.3125px (D0192) and 3.4px (D0199); D0055 built it for 15.85px, and this world is 192px wide, so pressing
-into a wall is ordinary play. The discriminator is written up: overshoot against `|vel|/TICK_HZ` separates
-a wall-press from an escape without a threshold picked to silence a log.
+**D0193 — the bounds invariant has no magnitude, and it is the director's call** (gate 24's subject). It
+fired at 0.3125px and 3.4px; D0055 built it for 15.85px, and this world is 192px wide, so pressing into a
+wall is ordinary play. The discriminator is written up: overshoot against `|vel|/TICK_HZ` separates a
+wall-press from an escape without a threshold picked to silence a log.
 
-**The fuzzer still never sets `mine_held`, and D0202 raises the price of that.** Gate 26 is green about
-cursor-aim mining only because it never exercises it. A bite radius is a shape generator and it found a
-real resolver defect in one recorded session; wiring the fuzzer to the verb is now a much better bet than
-it looked. Still not done, still its own unit of work.
+**The fuzzer still never sets `mine_held`.** Gate 26 is green about cursor-aim mining only because it
+never exercises it. Named four times now; still its own unit of work. **Line of sight is not ported**
+(D0195) — a player can mine through one tile of rock, a real behaviour difference from legacy.
 
-**Line of sight is not ported.** Legacy gates mining on a float DDA; without it a player can mine through
-one tile of rock. Real behaviour change, stated rather than dropped (D0195).
+**Standing instruction — milestone recordings and captures.** Every slice, and any work that changes what
+a player sees or does, commits the `--play`/agent `.log`, a screenshot, and the commit SHA it was produced
+against, **generated from the commit, never hand-typed**, agent-mode always LABELLED. Fixed 1920x1080,
+fixed camera, plus a before/after PAIR. `docs/MILESTONES.md` carries the rows;
+`tools/capture_moments.sh <slice-label>` is the driver, with `BITE=` and `TICKS=` pinning the two things a
+mining change moves — and D0219 is why both halves of a pair must pin them explicitly.
 
-**Standing instructions — milestone recordings and the screenshot set.** Every slice, and any intermediary
-work that changes what a player sees or does, commits the `--play`/agent `.log`, a screenshot, and the
-commit SHA it was produced against — **generated from the commit, never hand-typed**, never overwritten,
-agent-mode always LABELLED. Canonical moments at a FIXED 1920x1080 from a FIXED camera plus a before/after
-PAIR at each visual milestone. `docs/MILESTONES.md` carries a row per milestone and the full rationale;
-`tools/capture_moments.sh <slice-label>` is the driver, with `BITE=n` and `TICKS=a,b,c` pinning the two
-things a mining change moves.
-
-**Slice 0 and Slice 1, both closed.** Evidence: `docs/DECISIONS_LEDGER.md` D0187-D0198 and
-`docs/MILESTONES.md`. The Q1 answer that gates the expensive slices still stands — **the palette reads at
-16px; the FLECK does not**, so any material whose identity lives in its flecks needs its base retuned for
-Slices 3-4, and `terrain_painter.gd` is not portable as written. **`claims/C004` is still untouched on
-purpose:** two real human sessions now exist, but deciding whether one qualifies is the director's
-judgment, not a session's.
+**Slices 0, 1 and 1.5 closed; Slice 2 closed this round.** The Q1 answer that gates the expensive slices
+stands: **the palette reads at 16px; the FLECK does not**, so `terrain_painter.gd` is not portable as
+written and needs an art pass rather than a port. **`claims/C004` is still untouched on purpose:** four
+real human sessions exist, but deciding whether one qualifies is the director's judgment.
 
 ## CLOSED — D0139, reverted on the director's ruling; the diagnosis survived, the remedy did not
 

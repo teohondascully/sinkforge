@@ -250,6 +250,54 @@ def branch_duplication_main_exclusion() -> None:
           detail=str(result3["py"]["clusters"]))
 
 
+def branch_duplication_plain_constructor_exclusion() -> None:
+    """D0221's exclusion, and its three failure directions. A plain `_init` collides with every other
+    plain `_init` of the same arity BY ARITHMETIC -- after identifier normalisation both are `ID = ID`
+    repeated N times -- so the exclusion has to hold, and has to be narrow enough that a constructor
+    doing anything at all is still compared."""
+    ctor_a = gd_func("_init", 4, "func _init(a: int, b: int, c: int) -> void:\n"
+                                 "\t_x = a\n\t_y = b\n\t_z = c\n")
+    ctor_b = gd_func("_init", 4, "func _init(p: TileGrid, q: Body, r: Mining) -> void:\n"
+                                 "\twidth = p\n\theight = q\n\tseed = r\n")
+    result = duplication.analyze([ctor_a, ctor_b])
+    check("duplication (gd): two assignment-only _init constructors are NOT clustered",
+          result["gd"]["clusters"] == [], detail=str(result["gd"]["clusters"]))
+
+    # Direction 1: the exclusion is keyed on the NAME `_init`, not on being short and assignment-shaped.
+    named_a = gd_func("setup", 4, "func setup(a: int, b: int, c: int) -> void:\n"
+                                  "\t_x = a\n\t_y = b\n\t_z = c\n")
+    named_b = gd_func("configure", 4, "func configure(p: int, q: int, r: int) -> void:\n"
+                                      "\twidth = p\n\theight = q\n\tseed = r\n")
+    r2 = duplication.analyze([named_a, named_b])
+    check("duplication (gd): the SAME shape under a name other than _init is still caught",
+          any(named_a.qualname in cl and named_b.qualname in cl for cl in r2["gd"]["clusters"]),
+          detail=str(r2["gd"]["clusters"]))
+
+    # Direction 2: an `_init` that does anything beyond bare assignment is still compared. A call on the
+    # right-hand side is the cheapest case that must not be swallowed.
+    doing_a = gd_func("_init", 4, "func _init(a: int, b: int, c: int) -> void:\n"
+                                  "\t_x = a.dup()\n\t_y = b\n\t_z = c\n")
+    doing_b = gd_func("_init", 4, "func _init(p: int, q: int, r: int) -> void:\n"
+                                  "\twidth = p.dup()\n\theight = q\n\tseed = r\n")
+    r3 = duplication.analyze([doing_a, doing_b])
+    check("duplication (gd): an _init with a CALL in it is still compared -- the exclusion is "
+          "assignment-only, not name-only",
+          any(doing_a.qualname in cl and doing_b.qualname in cl for cl in r3["gd"]["clusters"]),
+          detail=str(r3["gd"]["clusters"]))
+
+    # Direction 3: the positive control for the whole branch. Without it, all three checks above would
+    # also pass on a build where `analyze()` had stopped clustering anything at all.
+    dup_a = gd_func("compute", 5, "func compute(a: int) -> int:\n\tvar t = a * 2\n"
+                                  "\tt += 1\n\tt *= 3\n\treturn t\n")
+    dup_b = gd_func("evaluate", 5, "func evaluate(z: int) -> int:\n\tvar u = z * 2\n"
+                                   "\tu += 1\n\tu *= 3\n\treturn u\n")
+    r4 = duplication.analyze([dup_a, dup_b])
+    check("duplication (gd): control -- a genuinely duplicated pair IS still clustered, so the three "
+          "checks above are not passing on a detector that stopped working",
+          any(dup_a.qualname in cl and dup_b.qualname in cl for cl in r4["gd"]["clusters"]),
+          detail=str(r4["gd"]["clusters"]))
+
+
 def branch_duplication_gate_exit() -> None:
     clean = {"gd": {"functions_considered": 5, "clusters": []},
              "py": {"functions_considered": 5, "clusters": []}}
@@ -382,7 +430,8 @@ def branch_dashboard_runs_end_to_end() -> None:
 def main() -> int:
     for branch in (branch_function_length_outlier, branch_function_length_guardrail,
                    branch_complexity, branch_complexity_guardrail, branch_duplication,
-                   branch_duplication_main_exclusion, branch_duplication_gate_exit,
+                   branch_duplication_main_exclusion,
+                   branch_duplication_plain_constructor_exclusion, branch_duplication_gate_exit,
                    branch_coupling_sim_path_and_class_name, branch_coupling_tools_import_resolution,
                    branch_coupling_stub_exclusion,
                    branch_find_gd_files_reaches_whole_tree,

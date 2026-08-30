@@ -28,8 +28,9 @@ extends "res://tests/test_base.gd"
 ## `queue_free()` never runs at all, because the suite quits before the tree processes the queue, which
 ## leaves an ObjectDB leak that `tools/run_gd_test.sh` reads as an engine-level failure. Adding the
 ## players as children of a DETACHED node works fine, so nothing is lost by staying out of the tree.
-func _built() -> Score:
+func _built(music_db: float = 0.0) -> Score:
 	var score: Score = Score.new()
+	score.music_db = music_db
 	score._ready()
 	return score
 
@@ -39,6 +40,7 @@ func _initialize() -> void:
 	_test_the_noise_bed_is_the_same_recording_every_boot()
 	_test_the_mix_follows_depth_in_the_direction_the_header_claims()
 	_test_nothing_plays_under_headless()
+	_test_the_injected_music_level_reaches_the_mix()
 	_finish("score")
 
 
@@ -106,3 +108,25 @@ func _test_nothing_plays_under_headless() -> void:
 	_check(score._muted, "so the score mutes itself, and no voice is started for the Dummy driver to leak")
 	_check(not score._open.playing, "confirmed on the player itself after synthesis")
 	score.free()
+
+
+## The ONE line that differs from `legacy/scenes/score.gd`, and until now the only part of the port with
+## no coverage at all: legacy read the music slider off a `Settings` global, and `Settings` belongs in
+## `shell/`, which a `view/` file may not reach. The level is an injected property instead -- so the
+## thing worth asserting is that injecting it actually moves the output, and that its DEFAULT is no
+## attenuation rather than silence. A default of 0.0 that had been written as -80.0 would look like a
+## successful lift and produce nothing.
+func _test_the_injected_music_level_reaches_the_mix() -> void:
+	var plain: Score = _built()
+	plain.set_depth(0.0, 100.0)
+	var at_default: float = plain._open.volume_db
+	plain.free()
+	var quiet: Score = _built(-12.0)
+	quiet.set_depth(0.0, 100.0)
+	var attenuated: float = quiet._open.volume_db
+	quiet.free()
+	_check(is_equal_approx(attenuated, at_default - 12.0),
+		"music_db is applied as a dB offset on top of the mix (%.1f -> %.1f, expected -12.0)" %
+		[at_default, attenuated])
+	_check(at_default > -80.0,
+		"and its default of 0.0 means NO attenuation, not silence (%.1f dB)" % at_default)

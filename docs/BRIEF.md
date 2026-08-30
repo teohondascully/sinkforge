@@ -5,13 +5,15 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
 **Last updated: 2026-08-30. This round: the third teleport closed, then Slice 2 — `interface/` exists, the
-build makes a sound, and mining throws chips. 7 commits, `c953117`..`5c655b7`.
-`docs/DECISIONS_LEDGER.md` D0213-D0220, `docs/adr/0007-l2-interface.md`.**
+build makes a sound, and mining throws chips. 9 commits, `c953117`..HEAD.
+`docs/DECISIONS_LEDGER.md` D0213-D0221, `docs/adr/0007-l2-interface.md`.**
 
 **Headline: the instant-translation class is closed at its third and last instance, and L2 is real.
 `interface/` and `sim/commands/` stop being skeletons, which was the literal blocker on the presentation
 batch. But the batch itself is mostly blocked by the run's own non-negotiable — measured, not guessed —
-and `docs/NEEDS_DIRECTOR.md` is a new file carrying six parked items. Read it before this one.**
+and `docs/NEEDS_DIRECTOR.md` is a new file carrying six parked items. Read it before this one. Gate 7 is
+green for the first time in weeks, which is what unmasked ten BLOCKING checks that had been reporting
+`skipped` behind it.**
 
 ---
 
@@ -73,10 +75,16 @@ not claimed, and how to build it is written down instead.
 **All 36 suites pass locally**, including the four new ones (`test_corner_consent`, `test_interface`,
 `test_score`, `test_particles`). Golden re-captured from CI's Linux build, run `33331589523`.
 
-**Gate 7 (LOC velocity) is the one red, and this round made it much worse** — four new suites, a new
-gate mutation test, and two new `view/` modules. Its own message stands: "the next unit of work is game,
-not another check." D0207's finding still applies: gate 7 aborts the `structural gates` job, so ten
-BLOCKING checks after it report `skipped` rather than pass or fail.
+**Gate 7 (LOC velocity) is GREEN, for the first time in weeks.** I expected the opposite and said so
+before measuring: four new suites and a gate mutation test should have made it worse. They did — but
+`interface/`, `sim/commands/`, `view/audio/` and `view/fx/` are GAME code, and game LOC went 2,362 ->
+3,075 while instrument went +1,186. **1.66x against a 2x limit.** Gate 7's own message is "the next unit
+of work is game, not another check", and it is green because that is what this round was.
+
+The absolute ratio is still 4.49 and still informational; it falls only when game LOC grows.
+**D0207's finding is untested by this run and still stands:** gate 7 aborting the job made ten BLOCKING
+checks report `skipped`, and with gate 7 passing they now run — which is how the duplication gate (D0221)
+surfaced at all, after being masked for as long as gate 7 was red.
 
 ## Claims
 
