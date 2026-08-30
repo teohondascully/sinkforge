@@ -328,6 +328,9 @@ jobs:
       - name: test_movement_course (the agility playground still poses what it claims — D0208)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_movement_course.gd
 
+      - name: test_view_window (per-frame draw work is bounded by the viewport — D0211)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_view_window.gd
+
       - name: test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_spawn_bounds.gd
 

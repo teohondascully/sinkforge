@@ -68,15 +68,60 @@ static func _resolve_cell(body: Body, grid: TileGrid, input: InputFrame, moving_
 ## held but head clearance refused it. Extracted 2026-08-28 (D0100) from `body.gd`'s own
 ## `_resolve_horizontal_cell` -- returns true iff a climb succeeded (caller should stop, this cell is
 ## resolved), false otherwise (caller falls through to depenetration).
+## D0209: the auto step-up is a WALKING affordance and only fires with the feet already on the ground.
+## Without that gate it also fired in mid-air, which is a different move entirely: the body is translated
+## up to a full `STEP_UP_PX` in ONE tick -- 16px at 60Hz is 960 px/s, 1.7x `MAX_FALL_PX_S` -- so jumping
+## alongside a ledge snapped the body onto it instead of letting the jump carry it there. The director's
+## own words, on a session where 12 of 17 step-ups happened while airborne: "it feels like I teleport on
+## top of the high step instead of jumping straight up and needing to move right onto the platform."
+##
+## This is the reference implementation's rule, not a new one, and it is the SECOND precondition of
+## `_try_step` that was left behind when the function itself was ported -- D0205 was the first (the
+## `_stepped` gravity-skip). `legacy/scenes/player.gd` line 367 sets `_step_grounded = grounded` with the
+## comment "let the horizontal resolve auto-step <=1-tile walls when grounded", and line 531 gates on it.
+## **Porting a function is not porting its preconditions**, and this module has now paid for that twice.
+##
+## The MANTLE is deliberately NOT gated the same way: it already requires `input.mantle_hold`, so it is a
+## thing the player asks for rather than something that happens to them, and climbing while airborne is
+## the move. Gating the edge-catch report alongside the step-up matters too -- an airborne near-miss is
+## not a ledge the body "should have been able to walk up", and counting it as one would report a feel
+## failure that never happened.
 static func _try_climb(body: Body, grid: TileGrid, input: InputFrame, extends_forward: bool, lift: int) -> bool:
-	if extends_forward and body.vel_x != 0 and lift <= Body.STEP_UP_PX * Fx.SCALE and _try_step(body, grid, lift):
+	# COYOTE, not raw `on_floor`, and the difference is not cosmetic. `on_floor` is whatever the PREVIOUS
+	# tick's vertical pass left, and `move_and_resolve` clears it on any tick with vertical movement, so a
+	# body running over even slightly uneven ground reads airborne on scattered ticks and would skip a
+	# step it is plainly walking into. Measured: with raw `on_floor` the 20,000-tick shaft replay produced
+	# ZERO step-ups (down from 3), which is the scenario losing the path rather than the path behaving.
+	#
+	# `_coyote_ticks_left` is exactly "grounded within the last COYOTE_TICKS and has not jumped since" --
+	# `_handle_jump` zeroes it on launch. So a deliberate jump still cannot auto-step, which is the whole
+	# point of the gate, while a body that merely left the ground for a tick or two still can.
+	var recently_grounded: bool = body.on_floor or body._coyote_ticks_left > 0
+	var may_step: bool = (recently_grounded and extends_forward and body.vel_x != 0
+		and lift <= Body.STEP_UP_PX * Fx.SCALE)
+	if may_step and _try_step(body, grid, lift):
 		body.stepped_up_this_tick = true
 		return true
-	if (extends_forward and body.vel_x != 0 and lift <= Body.MANTLE_PX * Fx.SCALE and input.mantle_hold
+	# D0212: the mantle is gated the same way, and the reasoning that first exempted it was wrong. "It
+	# requires `input.mantle_hold`, so the player asked for it" -- except `mantle_hold` is toward-and-UP,
+	# and holding up while jumping is not a request to climb. Measured on the director's own session, all
+	# three occurrences at the same cell (217,33): the body jumping UP past the movement course's perch
+	# (`vel_y` -35, -140, -125) with its leading edge in the perch's column, yanked 17.4 / 26.8 / 24.7 px
+	# in ONE tick -- up to 1605 px/s, nearly 3x terminal velocity. It bypassed the jump and made the
+	# perch, which exists to demand a precise landing, free.
+	#
+	# There is no reference implementation for this one: `legacy/scenes/player.gd` has no mantle at all,
+	# and `docs/ARCHITECTURE.md` §9 specifies it in one line ("2 tiles on toward-and-up hold") that says
+	# nothing about grounding. So this is a judgment call rather than a port, made to match the sibling
+	# mechanic: a climb is something the body does FROM THE GROUND. That is also what makes an instant
+	# translation tolerable at all -- a 16px pop while walking reads as stepping onto a kerb, the same pop
+	# mid-flight reads as a teleport, because in the air there was an expected trajectory to violate.
+	if (recently_grounded and extends_forward and body.vel_x != 0
+			and lift <= Body.MANTLE_PX * Fx.SCALE and input.mantle_hold
 			and _try_step(body, grid, lift)):
 		body.mantled_this_tick = true
 		return true
-	if extends_forward and body.vel_x != 0 and lift <= Body.STEP_UP_PX * Fx.SCALE:
+	if may_step:
 		body.edge_caught_this_tick = true  # should have been walkable; head clearance refused it
 	return false
 

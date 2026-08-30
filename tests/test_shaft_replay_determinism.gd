@@ -199,5 +199,22 @@ func _test_scenario_actually_exercises_jump_mantle_step_and_dig(a: Dictionary) -
 	# doesn't stay permanently red over a platform gap Part G was never scoped to fix.
 	if mantles == 0:
 		print("shaft_replay_determinism NOTE: golden run mantled zero times on this platform (see D0168)")
-	_check(stepups > 0, "the golden scenario actually steps up at least once (got %d)" % stepups)
+	# NOT a _check() either, from D0209, and for a sharper reason than the mantle case above: this
+	# assertion was only ever satisfied BY THE DEFECT. Measured directly, by instrumenting this scenario's
+	# own probe to record whether the body was airborne on each step-up and running it either side of the
+	# fix: **AIRBORNE_STEPUPS=11 of 11**. Every step-up this 20,000-tick scenario has ever produced was
+	# `_try_step` firing in mid-air -- the body translated a full logic tile in one tick, 960 px/s against
+	# a 560 px/s terminal velocity. It has never once exercised a legitimate grounded step-up, so the
+	# coverage this line claimed to prove did not exist; what it actually proved was that the bug was
+	# still present. Gating on it now would mean keeping the defect to keep the assertion green.
+	#
+	# The path's REAL coverage, all of it grounded and all of it passing: `test_step_up_grounding.gd`,
+	# `test_floor_source_telemetry.gd::_test_auto_step_up_names_try_step`, `test_movement_course.gd`'s
+	# four one-tile stairs, and `test_body_acceptance.gd`'s own `step_up_success_rate` over
+	# `HostileChamber.LEDGE_START`. Reported here, not asserted, and the gap is named rather than papered
+	# over: this scenario's random driver does not currently produce a grounded walk into its own carved
+	# ledge, which is worth fixing in the scenario if step-up determinism coverage is wanted back.
+	if stepups == 0:
+		print("shaft_replay_determinism NOTE: golden run stepped up zero times -- all 11 occurrences " +
+			"before D0209 were AIRBORNE, i.e. the defect; grounded step-up is covered by four other suites")
 	_check(digs > 0, "the golden scenario actually digs at least once (got %d)" % digs)

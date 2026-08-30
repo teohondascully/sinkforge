@@ -54,7 +54,9 @@ var _screenshot_tick: int = -1
 var _screenshot_path: String = ""
 var _course: bool = false
 var _zoom: float = 3.0
+var _air: int = Body.AIR_CONTROL_NUM
 var _look: MaterialLook = MaterialLook.new()
+var _color_cache: Dictionary = {}  ## see `_cell_color` -- valid only because this scene cannot dig
 
 
 func _ready() -> void:
@@ -68,6 +70,11 @@ func _ready() -> void:
 			_zoom = maxf(0.5, float(arg.trim_prefix("--zoom=")))
 		elif arg == "--course":
 			_course = true
+		elif arg.begins_with("--air="):
+			# D0210: the numerator of AIR_CONTROL_NUM/DEN, so `--air=5` is full ground accel in the air
+			# and `--air=3` is the shipped default. Clamped to [0, DEN] -- above the denominator would be
+			# MORE responsive airborne than grounded, which is not a point on the axis being judged.
+			_air = clampi(int(arg.trim_prefix("--air=")), 0, Body.AIR_CONTROL_DEN)
 	# `--course` swaps the terrain and the spawn, and nothing else: the input reading, the recording, the
 	# screenshot path and the camera are all unchanged, because a movement playground and an acceptance
 	# chamber differ only in what the ground is shaped like. Agent mode stays on `HostileChamber` --
@@ -79,6 +86,7 @@ func _ready() -> void:
 		_body = Body.new(
 			Fx.from_int(HostileChamber.SPAWN_START * CELL + Body.WIDTH_PX),
 			Fx.from_int(HostileChamber.FLOOR_ROW * CELL) - Body.HEIGHT_PX / 2 * Fx.SCALE)
+	_body.air_control_num = _air
 	_camera = Camera2D.new()
 	add_child(_camera)
 	# Default zoom 1 shows 1280x720 world px, against a 16x40px body -- unreadable for a feel judgment,
@@ -151,13 +159,33 @@ func _update_camera() -> void:
 	_camera.position = Vector2(float(_body.pos_x) / float(Fx.SCALE), float(_body.pos_y) / float(Fx.SCALE))
 
 
+## D0211. Only what the camera can see. The math lives in `ViewWindow` rather than here so the bound it
+## establishes can be ASSERTED by `tests/test_view_window.gd` -- a scene method cannot be unit-tested, and
+## the whole point of this change is that the per-frame work is now a checkable quantity rather than a
+## thing that has to be felt in a running window.
+func _visible_cells() -> Rect2i:
+	return ViewWindow.visible_cells(_camera.position, get_viewport_rect().size, _zoom, CELL,
+		_grid.width, _grid.height)
+
+
+## Memoized per cell. `MaterialLook.cell_color` does a band lookup, a depth darken and two hashes per
+## call, which was being paid for every solid cell of every frame once this scene stopped drawing one flat
+## colour. SAFE HERE AND ONLY HERE: `play_scene` has no mining or digging verb -- `_read_play_input` never
+## sets `dig_pressed`, and `Body._handle_dig` is the only thing that mutates terrain -- so the grid is
+## immutable after `_ready`. `reveal_scene` must NOT copy this; its terrain changes under the player.
+func _cell_color(cell: Vector2i) -> Color:
+	if _color_cache.has(cell):
+		return _color_cache[cell]
+	var c: Color = _look.cell_color(_grid.get_material(cell), cell.x, cell.y)
+	_color_cache[cell] = c
+	return c
+
+
 func _draw() -> void:
 	draw_rect(Rect2(-4000, -4000, 12000, 12000), COLOR_BG, true)
-	var view_center_col: int = Body._px_to_cell(_body.pos_x)
-	var col_lo: int = maxi(0, view_center_col - 200)
-	var col_hi: int = mini(_grid.width, view_center_col + 200)
-	for col: int in range(col_lo, col_hi):
-		for row: int in range(0, _grid.height):
+	var view: Rect2i = _visible_cells()
+	for col: int in range(view.position.x, view.position.x + view.size.x):
+		for row: int in range(view.position.y, view.position.y + view.size.y):
 			var cell: Vector2i = Vector2i(col, row)
 			if not _grid.is_solid(cell):
 				continue
@@ -165,8 +193,7 @@ func _draw() -> void:
 			# `reveal_scene`). It matters here specifically: the movement course marks every target that
 			# has to be READ before it is jumped to -- the perch, the pillars -- in `hardrock` against
 			# `clay` ground, and a single flat fill would throw that distinction away.
-			draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL),
-				_look.cell_color(_grid.get_material(cell), col, row), true)
+			draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL), _cell_color(cell), true)
 	var left: float = float(_body._left_x()) / float(Fx.SCALE)
 	var top: float = float(_body._top_y()) / float(Fx.SCALE)
 	draw_rect(Rect2(left, top, Body.WIDTH_PX, Body.HEIGHT_PX),
@@ -205,8 +232,14 @@ func _flush_recording() -> void:
 	if f == null:
 		push_error("play_scene: could not open %s for writing (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return
-	f.store_line("# sinkforge input recording -- mode=%s chamber=hostile_chamber ticks=%d" %
-		[prefix, _recording.size()])
+	# D0209: `chamber=` was the literal `hostile_chamber` until `--course` existed, so every course
+	# recording claimed to be a chamber one and would replay against the wrong terrain -- silently, since
+	# both worlds are walkable and a replay against the wrong one still produces a plausible-looking run.
+	# Same rule the mining recordings already follow (D0200's `bite=`): a log carries what is needed to
+	# reconstruct it, and an OLD log must reconstruct as what it actually was, never as the current default.
+	f.store_line("# sinkforge input recording -- mode=%s chamber=%s ticks=%d" %
+		[prefix, "movement_course" if _course else "hostile_chamber", _recording.size()])
+	f.store_line("# air_control=%d/%d" % [_air, Body.AIR_CONTROL_DEN])
 	f.store_line("# tick,move_dir,jump_pressed,jump_held,mantle_hold")
 	for row: PackedStringArray in _recording:
 		f.store_line(",".join(row))

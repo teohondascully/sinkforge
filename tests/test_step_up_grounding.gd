@@ -61,6 +61,13 @@ func _test_a_step_up_tick_ends_grounded_and_not_embedded() -> void:
 	var grid: TileGrid = _map_grid(LEDGE_MAP)
 	var body: Body = Body.new(Fx.from_int(12), Fx.from_int(32))
 	var input: InputFrame = InputFrame.new()
+	# D0209: SETTLE FIRST. A freshly-constructed body has `on_floor == false` until a vertical pass has
+	# run, and the auto step-up now requires the feet to have been on the ground recently -- so pressing
+	# into the ledge on tick ONE asks a body that has never touched anything to climb. That is correct
+	# behaviour and this test was posing the wrong situation: a body walking into a ledge is grounded.
+	for _i: int in 20:
+		body.tick(input, grid)
+	_check(body.on_floor, "sanity: the body is standing on the floor before it is asked to climb")
 	input.move_dir = 1
 	body.tick(input, grid)
 	print("  [OBSERVED] step-up tick: floor_source=%s on_floor=%s vel_y=%.2f overlap=%d"

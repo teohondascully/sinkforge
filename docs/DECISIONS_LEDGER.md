@@ -8419,3 +8419,189 @@ that have to be READ before they are jumped to separate from the `clay` ground.
 
 **Reverse:** delete the fixture and its suite, drop `--course`/`--zoom` from `play_scene`. Nothing else
 reads either.
+
+---
+
+## D0209 · The auto step-up fired in mid-air — the SECOND precondition dropped from the same ported function · 2026-08-30
+**Decided:** `HorizontalResolve._try_climb`'s auto step-up now requires `body.on_floor`. The mantle does
+not, and deliberately: it already requires `input.mantle_hold`, so it is a thing the player asks for
+rather than something that happens to them.
+
+**The director's report, on a session they recorded themselves:** "when i jump next to a high step, it
+feels like i teleport on top of the high step instead of jumping straight up and needing to move right
+onto the platform." Measured against that exact log (`tools/scratch/trace_lift.gd`, 2163 ticks): **17
+step-ups, 12 of them while AIRBORNE**, biggest single-tick lift **16.0 px — 960 px/s at 60Hz, 1.7x
+`MAX_FALL_PX_S`**. The body was translated a full logic tile in one tick, faster than it can ever fall.
+The word "teleport" was not loose; it was the most accurate available description.
+
+**This is the same failure as D0205, four days apart and in the same function.** `legacy/scenes/player.gd`
+line 367 sets `_step_grounded = grounded`, commented "let the horizontal resolve auto-step <=1-tile walls
+when grounded", and line 531 gates on it. We ported `_try_step`'s BODY and left its preconditions behind
+— the `_stepped` gravity-skip (D0205) and now the grounded gate. **Porting a function is not porting its
+preconditions**, and the screen is: read every guard at the reference call site, not just the callee.
+
+**Result:** airborne step-ups 12 -> 0 on the director's own replayed session; 4 grounded step-ups remain,
+which is the stairs section working as intended. Bad ticks stay 0. `test_body_acceptance`'s
+`step_up_success_rate == 100%` still holds — the scripted traverse walks into its ledge grounded.
+
+**The edge-catch report is gated with it**, not separately: an airborne near-miss is not a ledge the body
+"should have been able to walk up," and counting it as one would report a feel failure that never
+happened. Sharing one `may_step` local makes the two impossible to drift apart.
+
+**Found only because the recording could be replayed, and it nearly could not be.** `play_scene`'s
+recording header wrote the literal `chamber=hostile_chamber` regardless of `--course`, so the director's
+course session claimed to be a chamber one. Replayed against the chamber it produced **1076 bad ticks**
+and a plausible-looking run; against the course, **0**. Both worlds are walkable, so nothing would have
+announced the mistake — the diagnosis would simply have been of the wrong world. Header now names the
+world it was recorded in, same rule as D0200's `bite=`.
+
+**Reverse:** drop `body.on_floor` from `may_step`; the airborne count returns to 12 on the same log.
+
+---
+
+## D0210 · Air control 3/5 -> 4/5, and the axis is now playable · 2026-08-30 · director's ruling
+**Decided:** `Body.AIR_CONTROL_NUM` 3 -> 4 (60% -> 80% of ground accel), and `Body.air_control_num` is a
+var so `play_scene`'s `--air=N` can sweep it live. The default is the shipped value; the flag exists so a
+feel question is answered by playing, the same shape `Mining.bite_radius` gave the bite (D0200).
+
+**The question, verbatim:** "what are your thoughts on making the movement mid air more reactive? i like
+games where u can kind of strafe back and forth while midair because of the reactive directions."
+
+**Measured before recommending, not after.** Flip the stick at the top of a full-speed jump; count ticks
+until the body is actually going the other way, against 52 ticks of airtime:
+
+| ratio | vel_x -> 0 | 60% reversed | share of airtime | overshoot |
+|---|---|---|---|---|
+| 2/5 | 20 ticks (0.33s) | 32 (0.53s) | 61% | 23.8 px |
+| 3/5 | 14 ticks (0.23s) | 22 (0.37s) | 42% | 15.4 px |
+| **4/5** | **10 ticks (0.17s)** | **16 (0.27s)** | **30%** | **11.2 px** |
+| 5/5 | 8 ticks (0.13s) | 13 (0.22s) | 25% | 8.8 px |
+
+**The number that names the complaint is the overshoot.** At 3/5 it is 15.4px against a 16px-wide body:
+the stick flips and the body drifts a full body-width past the point the decision was made at. At 4/5 it
+is 11.2px, inside its own width, so a correction lands roughly where it was aimed.
+
+**Why not 5/5, which is what "strafe freely" literally asks for.** Two reasons, and the second is the
+load-bearing one. At 5/5 air and ground accel are identical, so the grounded/airborne distinction leaves
+the movement entirely and a jump stops being a commitment. And full air control is worth more as an
+UPGRADE than as a default — `docs/GDD.md`'s progression web has a Tools axis, and this is a classic thing
+to grant. Shipping at 5/5 spends a lever that cannot be got back. `--air=5` is one flag away if the
+director wants to feel that trade rather than take it on argument.
+
+**Named as a feel decision in the source.** Every other constant in that block is either a port of
+legacy's tuning or a value `docs/ARCHITECTURE.md` §9 states; §9 names no air-control ratio at all, so
+this one is marked as the judgment call it is rather than sitting silently among ported numbers.
+
+**State-affecting, so it travels with the recording:** `air_control_num` is in `Body.state_signature` and
+`air_control=N/D` is in the recording header. A log replayed at a different ratio is a different run.
+
+**Flagged, not acted on:** `GROUND_ACCEL_TICKS = 8` means even grounded movement takes 8 ticks to reach
+full speed. If "reactive" turns out to mean snappy generally rather than airborne specifically, that is
+the other dial, and it is a separate decision rather than something to compensate for in the air.
+
+---
+
+## D0211 · The lag was the renderer, and the gate for it counts work rather than timing it · 2026-08-30
+**Decided:** `play_scene._draw` visits only the cells the camera can see (`ViewWindow.visible_cells`) and
+memoizes per-cell colour. `tests/test_view_window.gd` gates the bound. **A performance gate in this repo
+counts, it does not time.**
+
+**The director's report:** "as the progression go tby 800 ticks or something it started to lag a decent
+amount. is this because of the recording part? hmmm" — with their own hypothesis attached. The recording
+is a 1,473-row `Array.append`; it is not the cost. **A feel report is data and the mechanism attributed to
+it is a hypothesis** (D0200's own law, now the third time it has held).
+
+**It was mine, introduced two commits earlier.** D0208 changed this scene's draw from one flat constant to
+`MaterialLook.cell_color` per cell, so the pre-existing `body_col +/- 200 by full grid height` scan --
+already far more than fits on screen -- started paying a 110x more expensive colour lookup on every solid
+cell of every frame. Measured (`tools/scratch/bench_draw.gd`):
+
+| body column | old cells scanned | old cells drawn | new scanned | new drawn |
+|---|---|---|---|---|
+| 8 (spawn) | 14,144 | 3,984 | 3,213 | 1,116 |
+| 200 | **27,200** | **7,288** | 5,610 | 2,704 |
+| 300 | 23,120 | 6,440 | 5,610 | 1,744 |
+
+`cell_color` against a flat constant: **232,529 us vs 2,119 us for 200,000 calls, 110x**. At the old draw
+volume that is **~8.5 ms per frame on colour lookup alone, against a 16.67 ms budget at 60 Hz** -- about
+half the frame, before a single `draw_rect`.
+
+**Why it got WORSE as they played, which is the part their report pinned exactly:** `maxi(0, col - 200)`
+clamps the low end, so the window WIDENS as the body leaves the left edge behind -- 14,144 cells at spawn,
+27,200 by column 200. The cost was a function of progress. It is now flat: 5,610 everywhere, dropping only
+at the world's own edges where it clamps.
+
+**THE GATE IS A COUNT, AND A CLOCK WOULD HAVE BEEN GREEN THROUGH ALL OF IT.** Three reasons, and the
+first is decisive: CI runs headless, and the headless renderer is a dummy that does not rasterise (D0190
+caught it saving blank PNGs while reporting success), so **render cost is structurally invisible to CI**.
+Second, a duration assertion in this repo has already inverted its own 12% margin under `JOBS=4` -- timing
+layers must run alone, which makes them slow and fragile exactly where they need to be cheap. Third, D0207
+established that ten blocking gates already go unenforced behind a red gate 7, so an eleventh check in
+that job would not run at all; this one goes in the `tests` job, which is green.
+
+Cells-visited is deterministic, display-free, cannot flake, and is the quantity that actually regressed.
+`test_view_window.gd` asserts it is bounded by the viewport, does not grow with body position, and does
+not grow with world size (a 32-million-cell world visits the same 6,820). **Its positive control
+re-implements the OLD rule inline and asserts it BLOWS the bound -- 27,200 against 6,930, 3.9x over** --
+so a bound set loosely enough for anything to pass fails that test rather than passing silently.
+
+**The colour cache is scoped, and the scope is load-bearing:** `play_scene` has no mining or digging verb,
+so its grid is immutable after `_ready`. `reveal_scene` must not copy this; its terrain changes under the
+player. Stated at the cache, not just here.
+
+**Also fixed, and it nearly cost the whole diagnosis:** the recording header wrote the literal
+`chamber=hostile_chamber` regardless of `--course` (D0209). Replayed against the wrong world the
+director's session showed 1076 bad ticks and a plausible-looking run; against the right one, 0.
+
+---
+
+## D0212 · The mantle climbs from the ground too — and "the player asked for it" was the wrong test · 2026-08-30 · corrects D0209
+**Decided:** `HorizontalResolve._try_climb`'s mantle branch takes the same `recently_grounded` gate as the
+auto step-up. D0209 explicitly exempted it, with a reason that reads well and is wrong.
+
+**What D0209 said:** "The MANTLE is deliberately NOT gated the same way: it already requires
+`input.mantle_hold`, so it is a thing the player asks for rather than something that happens to them."
+**`mantle_hold` is toward-and-UP held** (`InputFrame`'s own field comment), and holding up while jumping
+is not a request to climb — it is holding up. The gate I reasoned about was a gate on INTENT; what
+`mantle_hold` actually reports is a key state that a player has every reason to be holding for other
+reasons. **An input flag is not consent unless the input means only one thing.**
+
+**Found by the director inside one session of playing the course** ("Found glitch bug at some point
+here"), and measured from their own recording: all three occurrences at the identical cell (217, 33) —
+the body travelling UPWARD past `MovementCourse`'s perch (`vel_y` -35, -140, -125) with its leading edge
+in the perch's column — yanked **17.4 / 26.8 / 24.7 px in ONE tick, up to 1605 px/s, nearly 3x terminal
+velocity**. It bypassed the jump entirely and made the perch, a section that exists to demand a precise
+landing, free.
+
+**No reference implementation exists for this one, unlike D0209's.** `legacy/scenes/player.gd` has no
+mantle at all — grep returns nothing — and `docs/ARCHITECTURE.md` §9 specifies it in a single table row,
+"2 tiles on toward-and-up hold", which says nothing about grounding. So this is a judgment call rather
+than a port, and it is made to match the sibling mechanic.
+
+**The principle both gates now share, worth stating once because it explains why an instant translation
+is tolerable at all:** a climb is something the body does FROM THE GROUND. A 16px pop while walking reads
+as stepping onto a kerb; the same pop mid-flight reads as a teleport, because in the air there was an
+expected trajectory for it to violate. That is why the director's word for both defects was "teleport"
+and then "glitch", and why the fix is a precondition rather than a smaller lift.
+
+**The better long-term fix is not this one.** Both climbs still translate the body instantaneously; they
+are merely now restricted to the state where that reads as correct. Animating a climb over several ticks
+would remove the class rather than fence it. Flagged, not attempted — it needs a climbing state in the
+resolver, which is a design change rather than a precondition.
+
+**Verified across all four of the director's recorded sessions, each replayed at the air-control ratio
+and world it was ACTUALLY recorded under:** 0 airborne step-ups, 0 mantles, 0 bad ticks.
+
+**Two instrument bugs found in the replayer while doing that, both mine, both the same shape.**
+(1) `trace_lift.gd` ignored the `air_control=` header and replayed at the current default, so a session
+recorded at 5/5 was being replayed at 4/5 — a completely different run, reported as if it were the
+subject's behaviour. (2) Once it read the header, its fallback for a log with NO such field was
+`Body.AIR_CONTROL_NUM` — **the current default**, which is precisely the rule D0200 already wrote down
+for `bite=` ("a log without it reconstructs at radius 0, never at the current default") and which D0209's
+own header fix restated. Writing the rule in a comment and then implementing the current default one line
+below it is the recurring failure here, not the rule being unknown. Pinned to the literal `3`.
+
+**Known and recorded, not fixed:** logs written before D0209 carry `chamber=hostile_chamber` regardless
+of the world they were played in. `play_2026-08-30T15-46-21.log` is one — proven to be a COURSE session
+(0 bad ticks against the course, 1076 against the chamber) while its own header says chamber. Any replay
+of a pre-D0209 log has to establish the world empirically rather than trust the field.

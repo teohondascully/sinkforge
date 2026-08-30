@@ -41,7 +41,13 @@ const GROUND_ACCEL_TICKS: int = 8    ## docs/ARCHITECTURE.md §9
 const GROUND_DECEL_TICKS: int = 4
 const ACCEL_PER_TICK: int = RUN_SPEED / GROUND_ACCEL_TICKS
 const DECEL_PER_TICK: int = RUN_SPEED / GROUND_DECEL_TICKS
-const AIR_CONTROL_NUM: int = 3       ## 60% of ground accel, as a plain-int ratio (no Fx needed: an
+## D0210, the director's ruling: raised 3 -> 4 (60% -> 80% of ground accel). The one FEEL DECISION in this
+## block -- every other constant here is a port of legacy's tuning or a value `docs/ARCHITECTURE.md` §9
+## states, and §9 names no air-control ratio at all. At 3/5 a mid-air reversal overshot 15.4px, just under
+## one BODY WIDTH; at 4/5 it is 11.2px, inside it. NOT 5/5, deliberately: there air and ground accel are
+## identical, so a jump stops being a commitment, and full air control is worth more granted on the
+## progression web's Tools axis than spent as the default. D0210 has the measured sweep across all four.
+const AIR_CONTROL_NUM: int = 4       ## 80% of ground accel, as a plain-int ratio (no Fx needed: an
 const AIR_CONTROL_DEN: int = 5       ## int*int/int, not two Fx values multiplied)
 const COYOTE_TICKS: int = 6
 const JUMP_BUFFER_TICKS: int = 6
@@ -77,6 +83,11 @@ var pos_y: int
 var vel_x: int = 0
 var vel_y: int = 0
 var facing: int = 1
+## D0210. Sweepable via `play_scene`'s `--air=N`, the same shape `Mining.bite_radius` (D0200) gave the
+## bite: this project answers a feel question by making the axis playable. State-affecting, so it travels
+## in `state_signature` AND in the recording header -- a log replayed at a different ratio is a different
+## run, and one without the field reconstructs at the ratio it was recorded under, never today's default.
+var air_control_num: int = AIR_CONTROL_NUM
 var on_floor: bool = false
 var _coyote_ticks_left: int = 0
 var _jump_buffer_ticks_left: int = 0
@@ -124,9 +135,9 @@ func _init(start_x: int, start_y: int) -> void:
 ## check). Excludes `_last_violation_col`/`_last_violation_row`/`_had_bounds_violation`: those gate
 ## `Invariants`' own stderr rate-limiting, not any future simulation output.
 func state_signature() -> String:
-	return "%d,%d,%d,%d,%d,%s,%d,%d,%s" % [
+	return "%d,%d,%d,%d,%d,%s,%d,%d,%s,%d" % [
 		pos_x, pos_y, vel_x, vel_y, facing, on_floor,
-		_coyote_ticks_left, _jump_buffer_ticks_left, _was_jump_held]
+		_coyote_ticks_left, _jump_buffer_ticks_left, _was_jump_held, air_control_num]
 
 
 func _left_x() -> int:
@@ -287,8 +298,8 @@ func _integrate_horizontal(input: InputFrame) -> void:
 	var accel: int = ACCEL_PER_TICK
 	var decel: int = DECEL_PER_TICK
 	if not on_floor:
-		accel = (accel * AIR_CONTROL_NUM) / AIR_CONTROL_DEN
-		decel = (decel * AIR_CONTROL_NUM) / AIR_CONTROL_DEN
+		accel = (accel * air_control_num) / AIR_CONTROL_DEN
+		decel = (decel * air_control_num) / AIR_CONTROL_DEN
 	if input.move_dir != 0:
 		facing = input.move_dir
 		var target: int = input.move_dir * RUN_SPEED

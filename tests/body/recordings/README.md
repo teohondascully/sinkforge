@@ -25,3 +25,21 @@ files are a self-test byproduct, not a real session; delete them freely (`reveal
 — see `docs/DECISIONS_LEDGER.md` for the entry proving it round-trips). `*play_*.log` files are real
 recorded play and should not be deleted without checking with the director first (`CONTEXT.md`: never
 delete user artifacts without confirmation).
+
+## Header fields are load-bearing, and two of them were added late
+
+A recording replays against the world and the tuning it was made under, so the header carries both. Read
+them; do not assume the current defaults.
+
+- `chamber=` (`play_*.log`) — **unreliable before D0209.** It was a hardcoded literal
+  `hostile_chamber` until 2026-08-30, so every `--course` session recorded before that claims to be a
+  chamber session. `play_2026-08-30T15-46-21.log` is one: replayed against the course it is 0 bad ticks,
+  against the chamber 1076, and the course is what was actually played. Both worlds are walkable, so a
+  replay against the wrong one produces a plausible-looking run and no error — establish the world
+  empirically for any pre-D0209 log rather than trusting the field.
+- `air_control=N/D` (`play_*.log`) — added with D0210, which also raised the default from 3/5 to 4/5. A
+  log **without** this line was recorded at **3/5** and must be replayed at 3/5, never at whatever
+  `Body.AIR_CONTROL_NUM` happens to be. Same rule as `bite=` below, and it was got wrong once in
+  `tools/scratch/trace_lift.gd` before being got right.
+- `bite=` (`reveal_*.log`) — D0200. A log without it reconstructs at radius **0**, never at the current
+  default.
