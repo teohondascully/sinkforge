@@ -7,10 +7,15 @@ extends RefCounted
 ## layer_lint.py`'s "no sibling reach-in" rule only requires outside code to go through `body.gd`; files
 ## inside `sim/body/` reaching each other's -- and `Body`'s own, GDScript has no real privacy --
 ## underscore-prefixed members is the same shape those two files already use). Pure vertical-axis
-## collision resolution: ceilings (grid-swept, hard) and the ground plane (`Heightfield`, sub-pixel, plus
-## a grid-solidity backstop for what the sub-pixel model's own contract can't answer). Every function
-## takes `body: Body` explicitly rather than being instance methods on `Body` itself -- that's the whole
-## point of the split.
+## collision resolution: ceilings (grid-swept, hard) and the ground plane (`Heightfield`, read per column
+## across the box's whole footprint, plus a grid-solidity backstop that de-penetrates a box already
+## inside rock). Every function takes `body: Body` explicitly rather than being instance methods on
+## `Body` itself -- that's the whole point of the split.
+##
+## D0206: the ground plane used to be sub-pixel, interpolating `Heightfield` between column centres.
+## It cannot be, for a flat-bottomed collider -- `footprint_surface_y` carries the proof and the
+## measurement. `Heightfield.surface_y_at_x` still exists and is still tested; nothing in `sim/` calls
+## it any more.
 
 const V_SUBSTEP_PX: int = 2  ## Comfortably under one terrain cell (4px), so no substep can cross more
                               ## than one row boundary and skip past it -- the fixed-tick equivalent of
@@ -19,7 +24,8 @@ const V_SUBSTEP_PX: int = 2  ## Comfortably under one terrain cell (4px), so no 
 
 
 ## Vertical movement, substepped so a fast fall or jump cannot tunnel through a one-cell-thick floor or
-## ceiling. Ceilings are grid-swept and hard; the ground plane is `Heightfield`, sub-pixel.
+## ceiling. Ceilings are grid-swept and hard; the ground plane is `Heightfield`, read per column across
+## the box's full footprint (`footprint_surface_y`).
 ##
 ## KNOWN COMPLEXITY OUTLIER, accepted (`docs/DECISIONS_LEDGER.md` D0101/D0103), not chased further: 9,
 ## against a 6.0 fence, after `_resolve_substep_collision` was already extracted from it. The remainder
@@ -102,7 +108,18 @@ static func grid_floor_backstop(body: Body, grid: TileGrid) -> bool:
 	var top_row: int = _topmost_solid_row(grid, Body._px_to_cell(body._top_y()), hi_row, lo_col, hi_col)
 	if _has_deferred_floor_below(body, grid, lo_col, hi_col, top_row):
 		return false
-	body.pos_y = Fx.from_int(top_row * Body.CELL_PX) - (Body.HEIGHT_PX * Fx.SCALE) / 2
+	# D0206. This path snaps to the topmost solid row ANYWHERE in the box, which is right for the
+	# de-penetration it exists for -- a body buried in a solid mass gets pushed up onto its surface --
+	# and catastrophically wrong when that topmost solid is a CEILING the head is inside: it then places
+	# the FEET on the ceiling's own top face, and for the world's ceiling row that face is y=0, putting
+	# the whole body above the world. 153 of the 184 bad ticks across the director's two recorded
+	# sessions are that one event: the ejection at tick 598 of the 767-tick session, and every tick after
+	# it. Checking the DESTINATION is what separates the two cases; the scan itself is deliberately left
+	# alone, because scanning from the box's top is exactly what the de-penetration case needs.
+	var candidate: int = Fx.from_int(top_row * Body.CELL_PX) - (Body.HEIGHT_PX * Fx.SCALE) / 2
+	if not _landing_is_clear(body, grid, candidate):
+		return false
+	body.pos_y = candidate
 	body.vel_y = 0
 	body.on_floor = true
 	body.floor_source_this_tick = &"grid_floor_backstop"
@@ -138,19 +155,67 @@ static func _has_deferred_floor_below(body: Body, grid: TileGrid, lo_col: int, h
 	return false
 
 
-## The ground plane: sample the heightfield under both feet and the centre, rest on whichever is
-## highest (smallest Fx `y`) -- matches `legacy/scenes/player.gd`'s `_follow_slope` sampling rule,
-## adapted to a continuous heightfield instead of an authored ramp overlay. `NO_FLOOR` at all three
+## THE SHARED CRITERION (D0206) -- the one height either grounding path in this file may put the body's
+## feet at: the highest (smallest Fx `y`) solid top face across EVERY column the box occupies, or
+## `NO_FLOOR` when no column has one in range.
+##
+## Why this is forced rather than chosen. The box's bottom edge spans `[left_x, right_x)`, and it
+## overlaps no solid cell exactly when, for every column `c` beneath it, that edge sits at or above
+## `c`'s topmost solid face. So the lowest legal bottom IS the minimum of those faces, and any value
+## below it is inside some column's rock. `Heightfield.surface_y_at_x` interpolates BETWEEN two columns'
+## faces, so wherever the footprint spans columns of different heights it returns a height below that
+## minimum: sub-pixel ground following and a zero-overlap flat-bottomed box are mutually exclusive, and
+## `docs/DECISIONS_LEDGER.md` D0032 already chose the flat-bottomed box. Measured, not only argued -- 13
+## of the 184 bad ticks across the director's two recorded sessions are the feet sunk up to 0.75px into
+## a ledge exactly this way.
+##
+## It erred the other way too, and that half was the expensive one. The blend anchors on column CENTRES,
+## so a foot sample near the box's edge mixes in the neighbouring column OUTSIDE the footprint -- ground
+## the body is not standing on. Where that neighbour is taller the body was lifted ABOVE its real floor:
+## 10 more bad ticks, every one of them the head pushed up into the world's ceiling row in a shaft
+## almost exactly one body-height tall, which is what then handed `grid_floor_backstop` a ceiling to
+## mistake for a floor (153 more -- see its own note).
+##
+## Reading each column on its own also answers D0059f's original complaint head-on, which matters
+## because that complaint is the whole reason `grid_floor_backstop` exists: `surface_y_at_x` returns
+## `NO_FLOOR` if EITHER straddled column lacks a floor, so a body over a pit's lip could read "no
+## ground" at all three samples while most of its footprint stood on real ground. A per-column minimum
+## cannot do that -- a floorless column contributes `NO_FLOOR` to a `mini`, and the columns that do have
+## ground decide the answer.
+static func footprint_surface_y(body: Body, grid: TileGrid, scan_from: int) -> int:
+	var surface: int = Heightfield.NO_FLOOR
+	for col: int in range(Body._px_to_cell(body._left_x()), Body._px_to_cell(body._right_x() - 1) + 1):
+		surface = mini(surface, Heightfield.column_surface_y(grid, col, scan_from, Body.FLOOR_SCAN_ROWS))
+	return surface
+
+
+## The post-condition D0206 makes both grounding paths establish BEFORE they commit, so that neither can
+## hand `Invariants` a state to catch: the box at `candidate_pos_y` lies inside the world and overlaps
+## nothing solid. Testing bounds separately is not belt-and-braces -- `is_solid` is a sparse lookup and
+## every cell past the grid's edge reads OPEN, not solid (D0059c's own trap, one function up), so a snap
+## that leaves the world is "unblocked" precisely BECAUSE it left.
+static func _landing_is_clear(body: Body, grid: TileGrid, candidate_pos_y: int) -> bool:
+	var half: int = (Body.HEIGHT_PX * Fx.SCALE) / 2
+	if candidate_pos_y - half < 0 or candidate_pos_y + half > Fx.from_int(grid.height * Body.CELL_PX):
+		return false
+	return not body._box_blocked(grid, body._left_x(), candidate_pos_y - half,
+		body._right_x(), candidate_pos_y + half)
+
+
+## The ground plane: rest the box on the highest solid surface across its OWN FULL FOOTPRINT, which for
+## a flat-bottomed collider is the only height that does not put part of it inside rock (see
+## `footprint_surface_y` for why that is a proof and not a preference). `NO_FLOOR` under every column
 ## means open air: falling continues, `on_floor` stays false.
+##
+## D0206 replaced the three interpolated sample points that stood here -- both feet and the centre,
+## `mini` of the three, ported from `legacy/scenes/player.gd`'s `_follow_slope` rule. Legacy sampled an
+## AUTHORED ramp overlay whose heights were continuous by construction; a derived heightfield over a
+## 4px grid is a step function, and interpolating one is what put the body inside it. The sample count
+## was wrong too, independently: three points cannot cover the FOUR columns a 16px-wide box occupies.
 static func resolve_floor(body: Body, grid: TileGrid) -> bool:
 	var row: int = Body._px_to_cell(body._bottom_y())
 	var scan_from: int = maxi(0, row - 2)
-	var s_left: int = Heightfield.surface_y_at_x(
-		grid, body._left_x() + Fx.SCALE, scan_from, Body.FLOOR_SCAN_ROWS)
-	var s_right: int = Heightfield.surface_y_at_x(
-		grid, body._right_x() - Fx.SCALE, scan_from, Body.FLOOR_SCAN_ROWS)
-	var s_center: int = Heightfield.surface_y_at_x(grid, body.pos_x, scan_from, Body.FLOOR_SCAN_ROWS)
-	var surface: int = mini(mini(s_left, s_right), s_center)
+	var surface: int = footprint_surface_y(body, grid, scan_from)
 	if surface == Heightfield.NO_FLOOR or body._bottom_y() < surface:
 		body.on_floor = false
 		return false

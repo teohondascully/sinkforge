@@ -8,58 +8,66 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-**Reset this round:** the Slice 1 section closed and its still-live items moved into STANDING below rather
-than being dropped with it; Slice 0's own section compressed to the two findings that outlive it. Nothing
-deleted from the record — the detail is in `docs/DECISIONS_LEDGER.md` D0187-D0198 — only relocated, per
-this file's own 150-line cap.
+**Reset this round:** the Slice 1.5 section compressed to its result (the detail is `docs/DECISIONS_LEDGER.md`
+D0199-D0205), and the D0139 "OPEN, MID-INVESTIGATION" section is CLOSED — it was the last thing keeping
+the working tree dirty. Nothing deleted from the record, only relocated, per this file's own 150-line cap.
 
-## IN FLIGHT — SLICE 1.5, the bite. Probe delivered, STOPPED for the director's play session
+## DONE THIS RUN — the criterion flaw, fixed on both grounding paths (D0206)
 
-**The brief's premise was false and is worth reading before the result.** It asked for sub-cell mining at
-SUBDIV-4 with collision kept on a coarse logic grid behind a threshold. This tree has neither thing to
-change: `Mining.CELL_PX` is already `Heightfield.TERRAIN_CELL_PX` (4), and `TileGrid` stores only 4px
-cells with `Heightfield` reading them directly — its own header says the 16px grid "is a VIEW over this,
-not a second array". Building the probe as written would have been a no-op the director then played, felt
-nothing from, and reasonably read as "granularity doesn't help — shrink the body" (D0200).
+**Authorized overnight collision work, the exception to the standing hard stop.** Both defects the
+director's own sessions produced are gone: bad ticks (body inside rock or outside the world) on clean-tree
+replays go **6 → 0** (710-tick session) and **171 → 0** (767-tick session), and
+`fixture_step_up_into_wall_probe` reports NOT REPRODUCED. `test_body_acceptance`'s golden traverse is
+**225, byte-identical to golden**, not merely inside ±12.
 
-**What the director's own session says** (`tools/measure_play_session.gd` on
-`reveal_play_2026-08-30T05-58-03.log`): 29.6 s, MINE held 876 ticks, **504 of them aimed at AIR**, 29 cells
-broken, first break **11.4 s in**, **0.50 m** descended, **0.7 of one body-volume** removed. The bite was
-never huge — it was so small that half a minute of holding dug a hole smaller than the digger, and a blow
-ends on the cell it just cleared, so the cursor is over air the moment it lands. The perception was right;
-the mechanism attributed to it was inverted.
+**The brief's direction was inverted, and classifying beat theorising.** It described both paths sinking
+the body into rock. `tools/scratch/classify_bad_ticks.gd` over all 184 bad ticks found **153 of them are
+the body thrown ABOVE the world** — `grid_floor_backstop` placing the feet on the world CEILING's top
+face (y=0) — caused by `resolve_floor` first lifting the head 1px into row 0. Sinking was 13 ticks.
 
-**Delivered (D0200):** `Mining.bite_radius`, a Euclidean disc (areas 1/5/13/29 for r=0..3), default **2**.
-DERIVED, and it **corrects D0195**: legacy's 32px cell is one square METRE and one charge removes it; this
-world's metre is 16 terrain cells and Slice 1 charged a full metre of hardness-seconds to remove one of
-them, so it mined at **0.06x legacy per unit volume**. D0195 checked seconds-per-CELL, one paragraph after
-establishing that the metre is the portable unit. r=2 is 0.81 m², the largest disc under legacy's metre.
-**`--bite=0` is bit-for-bit Slice 1 and is the control**; `--bite=N` sweeps it. Collision untouched
-(confirmed by diff) and it needed no threshold rule, because there is only one grid. Determinism green: the
-disc is a nested integer `range`, and `bite=` joins `site=`/`seed=` in the recording header so a log
-without it reconstructs at radius 0, never at the current default. Milestone artifacts in
-`docs/MILESTONES.md`: the same 24-cell shaft takes **991 ticks at bite=0, 242 at bite=2**.
+**The fix is one shared criterion, which is what stops it relocating.** `VerticalResolve.footprint_surface_y`
+— the highest solid face across EVERY column the box occupies — is now the only height either path grounds
+at, and `grid_floor_backstop` must pass `_landing_is_clear` (destination in-bounds AND unblocked) before
+committing. The interpolated sub-pixel ground plane is gone from `sim/`, by proof not preference: a blend
+between two columns of different heights is BELOW the taller one's face, so sub-pixel following and a
+zero-overlap flat-bottomed box are mutually exclusive, and D0032 already chose the box.
 
-**HARD STOP HIT — D0202/D0203, reported not fixed, and the most useful thing this probe produced.** The
-failing tick **excavates nothing**; it reproduces on a clean checkout without D0139's parked change, and
-then from a **hand-authored 15-row map with no `Mining` in the script at all**. **Not rare:** the
-director's second `--play` session hits it **4 times in 710 ticks on a clean tree, at the shipped bite
-radius**. Reproduce: `godot --headless --path . --script res://tests/fixture_step_up_into_wall_probe.gd`.
+**`grounded_no_floor` stayed at exactly 59 — and it is NOT D0139's relocation.** The count cannot tell
+the two apart, so the SET was diffed: all **805,456** sweep violations are byte-identical before and after
+in seed, tick and POSITION; **4 lines** differ, in attribution only, `grid_floor_backstop` → `resolve_floor`
+(the backstop's share went 4 → **0**; D0139's went 4 → **59**). It cannot go to zero alongside the bad-tick
+count: full support means resting at the DEEPEST column, zero overlap means the HIGHEST, and a flat-bottomed
+box cannot do both on uneven ground. **A design fork for the director, not a bug** — D0061 already weighed
+and rejected the alternative on feel.
 
-**The mechanism, corrected (D0203).** D0202 said "the step-up's HEIGHT is checked, the destination's FIT is
-not." That is false — `_try_step` calls `_box_blocked` on the body's box translated up by the lift, with
-the half-open bounds right. What actually happens: the step succeeds and is **undone inside its own tick**.
-`Body.tick` runs `_integrate_horizontal` → `pos_x +=` → `HorizontalResolve.resolve` (the step) →
-`_integrate_vertical` → `VerticalResolve`; the vertical pass moves the body again by one tick of gravity
-against the `vel_y` the step had just zeroed, and leaves it inside rock without re-grounding it. **The tell
-was already on screen:** the tick ends with `floor_source_this_tick = "try_step"` and `on_floor = false`,
-which cannot both be true. That pair is a cheap general invariant nobody asserts yet.
+**A test was pinning the defect.** `test_cave_geometry`'s lower-floor case dropped a 4-column-wide body into
+a 4-column gap offset by one column, so its box included a shelf column; it reached the lower floor by
+clipping THROUGH the shelf's 6-row slab (`worst_overlap=1`, measured against the OLD resolver via
+`tools/scratch/cave_gap_ab.gd` either side of a `git stash`). Corrected, with the catching case added
+separately — and the correction is backed by an A/B of the old code, never by the new code's say-so.
 
-**D0204 — do not read the director's second session as a reading of `main`.** Replayed against a clean
-checkout it is **8 bad ticks in 4 episodes (1%)**; in the working tree, which carries D0139's parked
-`vertical_resolve.gd`, it is **268 in 12 episodes (38%)**. 33x. The clean-tree numbers are the quotable
-ones. A build handed over for a feel judgment gets played from a clean checkout, or the dirty-tree
-difference gets measured before it is described.
+## SLICE 1.5, the bite — delivered, still awaiting the director's play verdict
+
+**The brief's premise was false in both halves and the real defect was its opposite** (D0200, full account
+in the ledger): mining was already at the 4px resolution and collision already runs on it. What was wrong
+is that one blow removed 1/16th of a metre while being charged a full metre's worth of legacy
+hardness-seconds — **0.06x legacy per unit volume**, unmeasured because the check was in seconds-per-CELL
+and the two codebases' cells are different sizes.
+
+**Delivered:** `Mining.bite_radius`, a Euclidean disc (areas 1/5/13/29 for r=0..3), default **2** (0.81 m²,
+the largest disc under legacy's metre). **`--bite=0` is bit-for-bit Slice 1 and is the control.**
+Determinism green; `bite=` joins `site=`/`seed=` in the recording header so an old log reconstructs at
+radius 0, never at the current default. The same 24-cell shaft takes **991 ticks at bite=0, 242 at bite=2**
+(`docs/MILESTONES.md`, `docs/TASTE_QUEUE.md` T004).
+
+**The probe's most useful output was a collision defect, now fixed** — D0202 escalated it, D0203 corrected
+its mechanism (the step succeeds and is undone inside its own tick), D0205 fixed that, and D0206 fixed the
+criterion flaw underneath it. `fixture_step_up_into_wall_probe` no longer reproduces and can be retired
+whenever the director wants; it is left in place as a one-command check.
+
+**D0204 stands as a rule, not an open item:** a build handed over for a feel judgment gets played from a
+clean checkout. The director's second session read 8 bad ticks on a clean tree and 268 in the D0139-dirty
+one — 33x — and that dirty tree no longer exists (see below).
 
 **Also fixed on the way in:** D0199, the vertical half of D0192. The entry shaft opened row 0, so the body
 spawned with its head ON y=0 and the first jump left the world — one bounds violation in the director's own
@@ -80,10 +88,11 @@ possibility the geometry raises:** the world is 48 cells / 12 m wide and the bod
 of the screen's HEIGHT at zoom 6. Shrinking the body and widening the world are the same fix from two ends,
 and no mining change reaches either.
 
-**GATES.** All green except two, both D0139's parked work, verified unchanged: `check_size_limits`
-(`resolve_floor` at 60 lines) and `check_untracked_files` (`test_vertical_resolve.gd`). Gate 7 (LOC
-velocity) still red on its trailing window. Every suite passes on a clean clone carrying this work and not
-D0139's — checked, not assumed.
+**GATES.** `check_size_limits` and `check_untracked_files` are GREEN for the first time in weeks — both
+were red only on D0139's parked work. **Gate 7 (LOC velocity) is the one red**, and this run made it
+worse, honestly: instrument +1185 against game +169 over the trailing 10 commits. Its own message is the
+signal — "the next unit of work is game, not another check." `check_claim_references` is VOID (zero
+scenarios exist to carry a reference), unchanged and by construction.
 
 
 ## STANDING — carried forward, none of it closed by Slice 1.5
@@ -116,22 +125,19 @@ Slices 3-4, and `terrain_painter.gd` is not portable as written. **`claims/C004`
 purpose:** two real human sessions now exist, but deciding whether one qualifies is the director's
 judgment, not a session's.
 
-## OPEN, MID-INVESTIGATION — D0139's Option-2 `resolve_floor` fix hit a SECOND hard stop, uncommitted,
-awaiting the director's ruling
+## CLOSED — D0139, reverted on the director's ruling; the diagnosis survived, the remedy did not
 
-**Do not touch `sim/body/vertical_resolve.gd` or `tests/test_vertical_resolve.gd` without reading the full
-account first** — `docs/archive/working/WORKING-2026-08-29.md`'s own "OPEN, MID-INVESTIGATION" section has
-the complete detail (tick traces, exact grid dumps). Working tree is dirty on purpose: `vertical_resolve.gd`
-carries an uncommitted `_full_footprint_solid` attempt; `tests/test_vertical_resolve.gd`(`.uid`) are new,
-untracked, 6 passing unit tests, one mutation-tested.
+Shelved on branch **`shelf/d0139-full-footprint`** (`f8186fb`, pushed) and reverted from the working tree.
+Recover with `git checkout shelf/d0139-full-footprint -- sim/body/vertical_resolve.gd tests/test_vertical_resolve.gd`.
+Four measurements against it, three from its own investigation: its acceptance signal failed
+(`grounded_no_floor` stayed at 59, attribution flipping `resolve_floor` 55→0 / `grid_floor_backstop` 4→59
+— the flaw changing hands, the director's own anticipated "second bug"); it regressed
+`test_body_acceptance`'s HARD gate (`depenetration_events` 0→1, `stall_seconds` 0→0.017s); it broke
+`check_size_limits`; and it made real play 33x worse.
 
-Two real findings, reported, neither acted on: (1) the full 1000×1500 sweep's `grounded_no_floor` did NOT
-drop toward ~4 — it stayed at 59, mechanism flipped entirely to `grid_floor_backstop`, which has the
-identical criterion flaw (the director's own anticipated "second bug"). (2) A real regression against
-`test_body_acceptance.gd`'s own HARD gate — the golden traverse stalls at tick 133, traced to an authored
-1-row rubble notch the new exact-same-row check can't distinguish from a real gap. Also breaks
-`check_size_limits` (`resolve_floor` 49→59 lines against the 50-line limit). Not shippable as written even
-if both findings resolve. Waiting on the director; nothing here resolves unilaterally.
+**Its diagnosis was right and is now closed by D0206 instead** — the criterion really was the bug, but the
+fix is to make both paths share ONE full-footprint criterion, not to make `resolve_floor` refuse landings
+and leave the backstop holding the same flaw.
 
 ## OPEN, NOT STARTED — the persistent-world GDD reversal
 

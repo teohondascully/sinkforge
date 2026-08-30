@@ -8239,3 +8239,85 @@ prints its own observed hashes precisely so CI's run can supply them (D0168's ow
 
 **Reverse:** drop the `if not (stepped_up_this_tick or mantled_this_tick)` guard; the new suite goes red
 on 4 assertions immediately.
+
+---
+
+## D0206 · Both grounding paths onto one full-footprint criterion — and the interpolated ground plane had to go · 2026-08-30 · supersedes D0139, corrects D0137's remedy
+**Decided:** `VerticalResolve.footprint_surface_y` is the single quantity both grounding paths place the
+body's feet at — the highest solid top face across EVERY column the box occupies. `resolve_floor` uses it
+in place of the three interpolated sample points it used to blend. `grid_floor_backstop` keeps its own
+top-down de-penetration scan but must now pass `_landing_is_clear` before it commits: the destination box
+has to be inside the world and overlap nothing.
+
+**The director's framing was right in shape and inverted in direction.** The brief described both paths
+"grounding the body into positions that overlap solid rock" — feet sinking. Classifying all 184 bad ticks
+across the two recorded sessions (`tools/scratch/classify_bad_ticks.gd`) found three mechanisms, and the
+sinking one is the smallest:
+
+| kind | ticks | what it is |
+|---|---|---|
+| `OUTSIDE_WORLD` | 153 | `grid_floor_backstop` put the feet on the WORLD CEILING's top face — y=0 — so the whole body went above the world. One event: tick 598 of the 767-tick session, and every tick after it. |
+| `A_interp_below_hard` | 13 | the interpolated surface is DEEPER than the hard floor of an occupied column; feet sink up to 0.75px into a ledge. |
+| `embedded_above_feet` | 10 | the interpolated surface is SHALLOWER than the hard floor; the body is lifted and its head is pushed into the ceiling. |
+| other | 8 | — |
+
+The last two are one mechanism with two signs, and the first is their consequence: `resolve_floor` lifted
+the head into row 0 (t596, `bottom=43.000 hard=44.000`), which handed `grid_floor_backstop` a ceiling as
+"the topmost solid row in the box" (t598, `bottom` clamped from a pre-clamp box of `[-40px, 0px)`). One
+1px error in the ground plane cascaded into 153 ticks outside the world.
+
+**Why the interpolated ground plane cannot stay, stated as a proof rather than a preference.** The box's
+bottom edge spans `[left_x, right_x)`. It overlaps no solid cell exactly when, for every column `c`
+beneath it, the edge sits at or above `c`'s topmost solid face. So the lowest legal bottom IS the minimum
+of those faces. `Heightfield.surface_y_at_x` interpolates BETWEEN two columns' faces, so wherever the
+footprint spans columns of different heights it returns a value below that minimum. **Sub-pixel ground
+following and a zero-overlap flat-bottomed collider are mutually exclusive**, and D0032 already chose the
+flat-bottomed box. It errs upward too, for a separate reason: the blend anchors on column CENTRES, so a
+foot sample near the box's edge mixes in the neighbouring column OUTSIDE the footprint — ground the body
+is not standing on. Three samples also cannot cover the four columns a 16px box occupies.
+
+`Heightfield.surface_y_at_x` still exists and is still tested. Nothing in `sim/` calls it now.
+
+**Results.** Bad ticks on clean-tree replays of the director's own sessions, and the probe:
+
+| signal | before | after |
+|---|---|---|
+| 07-31-23, 710 ticks | 6 | **0** |
+| 07-42-13, 767 ticks | 171 | **0** |
+| `fixture_step_up_into_wall_probe` | reproduced | **NOT REPRODUCED** |
+| `test_body_acceptance` traverse | 225 | **225 (identical, not merely within ±12)** |
+| grounding-consistency violations | 0 | 0 |
+
+**`grounded_no_floor` stayed at exactly 59, and this is NOT D0139's relocation — the sets say so, not the
+count.** D0139 failed with that same number, so the count alone cannot distinguish the two; the full
+violation set can. Across the 1000×1500 sweep, all **805,456** violation lines are byte-identical before
+and after in seed, tick and POSITION. Exactly **4 lines** differ, and only in attribution:
+`grid_floor_backstop` → `resolve_floor`. The backstop's share went **4 → 0**. D0139's went **4 → 59**:
+its `resolve_floor` refused 55 landings and the unfixed backstop performed them instead — the defect
+changed hands. Here the body lands in the identical pixel and the ground plane simply answers on its own,
+because reading every column resolves the pit-lip case (D0059f) that the backstop existed to catch.
+
+**Why the count cannot go to zero alongside the bad-tick count — they are opposed properties.**
+`PropertyChecks.grounded_implies_solid_beneath` requires EVERY column below the feet to be solid, i.e.
+full support, which means resting at the DEEPEST column's surface. Zero overlap requires resting at the
+HIGHEST. On uneven ground a flat-bottomed box cannot satisfy both. Driving this count to zero means
+refusing to ground on a partial footprint — which is D0139, and which D0061 already weighed and rejected
+on feel ("a body standing at ANY narrow ledge edge needing to walk fully onto it before resting").
+**Residual, diagnosed:** 59 occurrences, 59/59 now `resolve_floor`, all at bottom row 60
+(`HostileChamber.FLOOR_ROW`), at the chamber's own built-in flat-to-open transitions — D0137's population
+exactly, untouched and unrelocated. Whether to pursue it is a design fork, not a bug fix.
+
+**A test was pinning the defect, and the A/B is what showed it.** `test_cave_geometry`'s
+`_test_local_window_resolves_the_lower_floor_when_body_lands_there` dropped the body on
+`_col_center_x(CAVE_GAP_START + 1)`. The cave gap is 4 columns and the body is 4 columns wide, so that
+placement puts its box on columns [171,175] — 171 being a SHELF column. It "resolved the lower floor" by
+passing straight THROUGH the shelf's 6-row slab: measured against the pre-D0206 resolver,
+`worst_overlap=1` at tick 11 of the settle (`tools/scratch/cave_gap_ab.gd`, run either side of a
+`git stash` of this one file). Passing that assertion required the body to clip through solid rock. The
+test now aligns the body to the gap's own edge for the through-the-gap case, and asserts the catching
+case separately. **Correcting a test to match new behaviour is how a real regression gets shipped, so
+the correction is backed by an A/B measurement of the OLD code, not by the new code's say-so.**
+
+**Reverse:** restore the three `surface_y_at_x` samples in `resolve_floor` and drop the
+`_landing_is_clear` call in `grid_floor_backstop`; `test_footprint_grounding` goes red on 5 assertions,
+and the two replays return to 6 and 171 bad ticks.
