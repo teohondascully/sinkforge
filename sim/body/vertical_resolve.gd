@@ -72,24 +72,47 @@ static func _resolve_substep_collision(body: Body, grid: TileGrid, dir: int) -> 
 	return resolve_floor(body, grid) or grid_floor_backstop(body, grid)
 
 
-## Hard grid-swept ceiling block, with corner correction: a horizontal nudge up to 6px toward the
-## direction the body is already moving, tried before blocking outright, since a ceiling contact right
-## at a corner is exactly the case docs/ARCHITECTURE.md §9 names this mechanic for.
+## Hard grid-swept ceiling block, with corner correction: a horizontal nudge up to 6px along the
+## direction the body is already travelling, tried before blocking outright, since a ceiling contact
+## right at a corner is exactly the case docs/ARCHITECTURE.md §9 names this mechanic for.
+##
+## D0213, the third and last instance of the instant-translation class D0209/D0212 opened. `nudge_dir`
+## used to fall back to `body.facing` when `vel_x` was zero -- and `facing` is a stale field, last written
+## by whatever direction was pressed however long ago. So a body jumping STRAIGHT UP under an overhang,
+## with no horizontal input and no horizontal velocity, was translated 6px sideways: 360 px/s against a
+## run speed of 150, in a direction the player had not asked for and could not predict. Reproduced
+## deterministically in `tests/test_corner_consent.gd`; not observed in the director's four recorded
+## sessions (3 corner corrections across all four, all of them the consented case), so this is a
+## reachable-but-unhit defect, reported as such.
+##
+## The gate is MOTION, not grounding, and that is a measurement rather than a preference. The two sibling
+## climbs were gated on `recently_grounded`; the same gate here would be a gate that can never pass.
+## `move_and_resolve` sets `on_floor = false` before any substep runs, and `_handle_jump` zeroes
+## `_coyote_ticks_left` on launch, so every corner correction that has ever fired -- all three real ones,
+## and both probe cases -- ran at `on_floor=false, coyote=0`. Mutation-tested rather than argued: adding
+## the grounded gate takes `test_body_acceptance`'s `corner_correction_success_rate` from 100% to 0. This
+## mechanic is airborne BY CONSTRUCTION, because a ceiling is only ever contacted moving up.
+##
+## What the two siblings and this one do share is the motion condition: `_try_climb` already requires
+## `body.vel_x != 0` before either climb translates the body, and this path was the one instant
+## translation in the module with no motion condition at all. Requiring it makes the nudge a rescue of a
+## trajectory the body already had, which is what "reads as correct" means for an instant translation --
+## the same reasoning D0212 recorded, applied to the axis this path moves along.
 static func resolve_ceiling(body: Body, grid: TileGrid) -> bool:
 	if not body._box_blocked(grid, body._left_x(), body._top_y(), body._right_x(), body._bottom_y()):
 		return false
-	var nudge_dir: int = signi(body.vel_x) if body.vel_x != 0 else body.facing
-	var nudge: int = nudge_dir * Body.CORNER_NUDGE_PX * Fx.SCALE
-	# D0059c: `is_solid` is a sparse lookup -- a cell past the grid's own width/height reads as open,
-	# not solid, so nothing stopped the nudge from carrying the body past the world edge (`_try_step`
-	# already refuses a move crossing row 0 the same way, D0055).
-	var in_bounds: bool = (body._left_x() + nudge >= 0 and
-		body._right_x() + nudge <= grid.width * Body.CELL_PX * Fx.SCALE)
-	if in_bounds and not body._box_blocked(
-			grid, body._left_x() + nudge, body._top_y(), body._right_x() + nudge, body._bottom_y()):
-		body.pos_x += nudge
-		body.corner_corrected_this_tick = true
-		return false
+	if body.vel_x != 0:
+		var nudge: int = signi(body.vel_x) * Body.CORNER_NUDGE_PX * Fx.SCALE
+		# D0059c: `is_solid` is a sparse lookup -- a cell past the grid's own width/height reads as open,
+		# not solid, so nothing stopped the nudge from carrying the body past the world edge (`_try_step`
+		# already refuses a move crossing row 0 the same way, D0055).
+		var in_bounds: bool = (body._left_x() + nudge >= 0 and
+			body._right_x() + nudge <= grid.width * Body.CELL_PX * Fx.SCALE)
+		if in_bounds and not body._box_blocked(
+				grid, body._left_x() + nudge, body._top_y(), body._right_x() + nudge, body._bottom_y()):
+			body.pos_x += nudge
+			body.corner_corrected_this_tick = true
+			return false
 	body.vel_y = 0
 	return true
 

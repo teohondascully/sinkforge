@@ -79,9 +79,23 @@ func _initialize() -> void:
 	var mantles: int = 0
 	var stepups: int = 0
 	var digs: int = 0
+	# D0213. Corner corrections, split by whether the body consented to the direction it was moved in.
+	# The classifier is `translation_consent_violation_this_tick`, NOT a velocity read from before the
+	# tick: `_integrate_horizontal` runs first, so a body at rest at tick entry can legitimately have a
+	# velocity by the time `resolve_ceiling` looks. Measured, not assumed -- the entry-velocity version of
+	# this counter reported 7 "invented" nudges on a build where the gate makes that impossible.
+	# This scenario is the witness for the class: the D0213 gate moved this fixture's golden at
+	# checkpoint 30, and no other change in the tick could have done it.
+	var corner_ok: int = 0
+	var corner_unconsented: int = 0
 	var hashes: PackedStringArray = []
 	for tick: int in range(TICKS):
 		body.tick(FuzzDriverCommon.random_input(input_rng, false), grid)
+		if body.corner_corrected_this_tick:
+			if body.translation_consent_violation_this_tick:
+				corner_unconsented += 1
+			else:
+				corner_ok += 1
 		if body.vel_y == Body.JUMP_VELOCITY:
 			jumps += 1
 		if body.mantled_this_tick:
@@ -95,6 +109,7 @@ func _initialize() -> void:
 			hashes.append(str(combined.hash()))
 
 	print("SHAFT_REPLAY_HASHES seed=%d %s" % [run_seed, ",".join(hashes)])
-	print("SHAFT_REPLAY_SUMMARY seed=%d ticks=%d checkpoints=%d jumps=%d mantles=%d stepups=%d digs=%d" %
-		[run_seed, TICKS, hashes.size(), jumps, mantles, stepups, digs])
+	print(("SHAFT_REPLAY_SUMMARY seed=%d ticks=%d checkpoints=%d jumps=%d mantles=%d stepups=%d digs=%d " +
+		"corner_ok=%d corner_unconsented=%d") %
+		[run_seed, TICKS, hashes.size(), jumps, mantles, stepups, digs, corner_ok, corner_unconsented])
 	quit(0)

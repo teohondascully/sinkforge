@@ -117,6 +117,8 @@ var bounds_violation_this_tick: bool = false; var floor_selection_violation_this
 ## it would fire on correct behaviour.
 var jumped_this_tick: bool = false
 var grounding_consistency_violation_this_tick: bool = false
+var translation_consent_violation_this_tick: bool = false  ## D0213: x moved on a tick that had no
+## horizontal input, no incoming velocity, and no recovery to account for it (`Invariants` carries the why)
 var dig_event_this_tick: bool = false  ## true iff `input.dig_pressed` this tick actually excavated a
 ## cell (a press against air or out of bounds is not an event) -- the caller's ground truth for a
 ## dig-rate metric that must never look at cells the player hasn't dug (docs/DECISIONS_LEDGER.md D0110)
@@ -248,12 +250,15 @@ func _reset_tick_flags() -> void:
 	floor_selection_violation_this_tick = false
 	jumped_this_tick = false
 	grounding_consistency_violation_this_tick = false
+	translation_consent_violation_this_tick = false
 	dig_event_this_tick = false
 	dug_material_this_tick = &""
 
 
 func tick(input: InputFrame, grid: TileGrid) -> void:
 	_reset_tick_flags()
+	var entry_pos_x: int = pos_x   ## D0213's two witnesses, read before anything can change them
+	var entry_vel_x: int = vel_x
 
 	_integrate_horizontal(input)
 	pos_x += vel_x / TICK_HZ
@@ -289,6 +294,11 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	_enforce_grounding_consistency()
 	if input.dig_pressed:
 		_handle_dig(grid)
+	# LAST, and after `_enforce_grid_bounds` in particular: the clamp is one of the two recovery paths
+	# entitled to move `pos_x` without consent, and the flag that exempts it is only set once it fires.
+	translation_consent_violation_this_tick = Invariants.report_translation_consent(
+		input.move_dir, entry_vel_x, entry_pos_x, pos_x,
+		depenetrated_this_tick or bounds_violation_this_tick, grid.seed, pos_y) != null
 
 	_coyote_ticks_left = COYOTE_TICKS if on_floor else maxi(0, _coyote_ticks_left - 1)
 	_jump_buffer_ticks_left = maxi(0, _jump_buffer_ticks_left - 1)

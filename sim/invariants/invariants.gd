@@ -153,3 +153,63 @@ static func report_bounds(grid_min_x: int, grid_min_y: int, grid_max_x: int, gri
 		v.pos_y = pos_y
 		push_error(v._to_string())
 	return v
+
+
+class TranslationConsentViolation:
+	var dx: int  ## Fx, the displacement nothing accounts for -- the discriminating quantity, printed first
+	var seed: int
+	var pos_x: int  ## Fx
+	var pos_y: int  ## Fx
+
+	func _to_string() -> String:
+		return ("Invariants: body's x moved %d Fx on a tick with no horizontal input and no incoming " +
+			"horizontal velocity, and with no depenetration or bounds correction to account for it -- " +
+			"some resolver path translated the body sideways of its own accord. seed=%d pos=(%d,%d)") % [
+			dx, seed, pos_x, pos_y]
+
+
+## Third real check (D0213): the post-condition for the INSTANT-TRANSLATION class -- a resolver path
+## that moves the body further in one tick than its own velocity could carry it, in a direction the
+## player never asked for. Three instances shipped before this check existed, each found by a human
+## playing rather than by anything automated: the auto step-up firing mid-air (D0209, the director's
+## "it feels like I teleport on top of the high step"), the mantle doing the same at up to 32px
+## (D0212), and the ceiling corner nudge taking its direction from the stale `facing` field when the
+## body had no horizontal velocity at all (D0213). A fourth needs to be loud on its first tick.
+##
+## The condition is deliberately about CONSENT rather than about any particular path, so it does not
+## have to be updated when a new path is added -- that is the whole point. `move_dir == 0` and
+## `entry_vel_x == 0` together mean the tick's own horizontal integration cannot move the body: with no
+## input, `_integrate_horizontal`'s decel branches leave a zero velocity at zero, and `pos_x += vel_x /
+## TICK_HZ` adds nothing. So on such a tick ANY change in `pos_x` came from a correction, and the only
+## corrections entitled to make one are the two RECOVERY paths -- horizontal depenetration out of an
+## existing overlap, and the world-bounds clamp -- which the caller reports via `recovering`. Both
+## already announce themselves with their own per-tick flag, and both are responses to a state the body
+## should not have been in; a nudge, a step, or a snap is not.
+##
+## What this cannot see, stated so it is not mistaken for wider cover: a translation that fires while
+## the body IS moving horizontally. That case is exempt on purpose -- moving the body along a
+## trajectory it already has is the definition of the forgiveness set, and a bound on its SIZE is a
+## different check with a different threshold, not this one.
+static func check_translation_consent(move_dir: int, entry_vel_x: int, entry_pos_x: int, pos_x: int,
+		recovering: bool) -> TranslationConsentViolation:
+	if move_dir != 0 or entry_vel_x != 0 or pos_x == entry_pos_x or recovering:
+		return null
+	var v: TranslationConsentViolation = TranslationConsentViolation.new()
+	v.dx = pos_x - entry_pos_x
+	return v
+
+
+## Runs `check_translation_consent`, and if it fires, logs it -- same "log always, never assert" policy
+## as the two reports above. NOT rate-limited, and unlike `report_floor_selection` it needs no caller-side
+## de-duplication either: this reports a should-never-happen transition, not a state a resting body can
+## sit in and re-announce every tick.
+static func report_translation_consent(move_dir: int, entry_vel_x: int, entry_pos_x: int, pos_x: int,
+		recovering: bool, seed: int, pos_y: int) -> TranslationConsentViolation:
+	var v: TranslationConsentViolation = check_translation_consent(
+		move_dir, entry_vel_x, entry_pos_x, pos_x, recovering)
+	if v != null:
+		v.seed = seed
+		v.pos_x = pos_x
+		v.pos_y = pos_y
+		push_error(v._to_string())
+	return v

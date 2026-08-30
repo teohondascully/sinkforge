@@ -218,3 +218,31 @@ func _test_scenario_actually_exercises_jump_mantle_step_and_dig(a: Dictionary) -
 		print("shaft_replay_determinism NOTE: golden run stepped up zero times -- all 11 occurrences " +
 			"before D0209 were AIRBORNE, i.e. the defect; grounded step-up is covered by four other suites")
 	_check(digs > 0, "the golden scenario actually digs at least once (got %d)" % digs)
+	_check_corner_consent(a.summary)
+
+
+## D0213, and the `_check()` half of it IS an assertion rather than a NOTE, unlike the mantle and step-up
+## reports above -- because unlike them it has a witness. This 20,000-tick scenario is the only automated
+## thing in the project that poses the ceiling corner nudge at all: measured either side of the gate, it
+## produces **corner_unconsented=2, corner_ok=18** with the defect present and **0 and 11** with it fixed.
+## The fast fuzzer cannot stand in for it -- over 50,000 ticks of `HostileChamber` it fires
+## `corner_corrected_this_tick` **zero** times, so its own green on this class is vacuous
+## (`fixture_body_fuzz_probe.gd`'s header carries that isolation).
+##
+## `corner_ok` is REPORTED, not asserted, and the asymmetry is deliberate. `unconsented == 0` alone would
+## also pass on a build where the mechanic had been deleted outright -- the wrong fix, and exactly what a
+## grounded gate here would produce -- so something has to hold the other side. But this scenario's world
+## comes from `ShaftGenerator`, and D0167/D0168 already measured that its `ValueNoise` differs between
+## macOS and CI's Linux; a platform whose generated shaft simply has no reachable corner would go red for
+## a reason that is not a regression. The pairing is carried instead by `tests/test_corner_consent.gd`,
+## which builds its own grid from constants and so means the same thing on every platform.
+func _check_corner_consent(summary: String) -> void:
+	var ok: int = -1
+	var unconsented: int = -1
+	for field: String in summary.split(" "):
+		if field.begins_with("corner_ok="): ok = int(field.trim_prefix("corner_ok="))
+		elif field.begins_with("corner_unconsented="): unconsented = int(field.trim_prefix("corner_unconsented="))
+	_check(unconsented == 0,
+		"no corner nudge moved the body in a direction it had no velocity for (got %d, was 2 before D0213)" % unconsented)
+	print("shaft_replay_determinism NOTE: corner_ok=%d on this platform (D0213: 11 locally, 18 before the " % ok +
+		"gate; the deletion-proofing pair lives in test_corner_consent.gd, which is platform-independent)")

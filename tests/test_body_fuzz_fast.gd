@@ -39,7 +39,7 @@ func _test_fast_fuzz_finds_no_correctness_defects() -> void:
 		" otherwise silently undercount violations rather than fail loud (docs/DECISIONS_LEDGER.md D0117)")
 	var counts: Dictionary = {}
 	for kind: String in ["bounds", "floor_selection", "embedded", "grounded_no_floor", "overflow",
-			"discontinuity", "deadlock"]:
+			"discontinuity", "deadlock", "translation_consent"]:
 		counts[kind] = combined.count("type=%s " % kind)
 	var summary_line: String = ""
 	for line: String in combined.split("\n"):
@@ -51,7 +51,14 @@ func _test_fast_fuzz_finds_no_correctness_defects() -> void:
 		summary_line)
 	print("body_fuzz_fast coverage: %s -- bounds=%d floor_selection=%d (reported, not gated)" %
 		[summary_line, counts["bounds"], counts["floor_selection"]])
-	for kind: String in ["embedded", "grounded_no_floor", "overflow", "discontinuity", "deadlock"]:
+	# D0213 adds `translation_consent` to the hard-zero set. It belongs there rather than in the
+	# reported-not-gated pair above -- unlike `bounds` it has a principled zero, since its exemptions are
+	# exactly the two recovery paths, so a hit is by construction a translation nothing accounts for. But
+	# read its PASS for what it is: measured 0 with the D0213 defect present as well as absent, because
+	# random input never leaves the body at horizontal rest. `fixture_body_fuzz_probe.gd` carries the
+	# isolation; `tests/test_corner_consent.gd` is where this class is actually witnessed.
+	for kind: String in ["embedded", "grounded_no_floor", "overflow", "discontinuity", "deadlock",
+			"translation_consent"]:
 		_check(counts[kind] == 0,
 			"zero '%s' violations across the fast fuzz sweep (got %d) -- see this run's own stdout above for the first occurrences" %
 			[kind, counts[kind]])

@@ -8,43 +8,47 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-**Reset this round:** the Slice 1.5 section compressed to its result (the detail is `docs/DECISIONS_LEDGER.md`
-D0199-D0205), and the D0139 "OPEN, MID-INVESTIGATION" section is CLOSED — it was the last thing keeping
-the working tree dirty. Nothing deleted from the record, only relocated, per this file's own 150-line cap.
+**Reset this round:** the D0206 section compressed to its result (detail in `docs/DECISIONS_LEDGER.md`
+D0206-D0212), replaced by D0213 below. New file this round: **`docs/NEEDS_DIRECTOR.md`**, the parked
+queue — read it first if you are the director picking this up, it is what is waiting on a ruling.
 
-## DONE THIS RUN — the criterion flaw, fixed on both grounding paths (D0206)
+## DONE THIS RUN — the third and last instant translation, closed (D0213)
 
-**Authorized overnight collision work, the exception to the standing hard stop.** Both defects the
-director's own sessions produced are gone: bad ticks (body inside rock or outside the world) on clean-tree
-replays go **6 → 0** (710-tick session) and **171 → 0** (767-tick session), and
-`fixture_step_up_into_wall_probe` reports NOT REPRODUCED. `test_body_acceptance`'s golden traverse is
-**225, byte-identical to golden**, not merely inside ±12.
+**The class D0209 (step-up mid-air) and D0212 (mantle mid-air) opened is now closed at its third
+instance.** `VerticalResolve.resolve_ceiling`'s corner nudge took its direction from `body.facing`
+whenever `vel_x` was zero, so a body jumping STRAIGHT UP under an overhang, with no horizontal input at
+all, was translated **+6.00px sideways in one tick** — 360 px/s against a 150 px/s run speed — in a
+direction it had never been asked to move. Found by a Codex audit, not by playing; reproduced before
+anything was changed.
 
-**The brief's direction was inverted, and classifying beat theorising.** It described both paths sinking
-the body into rock. `tools/scratch/classify_bad_ticks.gd` over all 184 bad ticks found **153 of them are
-the body thrown ABOVE the world** — `grid_floor_backstop` placing the feet on the world CEILING's top
-face (y=0) — caused by `resolve_floor` first lifting the head 1px into row 0. Sinking was 13 ticks.
+**The gate is MOTION, not grounding, and that is measured rather than argued.** `resolve_ceiling` runs
+only while moving upward, `move_and_resolve` clears `on_floor` before any substep, and `_handle_jump`
+zeroes coyote on launch — so every corner correction that has ever fired ran at `on_floor=false,
+coyote=0`. Applying the grounded gate the two climbs use took `test_body_acceptance`'s
+`corner_correction_success_rate` **from 100% to 0**. A ceiling is only ever contacted airborne; a
+grounded gate there is not a gate, it is a deletion. What the three instances share is the CONSENT half:
+`_try_climb` has required `vel_x != 0` all along, and this path had no motion condition at all.
 
-**The fix is one shared criterion, which is what stops it relocating.** `VerticalResolve.footprint_surface_y`
-— the highest solid face across EVERY column the box occupies — is now the only height either path grounds
-at, and `grid_floor_backstop` must pass `_landing_is_clear` (destination in-bounds AND unblocked) before
-committing. The interpolated sub-pixel ground plane is gone from `sim/`, by proof not preference: a blend
-between two columns of different heights is BELOW the taller one's face, so sub-pixel following and a
-zero-overlap flat-bottomed box are mutually exclusive, and D0032 already chose the box.
+**Did not relocate, proven at set level.** Full 1000x1500 sweeps either side of the gate, diffed line by
+line: **one violation removed, zero added** (`type=bounds edge=left seed=0 tick=1487` — the invented
+nudge pushing the body out through the world's left edge). All **46** `grounded_no_floor` lines are
+byte-identical in seed, tick, position and `floor_source`; the D0206 residual is untouched. All four
+director sessions still replay **0 bad ticks, 0 airborne climbs, 0 unconsented nudges**.
 
-**`grounded_no_floor` stayed at exactly 59 — and it is NOT D0139's relocation.** The count cannot tell
-the two apart, so the SET was diffed: all **805,456** sweep violations are byte-identical before and after
-in seed, tick and POSITION; **4 lines** differ, in attribution only, `grid_floor_backstop` → `resolve_floor`
-(the backstop's share went 4 → **0**; D0139's went 4 → **59**). It cannot go to zero alongside the bad-tick
-count: full support means resting at the DEEPEST column, zero overlap means the HIGHEST, and a flat-bottomed
-box cannot do both on uneven ground. **A design fork for the director, not a bug** — D0061 already weighed
-and rejected the alternative on feel.
+**Two new instruments, and one honest null.** `Invariants.check_translation_consent` is a runtime
+post-condition that names no path — a tick with no input and no incoming velocity cannot move the body
+horizontally, so any displacement on one came from a correction, and only the two RECOVERY paths
+(depenetration, bounds clamp) are exempt. `tests/test_corner_consent.gd` witnesses it deterministically
+and mutation-tests both directions. But **the per-commit fuzzer is blind to this class**: it reports 0
+with the defect present as well as absent, because `HostileChamber` fires `corner_corrected_this_tick`
+**0 times in 50,000 ticks** — D0055's hand-placed corner tile has been unreachable since the held-jump
+bug it was fitted against was fixed. The real witness is `fixture_shaft_replay_probe.gd` (a generated
+shaft is walls, and every wall contact zeroes `vel_x`): **corner_unconsented 2 -> 0, corner_ok 18 -> 11**.
+That fixture now asserts it per commit. Remedy for the fuzzer is parked, not applied (P004).
 
-**A test was pinning the defect.** `test_cave_geometry`'s lower-floor case dropped a 4-column-wide body into
-a 4-column gap offset by one column, so its box included a shelf column; it reached the lower floor by
-clipping THROUGH the shelf's 6-row slab (`worst_overlap=1`, measured against the OLD resolver via
-`tools/scratch/cave_gap_ab.gd` either side of a `git stash`). Corrected, with the catching case added
-separately — and the correction is backed by an A/B of the old code, never by the new code's say-so.
+**Open, and expected:** the shaft-replay golden array is stale by construction — the resolver changed, so
+200 checkpoint hashes changed with it (first mismatch at checkpoint 30). It must be re-captured from CI's
+pinned **Linux** build, not locally: D0167/D0168 measured `ValueNoise` differing across platforms.
 
 ## SLICE 1.5, the bite — delivered, still awaiting the director's play verdict
 

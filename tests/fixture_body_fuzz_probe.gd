@@ -16,6 +16,25 @@ extends SceneTree
 ## The `TileGrid` is built ONCE, outside the seed loop -- `HostileChamber.build()`'s own terrain seed
 ## (20260825) is fixed and unrelated to the fuzzer's input seed, so rebuilding it per run would only
 ## waste time, not add coverage.
+##
+## D0213: `translation_consent` IS A TRIPWIRE WITHOUT A WITNESS **in this fixture**, and is labelled that
+## way rather than counted as coverage. It reports 0 both with the D0213 defect present and with it fixed,
+## so its own zero here is evidence of nothing. Isolated rather than assumed: wiring that same line to
+## `bounds_violation_this_tick` prints 922 over the fast window, so the print-and-count path works and it
+## is the CONDITION that is never reached.
+##
+## **The cause is the WORLD, not the input distribution, and the first answer written here was the wrong
+## one.** It said uniform random input essentially never leaves the body at horizontal rest. That is false
+## and `fixture_shaft_replay_probe.gd` falsifies it: the same goalless driver, over 20,000 ticks of a
+## GENERATED SHAFT, hits the unconsented case twice. A shaft is walls -- and every wall contact
+## depenetrates and zeroes `vel_x`, so "at rest horizontally" is common there and rare in the open
+## `HostileChamber` this fixture runs in. The confirming measurement: this fixture fires
+## `corner_corrected_this_tick` **0** times in 50,000 ticks, so it does not pose the mechanic AT ALL,
+## never mind the defect -- `docs/DECISIONS_LEDGER.md` D0055 already recorded that the chamber's one
+## hand-placed corner tile stopped being reached once the held-jump bug it had been fitted against was
+## fixed. A fuzzer is only as wide as the geometry it is pointed at.
+## `tests/test_corner_consent.gd` witnesses the class deterministically; `test_shaft_replay_determinism.gd`
+## asserts it in a world that actually produces it.
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
 const DEFAULT_NUM_SEEDS: int = 1000
@@ -76,19 +95,30 @@ class _RunState:
 		prev_vx = body.vel_x; prev_vy = body.vel_y; prev_floor = body.on_floor
 
 
-## Checks all six invariants for the tick that just ran, prints one FUZZ_VIOLATION line per hit, and
+## By the time `tick()` returns, `_enforce_grid_bounds` has already corrected the position -- the edge is
+## inferred from which exact clamp value it landed on, not from re-checking bounds now. Extracted from
+## `_check_tick` (D0213) when an eighth violation type took that function past QUALITY gate 4's limit.
+func _clamped_edge(body: Body, grid_w: int, grid_h: int) -> String:
+	var edge: String = ""
+	if body.pos_x == (Body.WIDTH_PX * Fx.SCALE) / 2: edge += "left "
+	if body.pos_x == grid_w - (Body.WIDTH_PX * Fx.SCALE) / 2: edge += "right "
+	if body.pos_y == (Body.HEIGHT_PX * Fx.SCALE) / 2: edge += "top "
+	if body.pos_y == grid_h - (Body.HEIGHT_PX * Fx.SCALE) / 2: edge += "bottom "
+	return edge
+
+
+## Checks all eight invariants for the tick that just ran, prints one FUZZ_VIOLATION line per hit, and
 ## returns how many fired. Mutates `state` to the tick's own post-move values for the next call.
 func _check_tick(body: Body, grid: TileGrid, grid_w: int, grid_h: int, state: _RunState, seed: int, tick: int) -> int:
 	var violations: int = 0
 	if body.bounds_violation_this_tick:
-		# By the time tick() returns, _enforce_grid_bounds has already corrected the position -- the
-		# edge is inferred from which exact clamp value it landed on, not from re-checking bounds now.
-		var edge: String = ""
-		if body.pos_x == (Body.WIDTH_PX * Fx.SCALE) / 2: edge += "left "
-		if body.pos_x == grid_w - (Body.WIDTH_PX * Fx.SCALE) / 2: edge += "right "
-		if body.pos_y == (Body.HEIGHT_PX * Fx.SCALE) / 2: edge += "top "
-		if body.pos_y == grid_h - (Body.HEIGHT_PX * Fx.SCALE) / 2: edge += "bottom "
-		print("FUZZ_VIOLATION type=bounds edge=%s seed=%d tick=%d pos=(%d,%d)" % [edge, seed, tick, body.pos_x, body.pos_y])
+		print("FUZZ_VIOLATION type=bounds edge=%s seed=%d tick=%d pos=(%d,%d)" %
+			[_clamped_edge(body, grid_w, grid_h), seed, tick, body.pos_x, body.pos_y])
+		violations += 1
+	# D0213's instant-translation class. A TRIPWIRE WITHOUT A WITNESS -- see this file's own header for
+	# what its zero does and does not mean, because on its own it means nothing.
+	if body.translation_consent_violation_this_tick:
+		print("FUZZ_VIOLATION type=translation_consent seed=%d tick=%d pos=(%d,%d)" % [seed, tick, body.pos_x, body.pos_y])
 		violations += 1
 	if body.floor_selection_violation_this_tick:
 		print("FUZZ_VIOLATION type=floor_selection seed=%d tick=%d pos=(%d,%d)" % [seed, tick, body.pos_x, body.pos_y])

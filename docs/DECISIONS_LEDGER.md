@@ -8605,3 +8605,114 @@ below it is the recurring failure here, not the rule being unknown. Pinned to th
 of the world they were played in. `play_2026-08-30T15-46-21.log` is one — proven to be a COURSE session
 (0 bad ticks against the course, 1076 against the chamber) while its own header says chamber. Any replay
 of a pre-D0209 log has to establish the world empirically rather than trust the field.
+
+---
+
+## D0213 · The corner nudge invents a direction — the third instant translation, and the first one gated on MOTION rather than grounding · 2026-08-30 · completes D0209/D0212
+**Decided:** `VerticalResolve.resolve_ceiling`'s corner correction requires `body.vel_x != 0`. The
+`body.facing` fallback that stood in for a direction when the body had no horizontal velocity is deleted;
+with no motion, the ceiling simply blocks, which is the ordinary outcome the rest of that function
+already produces.
+
+**Found by a Codex audit, not by playing** — the first of the three found that way. Its reading:
+"ceiling corner correction remains an airborne, instantaneous 6px horizontal translation with neither a
+grounded nor an input-consent gate." Half right, and the half it got right is the half that matters.
+
+**Reproduced before anything was changed** (`tools/scratch/probe_corner.gd`, now the tracked
+`tests/test_corner_consent.gd`): a body standing still under an overhang, jumping straight up with
+`move_dir = 0` for the entire flight, was translated **+6.00px sideways on tick 6** — 360 px/s against a
+run speed of 150 — in the direction of `facing`, a field last written by whatever was pressed however
+long ago and never cleared. It defaults to `1`, so a body that had never been asked to move in any
+direction still had one on file.
+
+**The gate is MOTION, and the brief's proposed grounded gate was mutation-tested rather than
+argued down.** `resolve_ceiling` is reached only from `_resolve_substep_collision` with `dir < 0`, and
+`move_and_resolve` sets `on_floor = false` before any substep runs, while `_handle_jump` zeroes
+`_coyote_ticks_left` on launch. So every corner correction that has ever fired — all 3 real ones across
+the director's four sessions, and both probe cases — ran at `on_floor=false, coyote=0`. Applying
+`recently_grounded` here and re-running measured the consequence directly: **`test_body_acceptance`'s
+`corner_correction_success_rate` went from 100% to 0**, and the consented probe case stopped firing
+entirely. A ceiling is only ever contacted moving upward. **There is no grounded state for this path to
+be restricted to, so a grounded gate is not a gate — it is a deletion**, of a mechanic
+`docs/ARCHITECTURE.md` §9 specifies by name and CI asserts at 100%.
+
+**What the three instances actually share, now that all three are closed.** Not grounding: `_try_climb`'s
+two branches are gated on `recently_grounded` because a climb is something the body does from the ground,
+and that reasoning does not transfer to a ceiling. What transfers is the CONSENT half — `_try_climb` has
+required `body.vel_x != 0` all along, and this path was the one instant translation in the module with no
+motion condition of any kind. A nudge along a trajectory the body already has is forgiveness; the same
+nudge with no trajectory to forgive is invention.
+
+**Reachable but unhit, and reported as such.** Across the director's four recorded sessions there are 3
+corner corrections in total, every one of them the consented case, 0 invented. The probe fires it
+deterministically, so it is a real defect and not a theoretical one, but nobody has met it in play. That
+distinction is worth keeping in the record: D0209 and D0212 were found because the body did something the
+director could feel, and this one could not have been.
+
+**The assertion the class needed** (`Invariants.check_translation_consent`, called from `Body.tick` after
+`_enforce_grid_bounds`). A tick with `move_dir == 0` and an entry `vel_x` of 0 cannot move the body
+horizontally under its own integration — `_integrate_horizontal`'s decel branches leave a zero at zero,
+and `pos_x += vel_x / TICK_HZ` adds nothing — so **any** change in `pos_x` on such a tick came from a
+correction. The two RECOVERY paths are exempt, by their own already-existing per-tick flags:
+`depenetrated_this_tick` and `bounds_violation_this_tick`, both of which are responses to a state the
+body should never have been in. Nothing else is. The check names no path, which is the point: a fourth
+one does not need to be added to it.
+
+**Mutation-tested both ways before being trusted, per the standing rule.** Restoring the `facing`
+fallback makes `test_corner_consent` fail 4 checks and prints the invariant's own `push_error` with
+`dx=393216 Fx` (exactly 6px). Applying the grounded gate makes `test_body_acceptance` fail its corner
+metric. The suite also carries its own positive control — that the invented case really does put the
+head into the slab (`ceiling_stops >= 1`) — because "no nudge fired" is worth nothing from a probe that
+never posed its subject.
+
+**What this check deliberately cannot see, so it is not mistaken for wider cover:** a translation that
+fires while the body IS moving horizontally. That case is exempt on purpose — moving a body along a
+trajectory it already has is the definition of the forgiveness set — and a bound on the SIZE of such a
+translation is a different check with a different threshold, not this one. `fixture_body_fuzz_probe.gd`'s
+`_max_legit_displacement` is that other check, and it already models the 6px nudge.
+
+**Scope, stated because the brief fenced it:** two files in `sim/` (`vertical_resolve.gd`'s gate,
+`invariants.gd`'s new check) plus `body.gd`'s three-line call site. No resolver logic beyond the gate
+itself, no change to either grounding path, no change to the two climbs.
+
+**Set-level proof it did not relocate, the same test D0206 was held to.** Full 1000-seed x 1500-tick
+sweeps either side of the gate, violation lines sorted and diffed: **exactly one line removed, zero
+added.** The removed line is `type=bounds edge=left seed=0 tick=1487` — an invented nudge pushing the
+body out through the LEFT world edge, which is also why the count moved at all. All **46**
+`grounded_no_floor` lines are byte-identical before and after in seed, tick, position and
+`floor_source`, so the residual D0206 left is untouched; totals 1,179,062 -> 1,179,061.
+
+**The class has exactly one automated witness, and it is not the fuzzer.** Instrumenting
+`fixture_shaft_replay_probe.gd` and running it either side of the gate: **`corner_ok=18,
+corner_unconsented=2`** with the defect, **`11` and `0`** with it. That is the second real-world
+occurrence of the defect after the probe, and it is why this fixture's golden array moved (first
+mismatch at checkpoint 30 — nothing else in the tick could have moved it). `test_shaft_replay_determinism`
+now asserts `corner_unconsented == 0` and reports `corner_ok` rather than asserting it, because that
+scenario's world comes from `ShaftGenerator` and D0167/D0168 already measured its `ValueNoise` differing
+between macOS and CI's Linux; the deletion-proofing pair is carried by `test_corner_consent.gd`, which
+builds its grid from constants.
+
+**And the per-commit fuzzer is blind to this class — a null result, reported because it changes what the
+green means.** `translation_consent` was added to `fixture_body_fuzz_probe.gd` as an eighth violation
+type and reports **0 with the defect present and 0 with it fixed**, which is worth nothing on its own.
+Isolated rather than assumed: wiring that same line to `bounds_violation_this_tick` prints 922, so the
+count path works and the CONDITION is what is never reached. **The cause is the world, not the input
+distribution** — and the first explanation written down here was wrong. It said uniform random input
+never leaves the body at horizontal rest; the shaft probe, running the identical goalless driver,
+falsifies that by hitting the case twice. A shaft is walls, every wall contact zeroes `vel_x`, and there
+is always a ceiling overhead. The confirming measurement is blunter: the fuzzer fires
+`corner_corrected_this_tick` **0 times in 50,000 ticks**, so it does not pose the MECHANIC, never mind
+the defect — D0055 already recorded that `HostileChamber`'s one hand-placed corner tile stopped being
+reached once the held-jump bug it was fitted against was fixed, and nobody re-placed it. The tripwire is
+kept and labelled; the remedy (point the fuzzer at a generated shaft too) is parked as
+`docs/NEEDS_DIRECTOR.md` P004 rather than applied, since it doubles the nightly sweep.
+
+**Instrument bug found and fixed while doing this, the third in `trace_lift.gd` and the same shape as the
+first two.** D0212 recorded that pre-D0209 logs carry `chamber=hostile_chamber` regardless of the world
+played — and then the tool, which parses that field, believed it anyway. `play_2026-08-30T15-46-21.log`
+was being replayed against the chamber and reporting **855 bad ticks** for a session that has 0. The rule
+now implemented rather than only written down: **`chamber=` is believed only in a log that also carries
+`air_control=`**, because one commit introduced both fields, so the co-field is the evidence that the
+first one was measured rather than hardcoded. Absent it, both worlds are replayed and the one without a
+bounds violation is the one that was played. A field that is WRONG is worse than a field that is missing,
+and the only thing separating them here is a second field's presence.
