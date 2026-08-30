@@ -5,6 +5,11 @@
 
 - No .gd file over 400 lines (warn at 300). legacy/ is excluded — it is
   frozen pre-pivot code and these limits were never its contract.
+- No `MODULE.md` over 100 lines. Added 2026-08-30 (D0226): `CONTEXT.md` stated a 60-line TARGET that
+  **10 of the 18 tracked MODULE.md files exceeded, with nothing checking it** -- a rule no instance obeys
+  is not a cap, it is a comment. The director ruled the number up to one the tree can meet rather than
+  spending an hour deleting prose somebody wrote on purpose. Worth knowing when it next fires:
+  `core/MODULE.md` is 98, so the headroom on the largest file is two lines.
 - No function over 50 lines. Cyclomatic complexity is NOT checked here
   (this script only counts lines); if that gate is wanted later it needs a
   real branch-counting pass, not a line-based approximation pretending to
@@ -36,7 +41,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from gd_scan import gd_files_excluding  # noqa: E402
+from gd_scan import files_named, gd_files_excluding  # noqa: E402
 
 FUNC_NAME_RE = re.compile(r'^\s*(?:static\s+)?func\s+([A-Za-z_]\w*)')
 
@@ -45,10 +50,27 @@ EXCLUDED_TOP = {"legacy"}
 FILE_WARN = 300
 FILE_LIMIT = 400
 FUNC_LIMIT = 50
+MODULE_DOC = "MODULE.md"
+MODULE_DOC_LIMIT = 100  # CONTEXT.md's five-file rule, D0226 -- was an unenforced 60
 
 
 def find_gd_files():
     return gd_files_excluding(ROOT, EXCLUDED_TOP)
+
+
+def module_doc_violations(root: Path) -> tuple[list, int]:
+    """Returns (violations, files_checked) for MODULE.md against MODULE_DOC_LIMIT.
+
+    The count is returned and printed rather than kept internal on purpose: this gate is replacing a
+    rule that went unenforced for months, and a run that checked ZERO MODULE.md files would otherwise
+    print PASS in exactly the voice of the thing it fixes."""
+    found = files_named(root, MODULE_DOC, EXCLUDED_TOP)
+    violations = []
+    for rel in found:
+        count = len((root / rel).read_text(encoding="utf-8", errors="replace").splitlines())
+        if count > MODULE_DOC_LIMIT:
+            violations.append(f"{rel}: {count} lines (limit {MODULE_DOC_LIMIT})")
+    return violations, len(found)
 
 
 def indent_of(line: str) -> int:
@@ -106,7 +128,10 @@ def main() -> int:
             if length > FUNC_LIMIT:
                 fails.append(f"{rel}:{start}: func {name}() is {length} lines (limit {FUNC_LIMIT})")
 
-    print(f"check_size_limits: {len(files)} files scanned")
+    module_fails, module_count = module_doc_violations(ROOT)
+    fails += module_fails
+
+    print(f"check_size_limits: {len(files)} .gd file(s) and {module_count} {MODULE_DOC} file(s) scanned")
     for w in warns:
         print(f"  WARN  {w}")
     if fails:

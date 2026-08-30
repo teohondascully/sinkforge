@@ -9170,3 +9170,83 @@ verification stops at the work you are declining to do. The failure here is adja
 verified enthusiastically, then generalised from a window I never checked was wide enough to contain the
 event. **Before a zero becomes a claim, state the rate at which the event would have to occur for that
 zero to be unsurprising** — and check whether a prior ledger entry already measured it.
+
+## D0224 · The layer lint was a required CI check that had never evaluated an edge — `class_name` globals now resolve, and a plant proves it · 2026-08-30 · closes the cold-read audit's oldest open finding
+**Decided:** `tools/layer_lint/layer_lint.py` printed `PASS` on every commit while reporting, in its own
+output, `22 files scanned, 0 res://*.gd references checked`. **Zero.** It matched only `res://...gd`
+path references; this codebase couples entirely through `class_name` globals, so there was never an edge
+for it to find. Every "view/ is layer-clean" and "the boundaries hold" claim made from this gate rested
+on nothing.
+
+**Its own docstring said so, and that protected nothing.** The file carried an explicit paragraph —
+"WHAT THIS DOES NOT SEE... do not report a PASS from this tool as 'the dependency graph holds'" — while
+the gate sat in `.github/workflows/harness.yml` as a required check named "structural gates (layer
+boundaries, ...)". **A caveat in a docstring does not travel with the verdict.** The remedy is that the
+run now prints the edge counts it actually resolved, so the scope of a PASS is in the output rather than
+in a file nobody reads at verdict time.
+
+**What was added.** `gd_source.py` blanks comments and string literals (preserving offsets), and the
+lint resolves every `class_name` identifier used in the remaining CODE as a dependency edge. **38 edges
+where there were 0**, against 22 globals. Layer-direction violations found: **none** — the boundaries do
+hold, and that is now a measurement rather than an assumption.
+
+**Blanking is deliberately the conservative direction.** A missed edge under-reports; it never accuses a
+file falsely. This repository's comments are dense with capitalised type names, and a lint that flagged
+prose would be switched off within a day — so two of the mutation-test branches assert that a
+`class_name` inside a comment and inside a string are NOT edges.
+
+**The guard the gate did not have.** `check_edges_were_resolved` FAILS (exit 2, "CONTROL FAILED") when
+globals exist and not one reference to any of them resolves. That is the branch that would have caught
+this in the first place, and it is tested by reproducing the original defect: a tree whose globals are
+never referenced must now exit 2 rather than print PASS.
+
+**Plant-proven, in both places.** `tools/layer_lint/test_layer_lint.py` observes 8/8 branches against
+scratch trees via a new `--root`. And on the REAL tree, per the brief: adding a `TileGrid` reference to
+`view/controls.gd` produced `FAIL -- view/controls.gd: references class_name TileGrid -- layer 'view'
+may not depend on layer 'sim'`, and removing it returned the gate to PASS with the file byte-identical
+to HEAD.
+
+**Stated plainly, because it qualifies the headline.** `view/` currently has **zero outgoing class_name
+edges** — `score.gd`, `particles.gd` and `controls.gd` reference no sim, interface or core type at all.
+So "view is layer-clean" is true in the strongest available sense, but the view-specific check remains
+untested by the tree itself; only the plant exercised it. The lifts landing this run give it a real
+subject for the first time.
+
+## D0225 · The size gate measured a developer's scratch directory and CI measured nothing — one population now · 2026-08-30 · closes NEEDS_DIRECTOR P003
+**Decided:** `gd_scan.gd_files_excluding` enumerated with `rglob("*.gd")` and never consulted git, so
+`check_size_limits.py` linted **8 gitignored files under `tools/scratch/`** locally and **0** in CI,
+where a fresh checkout has no scratch directory. Measured: 94 files unfiltered, **86 filtered**, and the
+8 dropped are exactly the scratch set. CI was already seeing 86; only the local run was wrong.
+
+**The sharp half is not the noise.** A local run could FAIL for a reason CI can never see — this
+project already paid for that when `trace_lift.gd::_replay` crossed the 50-line limit and was reshaped
+to satisfy a gate that will never read it — and, worse, a local run could be made to **PASS by deleting
+an untracked file**.
+
+**The exit code is classified, not truth-tested.** `git check-ignore --stdin` exits **1 when nothing
+matched**, which is the ordinary case; only 128 is an error. A `returncode != 0` check would have
+silently returned "nothing is ignored" and restored the defect while every other test still passed —
+`docs/CORRECTIONS.md`'s existence-probe class. Asserted directly in `test_gd_scan.py`, which observes
+5/5 branches including the control that makes the rest mean something: **the same file in the same place
+with the ignore rule removed must come back**, or a path-shape heuristic would pass identically.
+
+## D0226 · A 60-line rule that 10 of 18 files broke and nothing read — raised to 100 and made real · 2026-08-30 · closes NEEDS_DIRECTOR P006, director's ruling
+**Decided:** `CONTEXT.md`'s five-file rule stated a 60-line `MODULE.md` target, described in its own
+text as "not enforced by any gate". **10 of the 18 tracked files exceeded it**, two of them written that
+way deliberately last session. The director ruled option 1: raise the number to one the tree can meet
+rather than spend an hour deleting prose somebody wrote on purpose, and **enforce it**, because a rule
+no instance obeys is not a cap, it is a comment.
+
+**Corrected while applying it:** P006 reported "10 of 10 modules". The real population is **18** — the
+count of 10 was the count of files over 60, which is the violation set, not the population. The
+distinction matters for exactly the reason this entry exists: a cap needs to be read against everything
+it will govern, not against the subset that already broke it.
+
+**The headroom is thin and that is worth knowing before it fires.** `core/MODULE.md` is 98 against a
+limit of 100. The ruling was applied as given rather than quietly substituting a roomier number, but the
+next two lines added to that file will trip a blocking gate.
+
+Boundary-tested rather than assumed (`test_check_size_limits.py`, 4/4): 99 passes, **exactly 100
+passes** (the cap is `>`, not `>=`), 101 fails, and a gitignored `MODULE.md` is not counted at all —
+inheriting D0225's population so this new cap cannot repeat the two-population defect it was written
+alongside.
