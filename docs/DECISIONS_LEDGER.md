@@ -7099,3 +7099,67 @@ since it was cheap, clear, and found doing exactly the requested attack.
 **Reverse cost:** CHEAP — revert `tools/gate_status.py`'s one-branch change, `tools/gate_status_ci.py`'s
 one-line change, and the four new test functions in `tools/test_gate_status.py`, independently of each
 other.
+
+## D0180 · Gate 8's closure proof rebuilt to actually isolate what it claims — the prior "moving sim/ aside" framing was imprecise, Codex's own naive re-run correctly disproved it (R2, fix queue) · 2026-08-29
+
+**Codex's finding, confirmed correct.** `tests/test_shaft_replay_determinism.gd`'s own docstring said
+"moving `sim/` aside... turns it red... re-running `test_replay_determinism.gd` the same way stays GREEN."
+Codex physically removed ALL of `sim/` and got BOTH tests red — because `tests/test_base.gd`'s own
+`_flat_grid()` helper (every suite's shared harness base) constructs a real `TileGrid`, so deleting all of
+`sim/` breaks the shared base itself, not just the real test's own subject. The docstring's literal claim,
+taken at face value, does not hold — Codex was right to disprove it by doing exactly what it said.
+
+**What actually happened, read from D0165's own ledger text directly rather than re-guessed:** D0165
+already found and fixed this EXACT confound during its own first attempt, and its own SECOND, corrected
+attempt moved only `sim/terrain_gen/`, `sim/body/`, `sim/invariants/`, and `tests/body/
+fuzz_driver_common.gd` — leaving `sim/world/tile_grid.gd` in place — which DID isolate cleanly (stub
+green, real test red with 16 failures). That corrected methodology was recorded in the LEDGER but never
+made it into the TEST FILE's own docstring, which still said the vague, disproven "sim/" framing. The bug
+this item fixes is a documentation-precision bug: the claim in the code didn't match the proof that was
+actually done.
+
+**Rebuilt and re-verified, this time in a scratch clone of HEAD rather than the real working tree** — this
+session's own working tree currently carries D0139's uncommitted `sim/body/vertical_resolve.gd` change,
+and running the closure proof against a dirty tree would have been exactly the same contamination class
+`gate_status.py`'s own docstring already warns about. Confirmed the contamination is real, not
+theoretical: running both suites against the REAL (dirty) working tree first, as a sanity check, showed
+`test_shaft_replay_determinism.gd` FAILING even unmutated — golden hash mismatch from checkpoint 0,
+`mantles=3` instead of the golden run's own recorded value — caused by D0139's own in-progress
+`resolve_floor` experiment changing simulation output, nothing to do with this proof. Switched to
+`git clone /Users/thondascully/Projects/sinkforge <scratch>` (HEAD, clean, zero uncommitted state) for the
+entire experiment instead.
+
+**Clean-clone baseline, unmutated, both PASS:**
+```
+stub exit=0
+real exit=0
+```
+
+**The isolating mutation:** moved `sim/terrain_gen/`, `sim/body/`, `sim/invariants/`, and `tests/body/
+fuzz_driver_common.gd` out of the clone (leaving `sim/world/tile_grid.gd` in place), re-ran `godot
+--headless --path <clone> --import`, confirmed via `grep -c "ShaftGenerator\|res://sim/body\|res://sim/
+terrain_gen\|res://sim/invariants" .godot/global_script_class_cache.cfg` → `0` (genuinely gone, not just
+renamed within the tree — the exact check D0165's own first, invalid attempt skipped).
+
+**Result — the actual isolating proof, exit codes pasted:**
+```
+STUB (test_replay_determinism.gd) exit=0
+REAL (test_shaft_replay_determinism.gd) exit=1
+```
+The real test's own failure output: `ERROR: Failed to load script "res://tests/fixture_shaft_replay_
+probe.gd" with error "Parse error"`, 15 FAILURE(S), `0` checkpoint hashes produced. The stub's own output:
+`ALL PASS (replay_determinism)` — `test_base.gd` provably still loadable, proving the contrast isolates
+the real test's `sim/` dependence from the shared base's `sim/` dependence, exactly what R2 asked for.
+
+**Restored immediately, verified byte-for-byte:** moved all four paths back into the clone, re-ran
+`--import`, re-ran both suites (`stub restored exit=0`, `real restored exit=0`), confirmed `git status
+--porcelain` on the clone is empty (matches HEAD exactly). The real working tree was never touched by any
+of this — the whole experiment ran in a disposable clone — confirmed via `git status --porcelain` on the
+real tree before and after, D0139's own files untouched throughout.
+
+**Fixed:** `tests/test_shaft_replay_determinism.gd`'s own docstring rewritten to state the precise
+methodology (the four specific paths, `sim/world` left in place, verified in a scratch clone) instead of
+the disproven generic "moving sim/ aside" framing, citing this entry.
+
+**Reverse cost:** CHEAP — revert the docstring edit; nothing else changed. The experiment itself touched
+only a disposable clone, already deleted.

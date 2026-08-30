@@ -9,12 +9,19 @@ extends "res://tests/test_base.gd"
 ## nondeterminism, e.g. leaked static/global RNG state between calls in the same process, cannot show up
 ## in an in-process double-run the way it can across two independently-started engines).
 ##
-## Proof this actually tests `sim/`, unlike the stub: moving `sim/` aside and re-running this test turns
-## it red (a Parse Error on `ShaftGenerator`/`TileGrid`/`Body`/`FuzzDriverCommon`, all real `sim/`-rooted
-## classes this fixture calls directly) -- verified directly, not assumed, `docs/DECISIONS_LEDGER.md`
-## D0165 has the exact command and its output. Re-running `test_replay_determinism.gd` the same way
-## (`sim/` moved aside) stays GREEN, confirmed the same way -- the stub genuinely never touches `sim/` at
-## all, which is exactly the contrast this queue asked this file to prove, not just claim.
+## Proof this actually tests `sim/`, unlike the stub -- stated PRECISELY, not as "moving sim/ aside"
+## generically (that claim was itself wrong, caught by a fix-queue certification: `tests/test_base.gd`'s
+## own `_flat_grid()` helper constructs a real `TileGrid`, so removing ALL of `sim/` breaks the shared
+## harness base for EVERY suite, including the stub -- a contrast that doesn't isolate what this docstring
+## needs to prove, since both tests go red for the same unrelated reason). The actual isolating removal
+## (verified in a scratch clone of HEAD, never the real working tree, so a dirty local tree can never
+## contaminate the result): move ONLY `sim/terrain_gen/`, `sim/body/`, `sim/invariants/`, and `tests/
+## body/fuzz_driver_common.gd` outside the project, leaving `sim/world/tile_grid.gd` in place (the one
+## `sim/` file `test_base.gd` itself needs). Re-import, then run both suites: `test_replay_determinism.gd`
+## (the stub) stays ALL PASS, exit 0 -- `test_base.gd` is provably still loadable. `test_shaft_replay_
+## determinism.gd` (this file) goes 15 FAILURE(S), exit 1, root cause `ERROR: Failed to load script
+## "res://tests/fixture_shaft_replay_probe.gd" with error "Parse error"` -- `ShaftGenerator`/`Body` are
+## genuinely gone. `docs/DECISIONS_LEDGER.md` D0180 has the full command sequence and pasted exit codes.
 
 const FIXED_SEED: int = 20260826
 const EXPECTED_CHECKPOINTS: int = 200
