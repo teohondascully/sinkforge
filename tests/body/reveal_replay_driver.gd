@@ -28,6 +28,11 @@ class ParsedLog:
 	var seed_value: int = 0
 	var mode: String = ""
 	var dialect: String = ""  ## the exact column-header line this log declared
+	## D0200. The bite radius the session was played at. A log with no `bite=` field predates the probe and
+	## was therefore played at one cell per break, so it reconstructs as `CONTROL_BITE_RADIUS` -- NOT as
+	## `Mining`'s own default, which would silently replay six committed recordings at a radius none of
+	## them was played at and change every number C004 has ever computed from them.
+	var bite_radius: int = Mining.CONTROL_BITE_RADIUS
 	var inputs: Array[InputFrame] = []
 
 
@@ -73,6 +78,8 @@ static func parse_log(path: String) -> ParsedLog:
 				result.site_id = StringName(line.split(" site=")[1].split(" ")[0])
 				result.seed_value = int(line.split(" seed=")[1].split(" ")[0])
 				result.mode = line.split("mode=")[1].split(" ")[0]
+				if " bite=" in line:
+					result.bite_radius = int(line.split(" bite=")[1].split(" ")[0])
 				found_site = true
 				found_seed = true
 			elif line.begins_with("# tick,"):
@@ -133,6 +140,7 @@ static func replay(parsed: ParsedLog) -> Array[RevealMetric.TickEvent]:
 	var grid: TileGrid = session["grid"]
 	var body: Body = session["body"]
 	var mining: Mining = Mining.new()
+	mining.bite_radius = parsed.bite_radius  ## D0200: replay at the radius the session was PLAYED at
 	var events: Array[RevealMetric.TickEvent] = []
 	for input: InputFrame in parsed.inputs:
 		body.tick(input, grid)

@@ -36,27 +36,14 @@ func _initialize() -> void:
 	_finish("mining")
 
 
-func _solid_grid(material: StringName) -> TileGrid:
-	var grid: TileGrid = TileGrid.new(GRID_W, GRID_H, 1)
-	for col: int in GRID_W:
-		for row: int in GRID_H:
-			grid.set_material(Vector2i(col, row), material)
-	return grid
-
-
-## Body centre placed exactly on a cell's centre, so every distance in these tests is a clean multiple of
-## the cell size rather than an offset that has to be reasoned about at each assertion.
-func _at_cell_centre(cell: Vector2i) -> Vector2i:
-	return Vector2i(cell.x * CELL * Fx.SCALE + (CELL * Fx.SCALE) / 2,
-		cell.y * CELL * Fx.SCALE + (CELL * Fx.SCALE) / 2)
-
-
-## Holds MINE on one cell until it breaks, and returns how many ticks that took (-1 if it never did).
-func _ticks_to_break(mining: Mining, grid: TileGrid, body: Vector2i, cell: Vector2i, cap: int) -> int:
-	for t: int in range(1, cap + 1):
-		if mining.mine(grid, body.x, body.y, cell, true) != Mining.NO_CELL:
-			return t
-	return -1
+## A `Mining` pinned to the single-cell blow, for the tests whose subject is the CHARGE mechanic -- the
+## bank, the heal, the rhythm. Those work over cells one or two apart, so at the default bite radius the
+## first break would clear the neighbours the test is about and the failure would read as a rhythm bug
+## rather than a bite one. Pinning it here keeps each test measuring the thing it names (D0200).
+func _charge_mechanic_mining() -> Mining:
+	var mining: Mining = Mining.new()
+	mining.bite_radius = Mining.CONTROL_BITE_RADIUS
+	return mining
 
 
 ## The one dial relating two hardness scales that do not agree. Printed as a table in seconds, because the
@@ -113,7 +100,7 @@ func _test_a_hold_breaks_a_cell_in_exactly_its_stated_tick_count() -> void:
 ## progress. Half-charge a cell, look away for a few ticks, come back -- it must resume, not restart.
 func _test_charge_is_banked_per_cell_so_a_mis_aim_costs_travel_not_progress() -> void:
 	var grid: TileGrid = _solid_grid(&"deepstone")
-	var mining: Mining = Mining.new()
+	var mining: Mining = _charge_mechanic_mining()
 	var body: Vector2i = _at_cell_centre(Vector2i(8, 8))
 	var target: Vector2i = Vector2i(8, 10)
 	var elsewhere: Vector2i = Vector2i(9, 10)
@@ -154,7 +141,7 @@ func _test_a_neglected_crack_heals_away_after_the_grace_window() -> void:
 ## it would just restate them, while the direction is the mechanic.
 func _test_rhythm_makes_consecutive_breaks_faster() -> void:
 	var grid: TileGrid = _solid_grid(&"deepstone")
-	var mining: Mining = Mining.new()
+	var mining: Mining = _charge_mechanic_mining()
 	var body: Vector2i = _at_cell_centre(Vector2i(8, 8))
 	var first: int = _ticks_to_break(mining, grid, body, Vector2i(8, 10), 400)
 	var second: int = _ticks_to_break(mining, grid, body, Vector2i(9, 10), 400)

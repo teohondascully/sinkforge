@@ -120,6 +120,11 @@ func _parse_args() -> Dictionary:
 			var parts: PackedStringArray = arg.trim_prefix("--camera=").split(",")
 			_fixed_camera = Vector2(float(parts[0]) * CELL, float(parts[1]) * CELL)
 			_has_fixed_camera = parts.size() == 2
+		elif arg.begins_with("--bite="):
+			# D0200 (Slice 1.5). The probe's own dial, and its own control: `--bite=0` is exactly the Slice 1
+			# single-cell blow, so a director sweeping this flag is running the experiment rather than
+			# reading a verdict on it.
+			_mining.bite_radius = int(arg.trim_prefix("--bite="))
 		elif arg == "--mine-down":
 			_mine_down = true  ## D0195: agent mode aims straight down and holds, so the mining verb has a
 			## deterministic, headless, reproducible proof that needs no human at the keyboard
@@ -370,8 +375,10 @@ func _flush_recording() -> void:
 	if f == null:
 		push_error("reveal_scene: could not open %s for writing (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return
-	f.store_line("# sinkforge reveal-scene input recording -- mode=%s ticks=%d site=%s seed=%d" %
-		[prefix, _recording.size(), _site_id, _seed_value])
+	# `bite=` is as load-bearing as `site=`/`seed=` (D0200): the same inputs at a different bite radius
+	# diverge on the first break, so a log that cannot restate it cannot be replayed as played.
+	f.store_line("# sinkforge reveal-scene input recording -- mode=%s ticks=%d site=%s seed=%d bite=%d" %
+		[prefix, _recording.size(), _site_id, _seed_value, _mining.bite_radius])
 	f.store_line(RevealReplayDriver.COLUMN_HEADER_V2)
 	for row: PackedStringArray in _recording:
 		f.store_line(",".join(row))

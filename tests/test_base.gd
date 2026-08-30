@@ -49,6 +49,32 @@ func _flat_grid(floor_row: int, width: int) -> TileGrid:
 	return grid
 
 
+## A uniform grid of one material, `size` cells square. Lives here rather than in a suite for the same
+## reason `_flat_grid` above does (D0102): `test_mining.gd` and `test_mining_bite.gd` both need the
+## identical fixture, and two private copies is exactly the duplication that check found byte-for-byte.
+func _solid_grid(material: StringName, size: int = 64) -> TileGrid:
+	var grid: TileGrid = TileGrid.new(size, size, 1)
+	for col: int in size:
+		for row: int in size:
+			grid.set_material(Vector2i(col, row), material)
+	return grid
+
+
+## Body centre placed exactly on a terrain cell's centre, so every distance in a mining test is a clean
+## multiple of the cell size rather than an offset that has to be reasoned about at each assertion.
+func _at_cell_centre(cell: Vector2i) -> Vector2i:
+	var cell_px: int = Heightfield.TERRAIN_CELL_PX * Fx.SCALE
+	return Vector2i(cell.x * cell_px + cell_px / 2, cell.y * cell_px + cell_px / 2)
+
+
+## Holds MINE on one cell until it breaks, and returns how many ticks that took (-1 if it never did).
+func _ticks_to_break(mining: Mining, grid: TileGrid, body: Vector2i, cell: Vector2i, cap: int) -> int:
+	for t: int in range(1, cap + 1):
+		if mining.mine(grid, body.x, body.y, cell, true) != Mining.NO_CELL:
+			return t
+	return -1
+
+
 ## Canonical string signature of any Variant -- dictionary keys sorted so the signature is content-based
 ## and insertion-order-proof. Used to compare two captured states for exact equality without caring how
 ## either dictionary was built up.

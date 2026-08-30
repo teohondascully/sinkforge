@@ -99,6 +99,13 @@ jobs:
       - name: No test suite redeclares a tests/test_base.gd member (D0117/D0119) — --no-verify skips the local hook, not CI
         run: sh tools/check_base_namespace.sh
 
+      # QUALITY gate 31 (D0201). Reconciles the tracked `tests/test_*.gd` population against the suite
+      # list in the `tests` job below. Four suites written across Slices 0 and 1 were passing locally and
+      # running nowhere; the counts on both sides looked healthy the whole time, which is why this
+      # compares SETS and prints members.
+      - name: Every tracked test suite is actually run by CI (QUALITY gate 31)
+        run: python3 tools/layer_lint/check_suite_coverage.py
+
       - name: Layer dependency lint (ARCHITECTURE §3)
         run: python3 tools/layer_lint/layer_lint.py
 
@@ -294,6 +301,26 @@ jobs:
 
       - name: test_floor_source_telemetry (grounding-path telemetry, D0132)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_floor_source_telemetry.gd
+
+      # D0201. These four were written in Slices 0 and 1 and never wired in here, so every guard they
+      # carry — the Slice 0 palette's colour-distance claim, the mining verb, the dig edge latch, and
+      # D0192/D0199's own spawn-bounds controls — has been running nowhere. Found by reconciling the
+      # `tests/test_*.gd` population against this file's own list rather than by reading either alone;
+      # neither side looks wrong on its own, which is the whole shape of the failure.
+      - name: test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_material_palette.gd
+
+      - name: test_mining (cursor-aim, reach, hold-to-charge, the bite, the hollow tell — D0195/D0196/D0200)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_mining.gd
+
+      - name: test_mining_bite (one blow's volume against legacy's metre, D0200)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_mining_bite.gd
+
+      - name: test_reveal_scene_dig_edge (dig is edge-triggered, Defect B — D0188)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_scene_dig_edge.gd
+
+      - name: test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_spawn_bounds.gd
 
   # D0060: the deep companion to test_body_fuzz_fast above -- the full 1000-seed x 1500-tick sweep
   # (~114s measured), which is why it runs nightly rather than on every push/PR. Only fires on the

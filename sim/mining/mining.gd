@@ -67,6 +67,21 @@ const RHYTHM_DECAY_PER_TICK: int = 11  ## 0.55/s, exactly
 ## `CHARGE_UNIT + (CHARGE_UNIT * rhythm) / RHYTHM_SPEED_DEN`, with RHYTHM_SPEED_DEN = RHYTHM_FULL / 0.60.
 const RHYTHM_SPEED_DEN: int = 2000
 
+## THE BITE (Slice 1.5, D0200). How far the breaking blow reaches around the cell that was charged,
+## in TERRAIN CELLS, as a Euclidean disc: `dx*dx + dy*dy <= r*r`. 0 clears exactly the target and is
+## bit-for-bit the Slice 1 behaviour, which is what makes it the probe's own control.
+##
+## DERIVED from legacy's volumetric rate, not picked. Legacy's `CELL` is 32px and `sim.mine(cell)` removes
+## ONE of them per charge -- one square METRE, at `hardness` seconds. This world's metre is the 16px logic
+## tile, which is 16 terrain cells, and Slice 1 charged a full metre's worth of hardness-seconds to remove
+## ONE of those 16. That is the porting error D0195 did not catch: it checked seconds-per-CELL against
+## legacy and got 0.283s vs 0.28s, but the two codebases' cells are different sizes, so the portable
+## quantity was never seconds-per-cell -- it was seconds-per-METRE, and on that axis Slice 1 mines
+## **16x slower than legacy**. The disc radii are 1, 5, 13, 29 cells for r = 0, 1, 2, 3; r = 2's 13 cells
+## is 81% of a metre and the closest disc to legacy's rate without exceeding it.
+const DEFAULT_BITE_RADIUS: int = 2
+const CONTROL_BITE_RADIUS: int = 0  ## named rather than a bare 0 at the call sites that mean "as Slice 1"
+
 const NO_CELL: Vector2i = Vector2i(-2147483648, -2147483648)  ## `mine()`'s "nothing broke" return
 
 ## cell -> Vector2i(banked charge units, ticks since last worked). Legacy's `_cracks`, one grid finer.
@@ -74,11 +89,20 @@ var _cracks: Dictionary = {}
 var _rhythm: int = 0
 var _rhythm_idle: int = 0
 
+## The bite radius this instance mines at. Sim state in the sense that matters for replay: two runs of the
+## same inputs at different radii diverge on the first break, so a recording that cannot restate it cannot
+## be replayed (`tests/body/reveal_replay_driver.gd` reads it back out of the log header).
+var bite_radius: int = DEFAULT_BITE_RADIUS
+
 ## Per-tick telemetry, read by the caller, not auto-cleared -- same contract `body.gd`'s own flags have.
 var charging_cell: Vector2i = NO_CELL  ## the cell this tick's hold advanced, if any
 var broke_this_tick: bool = false
 var broke_material: StringName = &""
 var breach_this_tick: bool = false  ## the break opened into a void -- `HollowTell.BREACH` or above
+## Every cell this tick's blow actually cleared, target first, in the deterministic scan order `_clear_bite`
+## walks. A view wanting to spray debris per cleared cell reads this rather than re-deriving the disc, which
+## would be a second copy of the shape free to drift from the one that ran.
+var broke_cells: Array[Vector2i] = []
 
 
 ## Canonical state signature, for the replay-determinism check. The crack bank is real sim state: two runs
@@ -93,7 +117,10 @@ func state_signature() -> String:
 	for k: Vector2i in keys:
 		var v: Vector2i = _cracks[k]
 		parts.append("%d:%d=%d,%d" % [k.x, k.y, v.x, v.y])
-	return "r%d,i%d|%s" % [_rhythm, _rhythm_idle, ";".join(parts)]
+	# `bite_radius` is configuration rather than evolving state, but it belongs here: a replay run at the
+	# wrong radius diverges on its first break, and without it in the signature the divergence would surface
+	# only as a mismatched GRID, several hundred cells later, attributed to whatever ran in between.
+	return "b%d,r%d,i%d|%s" % [bite_radius, _rhythm, _rhythm_idle, ";".join(parts)]
 
 
 ## How much charge a cell has banked, 0 if none. The renderer's crack overlay reads this.
@@ -175,6 +202,7 @@ func mine(grid: TileGrid, body_x: int, body_y: int, target: Vector2i, held: bool
 	broke_this_tick = false
 	broke_material = &""
 	breach_this_tick = false
+	broke_cells.clear()
 
 	_rhythm_idle += 1
 	if _rhythm_idle > RHYTHM_GRACE_TICKS:
@@ -228,14 +256,38 @@ func _heal_cracks(grid: TileGrid, working: Vector2i) -> void:
 ## that would make two identical holds break at different times depending on where the previous one ended.
 func _break(grid: TileGrid, body_x: int, body_y: int, cell: Vector2i, material: StringName) -> Vector2i:
 	var hollow: int = hollow_at(grid, cell, swing_dir(body_x, body_y, cell))
-	_cracks.erase(cell)
-	grid.excavate(cell)
+	_clear_bite(grid, cell)
 	_rhythm = mini(RHYTHM_FULL, _rhythm + RHYTHM_GAIN)
 	_rhythm_idle = 0
 	broke_this_tick = true
 	broke_material = material
 	breach_this_tick = hollow >= HollowTell.BREACH
 	return cell
+
+
+## Clears the blow's whole disc, target first, then the rest in a fixed row-major scan -- a nested integer
+## `range`, never a `Dictionary` iteration, so the order is the same on every machine and `broke_cells` is
+## replay-stable (`CONTEXT.md`, "Determinism").
+##
+## Only SOLID, in-bounds cells are cleared and recorded, so `broke_cells.size()` is what the blow actually
+## removed rather than the disc's nominal area -- a bite at a wall's edge honestly reports the smaller
+## number. The disc is deliberately NOT reach-tested per cell: the charge was earned on the target, and at
+## r = 2 the rim reaches 8px past it against a 51.2px reach, which is the blow's own radius rather than a
+## way to mine further than the arm goes.
+func _clear_bite(grid: TileGrid, target: Vector2i) -> void:
+	_cracks.erase(target)
+	grid.excavate(target)
+	broke_cells.append(target)
+	for dy: int in range(-bite_radius, bite_radius + 1):
+		for dx: int in range(-bite_radius, bite_radius + 1):
+			if dx * dx + dy * dy > bite_radius * bite_radius:
+				continue
+			var cell: Vector2i = target + Vector2i(dx, dy)
+			if cell == target or not grid.in_bounds(cell) or not grid.is_solid(cell):
+				continue
+			_cracks.erase(cell)  ## a cell that no longer exists may not keep banked charge
+			grid.excavate(cell)
+			broke_cells.append(cell)
 
 
 ## Which way the blow faces -- the axis the tell's probe box looks along. Axis-dominant from the body

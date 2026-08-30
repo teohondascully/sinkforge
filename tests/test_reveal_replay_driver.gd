@@ -20,6 +20,7 @@ func _initialize() -> void:
 	_test_parse_log_rejects_a_header_missing_site_or_seed()
 	_test_parse_log_rejects_a_malformed_row()
 	_test_parse_log_rejects_a_different_dialect_with_matching_field_count()
+	_test_a_log_replays_at_the_bite_radius_it_names_and_a_silent_log_at_the_control()
 	_finish("reveal_replay_driver")
 
 
@@ -184,3 +185,46 @@ func _write_log(path: String, rows: Array[PackedStringArray]) -> void:
 	for row: PackedStringArray in rows:
 		f.store_line(",".join(row))
 	f.close()
+
+
+## D0200. The bite radius is as load-bearing as `site=`/`seed=`: the same inputs at a different radius
+## diverge on the first break. Two claims, and the SECOND is the one that protects existing evidence --
+## a log with no `bite=` field was recorded before the probe, so it must reconstruct at
+## `CONTROL_BITE_RADIUS`, not at whatever `Mining` currently defaults to. Six committed recordings and
+## every C004 number ever computed from them depend on that default being the OLD behaviour rather than
+## the NEW one; defaulting the other way would silently restate history in the present tense.
+func _test_a_log_replays_at_the_bite_radius_it_names_and_a_silent_log_at_the_control() -> void:
+	var cases: Array = [
+		{"suffix": "", "want": Mining.CONTROL_BITE_RADIUS, "label": "a log with NO bite= field (pre-probe)"},
+		{"suffix": " bite=0", "want": 0, "label": "a log naming bite=0"},
+		{"suffix": " bite=2", "want": 2, "label": "a log naming bite=2"},
+		{"suffix": " bite=3", "want": 3, "label": "a log naming bite=3"},
+	]
+	for case: Dictionary in cases:
+		var log_path: String = "user://test_reveal_replay_bite_%d.log" % Time.get_ticks_usec()
+		var f: FileAccess = FileAccess.open(log_path, FileAccess.WRITE)
+		f.store_line("# sinkforge reveal-scene input recording -- mode=agent ticks=1 site=%s seed=%d%s"
+			% [SITE_ID, SEED_VALUE, case["suffix"]])
+		f.store_line(RevealReplayDriver.COLUMN_HEADER_V1)
+		f.store_line("0,0,false,false,false")
+		f.close()
+		var parsed: RevealReplayDriver.ParsedLog = RevealReplayDriver.parse_log(log_path)
+		_check(parsed != null and parsed.bite_radius == int(case["want"]),
+			"%s reconstructs at radius %d (got %s)"
+			% [case["label"], case["want"], "null" if parsed == null else str(parsed.bite_radius)])
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(log_path))
+	# `seed=` sits immediately before `bite=` in the real header, so the seed parse has to stop at the
+	# space rather than swallowing the rest of the line -- an off-by-one there would replay a seed of
+	# `20260826 bite=2`, which `int()` would quietly truncate back to the right number and hide itself.
+	var probe: String = "# sinkforge reveal-scene input recording -- mode=play ticks=9 site=%s seed=%d bite=2" % [SITE_ID, SEED_VALUE]
+	var log2: String = "user://test_reveal_replay_bite_order_%d.log" % Time.get_ticks_usec()
+	var g: FileAccess = FileAccess.open(log2, FileAccess.WRITE)
+	g.store_line(probe)
+	g.store_line(RevealReplayDriver.COLUMN_HEADER_V1)
+	g.store_line("0,0,false,false,false")
+	g.close()
+	var p2: RevealReplayDriver.ParsedLog = RevealReplayDriver.parse_log(log2)
+	_check(p2 != null and p2.seed_value == SEED_VALUE and p2.mode == "play" and p2.bite_radius == 2,
+		"a full real-shaped header parses seed, mode and bite independently of their order (%s)"
+		% ("null" if p2 == null else "seed=%d mode=%s bite=%d" % [p2.seed_value, p2.mode, p2.bite_radius]))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(log2))

@@ -168,6 +168,31 @@ scoped the Reveal want-layer to *lateral* search, and D0110's horizontal-only di
 So what D0195 actually reopens is a GDD-level scope question, not just a controller decision, and the
 director should read it that way rather than as a bug fix.
 
+## D0200 corrects D0195 — the port was checked in the wrong units, one paragraph from the right ones
+
+**What D0195 claimed** (2026-08-29): the hardness port is faithful at the shallow end, anchored on
+seconds-per-cell. Clay breaks in 17 ticks = 0.283 s against legacy earth's 0.28 s; hardrock in 51 ticks =
+0.850 s against legacy stone's 0.850 s, exact. Both numbers are correct and both are still asserted.
+
+**What D0200 establishes** (2026-08-29): seconds-per-cell was never the portable quantity. Legacy's cell is
+32px and one charge removes one of them — one square **metre**. This world's metre is the 16px logic tile,
+which is **16 terrain cells**, and Slice 1 charged a full metre's worth of legacy hardness-seconds to
+remove ONE of them. Per unit volume, Slice 1 mines at **0.06x legacy** — sixteen times slower — and no
+seconds-per-cell comparison could ever have shown it, because the comparison holds fixed the very thing
+that differs.
+
+**Why this one is worth reading twice.** D0195 states the correct rule explicitly, about a different
+constant, in the same entry: legacy's `REACH_CELLS = 3.2` is 102.4px there and 51.2px here **because both
+codebases' cells are one metre, so the portable quantity is metres, not pixels**. The reach was converted
+through the metre and the hardness was not — and the hardness section even opens by saying the two hardness
+scales do not agree, which is true and which is what drew attention away. Having the general rule written
+down, in the same file, adjacent, was not enough to make it get applied to the second constant.
+
+**What this suggests for the rest of the migration.** Every ported constant should be asked which unit it
+travels in, and the answer "seconds" or "cells" is not sufficient on its own — seconds *per what*, cells
+*of what size*. `docs/DECISIONS_LEDGER.md` D0195's own framing ("two codebases can share a constant's name
+and not its units") was right and was applied to only one of the two constants in front of it.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,

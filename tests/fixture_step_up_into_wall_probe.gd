@@ -1,0 +1,105 @@
+extends SceneTree
+
+## D0202. A minimal, hand-authored reproduction of a COLLISION RESOLVER defect: standing at the foot of a
+## ragged wall and pressing toward it makes `try_step` lift the body INTO solid rock, from which it never
+## recovers -- overlap grows, the body accelerates, and within a few hundred ticks it is ejected out of
+## the world entirely.
+##
+## Not a suite (no `_finish()`, doesn't extend `test_base.gd`): the defect is UNFIXED and the collision
+## resolver is a hard stop for the slice that found it, so this is a reproducer for whoever takes the
+## collision arc, not a gate that would paint CI red about something nobody is allowed to touch here.
+##
+## NO MINING. That is the whole point. It was found by replaying the director's own `--play` session at
+## bite radius 1 (`tools/measure_play_session.gd <log> 1`), and the tick it goes wrong on excavates NOTHING
+## -- the grid is byte-identical either side of it. The bite only carved the shaft; what fails is
+## `body.tick()` against a static geometry, so the geometry is transcribed here verbatim and the mining
+## verb is absent. Reachable in shipped Slice 1 too: any cell set a radius-1 blow clears, a radius-0 blow
+## clears one at a time.
+##
+## THE GEOMETRY, exactly as dumped at the failing tick (`#` solid, `.` open; the body's box covers columns
+## 1-4, rows 3-12, standing on row 13):
+##
+##       0123456789012
+##   r 0 #############
+##   r 1 #.....#######     <- the right wall is at column 6 here ...
+##   r 2 #......######
+##   r 3 #.....#######
+##   r 4 #......######
+##   r 5 #.....#######
+##   r 6 #.....#######
+##   r 7 #......######
+##   r 8 #.....#######
+##   r 9 #......######
+##   r10 #.....#######
+##   r11 #....########     <- ... but at column 5 here, a two-row ledge at the body's feet
+##   r12 #....########
+##   r13 #############
+##
+## THE MECHANISM. Pressing right, the body's lower rows meet the column-5 ledge at rows 11-12. That ledge
+## is 2 cells tall, inside `STEP_UP_PX`, so `try_step` steps up -- but the destination it steps to is NOT
+## clear for the body's whole box: at 8px higher the box spans rows 1-10, and column 5 is SOLID on rows
+## 1, 3, 5, 6, 8 and 10. The step-up height is checked; the destination's fit is not.
+##
+## Run: godot --headless --path . --script res://tests/fixture_step_up_into_wall_probe.gd
+## Prints one line per tick and a verdict. Exits 0 either way -- it reports, it does not gate.
+
+const CELL: int = Heightfield.TERRAIN_CELL_PX
+const TICKS: int = 12
+## Transcribed from the dump above. Row 13 is the floor the body rests on; rows 14+ are irrelevant to the
+## step and are left solid.
+const MAP: Array[String] = [
+	"#############",
+	"#.....#######",
+	"#......######",
+	"#.....#######",
+	"#......######",
+	"#.....#######",
+	"#.....#######",
+	"#......######",
+	"#.....#######",
+	"#......######",
+	"#.....#######",
+	"#....########",
+	"#....########",
+	"#############",
+	"#############",
+]
+
+
+func _initialize() -> void:
+	var grid: TileGrid = TileGrid.new(MAP[0].length(), MAP.size(), 1)
+	for row: int in MAP.size():
+		for col: int in MAP[row].length():
+			if MAP[row][col] == "#":
+				grid.set_material(Vector2i(col, row), &"clay")
+	# The body's own position at the failing tick, in pixels: centred on x=12 (box 4..20, columns 1-4) and
+	# y=32 (box 12..52, rows 3-12), at rest on row 13. Stated as pixels rather than derived from a cell,
+	# because it is a transcribed observation and deriving it would invite a rounding that moves it.
+	var body: Body = Body.new(Fx.from_int(12), Fx.from_int(32))
+	var input: InputFrame = InputFrame.new()
+	input.move_dir = 1  ## the director pressed RIGHT for the first time on this tick, and only this
+	var worst: int = 0
+	for t: int in TICKS:
+		body.tick(input, grid)
+		var overlap: int = _overlap(grid, body)
+		worst = maxi(worst, overlap)
+		print("  t%-3d pos=(%6.2f,%7.2f) vel=(%7.2f,%7.2f) floor=%-5s src=%-20s OVERLAPPING %d solid cells%s"
+			% [t, float(body.pos_x) / float(Fx.SCALE), float(body.pos_y) / float(Fx.SCALE),
+			float(body.vel_x) / float(Fx.SCALE), float(body.vel_y) / float(Fx.SCALE),
+			str(body.on_floor), str(body.floor_source_this_tick), overlap,
+			"  <<< BOUNDS VIOLATION" if body.bounds_violation_this_tick else ""])
+	if worst > 0:
+		print("REPRODUCED: the body ended up inside %d solid cell(s) after pressing toward the ledge." % worst)
+	else:
+		print("NOT REPRODUCED: the body never overlapped solid rock. If this is a fix, retire the fixture;")
+		print("if it is a change of geometry or spawn, the transcription above no longer poses the defect.")
+	quit(0)
+
+
+func _overlap(grid: TileGrid, body: Body) -> int:
+	var n: int = 0
+	for col: int in range(Body._px_to_cell(body._left_x()), Body._px_to_cell(body._right_x() - 1) + 1):
+		for row: int in range(Body._px_to_cell(body._top_y()), Body._px_to_cell(body._bottom_y() - 1) + 1):
+			if grid.in_bounds(Vector2i(col, row)) and grid.is_solid(Vector2i(col, row)):
+				n += 1
+	return n

@@ -7980,3 +7980,129 @@ true of D0192 and is the standing cost of fixing a spawn.
 for D0192, and it still cannot tell a wall-press from an escape. That remains the director's call.
 
 **Reverse:** set `CEILING_ROWS = 0`; the vertical control pair goes red immediately.
+
+## D0200 · The bite: Slice 1 mined 16x slower than legacy per unit VOLUME · 2026-08-29 · corrects D0195
+**Decided:** `Mining.bite_radius` — a charged blow clears a Euclidean disc of terrain cells around the
+target instead of exactly one. Default `2` (13 cells), `0` is bit-for-bit the Slice 1 blow and is the
+probe's own control, and `--bite=N` sweeps it from the command line.
+
+**The brief this answers asked for the opposite, and the build already had it.** Slice 1.5's brief reads
+"one mine removes a whole logic cell, i.e. a chunk nearly the size of the body… mine at the SUBDIV-4 fine
+resolution instead," with collision to be kept on a coarse logic grid behind a threshold. Both halves of
+that premise are false in this tree, and it is worth writing down exactly how:
+
+- **Mining was already at the fine resolution.** `Mining.CELL_PX` is `Heightfield.TERRAIN_CELL_PX` = 4.
+  One blow removed one 4px cell — **2.5% of the body's own area**, not a body-sized chunk.
+- **Collision already runs on the fine grid too.** `TileGrid` stores 4px cells only and says so in its own
+  header ("the 16px machine/logic grid is a VIEW over this, not a second array"); `Heightfield` reads
+  `TileGrid.is_solid` per 4px cell. There is no coarse grid to keep collision on.
+
+So the requested probe had no content: building it would have been a no-op that the director then played,
+felt no change from, and reasonably read as "granularity doesn't help — shrink the body." A measurement
+whose subject is absent is the ledger's own dominant failure class, and shipping one here would have
+steered the next decision with it.
+
+**What the director's session actually says.** Replayed offline
+(`tools/measure_play_session.gd`, `reveal_play_2026-08-30T05-58-03.log`, 1775 ticks / 29.6 s):
+
+| | |
+|---|---|
+| MINE held | 876 ticks (14.6 s, 49% of the session) |
+| ... of which did any work | 372 (42%) — **504 held ticks were aimed at AIR** |
+| cells broken | **29**, first at tick 682 (**11.4 s in**) |
+| net descent | **2 cells = 0.50 m** |
+| total removed | **0.7 of one body-volume**, in half a minute |
+
+The bite was never huge. It was so small that half a minute of holding dug a hole smaller than the digger,
+and because a blow ends on the cell it just cleared, the cursor is over air the moment it lands — which is
+what the 504 air ticks are. The director's perception was right and its attributed mechanism was inverted:
+the body is massive **relative to what a blow removes**, not relative to the cell.
+
+**The constant is derived, not picked, and it corrects a units error in D0195.** Legacy's `CELL` is 32px
+and `sim.mine(cell)` removes one of them per charge — one square METRE, at `hardness` seconds. This
+world's metre is the 16px logic tile, which is **16 terrain cells**, and Slice 1 charged a full metre's
+worth of legacy hardness-seconds to remove ONE of them. D0195 checked seconds-per-CELL (0.283 s vs legacy
+earth's 0.28 s) and called the port faithful; the two codebases' cells are different sizes, so
+seconds-per-cell was never the portable quantity. **On the metre — which D0195 itself established as the
+portable unit for REACH, one paragraph away — Slice 1 mines at 0.06x legacy.** Disc areas run 1, 5, 13, 29
+for r = 0..3; r = 2's 13 cells is 0.81 m², the largest disc that stays under legacy's metre.
+`tests/test_mining_bite.gd` prints both rates and asserts r = 3 would exceed it, so the "largest such
+disc" claim is checked rather than asserted.
+
+**The look is not what changes.** The removed shape is still built out of 4px cells, so the wall stays
+finely divided and ragged; only the RATE changes. That is legacy's own trick and Noita's: granularity
+lives in the edge of the hole, not in the size of the bite.
+
+**Replay safety.** The radius is state for replay purposes — the same inputs at different radii diverge on
+the first break — so `bite=` joins `site=`/`seed=` in the recording header, `RevealReplayDriver` reads it
+back, and it is in `Mining.state_signature()`. A log with no `bite=` field predates the probe and
+reconstructs at `CONTROL_BITE_RADIUS`, never at `Mining`'s current default: six committed recordings and
+every C004 number computed from them depend on that, and defaulting the other way would silently restate
+history in the present tense. Mutation-tested: flipping that default fails
+`tests/test_reveal_replay_driver.gd` immediately.
+
+**Reverse:** one commit. `--bite=0` also reverts it at runtime without touching the tree.
+
+## D0201 · Four suites, two of them mutation-tested guards, ran nowhere · 2026-08-29
+**Decided:** QUALITY gate 31 — `tools/layer_lint/check_suite_coverage.py` reconciles the tracked
+`tests/test_*.gd` population against the workflow's own `res://tests/…` references, and the four missing
+suites are wired in.
+
+**Found by reconciling, not by reading.** `test_material_palette` (Slice 0), `test_mining`,
+`test_reveal_scene_dig_edge` and `test_reveal_spawn_bounds` (Slice 1) were all written, all passing, all
+committed — and none appeared in `.github/workflows/harness.yml`. **Every suite written in the last two
+slices ran nowhere**, including D0192's and D0199's bounds controls, both of which were deliberately
+mutation-tested precisely so they could be trusted.
+
+**Why neither side looked wrong.** The workflow is a long, correct-looking list of steps; `tests/` is a
+long, correct-looking directory. Only the set difference says anything — and after the fix the first run
+printed "26 suites on disk, 26 referenced by CI" while the sets still differed, exactly the ledger's own
+"equal counts, different sets". The gate therefore reports MEMBERS in both directions (unrun, and dangling
+steps naming files that do not exist) and never a bare total.
+
+**Population, deliberately chosen:** TRACKED files, via `git ls-files`, not files on disk. CI runs against
+a checkout, so an untracked suite is not something CI could run even in principle; counting it would make
+this gate permanently red over D0139's parked `tests/test_vertical_resolve.gd`, which is gate 27's subject
+and not this one's. It also carries a positive control on itself — an empty population is a FAIL, not a
+pass, because a broken scan would otherwise produce an empty set difference forever.
+
+**Reverse:** delete the script and its CI step; the four suite steps are independently useful and should
+stay regardless.
+
+## D0202 · Pressing toward a ragged wall steps the body INTO rock — escalated, not fixed · 2026-08-29
+**Decided:** report and hold. `tests/fixture_step_up_into_wall_probe.gd` is a minimal hand-authored
+reproduction; nothing in `sim/body/` was touched.
+
+**This is the slice's hard stop, hit for real.** Slice 1's step-one rule and Slice 1.5's constraints both
+say the collision resolver is out of bounds and a defect tracing into it must be reported. This one traces
+into `try_step`.
+
+**How it surfaced.** Replaying the director's own session at bite radius 1 produced a 253 m descent and
+three bounds violations. The obvious read — "the bigger bite broke something" — is wrong, and the trace
+says so: **the failing tick excavates nothing** (`cleared=0`, no break, grid byte-identical either side of
+it). The bite only carved the shaft; what fails is `body.tick()` against a static geometry.
+
+**Confirmed independent of every local variable.** It reproduces on a clean checkout without D0139's
+parked `vertical_resolve.gd` (same tick, same transition — only the `floor_source` label differs,
+`resolve_floor` vs `grid_floor_backstop`), and then from a **hand-authored 15-row map with no `Mining` in
+the script at all**, in one tick.
+
+**Mechanism.** The body stands at the foot of a wall that is at column 6 for most of its height but juts to
+column 5 for the two rows at its feet. Pressing toward it, the ledge is 2 cells — inside `STEP_UP_PX` — so
+`try_step` steps up. The destination is not clear for the body's whole box: 8px higher the box spans rows
+1-10 and column 5 is solid on rows 1, 3, 5, 6, 8 and 10. **The step-up's HEIGHT is checked; the
+destination's FIT is not.** The result cycles — step into rock, get pushed out, fall back, step again —
+which is a visible stutter before it becomes an ejection.
+
+**Reachable in shipped Slice 1, not just under the probe.** Any cell set a radius-1 blow clears, a
+radius-0 blow clears one at a time; and the input that triggers it is the first press of RIGHT. The
+shipped radius 2 happens to be clean on this session, which is one seed and one input trace and is not
+evidence that it is safe.
+
+**Why this is the probe's most useful output.** Slice 1 named it: the fuzzer drives `InputFrame` and never
+sets `mine_held`, so gate 26 is green about cursor-aim mining only because it never exercises it. A bite
+radius is a shape generator, and it found a real resolver defect in 987 ticks of one recorded session.
+**Wiring the fuzzer to the mining verb is now a much better bet than it looked.**
+
+**Reverse:** N/A — nothing was changed. The fixture retires itself when the defect is fixed, and says so
+in its own output.
