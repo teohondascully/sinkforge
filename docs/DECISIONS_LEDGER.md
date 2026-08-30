@@ -8177,3 +8177,65 @@ the dirty-tree difference gets MEASURED before it is described. `tools/capture_m
 to let a dirty tree pass as reproducible (D0198); the same discipline had no equivalent for "go play it."
 
 **Reverse:** N/A.
+
+## D0205 · A climb owns its own tick's vertical state — the reference rule we ported half of · 2026-08-30
+**Decided:** `Body.tick` skips `_integrate_vertical` + `VerticalResolve.move_and_resolve` on a tick where
+`stepped_up_this_tick or mantled_this_tick`. Plus `_enforce_grounding_consistency`, a diagnostic
+invariant: a tick may not end naming a `floor_source_this_tick` while reporting `on_floor == false`.
+
+**The mechanism (D0203's corrected account).** `_try_step` places the feet on the ledge, zeroes `vel_y`
+and sets `on_floor` — and then the same tick ran the vertical pass anyway. That re-applies gravity to the
+just-zeroed velocity, and `move_and_resolve`'s own first act is `body.on_floor = false`, so the grounding
+the climb established is discarded before `resolve_floor` gets a chance to re-establish it. On a ledge
+narrower than the body's footprint it cannot, and the body sinks into the cell it just climbed onto.
+
+**This is the reference implementation's rule and we ported `_try_step` without it.**
+`legacy/scenes/player.gd` sets `_stepped = true` inside its step-up and branches on it immediately after,
+with a comment that describes our defect exactly: *"an auto step-up likewise just placed the feet on a
+ledge, perched on its edge with the footprint possibly still over the lower cell, so this frame's gravity
+drop is skipped in both cases; otherwise the same frame's fall would yank the body straight back down."*
+Not a new invention, and not a tolerance — the half of the mechanic that makes the other half safe.
+
+**Cost accepted:** one tick of deferred fall if the ledge turns out not to hold. Legacy accepts the same.
+
+**The invariant, and why it needed a positive control.** Every `floor_source_this_tick` assignment in
+`sim/body` sits on the line beside its own `on_floor = true`, so the pair is contradictory by
+construction. A jump is the sole legitimate producer — it fires after the vertical resolve by design, the
+"one-tick touch-and-go" the tick order's own comment describes — so `jumped_this_tick` was added and is
+exempt by FLAG, never by tolerance. Diagnostic only, same policy as `_enforce_grid_bounds`: the resolver
+is made not to produce the state, and this exists so a future path reopening it is loud.
+
+**Mutation-tested three ways, and the third one mattered.** Disabling the tick-order skip fails 4
+assertions. Making the invariant never fire, and widening its exemption to always-exempt, BOTH left the
+whole suite green — because with the fix in place the resolver no longer emits the state the guard
+watches for, so every behavioural test passes just as happily against a guard that cannot fire. The
+remedy is `_test_the_invariant_itself_fires_when_the_pair_is_posed_directly`, which poses the state by
+hand and calls the check, with a negative control per exemption clause. **A guard whose subject the code
+has stopped emitting can only be tested by posing its subject.**
+
+**WHAT THIS DOES NOT FIX, measured and reported rather than papered over.** Bad ticks (body inside rock or
+outside the world) over the director's three recorded sessions, replayed on a clean tree:
+
+| session | ticks | before | after |
+|---|---|---|---|
+| 05-58-03 (bite 0) | 1775 | 0 | 0 |
+| 07-31-23 (bite 2) | 710 | 8 in 4 episodes | 6 in 3 |
+| 07-42-13 (bite 2) | 767 | 173 in 3 episodes | **171 in 3** |
+
+**The contradiction is gone (0 consistency violations, against 2 with the fix disabled) and the embedding
+is not.** The remaining mechanism is DIFFERENT and traced: `resolve_floor` and `grid_floor_backstop` both
+ground the body at positions that already overlap solid cells — `t596 src=resolve_floor floor=true
+overlap=1`, then `t598 src=grid_floor_backstop overlap=4`, `t599 src=resolve_floor overlap=13`. That is
+the three-sample-heightfield-vs-full-footprint criterion flaw, which is **D0139's exact subject**, and it
+is `_resolve` logic beyond the tick-order interaction and the consistency assertion — the stated STOP
+condition for this unit of work. Reported, not attempted.
+
+**Determinism:** the A/B/C check is GREEN (two processes agree bit-for-bit, the seed+1 control differs).
+`test_shaft_replay_determinism`'s committed GOLDEN array no longer matches, which is correct and expected —
+the fix changes how a body settles, so it changes the shaft replay, and that array is a regression
+tripwire rather than a determinism check. It must be re-captured from **CI's pinned Linux build**, never
+locally: D0167 records capturing it on macOS as a mistake already made and corrected once, and the test
+prints its own observed hashes precisely so CI's run can supply them (D0168's own method).
+
+**Reverse:** drop the `if not (stepped_up_this_tick or mantled_this_tick)` guard; the new suite goes red
+on 4 assertions immediately.

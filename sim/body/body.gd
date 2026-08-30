@@ -100,6 +100,12 @@ var depenetrated_this_tick: bool = false
 var floor_source_this_tick: StringName = &""  ## D0132: which call set on_floor=true THIS tick --
 ## "resolve_floor"/"grid_floor_backstop"/"try_step", empty if none did this tick (read-only telemetry).
 var bounds_violation_this_tick: bool = false; var floor_selection_violation_this_tick: bool = false  ## NOT rate-limited, unlike the push_error reports
+## D0205. True on a tick `_handle_jump` actually launched. Exists because it is the ONE legitimate way a
+## tick can end with `floor_source_this_tick` set and `on_floor` false -- the "one-tick touch-and-go" the
+## tick order's own comment describes -- and the grounding-consistency invariant below has to exempt it or
+## it would fire on correct behaviour.
+var jumped_this_tick: bool = false
+var grounding_consistency_violation_this_tick: bool = false
 var dig_event_this_tick: bool = false  ## true iff `input.dig_pressed` this tick actually excavated a
 ## cell (a press against air or out of bounds is not an event) -- the caller's ground truth for a
 ## dig-rate metric that must never look at cells the player hasn't dug (docs/DECISIONS_LEDGER.md D0110)
@@ -217,7 +223,10 @@ func _handle_dig(grid: TileGrid) -> void:
 ## One fixed 60Hz tick. Order: horizontal integrate+move+collide, vertical integrate+move+collide.
 ## Matches `docs/ARCHITECTURE.md` §4's phase order at body's own scope (input already read into
 ## `input`; body never polls a device).
-func tick(input: InputFrame, grid: TileGrid) -> void:
+## Every per-tick telemetry flag, cleared together. Split out of `tick()` when the D0205 additions took it
+## to 51 lines against QUALITY gate 4's limit; keeping the whole set in one place also means a new flag has
+## one obvious home rather than being appended to whichever list a reader notices first.
+func _reset_tick_flags() -> void:
 	stepped_up_this_tick = false
 	mantled_this_tick = false
 	corner_corrected_this_tick = false
@@ -226,15 +235,37 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	floor_source_this_tick = &""
 	bounds_violation_this_tick = false
 	floor_selection_violation_this_tick = false
+	jumped_this_tick = false
+	grounding_consistency_violation_this_tick = false
 	dig_event_this_tick = false
 	dug_material_this_tick = &""
+
+
+func tick(input: InputFrame, grid: TileGrid) -> void:
+	_reset_tick_flags()
 
 	_integrate_horizontal(input)
 	pos_x += vel_x / TICK_HZ
 	HorizontalResolve.resolve(self, grid, input)
 
-	_integrate_vertical()
-	VerticalResolve.move_and_resolve(self, grid)
+	# D0205. A climb that just succeeded OWNS this tick's vertical state, and the vertical pass is skipped
+	# rather than allowed to undo it. `_try_step` has already placed the feet on the ledge, zeroed `vel_y`
+	# and set `on_floor`; running the pass anyway re-applies gravity to that zeroed velocity, and
+	# `move_and_resolve`'s own first act is `on_floor = false`, so the grounding the climb established is
+	# discarded before `resolve_floor` gets a chance to re-establish it -- and on a ledge narrower than the
+	# body's footprint it cannot, so the body sinks into the very cell it just climbed onto.
+	#
+	# This is the reference implementation's rule, not a new one, and not porting it with `_try_step` is
+	# the whole defect. `legacy/scenes/player.gd` states it in its own words: "an auto step-up likewise
+	# just placed the feet on a ledge, perched on its edge with the footprint possibly still over the
+	# lower cell, so this frame's gravity drop is skipped in both cases; otherwise the same frame's fall
+	# would yank the body straight back down." Legacy sets `_stepped` and branches on it exactly here.
+	#
+	# The cost is one tick of deferred fall if the ledge turns out not to hold: next tick runs the pass
+	# normally and the body falls then. Legacy accepts the same trade.
+	if not (stepped_up_this_tick or mantled_this_tick):
+		_integrate_vertical()
+		VerticalResolve.move_and_resolve(self, grid)
 
 	# Jump is handled AFTER vertical resolve, not before: a buffered jump has to see THIS tick's own
 	# landing, not the previous tick's `on_floor` -- checking it earlier meant a jump buffered right up
@@ -244,6 +275,7 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	# integration reflects the jump.
 	_handle_jump(input)
 	_enforce_grid_bounds(grid)
+	_enforce_grounding_consistency()
 	if input.dig_pressed:
 		_handle_dig(grid)
 
@@ -286,11 +318,31 @@ func _handle_jump(input: InputFrame) -> void:
 	if _jump_buffer_ticks_left > 0 and (on_floor or _coyote_ticks_left > 0):
 		vel_y = JUMP_VELOCITY
 		on_floor = false
+		jumped_this_tick = true
 		_coyote_ticks_left = 0
 		_jump_buffer_ticks_left = 0
 	elif vel_y < 0 and _was_jump_held and not input.jump_held:
 		vel_y = (vel_y * JUMP_CUT_MULT_NUM) / JUMP_CUT_MULT_DEN
 	_was_jump_held = input.jump_held
+
+
+## D0205. Every assignment to `floor_source_this_tick` in this module sits on the line beside its own
+## `on_floor = true` -- `resolve_floor`, `grid_floor_backstop`, `_try_step`, and nothing else -- so a tick
+## that ends naming a grounding source while reporting the body airborne is reporting two things that
+## cannot both be true. That exact pair was on screen through the whole D0202 investigation
+## (`floor_source = "try_step"`, `on_floor = false`) and nothing was watching for it; the trace was read
+## for position and velocity instead, and the mechanism was misdiagnosed twice before this pair was noticed.
+##
+## Diagnostic, never a correction, same policy as `_enforce_grid_bounds`'s own report: the resolver is made
+## not to produce the state, and this exists so a future path that reopens it is loud rather than silent.
+## A jump is the one legitimate producer and is exempt by flag, not by tolerance.
+func _enforce_grounding_consistency() -> void:
+	if floor_source_this_tick == &"" or on_floor or jumped_this_tick:
+		return
+	grounding_consistency_violation_this_tick = true
+	push_error(("Invariants: tick ended with floor_source=%s but on_floor=false and no jump -- a grounding " +
+		"was established and then discarded inside the same tick. pos=(%d,%d) vel=(%d,%d)")
+		% [floor_source_this_tick, pos_x, pos_y, vel_x, vel_y])
 
 
 ## World boundary, not terrain (D0055) -- called last in `tick()`, reports (D0052) BEFORE correcting.

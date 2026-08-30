@@ -319,6 +319,9 @@ jobs:
       - name: test_reveal_scene_dig_edge (dig is edge-triggered, Defect B — D0188)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_scene_dig_edge.gd
 
+      - name: test_step_up_grounding (a climb owns its tick; the on_floor/floor_source pair — D0205)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_step_up_grounding.gd
+
       - name: test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_spawn_bounds.gd
 
