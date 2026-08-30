@@ -5,8 +5,9 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
 **Last updated: 2026-08-30. This round: the collision resolver's grounding criterion, authorized overnight.
-4 commits (`3ea7c87`, `db05f00`, `f784aac`, plus this wrap) and one shelf branch `shelf/d0139-full-footprint`
-(`f8186fb`). `docs/DECISIONS_LEDGER.md` D0206.**
+5 commits — `3ea7c87` (the fix), `db05f00` (milestone), `f784aac` (golden re-capture), `ec1acfa` (D0207),
+`bae9565` — plus this wrap, and one shelf branch `shelf/d0139-full-footprint` (`f8186fb`).
+`docs/DECISIONS_LEDGER.md` D0206 and D0207.**
 
 **Headline: bad ticks on the director's own two recorded sessions go 6 → 0 and 171 → 0, the step-up probe
 no longer reproduces, and the golden traverse is 225 — identical, not merely within tolerance. The one
