@@ -72,11 +72,16 @@ doesn't make local capture correct — it means this one scenario is insensitive
 
 ## Gates
 
-`python3 tools/gate_status.py`. **One red: gate 7 (LOC velocity)**, and this round made it worse — instrument
-+1185 against game +169 over the trailing 10 commits. Its own message is the signal: *"the next unit of work
-is game, not another check."* `check_size_limits` and `check_untracked_files` are **green for the first time
-in weeks** (both were red only on D0139's parked work). `check_claim_references` is VOID by construction.
-All 29 suites pass locally and on CI's Linux build.
+**All 29 suites pass on CI's Linux build** (run `33303000919`), golden array re-captured. Two gates were
+red only on D0139's parked work and are now green. **Gate 7 (LOC velocity) is the one red** — and this
+round made it worse, honestly: instrument +1185 against game +169 over the trailing 10 commits.
+
+**D0207, and it is the more serious finding of the two:** gate 7 runs early in the `structural gates` job,
+a failed step aborts the job, so **ten BLOCKING checks after it come back `skipped` — not failed, not
+passed.** Gate 13, gates 15-16, 22, 23 (WORKING freshness), **27 (untracked files)**, 30, the
+`project.godot` tripwire, the gate mutation tests, and duplication. **None has been enforced by CI for as
+long as gate 7 has been red.** All pass locally, checked individually this session. Found only because
+`gate_status.py` prints `local=` beside the CI conclusion — reading CI alone shows silence, not an error.
 
 ## Claims
 

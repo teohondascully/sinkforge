@@ -88,11 +88,26 @@ possibility the geometry raises:** the world is 48 cells / 12 m wide and the bod
 of the screen's HEIGHT at zoom 6. Shrinking the body and widening the world are the same fix from two ends,
 and no mining change reaches either.
 
-**GATES.** `check_size_limits` and `check_untracked_files` are GREEN for the first time in weeks — both
-were red only on D0139's parked work. **Gate 7 (LOC velocity) is the one red**, and this run made it
-worse, honestly: instrument +1185 against game +169 over the trailing 10 commits. Its own message is the
-signal — "the next unit of work is game, not another check." `check_claim_references` is VOID (zero
-scenarios exist to carry a reference), unchanged and by construction.
+**GATES.** All 29 suites pass on CI's Linux build (run `33303000919`), `test_shaft_replay_determinism`
+included with its re-captured golden. `check_size_limits` and `check_untracked_files` are green for the
+first time in weeks — both were red only on D0139's parked work.
+
+**Gate 7 (LOC velocity) is the one red, and D0207 is why that now matters more than a red gate usually
+does.** It runs early in the `structural gates` job, a failed step aborts the job, so **ten BLOCKING
+checks after it were reported `skipped` — not failed, not passed** — on the final run of this session:
+
+> gate 13 (schema validation) · gates 15-16 (claim references) · gate 22 (generated data freshness) ·
+> gate 23 (WORKING.md freshness) · gate 27 (no untracked files) · gate 30 (CORRECTIONS freshness) ·
+> `project.godot` load-bearing flags · gate mutation tests (BLOCKING) · duplication (BLOCKING)
+
+**None of those has been enforced by CI for as long as gate 7 has been red.** They pass locally right now —
+checked individually this session, not assumed — but "CI is green except gate 7" was never what was
+happening. This is a real hole, it is bigger than the duplication that revealed it, and fixing it means
+changing the CI topology (one job per gate, or `continue-on-error` plus an aggregation step), which is a
+director-level call, not something to slip into a body fix. **Gate 7 itself only falls when GAME LOC grows
+— its own message: "the next unit of work is game, not another check."**
+
+`check_claim_references` is VOID (zero scenarios exist to carry a reference), unchanged and by construction.
 
 
 ## STANDING — carried forward, none of it closed by Slice 1.5
