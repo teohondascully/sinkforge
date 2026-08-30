@@ -5,7 +5,10 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
 **Last updated: 2026-08-30. This round: gate hygiene and the last unblocked lifts, under a new
-PR workflow. 6 commits across 3 PRs, all merged by rebase. `docs/DECISIONS_LEDGER.md` D0224-D0233.**
+PR workflow. Every PR merged by rebase; `git log --oneline 0c718eb..main` is the commit count, not a
+figure written here that goes stale the moment the next one lands — this one did, twice, because a brief
+that counts its own commit is never right after it is merged (`CONTEXT.md` solves its own line count the
+same way). `docs/DECISIONS_LEDGER.md` D0224-D0233.**
 
 **Headline: a REQUIRED CI check had never evaluated a single dependency edge.** `layer_lint` printed
 PASS on every commit for weeks while reporting, in its own output, `0 references checked` — it matched
@@ -70,8 +73,9 @@ between a broken parse and a green report (D0233).
 ## The three PRs, all merged
 
 **#1** gate hygiene + the lifts (had to ship together — see Gates). **#2** the recorded-session test, the
-battery tool, P007's free half. **#3** the migration map. Nothing is parked on gate 7; nothing was
-forced; branch protection was not touched.
+battery tool, P007's free half. **#3** the migration map. **#4/#5** this file. Nothing is parked on
+gate 7; nothing was forced; branch protection was not touched, and `main` still carries exactly one
+committer identity after five rebase merges — which is P010's rule holding under test.
 
 ## Gates
 
