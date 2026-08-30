@@ -97,6 +97,25 @@ immediate predecessor when the claim's real origin sits further back.
   found a further real gap (the golden scenario never mantles on CI regardless of spawn placement) and
   downgraded that specific assertion from gated to reported, rather than force a fix neither queue
   authorized.
+- **D0180** — a Codex certification pass disproved `test_shaft_replay_determinism.gd`'s own docstring
+  claim exactly as it was written ("moving sim/ aside" turns the real test red, the stub stays green):
+  removing ALL of `sim/` reds BOTH, because `test_base.gd`'s shared `_flat_grid()` needs `TileGrid` too.
+  The real isolating methodology (D0165's own second, corrected attempt) was already right, just never
+  made it into the docstring — rebuilt and re-verified in a scratch clone, docstring corrected to match.
+- **D0182** — `project.godot`'s own pin comment said CI "replaced" the Godot-installing job with pure
+  static analysis needing no engine at all; the real `tests` job (harness.yml:199) boots Godot and
+  checksum-verifies this exact pin before running every suite. Same class as the retired roguelite
+  description corrected earlier this session (D0177) — shipped metadata nobody re-read before quoting it.
+- **D0183** — five docs framed `ValueNoise.sample()` as "the one place" `sim/` departs from fixed-point;
+  a certification pass found float arithmetic on the same terrain-generation/RNG state path in three more
+  places (two in `shaft_generator.gd`, one in `core/split_rng.gd`). The direction of D0171/D0172's own
+  correction (proven within-platform, not across) was right; the SCOPE was still an undercount — corrected
+  to name all four sites, enumerated in D0183 itself.
+
+**D0181, read and deliberately excluded, not silently dropped:** its own header matches this page's
+keyword scan ("7 files corrected"), but it is drift cleanup — annotating already-true comments as
+"parked, see D0153-D0155" — not a correction of a claim that was ever WRONG. Noted here so the freshness
+gate (`tools/check_corrections_freshness.py`) doesn't keep re-flagging it as unreviewed drift.
 
 ## What this page is not
 

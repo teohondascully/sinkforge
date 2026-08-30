@@ -7322,3 +7322,24 @@ it IS.
 
 **Reverse cost:** CHEAP — revert the one inline comment and the one docstring pointer in `tests/
 test_body_fuzz.gd`; no logic, no value, no test assertion touched.
+
+## D0185 · `docs/CORRECTIONS.md` updated with this fix queue's own real corrections — its own freshness gate caught the drift it was built to catch (fix queue wrap) · 2026-08-29
+
+**Not part of R1-R6, a direct consequence of them.** Running the standing gate sweep before pushing, per
+this queue's own "unexplained gate red beyond the known velocity gate" hard stop:
+`tools/check_corrections_freshness.py --check` (D0175, queue #3 Part L2) reported DRIFT — D0180, D0181,
+D0182, D0183 all match the page's own keyword scan and were not yet mentioned. Exactly the property this
+gate was built to catch, catching real drift from real work for the first time since it was built.
+
+**Read each of the four before acting, per the page's own established discipline (D0170):** D0180
+(gate 8's closure-proof docstring corrected), D0182 (`project.godot`'s stale CI comment corrected), and
+D0183 (ValueNoise's "one place" scope corrected) all genuinely name an earlier claim as wrong — added to
+`docs/CORRECTIONS.md`'s chronological list. D0181 (the parking-reference sweep) does NOT — it annotates
+already-true comments with "parked, see D0153-D0155" rather than correcting anything that was ever false —
+excluded, but noted explicitly in the page's own text (a one-paragraph addition) so the gate stops
+re-flagging it as unreviewed rather than the exclusion looking like an oversight.
+
+**Verified clean:** `tools/check_corrections_freshness.py --check` → `clean: every candidate entry's
+D-number appears somewhere in docs/CORRECTIONS.md`.
+
+**Reverse cost:** CHEAP — revert the one addition to `docs/CORRECTIONS.md`.
