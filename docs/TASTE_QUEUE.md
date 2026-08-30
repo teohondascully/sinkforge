@@ -66,3 +66,30 @@ more honest but abandons the one anchor that currently ties this build's feel to
 **Only playing it answers this.** The agent trace cannot: it has no sense of whether a 1.4-second hold on
 deepstone is a satisfying commitment or a chore, and that is precisely the axis the whole migration is
 about.
+
+**T004 · The bite radius: 0, 1, 2 or 3.** New with D0200, and it partly re-frames T003 above — that table
+measures seconds **per cell**, and one blow no longer removes one cell. What a radius costs, measured:
+
+| radius | cells per blow | as a fraction of a square metre | rate against legacy | 24-cell shaft takes |
+|---|---|---|---|---|
+| 0 (Slice 1) | 1 | 0.06 m² | **0.06x** | 991 ticks (16.5 s) |
+| 1 | 5 | 0.31 m² | 0.31x | 505 ticks (8.4 s) |
+| **2 (shipped)** | **13** | **0.81 m²** | **0.80x** | **242 ticks (4.0 s)** |
+| 3 | 29 | 1.81 m² | 1.79x | 152 ticks (2.5 s) |
+
+Legacy is the 1.00x row that does not exist here: its 32px cell IS one square metre and one charge removes
+it. Radius 2 is the largest disc that stays under that, which is where the default came from — but "closest
+to legacy" is a derivation, not a ruling. Legacy was a factory game with a rig to feed; this is a descent
+game, and the right answer may well be that digging should feel *faster* than legacy rather than equal to
+it, in which case radius 3 is the honest choice and the metre stops being the anchor.
+
+*Question: sweep `--bite=0/1/2/3` in `--play` and say which one feels like mining rather than like waiting
+or like a cheat.* Radius 0 is exactly the build that was played and reported as "weird", so it is the
+control and it should feel worse.
+
+**Two things to watch that no measurement covers.** First, **the hole's edge**: a disc is a regular shape,
+so a swept column comes out with straighter sides than Noita's, whose raggedness comes from irregular
+material rather than from a small bite. Second, **the dead time after a blow** — a blow ends on the cell it
+just cleared, so the cursor is over air until it moves. That was 504 of the director's 876 held ticks at
+radius 0; a larger radius shortens it but does not remove it, and the real fix (if it needs one) is a
+mechanic question, not a constant.

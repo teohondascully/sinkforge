@@ -4,12 +4,14 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-29. This round: LEGACY REVIVAL Slice 1 — the mining verb. 3 commits
-(`caf0d99`, `427b3e0`, `c7a137f`). `docs/DECISIONS_LEDGER.md` D0192-D0198.**
+**Last updated: 2026-08-30. This round: LEGACY REVIVAL Slice 1.5 — the bite. 4 commits dated 2026-08-29
+(`7199940`, `627e24b`, `ea33549`, `1ac7939`), plus this wrap. `docs/DECISIONS_LEDGER.md` D0199-D0202.**
 
-**Headline: a body can now mine downward and descend into what it mined — the core verb D0110
-deliberately never built. And the bounds error that was gating this slice was not the collision arc at
-all: the reveal scene was spawning the body flush against the world's left wall on 53% of dense seeds.**
+**Headline: the Slice 1.5 brief's premise was false in both halves, and the real defect is the opposite
+of the one it describes. Mining was already at the 4px resolution and collision already runs on it; what
+was wrong is that one blow removed 1/16th of a metre while being charged a full metre's worth of legacy
+hardness-seconds. Slice 1 mined 16x slower than legacy per unit volume, and nothing measured it because
+the check was in seconds-per-CELL and the two codebases' cells are different sizes.**
 
 ---
 
@@ -18,108 +20,100 @@ all: the reveal scene was spawning the body flush against the world's left wall 
 Findings from this round, written while they're fresh — not the ledger's judgment-call record (that's
 `docs/DECISIONS_LEDGER.md`), and not a work log.
 
-### The bounds error was a spawn bug, and the invariant that caught it cannot do its job
+### A feel report is data; the mechanism attributed to it is a hypothesis
 
-`pos=(503808, ...)` decodes to x = 7.6875px, so the body's left edge was **−0.3125px** — exactly one
-acceleration step, at the world's LEFT edge. Not the floor. The trace is `_enforce_grid_bounds ← tick`
-with `on_floor` true throughout; `resolve_floor` and `grid_floor_backstop` are nowhere in it. `find_spawn`
-returned spawn column 0 whenever the target pocket sat at column 6, and `carve_entry_shaft` then
-excavated the column-0 rock that would have stopped the walk. **53.2% of dense seeds, 14.0% of sparse** —
-the guard that skips columns 0..5 piles every shallow pocket onto column 6, so this is the mode of the
-distribution, not a tail (D0192).
+The brief reads "one mine removes a whole logic cell, i.e. a chunk nearly the size of the body." Replaying
+the session that produced that sentence (`tools/measure_play_session.gd`): 29.6 s, MINE held 876 ticks,
+**504 of them aimed at AIR**, 29 cells broken, first break **11.4 s in**, **0.50 m** descended, **0.7 of
+one body-volume** removed. The bite was 2.5% of the body's area — it takes **40 of them** to make a
+body-sized hole. Half a minute of holding dug a hole smaller than the digger.
 
-The deeper finding is the one to rule on (D0193): `Invariants.check_bounds` has **no magnitude**. It fired
-here at 0.3125px; D0055 built it for a chained step-up that launched the body **15.85px** out. This world
-is 192px wide — twelve body-widths — so pressing into the outer wall is ordinary play, not an edge case,
-and an invariant that fires during ordinary play trains everyone to ignore it. That defeats exactly what
-D0055's own comment says it exists for. **It is gate 24's subject, so loosening it is a gate change and
-yours, not mine.** A principled discriminator exists and is written up: the body can only ever be outside
-by one tick of legal motion unless something teleported it, so overshoot measured against `|vel|/TICK_HZ`
-separates a wall-press from an escape without a threshold picked to silence a log.
+The perception ("the body is massive, mining feels weird") was exactly right. The mechanism was inverted:
+the body is massive **relative to what a blow removes**. Building the requested probe would have made bites
+16x *smaller* — except it couldn't, because they were already at that resolution, so it would have been a
+no-op the director played, felt nothing from, and read as "granularity doesn't help — shrink the body."
+**A measurement whose subject is absent doesn't return "no effect"; it returns a wrong reason** (D0200).
 
-### Two codebases can share a constant's name and not its units
+### The general rule was written down, one paragraph away, and still wasn't applied
 
-Legacy's hardness numbers **are seconds to break** (earth 0.28, stone 0.85). This project's are unitless
-(clay 1.0, hardrock 3.0). No single factor maps one onto the other — the scales genuinely differ in shape
-at the deep end. Porting "the same" hardness would have silently changed every mining time. The one dial
-relating them (`TICKS_PER_HARDNESS = 17`) is derived from the shallow end and reproduces legacy's two
-shallowest materials at 0.283s vs 0.28s and 0.850s vs 0.850s — the second exact, and not fitted to. The
-deep end lands ~2x faster than legacy, which is a tuning question and is printed as a table in seconds so
-it stays visible instead of buried in a constant (D0195).
+D0195 established the right rule about REACH: legacy's `REACH_CELLS = 3.2` is 102.4px there and 51.2px
+here, **because both codebases' cells are one metre, so the portable quantity is metres, not pixels**. The
+same entry then validated the HARDNESS port in seconds-per-cell — 0.283s vs legacy earth's 0.28s — and
+called it faithful. Legacy's cell is a square metre and one charge removes it; here a metre is 16 terrain
+cells and one charge removed one. **0.06x legacy per unit volume.** Having the rule stated, correctly, in
+the same file, about the adjacent constant, was not enough. The screen is: seconds *per what*, cells *of
+what size* (`docs/CORRECTIONS.md`, D0200).
 
-Same class, different axis: legacy's `REACH_CELLS = 3.2` is 102.4px there and **51.2px here** — because
-legacy's 32px cell and this world's 16px logic tile are both **one metre**. The portable quantity was
-metres; copying the pixel count would have doubled the reach.
+### The probe found a collision defect, and the tick it fails on excavates nothing
 
-### "Not blank" and "shows its subject" are different claims
+Replaying the director's session at radius 1 ejects the body from the world. The obvious read — "the bigger
+bite broke something" — is wrong, and `cleared=0` on the failing tick says so: the grid is byte-identical
+either side of it. It reproduces on a clean checkout without D0139's parked change, and then from a
+**hand-authored 15-row map with no `Mining` in the script at all**. Standing at a wall that juts one column
+at the body's feet and pressing toward it, `try_step` lifts the body INTO rock — **the step-up's HEIGHT is
+checked, the destination's FIT is not**. Reachable at radius 0 too, since any cell set one blow clears,
+single-cell blows clear one at a time. **Escalated, not fixed** (D0202); `tests/fixture_step_up_into_wall_probe.gd`
+is a one-command reproduction.
 
-D0190's blank-frame guard is real and it could not catch this: the first milestone capture derived its zoom
-from the **output** resolution (1920) when the project renders 2D at **1280×720** and scales up. Every
-moment was framed 1.5x tighter than intended and the `delve` shot had the shaft and the body **both
-entirely outside the frame** — while reporting 159 distinct colours, because a wall of textured clay is not
-blank. Found by looking at the image and then printing the camera and body position; not by re-reading the
-arithmetic (D0197). The scene now prints camera, zoom and body cell alongside every capture.
+The lesson beyond the bug: Slice 1 named the fuzzer's blind spot (it never sets `mine_held`) and moved on.
+A bite radius is a shape generator, and it found a real resolver defect inside 987 ticks of one recorded
+session. Wiring the fuzzer to the mining verb is now a much better bet than it looked.
 
-### An artifact made over a dirty tree names a commit that cannot reproduce it
+### Every suite written in the last two slices ran nowhere
 
-Measured, not theorised: the same scripted `--mine-down` run gives **954 ticks in the working tree and 1019
-on a clean checkout**, because the tree carries D0139's uncommitted `vertical_resolve.gd`. Every Slice 1
-milestone artifact was therefore re-made on a clean clone. A recording that names a commit producing a
-different recording is declared state wearing a reproducible label (D0198).
+`test_material_palette`, `test_mining`, `test_reveal_scene_dig_edge`, `test_reveal_spawn_bounds` — all
+written, all passing, all committed, in no CI job. Two of them are the bounds controls that were
+deliberately mutation-tested so they could be trusted. Neither side looked wrong alone: a long
+correct-looking workflow, a long correct-looking directory. After the fix the first run printed **"26
+suites on disk, 26 referenced by CI"** while the sets still differed — the ledger's own "equal counts,
+different sets", live. Gate 31 reports members, never a total (D0201).
 
-### Legacy's breach camera-settle has never once fired
+### A derived rule and its repair are different sizes
 
-`_note_breach` sets `_shake = max(_shake, 1.4 * hollow)`, but `try_mine` has already set it to 2.0 or 2.6
-on every successful break, and `1.4 * hollow ≤ 1.4 < 2.0`. Found while extracting the tell; not ported. A
-faithful port would have carried a dead line forward as if it were behaviour.
-
-### A green gate that is green because it never runs the subject
-
-`tests/test_body_fuzz_fast.gd` (gate 26) drives `InputFrame` and never sets `mine_held`. So it says nothing
-about cursor-aim mining — and single-cell mining is exactly the shape that can produce the straddle-able
-geometry D0113/D0125 exist to prevent and D0122/D0123 found as a real `discontinuity`. **Named rather than
-assumed away; wiring the fuzzer to the new verb is its own unit of work and was not done.**
+D0192 derived "one solid cell between the body's edge and the boundary" and applied it to the left edge.
+The entry shaft still opened row 0, so the body spawned with its head ON y=0 and **the first jump of any
+session left the world** — one bounds violation in the director's own log. What found it was not a re-read
+of that work but a new measurement of a new session (D0199).
 
 ## Gates
 
-Run `python3 tools/gate_status.py`. Its live output is the current gate table — this section does not copy
-it (`docs/DECISIONS_LEDGER.md` D0143, D0146: a copied number here is exactly the drift an external audit
-found, twice). **Two locally-red suites (`test_shaft_replay_determinism`, `test_body_acceptance`) and one
-size FAIL (`resolve_floor` at 60 lines) are D0139's parked uncommitted work, not this round's** —
-re-confirmed by running Slice 1's files on a clean clone at `caf0d99`, where all three pass.
-
-## Ratio
-
-Run `python3 tools/layer_lint/check_loc_ratio.py`. **Still red, and for the last time on this cause**: its
-trailing 10-commit window still reaches back over Slice 0, which was instrument-heavy by design (+588
-instrument, +28 game). **Slice 1's own ratio is 1.12x against the 2.00x limit** (game +546, instrument
-+609) — the first slice in a while to add real game LOC. It clears as the window rolls forward.
+Run `python3 tools/gate_status.py`. **Two red, both D0139's parked uncommitted work, verified unchanged:**
+`check_size_limits` (`resolve_floor` at 60 lines) and `check_untracked_files` (`test_vertical_resolve.gd`).
+Every suite passes on a clean clone carrying this round's changes and not D0139's — isolated and checked,
+not assumed. Gate 7 (LOC velocity) still red on its trailing window.
 
 ## Claims
 
-Aggregate: `python3 tools/layer_lint/check_claim_references.py`. Per-claim status: `claims/*.md`
-frontmatter directly. **`claims/C004` is untouched on purpose** — this round produced a clean recording,
-and deciding whether a session qualifies is your judgment, not the session's.
+`python3 tools/layer_lint/check_claim_references.py`. **`claims/C004` is still untouched on purpose** — a
+real human session now exists in the tree, but deciding whether one qualifies is your judgment.
+
+## The decision this round is waiting on
+
+**Play it and sweep `--bite=0/1/2/3`** (`godot --path . tests/body/reveal_scene.tscn -- --play --bite=N`).
+Radius 0 is bit-for-bit the build you played and called weird, so it is the control and should feel worse.
+`docs/TASTE_QUEUE.md` T004 carries the measured table: the same 24-cell shaft takes 991 / 505 / 242 / 152
+ticks at radius 0 / 1 / 2 / 3.
+
+**And a third option the geometry raises, which no mining change reaches.** The world is 48 cells — 12 m —
+wide. The body is **8.3% of the world's entire width** and **33% of the screen's height** at zoom 6. You
+cannot zoom out to fix that: at zoom 6 the view is already 213px against a 192px world, so zooming out adds
+background, not world. **Shrinking the body and widening the world are the same fix seen from two ends**,
+and the brief's Option 1 is only one of them.
 
 ## Blocked, and what it's waiting on
 
-- **The human `--play` acceptance run** — Slice 1's own acceptance bar, half met. The verb is proven
-  mechanically (agent trace: 24 cells / 6.0m descent, 91 breaks, 0 bounds violations). **A human session
-  cannot be produced from a session with no keyboard**; the command is in the report.
-- **D0193 / the bounds invariant's missing magnitude** — new, yours, gate 24's subject.
-- **D0139 / `resolve_floor`** — unchanged, untouched, still dirty on purpose. Now also known to change the
-  mine-down trace by 65 ticks (D0198).
-- **Line of sight** — legacy gates mining on a float DDA; not ported, so a player can currently mine
-  through one tile of rock. Real behaviour change, stated rather than dropped.
-- **The `ValueNoise` cross-platform float gap** (D0171/D0172) — unchanged.
-- **Three GDD contradictions** (D0177) — unchanged, yours.
-- **The persistent-world GDD reversal** — unchanged; text exists only in pre-compaction history.
-- **`data/economy/` D1-D6**, **`history/`'s 168-image cull**, **the parked Anvil CONSTRAINED finding** —
-  all unchanged, all yours.
+- **D0202 / `try_step`** — new, yours, and a hard stop for anyone not on the collision arc.
+- **D0193 / the bounds invariant's magnitude** — unchanged, yours, gate 24's subject. It has now fired
+  twice more (0.3125px, 3.4px) against the 15.85px it was built for.
+- **D0139 / `resolve_floor`** — unchanged, untouched, still dirty on purpose.
+- **Line of sight** — still not ported, so a player can mine through one tile of rock.
+- **The fuzzer and `mine_held`** — named twice now, still its own unit of work.
+- **The `ValueNoise` cross-platform float gap** (D0171/D0172), **three GDD contradictions** (D0177), **the
+  persistent-world GDD reversal** (text exists only in pre-compaction history), **`data/economy/` D1-D6**,
+  **`history/`'s 168-image cull**, **the parked Anvil CONSTRAINED finding** — all unchanged, all yours.
 
 ## Taste queue
 
-**3 open.** T001 (`ore_copper` reads silver) and T002 (band tint at 0.10 nearly invisible) carry over
-unanswered from Slice 0. **T003 is new**: mining times. Clay breaks in 0.28s and deepstone in 1.42s against
-legacy's 2.80s — the shallow end is legacy's exactly, the deep end is twice as fast, and only playing it
-answers whether that is right.
+**4 open.** T001 (`ore_copper` reads silver) and T002 (band tint at 0.10) carry over from Slice 0,
+unanswered. T003 (mining times) is now partly re-framed by T004 — that table is seconds **per cell**, and
+one blow no longer removes one cell. **T004 is the bite radius**, and it is the one that gates Slice 2.
