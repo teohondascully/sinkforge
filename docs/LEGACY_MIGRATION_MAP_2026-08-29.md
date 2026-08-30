@@ -373,7 +373,7 @@ SKIP-DONE 3.**
 | `.github/workflows/harness.yml` | 290 | SKIP | - | TRACE | Legacy CI for the legacy harness. Current `harness.yml` supersedes. |
 | `.gitignore` | 147 | SKIP | - | TRACE | Repo metadata. |
 | `project.godot` | 45 | SKIP | - | TRACE | Legacy project config (32px cell assumptions, legacy autoloads). Current supersedes. |
-| `scenes/art.gd` | 26 | LIFT | view/visuals | FULL | Colour/shape helpers. 0 deps, 0 sim. |
+| `scenes/art.gd` | 26 | **LANDED** `view/visuals/art.gd` (D0227) | view/visuals | FULL | Colour/shape helpers. 0 deps, 0 sim. |
 | `scenes/bazaar_bench.gd` | 191 | DEAD | - | SCAN | Research bench tab — the UI of the terminal ladder. |
 | `scenes/bazaar_catalogue.gd` | 55 | DEAD | - | SCAN | Catalogue model behind the tabs. |
 | `scenes/bazaar_costs.gd` | 67 | DEAD | - | SCAN | *"THE ONE PLACE THAT DECIDES WHETHER A PRICE CAN BE PAID"*, consolidating 4 surfaces onto one answer. The `craft_cost` implementation dies, but note the PATTERN: rig demands will have the same many-surfaces-one-affordability-answer problem. |
@@ -391,21 +391,21 @@ SKIP-DONE 3.**
 | `scenes/hints.gd` | 317 | MERGE | view/hud | FULL | **[DOWNGRADED from LIFT]** MECHANISM lifts whole: acquisition-edge firing, relevance gates, ceremony arbitration, busy-freeze so a lesson fired mid-swing returns intact, save-persisted latches. CONTENT tables teach dead machines. Lift the engine, re-author the 22 lessons. |
 | `scenes/hover_info.gd` | 188 | MERGE | view/hud | FULL | **[DOWNGRADED from LIFT]** `describe()` returns a render-agnostic dict — exactly an Observation projection. But branches on descent/h_drill/sealrock/DESCENT_QUOTA/the bench. Contains a finding the CURRENT build needs: the body rect always covers TWO ROWS (34px body vs 32px cell) and 2-4 cells total, so a cell-addressed verb is never really one cell. |
 | `scenes/hud.gd` | 2189 | MERGE | view/hud | SKIM | Reads exactly 16 sim accessors (an Observation shape). Lift depth readout/hotbar/objective card/announce/key hints; DROP the `bazaar_page` delegation. Must split. |
-| `scenes/light_layer.gd` | 25 | LIFT | view/fx | FULL | **[REASON CORRECTED]** 25 lines: a canvas + blend mode + a `Callable` painter. Its own header: *"MainView owns all the light math"*. Lifting this gets the CANVAS, not the lighting — head-lamp pool and darkness veil live in `main.gd` (REBUILD). Do not mistake this file for the lighting. |
+| `scenes/light_layer.gd` | 25 | **LANDED** `view/fx/light_layer.gd` (D0227; see P009) | view/fx | FULL | **[REASON CORRECTED]** 25 lines: a canvas + blend mode + a `Callable` painter. Its own header: *"MainView owns all the light math"*. Lifting this gets the CANVAS, not the lighting — head-lamp pool and darkness veil live in `main.gd` (REBUILD). Do not mistake this file for the lighting. |
 | `scenes/machine_view.gd` | 726 | MERGE | view/render_entities | SCAN | **[DOWNGRADED from LIFT]** Casing/construction-anim/status/nameplate/load-gauge, extracted along a MEASURED seam. 9 dead-content references to trim. |
 | `scenes/main.gd` | 3003 | REBUILD | shell/ | SKIM | 3003 lines, 52 deps — largest fan-out in the codebase. Owns input, verbs, lifecycle, camera, AND the mining charge loop (salvage). Never read in full by any audit including this one. |
 | `scenes/main.tscn` | 6 | SKIP | - | FULL | 6-line stub: one `Node2D` + script. |
 | `scenes/objectives.gd` | 211 | REBUILD | sim/economy | SKIM | A 14-step ladder of which 5 steps are Claim-the-Bazaar / Research-Automation / Research-Power / Research-Descent / Breach-the-seal. Content dead. MECHANISM worth re-deriving: measures progress as deltas against a construction-time baseline, so a pre-stocked pack cannot tick a step — the same derived-not-authored discipline `CONTEXT.md` requires of fixtures. |
 | `scenes/page_surface.gd` | 81 | LIFT | view/hud | FULL | **[UPGRADED from MERGE]** Genuinely generic: canvas + font + probe, binding onto Visuals/UiTheme primitives. Nothing to cut. |
-| `scenes/particles.gd` | 117 | LIFT | view/fx | FULL | 8 named emitters incl. the draught (the silent half of the hollow tell) and chip/debris. Capped at 240. Uses `randf()` and its header states WHY that is safe: *"it never touches the sim, so randf() is safe here"* — the right precedent for view-layer nondeterminism. |
+| `scenes/particles.gd` | 117 | **LANDED** `view/fx/particles.gd` (D0216) | view/fx | FULL | 8 named emitters incl. the draught (the silent half of the hollow tell) and chip/debris. Capped at 240. Uses `randf()` and its header states WHY that is safe: *"it never touches the sim, so randf() is safe here"* — the right precedent for view-layer nondeterminism. |
 | `scenes/payouts.gd` | 77 | LIFT | view/fx | SCAN | **[CORRECTED from DEAD]** The floating "+3 ore" tick that rises off a broken block, with merging for repeat gains. 77 lines, pure feedback. |
 | `scenes/player.gd` | 818 | KEEP-CURRENT | - | SKIM | Float `Node2D` `_physics_process` controller. Its OWN header: *"purely a representation-layer entity... never enters the deterministic tick"*. Current `sim/body` already carries its exact feel constants. Nothing to gain, 4 gates to lose. |
 | `scenes/post_fx.gdshader` | 85 | LIFT | view/shaders | SKIM | Vignette+grain+aberration+filmic grade. The "shot through glass" look. |
 | `scenes/rock_grit.gdshader` | 44 | LIFT | view/shaders | SKIM | Sub-cell tooth. Hardcodes the 8px cell → retune to 4px (Q1). |
 | `scenes/rock_tooth.gdshader` | 69 | LIFT | view/shaders | SKIM | Additive-above-veil rock marks. Encodes the additive-at-depth constraint. |
 | `scenes/rope_view.gd` | 274 | LIFT | view/render_entities | SCAN | Grapple cord with slack bow, hook, aim ghost, hung climb-ropes. 1 dead reference, in a comment. |
-| `scenes/score.gd` | 162 | LIFT | view/audio | SCAN | **[CORRECTED from DEAD]** The MUSICAL score: three synthesized beds mixed by the body's DEPTH. Pure presentation, zero economy. |
-| `scenes/settings.gd` | 455 | LIFT | shell/settings | SCAN | Audio levels, shake, zoom, bindings; persisted to `user://` ConfigFile, deliberately OUT of SaveGame (*"a save is a world; settings belong to this machine"*). ZERO dead references. `persist` defaults false so a scripted run works from pure defaults. |
+| `scenes/score.gd` | 162 | **LANDED** `view/audio/score.gd` (D0215) | view/audio | SCAN | **[CORRECTED from DEAD]** The MUSICAL score: three synthesized beds mixed by the body's DEPTH. Pure presentation, zero economy. |
+| `scenes/settings.gd` | 455 | **LANDED** `shell/settings.gd` + `shell/settings_bindings.gd` (D0227) | shell/settings | SCAN | Audio levels, shake, zoom, bindings; persisted to `user://` ConfigFile, deliberately OUT of SaveGame (*"a save is a world; settings belong to this machine"*). ZERO dead references. `persist` defaults false so a scripted run works from pure defaults. |
 | `scenes/settings_page.gd` | 865 | MERGE | view/hud | SCAN | Settings screen, unrelated to the economy. CORRECTED from LIFT: depends on `scenes/main.gd` (REBUILD), so that edge must be cut first. |
 | `scenes/sfx.gd` | 1125 | LIFT | view/audio | SCAN | Every sound SYNTHESIZED at boot (no audio assets to port), plus looping beds whose levels follow the world. Resolves a blow against the material it lands on — the hollow/breach tells live here. Only 6 dead references, all trivial. `RandomNumberGenerator` is legal in `view/`; gate 2 polices `core/` and `sim/` only. |
 | `scenes/sky_painter.gd` | 255 | LIFT | view/render_world | FULL | Sky gradient, star field, sun/moon arc, clouds, 3 parallax ridges with aerial perspective — AND the SINKFORGE CROWN on the horizon. That matters: GDD §9 rejected Sinkforge-as-consumer partly because it *"is invisible from anywhere the player stands, so it cannot carry emotional weight"*. Legacy already built the answer. Caveat: reads 8 private fields off the coordinator. |
@@ -457,7 +457,7 @@ SKIP-DONE 3.**
 | `src/data/recipe_def.gd` | 14 | MERGE | data/recipes | FULL | `id`/`inputs`/`outputs`/`time`. Recipes survive; their acquisition model does not. `time: float` seconds becomes a tick count. |
 | `src/data/recipes/*.tres` (6 files) | 12-15 ea | LIFT | data/recipes | FULL | Recipe records. The processing CHAIN survives; only its acquisition model dies. Files: `mill_gear`, `mine_ore`, `press_plate`, `smelt_ingot`, `smelt_iron`, `smelt_rich`. |
 | `src/data/research_rules.gd` | 129 | DEAD | - | FULL | **THE TERMINAL ECONOMY.** 11-entry finite `ORDER`; `next_tech()` returns `""` when exhausted. 0 outbound deps; NONE of its 16 importers are on the lift side. Excision is provably safe. |
-| `src/data/seams.gd` | 80 | LIFT | sim/world | FULL | Rock grain as PLANES (row/column/anti-diagonal), a pure function of (coord, world_seed), never saved, RNG-free integer hashes. Exactly the current architecture's preferred shape. `RATE_*` and `_plane()` are float → `Fx` for `sim/`. Also the substrate for the Wedge bit AND used by `sky_painter` as a scatter hash. |
+| `src/data/seams.gd` | 80 | **LANDED** `sim/world/seams.gd` (D0227) | sim/world | FULL | Rock grain as PLANES (row/column/anti-diagonal), a pure function of (coord, world_seed), never saved, RNG-free integer hashes. Exactly the current architecture's preferred shape. `RATE_*` and `_plane()` are float → `Fx` for `sim/`. Also the substrate for the Wedge bit AND used by `sky_painter` as a scatter hash. |
 | `tests/*.gd` (5 suites) | 128-2015 ea | SKIP | - | TRACE | Legacy test suite against the legacy sim. Dies with that sim; current `tests/` supersedes. Files: `test_base`, `test_power_water`, `test_sim`, `test_stress`, `test_worldgen`. |
 | `tools/**` (151 layers) | varies | SKIP | - | TRACE | Legacy's own 108-layer harness. Superseded by the CURRENT substrate (30 gates, 19 with enforcing code). Imperative one-script-per-case; no declarative format. |
 | `tools/capture_moments.gd` | 1977 | SKIP-READ | - | SKIM | The blind-vision moment renderer that produced this report's screenshots. Worth re-deriving; not portable as-is (references `research_rules` + `bazaars`). |
@@ -664,3 +664,29 @@ Reproduced without softening. Where a later session has closed one, that is note
    category judgment is wrong, it is wrong 151 times.
 6. **The 22 machine records were field-enumerated, not read as prose.** Every field was extracted; the
    surrounding comments were not read.
+
+---
+
+## What actually landed, and what changed on the way (2026-08-30)
+
+Six files have moved from LIFT to LANDED. **The unblocked batch is now dry** — every remaining LIFT row
+is blocked on the `WorldRenderer` coordinator (~1,540 lines), on legacy's `FactorySim` (~2,700), or on
+`MachineDef`/`RecipeDef` entities this build does not have (~2,050). `docs/NEEDS_DIRECTOR.md` P005 was
+closed by the director choosing option 1; option 3 (un-park the coordinator) is the only route left to
+changing how the game looks.
+
+**Corrected while porting:** P005's "~900 lines liftable" already counted `score` and `particles`. The
+remaining batch was **586 lines**.
+
+| File | Landed as | Changed on the way |
+|---|---|---|
+| `score.gd` | `view/audio/score.gd` | One line: `Settings.music_db()` became an injected `music_db` float (D0215). **Now reconnectable** — `shell/settings.gd` provides the real source, but `shell/` has no boot, so the two are still not wired. |
+| `particles.gd` | `view/fx/particles.gd` | Nothing. Lifted unchanged (D0216). |
+| `art.gd` | `view/visuals/art.gd` | Added `clear_cache()` for tests. **`res://assets/` does not exist**, which is its designed empty state, not a defect — but it means only the miss path is testable. |
+| `light_layer.gd` | `view/fx/light_layer.gd` | Nothing. **No consumer**: this build draws one flat `_draw` with no blend modes, and the veil "is not in Slice 0". Flagged as possibly contradicting its own ruling — `NEEDS_DIRECTOR` P009. |
+| `settings.gd` | `shell/settings.gd` (131) + `shell/settings_bindings.gd` (351) | **SPLIT**, at its own seam: 455 lines against a 400-line blocking gate. Nothing in the first half reads an InputEvent, nothing in the second reads an audio level. `reconcile()` then came over at 52 against a 50-line function limit, so the device-rescue block became `_rescue_emptied_devices`, body unchanged. Its three `Controls` dependencies (`defaults`, `event_from_spec`, `register`) were already present from the Slice 1 lift. |
+| `seams.gd` | `sim/world/seams.gd` | **Float → integer**, which is what let it into `sim/` at all. Proven exact over the entire domain: 196,608 comparisons, 0 disagreements, with the naive `v < int(rate * 65535)` form kept as a control that must keep failing (it differs on exactly 3 inputs). Also renamed for the D0027 coordinate rule: `terrain_cell`, `terrain_dir`, `terrain_axis()`. |
+
+**Three of the six have no consumer today** (`art`, `light_layer`, `seams`) and one is one wire away
+(`score`). That is not an argument against having ported them — each was cheap and provably inert — but
+it is the reason the batch running dry does not look like progress on screen.
