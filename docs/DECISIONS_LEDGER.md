@@ -7289,3 +7289,36 @@ state path," pointing here for the enumeration and D0171/D0172 for the crack ref
 **Reverse cost:** CHEAP — six doc edits, each independently revertible; no code changed, nothing here
 converts anything to `Fx` (that conversion remains explicitly out of scope, a director-scoped design
 cycle per D0172, unchanged by this scope correction).
+
+## D0184 · `grounded_no_floor` bound relabeled — a cumulative-trajectory count at one seed order, not an independent-trial resolver rate (director's ruling on Finding B, R6, fix queue) · 2026-08-29
+
+**Director's ruling, applied precisely — comment/label only, no bound value or collision logic touched.**
+Finding B (Codex certification): the fuzzer's 1,000 seeds share one `TileGrid` built outside the seed
+loop (`fixture_body_fuzz_probe.gd:16-18`), so the sweep is not 1,000 independent trials — it is one
+1.5-million-tick cumulative trajectory over a chamber each successive seed digs further apart. Every
+full-sweep count, including `grounded_no_floor`'s own 59, is conditioned on seed ORDER and cumulative
+demolition state, not drawn from 1,000 independent samples of "how often does the resolver misfire." The
+isolated collision tests that build their own fresh grid remain valid and unaffected — this finding is
+specific to the FULL-SWEEP fuzz population's own statistical shape, not to any collision-logic conclusion
+drawn from a controlled, single-grid test.
+
+**Director's ruling: PROVISIONAL, not INVALID.** The bound stays as a real, useful regression baseline
+("did this exact seed-ordered trajectory get worse") — it just cannot be read as an independent-trial
+resolver misfire RATE the way its own surrounding comment block (D0135/D0137, unchanged, still accurate
+about the MECHANISM) might otherwise imply to a reader who doesn't also know the population shape.
+
+**Applied:** `tests/test_body_fuzz.gd`'s `DESIGN_TRADEOFF` constant (`grounded_no_floor: 59`) gets a new
+inline comment stating exactly this — "a cumulative-trajectory count at this seed order, NOT an
+independent-trial resolver rate; provisional as a regression baseline pending fuzz restructure" — plus a
+pointer from the header docstring block to this entry, alongside the existing D0135/D0137 mechanism
+account (which stays correct and untouched: this is a population-shape caveat layered ON TOP of that
+mechanism finding, not a correction to it).
+
+**Explicitly NOT done, both OUT per the queue's own hard stops:** the fuzz restructure itself (separating
+terrain exposure from seed-order behavior, e.g. rebuilding the grid per seed or otherwise decorrelating
+seeds from cumulative demolition) is a real design cycle — filed here for the director, not attempted;
+the bound's own numeric value (59) is unchanged, since this entry corrects what the number MEANS, not what
+it IS.
+
+**Reverse cost:** CHEAP — revert the one inline comment and the one docstring pointer in `tests/
+test_body_fuzz.gd`; no logic, no value, no test assertion touched.

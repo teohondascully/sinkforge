@@ -66,6 +66,14 @@ extends "res://tests/test_base.gd"
 ##     fix to `resolve_floor`'s own criterion exists and is not yet landed (`docs/DECISIONS_LEDGER.md`,
 ##     D0139 and its own follow-ups, for the current state of that attempt). If `grounded_no_floor` ever
 ##     exceeds 59, THAT is a new regression against this measured baseline, not a widening of this bound.
+##   - **Relabeled, director's ruling on Finding B (D0184, fix queue R6):** the full sweep's 1,000 seeds
+##     share one `TileGrid` built outside the seed loop -- this is one 1.5-million-tick CUMULATIVE
+##     trajectory at one seed ORDER, not 1,000 independent trials. 59 is a real, useful regression baseline
+##     for THIS exact trajectory; it is NOT an independent-trial resolver misfire RATE, and full-sweep
+##     count changes should not be read as such. Isolated collision tests that build their own fresh grid
+##     are unaffected by this caveat -- it is specific to the full-sweep population's own shape, not to the
+##     resolve_floor mechanism account above, which stays accurate. The fuzz restructure this implies
+##     (decorrelating seeds from cumulative demolition) is a real design cycle, deferred, not attempted here.
 ##
 ## An allowlist with a number attached is honest; a disabled check is not (the director's own words) --
 ## if either count grows on a future run, that is a new, real regression, not a widening of this bound.
@@ -82,7 +90,9 @@ func _initialize() -> void:
 ## is a regression to root-cause; a `DESIGN_TRADEOFF` count moving is a change in how often the traded-off
 ## scenario actually occurs, worth noting but not automatically a defect.
 const RESIDUAL: Dictionary = {"embedded": 1}
-const DESIGN_TRADEOFF: Dictionary = {"grounded_no_floor": 59}  ## D0122/D0127/D0128: raised from 32
+const DESIGN_TRADEOFF: Dictionary = {"grounded_no_floor": 59}  ## D0122/D0127/D0128: raised from 32.
+## D0184: a cumulative-trajectory count at this seed order, NOT an independent-trial resolver rate;
+## provisional as a regression baseline pending fuzz restructure (director's ruling, Finding B).
 
 
 func _test_fuzz_finds_no_new_correctness_defects() -> void:
