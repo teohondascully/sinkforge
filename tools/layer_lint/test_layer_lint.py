@@ -26,8 +26,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gate_test_support import Observations  # noqa: E402
+
 SCRIPT = Path(__file__).resolve().parent / "layer_lint.py"
-RESULTS: list[tuple[str, bool]] = []
+LOG = Observations("test_layer_lint")
 
 # A minimal but REAL-shaped tree: core publishes a global, sim uses it (legal), view uses interface
 # (legal). Every case below is this tree plus one edit, so a failure names the edit, not the fixture.
@@ -67,9 +70,7 @@ def with_edit(rel: str, text: str) -> dict:
 def check(name: str, files: dict, expect_code: int, expect_substring: str) -> None:
     code, out = run_lint(files)
     ok = code == expect_code and expect_substring in out
-    RESULTS.append((name, ok))
-    print(f"[{'OBSERVED' if ok else 'NOT OBSERVED -- BRANCH UNTESTED'}] {name} "
-          f"-- want exit {expect_code}, got {code}")
+    LOG.observe(name, ok, f"want exit {expect_code}, got {code}")
     if not ok:
         print("    output was:\n" + "\n".join("      " + line for line in out.splitlines()))
 
@@ -129,12 +130,7 @@ def main() -> int:
            "sim/world/tile_grid.gd": "class_name TileGrid\nextends RefCounted\n\nvar width: int = 0\n"},
           2, "CONTROL FAILED")
 
-    failed = [name for name, ok in RESULTS if not ok]
-    print(f"\ntest_layer_lint: {len(RESULTS) - len(failed)}/{len(RESULTS)} branches observed")
-    for name in failed:
-        print(f"  UNTESTED: {name}")
-    print("test_layer_lint: " + ("FAIL." if failed else "PASS."))
-    return 1 if failed else 0
+    return LOG.summarise()
 
 
 if __name__ == "__main__":
