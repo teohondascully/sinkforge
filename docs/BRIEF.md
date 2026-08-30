@@ -5,7 +5,7 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
 **Last updated: 2026-08-30. This round: gate hygiene and the last unblocked lifts, under a new
-PR workflow. 5 commits across 2 PRs. `docs/DECISIONS_LEDGER.md` D0224-D0232.**
+PR workflow. 6 commits across 3 PRs, all merged by rebase. `docs/DECISIONS_LEDGER.md` D0224-D0233.**
 
 **Headline: a REQUIRED CI check had never evaluated a single dependency edge.** `layer_lint` printed
 PASS on every commit for weeks while reporting, in its own output, `0 references checked` — it matched
@@ -51,14 +51,27 @@ merge-commit or a squash-merge through the UI writes `noreply@github.com` perman
 the gate reads `git log --all`, so authorship would then fail on **every commit afterwards** with no
 remedy short of a history rewrite. **Merge by rebase.** Verified: `main` still has one committer identity.
 
-### Two of my own defects reached CI, both the same shape
+### Three of my own defects reached CI or nearly did, and two share a shape
 
 A coordinate-naming violation in the file I had just written (I ran the gate set *before* writing it), and
 an `ImportError` from inlining a function whose caller lived in another directory. **Both are "the corpus
 I checked was smaller than the corpus that matters"** — a stale gate run, and a grep scoped to the file I
 was editing. Now mirrored: the whole gates job, 27 checks, run locally before every push.
 
+The third is the one worth keeping. **`run_local_battery.sh` — the tool written to stop a battery
+silently covering the wrong population — shipped covering the empty one.** Written with `mapfile`, absent
+from macOS's bash 3.2, it executed **zero suites and still looked fine**. It was caught only because the
+tool was *run* rather than reported; a commit message describing it would have been entirely accurate
+about the intent. Its zero-suite guard, written as belt-and-braces, turned out to be the only thing
+between a broken parse and a green report (D0233).
+
 ---
+
+## The three PRs, all merged
+
+**#1** gate hygiene + the lifts (had to ship together — see Gates). **#2** the recorded-session test, the
+battery tool, P007's free half. **#3** the migration map. Nothing is parked on gate 7; nothing was
+forced; branch protection was not touched.
 
 ## Gates
 
