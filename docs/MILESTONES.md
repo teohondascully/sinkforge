@@ -93,3 +93,25 @@ HUD, and the body is a rectangle.
 
 **Cost:** the five frames total **0.17 MB**, consistent with Slice 1's 0.11 MB for three. Re-measure when
 Slice 3 adds lighting; do not carry this number past it.
+
+---
+
+## D0206 — the collision resolver's grounding criterion
+
+| | |
+|---|---|
+| **Slice** | 1.5 (out-of-band) — authorized collision-resolver work, the exception to the standing hard stop |
+| **Commit** | `3ea7c87` |
+| **Recording** | [`tests/body/recordings/d0206_minedown_bite2_agent_2026-08-30.log`](../tests/body/recordings/d0206_minedown_bite2_agent_2026-08-30.log) — **AGENT-MODE**, scripted `--mine-down --bite=2`, **228 ticks** |
+| **Shows** | The same shaft the Slice 1.5 milestone row records, run again on the fixed resolver: **228 ticks against the parent commit's 242**, measured on this machine by checking out the parent's `vertical_resolve.gd` alone and re-running — not quoted from the older row, which predates D0205. Same seed, same site, same 24-cell target depth. **0 bad ticks** replayed through `tools/scratch/classify_bad_ticks.gd`. |
+| **Screenshots** | none — this milestone changes where the body RESTS, not what a frame looks like. A still cannot show it; the two replays below can. |
+
+**The evidence that matters here is not a picture.** The director's own two recorded sessions, replayed on
+a clean tree: **6 → 0** bad ticks (710-tick session) and **171 → 0** (767-tick session), where a "bad tick"
+is the body's own box overlapping solid rock or leaving the world. `fixture_step_up_into_wall_probe`
+reports NOT REPRODUCED. `test_body_acceptance`'s golden traverse is **225, identical to golden**, so the
+one scripted route this project has pinned since D0038 is bit-for-bit unchanged by the fix.
+
+**Why the shaft got 14 ticks faster.** The body now rests on the highest solid face under its whole
+footprint rather than on a blend of three sample points, so each layer it opens drops it a slightly
+different amount. It reaches the same depth; it is not a throughput change and should not be read as one.
