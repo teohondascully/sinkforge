@@ -7919,3 +7919,24 @@ at the image, then printing the camera and body position; not by re-reading the 
 prints camera, zoom and body cell alongside every capture, so a badly-aimed camera is legible in the log.
 
 **Reverse:** CHEAP — a tool and one scene argument.
+
+## D0198 · A milestone artifact made over a dirty tree names a commit that cannot reproduce it — measured, not theorised · 2026-08-29
+**Decided:** every Slice 1 milestone artifact was re-made on a clean clone of its own commit, and
+`tools/capture_moments.sh` suffixes a dirty-tree capture `-dirty` rather than letting it pass.
+
+**The measurement.** The same scripted `--mine-down` run produced **954 ticks** in the working tree and
+**1019 ticks** on a clean checkout of `427b3e0`. The difference is D0139's uncommitted
+`sim/body/vertical_resolve.gd` (+28 lines), which is parked mid-investigation and cannot be committed. It
+changes how the body settles, so it changes how many ticks the shaft takes — 65 ticks, ~7%.
+
+**Why this matters beyond one recording.** The standing milestone rule says an artifact must name the
+commit that produced it. A recording made over a dirty tree names a commit that produces a *different*
+recording, and nothing about the file says so — it is declared state wearing a reproducible label. This is
+the same class as the ledger's own "count without membership": the artifact records a number without
+recording the conditions that would let anyone re-derive it.
+
+**Consequence accepted:** the committed Slice 1 recording (1019 ticks, 24 cells / 6.0 m descent, 91 breaks,
+0 bounds violations) reproduces from `427b3e0` only on a CLEAN checkout. Anyone replaying it in a tree that
+still carries D0139's change will get a different trace and should not read that as a regression.
+
+**Reverse:** N/A — a discipline plus a warning line, nothing to undo.

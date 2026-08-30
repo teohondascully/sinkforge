@@ -144,6 +144,30 @@ keyword scan ("7 files corrected"), but it is drift cleanup — annotating alrea
 "parked, see D0153-D0155" — not a correction of a claim that was ever WRONG. Noted here so the freshness
 gate (`tools/check_corrections_freshness.py`) doesn't keep re-flagging it as unreviewed drift.
 
+## D0195 supersedes D0110 — a deferral answered by dissolving the question, not by picking a side
+
+**What D0110 claimed** (2026-08-28): digging is horizontal-only, and the reason given was that a vertical
+or diagonal dig "would raise the aim-direction design question — which key means 'down,' does it compete
+with `mantle_hold`'s up-key — without a stated answer yet." The scope restriction was a *consequence* of an
+unanswered design question, and the ledger said so honestly at the time.
+
+**What D0195 establishes** (2026-08-29): cursor-aim answers the question by removing it. Aim is a point
+against a reach radius, not a facing direction, so "down" is simply a cell below the body and **no key has
+to mean it**. The competition with `mantle_hold` that D0110 was avoiding cannot arise, because direction
+was never a key in the first place.
+
+**Why this is a supersession and not a reversal.** D0110 was not wrong about anything it measured — a
+facing-based dig genuinely does raise the key-competition problem, and deferring rather than guessing was
+correct. What changed is the input model, which is a director ruling (Q2 of the Slice 1 brief), not a
+discovery that D0110 mis-reasoned. The horizontal column dig it introduced is still in the tree and still
+what the reveal metric and every committed V1 recording run on; both verbs exist through Slice 1.
+
+**The origin, traced past the immediate citation** per this page's own rule: D0110's restriction is not the
+origin of "no downward digging." That goes back to the reveal-layer scope itself — `docs/GDD.md` §8/§12
+scoped the Reveal want-layer to *lateral* search, and D0110's horizontal-only dig was built to serve it.
+So what D0195 actually reopens is a GDD-level scope question, not just a controller decision, and the
+director should read it that way rather than as a bug fix.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,
