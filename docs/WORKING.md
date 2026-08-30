@@ -12,6 +12,59 @@ caught mechanically rather than relying on someone noticing later.
 `docs/archive/working/WORKING-2026-08-29.md` alongside queues #2 and #3. Nothing deleted, only relocated,
 per this file's own 150-line cap.
 
+## IN FLIGHT — SLICE 1, the director's brief, written down before item 1 (CONTEXT.md's own rule)
+
+Slice 0 is ACCEPTED: Q1 passed, the palette reads as material at 16px, the 16px world stays. Order is
+playable-first, pretty-later — the legacy *look* (light pools, shaders, molded rock) is Slice 3 and must
+NOT be pulled forward.
+
+1. ~~**STEP ONE, gating: diagnose the bounds error**~~ **DONE — scene setup, fixed (D0192).** It is the
+   world's **LEFT edge**, not the floor: `pos_x=503808` is x=7.6875px, left edge −0.3125px (one accel
+   step). The trace is `_enforce_grid_bounds ← tick` with `on_floor` true throughout — `resolve_floor`
+   and `grid_floor_backstop` are **not in it**, so the escalation fork did not fire. Cause:
+   `find_spawn` returned spawn column **0** (pocket at column 6 minus the offset 6), putting the body's
+   left edge exactly on x=0, and `carve_entry_shaft` then removed the column-0 rock that would have
+   stopped it. Not a tail case — **53.2% of dense seeds / 14.0% of sparse** over 400. Deterministic:
+   two independent replays are byte-identical. Fixed by clamping the spawn to `MIN_SPAWN_COL = 1`; the
+   director's own log now replays **0 violations**, furthest-left 4.0px (stopped by terrain, not the
+   clamp). **Escalated separately (D0193): the invariant itself cannot tell a wall-press from an
+   escape** — it fired at −0.3125px, D0055 built it for −15.85px, and this world is 192px wide, so wall
+   contact is ordinary play. Not fixed unilaterally; the discriminator is written up for the director.
+2. **Cursor-aim + reach radius + hold-to-charge** against the current TileGrid, collision resolver
+   UNTOUCHED. Legacy `REACH_CELLS = 3.2` is the reference. Charge banked per cell.
+3. **Downward is possible by construction** — aim is a cursor against a radius, not a facing. Document
+   the D0110 supersession in the ledger.
+4. **Lift legacy `controls.gd`** for the posable-pointer API (`pose_pointer`/`release_pointer`/
+   `pointer_posed`) — MANDATORY, it is what keeps agent/fuzz runs deterministic under cursor-aim. A
+   contaminated aim reading is VOID, not FAIL. Lift the deafness switch too.
+5. **`Command.Mine(target_cell)`** as a direct call, NOTED IN CODE as a seam to formalise into
+   `observe()`/`apply()` at Slice 2. Do not build `interface/` now.
+6. **Extract the charge loop** from legacy `main.gd` (3003 lines, REBUILD) — do not lift the file.
+7. **Port the hollow/breach tell** from legacy `sfx.gd` as view feedback. Minimal for Slice 1.
+
+**Acceptance:** a human mines downward in `--play` and descends into what they mined, no bounds error,
+correct dig semantics, proven with a recorded session. Do NOT populate `claims/C004` — the director rules
+on which sessions qualify.
+
+**HARD STOPS — report and hold:** the bounds error tracing into `resolve_floor`/`grid_floor_backstop`;
+any change to the collision resolver; the determinism gate going red; `interface/` ballooning; the
+economy (no `craft_cost`, no research, no demands, do not touch `data/economy/`); pulling Slice 3 visual
+work forward.
+
+**Standing, from this slice onward — milestone recordings.** Every slice, and any intermediary work that
+changes what a player sees or does, commits: (1) the `--play` or agent trace `.log` in
+`tests/body/recordings/`, named by slice + timestamp; (2) a screenshot of the resulting state; (3) the
+commit SHA it was produced against, recorded IN the artifact or a sibling note — generated from the
+commit, never hand-typed. Re-recordings name the new SHA and never overwrite: the sequence IS the
+migration's visual history. Agent-mode captures are fine but must be LABELLED agent-mode. Keep
+`docs/MILESTONES.md` — one line per milestone: slice, SHA, recording path, screenshot path, one sentence.
+
+**Standing — the screenshot set.** Beyond the single state shot: canonical moments at a FIXED resolution
+(1920x1080) from a FIXED camera so milestone-to-milestone shots are directly comparable, plus a
+before/after PAIR at each visual milestone. Re-derive legacy's `tools/capture_moments.gd` APPROACH
+(scripted fixed-frame moment capture) once, minus its dead economy references; every milestone then runs
+it. Shots are keyed to their SHA, named by slice + moment + SHA.
+
 ## GATED — LEGACY REVIVAL, Slice 0 done, STOPPED for the director's look before Slice 1
 
 The Phase 1 map is approved and committed. Slice 0 landed in 4 commits (`b8e9b59..`); evidence

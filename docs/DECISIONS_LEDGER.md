@@ -7678,3 +7678,101 @@ and are not acted on here.
 
 **Reverse cost:** none — this entry is a record of reads, and the map file it corrects is unedited (the
 map is a pinned historical record; corrections belong here, in the append-only ledger, not in edits to it).
+
+## D0192 · The reveal scene spawned the body flush against the world's left edge — 53% of dense seeds, and the bounds error the director saw · 2026-08-29
+**Decided:** `RevealSessionSetup.find_spawn` clamps its result to `MIN_SPAWN_COL = 1`
+(`spawn_col = maxi(MIN_SPAWN_COL, col - APPROACH_OFFSET_COLS)`). Slice 1 step 1, the gating diagnosis.
+
+**The diagnosis, decoded rather than guessed.** The error the director's Slice 0 `--play` run threw twice
+reads `pos=(503808, 1835008)`. `Fx.SCALE` is 65536, so that is x = **7.6875 px**, and the body's own left
+edge (`pos_x - 8px`) is **−0.3125 px**. It is the **LEFT world edge**, not a fall through the floor. The
+whole trace is `_enforce_grid_bounds ← tick`; `resolve_floor` and `grid_floor_backstop` appear nowhere in
+it, and `on_floor` is true throughout — the body is standing on solid ground at row 7 the entire time.
+**This is not the collision-resolver arc and does not touch it**, so the brief's escalation fork does not
+fire.
+
+−0.3125 px is exactly one acceleration step: `ACCEL_PER_TICK / TICK_HZ = 1228800 / 60 = 20480` Fx.
+
+**Mechanism.** `find_spawn` returned `col - APPROACH_OFFSET_COLS`; a pocket at column 6 gives spawn column
+**0**, which puts the body's left edge exactly ON x = 0. `carve_entry_shaft` then excavates columns 0..3 —
+removing the very rock that would have stopped the walk — so nothing but the world-edge clamp was left. One
+leftward keypress carried the body 0.3125 px out; the clamp caught it correctly and `report_bounds` logged
+it. Reported twice because D0052's latch reports once per excursion, and the director pushed into the wall
+twice (ticks 91–102 and 165–169).
+
+**Not a tail case — the mode of the distribution.** The `col < APPROACH_OFFSET_COLS: continue` guard skips
+columns 0..5, so every shallow pocket in that range piles onto column 6 and every one of those spawns
+flush. Measured over 400 seeds: `reveal_test_dense` **213/400 (53.2%)**, `reveal_test_sparse` **56/400
+(14.0%)**. The director's seed 20260826 is one of them.
+
+**Deterministic.** Two independent replay processes over the recorded log produce byte-identical output,
+same ticks, same coordinates. Nothing here points at nondeterminism.
+
+**Evidence, before and after.** Replaying the director's own log
+(`tests/body/recordings/reveal_play_2026-08-30T04-19-05.log`, 530 ticks) reproduced **both** errors at
+ticks 91 and 165. After the fix the same log replays with **0** violating ticks, and the body's
+furthest-left is **4.0000 px** — stopped by terrain one cell in, never by the clamp.
+
+**Why 1 and not more — derived, not picked.** The body is stopped by terrain, so what it needs is one
+SOLID cell between its left edge and x=0. `carve_entry_shaft` opens `[spawn_col, spawn_col+4)`, so
+`spawn_col = 1` leaves column 0 solid full-height and `HorizontalResolve` halts the walk at x = 4 px. One
+cell is the entire kinematic requirement; more margin would only change how much digging removes it.
+The clamp also cannot swallow its own target: the tightest case is `col == 6 → spawn_col == 1`, whose shaft
+ends at column 5, one clear of the pocket — asserted, so a future margin increase cannot silently
+pre-reveal the target and quietly invalidate every reveal measurement taken after it.
+
+**Alternative considered and rejected:** raising the scan threshold to `col >= 10` so `spawn_col - 6 >= 4`
+naturally. It changes the chosen target column for far more seeds (80% of dense, against 53%), and on a
+site whose only shallow pocket sits at column 7 it would return "no glimmer" and park the spawn at
+`width/2`, losing a valid target outright. Clamping preserves `find_spawn`'s stated intent maximally and
+only ever binds where the world edge actually forces it.
+
+**A consequence that must be stated, not buried.** Changing the spawn re-bases the world every existing
+recording replays against. `reveal_test_dense` at seed 20260826 moves from spawn column 0 to 1, so the four
+dense recordings no longer replay against the world they were played on. `reveal_test_sparse` at that seed
+is unaffected (its spawn was never 0), which includes `reveal_play_2026-08-30T02-04-24.log` — D0188's
+Defect-B evidence, whose asserted numbers are counted off the raw input log's own dig column and are
+unaffected regardless. No `claims/C004` datum is invalidated because none has been populated.
+
+**Test:** `tests/test_reveal_spawn_bounds.gd`, 7 assertions over 64 seeds × 2 sites, with the pre-fix flush
+spawn carried inside as a live control. Mutation-tested twice. The first round caught two real defects in
+the suite itself: (1) a `min_left < 0` assertion that **cannot fail** — `_walk_left` samples the edge after
+`tick()` returns, and the clamp has already run, so a post-tick sample can never see a pre-correction
+excursion; replaced with the quantity that actually discriminates, `min_left == 0` (stopped by the CLAMP)
+against `min_left > 0` (stopped by TERRAIN). (2) `spawn_col >= MIN_SPAWN_COL`, which is true by
+construction for any value of the constant it exists to test, and duly passed on its own mutant (D0112's
+self-referential class); replaced with the derived literal.
+
+**Reverse:** CHEAP — one `maxi` and one constant, and the four dense recordings re-base back with it.
+
+## D0193 · The bounds invariant cannot tell a wall-press from an escape — reported, deliberately NOT fixed · 2026-08-29
+**Decided:** report this and hold. D0192's spawn fix removes the systematic case; it does not and cannot
+make the class impossible, and the residual is a `sim/invariants` design question that is not Slice 1's to
+settle unilaterally.
+
+**The finding.** `Invariants.check_bounds` is a strict box comparison with no magnitude and no notion of
+which mechanism stopped the body. `_enforce_grid_bounds` reports BEFORE correcting (deliberately, D0052/
+D0055). So *any* contact with the world's outer wall at speed — left or right, by walking or by digging to
+the edge — overshoots by up to one integration step, is reported as "left the world", and is then clamped.
+The subject D0055 built it for was a chained step-up/mantle launching the body to y = **−15.85 px**. What
+fires today is **−0.3125 px**. The instrument cannot separate them, and this world is **192 px wide** — 12
+body-widths — so wall contact is ordinary play, not an edge case.
+
+**Why that matters more than the noise.** An invariant that fires during normal play trains everyone to
+ignore it, which defeats exactly the purpose D0055's own comment states: "so a FUTURE regression that
+reopens some other path out of the world is still loud, not a silent clamp." Cry-wolf is the failure mode
+here, not the log lines.
+
+**The discriminator, if the director wants it built.** The body can only ever be outside by one tick of
+legal motion unless something teleported it. So the quantity that separates the two cases is the overshoot
+measured against `|vel| / TICK_HZ`: a wall-press overshoot is bounded by the body's own velocity, and a
+chained-step-up launch is not. That is a real criterion rather than a threshold picked to silence a log.
+
+**Why not now.** Loosening an invariant is the highest-risk edit available in this repository — it is the
+one change whose failure mode is a permanent quiet green, and this ledger already carries "a gate wrong
+about its own hits" and "guards that cannot be false" as house classes. It is also not the collision
+resolver, so the brief's escalation fork does not name it; it is a third thing the brief did not anticipate,
+and it gets the escalation treatment by analogy rather than a unilateral fix inside a slice about mining.
+
+**Reverse:** N/A — nothing was changed. The cost of waiting is log noise when a player walks into the outer
+wall on purpose, which is now the only way to reach it.

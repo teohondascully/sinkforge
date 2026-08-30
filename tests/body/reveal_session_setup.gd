@@ -13,18 +13,37 @@ const CELL: int = Heightfield.TERRAIN_CELL_PX
 const SHALLOW_ROW_LIMIT: int = 30  ## how far down the scan looks for a "near-surface" glimmer pocket
 const APPROACH_OFFSET_COLS: int = 6  ## spawn this many columns left of the found pocket
 
+## D0192. The spawn may never sit flush against the world's own left edge. DERIVED, not picked: the body
+## is stopped by terrain, so what it needs is one SOLID cell between its left edge and x=0 -- `carve_entry_shaft`
+## opens `[spawn_col, spawn_col+4)`, so `spawn_col = 1` leaves column 0 solid full-height and
+## `HorizontalResolve` halts a leftward walk at x=4px instead of the world-edge clamp halting it at x=0.
+## One cell is the whole kinematic requirement; more margin would only change how much digging removes it.
+##
+## What this was: `spawn_col = col - APPROACH_OFFSET_COLS` with a `col < APPROACH_OFFSET_COLS: continue`
+## guard, which prevents a NEGATIVE spawn column but permits exactly 0 -- and 0 puts the body's left edge
+## exactly ON x=0, one acceleration step (0.3125px) from a bounds violation, with the entry shaft having
+## already excavated the column 0 rock that would otherwise have stopped it. The guard's `continue` also
+## piles every pocket in columns 0..5 onto column 6, so this is the MODE of the distribution rather than a
+## tail: measured over 400 seeds, `reveal_test_dense` spawns flush **213/400 (53.2%)** and
+## `reveal_test_sparse` **56/400 (14.0%)**. The director's own seed 20260826 is one of them.
+const MIN_SPAWN_COL: int = 1
+
 
 ## First shallow (row < SHALLOW_ROW_LIMIT) glimmer cell, scanning columns left to right -- deterministic
 ## given a deterministic grid, so the same (site, seed) always finds the same spawn column and the same
 ## target glimmer column. Returns `{"spawn_col": int, "target_glimmer_col": int}` -- the latter is -1 if
 ## this seed/site placed no shallow glimmer at all (parks the spawn in the middle instead of crashing).
+##
+## The `maxi` never pushes the spawn far enough right to swallow its own target: the pocket must stay
+## outside the carved entry shaft `[spawn_col, spawn_col+4)`, and with the `col >= APPROACH_OFFSET_COLS`
+## guard above, the tightest case is `col == 6 -> spawn_col == 1`, whose shaft ends at column 5.
 static func find_spawn(grid: TileGrid) -> Dictionary:
 	for col: int in grid.width:
 		if col < APPROACH_OFFSET_COLS:
 			continue
 		for row: int in SHALLOW_ROW_LIMIT:
 			if grid.get_material(Vector2i(col, row)) == &"glimmer":
-				return {"spawn_col": col - APPROACH_OFFSET_COLS, "target_glimmer_col": col}
+				return {"spawn_col": maxi(MIN_SPAWN_COL, col - APPROACH_OFFSET_COLS), "target_glimmer_col": col}
 	return {"spawn_col": grid.width / 2, "target_glimmer_col": -1}
 
 
