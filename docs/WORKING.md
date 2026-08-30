@@ -12,7 +12,7 @@ caught mechanically rather than relying on someone noticing later.
 what a future session needs that the ledger does not already say better. New this round:
 **`docs/NEEDS_DIRECTOR.md`**, the parked queue — read it FIRST if you are the director picking this up.
 
-## DONE THIS RUN — five entries, D0213 to D0220
+## DONE THIS RUN — D0213 to D0222, grouped below into six
 
 Full accounts in `docs/DECISIONS_LEDGER.md`. What a future session needs to know:
 
@@ -68,6 +68,18 @@ ends at 228, so it silently wrote no file — and Slice 1's and Slice 2's `delve
 comparable pair**, because the bite default moved and nobody re-derived the tick. And the capture tool
 left one recording behind per moment; twelve reached two commits before it started cleaning up after
 itself.
+
+**D0222 — the parked items' own numbers were the unmeasured ones.** P007 named two sub-items "cheap, no
+ruling needed" from reading rather than measuring; both were wrong, both in the direction that made the
+deferred work sound safer. `test_reveal_spawn_bounds` calls `ShaftGenerator.generate` **517 times, 149.3
+ms each, 77.2s of its 81.1s** — four passes over the same 128 pairs, and the free half of the saving is a
+different half from the one that needs a ruling. And the fuzz probe's seeds are **not** independent by
+design: `HostileChamber.build()` runs once above the loop and all seeds share the object. Checking whether
+that bites found the real thing: **`dig_pressed` is true on 1,544 of 3,000 ticks and zero cells are ever
+excavated** (solid count 1285 at every seed's entry; 63 violations with digging and 63 with `--no-dig`).
+So `--no-dig` is currently a control that cannot fail, the fuzz suite has never exercised mining, and seed
+independence holds by accident. Recorded in P004; **the mechanism behind `events=0` is deliberately not
+diagnosed** — three plausible causes and no evidence between them is a unit of work, not a line in a wrap.
 
 ## THE PRESENTATION BATCH IS MOSTLY BLOCKED — read `docs/NEEDS_DIRECTOR.md` P005
 

@@ -9058,3 +9058,59 @@ a detector that has stopped working.
 `docs/NEEDS_DIRECTOR.md` P003 exactly — the same gate name reporting on two different populations
 depending on where it runs. The scratch file is deleted rather than worked around; its content lives on
 as `tests/test_corner_consent.gd`.
+
+## D0222 · A parked item's own numbers were the unmeasured ones — and measuring them found a fuzzer that presses dig 1,544 times and digs nothing · 2026-08-30 · corrects `docs/NEEDS_DIRECTOR.md` P007, extends P004
+**Decided:** `docs/NEEDS_DIRECTOR.md` P007 closed with two sub-items described as cheap and needing no
+ruling. Neither was measured before being written down, which is exactly the standing rule
+(`CLAUDE.md`: verify a numeric claim against actual tool output before writing it into a commit, doc or
+report) applied to everything in this round *except* the paragraph explaining what was left undone.
+Both are now measured, and **both statements were wrong in the direction that made the work sound
+safer than it is.**
+
+**"Generates each grid at least twice — caching roughly halves its 82s."** A temporary call counter
+inside `ShaftGenerator.generate` reports **517 calls, 77,198.0 ms, 149.3 ms each** — 95% of the suite's
+81.1s, and four passes over the same 128 `(site, seed)` pairs, not two. The correction that matters is
+not the count though. **Two of those four passes are read-only and two go through
+`RevealSessionSetup.build`, which carves** — so the free half of the saving (~19s, merging the two
+read-only loops) and the half that needs a ruling (~19s, sharing one carved grid between the walk test
+and the jump test) are different halves. Sharing a mutated grid across two tests in the suite that
+guards bounds violations rests on "neither run mutates it" holding forever, which is this project's own
+house failure class with a fuse in it. Parked whole rather than half-applied, because applying the free
+half alone buys 19s on a 307s suite in exchange for making a bounds-guard file harder to read.
+
+**"Each seed is fully independent (`SplitRng.new(seed)`), so a `--seed-start=` makes 4-way sharding
+exact."** The RNG is per-seed. **The world is not:** `HostileChamber.build()` is called once above the
+loop (`tests/fixture_body_fuzz_probe.gd:171`) and all seeds share the one object. Independence was
+inferred from the line that was easy to see, which is the same reasoning error the ledger records under
+presence-is-not-identity.
+
+**And checking whether that actually bites produced the finding.** Instrumenting the probe's own loop
+over 6 seeds x 500 ticks:
+
+```
+TEMP_DIG pressed=1544 events=0
+```
+
+**`dig_pressed` is true on 1,544 of 3,000 ticks and `dig_event_this_tick` fires zero times.** Two
+independent confirmations, because one counter proving itself is not evidence: the chamber's solid-cell
+count is **1285 at the entry to every one of the six seeds**, and the violation total is **63 with
+digging and 63 with `--no-dig`**. So the shared grid is never mutated, seed independence holds — **by
+accident, contingent on a dig path that does nothing.**
+
+**Three consequences recorded in P004 rather than acted on.** `--no-dig` (D0127) is currently a control
+that cannot fail, since it suppresses a field whose effect is already nil; the fuzz suite has never
+exercised mining, the 747,000-tick D0122 regression included; and a `--seed-start=` would be exact today
+and silently wrong the day the fixture's dig path starts working — which is P004's own proposed remedy,
+so the two cannot be decided apart.
+
+**Not diagnosed, deliberately.** Why `events=0` — target cell out of bounds, an already-open column, or
+no solid cell adjacent to the body at its centre height — is left unmeasured and explicitly flagged as
+the first thing to measure rather than the first thing to fix. Three plausible mechanisms and no
+evidence between them is where this project's own remove-the-subject-and-re-run rule applies, and that
+is a unit of work, not a line in a wrap.
+
+**Why nothing was applied.** The run's brief ends Bin A at the presentation queue and parks every
+judgment call to `docs/NEEDS_DIRECTOR.md`; test-suite throughput is neither. The tree was already green
+and pushed at `fb1852d` when these were measured, and adding an unreviewed refactor of a bounds-guard
+suite to what the comprehensive sweep will read, for 19s of local wall-clock, is a bad trade offered
+without being asked for. The numbers are the deliverable here, not the diff.

@@ -5,13 +5,13 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
 **Last updated: 2026-08-30. This round: the third teleport closed, then Slice 2 — `interface/` exists, the
-build makes a sound, and mining throws chips. 9 commits, `c953117`..HEAD.
-`docs/DECISIONS_LEDGER.md` D0213-D0221, `docs/adr/0007-l2-interface.md`.**
+build makes a sound, and mining throws chips. 10 commits, `c953117`..HEAD.
+`docs/DECISIONS_LEDGER.md` D0213-D0222, `docs/adr/0007-l2-interface.md`.**
 
 **Headline: the instant-translation class is closed at its third and last instance, and L2 is real.
 `interface/` and `sim/commands/` stop being skeletons, which was the literal blocker on the presentation
 batch. But the batch itself is mostly blocked by the run's own non-negotiable — measured, not guessed —
-and `docs/NEEDS_DIRECTOR.md` is a new file carrying six parked items. Read it before this one. Gate 7 is
+and `docs/NEEDS_DIRECTOR.md` is a new file carrying seven parked items. Read it before this one. Gate 7 is
 green for the first time in weeks, which is what unmasked ten BLOCKING checks that had been reporting
 `skipped` behind it.**
 
@@ -59,6 +59,30 @@ lands dead code. Two had real consumers — `score.gd` (its entire interface wit
 `particles.gd` (`sim/mining` already reports break and breach every tick) — and those are the two that came
 over.
 
+### The claims I did not verify were the ones about work I was declining to do
+
+Every number in this round was checked against tool output — except the paragraph in
+`docs/NEEDS_DIRECTOR.md` P007 explaining what was being left undone, which was written from reading. Both
+of its claims were wrong, and **both ran the same direction: each made the deferred work sound cheaper and
+safer than it is.** `test_reveal_spawn_bounds` does not generate each grid twice, it calls
+`ShaftGenerator.generate` **517 times, 149.3ms each, 77.2s of its 81.1s** — and the free half of that
+saving is a different half from the one needing a ruling. The fuzz probe's seeds are not independent by
+design either: `HostileChamber.build()` runs once *above* the loop and every seed shares the object.
+**A parked item is a claim — the director schedules against "cheap, no ruling needed".**
+
+### The fuzzer presses dig 1,544 times and excavates nothing
+
+Found by checking whether that shared world actually bites. Over 6 seeds x 500 ticks, `dig_pressed` is
+true on **1,544 of 3,000 ticks** and `dig_event_this_tick` fires **0** times. Confirmed twice more,
+because one counter proving itself is not evidence: the chamber's solid-cell count is **1285 at the entry
+to every seed**, and the run totals **63 violations with digging and 63 with `--no-dig`**. So `--no-dig`
+(D0127) is currently a control that cannot fail; **the fuzz suite has never exercised mining**, the
+747,000-tick D0122 regression included; and seed independence holds by accident, expiring the day the
+fixture digs. This is the same shape as the corner finding above — `HostileChamber` now demonstrably
+fails to pose **two** mechanics. **Why `events=0` is deliberately not diagnosed**: three plausible
+mechanisms, no evidence between them, and this repo's own rule says remove the subject and re-run rather
+than pick one.
+
 ### A milestone pair is only a pair if every knob was held
 
 `MILESTONES.md` says the point of fixing resolution, camera and seed is that only the CONTENT differs.
@@ -94,12 +118,15 @@ reference. **`claims/C004` still untouched on purpose**: whether a session quali
 ## The decisions this round is waiting on
 
 **`docs/NEEDS_DIRECTOR.md` is new and is where these live now**, with the numbers and a proposed remedy
-for each. Six items: P001 (ratchet the fuzz `bounds` count at 922 rather than leaving it ungated), P002
+for each. Seven items: P001 (ratchet the fuzz `bounds` count at 922 rather than leaving it ungated), P002
 (promote the recorded-session replay from scratch to a real CI test — makes every recording you make
-binding), P003 (the size gate lints gitignored files locally and none in CI), P004 (point the fuzzer at a
-generated shaft, since the chamber poses neither the corner mechanic nor its defect), **P005 (the
+binding), P003 (the size gate lints gitignored files locally and none in CI), **P004 (point the fuzzer at
+a generated shaft — the chamber poses neither the corner mechanic nor its defect, and is now measured to
+pose no mining either: 1,544 dig presses, 0 excavations)**, **P005 (the
 presentation batch — three options, and only option 3 changes how the game looks)**, P006 (the MODULE.md
-60-line cap is violated by 10 of 10 modules, two of them this session's).
+60-line cap is violated by 10 of 10 modules, two of them this session's), **P007 (the determinism suite
+is 93% string-building — `TileGrid.state_signature()` formats 28 million strings to checkpoint 60,000
+ticks; the fix is a running hash, and it touches the determinism contract itself)**.
 
 Carried, unchanged: **`grounded_no_floor`'s residual** (now 46, down from 59 — full support vs perching is
 still a feel call, not a bug); **Slice 1.5's bite radius**, `--bite=0/1/2/3`, `docs/TASTE_QUEUE.md` T004;

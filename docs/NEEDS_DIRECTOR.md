@@ -126,12 +126,44 @@ additional seed band, reusing `fixture_shaft_replay_probe.gd`'s own construction
 the violation types and the determinism all stay exactly as they are; only the geometry the body is
 dropped into changes, and the geometry is the thing that was missing.
 
+**The corner mechanic is not the only thing the chamber fails to pose — mining is not exercised at
+all.** Measured after the above, while checking an unrelated claim about sharding. Instrumenting the
+probe's own loop over 6 seeds x 500 ticks:
+
+```
+TEMP_DIG pressed=1544 events=0
+```
+
+`FuzzDriverCommon.random_input` rolls `dig_pressed` true on about half of all ticks — 1,544 presses in
+3,000 ticks — and `body.dig_event_this_tick` fires **zero** times. Nothing is ever excavated. Two
+independent confirmations of the same fact: the chamber's solid-cell count is **1285 at the entry to
+every one of the six seeds**, unchanged; and the run's violation total is **63 with digging and 63 with
+`--no-dig`**, byte-identical.
+
+Three consequences, none of them visible from any green:
+
+- **`--no-dig` (D0127) is currently a control that cannot fail.** It suppresses a field whose effect is
+  already nil, so an A/B across it can only ever come back "no difference" — which is the reading D0127
+  itself records, and which will stay true whatever the dig path does.
+- **The fuzz suite has never exercised mining**, including the 747,000-tick D0122 regression run.
+- **Seed independence is accidental.** The grid is built once *outside* the seed loop
+  (`fixture_body_fuzz_probe.gd:171`) and every seed shares that one object; seeds are independent only
+  because nothing mutates it. The moment digging works, `--seeds=N` becomes order-dependent, and any
+  attempt to shard or to reproduce a single seed in isolation silently stops matching the full run.
+
+The mechanism behind `events=0` is *not* diagnosed here and should not be assumed — `_dig_target_cell`
+may be landing out of bounds, or on an already-open column, or the chamber may have no solid cell
+adjacent to the body at its own centre height. That is the first thing to measure, not the first thing
+to fix.
+
 **Why this is yours.** It roughly doubles the nightly sweep, which is already the longest job in the
 harness, and it introduces a second population whose numbers are not comparable with the first — a
 permanent complication to every "the fuzzer says N" statement made afterward. It also raises a question
 nobody has answered: whether `HostileChamber` should be *repaired* instead (its corner tile has been
 unreachable since D0055, so it is carrying a feature it no longer tests), which is a fixture-design call
-rather than a harness-throughput one.
+rather than a harness-throughput one. The dig measurement above sharpens that question rather than
+answering it: the chamber now demonstrably fails to pose *two* mechanics, which is an argument for
+replacing it and an argument for repairing it in equal measure.
 
 ---
 
@@ -211,3 +243,73 @@ than quietly complied with or quietly ignored**, because both of those are how a
 deliberate constraint on how much a module is allowed to explain about itself, option 2 spends an hour
 deleting prose that somebody wrote on purpose. What is not defensible is the current state, where the
 number exists and nothing checks it.
+
+---
+
+## P007 · The determinism suite is 93% string-building, and the fix touches the determinism contract
+
+**Status:** open · **Cost to apply:** ~2 hours + a golden re-capture · **Raised by:** a measurement pass, 2026-08-30
+
+The per-commit suite takes ~307s locally. Where it goes, timed per suite:
+
+| suite | time | share |
+|---|---|---|
+| `test_body_fuzz_regression_d0122` | 120.0s | 39% |
+| `test_reveal_spawn_bounds` | 82.6s | 27% |
+| `test_shaft_replay_determinism` | 74.4s | 24% |
+| the other 31 | 30.1s | 10% |
+
+**Only one of those three is sim-bound.** Benchmarked inside the determinism suite's own world:
+
+```
+world gen                  :    149.9 ms
+20,000 body ticks          :   1650.0 ms   (12,121 ticks/sec)
+200 grid.state_signature() :  23357.6 ms   (116.79 ms each)
+200 body.state_signature() :      0.2 ms
+```
+
+`TileGrid.state_signature()` formats one string per occupied cell and joins them — 46,805 cells x 200
+checkpoints x 3 processes is **28 million string formats to checkpoint 60,000 ticks.** The simulation is
+7% of that suite; the rest is building strings to hash.
+
+**Proposed remedy: a running hash**, updated in `set_material` / `excavate` /
+`extend_terrain_dig_extent`, making `state_signature()` O(1). Takes the suite from ~74s to ~5s.
+
+**Why this is yours and not a session's.** `state_signature()` **is** the determinism contract — gate 8,
+the golden array, the cross-process replay and every "byte-identical" claim in the ledger all rest on it.
+Making it cheaper must not make it weaker, and "weaker" here is subtle: a running hash must be updated on
+every mutation path, and a path that forgets to update it produces a signature that agrees when the
+worlds differ, which is the exact failure this project's own house class is about. It also costs a golden
+re-capture from CI Linux. Worth doing, and worth doing deliberately.
+
+**Two more items in the same measurement. Both were first written down here as cheap and needing no
+ruling; measuring them made both statements wrong, so they are restated against tool output.**
+
+**`test_reveal_spawn_bounds` regenerates the same worlds four times over.** Counted with a temporary
+call counter inside `ShaftGenerator.generate`, not by reading the file:
+
+```
+[TEMP] ShaftGenerator.generate called 517 times, 77198.0 ms total, 149.3 ms each
+```
+
+517 generations, **77.2s of the suite's 81.1s — 95%, not the "at least twice" first written here.** Four
+passes cover the identical 128 `(site, seed)` pairs: two read-only (`find_spawn` only) and two through
+`RevealSessionSetup.build`. **But the cheap half and the valuable half are not the same half.** Merging
+the two read-only passes is provably safe and saves 128 generations, ~19s. Getting the other ~19s means
+sharing one *carved* grid between the walk test and the jump test — and that is an aliasing decision
+inside the suite that guards bounds violations, resting on "neither run mutates the grid" staying true
+forever. In this repository that is the house failure class with a fuse in it, so it is parked rather
+than done: **~23% is free, the other ~23% is a ruling.**
+
+**The fuzz probe cannot be sharded, and the reason is not the one first written here.** The claim was
+that each seed is fully independent because of `SplitRng.new(seed)`. The RNG is per-seed; the **world is
+not** — `HostileChamber.build()` is called once, above the loop, and every seed shares that object. It
+survives today only because the dig path excavates nothing (P004, measured: 1,544 presses, 0 events). A
+`--seed-start=` is still about four lines plus the summary line, and it would be **exact today and
+silently wrong the day mining starts working in the fixture** — which is P004's own proposed remedy. The
+two must be decided together, or the shard flag must refuse to run unless the world is rebuilt per seed.
+
+**A trap worth recording separately.** A local battery built by grepping `harness.yml` for
+`res://tests/test_*.gd` picks up `test_body_fuzz.gd` — which is `if: github.event_name == 'schedule'` and
+runs 1.5M ticks. This session's own battery ran it every time, ~4 minutes each. Parse the YAML and take
+the `tests` job's steps; the file now parses, and D0217 made that a gate.

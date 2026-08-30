@@ -293,6 +293,36 @@ runs no gate, so every OTHER gate's verdict for that commit was also unchecked a
 (`tools/layer_lint/test_check_suite_coverage.py`, 5/5 branches observed) that asserts both the new
 behaviour AND that the old regex-only version passes on the broken files.
 
+## D0222 corrects `docs/NEEDS_DIRECTOR.md` P007 — the paragraph explaining what was left undone was the one nobody measured
+
+The odd one out on this page: the corrected claim is not in the ledger at all, it is in the parked-items
+document written the same day. Recorded here anyway, because the failure is about *where* verification
+stopped, and that is a lesson about this page's own subject.
+
+**What was claimed:** P007 closed by naming two sub-items as cheap and needing no ruling — that
+`test_reveal_spawn_bounds` "generates each grid at least twice ... caching roughly halves its 82s", and
+that in the fuzz probe "each seed is fully independent (`SplitRng.new(seed)`), so a `--seed-start=` of
+about three lines makes 4-way sharding exact."
+
+**Measured:** the suite calls `ShaftGenerator.generate` **517 times, 149.3 ms each, 77.2s of its 81.1s**
+— four passes over the same 128 `(site, seed)` pairs, not two. And the seeds are not independent by
+design: the probe builds `HostileChamber` **once, above the seed loop**, and every seed shares that one
+object.
+
+**The error, precisely.** Every number in the round it belonged to was checked against tool output. The
+paragraph describing the work *not* being done was written from reading, because a parked item feels
+like a note rather than a claim. It is a claim — a director reads "cheap, no ruling needed" and
+schedules against it. **Verification has to cover what you are declining to do, not only what you
+shipped**, and the tell is that both errors ran the same direction: each made the deferred work sound
+safer and smaller than the measurement shows it to be.
+
+**What it turned up.** Checking whether the shared world actually bites found that the fuzzer presses
+`dig_pressed` on **1,544 of 3,000 ticks and excavates zero cells** — confirmed twice over, by a solid-cell
+count identical (1285) at the entry to all six seeds and by a violation total identical (63) with and
+without `--no-dig`. So seed independence does hold, for a reason that is nobody's design and expires the
+day the fixture digs. Consequences are recorded in P004; the mechanism behind `events=0` is deliberately
+left unmeasured rather than guessed at.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,
