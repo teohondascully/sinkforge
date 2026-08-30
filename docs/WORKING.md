@@ -66,7 +66,16 @@ any change to the collision resolver; the determinism gate going red; `interface
 economy (no `craft_cost`, no research, no demands, do not touch `data/economy/`); pulling Slice 3 visual
 work forward.
 
-**Standing, from this slice onward — milestone recordings.** Every slice, and any intermediary work that
+**GATES.** Layer lint, engine imports, schema, codegen, corrections freshness, working freshness: PASS.
+Determinism, body acceptance and every other suite: PASS **in isolation** — the two that are red in this
+working tree are D0139's parked uncommitted `vertical_resolve.gd`, re-confirmed by running Slice 1's files
+on a clean clone at `caf0d99` where all three pass. Gate 3/4 (size): one FAIL, `resolve_floor()` at 60
+lines — also D0139's, pre-existing. **Gate 7 (LOC velocity) still FAILS**, but its trailing 10-commit
+window reaches back over Slice 0; **Slice 1's own ratio is 1.12x against the 2.00x limit** (game +546,
+instrument +609), and it is the first slice in a while to add real game LOC (+546 against Slice 0's +28).
+It clears as the window rolls forward, without anything being done to it.
+
+**Standing, from this slice onward — milestone recordings.** First set landed: `docs/MILESTONES.md`. Every slice, and any intermediary work that
 changes what a player sees or does, commits: (1) the `--play` or agent trace `.log` in
 `tests/body/recordings/`, named by slice + timestamp; (2) a screenshot of the resulting state; (3) the
 commit SHA it was produced against, recorded IN the artifact or a sibling note — generated from the

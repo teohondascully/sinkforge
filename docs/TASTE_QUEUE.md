@@ -36,3 +36,33 @@ Used as a background fill at full strength they wash the world out completely, s
 background only 10% toward the current band. That makes depth-as-colour almost unreadable, which may be
 right (the band belongs in a HUD readout at Slice 4, not in the dirt) or may be too timid. *Question:
 raise the tint, or leave the world neutral and let the band live in the HUD?*
+
+---
+
+## Slice 1 (D0195) — the mining verb
+
+**T003 · Mining times: the shallow end is legacy's exactly, the deep end is twice as fast.** The two
+codebases do not share a hardness scale — legacy's numbers ARE seconds, this project's are unitless — and
+no single factor maps one onto the other. `TICKS_PER_HARDNESS = 17` is derived from the shallow end, where
+a player starts, and lands clay at 0.283s against legacy earth's 0.28s and hardrock at 0.850s against
+legacy stone's 0.850s (exact, and not fitted to). The deep end falls out faster because this project's
+hardness scale compresses there:
+
+| material | hardness | breaks in | legacy counterpart |
+|---|---|---|---|
+| clay | 1.0 | **0.283 s** | earth 0.28 s |
+| glimmer | 1.0 | 0.283 s | — (authored here) |
+| coal | 1.5 | 0.417 s | coal 0.90 s |
+| ore_copper | 2.0 | 0.567 s | ore 0.90 s |
+| hardrock | 3.0 | **0.850 s** | stone 0.850 s |
+| ore_iron | 3.5 | 0.983 s | iron 3.00 s |
+| deepstone | 5.0 | 1.417 s | deepslate 2.80 s |
+
+Rhythm shortens consecutive breaks by up to 1.6x on top of this (deepstone measured at 85, 71, 62 ticks
+across three in a row). *Question: is the deep end supposed to be this fast? The alternative is to stop
+treating the two scales as relatable at all and author a `break_seconds` per material directly — which is
+more honest but abandons the one anchor that currently ties this build's feel to legacy's.*
+
+**Only playing it answers this.** The agent trace cannot: it has no sense of whether a 1.4-second hold on
+deepstone is a satisfying commitment or a chore, and that is precisely the axis the whole migration is
+about.
