@@ -4,13 +4,18 @@ Things a session stopped on rather than plowed through. **Nothing here has been 
 is a diagnosis plus a proposed remedy, held because the call is a judgment the director owns: a feel
 decision, a policy decision, or a trade with no obviously right side.
 
-Created 2026-08-30 for the presentation run, which was briefed to park rather than decide. Read this
-before `docs/WORKING.md` if you are picking the run up cold — WORKING.md says what happened, this says
-what is waiting on you.
+Created 2026-08-30 for the presentation run. Read this before `docs/WORKING.md` if you are picking the
+run up cold — WORKING.md says what happened, this says what is waiting on you.
 
 **How to close one:** rule on it, then delete the entry and record the ruling in
 `docs/DECISIONS_LEDGER.md`. An entry that stays here after a ruling is worse than no entry, because
 the next session cannot tell a live question from a settled one.
+
+**Closed 2026-08-30 by the gate-hygiene run, ruled and applied:** P002 (the recorded-session replay is
+now `tests/test_recorded_sessions.gd` and runs in CI — D0228), P003 (the size gate's two populations are
+one — D0225), P005 (the unblocked lifts landed and the batch is genuinely dry — D0227), P006 (the
+MODULE.md cap is 100 and enforced — D0226), and P007's two free sub-items (D0229, D0230). Their entries
+are deleted per the rule above; the ledger carries the rulings.
 
 ---
 
@@ -44,57 +49,6 @@ the count did not move in the fast window, while the full 1.5M-tick sweep moved 
 burden of explaining a number nobody chose on purpose. `docs/QUALITY.md` gate 7 is already one of
 those and is already red. Adding a second ratchet without a ruling is how a project acquires gates it
 resents.
-
----
-
-## P002 · The recorded-session replay is scratch, not a test
-
-**Status:** open · **Cost to apply:** ~1 hour · **Raised by:** Codex audit, 2026-08-30
-
-Four of the director's own play sessions are committed under `tests/body/recordings/`, and the thing
-that replays them and checks them — `tools/scratch/trace_lift.gd` — is gitignored. It has caught
-three real defects (D0209, D0212, D0213's verification) and it runs nowhere. Every claim made from it,
-including this run's, rests on a session having chosen to run it by hand.
-
-**Proposed remedy.** Promote it to `tests/test_recorded_sessions.gd`: replay every
-`tests/body/recordings/play_*.log`, assert 0 bad ticks, 0 airborne climbs, and 0 unconsented corner
-nudges per session. About 7,000 ticks total across the four, so it costs a second or two. Two things
-it has to carry over, both learned the hard way: the air-control ratio comes from the log's own header
-and never from the current default, and `chamber=` is only believable in a log that also carries
-`air_control=` (one commit introduced both, so the co-field is the evidence the first was measured
-rather than hardcoded).
-
-**Why this is yours.** It makes every recording the director makes into a **binding regression test**.
-That is exactly what you want while the body is frozen, and exactly what you do not want the first
-time a deliberate feel change legitimately invalidates an old session — at which point the suite fails
-for the right reason and someone has to decide whether the recording or the game is wrong. That policy
-("a recording is binding until the director retires it") is the ruling, not the code.
-
----
-
-## P003 · Local and CI runs of the size gate measure different populations
-
-**Status:** open · **Cost to apply:** ~10 minutes · **Raised by:** this session, 2026-08-30
-
-`tools/layer_lint/gd_scan.py::gd_files_excluding` enumerates with `root.rglob("*.gd")` and denies only
-top-level `legacy/` and dotted directories. Git's ignore rules are never consulted. So
-`check_size_limits.py` lints every gitignored `.gd` under `tools/scratch/` on a developer's machine and
-lints none of them in CI, where a fresh checkout has no scratch directory at all.
-
-**It is not only noise.** It means a local gate run can FAIL for a reason CI can never see, and — the
-sharper half — a local run can be made to PASS by deleting an untracked file. This run hit both:
-`trace_lift.gd::_replay` crossed the 50-line function limit while being edited, and the fix was to
-reshape a throwaway tool to satisfy a gate that will never see it. The same gate name reports on two
-different populations depending on where it runs, which is the thing `docs/QUALITY.md` exists to stop.
-
-**Proposed remedy.** Filter the enumeration through `git check-ignore --stdin` (one subprocess, cheap)
-so both runs see the tracked set. Fallback for a non-git checkout: keep today's behaviour.
-
-**Why this is yours.** The alternative reading is that scratch tools *should* be linted, on the grounds
-that a scratch tool that produced a shipped number is not really scratch — this session's own
-`trace_lift.gd` is the argument for that. Which population the gate is *supposed* to cover is a
-QUALITY.md question, and changing an enforcement's population is exactly the kind of change that
-should not happen quietly inside an unattended run.
 
 ---
 
@@ -171,85 +125,6 @@ replacing it and an argument for repairing it in equal measure.
 
 ---
 
-## P005 · The "63 clean LIFT batch" is mostly blocked by this run's own non-negotiable
-
-**Status:** open · **Cost to apply:** a slice, not a session · **Raised by:** this session, 2026-08-30 (D0215)
-
-The presentation run was briefed to work through the migration map's 63 LIFT files, with "no coordinator
-rebuilds (world_renderer/hud splits) — parked, judgment-dense" as a non-negotiable. Those two
-instructions are in direct tension, and measurement rather than reading is what shows it.
-
-**The measurement.** All 21 code files in the LIFT set, scanned for the legacy `class_name`s they
-reference **in code with comments stripped** — a raw text scan is useless here, because these files'
-comments are full of capitalised prose that reads as type names.
-
-| Blocked on | Files | Lines |
-|---|---|---|
-| `WorldRenderer` / `MainView`, the coordinator | sky_painter, terrain_painter, water_view, rope_view, falling_items | ~1,540 |
-| `FactorySim`, legacy's sim | fine_terrain, sfx, water_flow, power_flow | ~2,700 |
-| `MachineDef` / `RecipeDef`, entities that do not exist here | visuals (1,850) + 13 machine records | ~2,050 |
-| One hop: needs `Visuals`' keycap metrics only | ui_theme, page_surface, payouts | ~394 |
-| Nothing — liftable today | art, particles, light_layer, settings, seams, score | ~945 |
-
-**So roughly 900 of 8,539 lines are reachable without building a coordinator, and `score.gd` was one of
-them** (now lifted, D0215). `visuals.gd` — the single largest file and the one everything HUD-flavoured
-hangs off — is not blocked on a renderer at all; it is 1,850 lines of machine and item glyphs for
-entities this build does not have.
-
-**Three ways forward, and the choice is yours.**
-
-1. **Lift the rest of the unblocked ~900 and stop.** `art`, `particles`, `light_layer`, `settings`,
-   `seams`, plus `ui_theme` if the three keycap metrics are extracted out of `visuals.gd` first. Real,
-   cheap, and it does not touch the fork below. Ends with the batch genuinely dry.
-2. **Lift the ~394 one-hop files by extracting a `Visuals` subset.** `ui_theme.gd` is "what makes the UI
-   read as 2026" and needs exactly three members (`keycap_height`, `KEYCAP_BASE`, `KEYCAP_DROP`). The
-   catch: there is no UI in this build to theme yet, so the value is banked, not realised.
-3. **Un-park the coordinator.** ~1,540 lines of world rendering unblock at once, and it is the only
-   route to the thing that would actually change how the game looks. This is the judgment-dense work the
-   run was told not to do, and `docs/LEGACY_MIGRATION_MAP_2026-08-29.md` §10 names it as the risk most
-   likely to bite: `world_renderer.gd` is 3,656 lines against a 400-line gate.
-
-**One thing that is already ruled and worth re-reading before option 3.** `docs/WORKING.md` records the
-Q1 finding that **the palette reads at 16px but the FLECK does not**, and that `terrain_painter.gd` is
-"not portable as written". That is 438 of the 1,540, and it needs an art pass, not a port.
-
----
-
-## P006 · The MODULE.md 60-line cap is violated by every module that has one
-
-**Status:** open · **Cost to apply:** ~1 hour, or one sentence · **Raised by:** this session, 2026-08-30
-
-`CONTEXT.md`'s five-file rule states a 60-line maximum for a `MODULE.md`. Measured across every tracked
-one: **10 of 10 exceed it.**
-
-```
-core/MODULE.md              98      sim/mining/MODULE.md        77
-sim/terrain_gen/MODULE.md   91      sim/world/MODULE.md         70
-sim/body/MODULE.md          82      sim/meta/MODULE.md          70
-sim/run/MODULE.md           69      interface/MODULE.md         65
-sim/invariants/MODULE.md    63      sim/commands/MODULE.md      61
-```
-
-The cold-read audit flagged this on 2026-08-29 with four files over; it is now ten, and two of the ten
-(`interface`, `commands`) are this session's own — written at 65 and 61 because the gotchas they carry
-are load-bearing and trimming them would have deleted the reason each file exists. **Recorded rather
-than quietly complied with or quietly ignored**, because both of those are how a rule becomes decoration.
-
-**A rule no instance obeys is not a cap, it is a comment.** The two honest resolutions:
-
-1. **Raise it to a number the tree can meet** — 100 clears every current file with headroom — and add it
-   to `check_size_limits.py`, which already walks `.md`-adjacent structure and would make it real.
-2. **Keep 60 and mean it**, which means a trimming pass over ten files and accepting that a module's
-   gotchas move somewhere else. `core/MODULE.md` at 98 is the test case: read it and decide whether the
-   38 lines over budget are worth keeping.
-
-**Why this is yours.** Either answer costs something the session cannot weigh: option 1 relaxes a
-deliberate constraint on how much a module is allowed to explain about itself, option 2 spends an hour
-deleting prose that somebody wrote on purpose. What is not defensible is the current state, where the
-number exists and nothing checks it.
-
----
-
 ## P007 · The determinism suite is 93% string-building, and the fix touches the determinism contract
 
 **Status:** open · **Cost to apply:** ~2 hours + a golden re-capture · **Raised by:** a measurement pass, 2026-08-30
@@ -286,36 +161,108 @@ every mutation path, and a path that forgets to update it produces a signature t
 worlds differ, which is the exact failure this project's own house class is about. It also costs a golden
 re-capture from CI Linux. Worth doing, and worth doing deliberately.
 
-**Two more items in the same measurement. Both were first written down here as cheap and needing no
-ruling; measuring them made both statements wrong, so they are restated against tool output.**
+**Its two sub-items are DONE and are not waiting on you** (D0229, D0230). The read-only worldgen
+passes in `test_reveal_spawn_bounds` are merged -- **the suite went 81.1s -> 61.3s, measured, against a
+predicted ~19s** -- and the local-battery trap is closed by `tools/run_local_battery.sh`, which parses
+the workflow and reads the `tests` job's own steps (37 suites) instead of grepping the file for
+`res://tests/test_*.gd` (38, the extra being the schedule-only 1.5M-tick sweep). What remains here is
+only the running-hash change to `state_signature()`, which is the determinism contract itself.
 
-**`test_reveal_spawn_bounds` regenerates the same worlds four times over.** Counted with a temporary
-call counter inside `ShaftGenerator.generate`, not by reading the file:
+**The aliasing half stays parked and the reason is unchanged:** sharing one CARVED grid between the walk
+and jump tests would save another ~19s and rests on "neither run mutates the grid" holding forever, in
+the suite that guards bounds violations. That is the house failure class with a fuse in it.
+
+---
+
+## P008 · The layer lint sees `class_name` edges now, but cannot judge 14 of them
+
+**Status:** open · **Cost to apply:** ~1 hour, or one sentence · **Raised by:** this session, 2026-08-30 (D0224)
+
+`layer_lint.py` had never evaluated a dependency edge — 38 now resolve where 0 did, and **no layer
+direction is violated**. That half is done and plant-proven. This is the half that could not be answered
+without you.
+
+`docs/ARCHITECTURE.md` §3 says "no module imports a sibling's internal files. Each module exposes exactly
+one public interface file", and the path-based rule reads that as `sim/<module>/<module>.gd`. **The tree
+does not follow that convention.** Applying the rule to `class_name` edges reports **14 violations that
+are all ordinary structure**:
 
 ```
-[TEMP] ShaftGenerator.generate called 517 times, 77198.0 ms total, 149.3 ms each
+sim/body/*.gd, sim/mining/*.gd, sim/invariants, sim/terrain_gen, interface/  ->  TileGrid  (11 edges)
+sim/mining/*.gd                                                             ->  Heightfield (2)
+sim/mining/mining.gd -> WorldMaterials      sim/commands/command.gd -> InputFrame
 ```
 
-517 generations, **77.2s of the suite's 81.1s — 95%, not the "at least twice" first written here.** Four
-passes cover the identical 128 `(site, seed)` pairs: two read-only (`find_spawn` only) and two through
-`RevealSessionSetup.build`. **But the cheap half and the valuable half are not the same half.** Merging
-the two read-only passes is provably safe and saves 128 generations, ~19s. Getting the other ~19s means
-sharing one *carved* grid between the walk test and the jump test — and that is an aliasing decision
-inside the suite that guards bounds violations, resting on "neither run mutates the grid" staying true
-forever. In this repository that is the house failure class with a fuse in it, so it is parked rather
-than done: **~23% is free, the other ~23% is a ruling.**
+`sim/world` publishes `TileGrid` from `tile_grid.gd` and `WorldMaterials` from `materials.gd`, and there
+is no `world.gd` at all. So the rule as written is either violated everywhere or means something other
+than what the filename convention says.
 
-**The fuzz probe cannot be sharded, and the reason is not the one first written here.** The claim was
-that each seed is fully independent because of `SplitRng.new(seed)`. The RNG is per-seed; the **world is
-not** — `HostileChamber.build()` is called once, above the loop, and every seed shares that object,
-which digging then mutates mid-run (P004: seed 45 excavates a cell and seeds 46-99 inherit it). A
-`--seed-start=` is still about four lines plus the summary line, and it would be **inexact the day it
-lands**, not merely fragile later. Sharding needs the world rebuilt per seed first — which is a change to
-what gate 26 and gate 29 measure, so their standing numbers (922 and 440,652) would both move and both
-need re-baselining. That is the ruling, and it is entangled with P004's own remedy rather than separate
-from it.
+**Three ways to answer, and the choice is yours.**
 
-**A trap worth recording separately.** A local battery built by grepping `harness.yml` for
-`res://tests/test_*.gd` picks up `test_body_fuzz.gd` — which is `if: github.event_name == 'schedule'` and
-runs 1.5M ticks. This session's own battery ran it every time, ~4 minutes each. Parse the YAML and take
-the `tests` job's steps; the file now parses, and D0217 made that a gate.
+1. **Declare the public surface per module** — a `PUBLIC` list in each `MODULE.md`, or a `## public`
+   marker on the `class_name` line — and check `class_name` edges against that. Most faithful to the
+   rule's intent; costs a decision per module about what is public.
+2. **Say the convention is "one public FILE per module" and rename** so `sim/world/world.gd` exists and
+   re-exports. Faithful to the letter; a lot of churn for a naming rule.
+3. **Amend §3** to say a module's public surface is its `class_name` globals, and drop the sibling rule
+   for `class_name` edges permanently. Cheapest, and honest about what the code already does.
+
+Until then the exemption is **printed on every run** (`14 class_name edge(s) cross a sim module boundary
+and are NOT checked for reach-in`) rather than described only here, so nobody reads the PASS as wider
+than it is.
+
+**One thing worth knowing before you weigh this.** `view/` currently has **zero outgoing `class_name`
+edges** — `score.gd`, `particles.gd`, `controls.gd`, `art.gd` and `light_layer.gd` reference no sim,
+interface or core type at all. "View is layer-clean" is therefore true in the strongest possible sense
+and *also* the case the fixed lint has never had to discriminate on real code; only the planted violation
+exercised it. The first view file that reads an `Observation` will be the real test.
+
+---
+
+## P009 · `light_layer.gd` was lifted, and it may contradict the ruling that lifted it
+
+**Status:** open · **Cost to apply:** one sentence · **Raised by:** this session, 2026-08-30 (D0227)
+
+P005 option 1 named `light_layer.gd` in the liftable set and it landed. But the same brief declined
+option 2 — the ~394 one-hop files — on the grounds that they are **banked value theming a UI that does
+not exist**. `light_layer.gd` is the same shape:
+
+- It is 25 lines of canvas + blend mode + a painter `Callable`. Its own header, and the migration map's
+  `[REASON CORRECTED]` row, both say lifting it gets **the canvas, not the lighting**.
+- The lighting math lives in the coordinator, which is **parked**.
+- This build draws in ONE flat `_draw` on one CanvasItem with **no blend modes anywhere**, and
+  `tests/body/material_look.gd` states outright that the shadow veil "is not in Slice 0".
+
+So it is banked against parked work, which is the criterion option 2 was declined by. **The two decisions
+ought to agree and only you can say which way.** Landed as instructed rather than quietly skipped; it is
+25 lines and `git rm` closes it if the answer is that option 2's reasoning applies here too.
+
+`art.gd` (26 lines) is a weaker case of the same thing — it points at an `assets/` directory this tree
+does not have — but it differs in a way that may matter to you: it is the **seam the art pass lands
+through**, and its empty state is a designed behaviour (`has_any()` false keeps every renderer on its
+code-drawn path) rather than a dependency on unbuilt code.
+
+---
+
+## P010 · The merge button is now load-bearing: rebase, never merge or squash
+
+**Status:** open as an OPERATING RULE, not a task · **Raised by:** this session, 2026-08-30 (D0231)
+
+Branch protection made `authorship` a required check, and the first PR failed it on a clean history:
+**2 distinct committer identities**, the second being `noreply@github.com`. That is GitHub's own
+synthetic `refs/pull/N/merge` commit, and the job now pins to the PR's real head, which fixes the PR
+case.
+
+**What is not fixed, and cannot be fixed in the gate:** a **merge commit** or a **squash commit** created
+through GitHub's UI is also committed as `noreply@github.com`. Either one puts that identity
+**permanently into `main`**, and `check_trailers.sh` reads `git log --all`, so authorship would fail on
+**every commit afterwards** — with no remedy short of a history rewrite, which this project has already
+paid for once.
+
+**So: merge by REBASE.** It replays the commits under the merging account's identity and keeps `main`
+linear, which is what `docs/BRANCHING.md` already describes. Recorded rather than "fixed" by relaxing the
+committer assertion, because relaxing it is precisely the change that would let a real vendor trailer
+through later.
+
+The ruling you may want to make instead: disable merge-commit and squash-merge in the repository
+settings, so the constraint is enforced by the button rather than by remembering.

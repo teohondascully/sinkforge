@@ -70,6 +70,15 @@ def module_of(rel_path: Path) -> str | None:
     return None
 
 
+def references_in(path: Path) -> list:
+    """Every `res://...gd` path referenced by one file. Part of this module's PUBLIC surface, not a
+    leftover: `tools/quality_check/coupling.py` imports it alongside `module_of` to build its sim/ edge
+    set. Inlining it into `scan_file` during the D0224 rewrite broke that import and reached CI, which is
+    the reachability-scoped-to-one-file mistake -- a function's callers are only as visible as the corpus
+    you actually grepped."""
+    return RES_PATH_RE.findall(path.read_text(encoding="utf-8", errors="replace"))
+
+
 def build_class_map(root: Path, files) -> dict:
     """`class_name` -> the policed file declaring it. Built from the policed tree only: a global
     declared under legacy/ or tests/ is not part of the layer graph this gate polices."""
@@ -107,7 +116,7 @@ def scan_file(root: Path, rel: Path, class_map: dict) -> tuple[list, int, int]:
     src_layer, src_module = layer_of(rel), module_of(rel)
     text = (root / rel).read_text(encoding="utf-8", errors="replace")
     violations, path_edges = [], 0
-    for ref in RES_PATH_RE.findall(text):
+    for ref in references_in(root / rel):
         path_edges += 1
         dst = Path(ref)
         for found in (_layer_violation(rel, src_layer, ref, dst),
