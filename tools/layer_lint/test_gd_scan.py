@@ -25,9 +25,10 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gate_test_support import Observations  # noqa: E402
 from gd_scan import gd_files_excluding, git_ignored  # noqa: E402
 
-RESULTS: list[tuple[str, bool]] = []
+LOG = Observations("test_gd_scan")
 BUILT: list[Path] = []  # every scratch tree, removed in main()'s finally -- this runs on every commit
 
 
@@ -46,35 +47,29 @@ def build_tree(gitignore: str | None, as_repo: bool = True) -> Path:
     return root
 
 
-def check(name: str, condition: bool, detail: str = "") -> None:
-    RESULTS.append((name, condition))
-    print(f"[{'OBSERVED' if condition else 'NOT OBSERVED -- BRANCH UNTESTED'}] {name}"
-          + (f" -- {detail}" if detail else ""))
-
-
 def run_checks() -> None:
     ignoring = build_tree("tools/scratch/*\n")
     found = {str(p) for p in gd_files_excluding(ignoring, set())}
-    check("a tracked file is still yielded", "sim/world/tile_grid.gd" in found, str(sorted(found)))
-    check("an ignored scratch file is NOT yielded", "tools/scratch/probe.gd" not in found,
-          str(sorted(found)))
+    LOG.observe("a tracked file is still yielded", "sim/world/tile_grid.gd" in found, str(sorted(found)))
+    LOG.observe("an ignored scratch file is NOT yielded", "tools/scratch/probe.gd" not in found,
+                str(sorted(found)))
 
     # The control that makes the line above mean something: same tree, same paths, no ignore rule.
     plain = build_tree(None)
     found_plain = {str(p) for p in gd_files_excluding(plain, set())}
-    check("CONTROL: without the ignore rule the SAME file comes back",
-          "tools/scratch/probe.gd" in found_plain, str(sorted(found_plain)))
+    LOG.observe("CONTROL: without the ignore rule the SAME file comes back",
+                "tools/scratch/probe.gd" in found_plain, str(sorted(found_plain)))
 
     # Fallback: outside a repository the filter must not drop anything.
     loose = build_tree("tools/scratch/*\n", as_repo=False)
     found_loose = {str(p) for p in gd_files_excluding(loose, set())}
-    check("outside a git repository nothing is dropped (today's behaviour preserved)",
-          "tools/scratch/probe.gd" in found_loose, str(sorted(found_loose)))
+    LOG.observe("outside a git repository nothing is dropped (today's behaviour preserved)",
+                "tools/scratch/probe.gd" in found_loose, str(sorted(found_loose)))
 
     # The exit-code classification, asserted directly rather than inferred from the cases above.
     empty = git_ignored(plain, [Path("sim/world/tile_grid.gd")])
-    check("check-ignore exiting 1 (nothing matched) yields an empty set, not a crash or a fallback",
-          empty == set(), f"got {empty!r}")
+    LOG.observe("check-ignore exiting 1 (nothing matched) yields an empty set, not a crash or a fallback",
+                empty == set(), f"got {empty!r}")
 
 
 def main() -> int:
@@ -83,12 +78,7 @@ def main() -> int:
     finally:
         for root in BUILT:
             shutil.rmtree(root, ignore_errors=True)
-    failed = [name for name, ok in RESULTS if not ok]
-    print(f"\ntest_gd_scan: {len(RESULTS) - len(failed)}/{len(RESULTS)} branches observed")
-    for name in failed:
-        print(f"  UNTESTED: {name}")
-    print("test_gd_scan: " + ("FAIL." if failed else "PASS."))
-    return 1 if failed else 0
+    return LOG.summarise()
 
 
 if __name__ == "__main__":

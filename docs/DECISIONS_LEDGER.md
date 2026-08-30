@@ -9303,3 +9303,49 @@ skipped.
 **What did NOT get connected, so nobody reads the lift as the feature.** `Settings.music_db()` is the
 real source for `view/audio/score.gd`'s injected `music_db`, which D0215 left as a plain `0.0`. Wiring
 them is a shell job and `shell/` has no boot yet, so **the value now exists and nothing calls for it.**
+
+## D0231 · The authorship gate cannot pass on a pull request, and branch protection made that everyone's problem · 2026-08-30
+**Decided:** the first PR opened after `main` became protected failed `authorship`, a REQUIRED check, on
+a repository whose history is clean:
+
+```
+PASS  every commit shares one author identity (1 distinct found)
+FAIL  every commit shares one committer identity (2 distinct found)
+  121736842+teohondascully@users.noreply.github.com
+  noreply@github.com
+```
+
+**Neither identity is wrong and one of them is not ours.** On a `pull_request` event `actions/checkout`
+checks out `refs/pull/N/merge` -- a synthetic merge commit GitHub authors and commits as
+`noreply@github.com`. `check_trailers.sh` reads `git log --all` deliberately (this repository has been
+worked in several worktrees at once, and a branch scanned only at HEAD hides what it carries), so that
+one borrowed commit lands in its population.
+
+**The gate is right; its population was wrong.** What it must read is the commits that will land, so the
+`authorship` job now pins `ref: ${{ github.event.pull_request.head.sha || github.sha }}`. Push builds are
+untouched by construction -- the fallback is exactly what they checked out before.
+
+**The part that outlives this PR, and it makes the merge BUTTON load-bearing.** The same synthetic
+committer appears in a **merge commit** and in a **squash commit** created through GitHub's UI. Either
+one puts `noreply@github.com` permanently into `main`'s history, and `--all` would then fail the
+authorship gate on **every commit afterwards**, with no way to remove it short of a history rewrite --
+which this project has already paid for once (`docs/CORRECTIONS.md`, the 2026-08-19 rewrite). **Merge by
+REBASE**, which replays the commits under the merging account's own identity and keeps `main` linear,
+matching `docs/BRANCHING.md`'s own description of the history.
+
+Recorded rather than fixed in the gate, because relaxing the committer assertion is exactly the change
+that would let a real vendor trailer through later. The constraint is now a documented operating rule
+with a reason attached.
+
+## D0232 · Three mutation-test files, two identical helpers — deduplicated, unlike D0221's cluster · 2026-08-30
+**Decided:** `duplication.py` flagged byte-identical `check()` helpers in `test_gd_scan.py` and
+`test_check_size_limits.py`, written minutes apart in the same session. **Unlike D0221's `_init`
+cluster, this one is real copy-paste with nothing arithmetic about it**, so the answer is
+deduplication rather than a named exclusion: `gate_test_support.Observations` now carries the branch log
+and the tally for all three gate mutation tests. `test_layer_lint.py` keeps its own `check`, whose
+signature runs the lint and compares exit codes, and shares only the reporting half.
+
+The class carries one assertion the three copies did not: **an empty run is a FAIL.** A file whose cases
+stopped being collected would otherwise print `0/0 branches observed` and exit 0 -- the same quiet green
+that made `layer_lint.py` worth fixing in the first place (D0224), reproduced inside the very files
+written to prove it fixed.

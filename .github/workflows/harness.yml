@@ -59,9 +59,18 @@ jobs:
       # commit find nothing and print the identical green line a clean history prints —
       # tools/check_trailers.sh refuses to report a verdict on a shallow clone rather
       # than pass on one, so removing this line turns the job red instead of a formality.
+      #
+      # `ref` PINS THIS JOB TO THE PULL REQUEST'S OWN HEAD (D0231). On a `pull_request` event the
+      # default checkout is the synthetic `refs/pull/N/merge` commit, which GitHub itself authors and
+      # commits as `noreply@github.com`. check_trailers.sh reads `git log --all` and asserts one
+      # committer identity across the repository, so that single borrowed commit failed the gate on
+      # every PR the moment main became protected — "2 distinct found", neither of them wrong, one of
+      # them not ours. The gate was right and its population was wrong: what it must read is the
+      # commits that will land. `github.sha` keeps push builds behaving exactly as before.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check commit authorship
         run: bash tools/check_trailers.sh

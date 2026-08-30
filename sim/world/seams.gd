@@ -49,18 +49,20 @@ const RUN_CAP: int = 3
 
 ## The seam through a cell, or NONE. Precedence is bedding, joint, diagonal: arbitrary but FIXED, so a
 ## cell where two planes cross has one answer the renderer and the swing agree on.
-static func at(cell: Vector2i, world_seed: int) -> int:
-	if _under(_plane(cell.y, world_seed ^ SALT_HORIZONTAL), RATE_HORIZONTAL):
+static func at(terrain_cell: Vector2i, world_seed: int) -> int:
+	if _under(_plane(terrain_cell.y, world_seed ^ SALT_HORIZONTAL), RATE_HORIZONTAL):
 		return HORIZONTAL
-	if _under(_plane(cell.x, world_seed ^ SALT_VERTICAL), RATE_VERTICAL):
+	if _under(_plane(terrain_cell.x, world_seed ^ SALT_VERTICAL), RATE_VERTICAL):
 		return VERTICAL
-	if _under(_plane(cell.x + cell.y, world_seed ^ SALT_DIAGONAL), RATE_DIAGONAL):
+	if _under(_plane(terrain_cell.x + terrain_cell.y, world_seed ^ SALT_DIAGONAL), RATE_DIAGONAL):
 		return DIAGONAL
 	return NONE
 
 
-## The step along a seam: the direction its run travels. NONE has no axis.
-static func axis(seam: int) -> Vector2i:
+## The step along a seam, in TERRAIN cells: the direction its run travels. NONE has no axis. The
+## `terrain_` prefix is the D0027 rule -- a bare `axis()` returning Vector2i cannot say which of the two
+## grids it speaks, and seams are on the 4px terrain grid, not the 16px logic one.
+static func terrain_axis(seam: int) -> Vector2i:
 	match seam:
 		HORIZONTAL:
 			return Vector2i(1, 0)
@@ -75,20 +77,20 @@ static func axis(seam: int) -> Vector2i:
 ## Does a blow travelling `dir` cut ALONG this seam? Compared as an undirected line: requiring a sign
 ## would leave half of every seam dead. `dir` is the swing direction, body toward cell, need not be
 ## normalised or axis-aligned, and is quantised to the nearest of the three planes here.
-static func aligned(seam: int, dir: Vector2i) -> bool:
-	if seam == NONE or dir == Vector2i.ZERO:
+static func aligned(seam: int, terrain_dir: Vector2i) -> bool:
+	if seam == NONE or terrain_dir == Vector2i.ZERO:
 		return false
-	var seam_axis: Vector2i = axis(seam)
+	var seam_axis: Vector2i = terrain_axis(seam)
 	# Dominant-axis quantisation. Exact for integers, and no trigonometry in the dig path.
-	var along: int = absi(dir.x * seam_axis.x + dir.y * seam_axis.y)
-	var across: int = absi(dir.x * seam_axis.y - dir.y * seam_axis.x)
+	var along: int = absi(terrain_dir.x * seam_axis.x + terrain_dir.y * seam_axis.y)
+	var across: int = absi(terrain_dir.x * seam_axis.y - terrain_dir.y * seam_axis.x)
 	return along >= across
 
 
 ## A stable scramble of one cell, for anything needing the same seam to look different in different
 ## places: the plane decides where the grain runs, this decides how it looks along its length.
-static func grain(cell: Vector2i) -> int:
-	var h: int = (cell.x * 668265263) ^ (cell.y * 374761393)
+static func grain(terrain_cell: Vector2i) -> int:
+	var h: int = (terrain_cell.x * 668265263) ^ (terrain_cell.y * 374761393)
 	h = (h ^ (h >> 15)) * 1274126177
 	return (h ^ (h >> 16)) & 0x7fffffff
 

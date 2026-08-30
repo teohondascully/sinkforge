@@ -21,8 +21,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_size_limits import MODULE_DOC_LIMIT, module_doc_violations  # noqa: E402
+from gate_test_support import Observations  # noqa: E402
 
-RESULTS: list[tuple[str, bool]] = []
+LOG = Observations("test_check_size_limits")
 
 
 def scratch_with(line_count: int, ignored: bool = False) -> tuple[list, int, Path]:
@@ -36,12 +37,6 @@ def scratch_with(line_count: int, ignored: bool = False) -> tuple[list, int, Pat
     return violations, count, root
 
 
-def check(name: str, condition: bool, detail: str = "") -> None:
-    RESULTS.append((name, condition))
-    print(f"[{'OBSERVED' if condition else 'NOT OBSERVED -- BRANCH UNTESTED'}] {name}"
-          + (f" -- {detail}" if detail else ""))
-
-
 def run_checks(trees: list) -> None:
     limit = MODULE_DOC_LIMIT
     for count, want_fail, label in ((limit - 1, False, "one under the limit passes"),
@@ -49,17 +44,17 @@ def run_checks(trees: list) -> None:
                                     (limit + 1, True, "one over the limit FAILS")):
         violations, checked, root = scratch_with(count)
         trees.append(root)
-        check(f"{label} ({count} lines)",
-              bool(violations) == want_fail and checked == 1,
-              f"{checked} checked, {len(violations)} violation(s)")
+        LOG.observe(f"{label} ({count} lines)",
+                    bool(violations) == want_fail and checked == 1,
+                    f"{checked} checked, {len(violations)} violation(s)")
 
     # The population control: this gate shares `files_named`'s gitignore filter (D0225), so a MODULE.md
     # git ignores must not be counted. Without this, the cap would police a developer's scratch tree and
     # not CI -- the exact two-population defect P003 was raised for.
     violations, checked, root = scratch_with(limit + 50, ignored=True)
     trees.append(root)
-    check("an IGNORED MODULE.md is not checked, however long it is",
-          checked == 0 and not violations, f"{checked} checked, {len(violations)} violation(s)")
+    LOG.observe("an IGNORED MODULE.md is not checked, however long it is",
+                checked == 0 and not violations, f"{checked} checked, {len(violations)} violation(s)")
 
 
 def main() -> int:
@@ -69,12 +64,7 @@ def main() -> int:
     finally:
         for root in trees:
             shutil.rmtree(root, ignore_errors=True)
-    failed = [name for name, ok in RESULTS if not ok]
-    print(f"\ntest_check_size_limits: {len(RESULTS) - len(failed)}/{len(RESULTS)} branches observed")
-    for name in failed:
-        print(f"  UNTESTED: {name}")
-    print("test_check_size_limits: " + ("FAIL." if failed else "PASS."))
-    return 1 if failed else 0
+    return LOG.summarise()
 
 
 if __name__ == "__main__":

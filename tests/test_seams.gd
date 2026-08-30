@@ -105,7 +105,7 @@ func _test_a_seam_is_a_pure_function_of_cell_and_seed() -> void:
 
 
 func _test_axis_and_alignment_read_a_seam_as_an_undirected_line() -> void:
-	_check(Seams.axis(Seams.NONE) == Vector2i.ZERO, "NONE has no axis")
+	_check(Seams.terrain_axis(Seams.NONE) == Vector2i.ZERO, "NONE has no axis")
 	_check(not Seams.aligned(Seams.NONE, Vector2i(1, 0)), "nothing aligns with NONE")
 	_check(not Seams.aligned(Seams.HORIZONTAL, Vector2i.ZERO), "a still body's blow aligns with nothing")
 	# Undirected: both signs of the same line must align, or half of every seam is dead.
