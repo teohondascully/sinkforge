@@ -30,21 +30,36 @@ NOT be pulled forward.
    clamp). **Escalated separately (D0193): the invariant itself cannot tell a wall-press from an
    escape** — it fired at −0.3125px, D0055 built it for −15.85px, and this world is 192px wide, so wall
    contact is ordinary play. Not fixed unilaterally; the discriminator is written up for the director.
-2. **Cursor-aim + reach radius + hold-to-charge** against the current TileGrid, collision resolver
-   UNTOUCHED. Legacy `REACH_CELLS = 3.2` is the reference. Charge banked per cell.
-3. **Downward is possible by construction** — aim is a cursor against a radius, not a facing. Document
-   the D0110 supersession in the ledger.
-4. **Lift legacy `controls.gd`** for the posable-pointer API (`pose_pointer`/`release_pointer`/
-   `pointer_posed`) — MANDATORY, it is what keeps agent/fuzz runs deterministic under cursor-aim. A
-   contaminated aim reading is VOID, not FAIL. Lift the deafness switch too.
-5. **`Command.Mine(target_cell)`** as a direct call, NOTED IN CODE as a seam to formalise into
-   `observe()`/`apply()` at Slice 2. Do not build `interface/` now.
-6. **Extract the charge loop** from legacy `main.gd` (3003 lines, REBUILD) — do not lift the file.
-7. **Port the hollow/breach tell** from legacy `sfx.gd` as view feedback. Minimal for Slice 1.
+2. ~~Cursor-aim + reach + hold-to-charge~~ **DONE** (D0195) — `sim/mining/`, integer-only. Reach is 3.2
+   METRES (legacy's 3.2 of a 32px cell; both are one metre), Euclidean, compared squared. Collision
+   resolver untouched, confirmed by diff.
+3. ~~Downward by construction~~ **DONE** — D0110's deferral superseded and documented (D0195).
+4. ~~Lift `controls.gd`~~ **DONE** (D0194) — `view/controls.gd`, posable pointer + deafness switch +
+   4 actions. The other 22 (craft/research/bazaar/tech) are the dead economy and were NOT lifted.
+5. ~~`Command.Mine(target_cell)` seam~~ **DONE** — `Mining.mine()` is the payload shape, marked in code.
+   `interface/` not built.
+6. ~~Extract the charge loop~~ **DONE** — re-derived, not lifted; legacy's is float + `delta` + a
+   `time_scale`-sensitive accumulator.
+7. ~~Hollow/breach tell~~ **DONE** (D0196) — `sim/mining/hollow_tell.gd`, reads LOGIC TILES (at 4px cells
+   the probe box would be 1056 samples, not 20). **No audio** — Slice 1 has no sound layer; the tell is
+   surfaced visually in `tests/body/mining_overlay.gd`.
 
 **Acceptance:** a human mines downward in `--play` and descends into what they mined, no bounds error,
 correct dig semantics, proven with a recorded session. Do NOT populate `claims/C004` — the director rules
 on which sessions qualify.
+
+**ACCEPTANCE STATUS — half met, and the missing half is not mine to run.** The verb is proven
+mechanically: `--mine-down` agent mode sinks a shaft and the body DESCENDS 24 cells (6.0 m), 85 cells
+broken, **0 bounds violations**, verified by replaying the recording rather than by trusting the run's own
+exit condition. That is an AGENT trace and is labelled as one. **A human `--play` session cannot be
+produced from this session — there is no keyboard or mouse here.** The director's own run is the missing
+evidence; the command is in the report. Two things to watch for in it that the agent cannot test: whether
+the reach radius *feels* right at 3.2 m, and whether the crack bank reads as progress at a 4px cell.
+
+**Open risk, named because no gate covers it (D0195):** single-cell mining can produce the straddle-able
+geometry D0113/D0125 exist to prevent and D0122/D0123 found as a fuzzer `discontinuity`. The fuzzer drives
+`InputFrame` and never sets `mine_held`, so **gate 26 is green about this verb only because it never
+exercises it.** Wiring the fuzzer to cursor-aim is its own unit of work and was not done here.
 
 **HARD STOPS — report and hold:** the bounds error tracing into `resolve_floor`/`grid_floor_backstop`;
 any change to the collision resolver; the determinism gate going red; `interface/` ballooning; the

@@ -7776,3 +7776,146 @@ and it gets the escalation treatment by analogy rather than a unilateral fix ins
 
 **Reverse:** N/A — nothing was changed. The cost of waiting is log noise when a player walks into the outer
 wall on purpose, which is now the only way to reach it.
+
+## D0194 · Legacy `controls.gd` lifted for two mechanisms, not for its twenty-six actions · 2026-08-29
+**Decided:** `view/controls.gd` carries legacy's DEAFNESS SWITCH and POSABLE POINTER verbatim, plus a
+four-action InputMap. The other twenty-two actions -- craft, research, bazaar, tech, dashboard, drop,
+link -- are not lifted.
+
+**Why those two and not the file.** Both are load-bearing for measurement and both are things that are
+silently wrong when got wrong. The deafness switch exists because disabling a node's `_input` does not stop
+`Input.is_action_pressed`: polling is a separate mechanism, so a hand resting on a key still mines through
+anything that only cleared the callbacks. The posable pointer exists because cursor-aim makes AIM a
+state-affecting input, and a harness that had to move the OS cursor would be fighting the physical pointer
+and reading back whatever it did. `pointer_posed()` is the other half: a measurement can assert no pose is
+set, so a reading taken with a pose left on is VOID rather than passing as a hardware reading.
+
+**Why the rest is not lifted.** That vocabulary is the terminal economy, which stays dead by the director's
+ruling -- "not as code, not as a craft_cost data field". Four actions exist here because four verbs do.
+
+**Two details carried deliberately, both of which are traps.** `_posed` is a real `bool`, not a `Vector2`
+compared against `null`: in GDScript a Vector2, like Array, Dictionary and Callable, compares `!= null` as
+TRUE, so the guard written that way can never be false. And `pointer_world` goes through the VIEWPORT's
+canvas transform, not the node's -- through the node, the unposed branch returns layer coordinates while
+the posed branch returns world coordinates, so one accessor would silently mean two spaces.
+
+**One binding changed from legacy.** MINE is mouse and trigger only, NOT `KEY_E`: E is still `body.gd`'s
+horizontal column dig through Slice 1, and one key driving two mining verbs would make every recording
+ambiguous about which one fired.
+
+**Placed in `view/`,** which is also where gate 7 counts it as game rather than instrument. It touches no
+`sim` type, so `view/README.md`'s "never call a sim mutator" holds by construction.
+
+**Reverse:** CHEAP — one new file, no existing caller changed except the reveal scene's own input read.
+
+## D0195 · Cursor-aim mining: re-derived into integers, not lifted · 2026-08-29 · supersedes D0110's deferral
+**Decided:** `sim/mining/mining.gd` — reach, hold-to-charge, the per-cell crack bank and rhythm, all in
+integer arithmetic on the fixed 60Hz tick. `mine(grid, body_x, body_y, target, held)` is the seam: it is
+`Command.Mine(target_cell)` in everything but its type, and is deliberately dependency-light so that
+formalising it at Slice 2 is a wrapper rather than a refactor. `interface/` was NOT built.
+
+**D0110 is superseded, and precisely.** D0110 deferred "which key means down, does it compete with
+mantle_hold's up-key" and scoped digging to horizontal-only *as a consequence*. Cursor-aim answers the
+question by dissolving it: aim is a point against a radius, so "down" is a cell below the body and no key
+has to mean it. `body.gd::_handle_dig`'s horizontal column dig is NOT removed — the reveal metric and every
+committed recording run on it — so both verbs exist through Slice 1.
+
+**Why re-derived rather than lifted.** Legacy's loop is `_mine_charge += delta * speed * (1 + rhythm * 0.6)`
+— a float accumulator whose increment depends on a second float accumulator, scaled by a `delta` that
+legacy's own `Engine.time_scale` ladder changes. None of that can enter a deterministic sim. Every
+accumulator here is an integer, and `tests/test_mining.gd` proves two runs of the same 300-tick input
+produce identical mining AND grid state.
+
+**Three numbers that had to be derived rather than copied:**
+
+1. **Reach.** Legacy's `REACH_CELLS = 3.2` at its 32px cell is 102.4px — but legacy's 32px cell and this
+   world's 16px logic tile are *both one metre*, so the portable quantity is 3.2 METRES, not 102.4 pixels.
+   That is 51.2px here. Held as the rational 16/5 so the comparison stays exact integers, and compared
+   SQUARED so no `sqrt` — a square root would be the only float on the path.
+2. **Hardness → ticks.** The two codebases do not share a hardness scale: legacy's numbers ARE seconds
+   (earth 0.28, stone 0.85), this project's are unitless (clay 1.0, hardrock 3.0), and **no single factor
+   maps one onto the other** — the shapes genuinely differ at the deep end. `TICKS_PER_HARDNESS = 17` is
+   derived from the shallow end, where a player starts: clay breaks in 0.283s against legacy earth's 0.28s,
+   and hardrock in 0.850s against legacy stone's 0.850s — the second exact, and not fitted to. The deep end
+   lands faster than legacy (deepstone 1.42s against deepslate 2.80s) because this project's scale
+   compresses there. **That is a tuning question for the director, not a porting error**, and the test
+   prints the whole table in seconds so it is visible rather than buried.
+3. **Rhythm scale 1200, not 1024.** 1200 is the smallest scale on which legacy's 0.55/s decay is an exact
+   integer per tick (11), so the mechanic needs no rounding and accumulates no drift. The 0.34 gain lands
+   exact too (408). Measured result: consecutive deepstone breaks take 85, 71, 62 ticks.
+
+**Found in the extraction and NOT ported, because it is a legacy bug:** `_note_breach` sets
+`_shake = maxf(_shake, 1.4 * hollow)`, but `try_mine` has already set `_shake` to 2.0 or 2.6 on every
+successful break, and `1.4 * hollow <= 1.4 < 2.0`. Legacy's breach camera settle has never once fired.
+
+**Deliberately deferred, and it is a real behaviour change:** legacy gates mining on
+`_line_of_sight_clear`, a float DDA. Without it a player can mine a cell through one tile of rock. Its
+integer re-derivation needs its own tests and its own fixtures; ordinary for the genre, but stated rather
+than quietly dropped.
+
+**A risk that is real and is NOT covered by any gate yet.** Single-cell mining can produce geometry the
+column dig deliberately avoids — D0113/D0125 exist because a partially-dug column leaves a gap a
+several-cell-tall body can straddle, and D0122/D0123 found exactly that as a fuzzer `discontinuity`. The
+fuzzer drives `InputFrame` and does not set `mine_held`, so **gate 26 is green about this verb only because
+it never exercises it.** Wiring the fuzzer to cursor-aim is its own unit of work and was not done here.
+
+**Recording format V2.** Aim is state-affecting input, so a recording that cannot restate it cannot be
+replayed. `reveal_replay_driver.gd` now knows two dialects, both validated BY NAME rather than by field
+count — the by-name rule is what keeps D0140's arity trap closed as the format grows. All six existing V1
+recordings still replay, unchanged, against no aim and no mining.
+
+**Reverse:** MODERATE — a new sim module, a new `InputFrame` field set, and a recording dialect. The
+dialect is the sticky part: V2 logs cannot be read by an older checkout.
+
+## D0196 · The hollow tell reads LOGIC TILES, and out-of-bounds reads SOLID — the opposite of legacy · 2026-08-29
+**Decided:** `sim/mining/hollow_tell.gd` probes at the 16px logic tile, never at the 4px terrain cell, and
+treats an out-of-bounds probe as SOLID.
+
+**Granularity.** Legacy probes 4 cells deep by 5 wide — 20 samples — at its 32px cell. Probing the same
+PHYSICAL box at this world's 4px terrain cell would be 32×33 = **1056 samples per blow**. That is not a
+rescale, it is a rewrite. Reading at the logic tile (one metre, the same physical unit legacy's cell was)
+restores the sample count to exactly 20 and the reach to the same 4 metres.
+
+**Out-of-bounds, and this is a deliberate divergence.** Legacy counts an out-of-bounds probe as HOLLOW,
+which on its 128-cell-wide world put a false-void rim on ~3% of the map. These reveal sites are 48 terrain
+cells wide — **12 logic tiles** — against a probe that reaches 4 and spreads 2. Carrying legacy's
+convention would make a third of the world's width read as permanent cavity, so the tell would be loudest
+exactly where there is nothing to find. The world's edge is the edge of the world, not a hole in it.
+Asserted in `tests/test_mining.gd` so it cannot be quietly reverted.
+
+**The normalisation is derived, not written down.** Legacy accumulates `total` inside its probe loop, which
+makes it a compile-time constant it never names: `(REACH+1)(SPREAD+1)/2`, i.e. 7.5. Here the integer
+weights are scaled by `REACH * (SPREAD+1)` = 12, giving `TOTAL_WEIGHT = 90`, and 90/12 = 7.5 exactly. A
+test pins that identity, so changing REACH or SPREAD recomputes it instead of needing a hand re-tune.
+
+**Carried as-is with its own comment corrected:** legacy's `side = Vector2i(dir.y, dir.x)` is the
+coordinate SWAP, not the perpendicular its comment claims. Harmless, because the lateral offset runs
+symmetrically about zero — but the comment was wrong and is not reproduced.
+
+**Measured behaviour:** solid rock reads 0 in all four directions; a void one tile behind reads 1000; away
+from the void reads 0 against 1000 into it; approaching a void gives 0, 160, 480, 960, 1000 with no false
+peak. Legacy's own `check_tells.gd` contract (floor 0.30 at lead 3, ceiling 0.02 in rock) is reproduced in
+per-mille rather than restated loosely.
+
+**Reverse:** CHEAP — a pure query with no state; nothing depends on its exact value but presentation.
+
+## D0197 · Milestone capture re-derived as a shell driver over the scene that already has a shutter · 2026-08-29
+**Decided:** `tools/capture_moments.sh` drives `reveal_scene.gd`'s existing `--screenshot-tick`/
+`--screenshot-out` path at a fixed resolution, a fixed camera (new `--camera=col,row`) and a fixed seed.
+Legacy's `tools/capture_moments.gd` is 1,977 lines wired into the dead economy; only its APPROACH is
+re-derived, as the migration map itself recommends.
+
+**Why a shell script and not a Godot tool.** The scene already owns the seeded world, the shutter, and
+D0190's blank-frame check. A second Godot-side capture tool would be a second copy of all of it, free to
+drift from the one that actually renders.
+
+**A real error this made, worth recording because it was silent.** The first version derived its zoom from
+the OUTPUT resolution (1920). The project renders 2D at **1280×720** and scales up, so a camera at `zoom`
+shows `1280/zoom` world pixels regardless of PNG size. Every moment was framed 1.5× tighter than intended,
+and the `delve` shot had the shaft and the body both entirely outside the frame — **while still reporting
+159 distinct colours**, because a wall of textured clay is not a blank frame. D0190's blankness guard is
+real and it cannot catch this: "not blank" and "shows its subject" are different claims. Found by LOOKING
+at the image, then printing the camera and body position; not by re-reading the arithmetic. The scene now
+prints camera, zoom and body cell alongside every capture, so a badly-aimed camera is legible in the log.
+
+**Reverse:** CHEAP — a tool and one scene argument.

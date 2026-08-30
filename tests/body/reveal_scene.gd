@@ -33,6 +33,12 @@ const COLOR_BG: Color = Color(0.16, 0.16, 0.18)
 const COLOR_BODY: Color = Color(0.85, 0.25, 0.25)
 const COLOR_BODY_GROUNDED: Color = Color(0.95, 0.75, 0.15)
 const BAND_TINT: float = 0.10  ## how far the background leans toward the current band's own colour
+## `--mine-down` (D0195). The scan window only has to cover the reach itself -- 51.2px is 12.8 terrain
+## cells -- so 16 rows is the reach plus margin, not an arbitrary depth.
+const MINE_DOWN_SCAN_ROWS: int = 16
+## How far the scripted shaft sinks before the run is done, in terrain cells. 24 cells is 96px, six logic
+## tiles, six metres: deep enough that descending is unambiguous rather than a single ledge step.
+const MINE_DOWN_TARGET_ROWS: int = 24
 
 var _grid: TileGrid
 var _body: Body
@@ -51,10 +57,49 @@ var _wide_view: bool = false
 var _site_id: StringName = &""
 var _seed_value: int = 0
 var _look: MaterialLook = MaterialLook.new()  ## D0189: the lifted palette (Slice 0)
+var _mining: Mining = Mining.new()  ## D0195: the cursor-aim mining verb (Slice 1)
+var _mine_down: bool = false  ## `--mine-down`: agent mode sinks a shaft instead of walking to glimmer
+var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the reticle from
+var _spawn_row: int = 0  ## the row the body started on -- `--mine-down`'s descent is measured against it
+var _fixed_camera: Vector2 = Vector2.ZERO  ## `--camera=col,row`, for comparable milestone frames
+var _has_fixed_camera: bool = false  ## a real bool, not a Vector2 compared against null (D0194's note)
 
 
 func _ready() -> void:
 	_play_mode = "--play" in OS.get_cmdline_user_args()
+	var site: Dictionary = _parse_args()
+	var site_id: StringName = site["site_id"]
+	var seed_value: int = site["seed"]
+	_site_id = site_id
+	_seed_value = seed_value
+	Controls.register()  ## D0194: idempotent; MINE has to exist in InputMap before the first poll
+	var session: Dictionary = RevealSessionSetup.build(site_id, seed_value)
+	_grid = session["grid"]
+	_body = session["body"]
+	_target_glimmer_col = session["target_glimmer_col"]
+	_spawn_row = Body._px_to_cell(_body.pos_y)
+	_camera = Camera2D.new()
+	add_child(_camera)
+	_camera.make_current()
+	_camera.zoom = Vector2(_camera_zoom, _camera_zoom)  ## play_scene.gd never set this either (an open
+	## legibility gap, docs/WORKING.md's "camera zoom so the chamber fills more of the frame" item) --
+	## default 6x makes CELL's 4px cells ~24 screen-px, close enough to read a glimmer pocket's shape
+	## without the window mostly showing background. Overridable (`--zoom=`) since a density-contrast
+	## shot needs the opposite trade-off -- see `--wide-view` below.
+	if _wide_view:
+		# Centered on the DRAWN band's own midpoint (WIDE_VIEW_ROW_CAP), not the full grid height -- the
+		# full grid runs to max_depth_m's ~1024 rows, and _draw() only ever paints the first
+		# WIDE_VIEW_ROW_CAP of them in this mode. Centering on the true grid height pointed the camera at
+		# an empty, undrawn region far below the topsoil band, producing a blank screenshot -- found by
+		# actually looking at the captured image, not assumed correct from the math alone.
+		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
+		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
+	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
+
+
+## Every `--flag` this scene takes. Split out of `_ready()` when the two together crossed QUALITY gate 4's
+## 50-line function limit; the flags kept growing and the setup did not.
+func _parse_args() -> Dictionary:
 	var site_id: StringName = &"reveal_test_dense"
 	var seed_value: int = 20260826
 	for arg: String in OS.get_cmdline_user_args():
@@ -68,34 +113,22 @@ func _ready() -> void:
 			seed_value = int(arg.trim_prefix("--seed="))
 		elif arg.begins_with("--zoom="):
 			_camera_zoom = float(arg.trim_prefix("--zoom="))
+		elif arg.begins_with("--camera="):
+			# `--camera=col,row` pins the camera to a stated terrain cell and leaves it there. Milestone
+			# captures need a FIXED frame across commits -- a body-following camera makes two shots of the
+			# same world incomparable, which defeats the whole point of a before/after pair.
+			var parts: PackedStringArray = arg.trim_prefix("--camera=").split(",")
+			_fixed_camera = Vector2(float(parts[0]) * CELL, float(parts[1]) * CELL)
+			_has_fixed_camera = parts.size() == 2
+		elif arg == "--mine-down":
+			_mine_down = true  ## D0195: agent mode aims straight down and holds, so the mining verb has a
+			## deterministic, headless, reproducible proof that needs no human at the keyboard
 		elif arg == "--wide-view":
 			_wide_view = true  ## D0121: camera centers on the whole generated area (grid midpoint), not
 			## the body -- the body-following camera at zoom 6.0 shows ~28% of the topsoil band's own
 			## vertical extent in one frame, which is why the first density-contrast screenshots (D0109's
 			## round) read as nearly identical regardless of the real underlying count difference.
-	_site_id = site_id
-	_seed_value = seed_value
-	var session: Dictionary = RevealSessionSetup.build(site_id, seed_value)
-	_grid = session["grid"]
-	_body = session["body"]
-	_target_glimmer_col = session["target_glimmer_col"]
-	_camera = Camera2D.new()
-	add_child(_camera)
-	_camera.make_current()
-	_camera.zoom = Vector2(_camera_zoom, _camera_zoom)  ## play_scene.gd never set this either (an open
-	## legibility gap, docs/WORKING.md's "camera zoom so the chamber fills more of the frame" item) --
-	## default 6x makes CELL's 4px cells ~24 screen-px, close enough to read a glimmer pocket's shape
-	## without the window mostly showing background. Overridable (`--zoom=`) since a density-contrast
-	## shot needs the opposite trade-off -- see `--wide-view` above.
-	if _wide_view:
-		# Centered on the DRAWN band's own midpoint (WIDE_VIEW_ROW_CAP), not the full grid height -- the
-		# full grid runs to max_depth_m's ~1024 rows, and _draw() only ever paints the first
-		# WIDE_VIEW_ROW_CAP of them in this mode. Centering on the true grid height pointed the camera at
-		# an empty, undrawn region far below the topsoil band, producing a blank screenshot -- found by
-		# actually looking at the captured image, not assumed correct from the math alone.
-		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
-		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
-	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
+	return {"site_id": site_id, "seed": seed_value}
 
 
 func _physics_process(_delta: float) -> void:
@@ -103,6 +136,13 @@ func _physics_process(_delta: float) -> void:
 		return
 	var input: InputFrame = _read_play_input() if _play_mode else _scripted_approach_input()
 	_body.tick(input, _grid)
+	# Mining runs AFTER the body moves, so the reach test uses this tick's own position rather than the
+	# previous one's -- the same reason `_handle_jump` sits after the vertical resolve in `body.gd`. The
+	# replay driver runs the two in this same order; if they ever diverge, a replay stops matching its
+	# own live session and `test_reveal_replay_driver.gd` says so.
+	_mining.mine(_grid, _body.pos_x, _body.pos_y, Vector2i(input.aim_col, input.aim_row),
+		input.mine_held and input.has_aim)
+	_last_input = input
 	_record_tick(input)
 	_tick_count += 1
 	_update_camera()
@@ -120,35 +160,27 @@ func _physics_process(_delta: float) -> void:
 		var img: Image = get_viewport().get_texture().get_image()
 		img.save_png(_screenshot_path)
 		print("reveal_scene: screenshot saved to %s at tick %d" % [_screenshot_path, _tick_count])
-		_warn_if_blank(img)
+		# What was actually in frame. A capture tool that reports only "saved" cannot tell a badly-aimed
+		# camera from a correct one, which is the same class of blindness D0190 found in this very block.
+		print("reveal_scene: camera=%s zoom=%.1f body_cell=(%d,%d) body_px=(%.1f,%.1f)" %
+			[_camera.position, _camera_zoom, Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y),
+			float(_body.pos_x) / float(Fx.SCALE), float(_body.pos_y) / float(Fx.SCALE)])
+		DebugSceneCommon.warn_if_blank(img, _screenshot_path)
 		_flush_recording()
 		get_tree().quit(0)
 		return
 
-	if not _play_mode and (_tick_count >= MAX_TICKS or (_target_glimmer_col < 0)):
+	if not _play_mode and (_tick_count >= MAX_TICKS or _agent_run_is_done()):
 		_finish_and_quit()
 
 
-## Counts DISTINCT colours in a coarse sample of the captured image and pushes an error if the frame is
-## effectively uniform. Distinct-count, not a mean: a mean brightness reads a nearly-black frame with one
-## bright corner as "dark but fine", while the failure this guards (nothing drawn yet) is specifically
-## that every pixel is the SAME. Threshold is 4 rather than 1 so an almost-empty frame -- background plus
-## a couple of stray cells -- still trips it. Reported via push_error so `tools/run_gd_test.sh` and a
-## human both see it; it deliberately does not fail the run, because a legitimately blank capture (a
-## camera pointed off-world) is a real thing to want to look at.
-func _warn_if_blank(img: Image) -> void:
-	var seen: Dictionary = {}
-	var step: int = maxi(1, img.get_width() / 64)
-	for x: int in range(0, img.get_width(), step):
-		for y: int in range(0, img.get_height(), step):
-			seen[img.get_pixel(x, y).to_rgba32()] = true
-	if seen.size() < 4:
-		push_error(("reveal_scene: the captured frame has only %d distinct colour(s) -- it is blank or " +
-			"near-blank. The screenshot was still written to %s, but do not read it as a picture of the " +
-			"world. Likeliest cause: the capture tick is too early for the renderer, or the camera is " +
-			"pointed off-world (docs/DECISIONS_LEDGER.md D0121, D0189).") % [seen.size(), _screenshot_path])
-	else:
-		print("reveal_scene: capture has %d distinct colours in a %d-px sample grid" % [seen.size(), step])
+## Agent mode's own stopping condition. `--mine-down` runs until the body has actually DESCENDED the target
+## depth -- measured against the spawn row, not against how many cells were broken, because breaking rock
+## the body then fails to fall into is exactly the outcome this run exists to rule out.
+func _agent_run_is_done() -> bool:
+	if not _mine_down:
+		return _target_glimmer_col < 0
+	return Body._px_to_cell(_body.pos_y) - _spawn_row >= MINE_DOWN_TARGET_ROWS
 
 
 func _read_play_input() -> InputFrame:
@@ -164,7 +196,22 @@ func _read_play_input() -> InputFrame:
 	input.jump_pressed = jump_held and not _was_jump_held
 	_was_jump_held = jump_held
 	input.dig_pressed = _dig_edge(Input.is_physical_key_pressed(KEY_E))
+	# Cursor-aim mining (Slice 1). `Controls.pressed`/`Controls.pointer_world` rather than `Input.*`
+	# directly: both go through the deafness switch, and the pointer goes through the posable accessor, so
+	# a harness can aim this scene without touching the OS cursor and a measurement can assert it didn't.
+	input.mine_held = Controls.pressed(Controls.MINE)
+	_set_aim(input, Controls.pointer_world(self))
 	return input
+
+
+## Resolves a world point to the terrain cell the player is aiming at. `has_aim` is false off the edge of
+## the world rather than clamping to the nearest valid cell -- clamping would silently mine the rim
+## whenever the cursor left the window.
+func _set_aim(input: InputFrame, world: Vector2) -> void:
+	var cell: Vector2i = Vector2i(floori(world.x / float(CELL)), floori(world.y / float(CELL)))
+	input.aim_col = cell.x
+	input.aim_row = cell.y
+	input.has_aim = _grid.in_bounds(cell)
 
 
 ## The dig half of the same edge latch the two jump lines above implement (D0188, Defect B). Until this
@@ -192,6 +239,8 @@ func _dig_edge(dig_held: bool) -> bool:
 ## target column because it exists only to prove the scene renders and the dig-into-reveal path works,
 ## not to produce a trustworthy pull measurement.
 func _scripted_approach_input() -> InputFrame:
+	if _mine_down:
+		return _mine_down_input()
 	var input: InputFrame = InputFrame.new()
 	if _target_glimmer_col < 0:
 		return input
@@ -204,12 +253,53 @@ func _scripted_approach_input() -> InputFrame:
 	return input
 
 
+## `--mine-down` agent mode: sink a shaft straight down through the body's own footprint. This exists to
+## give the Slice 1 mining verb a deterministic, headless proof -- an agent trace is NOT a human `--play`
+## session and the two are different evidence (`tests/body/recordings/README.md`), but it is mechanically
+## reproducible, which a human session is not.
+##
+## It aims at the SHALLOWEST solid cell under the body's own width, not at one column: the body is 16px
+## wide, four terrain cells, so a one-cell-wide hole is something it can never descend into. Clearing the
+## shallowest cell across the footprint first means the shaft comes down layer by layer and the body falls
+## into each one as it opens -- which is precisely the acceptance question, "can the body descend into what
+## it mined", answered by construction rather than by hoping.
+func _mine_down_input() -> InputFrame:
+	var input: InputFrame = InputFrame.new()
+	var left_col: int = Body._px_to_cell(_body._left_x())
+	var right_col: int = Body._px_to_cell(_body._right_x() - 1)
+	var feet_row: int = Body._px_to_cell(_body._bottom_y() - 1)
+	var best_row: int = 1 << 30
+	var best_col: int = -1
+	for col: int in range(left_col, right_col + 1):
+		for row: int in range(feet_row, feet_row + MINE_DOWN_SCAN_ROWS):
+			var cell: Vector2i = Vector2i(col, row)
+			if not _grid.in_bounds(cell):
+				break
+			if not _grid.is_solid(cell):
+				continue
+			if _grid.is_solid(cell) and Mining.in_reach(_body.pos_x, _body.pos_y, cell) and row < best_row:
+				best_row = row
+				best_col = col
+			break  # only the shallowest solid cell in this column is a candidate
+	if best_col < 0:
+		return input
+	input.has_aim = true
+	input.aim_col = best_col
+	input.aim_row = best_row
+	input.mine_held = true
+	return input
+
+
 func _record_tick(input: InputFrame) -> void:
-	_recording.append(DebugSceneCommon.record_row(
-		_tick_count, input.move_dir, input.jump_pressed, input.jump_held, input.dig_pressed))
+	_recording.append(DebugSceneCommon.record_reveal_row(
+		_tick_count, input.move_dir, input.jump_pressed, input.jump_held, input.dig_pressed,
+		input.mine_held, input.has_aim, input.aim_col, input.aim_row))
 
 
 func _update_camera() -> void:
+	if _has_fixed_camera:
+		_camera.position = _fixed_camera
+		return
 	if _wide_view:
 		return  # camera stays fixed on the grid midpoint, set once in _ready() -- not the body
 	_camera.position = Vector2(float(_body.pos_x) / float(Fx.SCALE), float(_body.pos_y) / float(Fx.SCALE))
@@ -245,6 +335,9 @@ func _draw() -> void:
 	var top: float = float(_body._top_y()) / float(Fx.SCALE)
 	draw_rect(Rect2(left, top, Body.WIDTH_PX, Body.HEIGHT_PX),
 		COLOR_BODY_GROUNDED if _body.on_floor else COLOR_BODY, true)
+	# Drawn last so the reach ring and reticle sit over the terrain and the body rather than under them.
+	MiningOverlay.draw(self, _grid, _mining, _body.pos_x, _body.pos_y,
+		_last_input.has_aim, Vector2i(_last_input.aim_col, _last_input.aim_row))
 
 
 func _finish_and_quit() -> void:
@@ -279,7 +372,7 @@ func _flush_recording() -> void:
 		return
 	f.store_line("# sinkforge reveal-scene input recording -- mode=%s ticks=%d site=%s seed=%d" %
 		[prefix, _recording.size(), _site_id, _seed_value])
-	f.store_line("# tick,move_dir,jump_pressed,jump_held,dig_pressed")
+	f.store_line(RevealReplayDriver.COLUMN_HEADER_V2)
 	for row: PackedStringArray in _recording:
 		f.store_line(",".join(row))
 	f.close()
