@@ -32,6 +32,7 @@ var _body: Body
 var _play_mode: bool = false
 var _tick_count: int = 0
 var _was_jump_held: bool = false
+var _was_dig_held: bool = false  ## D0188: dig needs the same edge latch jump has -- see `_dig_edge()`.
 var _recording: Array[PackedStringArray] = []
 var _camera: Camera2D
 var _finished: bool = false
@@ -124,8 +125,26 @@ func _read_play_input() -> InputFrame:
 	input.jump_held = jump_held
 	input.jump_pressed = jump_held and not _was_jump_held
 	_was_jump_held = jump_held
-	input.dig_pressed = Input.is_physical_key_pressed(KEY_E)
+	input.dig_pressed = _dig_edge(Input.is_physical_key_pressed(KEY_E))
 	return input
+
+
+## The dig half of the same edge latch the two jump lines above implement (D0188, Defect B). Until this
+## existed, line 127 assigned the RAW held state straight into `dig_pressed`, which `InputFrame` documents
+## as edge-triggered ("true only on the tick the button transitioned to held ... not a
+## hold-to-clear-a-wall auto-repeat", D0110) -- so one physical hold recorded as one event per held tick.
+## Measured, not inferred: the director's own 807-tick session recorded a single unbroken 30-tick hold as
+## 30 events (`tests/body/recordings/reveal_play_2026-08-30T02-04-24.log`, the only dig input in it).
+##
+## Extracted as a named function rather than written inline like jump's, for one reason: `_read_play_input()`
+## polls real hardware and so cannot run headless, which would leave the fix untestable. This function is
+## the whole state machine and `tests/test_reveal_scene_dig_edge.gd` drives it over hold PATTERNS, asserting
+## event COUNTS -- rather than re-deriving `held and not was_held` in the test, which would be the
+## self-referential mutation test D0112 records as having hidden a real off-by-one.
+func _dig_edge(dig_held: bool) -> bool:
+	var pressed: bool = dig_held and not _was_dig_held
+	_was_dig_held = dig_held
+	return pressed
 
 
 ## Agent mode's own verification driver -- NOT a claims/C004 measurement tool (see module docstring).

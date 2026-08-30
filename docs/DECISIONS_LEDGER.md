@@ -7440,3 +7440,70 @@ drifts" problem the event-sourced discipline exists to avoid, and the director a
 
 **Reverse cost:** trivial — one file, no code, no gate depends on it. Deleting it would strand the slice
 plan's citations, nothing more.
+
+## D0188 · Defect B: `reveal_scene.gd`'s `dig_pressed` read raw held state, violating `InputFrame`'s own edge-triggered contract — fixed, swept, and mutation-tested against the real recorded number (Q5, Slice 0) · 2026-08-29
+
+**The defect.** `sim/body/input_frame.gd` documents `dig_pressed` as edge-triggered: true only on the tick
+the button transitioned to held, explicitly "not a hold-to-clear-a-wall auto-repeat (D0110)".
+`tests/body/reveal_scene.gd` handled jump correctly and dig incorrectly on adjacent lines — 125-126 compute a
+real edge against `_was_jump_held`; 127 assigned `Input.is_physical_key_pressed(KEY_E)` straight through. No
+`_was_dig_held` existed anywhere in the repository.
+
+**A correction to the report that flagged it, found by measuring instead of accepting.** The Phase 1 map
+(D0187) attributes the evidence to "the director's own committed 807-tick session". Counting the dig column
+of every recording directly gives:
+
+| recording | ticks | dig-true | runs |
+|---|---|---|---|
+| `reveal_play_2026-08-30T01-06-10.log` | 252 | 0 | — |
+| `reveal_play_2026-08-30T01-08-32.log` | 273 | 0 | — |
+| `reveal_play_2026-08-30T01-42-17.log` | 722 | 105 | 12, 26, 7, 6, 54 |
+| `reveal_play_2026-08-30T01-42-32.log` | 467 | 72 | 13, 30, 9, 7, 13 |
+| `reveal_play_2026-08-30T02-04-24.log` | **807** | **30** | **[30]** |
+
+The map's description — 807 ticks, one unbroken 30-tick run, the only dig input in the session — matches
+exactly **one** file, and it is the last row, which was **not committed**: it is a seventh session that
+landed in the working tree after D0186's commit and was still untracked. The map's claim is correct in
+every particular except the word "committed". A first draft of this entry cited
+`...01-42-32.log` on the strength of its 30-run without checking that the file had four other runs and 72
+dig ticks total; caught by counting all five before committing. The rule this is the standing instance of:
+never an identifying constant that has not just been read. **The recording is committed here**, so the
+number the test asserts has a tracked referent.
+
+**The fix** mirrors the two jump lines rather than inventing a second idiom — the bug existed precisely
+because dig did not look like jump. It is extracted as `_dig_edge()` rather than written inline for one
+reason: `_read_play_input()` polls real hardware and cannot run headless, so an inline fix would be
+untestable. `_dig_edge` is the entire state machine and is what the suite drives.
+
+**Swept for the shape rather than repairing one instance** (the ledger's own repeated finding that a repair
+reaching one site leaves siblings). Grepped every non-`legacy/` `.gd` for `dig_pressed` assignments and
+`_was_*_held` members, with a positive control. `reveal_scene.gd:127` was the only *hardware-derived* site.
+Two other non-edge assignments exist and are **deliberately left alone**, which is a judgment call, not an
+oversight:
+- `reveal_scene.gd:146` (`_scripted_approach_input`) sets `dig_pressed = true` every tick in agent mode. Its
+  own docstring reasons explicitly about relying on `body.tick()`'s resolve-then-dig order to alternate
+  advancing and digging. It is a scripted driver issuing a command, not a hardware reading, and changing it
+  would change agent-mode behaviour and the screenshots that verify the scene — out of Slice 0's scope.
+- `tests/body/fuzz_driver_common.gd:47` (`dig_roll and not dig_disabled`) is an independent per-tick roll by
+  design — decorrelated input is the fuzzer's whole point. Changing it would move the fuzz population, and
+  `grounded_no_floor`'s bound (59, D0184) is calibrated against the current one. Squarely inside the
+  standing hard stop.
+Both are noted here so a later reader finds a decision rather than an inconsistency.
+
+**Tested by driving the state machine over hold PATTERNS and asserting event COUNTS**, never by recomputing
+`held and not was_held` — that would be the self-referential test D0112 records as having hidden a real
+off-by-one. `tests/test_reveal_scene_dig_edge.gd`, 9 assertions, all pass.
+
+**Mutation-tested, and the mutant reproduces the director's own number.** Reverting `_dig_edge` to return
+the raw held state fails 6 of 9, and the recorded-shape assertion reports **got 30** — the exact count the
+real session recorded. Two assertions correctly still PASS under the mutant and are what make the suite
+discriminating rather than merely brittle: a 1-tick hold is 1 event either way, and input alternating every
+tick genuinely *is* an edge every tick (which also pins the fix to the transition rather than to a rate
+limit, so a debounce-style "fix" would fail).
+
+**What this does NOT claim.** Not established as the cause of D0186's `body ... left the world` bounds
+violation; not investigated here. And it does not repair the six previously-committed recordings — they
+were captured under the old semantics, and any future `claims/C004` measurement over them must account for
+that. Stated rather than silently carried forward.
+
+**Reverse cost:** low. One member, one small function, one test file, one recording.
