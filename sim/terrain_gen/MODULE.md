@@ -49,11 +49,13 @@ per-tick phase order.
   `docs/adr/0004-data-codegen.md`.
 - `ValueNoise` (`value_noise.gd`) — engine-free 2D noise, `.sample(x, y, seed) -> float` in roughly
   [-1, 1]. Deterministic WITHIN a platform (same seed, same build → same output); NOT yet proven
-  bit-identical ACROSS platforms — it uses real `float` arithmetic, the one place in `sim/` that departs
-  from the fixed-point rule `docs/ARCHITECTURE.md`'s own Determinism section states, and IEEE 754 doesn't
-  guarantee identical results for the same expression across CPU architectures. Real, measured, diagnosed
-  gap, not fixed (`docs/DECISIONS_LEDGER.md` D0171/D0172 — converting to `Fx` is a real design cycle, not
-  yet scheduled). Not terrain_gen-specific in principle, but has no other consumer yet.
+  bit-identical ACROSS platforms — it uses real `float` arithmetic, one of MULTIPLE places on the
+  terrain-generation and RNG state path that depart from the fixed-point rule `docs/ARCHITECTURE.md`'s own
+  Determinism section states (corrected 2026-08-29, fix queue R5 — "the one place" undercounted the real
+  scope; `docs/DECISIONS_LEDGER.md` D0183 enumerates all four known sites), and IEEE 754 doesn't guarantee
+  identical results for the same expression across CPU architectures. Real, measured, diagnosed gap, not
+  fixed (`docs/DECISIONS_LEDGER.md` D0171/D0172 — converting to `Fx` is a real design cycle, not yet
+  scheduled). Not terrain_gen-specific in principle, but has no other consumer yet.
 
 ## Gotchas
 

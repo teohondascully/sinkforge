@@ -80,10 +80,13 @@ Verified directly, not assumed, during the review that preceded this claim's fil
   `tests/test_shaft_replay_determinism.gd` (`docs/QUALITY.md` gate 8) now proves a real `sim/world` +
   `sim/terrain_gen` + `sim/body` run replays bit-identical across two independent OS processes on the
   same seed — closing the gap this bullet used to describe. Two gaps remain, real and diagnosed, not
-  closed: (1) `sim/terrain_gen`'s cave-carving noise uses real floats, not fixed-point, so cross-platform
+  closed: (1) multiple float sites on the terrain-generation and RNG state path (corrected 2026-08-29, fix
+  queue R5 — a prior version of this bullet named only the cave-carving noise as the exception;
+  `docs/DECISIONS_LEDGER.md` D0183 enumerates all four known sites), not fixed-point, so cross-platform
   (e.g. macOS vs. the project's own Linux CI) bit-identical replay is NOT yet proven for anything that
-  touches generated terrain (`docs/DECISIONS_LEDGER.md` D0171, diagnosis D0172 — a real design cycle, not
-  scheduled); (2) nothing has shown determinism through `machines`/`transport`/`fluid`/`economy`, none of
+  touches generated terrain (D0171 the canonical crack reference, D0172 the fix diagnosis — a real design
+  cycle, not scheduled); (2) nothing has shown determinism through `machines`/`transport`/`fluid`/
+  `economy`, none of
   which have a line of code yet. Any future claim about checkpoint fidelity — including this one's own
   re-loadability requirement — inherits both gaps until they're closed.
 

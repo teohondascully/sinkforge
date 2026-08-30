@@ -7233,3 +7233,59 @@ deleting the true half along with the false one.
 
 **Reverse cost:** CHEAP — revert the one comment block in `project.godot`; `check_project_settings.py` re-
 run clean (`PASS`, 2 required keys checked) confirming the file still parses.
+
+## D0183 · ValueNoise claim-scope correction: the "one place" framing undercounted — four real float sites enumerated on the terrain-generation and RNG state path (R5, fix queue) · 2026-08-29
+
+**The gap, exactly as Codex found it.** Queue #3's own honest-state correction (D0171/D0172, this same
+session) fixed the FALSE "unconditional determinism" overclaim but introduced a narrower, still-wrong
+scope claim: five docs (`sim/terrain_gen/MODULE.md` line 52's literal "the one place in `sim/` that
+departs," `docs/ARCHITECTURE.md`, `claims/C003-cold-start-reaches-d1.md`, `README.md`, `CONTEXT.md` twice)
+all framed `ValueNoise.sample()` alone as THE exception to the fixed-point rule. Codex found float
+arithmetic on the same terrain-generation/RNG state path in at least three more places. This is its own
+small instance of the exact failure class this whole queue is about: a correction that is honest about
+DIRECTION (proven within-platform, not across) but still wrong about SCOPE (one site, not several) — an
+undercount is still an overclaim of precision.
+
+**All four sites, read directly from the code, not guessed:**
+
+1. **`sim/terrain_gen/value_noise.gd:58-60`** (`_corner_value`) — `(float(h) / float(0xFFFFFFFF)) * 2.0 -
+   1.0`, converting a lattice hash into a float in [-1,1]. The originally-cited site; still real.
+2. **`sim/terrain_gen/shaft_generator.gd:111`** (`_carve_caves`) — `var depth_frac: float = float(row -
+   min_depth) / float(carve_span)`, feeding `lerpf(threshold_top, threshold_deep, depth_frac)` at line 112,
+   which directly gates `noise > threshold` at line 123 and therefore `grid.excavate(cell)` at line 124 —
+   a SEPARATE float computation from `ValueNoise` itself, on the same state-affecting decision (does this
+   cell become a cave).
+3. **`sim/terrain_gen/shaft_generator.gd:127-128`** (`_density_count`) — `int(round(float(width) * per_col
+   * float(height) / float(DENSITY_ROWS)))`, computing how many placement ATTEMPTS a generation pass makes
+   (`grep -n "_density_count" sim/terrain_gen/shaft_generator.gd`: called at lines 141/158/204, each
+   feeding an `attempts` loop bound that directly controls how many candidate cells get tried) — a float
+   computation whose OUTPUT (an integer attempt count) is itself state-affecting, since it changes how many
+   times the RNG below gets drawn.
+4. **`core/split_rng.gd:47-52,58-60`** (`next_float()`/`next_range()`) — `next_float()` divides an exact
+   integer by an exact power of two (`float(top53) / float(1 << 53)`, IEEE-754-exact by construction, no
+   rounding ambiguity in that one division); `next_range()` then multiplies that result by `float(span)`
+   (an arbitrary integer, not a power of two) — a standard IEEE-754 float multiply, deterministic per
+   compliant hardware for identical inputs, but NOT proven immune to compiler-level optimizations (FMA
+   contraction, differing across ARM/x86 build flags) the same way `ValueNoise`'s own arithmetic isn't.
+   Confirmed on the terrain-generation state path directly: `grep -n "next_range\\|next_float"
+   sim/terrain_gen/shaft_generator.gd` shows 8 call sites choosing candidate placement columns/rows for
+   caves, veins, and POIs — this is not a hypothetical consumer, it is the generator's own primary
+   randomness source.
+
+**Not claiming equal risk across all four, stated honestly rather than flattened into one number.** Sites
+1-3 use non-trivial float arithmetic (hash-to-float conversion, arbitrary division, multiply-then-lerp)
+with no exactness guarantee. Site 4's `next_float()` itself is provably exact (dividing by a power of two
+has zero rounding error in IEEE 754); its risk, if any, would come from `next_range()`'s own subsequent
+multiply-by-arbitrary-span step or from compiler-level FMA differences neither this entry nor D0171
+isolates. **Not resolved here, and not this item's job to resolve** — enumerating scope, not re-deriving
+root cause; D0171's own "not exhaustively proven root cause" caveat still applies, now correctly scoped to
+four candidate sites instead of implicitly to one.
+
+**Fixed:** `sim/terrain_gen/MODULE.md` (removed "the one place" claim), `docs/ARCHITECTURE.md` (removed
+the "known, standing exception" singular framing), `claims/C003-cold-start-reaches-d1.md`, `README.md`,
+`CONTEXT.md` (both instances) — all corrected to "multiple float sites on the terrain-generation and RNG
+state path," pointing here for the enumeration and D0171/D0172 for the crack reference and fix diagnosis.
+
+**Reverse cost:** CHEAP — six doc edits, each independently revertible; no code changed, nothing here
+converts anything to `Fx` (that conversion remains explicitly out of scope, a director-scoped design
+cycle per D0172, unchanged by this scope correction).

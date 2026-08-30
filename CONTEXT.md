@@ -25,7 +25,7 @@ This is a portfolio centerpiece. The standard is: a senior staff engineer reads 
 
 ## The one-sentence architecture
 
-**The simulation is a pure, engine-free library, deterministic within a single platform/build. Everything else, including Godot, is a client of it.** (Cross-platform bit-identical replay has a known, diagnosed gap in `sim/terrain_gen`'s float-based cave noise — `docs/DECISIONS_LEDGER.md` D0171/D0172, fix not yet scheduled.)
+**The simulation is a pure, engine-free library, deterministic within a single platform/build. Everything else, including Godot, is a client of it.** (Cross-platform bit-identical replay has a known, diagnosed gap in multiple float sites on the terrain-generation and RNG state path — corrected 2026-08-29, fix queue R5, a prior version of this line named only the cave noise; `docs/DECISIONS_LEDGER.md` D0183 enumerates all four known sites, D0171/D0172 fix not yet scheduled.)
 
 ```
 L4  experiment   claims, sweeps, ablations, reports
@@ -244,7 +244,7 @@ Non-negotiable, because it is what makes agent testing, replay debugging, and sw
 - Generational-index entity IDs. Never pointers, never bare array positions.
 - Four decoupled resolutions (visual, terrain/digging, machine/logic, collision) — collision is derived from the fine terrain as an integer heightfield, never equal to the pixel grid itself. `docs/ARCHITECTURE.md` §9.
 
-`replay_determinism_test` must exist and pass from day one: run a recorded input log twice from one seed, hash state every 100 ticks, assert identical. Real subject now `tests/test_shaft_replay_determinism.gd` (gate 8) — proven WITHIN a platform (two independent processes, bit-identical); NOT yet proven ACROSS platforms, since `sim/terrain_gen`'s cave noise uses real floats, not fixed-point (`docs/DECISIONS_LEDGER.md` D0171/D0172 — a real, diagnosed, unscheduled fix, not a design decision made here).
+`replay_determinism_test` must exist and pass from day one: run a recorded input log twice from one seed, hash state every 100 ticks, assert identical. Real subject now `tests/test_shaft_replay_determinism.gd` (gate 8) — proven WITHIN a platform (two independent processes, bit-identical); NOT yet proven ACROSS platforms, since multiple sites on the terrain-generation and RNG state path use real floats, not fixed-point (corrected 2026-08-29, fix queue R5 — a prior version of this line named only the cave noise; `docs/DECISIONS_LEDGER.md` D0183 enumerates all four known sites, D0171/D0172 — a real, diagnosed, unscheduled fix, not a design decision made here).
 
 ---
 
