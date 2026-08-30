@@ -73,7 +73,7 @@ mkdir -p "$OUT_DIR" || exit 1
 # centred without it, and a 4px cell has to reach ~78 output px to read as a reticle at all.
 MOMENTS=(
 	"surface|--zoom=6.5 --camera=24,13|2"
-	"delve|--mine-down --zoom=6.5 --camera=24,17|940"
+	"delve|--mine-down --zoom=6.5 --camera=24,17|216"
 	"aim|--mine-down --zoom=13.0 --camera=12,12|40"
 )
 
@@ -84,6 +84,17 @@ for entry in "${MOMENTS[@]}"; do
 	rest="${entry#*|}"
 	args="${rest%%|*}"
 	tick="${rest##*|}"
+	# D0219. `delve`'s tick was 940, chosen when the bite radius default was 0 and the scripted shaft took
+	# 991 ticks to reach its 24-cell target. At the shipped default of 2 the same run finishes at tick
+	# **228** (measured, not estimated), so the shutter never fired and the moment silently wrote no file.
+	# 216 is ~95% through the current run, matching where 940 sat in the old one.
+	#
+	# READ THIS BEFORE PAIRING TWO MILESTONES' `delve` SHOTS. They are only comparable if BITE and TICKS
+	# were the same on both, and across the bite default change they were not: Slice 1's delve is bite 0 at
+	# tick 940, Slice 2's is bite 2 at tick 216. Those are two different worlds at two different moments,
+	# and putting them side by side would attribute the difference to whatever the newer slice changed.
+	# For a real cross-milestone pair, pin both explicitly -- `BITE=0 TICKS=2,940,40` -- and re-capture the
+	# OLDER commit too, which is what the filename's SHA exists to make possible.
 	if [ -n "$TICKS" ]; then
 		tick="$(printf '%s' "$TICKS" | cut -d, -f$((i + 1)))"
 	fi
@@ -100,6 +111,9 @@ for entry in "${MOMENTS[@]}"; do
 	fi
 	if [ ! -s "$png" ]; then
 		echo "capture_moments: FAIL - $name wrote no file at $png" >&2
+		echo "capture_moments:        most likely the run ENDED before tick $tick -- a scripted --mine-down" >&2
+		echo "capture_moments:        run quits when it reaches its target, and how fast it gets there" >&2
+		echo "capture_moments:        depends on the bite radius. Re-run with TICKS= to pin a reachable tick." >&2
 		fail=1
 		continue
 	fi

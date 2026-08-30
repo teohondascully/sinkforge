@@ -8953,3 +8953,35 @@ missing three entries: `MILESTONES.md`, `NEEDS_DIRECTOR.md` (new this session) a
 `LEGACY_MIGRATION_MAP_2026-08-29.md`. `README.md` itself is deliberately absent, with a line saying why:
 a table cannot list itself without telling a reader who has not found it yet that they should have read
 it first.
+
+---
+
+## D0219 · A fixed-tick capture whose run now ends before that tick, and a milestone pair that was never a pair · 2026-08-30
+**Decided:** `tools/capture_moments.sh`'s `delve` moment moves from tick 940 to **216**, its failure
+message now names the likely cause, and both the script and `docs/MILESTONES.md` record that Slice 1's
+and Slice 2's `delve` shots are **not a comparable pair**.
+
+**Found by running it.** Capturing Slice 2's milestone produced `surface` and `aim` and then:
+`capture_moments: FAIL - delve wrote no file`. The reason is D0200's own change one round earlier: the
+scripted `--mine-down` run quits when it reaches its 24-cell target, and the bite radius decides how fast
+it gets there. At the old default of 0 that took 991 ticks and 940 was ~95% through; at the shipped
+default of 2 the same run finishes at **228** (measured, not estimated), so a shutter set for 940 never
+fires. **A fixed-tick capture is a claim that the run reaches that tick, and nothing was checking it.**
+
+**The failure was loud but uninformative**, which is its own defect. "wrote no file" is the same message
+for a blank frame, a crashed run and a shutter that never fired, and for a fixed-tick capture the first
+question is always the same: did the run get that far? The tool now says so.
+
+**The larger finding, and the one that would have shipped a misleading image.** `docs/MILESTONES.md` says
+the whole point of holding resolution, camera and seed constant is that "only the CONTENT differs between
+milestones". Two of those three were held. **The bite radius and the tick were not**: Slice 1's `delve` is
+bite 0 at tick 940, Slice 2's would have been bite 2 at tick 216. Side by side those are two different
+worlds at two different moments, and every difference between them would have been read as something the
+newer slice did. D0200 anticipated exactly this and built the `BITE=`/`TICKS=` overrides for it; what was
+missing is that **the DEFAULTS also form a pair, and nobody re-derived them when the default moved.**
+
+**The remedy is stated rather than automated**, deliberately: a real cross-milestone pair needs BOTH
+halves re-captured with `BITE=` and `TICKS=` pinned to the same values, including the OLDER commit, which
+is what the SHA in each filename exists to make possible. Automating "these two shots are comparable"
+would mean the tool deciding which knobs matter, and the knob that mattered here (bite) did not exist
+when the tool was written.

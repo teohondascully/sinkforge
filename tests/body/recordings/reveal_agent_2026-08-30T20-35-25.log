@@ -1,0 +1,14 @@
+# sinkforge reveal-scene input recording -- mode=agent ticks=12 site=reveal_test_dense seed=20260826 bite=2
+# tick,move_dir,jump_pressed,jump_held,dig_pressed,mine_held,aim_col,aim_row
+0,1,false,false,true,false,-2147483648,-2147483648
+1,1,false,false,true,false,-2147483648,-2147483648
+2,1,false,false,true,false,-2147483648,-2147483648
+3,1,false,false,true,false,-2147483648,-2147483648
+4,1,false,false,true,false,-2147483648,-2147483648
+5,1,false,false,true,false,-2147483648,-2147483648
+6,1,false,false,true,false,-2147483648,-2147483648
+7,1,false,false,true,false,-2147483648,-2147483648
+8,1,false,false,true,false,-2147483648,-2147483648
+9,1,false,false,true,false,-2147483648,-2147483648
+10,1,false,false,true,false,-2147483648,-2147483648
+11,0,false,false,false,false,-2147483648,-2147483648
