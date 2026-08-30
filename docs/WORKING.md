@@ -8,107 +8,69 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-**Reset this round:** the D0206 section compressed to its result (detail in `docs/DECISIONS_LEDGER.md`
-D0206-D0212), replaced by D0213 below. New file this round: **`docs/NEEDS_DIRECTOR.md`**, the parked
-queue — read it first if you are the director picking this up, it is what is waiting on a ruling.
+**Reset this round:** D0206-D0212 compressed to their results in the ledger; this file now carries only
+what a future session needs that the ledger does not already say better. New this round:
+**`docs/NEEDS_DIRECTOR.md`**, the parked queue — read it FIRST if you are the director picking this up.
 
-## DONE THIS RUN — the third and last instant translation, closed (D0213)
+## DONE THIS RUN — five entries, D0213 to D0220
 
-**The class D0209 (step-up mid-air) and D0212 (mantle mid-air) opened is now closed at its third
-instance.** `VerticalResolve.resolve_ceiling`'s corner nudge took its direction from `body.facing`
-whenever `vel_x` was zero, so a body jumping STRAIGHT UP under an overhang, with no horizontal input at
-all, was translated **+6.00px sideways in one tick** — 360 px/s against a 150 px/s run speed — in a
-direction it had never been asked to move. Found by a Codex audit, not by playing; reproduced before
-anything was changed.
+Full accounts in `docs/DECISIONS_LEDGER.md`. What a future session needs to know:
 
-**The gate is MOTION, not grounding, and that is measured rather than argued.** `resolve_ceiling` runs
-only while moving upward, `move_and_resolve` clears `on_floor` before any substep, and `_handle_jump`
-zeroes coyote on launch — so every corner correction that has ever fired ran at `on_floor=false,
-coyote=0`. Applying the grounded gate the two climbs use took `test_body_acceptance`'s
-`corner_correction_success_rate` **from 100% to 0**. A ceiling is only ever contacted airborne; a
-grounded gate there is not a gate, it is a deletion. What the three instances share is the CONSENT half:
-`_try_climb` has required `vel_x != 0` all along, and this path had no motion condition at all.
+**D0213 — the third and last instant translation, closed.** `resolve_ceiling`'s corner nudge took its
+direction from `body.facing` whenever `vel_x` was zero, so a body jumping STRAIGHT UP under an overhang
+was moved **+6.00px sideways in one tick**, 360 px/s against a 150 px/s run speed. **The gate is MOTION,
+not grounding, and that is measured**: `resolve_ceiling` runs only while moving upward, so every corner
+correction that has ever fired ran at `on_floor=false, coyote=0` — applying the two climbs'
+`recently_grounded` gate takes `corner_correction_success_rate` from **100% to 0**. A ceiling is only
+contacted airborne; a grounded gate there is a deletion, not a gate. What the three instances share is
+CONSENT: `_try_climb` has required `vel_x != 0` all along.
 
-**Did not relocate, proven at set level.** Full 1000x1500 sweeps either side of the gate, diffed line by
-line: **one violation removed, zero added** (`type=bounds edge=left seed=0 tick=1487` — the invented
-nudge pushing the body out through the world's left edge). All **46** `grounded_no_floor` lines are
-byte-identical in seed, tick, position and `floor_source`; the D0206 residual is untouched. All four
-director sessions still replay **0 bad ticks, 0 airborne climbs, 0 unconsented nudges**.
+Proven not to relocate at set level: full 1000x1500 sweeps either side, **one violation removed, zero
+added**, all 46 `grounded_no_floor` lines byte-identical. All four director sessions still replay 0 bad
+ticks. New instruments: `Invariants.check_translation_consent` (names no path, so a fourth instance trips
+it without an edit) and `tests/test_corner_consent.gd`.
 
-**Two new instruments, and one honest null.** `Invariants.check_translation_consent` is a runtime
-post-condition that names no path — a tick with no input and no incoming velocity cannot move the body
-horizontally, so any displacement on one came from a correction, and only the two RECOVERY paths
-(depenetration, bounds clamp) are exempt. `tests/test_corner_consent.gd` witnesses it deterministically
-and mutation-tests both directions. But **the per-commit fuzzer is blind to this class**: it reports 0
-with the defect present as well as absent, because `HostileChamber` fires `corner_corrected_this_tick`
-**0 times in 50,000 ticks** — D0055's hand-placed corner tile has been unreachable since the held-jump
-bug it was fitted against was fixed. The real witness is `fixture_shaft_replay_probe.gd` (a generated
-shaft is walls, and every wall contact zeroes `vel_x`): **corner_unconsented 2 -> 0, corner_ok 18 -> 11**.
-That fixture now asserts it per commit. Remedy for the fuzzer is parked, not applied (P004).
+**The fuzzer is blind to that class, and the reason generalises.** It reports 0 with the defect present
+AND absent, because `HostileChamber` fires `corner_corrected_this_tick` **0 times in 50,000 ticks** —
+D0055's hand-placed corner has been unreachable since the bug it was fitted against was fixed. The real
+witness is the shaft replay (a shaft is walls, and every wall contact zeroes `vel_x`): **corner_unconsented
+2 -> 0**, now asserted per commit. Remedy parked as P004.
 
-**Golden re-captured and CI green on the fix.** Run 33331589523 on commit c953117 confirms
-`corner_ok=11, corner_unconsented=0` on Linux, matching local exactly; the golden array moved because the
-scenario really did contain the defect, and all 200 checkpoints are now the CI-captured values (f9216b2).
+**D0214 — L2 exists (ADR 0007).** `Interface.observe(Envelope) -> Observation` / `apply(Command) -> Result`.
+The blocker on the whole presentation batch: layer lint gives `view` only `interface` and `core`. **The
+one decision everything follows from is that `observe()` COPIES** — handing back the grid would be cheaper
+and would silently delete the envelope, so the suite attempts the reach-around and asserts it fails. One
+envelope dimension, three deliberately ABSENT. Nothing persists, so its shape is cheap to change.
 
-## DONE THIS RUN — L2 exists (D0214, ADR 0007)
+**D0215/D0216 — the build makes a sound, and mining throws chips.** `view/audio/score.gd` (three beds
+mixed by depth; the whole port is one line, a `Settings` global becoming an injected `music_db`) and
+`view/fx/particles.gd` (chips on a break, a draught on a breach — the hollow tell's visual half). Both
+chosen by measuring rather than by slice order.
 
-**`interface/` and `sim/commands/` stop being skeletons.** `Interface.observe(Envelope) -> Observation`
-and `apply(Command) -> Result`, with `Command.move(InputFrame)` and `Command.mine(cell)`. This was the
-literal blocker on the presentation batch: `tools/layer_lint/layer_lint.py` gives `view` access to
-`interface` and `core` and nothing else, so every lifted renderer file is a red gate until the door exists.
+**D0217 — a regex read a workflow that could not parse, and said PASS.** Two step names with unquoted
+colons made `harness.yml` invalid YAML; **GitHub ran zero jobs** and reported an ordinary red, while gate
+31 found every suite it was looking for. It parses first now, with a permanent 5/5 mutation test.
 
-**The one decision the rest follows from: `observe()` COPIES.** An `Observation` holds a flat byte array
-over its window plus a legend, and no reference to `TileGrid`, `Body` or `Mining`. Handing back the grid
-would be cheaper and would silently delete the envelope — a consumer holding it reads any cell it likes.
-`tests/test_interface.gd` tests that by attempting the reach-around: observe, excavate, assert the
-observation still reports the old state. **One envelope dimension, three deliberately absent** — there is
-no fog, planner, motor model or priors table, and a `vision` field that never filters reads as a filter
-that has been checked. Same reasoning gives `Command` two members, one per verb that exists.
-
-**Safe to land in one unattended pass because nothing persists.** No save schema, no golden, no fixture
-depends on an `Observation`'s shape. Changing its fields later costs a recompile of its consumers and
-nothing else. **No consumer was migrated** — `reveal_scene`/`play_scene` still drive `sim/` directly.
-
-## DONE THIS RUN — the build makes a sound (D0215)
-
-**`view/audio/score.gd`, lifted from legacy, wired into `reveal_scene`.** Three synthesised beds mixed
-and pitched by depth. **The whole port is one line**: legacy read the music slider off a `Settings`
-global, and `Settings` is `shell/`, so the level is injected as `music_db`. That substitution is the shape
-every remaining lift needs.
-
-**Chosen by measuring, not by slice order.** The map puts it in Slice 4 behind a renderer; its entire
-interface with the game turned out to be one float (`set_depth(t, delta)`), so it needed neither.
-
-## DONE THIS RUN — particles on real mining events (D0216), and a gate that could not see a broken workflow (D0217)
-
-**`view/fx/particles.gd`, lifted unchanged, wired to `sim/mining`'s own flags.** A break throws chips of
-the broken material's colour; a breach gets a slow draught into the void — the visual half of the hollow
-tell. Chosen over the other five dependency-free LIFT files because it was the only one with a CONSUMER:
-`art.gd` needs sprites that do not exist, `light_layer.gd` needs light math in a coordinator that does
-not exist, `seams.gd` needs a `docs/BITS.md` that is not in this tree. **"No unsatisfied dependency" and
-"has a consumer" are different questions.**
-
-**Two tests carry it, and neither is about the emitter.** A busy particle layer cannot move the sim (400
-ticks with `randf()` thrashing between every one, byte-identical, with a control proving the comparison
-can fail) — the behavioural half of `no_engine_imports.py` policing only `core/` and `sim/`. And a real
-break reaches the layer through the same call the scene makes: 27 particles from one bite.
-
-**D0217, found by causing it.** Two CI step names written with an unquoted colon made `harness.yml`
-invalid YAML. **GitHub ran zero jobs on `36417e0`** and reported it as an ordinary red; gate 31 read the
-same bytes with a regex, found every `res://tests/test_*.gd`, and printed PASS. A regex over a file that
-does not parse still finds every string it is looking for — and a workflow that cannot load leaves every
-OTHER gate's verdict unchecked too. Gate 31 now parses first, and
-`tools/layer_lint/test_check_suite_coverage.py` is its permanent mutation test (5/5 branches observed,
-including a direct assertion that the old regex-only version passes on both broken files).
+**D0218/D0219/D0220 — three smaller ones with the same shape.** "No automated checks on documents" was
+stated in three normative docs while three ran in CI (repaired by stating the LINE: a gate may check that
+two artifacts agree, never that prose is true). The `delve` capture fired at tick 940 on a run that now
+ends at 228, so it silently wrote no file — and Slice 1's and Slice 2's `delve` shots are **not a
+comparable pair**, because the bite default moved and nobody re-derived the tick. And the capture tool
+left one recording behind per moment; twelve reached two commits before it started cleaning up after
+itself.
 
 ## THE PRESENTATION BATCH IS MOSTLY BLOCKED — read `docs/NEEDS_DIRECTOR.md` P005
 
 Classifying all 21 code files in the 63-file LIFT set by the legacy types they use **in code with
 comments stripped**: ~1,540 lines blocked on the `WorldRenderer` coordinator, ~2,700 on legacy's
 `FactorySim`, ~2,050 on `MachineDef`/`RecipeDef` entities this build does not have, and **~945 liftable
-today** (`art`, `particles`, `light_layer`, `settings`, `seams`, `score` — the last now done). The run's
-own "no coordinator rebuilds" non-negotiable is what blocks most of its own queue. P005 carries the three
-options and the numbers; option 1 (finish the unblocked ~900) needs no ruling and is the obvious next step.
+today**. The run's own "no coordinator rebuilds" non-negotiable is what blocks most of its own queue.
+
+**Of that ~945, only two files had a CONSUMER** — score and particles, both now done. `art.gd` needs
+sprites that do not exist, `light_layer.gd` needs light math in the absent coordinator, `seams.gd` needs
+a `docs/BITS.md` not in this tree. **"No unsatisfied dependency" and "has a consumer" are different
+questions.** P005 carries the three options; option 3 (un-park the coordinator) is the only route to
+changing how the game actually looks.
 
 ## SLICE 1.5, the bite — delivered, still awaiting the director's play verdict
 

@@ -4,112 +4,110 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-30. This round: the collision resolver's grounding criterion, authorized overnight.
-5 commits — `3ea7c87` (the fix), `db05f00` (milestone), `f784aac` (golden re-capture), `ec1acfa` (D0207),
-`bae9565` — plus this wrap, and one shelf branch `shelf/d0139-full-footprint` (`f8186fb`).
-`docs/DECISIONS_LEDGER.md` D0206 and D0207.**
+**Last updated: 2026-08-30. This round: the third teleport closed, then Slice 2 — `interface/` exists, the
+build makes a sound, and mining throws chips. 7 commits, `c953117`..`5c655b7`.
+`docs/DECISIONS_LEDGER.md` D0213-D0220, `docs/adr/0007-l2-interface.md`.**
 
-**Headline: bad ticks on the director's own two recorded sessions go 6 → 0 and 171 → 0, the step-up probe
-no longer reproduces, and the golden traverse is 225 — identical, not merely within tolerance. The one
-acceptance number that did NOT move is `grounded_no_floor`, still exactly 59, and proving that is not a
-relocation took the violation SET rather than its count.**
+**Headline: the instant-translation class is closed at its third and last instance, and L2 is real.
+`interface/` and `sim/commands/` stop being skeletons, which was the literal blocker on the presentation
+batch. But the batch itself is mostly blocked by the run's own non-negotiable — measured, not guessed —
+and `docs/NEEDS_DIRECTOR.md` is a new file carrying six parked items. Read it before this one.**
 
 ---
 
 ## What was learned
 
-### A bug report that names a direction is still a hypothesis about direction
+### A gate that cannot pass is a deletion, not a gate
 
-The brief described both grounding paths sinking the body into rock, and said so with justified
-confidence — the previous session had traced exactly that. Classifying all 184 bad ticks first
-(`tools/scratch/classify_bad_ticks.gd`) instead of designing to that description: **153 of them are the
-body thrown ABOVE the world**, `grid_floor_backstop` placing the feet on the world ceiling's top face
-(y=0). Sinking was 13. Both are the same interpolation error with opposite signs, and the expensive one
-was the sign nobody had looked for. **Cost of classifying first: one 90-line scratch script.** Cost of not
-having: a fix aimed at 7% of the population.
+The brief asked for the corner nudge to be gated the way step-up and mantle were: on being grounded.
+`resolve_ceiling` is reached only while moving upward, `move_and_resolve` clears `on_floor` before any
+substep, and `_handle_jump` zeroes coyote on launch — so every corner correction that has ever fired ran
+at `on_floor=false, coyote=0`. Applying that gate and re-running measured the consequence rather than
+arguing it: **`corner_correction_success_rate` went from 100% to 0.** A ceiling is only ever contacted
+airborne. What the three instances of the class actually share is the CONSENT half — `_try_climb` has
+required `vel_x != 0` all along, and this was the one instant translation in the module with no motion
+condition of any kind. **The right generalisation was one clause over from the one that was proposed, and
+only a mutation test could tell them apart.**
 
-### A count cannot tell a fix from a relocation. The set can
+### A regex over a file that does not parse still finds every string it is looking for
 
-`grounded_no_floor` came out of the 1000×1500 sweep at **exactly 59** — the same number D0139 failed with,
-and the brief's own stated stop condition ("if it stays at 59 again, the flaw moved again"). The count is
-genuinely unable to distinguish the two cases, so it was the wrong instrument to answer with. Diffing all
-**805,456** violation lines: byte-identical before and after in seed, tick and **position**; exactly **4**
-lines differ, in attribution only, and in the direction opposite to a relocation — `grid_floor_backstop`'s
-share went **4 → 0**, where D0139's went **4 → 59**. The bodies land in the identical pixels. This is the
-ledger's own "equal counts, different sets" law, arriving as *equal counts, equal sets, and a stop
-condition that would have been tripped by the wrong evidence*.
+Two CI step names written with an unquoted colon made `harness.yml` invalid YAML. **GitHub ran zero jobs**
+on that commit and reported it as an ordinary red push; gate 31 read the same bytes locally, found every
+`res://tests/test_*.gd`, and printed PASS. Worse than an ordinary blind spot because of what the file IS:
+a workflow that cannot load runs no gate, so every OTHER gate's verdict for that commit was also
+unchecked, and nothing anywhere said so. The gate parses first now, and its mutation test asserts the old
+regex-only version still matches through both broken files — the claim made checkable, not described.
 
-### Two invariants the project holds simultaneously are mutually exclusive
+### The fuzzer is only as wide as the geometry it is pointed at
 
-`PropertyChecks.grounded_implies_solid_beneath` wants every column under the feet solid — full support,
-which means resting at the **deepest** column's surface. Zero overlap means resting at the **highest**. A
-flat-bottomed box cannot do both on uneven ground; this is a proof, not a tuning problem. So
-`grounded_no_floor` cannot reach zero alongside the bad-tick count, and D0061 already weighed the
-alternative and rejected it on feel. **The residual is a design fork, not an unfinished fix.**
+D0213's consent invariant reports **0 in the fuzzer with the defect present and 0 with it fixed**, so its
+green means nothing. Isolated rather than assumed: wiring the same line to `bounds_violation_this_tick`
+prints 922, so the count path works and the CONDITION is never reached. The first explanation written
+down was wrong — it blamed the input distribution, and the shaft replay running the identical goalless
+driver falsifies that by hitting the case twice. **The cause is the WORLD:** `HostileChamber` fires
+`corner_corrected_this_tick` **0 times in 50,000 ticks**, because D0055's hand-placed corner tile stopped
+being reachable once the held-jump bug it was fitted against was fixed, and nobody re-placed it.
 
-### Sub-pixel ground following and a zero-overlap flat-bottomed collider cannot coexist
+### "No unsatisfied dependency" and "has a consumer" are different questions
 
-`Heightfield.surface_y_at_x` interpolates between two columns' faces, so wherever the footprint spans
-columns of different heights it returns a height *below* the taller one's face. It also anchors on column
-CENTRES, so a foot sample near the box's edge blends in a column **outside** the footprint — ground the
-body isn't standing on — which is what lifted the head 1px into the ceiling and started the 153-tick
-cascade. Three samples also cannot cover a four-column footprint. `surface_y_at_x` still exists and is
-still tested; nothing in `sim/` calls it now.
+Six of the migration map's 63 LIFT files reference no missing legacy type. Reading them: `art.gd` loads
+sprites from a directory that does not exist, `light_layer.gd` is a canvas for light math living in a
+coordinator that does not exist, `seams.gd` needs a `docs/BITS.md` not in this tree. Lifting any of them
+lands dead code. Two had real consumers — `score.gd` (its entire interface with the game is one float) and
+`particles.gd` (`sim/mining` already reports break and breach every tick) — and those are the two that came
+over.
 
-### A test was pinning the defect, and only an A/B of the OLD code licensed changing it
+### A milestone pair is only a pair if every knob was held
 
-`test_cave_geometry` asserted a body falls through the cave gap to the lower floor. The gap is 4 columns
-and the body is 4 columns wide, and the test placed it offset by one — so its box included a shelf column,
-and it reached the lower floor **by clipping through the shelf's 6-row slab** (`worst_overlap=1` at tick 11).
-Correcting a test to match new behaviour is how a real regression ships, so the correction is backed by
-measuring the OLD resolver either side of a `git stash` (`tools/scratch/cave_gap_ab.gd`), never by the new
-code's say-so.
+`MILESTONES.md` says the point of fixing resolution, camera and seed is that only the CONTENT differs.
+Two of those three were held. The bite radius and the tick were not: Slice 1's `delve` is bite 0 at tick
+940, Slice 2's would have been bite 2 at tick 216, because D0200 moved the bite default and the scripted
+run now finishes at 228 instead of 991 — which is also why the `delve` shutter silently wrote no file.
+**The overrides for this existed; what was missing is that the DEFAULTS also form a pair.** The pair is
+not claimed, and how to build it is written down instead.
 
-### The determinism golden came back identical on both platforms
-
-Re-captured from CI's Linux build per D0167. All 200 checkpoints matched the local macOS run exactly. That
-doesn't make local capture correct — it means this one scenario is insensitive to the D0171/D0172
-`ValueNoise` float gap, which is a real datum about where that gap reaches.
+---
 
 ## Gates
 
-**All 29 suites pass on CI's Linux build** (run `33303000919`), golden array re-captured. Two gates were
-red only on D0139's parked work and are now green. **Gate 7 (LOC velocity) is the one red** — and this
-round made it worse, honestly: instrument +1185 against game +169 over the trailing 10 commits.
+**All 36 suites pass locally**, including the four new ones (`test_corner_consent`, `test_interface`,
+`test_score`, `test_particles`). Golden re-captured from CI's Linux build, run `33331589523`.
 
-**D0207, and it is the more serious finding of the two:** gate 7 runs early in the `structural gates` job,
-a failed step aborts the job, so **ten BLOCKING checks after it come back `skipped` — not failed, not
-passed.** Gate 13, gates 15-16, 22, 23 (WORKING freshness), **27 (untracked files)**, 30, the
-`project.godot` tripwire, the gate mutation tests, and duplication. **None has been enforced by CI for as
-long as gate 7 has been red.** All pass locally, checked individually this session. Found only because
-`gate_status.py` prints `local=` beside the CI conclusion — reading CI alone shows silence, not an error.
+**Gate 7 (LOC velocity) is the one red, and this round made it much worse** — four new suites, a new
+gate mutation test, and two new `view/` modules. Its own message stands: "the next unit of work is game,
+not another check." D0207's finding still applies: gate 7 aborts the `structural gates` job, so ten
+BLOCKING checks after it report `skipped` rather than pass or fail.
 
 ## Claims
 
-`python3 tools/layer_lint/check_claim_references.py`. **`claims/C004` still untouched on purpose** — whether
-a session qualifies is your judgment, not a session's.
+`python3 tools/layer_lint/check_claim_references.py` reports VOID — zero scenarios exist to carry a
+reference. **`claims/C004` still untouched on purpose**: whether a session qualifies is your judgment.
 
 ## The decisions this round is waiting on
 
-1. **`grounded_no_floor`'s 59 — full support vs. perching.** Driving it to zero means refusing to ground on
-   a partial footprint, so a body at any narrow ledge edge must walk fully onto it before resting. That is a
-   feel call. It is the only part of the acceptance signal not met, and it is not a bug.
-2. **Slice 1.5's bite radius, unchanged from last round.** Play it and sweep `--bite=0/1/2/3`
-   (`godot --path . tests/body/reveal_scene.tscn -- --play --bite=N`). `docs/TASTE_QUEUE.md` T004.
-3. **The body/world proportion.** The world is 12 m wide, the body is 8.3% of that and 33% of the screen's
-   height at zoom 6. Shrinking the body and widening the world are the same fix from two ends.
+**`docs/NEEDS_DIRECTOR.md` is new and is where these live now**, with the numbers and a proposed remedy
+for each. Six items: P001 (ratchet the fuzz `bounds` count at 922 rather than leaving it ungated), P002
+(promote the recorded-session replay from scratch to a real CI test — makes every recording you make
+binding), P003 (the size gate lints gitignored files locally and none in CI), P004 (point the fuzzer at a
+generated shaft, since the chamber poses neither the corner mechanic nor its defect), **P005 (the
+presentation batch — three options, and only option 3 changes how the game looks)**, P006 (the MODULE.md
+60-line cap is violated by 10 of 10 modules, two of them this session's).
+
+Carried, unchanged: **`grounded_no_floor`'s residual** (now 46, down from 59 — full support vs perching is
+still a feel call, not a bug); **Slice 1.5's bite radius**, `--bite=0/1/2/3`, `docs/TASTE_QUEUE.md` T004;
+**the body/world proportion**.
 
 ## Blocked, and what it's waiting on
 
-- **D0193 / the bounds invariant's magnitude** — unchanged, yours, gate 24's subject. Worth pairing with the
-  fuzz sweep's `bounds` count, which is **805,397 of 1.5M ticks** and not gated by anything.
-- **The fuzzer still never sets `mine_held`** — named three times now, still its own unit of work.
+- **D0193 / the bounds invariant's magnitude** — yours, gate 24's subject. The full sweep's `bounds` count
+  is **1,179,015 of 1.5M ticks** and gated by nothing; P001 proposes the ratchet.
+- **The fuzzer still never sets `mine_held`** — named four times now, still its own unit of work.
 - **Line of sight** — still not ported; a player can mine through one tile of rock.
 - **The `ValueNoise` cross-platform float gap** (D0171/D0172), **three GDD contradictions** (D0177), **the
   persistent-world GDD reversal** (text exists only in pre-compaction history), **`data/economy/` D1-D6**,
-  **`history/`'s 168-image cull**, **the parked Anvil CONSTRAINED finding** — all unchanged, all yours.
+  **`history/`'s 168-image cull** — all unchanged, all yours.
 
 ## Taste queue
 
 **4 open**, unchanged. T001 (`ore_copper` reads silver), T002 (band tint at 0.10), T003 (mining times,
-partly re-framed by T004), **T004 (the bite radius) is the one that gates Slice 2.**
+partly re-framed by T004), T004 (the bite radius). **T004 no longer gates Slice 2 — Slice 2 shipped.**
