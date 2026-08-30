@@ -25,6 +25,10 @@ const SITES: Array[StringName] = [&"reveal_test_dense", &"reveal_test_sparse"]
 ## 150px/s == 2.5px/tick, so 120 ticks covers 300px against a 192px-wide world.
 const WALK_TICKS: int = 120
 const SHAFT_COLS: int = 4  ## `carve_entry_shaft`'s own `range(0, 4)`
+## D0199. One jump arc is `JUMP_VELOCITY/GRAVITY` = 365/900 s = 25 ticks up and as many back down; 90 gives
+## a full arc plus the initial fall onto the shaft floor plus a second attempt, so the run covers a re-jump
+## rather than a single launch.
+const JUMP_TICKS: int = 90
 
 
 func _initialize() -> void:
@@ -32,6 +36,8 @@ func _initialize() -> void:
 	_test_the_spawn_never_swallows_its_own_target_pocket()
 	_test_walking_left_from_the_real_spawn_never_leaves_the_world()
 	_test_the_control_walking_left_from_column_zero_DOES_leave_the_world()
+	_test_jumping_from_the_real_spawn_never_leaves_the_world_through_the_ceiling()
+	_test_the_control_jumping_under_an_open_ceiling_DOES_leave_the_world()
 	_test_the_control_builds_the_same_body_the_real_setup_does()
 	_finish("reveal_spawn_bounds")
 
@@ -44,10 +50,49 @@ func _initialize() -> void:
 func _session_at_column(site: StringName, seed_value: int, spawn_col: int) -> Dictionary:
 	var grid: TileGrid = ShaftGenerator.generate(StrataData.get_site(site), seed_value)
 	RevealSessionSetup.carve_entry_shaft(grid, spawn_col)
-	var spawn_row: int = Body.HEIGHT_PX / CELL / 2
-	var body: Body = Body.new(
-		spawn_col * CELL * Fx.SCALE + Body.WIDTH_PX / 2 * Fx.SCALE, Fx.from_int(spawn_row * CELL))
+	var body: Body = Body.new(spawn_col * CELL * Fx.SCALE + Body.WIDTH_PX / 2 * Fx.SCALE,
+		Fx.from_int(RevealSessionSetup.spawn_row_for_ceiling() * CELL))
 	return {"grid": grid, "body": body}
+
+
+## D0199's control: the setup EXACTLY as it stood before the ceiling fix -- entry shaft carved from row 0,
+## body centred at `HEIGHT_PX/CELL/2` so its top edge lands on y=0. Both literals are written out here
+## rather than derived from `RevealSessionSetup`, on purpose: the point of a control is to hold the OLD
+## shape fixed while the real one moves, and one that re-derived itself from the fixed code would follow
+## the fix and stop reproducing anything (D0112's self-referential-assertion class, the same trap the
+## `spawn_col >= MIN_SPAWN_COL` assertion above fell into and names).
+func _prefix_ceiling_session(site: StringName, seed_value: int) -> Dictionary:
+	var grid: TileGrid = ShaftGenerator.generate(StrataData.get_site(site), seed_value)
+	var spawn_col: int = RevealSessionSetup.find_spawn(grid)["spawn_col"]
+	var rows: int = Body.HEIGHT_PX / CELL + 2
+	for dc: int in SHAFT_COLS:
+		for row: int in rows:  # from row 0 -- the pre-fix carve, which opened the world's own ceiling
+			grid.excavate(Vector2i(spawn_col + dc, row))
+	var body: Body = Body.new(spawn_col * CELL * Fx.SCALE + Body.WIDTH_PX / 2 * Fx.SCALE,
+		Fx.from_int((Body.HEIGHT_PX / CELL / 2) * CELL))
+	return {"grid": grid, "body": body}
+
+
+## Holds JUMP for `JUMP_TICKS` and returns the violating-tick count plus the highest the body's own top edge
+## ever reached. `jump_pressed` is asserted on EVERY tick rather than pulsed: this is not a realistic input,
+## it is the maximum upward pressure the control scheme can produce, which is what a ceiling guard has to
+## survive. Re-jumps off the floor as often as it can, so one run covers repeated attempts, not one arc.
+##
+## `min_top` carries the same discriminating role `_walk_left`'s `min_left` does, and for the same reason:
+## it is sampled after `_enforce_grid_bounds` has already clamped, so it can never be negative. `== 0` means
+## the WORLD-EDGE CLAMP stopped the head; `> 0` means ROCK did.
+func _hold_jump(body: Body, grid: TileGrid) -> Dictionary:
+	var input: InputFrame = InputFrame.new()
+	input.jump_pressed = true
+	input.jump_held = true
+	var violations: int = 0
+	var min_top: int = 1 << 60
+	for _i: int in JUMP_TICKS:
+		body.tick(input, grid)
+		if body.bounds_violation_this_tick:
+			violations += 1
+		min_top = mini(min_top, body._top_y())
+	return {"violations": violations, "min_top": min_top}
 
 
 ## Holds move_dir = -1 for `WALK_TICKS` and returns how many ticks reported a bounds violation, plus the
@@ -168,6 +213,53 @@ func _test_the_control_walking_left_from_column_zero_DOES_leave_the_world() -> v
 	_check(int(walked["min_left"]) == 0,
 		"CONTROL: the pre-fix spawn is held at exactly x=0 by the world-edge CLAMP, not by terrain (min_left %.4f px) -- the mirror of the real spawn's strictly-positive value"
 		% (float(walked["min_left"]) / float(Fx.SCALE)))
+
+
+## D0199, the vertical mirror of `_test_walking_left_...`. Found in the director's own Slice 1 `--play`
+## session (`reveal_play_2026-08-30T05-58-03.log`), which reported one bounds violation with the body's box
+## reaching y = -3.4px -- through the CEILING, on a build where the left-edge fix was already in.
+func _test_jumping_from_the_real_spawn_never_leaves_the_world_through_the_ceiling() -> void:
+	var total_violations: int = 0
+	var offender: String = ""
+	var worst_top: int = 1 << 60
+	var worst_at: String = ""
+	for site: StringName in SITES:
+		for i: int in SEEDS:
+			var seed_value: int = BASE_SEED + i
+			var session: Dictionary = RevealSessionSetup.build(site, seed_value)
+			var jumped: Dictionary = _hold_jump(session["body"], session["grid"])
+			total_violations += int(jumped["violations"])
+			if int(jumped["min_top"]) < worst_top:
+				worst_top = int(jumped["min_top"])
+				worst_at = "%s seed=%d" % [site, seed_value]
+			if int(jumped["violations"]) > 0 and offender == "":
+				offender = ("%s seed=%d (%d ticks, min_top %.4f px)"
+					% [site, seed_value, jumped["violations"], float(jumped["min_top"]) / float(Fx.SCALE)])
+	print("  [OBSERVED] highest any real spawn's head reached over %d seeds x %d sites: %.4f px (%s)"
+		% [SEEDS, SITES.size(), float(worst_top) / float(Fx.SCALE), worst_at])
+	_check(total_violations == 0,
+		("holding JUMP for %d ticks from the real spawn never leaves the world through the ceiling, on any " +
+		"of %d seeds x %d sites (%d violating ticks%s)")
+		% [JUMP_TICKS, SEEDS, SITES.size(), total_violations, "" if offender == "" else ", first " + offender])
+	_check(worst_top > 0,
+		"every real spawn's head is stopped by ROCK, strictly inside the world, never by the world-edge clamp (highest %.4f px at %s; 0.0 would mean the clamp)"
+		% [float(worst_top) / float(Fx.SCALE), worst_at])
+
+
+## The vertical control, and what makes the assertion above a measurement. Same seed, same column, same
+## input -- only the entry shaft's own first row differs. If this ever reads 0 violations, either the jump
+## stopped happening or the body stopped moving, and the test above is green about nothing.
+func _test_the_control_jumping_under_an_open_ceiling_DOES_leave_the_world() -> void:
+	var session: Dictionary = _prefix_ceiling_session(&"reveal_test_dense", BASE_SEED)
+	var jumped: Dictionary = _hold_jump(session["body"], session["grid"])
+	print("  [OBSERVED] control (entry shaft carved from row 0): %d violating ticks, min_top %.4f px"
+		% [jumped["violations"], float(jumped["min_top"]) / float(Fx.SCALE)])
+	_check(int(jumped["violations"]) > 0,
+		"CONTROL: the pre-fix open ceiling still reproduces the director's own bounds violation (%d ticks) -- if this "
+		% jumped["violations"] + "ever reads 0, the test above is passing because it measures nothing")
+	_check(int(jumped["min_top"]) == 0,
+		"CONTROL: the pre-fix spawn is held at exactly y=0 by the world-edge CLAMP, not by rock (min_top %.4f px) -- the mirror of the real spawn's strictly-positive value"
+		% (float(jumped["min_top"]) / float(Fx.SCALE)))
 
 
 ## Pins the hand-built control to the real setup, so "the control reproduces the old path" stays true as

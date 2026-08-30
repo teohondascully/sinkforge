@@ -7940,3 +7940,43 @@ recording the conditions that would let anyone re-derive it.
 still carries D0139's change will get a different trace and should not read that as a regression.
 
 **Reverse:** N/A — a discipline plus a warning line, nothing to undo.
+
+## D0199 · The spawn's ceiling: D0192's fix reached one of two edges · 2026-08-29
+**Decided:** `carve_entry_shaft` leaves row 0 SOLID (`CEILING_ROWS = 1`) and the spawn row is derived from
+that ceiling rather than from the world's top edge, so the body's head is stopped by rock instead of by the
+world-edge clamp.
+
+**Found in the director's own Slice 1 `--play` session**, replayed offline
+(`tests/body/recordings/reveal_play_2026-08-30T05-58-03.log`, 1775 ticks): **1 bounds violation**, box y
+from `-223914` — that is −3.4px, through the CEILING, on a build that already carried D0192's left-edge
+fix. Same call path (`report_bounds ← _enforce_grid_bounds ← tick`), same class, other axis.
+
+**Mechanism.** `carve_entry_shaft` opened rows 0..11 across the body's four columns and `build` centred the
+body at `HEIGHT_PX/CELL/2 = 5`, putting its top edge on **exactly y = 0**. Jump is 365px/s against 900px/s²,
+so the apex is 74px above the ceiling: with row 0 excavated there was never anything but the clamp to stop
+it. The first jump of any session leaves the world.
+
+**Why this is the interesting part, not the fix.** D0192 derived the correct rule — *one solid cell between
+the body's edge and the boundary* — and applied it to the left edge only. The rule was general; the repair
+was one instance. The ledger already carries "repair reaches one instance" as a named class and this is a
+textbook case: the fix, its test, its 400-seed population study and its control were all correct, and all
+scoped to one of the four sides. What found the survivor was not a re-read of that work but a **new
+measurement of a new session** — the director playing on the fixed build.
+
+**The controls are what make it a measurement.** `tests/test_reveal_spawn_bounds.gd` gains a vertical pair
+mirroring the horizontal one: 64 seeds × 2 sites holding JUMP for 90 ticks report **0 violations** with the
+head stopped at **4.15px** (rock), while the pre-fix carve reproduces **7 violating ticks** at **min_top
+0.0000px** (clamp). The control's error line is byte-identical to the director's own —
+`box [262144,1310720)x[-223914,2397526) pos=(786432,1086806)` — which is the attribution, not an inference.
+`min_top` is sampled after the clamp has already run, so `> 0` vs `== 0` is the discriminator; a sign check
+would be a guard that cannot fail (the same trap `min_left` documents).
+
+**Consequence accepted:** the spawn row moves 5 → 6, so every existing recording replays against a body one
+cell lower than the one that recorded it. Recordings stay valid as *input traces* and their commit column
+says which tree reproduces them (D0198); they are not re-runnable as played across this fix. The same was
+true of D0192 and is the standing cost of fixing a spawn.
+
+**Not fixed here:** D0193 still stands. The invariant fired at 3.4px here, exactly as it fired at 0.3125px
+for D0192, and it still cannot tell a wall-press from an escape. That remains the director's call.
+
+**Reverse:** set `CEILING_ROWS = 0`; the vertical control pair goes red immediately.

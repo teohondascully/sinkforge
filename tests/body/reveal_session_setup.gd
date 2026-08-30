@@ -47,14 +47,39 @@ static func find_spawn(grid: TileGrid) -> Dictionary:
 	return {"spawn_col": grid.width / 2, "target_glimmer_col": -1}
 
 
+## D0199. The vertical half of D0192, and the instance that repair did not reach. D0192 derived "one SOLID
+## cell between the body's edge and 0" for the LEFT edge and stopped there; the entry shaft opened row 0
+## across the body's full width, so the body spawned with its head exactly ON y=0 and the FIRST JUMP left
+## the world through the ceiling. Measured in the director's own Slice 1 `--play` session, not predicted:
+## `tools/scratch` replay of `reveal_play_2026-08-30T05-58-03.log` reports 1 bounds violation, box y from
+## `-223914` (-3.4px), `report_bounds ← _enforce_grid_bounds ← tick` -- the same call path as D0192 on the
+## other axis. Jump is 365px/s against 900px/s^2 gravity, so the apex is 74px above the ceiling: nothing
+## but the clamp was ever going to stop it.
+##
+## The remedy is D0192's own rule applied here rather than a second mechanism: leave row 0 SOLID so the
+## head is stopped by ROCK (`VerticalResolve`'s ceiling case) instead of by the world-edge clamp. It also
+## reads better than the hole it replaces -- `docs/GDD.md`'s "solid earth you carve INTO" has no reason to
+## open onto the sky at row 0.
+const CEILING_ROWS: int = 1
+
+
 ## `ShaftGenerator` output is solid rock/clay from row 0 down -- pure geology, no pre-existing opening.
 ## Carves a small, explicit entry pocket the width of the body, standing height only, matching
-## `tests/body/hostile_chamber.gd`'s own SPAWN_START shape.
+## `tests/body/hostile_chamber.gd`'s own SPAWN_START shape -- but starting at `CEILING_ROWS`, never row 0.
 static func carve_entry_shaft(grid: TileGrid, col: int) -> void:
 	var rows: int = Body.HEIGHT_PX / CELL + 2
 	for dc: int in range(0, 4):  # Body.WIDTH_PX/CELL cells wide
-		for row: int in rows:
+		for row: int in range(CEILING_ROWS, CEILING_ROWS + rows):
 			grid.excavate(Vector2i(col + dc, row))
+
+
+## The spawn row that puts the body's own top edge flush under `carve_entry_shaft`'s rock ceiling and no
+## higher. DERIVED from the two of them together rather than written as a literal: the body is centred on
+## its position, so its top sits `HEIGHT_PX/2` above `spawn_row`, and the shallowest legal centre is the
+## one whose top lands on the first CARVED row. Public because `tests/test_reveal_spawn_bounds.gd` builds
+## the pre-fix setup as a live control and has to be able to state both rows against the same derivation.
+static func spawn_row_for_ceiling() -> int:
+	return Body.HEIGHT_PX / CELL / 2 + CEILING_ROWS
 
 
 ## The full session start: generates the grid, finds the spawn/target columns, carves the entry shaft, and
@@ -65,7 +90,7 @@ static func build(site_id: StringName, seed_value: int) -> Dictionary:
 	var spawn: Dictionary = find_spawn(grid)
 	var spawn_col: int = spawn["spawn_col"]
 	carve_entry_shaft(grid, spawn_col)
-	var spawn_row: int = Body.HEIGHT_PX / CELL / 2  # shallowest row whose top edge isn't already past row 0
+	var spawn_row: int = spawn_row_for_ceiling()
 	var body: Body = Body.new(
 		spawn_col * CELL * Fx.SCALE + Body.WIDTH_PX / 2 * Fx.SCALE, Fx.from_int(spawn_row * CELL))
 	return {"grid": grid, "body": body, "spawn_col": spawn_col, "target_glimmer_col": spawn["target_glimmer_col"]}
