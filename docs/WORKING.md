@@ -13,6 +13,17 @@ own CLOSED sections — moved verbatim to `docs/archive/working/WORKING-2026-08-
 behind anything below; nothing was deleted, only relocated, per this file's own header requiring it stay
 under 150 lines.
 
+## IN PROGRESS — FIX QUEUE, Codex certification findings on the three-queue batch, director still away, 2026-08-29
+
+Codex certification of queues #1-#3 found real defects. Fixing exactly what's specified, each its own
+commit: R1 (`gate_status.py`'s absent-CI-as-PASS sibling bug, third find on this tool), R2 (gate 8's
+closure proof didn't isolate what it claimed), R3 (stale parking references beyond the one Codex named),
+R4 (`project.godot`'s stale CI-description comment), R5 (ValueNoise claim-scope correction — the "one
+site" framing undercounts; Codex found four), R6 (relabel the `grounded_no_floor` bound's own comment per
+the director's Finding-B ruling — no value or logic change). Hard stops: collision/`resolve_floor`/
+`grid_floor_backstop`, the fuzz restructure, the ValueNoise fixed-point conversion, `data/economy/`, 5
+hours/20 commits. **Nothing certified closed — Codex re-verifies R1-R4 specifically on completion.**
+
 ## CLOSED (pending Codex re-verify) — 5-hour autonomous queue #3, director still away, 2026-08-29
 
 Parts J/K/L/M all landed, 9 commits, well inside the 5-hour/30-commit budget. **Nothing certified closed —
