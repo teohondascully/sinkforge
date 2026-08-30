@@ -123,7 +123,7 @@ legacy/               the pre-pivot codebase. read-only. excluded from build.
 The primary implementers here are agents with bounded context. These are architectural constraints, not style preferences.
 
 - **The 5-file rule.** Any task must be completable by reading five files totalling 1,500 lines or fewer. If a task needs more, the module boundaries are wrong. Report that rather than working around it.
-- **`MODULE.md` in every module**, a 60-line TARGET (not enforced by any gate — `wc -l */MODULE.md` shows the real spread, several modules run well past it): purpose, public API, invariants, dependencies, consumers, tick phase, and the three things that have bitten people here. Read the `MODULE.md` for dependencies, the implementation only for the module you are editing.
+- **`MODULE.md` in every module**, a 100-line LIMIT enforced by `check_size_limits.py` (gate 3): purpose, public API, invariants, dependencies, consumers, tick phase, and the three things that have bitten people here. Read the `MODULE.md` for dependencies, the implementation only for the module you are editing. The number was 60 and unenforced until 2026-08-30, by which point 10 of the 18 tracked files exceeded it — a rule no instance obeys is a comment, so the director ruled it up to one the tree can meet rather than deleting prose written on purpose (`docs/DECISIONS_LEDGER.md` D0226). Headroom is real but thin: `core/MODULE.md` is 98.
 - **One concept per file. Filename equals concept.** No file named `utils`, `helpers`, `common`, or `manager`.
 - **No cross-module reach-in.** A module's internals are private. All access goes through its interface file.
 - **No global singletons.** No Godot autoloads in `sim/`. State is passed explicitly.
