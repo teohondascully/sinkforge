@@ -267,13 +267,15 @@ def classify_step(s: dict, ci_steps: dict[str, str]) -> tuple[str, str]:
             "%s: CI=%s%s" % (s["name"][:60], ci_conclusion, (", local=%s" % local) if local else ""),
         )
 
-    # No CI data at all for this step name (e.g. it never ran in the fetched CI run) -- only in this
-    # case does local execution get to speak for the step at all.
-    if local is not None:
-        return ("PASS" if local == "PASS" else "FAIL"), "%s: local=%s (no CI conclusion available)" % (
-            s["name"][:60], local,
-        )
-    return "UNKNOWN", "%s: no run: command, nothing executed" % s["name"][:60]
+    # No CI data at all for this step name -- CI is ABSENT for it (never ran in the fetched CI run,
+    # renamed, or otherwise unreported), which is a DIFFERENT thing from "skipped"/"cancelled" above
+    # (those ARE a reported conclusion). This was this tool's own sibling defect to the SKIPPED-
+    # promotion bug (Codex, third find on this tool, same disease one layer over): the old code let
+    # `local` supply PASS/FAIL here, so a step CI never reported on at all could still read as a
+    # promoted local PASS. A step CI did not report on must read UNKNOWN, unconditionally -- local
+    # execution is informational only, shown in the detail line, never the status.
+    local_note = ", local=%s (informational only -- CI reported nothing for this step)" % local if local is not None else ""
+    return "UNKNOWN", "%s: no CI conclusion available%s" % (s["name"][:60], local_note)
 
 
 def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str]) -> tuple[str, list[str]]:

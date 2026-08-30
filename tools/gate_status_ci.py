@@ -55,7 +55,20 @@ def fetch_ci_state(head_sha: str) -> tuple[str | None, str, dict[str, str]]:
         if jobs_raw.returncode == 0:
             for job in json.loads(jobs_raw.stdout).get("jobs", []):
                 for step in job.get("steps", []):
-                    step_conclusions[step["name"]] = step.get("conclusion") or step.get("status") or "unknown"
+                    # Found attacking gate_status.py once more after R1 (fix queue, Codex certification):
+                    # the old fallback (`conclusion or status or "unknown"`) coerced a step with no real
+                    # conclusion (a job that never started/was cancelled mid-run inside an otherwise
+                    # "completed" overall run -- GitHub CAN report that shape) into a literal string like
+                    # "in_progress" or "unknown". That string is not "success", so classify_step's
+                    # `ci_conclusion is not None` branch reads it as a real, reported, non-passing
+                    # conclusion and reports FAIL -- not the PASS-promotion R1 fixed, but its mirror: a
+                    # step CI never actually concluded reads as a confident FAIL instead of UNKNOWN. Fix:
+                    # only record a REAL conclusion; an absent one is left out of the dict entirely, which
+                    # classify_step already resolves correctly to UNKNOWN via the same absent-CI path R1
+                    # just fixed -- no second code path needed to handle it.
+                    conclusion = step.get("conclusion")
+                    if conclusion is not None:
+                        step_conclusions[step["name"]] = conclusion
     except Exception as e:  # noqa: BLE001
         return run["conclusion"], "run found but per-step fetch errored: %r" % e, {}
 

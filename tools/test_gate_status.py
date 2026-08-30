@@ -8,6 +8,11 @@ touching anything real):
 
 A1 -- a CI "skipped" step (an earlier step in the same job already failed, so this one never actually
       ran) must never have its own local re-execution promoted into the gate's top-line PASS/FAIL.
+R1 -- the sibling defect (Codex, third find on this tool, fix queue after the three-queue certification):
+      a step CI reports NOTHING for at all -- absent, not skipped, a different case entirely -- must also
+      never have local re-execution promoted into PASS/FAIL. The old fallback at line 270 let exactly
+      that happen. Three cases proven explicitly: CI=success -> PASS, CI=skipped -> SKIPPED (A1, above),
+      CI=absent -> UNKNOWN (R1, not a promoted local PASS).
 A2 -- a gate whose QUALITY.md evidence is a bare DIRECTORY citation (no filename) must link only to the
       one script conventionally named after that directory, never to every other, differently-numbered
       script that happens to live alongside it.
@@ -70,6 +75,44 @@ def branch_a1_real_ci_conclusion_still_authoritative() -> None:
     status, _ = gs.resolve_status([step], ci_steps)
     check("A1c negative control: CI=success stays PASS even if local=FAIL (DISAGREE, not promoted)",
           status == "PASS")
+
+
+def branch_r1_absent_ci_never_promoted_to_pass() -> None:
+    """The sibling defect to A1, one layer over: CI reporting NOTHING for a step name at all (absent --
+    it never ran in the fetched CI run, was renamed, or is otherwise unmatched) is a DIFFERENT case from
+    "skipped"/"cancelled" (those ARE a reported conclusion). The old code's fallback let `local` supply
+    PASS/FAIL whenever CI had no entry for the step, so a step CI never reported on could still read as a
+    promoted local PASS. Must resolve UNKNOWN, never PASS."""
+    step = {"job": "gates", "name": "synthetic never-reported check", "run": "true", "coe": False}
+    ci_steps = {}  # CI has NO entry for this step name at all -- absent, not skipped
+    status, details = gs.resolve_status([step], ci_steps)
+    check("R1: CI=absent + local=PASS resolves to UNKNOWN, not PASS", status == "UNKNOWN",
+          f"got status={status}, details={details}")
+
+
+def branch_r1_absent_ci_never_promoted_to_fail_either() -> None:
+    """Symmetric case: a step CI never reported on, whose local re-run happens to FAIL, must also resolve
+    UNKNOWN, not FAIL -- proving the fix suppresses local promotion in BOTH directions, not just PASS."""
+    step = {"job": "gates", "name": "synthetic never-reported check 2", "run": "false", "coe": False}
+    ci_steps = {}
+    status, details = gs.resolve_status([step], ci_steps)
+    check("R1b: CI=absent + local=FAIL also resolves to UNKNOWN, not FAIL", status == "UNKNOWN",
+          f"got status={status}, details={details}")
+
+
+def branch_r1_three_cases_explicit() -> None:
+    """The three cases side by side, as the fix queue asked for explicitly: CI=success -> PASS,
+    CI=skipped -> SKIPPED, CI=absent -> UNKNOWN. All three use the SAME step (`run: "true"`, which PASSES
+    locally) so the only variable across the three calls is what CI itself reported -- proving the status
+    tracks CI's own conclusion, not what happened to run locally."""
+    step = {"job": "gates", "name": "synthetic three-case check", "run": "true", "coe": False}
+    status_success, _ = gs.resolve_status([step], {"synthetic three-case check": "success"})
+    status_skipped, _ = gs.resolve_status([step], {"synthetic three-case check": "skipped"})
+    status_absent, _ = gs.resolve_status([step], {})
+    check("R1 three-case: CI=success -> PASS", status_success == "PASS", f"got {status_success}")
+    check("R1 three-case: CI=skipped -> SKIPPED", status_skipped == "SKIPPED", f"got {status_skipped}")
+    check("R1 three-case: CI=absent -> UNKNOWN (not PASS, even though local=PASS)",
+          status_absent == "UNKNOWN", f"got {status_absent}")
 
 
 def branch_a2_bare_directory_citation_does_not_overmatch() -> None:
@@ -154,6 +197,9 @@ def main() -> int:
         branch_a1_skipped_never_promoted_to_pass,
         branch_a1_skipped_never_promoted_to_fail_either,
         branch_a1_real_ci_conclusion_still_authoritative,
+        branch_r1_absent_ci_never_promoted_to_pass,
+        branch_r1_absent_ci_never_promoted_to_fail_either,
+        branch_r1_three_cases_explicit,
         branch_a2_bare_directory_citation_does_not_overmatch,
         branch_a4_deleting_a_workflow_step_changes_the_table,
         branch_f2_env_expression_in_step_name_resolves_before_matching,

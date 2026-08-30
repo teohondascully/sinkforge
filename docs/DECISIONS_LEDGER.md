@@ -7042,3 +7042,60 @@ a later, unrelated change would misrepresent what was actually measured at the t
 
 **Reverse cost:** CHEAP — three one-line changes plus one comment, all in `tools/gate_status.py`; revert
 independently of D0175 (which does not need to be reverted for this fix to make sense on its own).
+
+## D0179 · `gate_status.py`'s absent-CI-as-PASS sibling bug fixed (R1) — third find on this tool, one more adjacent bug found and fixed attacking it a fourth time (fix queue, Codex certification) · 2026-08-29
+
+**The bug, exactly as Codex specified.** `classify_step()`'s final fallback (line 270, before this fix):
+when CI has NO conclusion at all for a step name — genuinely absent, never present in the fetched CI run,
+a DIFFERENT case from "skipped"/"cancelled" (D0145's own A1 fix, which ARE a reported conclusion) — the
+old code let `local` (this machine's own re-execution of the step's `run:` command) supply the step's
+status directly: `if local is not None: return ("PASS" if local == "PASS" else "FAIL"), ...`. A step CI
+never reported on at all could read as a confidently promoted local PASS. Same disease as A1, one layer
+over — Codex's third find on this tool.
+
+**Fix:** the absent-CI branch now unconditionally returns `UNKNOWN`, with `local`'s own result shown only
+as an informational note in the detail line (same convention the SKIPPED branch already uses) — never the
+status itself.
+
+**Three cases proven explicitly, per the queue's own instruction — `tools/test_gate_status.py`'s new
+`branch_r1_three_cases_explicit`, same synthetic step (`run: "true"`, passes locally) across all three,
+only the CI conclusion varies:**
+```
+[OBSERVED] R1 three-case: CI=success -> PASS -- got PASS
+[OBSERVED] R1 three-case: CI=skipped -> SKIPPED -- got SKIPPED
+[OBSERVED] R1 three-case: CI=absent -> UNKNOWN (not PASS, even though local=PASS) -- got UNKNOWN
+```
+Plus the symmetric direction (`branch_r1_absent_ci_never_promoted_to_fail_either`, absent-CI + local=FAIL
+also resolves UNKNOWN, not FAIL) and the original two ad hoc cases (`branch_r1_absent_ci_never_promoted_
+to_pass`, matching). **Mutation-tested, not just added:** reverted `classify_step`'s fallback to its old
+form (backed up first, learned from Part K's own near-miss this session), re-ran the suite — all three new
+R1 cases failed exactly as expected (`got status=PASS`/`got status=FAIL` against the old code, `UNKNOWN`
+expected), every pre-existing case (A1/A2/A4/F2) stayed correctly OBSERVED, confirming the new tests
+target only the intended branch. Restored the real fix from the backup; re-ran: `test_gate_status:
+16/16 cases observed correctly. test_gate_status: PASS.`
+
+**Attacking the tool a fourth time, per the queue's own explicit instruction ("is there any OTHER path
+where a non-pass becomes PASS? If you find one, that's the report").** Traced every `ci_conclusion` value
+`classify_step` can receive: `"skipped"`/`"cancelled"` → SKIPPED (correct); any OTHER non-None value →
+`ci_pass = ci_conclusion == "success"`, so anything but the literal string `"success"` (`"failure"`,
+`"timed_out"`, `"action_required"`, `"neutral"`, `"stale"`) maps to FAIL, never a promotion; the DISAGREE
+branch still returns `ci_pass`-derived status, never `local`. **No further PASS-promotion path found in
+`classify_step` itself** — the specific defect class the queue asked about is closed.
+
+**A different, real bug found in the adjacent file (`tools/gate_status_ci.py:58`), reported precisely as
+NOT the same class:** `step_conclusions[step["name"]] = step.get("conclusion") or step.get("status") or
+"unknown"` — a step whose real `conclusion` is `None` (a job that never started or was cancelled mid-run
+inside an otherwise "completed" overall run, a shape GitHub's API can produce) fell back to `step.get(
+"status")` (e.g. the literal string `"in_progress"`), which is NOT `"success"`, so `classify_step` reads
+it as a confidently reported, definitive FAIL — the MIRROR of R1's own bug (an unconcluded step reading as
+a confident negative, not a confident positive). Fixed: only a real, non-None `conclusion` is recorded at
+all; an absent one is simply left out of the dict, routing correctly into `classify_step`'s own (now-
+fixed) absent-CI → UNKNOWN path, no second handling needed. This is reported here in full rather than
+silently folded into the R1 fix, since it does not match "non-pass promoted to PASS" and the queue's own
+hard stop ("any status-tool path still promoting non-pass to PASS that you can't fix in one attempt —
+report it, don't paper it") is specific to that one direction; this is the other direction, fixed anyway
+since it was cheap, clear, and found doing exactly the requested attack.
+
+**Reverse cost:** CHEAP — revert `tools/gate_status.py`'s one-branch change, `tools/gate_status_ci.py`'s
+one-line change, and the four new test functions in `tools/test_gate_status.py`, independently of each
+other.
