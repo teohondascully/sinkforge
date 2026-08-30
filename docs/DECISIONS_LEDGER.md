@@ -7214,3 +7214,22 @@ mention, checked directly), `legacy/`/`docs/archive/`/`history/` (historical by 
 
 **Reverse cost:** CHEAP — every edit is an added parenthetical/clause in an existing comment or docstring;
 revert any subset independently, no functional code touched.
+
+## D0182 · `project.godot`'s stale CI-description comment corrected — the real `tests` job boots Godot, the pin comment said otherwise (R4, fix queue) · 2026-08-29
+
+**The claim, as it stood.** `project.godot`'s own pin comment (lines 10-18) said CI "replaced the Godot-
+installing CI jobs with pure static analysis that needs no engine at all" and "there is currently no CI
+step that verifies a contributor's local Godot matches this pin." Both false right now: `.github/
+workflows/harness.yml:199`'s `tests` job (`godot test suites: determinism, conservation, movement
+acceptance`) downloads and checksum-verifies `GODOT_VERSION: "4.6.2-stable"` — the exact string this pin
+declares — then runs every `tests/test_*.gd` suite under it. Same class as the retired run-based-roguelite
+description already corrected this session (queue #3 M2, D0177): shipped metadata describing a state that
+stopped being true, with nothing re-reading it before it was quoted.
+
+**What was actually true, kept rather than discarded:** the comment's OTHER half — a separate `gates` job
+runs pure static analysis needing no engine — is still accurate; only the "replaced" framing (implying the
+engine-booting job was gone entirely) was wrong. Corrected to describe both jobs precisely instead of
+deleting the true half along with the false one.
+
+**Reverse cost:** CHEAP — revert the one comment block in `project.godot`; `check_project_settings.py` re-
+run clean (`PASS`, 2 required keys checked) confirming the file still parses.

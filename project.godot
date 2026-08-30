@@ -8,14 +8,16 @@
 config_version=5
 
 ; Pinned engine version: 4.6.2-stable. Reproducibility — the same version everyone develops
-; against and the same one CI used to install before the gates job (docs/QUALITY.md, "structural
-; gates") replaced the Godot-installing CI jobs with pure static analysis that needs no engine at
-; all. There is currently no CI step that verifies a contributor's local Godot matches this pin;
-; README.md's "Running from source" section states the same version so the two can't drift apart
-; silently. If a CI step that boots the engine is ever added back (e.g. for the movement
-; acceptance suite, docs/ARCHITECTURE.md §9), pin and verify it there the way the old
-; .github/workflows/harness.yml did — compare the installed engine's reported version string
-; against this one rather than only printing it, since an unread version string catches nothing.
+; against. Corrected 2026-08-29 (queue fix R4): this comment previously said CI replaced the
+; Godot-installing job with pure static analysis needing no engine at all -- that stopped being
+; true once the real `tests` job (godot test suites: determinism, conservation, movement
+; acceptance, .github/workflows/harness.yml:199) was added; it downloads and checksum-verifies
+; this exact GODOT_VERSION (`env.GODOT_VERSION: "4.6.2-stable"`, matching this pin) before running
+; every tests/test_*.gd suite under the real engine. The separate `gates` job (docs/QUALITY.md,
+; "structural gates") is the one that runs pure static analysis with no engine -- that part of the
+; original claim was correct, just stated as if it were the whole picture. README.md's "Running
+; from source" section states the same version so a contributor's local install can't drift from
+; either job silently.
 
 [application]
 
