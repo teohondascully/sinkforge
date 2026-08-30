@@ -54,6 +54,15 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 mkdir -p "$OUT_DIR" || exit 1
 
+# Each moment boots `reveal_scene.gd`, and that scene writes an input recording on quit -- so a
+# three-moment capture leaves three `reveal_agent_*.log` byproducts behind every time it runs. D0220:
+# twelve of them reached two commits via `git add -A` before this was noticed. `tests/body/recordings/
+# README.md` already says these are "a self-test byproduct, not a real session; delete them freely", so
+# the tool deletes its OWN. Snapshotting the existing set first, and only removing what is new, is what
+# keeps that from touching a real session or the one agent log kept on purpose.
+RECORDINGS="tests/body/recordings"
+BEFORE_LOGS="$(ls "$RECORDINGS"/reveal_agent_*.log 2>/dev/null | sort)"
+
 # moment | extra scene args | capture tick
 # `surface` is the world as a player first meets it. `delve` is the same seed after the scripted shaft has
 # been sunk, framed so the whole descent is in one frame. `aim` is Slice 1's own subject: the reach ring,
@@ -121,6 +130,18 @@ for entry in "${MOMENTS[@]}"; do
 	echo "capture_moments: $name -> $png (${colours:-?} distinct colours, tick $tick, bite ${BITE:-default})"
 	i=$((i + 1))
 done
+
+# Remove only the recordings this run created; anything that existed beforehand is left alone, which is
+# what keeps this from touching a real `--play` session or the one agent log kept on purpose.
+AFTER_LOGS="$(ls "$RECORDINGS"/reveal_agent_*.log 2>/dev/null | sort)"
+NEW_LOGS="$(comm -13 <(printf '%s\n' "$BEFORE_LOGS") <(printf '%s\n' "$AFTER_LOGS"))"
+NEW_COUNT="$(printf '%s\n' "$NEW_LOGS" | grep -c . || true)"
+if [ "$NEW_COUNT" -gt 0 ]; then
+	printf '%s\n' "$NEW_LOGS" | while IFS= read -r log; do
+		[ -n "$log" ] && rm -f "$log"
+	done
+	echo "capture_moments: removed $NEW_COUNT byproduct recording(s) this run created"
+fi
 
 if [ "$fail" -eq 0 ]; then
 	echo "capture_moments: all moments captured at $SHA"

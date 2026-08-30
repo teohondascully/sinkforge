@@ -8985,3 +8985,28 @@ halves re-captured with `BITE=` and `TICKS=` pinned to the same values, includin
 is what the SHA in each filename exists to make possible. Automating "these two shots are comparable"
 would mean the tool deciding which knobs matter, and the knob that mattered here (bite) did not exist
 when the tool was written.
+
+---
+
+## D0220 · The capture tool leaves a recording behind per moment, and twelve of them reached two commits · 2026-08-30
+**Decided:** `tools/capture_moments.sh` deletes the `reveal_agent_*.log` byproducts **it created**, and
+the twelve already committed are removed.
+
+**The mechanism, which is nobody's bug and everybody's problem.** Each moment boots
+`tests/body/reveal_scene.gd`, and that scene writes an input recording when it quits — correctly, it is
+`claims/C004`'s own capture path. So a three-moment capture leaves three logs behind, every time it runs,
+and this session ran it four times. `git add -A` swept them into `def534a` and `b693e50`.
+`tests/body/recordings/README.md` already says these are "a self-test byproduct, not a real session;
+delete them freely", so nothing about them was ambiguous — they were simply invisible at commit time.
+
+**The cleanup snapshots the set BEFORE the run and removes only what is new**, which is what keeps it
+away from the two things in that directory that must never be touched automatically: a real `*play_*.log`
+session (`CONTEXT.md`: never delete a user artifact without confirmation) and
+`reveal_agent_2026-08-29T21-34-03.log`, kept on purpose as a mechanically-verified example of the
+pipeline. Verified rather than assumed: a probe run reported "removed 3 byproduct recording(s) this run
+created" and left all three pre-existing agent logs in place.
+
+**Why the tool and not the `.gitignore`.** Ignoring `reveal_agent_*.log` would also hide the one kept on
+purpose and any future labelled agent capture, and it would make the directory's own two-dialect rule
+(D0140) harder to reason about, not easier. The byproduct belongs to the run that made it, so the run
+cleans it up.
