@@ -112,6 +112,27 @@ immediate predecessor when the claim's real origin sits further back.
   correction (proven within-platform, not across) was right; the SCOPE was still an undercount — corrected
   to name all four sites, enumerated in D0183 itself.
 
+- **D0191** — corrects `docs/LEGACY_MIGRATION_MAP_2026-08-29.md` in eleven places, after five full reads
+  closed the coverage gap the map states about itself (§12 item 2: `main.gd` and `world_renderer.gd`, 6,659
+  lines, never read in full — a gap the 2026-08-25 compat audit flagged first and also left open). The
+  load-bearing one: the map places the head-lamp and darkness-veil math in `main.gd`, and it is all in
+  `world_renderer.gd`. The map inherited that from a **stale docstring inside `light_layer.gd`** ("MainView
+  owns all the light math"), written before the light pass moved out — prose outliving the code it
+  describes, shipped beside the code refuting it. The others are counting and category errors (a breakdown
+  summing to 15 against a stated 16; "21 of 22" reported as 22, contradicting the map's own manifest row;
+  6 private fields + 2 methods described as 8 private fields; two file populations mixed into one ratio;
+  a constant named as portable that does not exist on the receiving side). The map file is deliberately
+  NOT edited — it is a pinned historical record at two fixed hashes, and editing the artifact being
+  corrected is what an append-only ledger exists to avoid.
+- **D0191 also CONFIRMS a prior correction rather than making one**, which is worth recording separately:
+  the map's own correction to `docs/archive/COMPAT_AUDIT_2026-08-25.md` §2 ("scenes/ uses `%UniqueName` 71
+  times", then a walk-back telling readers to distrust its own correct measurement) is verified — there are
+  zero — **and the mechanism is now identified**: `grep -rn '%[A-Za-z_]' legacy/scenes | wc -l` returns
+  exactly 71, so the old audit counted LINES holding a printf format specifier (58 `%d` + 43 `%s`) and read
+  them as node paths. That turns "we looked and found nothing" into "we found what they actually counted",
+  which is the difference between a null result and an explanation. The archived audit's §2 should be
+  marked corrected.
+
 **D0185, read and deliberately excluded, not silently dropped:** it trips this page's own keyword scan
 because its header says "docs/CORRECTIONS.md updated with ... real corrections" — but D0185 IS the update,
 not a correction of anything. Listing it here would make the page cite itself. Noted so the freshness gate
