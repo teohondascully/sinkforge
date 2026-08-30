@@ -88,17 +88,6 @@ func _test_local_window_resolves_the_shelf_when_body_lands_there() -> void:
 		[want_row, got_row])
 
 
-## How many solid cells the body's box overlaps -- zero at every tick is the property the resolver
-## exists to maintain, and the quantity that showed this file's own expectation had been wrong (D0206).
-func _overlap(grid: TileGrid, body: Body) -> int:
-	var n: int = 0
-	for col: int in range(Body._px_to_cell(body._left_x()), Body._px_to_cell(body._right_x() - 1) + 1):
-		for row: int in range(Body._px_to_cell(body._top_y()), Body._px_to_cell(body._bottom_y() - 1) + 1):
-			if grid.in_bounds(Vector2i(col, row)) and grid.is_solid(Vector2i(col, row)):
-				n += 1
-	return n
-
-
 ## D0206 corrected this test's SUBJECT, not just its number. The gap is `CAVE_GAP_COLS` = 4 columns and
 ## the body is exactly 4 columns wide, so it fits only when its box is aligned to the gap exactly. This
 ## used to drop the body on `_col_center_x(CAVE_GAP_START + 1)`, which puts its box on columns
@@ -123,9 +112,9 @@ func _test_local_window_resolves_the_lower_floor_when_body_lands_there() -> void
 	_check(is_equal_approx(got_row, want_row),
 		"and rests on the LOWER floor, row %.0f (got %.3f) -- a wider window does not make a body snap onto a distant floor prematurely (_bottom_y() < surface still gates every candidate), it only lets the query see further once the body has genuinely fallen there" %
 		[want_row, got_row])
-	_check(_overlap(grid, body) == 0,
+	_check(PropertyChecks.solid_overlap_count(body, grid) == 0,
 		"having overlapped nothing solid on arrival (%d cells) -- `grid` is a second `HostileChamber.build()` of the same fixed-seed terrain as `_settle`'s own, so this reads the identical geometry the body fell through" %
-		_overlap(grid, body))
+		PropertyChecks.solid_overlap_count(body, grid))
 
 
 ## The other half of the correction, kept as its own case because it is the behaviour that CHANGED: a
@@ -143,8 +132,8 @@ func _test_a_body_partly_over_the_shelf_catches_on_it_instead_of_clipping_throug
 	_check(is_equal_approx(got_row, float(HostileChamber.CAVE_FLOOR_ROW)),
 		"and rests on the SHELF, row %d (got %.3f) -- not on the lower floor, which it could only reach by passing through the shelf's own slab" %
 		[HostileChamber.CAVE_FLOOR_ROW, got_row])
-	_check(_overlap(grid, body) == 0,
-		"with no part of its box inside rock (overlapping %d cells)" % _overlap(grid, body))
+	_check(PropertyChecks.solid_overlap_count(body, grid) == 0,
+		"with no part of its box inside rock (overlapping %d cells)" % PropertyChecks.solid_overlap_count(body, grid))
 
 
 func _test_invariant_check_is_silent_on_a_normal_single_floor_column() -> void:

@@ -8321,3 +8321,37 @@ the correction is backed by an A/B measurement of the OLD code, not by the new c
 **Reverse:** restore the three `surface_y_at_x` samples in `resolve_floor` and drop the
 `_landing_is_clear` call in `grid_floor_backstop`; `test_footprint_grounding` goes red on 5 assertions,
 and the two replays return to 6 and 171 bad ticks.
+
+---
+
+## D0207 · A BLOCKING gate reported `skipped` because a different gate failed above it · 2026-08-30
+**Decided:** `PropertyChecks.solid_overlap_count(body, grid)` replaces six independent copies of the same
+`_overlap` helper. It goes in `tests/property_checks.gd` rather than `tests/test_base.gd` because it is a
+named reusable property over `Body`+`TileGrid` — what that module's docstring says it is for — and being a
+`class_name` global it also reaches `tests/fixture_step_up_into_wall_probe.gd`, which extends `SceneTree`
+and could not inherit a suite-base helper. `test_base.gd` was the D0102 precedent and would have collapsed
+five of the six.
+
+**The finding is not the duplication.** `tools/quality_check/duplication.py` is wired into `harness.yml`
+with no `continue-on-error`, and its step name says **BLOCKING**. It runs in the `structural gates` job
+*after* `check_loc_ratio` (gate 7), which is red and has been for some time. A failed step aborts the job,
+so on the commit that took this cluster from three copies to six, CI reported the duplication step as
+**`skipped`** — not failed, not passed. `gh run view --log-failed` does not list skipped steps, and the
+run's failure summary named only the two gates that did fail. **A red gate was concealing a second red
+gate, and the concealment reads as silence rather than as an error.**
+
+Found only because `tools/gate_status.py` prints `local=` alongside the CI conclusion, and its line read
+`no CI conclusion available, local=FAIL (exit 1)`. Reading the CI result alone — which is what "is the
+build green" normally means — could not have surfaced it.
+
+**The general shape, for the screen list:** a gate ordered after a failing gate in the same job is not
+being enforced, and it does not announce that. Every blocking check downstream of a known-red one is in
+this state. Gate 7 has been red across the trailing window, so this is not hypothetical for this repo —
+the steps after it in `structural gates` have not been enforced for as long as it has been red.
+
+**Not fixed here, and named rather than quietly worked around:** the ordering itself. Making each gate its
+own job, or `continue-on-error` plus an explicit aggregation step, are both real changes to the CI
+topology, which is not this unit of work. What is fixed is the duplication that was hiding behind it.
+
+**Reverse:** restore any one of the six `_overlap` copies; `duplication.py` reports a cluster again and
+exits 1 — locally. Whether CI would say so depends on gate 7.

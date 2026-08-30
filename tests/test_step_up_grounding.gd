@@ -55,17 +55,6 @@ func _map_grid(map: Array[String]) -> TileGrid:
 	return grid
 
 
-## How many solid cells the body's own box overlaps. The half-open convention matters: a body RESTING on
-## a floor does not overlap it, so a nonzero count here means genuinely inside rock.
-func _overlap(grid: TileGrid, body: Body) -> int:
-	var n: int = 0
-	for col: int in range(Body._px_to_cell(body._left_x()), Body._px_to_cell(body._right_x() - 1) + 1):
-		for row: int in range(Body._px_to_cell(body._top_y()), Body._px_to_cell(body._bottom_y() - 1) + 1):
-			if grid.in_bounds(Vector2i(col, row)) and grid.is_solid(Vector2i(col, row)):
-				n += 1
-	return n
-
-
 ## The tick that used to fail. Body at rest at the foot of the ledge, pressing toward it: `_try_step`
 ## fires, and the tick must END with that grounding intact rather than undone by the vertical pass.
 func _test_a_step_up_tick_ends_grounded_and_not_embedded() -> void:
@@ -76,13 +65,13 @@ func _test_a_step_up_tick_ends_grounded_and_not_embedded() -> void:
 	body.tick(input, grid)
 	print("  [OBSERVED] step-up tick: floor_source=%s on_floor=%s vel_y=%.2f overlap=%d"
 		% [body.floor_source_this_tick, body.on_floor, float(body.vel_y) / float(Fx.SCALE),
-		_overlap(grid, body)])
+		PropertyChecks.solid_overlap_count(body, grid)])
 	_check(body.stepped_up_this_tick, "the geometry actually poses a step-up -- without this the rest passes on a tick that never climbed")
 	_check(body.floor_source_this_tick == &"try_step",
 		"the climb is what grounded the body (got %s)" % body.floor_source_this_tick)
 	_check(body.on_floor, "and the tick ENDS grounded -- the vertical pass did not discard it")
 	_check(body.vel_y == 0, "with vel_y still zero, so no gravity was applied to a body the climb had just settled (got %d)" % body.vel_y)
-	_check(_overlap(grid, body) == 0, "and the body is not inside rock (overlapping %d cells)" % _overlap(grid, body))
+	_check(PropertyChecks.solid_overlap_count(body, grid) == 0, "and the body is not inside rock (overlapping %d cells)" % PropertyChecks.solid_overlap_count(body, grid))
 
 
 ## The invariant itself, over a whole walk rather than one tick. This is the assertion that would have
@@ -149,13 +138,13 @@ func _test_an_ordinary_fall_still_grounds_through_resolve_floor() -> void:
 		if body.on_floor and landed_tick < 0:
 			landed_tick = i
 	print("  [OBSERVED] a plain fall onto flat ground: landed at tick %d, source=%s, overlap=%d"
-		% [landed_tick, body.floor_source_this_tick, _overlap(grid, body)])
+		% [landed_tick, body.floor_source_this_tick, PropertyChecks.solid_overlap_count(body, grid)])
 	_check(landed_tick >= 0, "a body dropped onto flat ground still lands")
 	_check(body.on_floor and body.floor_source_this_tick == &"resolve_floor",
 		"and rests grounded via resolve_floor, not via a climb (source %s)" % body.floor_source_this_tick)
 	_check(not body.stepped_up_this_tick,
 		"with no step-up involved -- this path is the one the fix must leave completely alone")
-	_check(_overlap(grid, body) == 0, "and it is not inside the floor (overlapping %d)" % _overlap(grid, body))
+	_check(PropertyChecks.solid_overlap_count(body, grid) == 0, "and it is not inside the floor (overlapping %d)" % PropertyChecks.solid_overlap_count(body, grid))
 
 
 ## THE POSITIVE CONTROL FOR THE INVARIANT, and the reason it exists: with the fix in place the resolver

@@ -88,7 +88,7 @@ func _initialize() -> void:
 	var worst: int = 0
 	for t: int in TICKS:
 		body.tick(input, grid)
-		var overlap: int = _overlap(grid, body)
+		var overlap: int = PropertyChecks.solid_overlap_count(body, grid)
 		worst = maxi(worst, overlap)
 		print("  t%-3d pos=(%6.2f,%7.2f) vel=(%7.2f,%7.2f) floor=%-5s src=%-20s OVERLAPPING %d solid cells%s"
 			% [t, float(body.pos_x) / float(Fx.SCALE), float(body.pos_y) / float(Fx.SCALE),
@@ -103,10 +103,3 @@ func _initialize() -> void:
 	quit(0)
 
 
-func _overlap(grid: TileGrid, body: Body) -> int:
-	var n: int = 0
-	for col: int in range(Body._px_to_cell(body._left_x()), Body._px_to_cell(body._right_x() - 1) + 1):
-		for row: int in range(Body._px_to_cell(body._top_y()), Body._px_to_cell(body._bottom_y() - 1) + 1):
-			if grid.in_bounds(Vector2i(col, row)) and grid.is_solid(Vector2i(col, row)):
-				n += 1
-	return n

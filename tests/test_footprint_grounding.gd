@@ -45,15 +45,6 @@ func _stepped_grid(floor_row: int, tall_col: int) -> TileGrid:
 	return grid
 
 
-func _overlap(grid: TileGrid, body: Body) -> int:
-	var n: int = 0
-	for col: int in range(Body._px_to_cell(body._left_x()), Body._px_to_cell(body._right_x() - 1) + 1):
-		for row: int in range(Body._px_to_cell(body._top_y()), Body._px_to_cell(body._bottom_y() - 1) + 1):
-			if grid.in_bounds(Vector2i(col, row)) and grid.is_solid(Vector2i(col, row)):
-				n += 1
-	return n
-
-
 ## The behavioural case. A body dropped straight down (no horizontal input, so nothing but the ground
 ## plane decides where it stops) must come to rest ON the one raised cell under its footprint, not 2px
 ## inside it. Also asserts WHICH path grounded it: D0139 failed by fixing one path and letting the flaw
@@ -67,10 +58,10 @@ func _test_a_tall_column_inside_the_footprint_is_rested_on_not_sunk_into() -> vo
 	var expected: int = Fx.from_int(12 * CELL) - HALF_H  ## feet on the raised cell's own top face
 	print("  [OBSERVED] dropped onto a footprint with one raised column: pos_y=%.3f (expected %.3f) src=%s overlap=%d"
 		% [float(body.pos_y) / float(Fx.SCALE), float(expected) / float(Fx.SCALE),
-		body.floor_source_this_tick, _overlap(grid, body)])
+		body.floor_source_this_tick, PropertyChecks.solid_overlap_count(body, grid)])
 	_check(body.on_floor, "the body settles rather than falling forever")
-	_check(_overlap(grid, body) == 0,
-		"and rests with NO part of its box inside rock (overlapping %d cells)" % _overlap(grid, body))
+	_check(PropertyChecks.solid_overlap_count(body, grid) == 0,
+		"and rests with NO part of its box inside rock (overlapping %d cells)" % PropertyChecks.solid_overlap_count(body, grid))
 	_check(body.pos_y == expected,
 		"resting exactly on the raised cell's top face, not on a blend below it (got %d, want %d)" %
 		[body.pos_y, expected])
@@ -178,11 +169,11 @@ func _test_the_backstop_still_depenetrates_a_body_inside_solid_ground() -> void:
 		"sanity: this body's own box is embedded in solid ground")
 	var fired: bool = VerticalResolve.grid_floor_backstop(body, grid)
 	print("  [OBSERVED] backstop against a buried body: fired=%s pos_y=%.3f overlap=%d"
-		% [str(fired), float(body.pos_y) / float(Fx.SCALE), _overlap(grid, body)])
+		% [str(fired), float(body.pos_y) / float(Fx.SCALE), PropertyChecks.solid_overlap_count(body, grid)])
 	_check(fired, "the backstop still fires for the de-penetration case it exists for")
 	_check(body.pos_y == Fx.from_int(15 * CELL) - HALF_H,
 		"lifting the body onto the mass's own top face (got %d, want %d)" %
 		[body.pos_y, Fx.from_int(15 * CELL) - HALF_H])
-	_check(_overlap(grid, body) == 0, "with the box now clear of rock (overlapping %d)" % _overlap(grid, body))
+	_check(PropertyChecks.solid_overlap_count(body, grid) == 0, "with the box now clear of rock (overlapping %d)" % PropertyChecks.solid_overlap_count(body, grid))
 	_check(body.floor_source_this_tick == &"grid_floor_backstop",
 		"named as its own path (got %s)" % body.floor_source_this_tick)
