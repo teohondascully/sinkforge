@@ -8,39 +8,43 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-**Reset this round (fix queue's own wrap):** queue #2 and queue #3's own CLOSED sections moved verbatim
-to `docs/archive/working/WORKING-2026-08-29.md`. Read it for detail behind anything below; nothing was
-deleted, only relocated, per this file's own header requiring it stay under 150 lines.
+**Reset this round:** the fix queue's own CLOSED section moved to
+`docs/archive/working/WORKING-2026-08-29.md` alongside queues #2 and #3. Nothing deleted, only relocated,
+per this file's own 150-line cap.
 
-## CLOSED (pending Codex re-verify) — FIX QUEUE, Codex certification findings, 2026-08-29
+## GATED — LEGACY REVIVAL, Slice 0 done, STOPPED for the director's look before Slice 1
 
-R1-R6 landed, 9 commits (well under the 20-commit budget). **Nothing certified — Codex re-verifies R1-R4
-specifically on return.** Evidence: `docs/DECISIONS_LEDGER.md` D0179-D0185.
+The Phase 1 map is approved and committed. Slice 0 landed in 4 commits (`b8e9b59..`); evidence
+`docs/DECISIONS_LEDGER.md` D0187-D0191. **Slice 1 is NOT started and must not be — Slice 0 is the gate.**
 
-- **R1** (D0179) — `gate_status.py`'s absent-CI-as-PASS sibling bug (3rd find on this tool) fixed; three
-  cases proven explicit (success→PASS, skipped→SKIPPED, absent→UNKNOWN), mutation-tested. Attacking the
-  tool a 4th time found no further PASS-promotion path, but a real mirror bug in `gate_status_ci.py`
-  (unconcluded step read as confident FAIL) — fixed too.
-- **R2** (D0180) — gate 8's closure proof rebuilt: the old "moving sim/ aside" claim was disproved by
-  Codex's own naive full-removal (breaks the shared test base too). Real isolating removal re-verified in
-  a scratch clone of HEAD (the dirty local tree would have contaminated it — confirmed directly).
-- **R3** (D0181) — 7 more stale `economy_check`/`anvil` references swept beyond Codex's one example.
-- **R4** (D0182) — `project.godot`'s stale "CI needs no engine" comment corrected.
-- **R5** (D0183) — ValueNoise's "one place" framing corrected to the true scope: 4 float sites enumerated
-  (`value_noise.gd`, 2× `shaft_generator.gd`, `core/split_rng.gd`), 6 docs fixed.
-- **R6** (D0184) — `grounded_no_floor`'s bound relabeled per the director's Finding-B ruling (cumulative
-  trajectory, not independent-trial rate) — comment only, no value/logic change.
-- **D0185** — the fix queue's own work drifted `docs/CORRECTIONS.md`'s freshness gate (D0180/182/183 are
-  real corrections, added; D0181 is drift cleanup, excluded and noted). Gate re-runs clean.
+- **Map committed** (D0187) as `docs/LEGACY_MIGRATION_MAP_2026-08-29.md`, pinned at legacy `666e551` /
+  current `0be151f`. It carries 265 legacy-side verdicts, not 432: the current-side 167 were behind a
+  second tab and are not in the text handed over. Said so in the file rather than implying coverage.
+- **Defect B fixed** (D0188) — `dig_pressed` is edge-triggered again. 9 assertions, mutation-tested; the
+  mutant reproduces the director's own recorded number (a 30-tick hold reading as 30 events, not 1).
+  Corrects the map's wording: that session was UNCOMMITTED, a 7th recording. It is committed now.
+- **Slice 0 shipped** (D0189) — 8 band records in `data/bands/`, appearance on all 7 materials, painted
+  in the reveal scene. Screenshots: `$CLAUDE_JOB_DIR/tmp/shots/slice0_reveal_test_{dense,sparse}.png`.
+- **Screenshot tool was lying** (D0190) — it saved BLACK PNGs and printed "saved". Fixed, plus a
+  distinct-colour check so a recurrence is loud. Every prior low-tick capture from it is suspect.
+- **The map's coverage gap closed** (D0191) — five full reads of the files it admits it never read.
+  Eleven corrections, one of which points a whole future slice at the wrong file (the lighting is in
+  `world_renderer.gd`, not `main.gd`; the map inherited a stale docstring).
 
-**New this round, not investigated further (collision-adjacent, out of this queue's scope):** the director
-recorded 4 real `reveal_scene.gd --play` sessions. Two produced real dig events; all four still show
-`qualifying_reveals=0` for `claims/C004`. The `reveal_test_sparse` site reproducibly throws a real
-`body ... left the world` bounds violation on replay — same exact position across two independent
-sessions with different input. Not yet known whether this is a live physics bug or a replay-fidelity gap
-(D0173's own "proven end-to-end" claim was only tested against a synthetic run). Director agreed: build a
-flag-gated verbose diagnostic capture (velocity, position deltas, touching-surface per tick) plus a
-replay-fidelity checker as the next piece of work, after this queue. New recordings not yet committed.
+**THE Q1 ANSWER, which is what gates the expensive slices: the palette reads at 16px; the FLECK does not.**
+Legacy distinguishes every ore by bright crystals scattered inside a dull host. Its nugget is 6.4px; this
+world's whole terrain cell is 4px, so a cell is either host or fleck and ~81% are bare host. Measured, not
+predicted — glimmer authored in the strict legacy idiom came out **0.028** from deepstone against a
+**0.087** rock-vs-rock noise floor, i.e. less distinct than two rocks are from each other, and broke a
+colour-distance claim the scene already had. Retuned per the Q1 ruling (art adapts, world does not):
+**0.286**. Six of seven records lift verbatim. **For Slices 3-4: any material whose identity lives in its
+flecks needs its base retuned.** Separately, `terrain_painter.gd` is not portable as written — its
+`h % int(CELL - 12.0)` collapses to a 4px band at CELL=16 and is a division by zero at CELL=12.
+
+**Waiting on the director:** approve Slice 0 → Slice 1 (cursor-aim mining, supersedes D0110). Two taste
+calls in `docs/TASTE_QUEUE.md` (T001 copper reads silver, T002 band tint). And a Slice 1 candidate found
+in passing: legacy's `STRIDE_GAIN = 0.55` takes top speed 150 → 232 px/s. The feel constants were ported;
+the stride mechanic was not, which is a concrete answer to "it feels barebones."
 
 ## OPEN, MID-INVESTIGATION — D0139's Option-2 `resolve_floor` fix hit a SECOND hard stop, uncommitted,
 awaiting the director's ruling

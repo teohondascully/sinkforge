@@ -7599,3 +7599,82 @@ while the failure being guarded is specifically that every pixel is identical (t
 pointed off-world) is a real thing to want to look at.
 
 **Reverse cost:** trivial. One extra frame of latency in a debug capture path.
+
+## D0191 · Five full reads closed the Phase 1 map's own stated coverage gap — and corrected it in eleven places, one of which points the wrong file at a whole future slice · 2026-08-29
+
+**Why this was done rather than deferred.** D0187 committed the map with §12 item 2 intact: `main.gd`
+(3,003) and `world_renderer.gd` (3,656) were never read in full, "and every view/shell estimate inherits
+that." The 2026-08-25 compat audit flagged the same gap first and did not close it. Committing it a third
+time and building six slices on top would have made it permanent. Five read-only audits ran in parallel
+against the working tree while Slice 0 proceeded in different files: the two unread coordinators,
+`terrain_painter.gd` + view-side `fine_terrain.gd`, the palette set, and an independent re-measurement of
+every counted claim the map makes. Every substantive verdict now rests on a full read.
+
+**The correction that matters most, because it misdirects future work.** The map states the head-lamp
+pool and darkness veil live in `main.gd`, and marks `light_layer.gd` "do not mistake this file for the
+lighting." **The lighting is in `world_renderer.gd`** — `LAMP_RADIUS`, `LAMP_EASE`, `LAMP_LEAD`,
+`_paint_darkness`, `_paint_lights`, `_draw_glow`, the whole skylight/openness model. `main.gd` owns only
+the tint palette (`LAMP_TINTS`) and three one-line pushes. The map's claim traces to a **stale docstring in
+`light_layer.gd` itself** ("MainView owns all the light math"), written before the light pass moved out and
+never updated — the shipped-prose-outliving-its-code class the ledger already records. Anyone porting the
+lighting on the map's authority would open the wrong 3,003-line file.
+
+**The other ten, each re-measured with a positive control:**
+1. `ui_theme.gd` does **not** compute WCAG contrast ratios; it records measured ones in prose. The
+   computation is `tools/check_text_contrast.gd` (`_relative_luminance`, linearised Rec.709, floor 4.5,
+   13 asserted pairs). The map's second half — that every colour's role is argued from "can a player's
+   input reach the thing this mark is on" — is verbatim true.
+2. `sky_painter` reads **6 private fields + 2 public methods**, not "8 private fields." Count right,
+   category wrong; two of the eight are `daylight()` and `day_phase()`, which a rebuilt coordinator can
+   satisfy as methods rather than exposed state.
+3. "33 files in `scenes/`, 24 plain RefCounted" mixes two populations. There are **37** `.gd` files, 24
+   RefCounted; **33** is the count declaring a `class_name`, of which **20** are RefCounted. 24/33 = 73%
+   overstates the share under either consistent reading. The qualitative point stands.
+4. `research_rules.gd`'s importer breakdown (3 + 1 + 3 + 8) **sums to 15**, not the 16 it is attached to.
+   The tools count is **9**. The 16 total is right.
+5. **21 of 22** machine records carry `craft_cost`, not 22 — `ore_vent.tres` has none. The map's own
+   manifest row for `ore_vent` says exactly this, so the summary contradicts its own table. The
+   contamination vector is 21 files wide, and `ore_vent` is a clean precedent for an economy-free record.
+6. `save_game.gd` contains the literal `sim.research` at **2** sites (`:101`, `:261`), not 3. The
+   research data flows through **3** places if `:229`'s sanitize pass is counted, which reads the env
+   dict, not `sim`. The migration point survives; the count needs its rule stated.
+7. There is **no `SUBDIV` constant on the current side.** The 4:1 ratio is real (`LOGIC_TILE_PX` 16 ÷
+   `TERRAIN_CELL_PX` 4) but implicit. "SUBDIV 4 vs SUBDIV 4" implies a constant to carry across; there
+   is nothing to port to.
+8. "1,937 lines / 20 `.gd` files" is `core/ + sim/ + data/` = 1,937 / **17**. `core/ + sim/` alone is
+   **1,675 / 15**. The line figure was also taken from the working tree (with D0139's +28 uncommitted)
+   while the 9,723 instrument figure is HEAD — two different trees in one comparison.
+9. "Four of the five architecture layers contain no code" is **three of five** (`interface`, `harness`,
+   `experiment`; `core` and `sim` have code). `view/`, `shell/` and `scenarios/` are also empty but are
+   not among ARCHITECTURE.md's numbered five. The stronger true statement: six of the seven non-`core`/
+   `sim` architecture directories contain no code at all.
+10. `world_renderer.gd` carries **183** sim-facing references, not 161.
+
+**One confirmation worth as much as the corrections.** The map's own correction to
+`docs/archive/COMPAT_AUDIT_2026-08-25.md` — that its "71 `%UniqueName` occurrences" is false and its
+walk-back was wrong — is **verified, and the mechanism identified**: there are zero unique-name node
+references, zero `$` characters anywhere in 28,522 lines, and `grep -rn '%[A-Za-z_]' legacy/scenes | wc -l`
+returns **exactly 71** — the old audit counted LINES containing a printf format specifier (58 `%d` + 43
+`%s`) and read them as node paths. That converts a null result into a positive identification.
+`docs/archive/COMPAT_AUDIT_2026-08-25.md` §2 should be marked corrected.
+
+**And one finding no question asked for, which answers something the director raised directly.** The map's
+"run speed / gravity / jump / max fall — identical" row is true of the constants and misleading about the
+result: `legacy/scenes/player.gd:51` carries `STRIDE_GAIN = 0.55`, whose own comment reads
+"extra top speed at full stride (150 -> 232 px/s)", plus water multipliers. **Legacy's effective top speed
+is 232, not 150, and this build has no stride mechanic.** The feel constants were ported; the mechanic
+that made them feel that way was not. This is a concrete, checkable answer to the director's own
+observation earlier this session that the movement "feels barebones" despite the port — and it is a
+candidate for Slice 1, not a defect in anything currently shipped.
+
+**Also carried forward for the slices that will need it:** `world_renderer.gd`'s rebuild has a measured
+13-file split plan and a 12-item risk register (the veil's four invalidation granularities with flags
+written from three places each; the `_open_field`/`_open_blur` buffer aliasing; the SubViewport's
+`own_world_3d` retention contract, whose absence compounded a saturation grade 1.18^n; and two radius
+units — `_veil_cut` takes CELLS, `_draw_glow` takes PIXELS — a 32x error that would read as "the lighting
+feels wrong" rather than crash). `main.gd`'s mining charge loop, the hollow tell and the posable-pointer
+API are extracted as an implementable spec with every constant named. Those are Slice 1 and Slice 3 inputs
+and are not acted on here.
+
+**Reverse cost:** none — this entry is a record of reads, and the map file it corrects is unedited (the
+map is a pinned historical record; corrections belong here, in the append-only ledger, not in edits to it).
