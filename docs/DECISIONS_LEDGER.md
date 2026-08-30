@@ -9250,3 +9250,56 @@ Boundary-tested rather than assumed (`test_check_size_limits.py`, 4/4): 99 passe
 passes** (the cap is `>`, not `>=`), 101 fails, and a gitignored `MODULE.md` is not counted at all —
 inheriting D0225's population so this new cap cannot repeat the two-population defect it was written
 alongside.
+
+## D0227 · The last unblocked lifts — and the largest one needed splitting to fit a gate it predates · 2026-08-30 · closes NEEDS_DIRECTOR P005 option 1, director's ruling
+**Decided:** the four files P005 measured as liftable without a coordinator came over: `sim/world/seams.gd`
+(80), `view/visuals/art.gd` (26), `view/fx/light_layer.gd` (25), and `legacy/scenes/settings.gd` (455)
+as **two** files. Game LOC 3,075 -> 3,760.
+
+**Corrected while applying it.** P005's "~900 lines liftable" already counted `score.gd` and
+`particles.gd`, which landed last session. The remaining batch was **586 lines**, not 900. The batch is
+now genuinely dry: every other LIFT row is blocked on the coordinator, on `FactorySim`, or on entities
+this build does not have.
+
+**`settings.gd` is 455 lines against a 400-line blocking gate**, so it split into `shell/settings.gd`
+(131: state, persistence, audio) and `shell/settings_bindings.gd` (351: rebinding, load-time collision
+reconciliation, keycap labels). **The seam is the file's own** -- nothing in the first half reads an
+InputEvent, nothing in the second reads an audio level -- and splitting was preferred to parking the
+most valuable lift or to raising a gate for one file. One further extraction inside it: `reconcile()`
+came over at 52 lines against the 50-line function limit, so the device-rescue block became
+`_rescue_emptied_devices`, body unchanged including the load-bearing desk-before-pad order.
+
+**The characteristic failure of a split is not a parse error, it is two copies of one piece of state.**
+`SettingsBindings` reading its own `bindings` dict would parse, run, and pass any single-file test while
+silently losing every rebind. `tests/test_settings.gd` writes through one class and reads through the
+other, in both directions, specifically to catch that.
+
+**`seams.gd` is the only one that changed on the way over, and the change is what let it into `sim/`.**
+Three float rates and a float-returning `_plane` became integers, because `sim/` is fixed-point and
+cross-platform-deterministic by contract and a float comparison is exactly what can differ between two
+machines. **The conversion is proven exact, not argued:** the test recomputes legacy's own float
+expression alongside the integer one across the **entire 0..65535 domain x 3 rates -- 196,608
+comparisons, 24,250 of them answering true, 0 disagreements.** The count of true answers is asserted
+first, because a sweep that answered false everywhere would also report zero disagreements.
+
+**And the obvious conversion would have been wrong.** `v < int(0.18 * 65535)` disagrees with the float
+original on **exactly 3 inputs** -- one per rate, the first at `numerator=11796` -- which no random
+sample would have found and which would have silently re-grained one plane of every world. That form is
+kept in the suite as a control that must keep failing, so the sweep is discriminating between two live
+candidates rather than confirming a tautology.
+
+**Three of the four arrive with no consumer, and that is stated rather than dressed up.** `art.gd` points
+at an `assets/` directory this tree does not have, which is its designed empty state (`has_any()` false
+keeps every renderer on its code-drawn path) but means only the miss path is testable. `light_layer.gd`
+is a canvas for a coordinator that does not exist -- this build draws one flat `_draw` with no blend
+modes, and `material_look.gd` says outright that the shadow veil "is not in Slice 0". `seams.gd` is the
+substrate for the grain mechanic; no mining path calls it.
+
+**`light_layer.gd` is flagged as possibly contradicting its own ruling.** It is banked value for the
+parked coordinator, which is the same shape as the one-hop `Visuals` batch the director declined for
+being banked. Both decisions ought to agree; landed as instructed and raised here rather than quietly
+skipped.
+
+**What did NOT get connected, so nobody reads the lift as the feature.** `Settings.music_db()` is the
+real source for `view/audio/score.gd`'s injected `music_db`, which D0215 left as a plain `0.0`. Wiring
+them is a shell job and `shell/` has no boot yet, so **the value now exists and nothing calls for it.**
