@@ -8355,3 +8355,67 @@ topology, which is not this unit of work. What is fixed is the duplication that 
 
 **Reverse:** restore any one of the six `_overlap` copies; `duplication.py` reports a cluster again and
 exits 1 — locally. Whether CI would say so depends on gate 7.
+
+---
+
+## D0208 · A surface agility course, sized from what the body can actually do · 2026-08-30
+**Decided:** `tests/body/movement_course.gd`, played via `play_scene.tscn -- --play --course`. The
+director asked to feel "how the mid-air dir change feels for agile movement," which is a question about
+air control, and there was nowhere to ask it: `HostileChamber` is the acceptance fixture, shaped around
+`ScriptedTraverse`'s one known route, and `reveal_scene`'s shaft is 12 m wide with a ceiling.
+
+**Every dimension is derived from a measurement, not chosen.** `tools/scratch/measure_agility.gd` ticks
+the real `Body` against a real `TileGrid`; the closed form from the feel constants is wrong, because
+`APEX_FLOAT` cuts gravity near the top and the jump-cut ratio reshapes the arc:
+
+| | measured |
+|---|---|
+| standing jump | 71.4 px (17.9 cells, 1.79 body-heights), 0.87 s airborne, 0.15 s of it near apex |
+| running jump | carries 132.5 px (33.1 cells, 8.3 body-widths) |
+| widest gap cleared | 28 cells (112 px) from a full-speed run |
+| **air reversal** | **vel_x crosses zero 14 ticks (0.23 s) after the stick flips; 60% of run speed the other way at 22 ticks (0.37 s)** |
+| reversal overshoot | 15.4 px (3.9 cells) past the flip point — about one body width |
+| air control | 11.25 px/s per tick against 18.75 on the ground |
+
+A full reversal costs 22 of the 52 airborne ticks — **42% of one jump** — which is the number the
+director's question was actually about, and it is now written down instead of felt at.
+
+**The section that exists for the question:** a 30-cell pit, deliberately two cells WIDER than the
+measured maximum so it cannot be crossed in one jump at any speed, with a perch in the middle exactly
+`Body.WIDTH_PX` wide. You arrive at full run speed and must kill it in the air to stop on it. The
+reversal is the mechanic, not an option.
+
+**THE COURSE'S FIRST BUILD LET THE BODY JUMP OUT OF THE TOP OF THE WORLD, and my own test agreed it was
+fine.** Plateau at row 24 with 96 px of sky; a jump from it put the head at y=-15.4px and
+`_enforce_grid_bounds` clamped it. The sky assertion I had written checked `headroom > 71` — the apex —
+and forgot that **it is the head that leaves the world, not the feet**. Required clearance is apex PLUS
+`Body.HEIGHT_PX` = 112 px. The constant and the check were wrong in the same direction, so they agreed
+with each other; only running it found the disagreement with reality. `SKY_ROWS` is now derived in the
+fixture from `MEASURED_APEX_PX + Body.HEIGHT_PX`, and the suite asserts against that same derivation
+rather than a second typed number — the ledger's own "constant must dominate constant: derive it, don't
+write it."
+
+**A second instrument error, same session, opposite kind.** `_best_case_jump` ran a blind 60-tick approach
+before looking for the lip, which for the committing gap started the body in mid-air over the PREVIOUS
+gap. It reported a 26-cell jump as unclearable — a driver failure reading as a subject failure. The helper
+now takes an explicit start column and **asserts it is solid ground** before running.
+
+**Not a metric and deliberately not one.** No claim, no threshold, no scripted policy — `--course` swaps
+the terrain and the spawn and nothing else. Agent mode stays on `HostileChamber`, because
+`ScriptedTraverse` encodes that chamber's route and would walk off the first gap here.
+
+**Playground rules, asserted:** a continuous catch floor under every column (12 cells down, inside the
+17.9-cell jump, so a miss is always recoverable without walking to a ramp), and both ends of the pit
+proven passable by simulation — the committing gap IS clearable at full speed, and the perch IS escapable
+from a standstill. A course with a dead end would be a worse instrument than no course.
+
+**Expect exactly one `ambiguous floor selection` push_error** from the perch: a floating platform with the
+catch floor inside the same 48-row window is precisely ADR 0005's documented, accepted multi-level case.
+Recorded in the fixture so a future session does not chase it.
+
+**Also:** `play_scene` gained `--zoom=` (default 3.0 — at zoom 1 the body is 16px on a 1280px view, which
+cannot support a feel judgment) and now draws per-material via `MaterialLook`, so the `hardrock` targets
+that have to be READ before they are jumped to separate from the `clay` ground.
+
+**Reverse:** delete the fixture and its suite, drop `--course`/`--zoom` from `play_scene`. Nothing else
+reads either.

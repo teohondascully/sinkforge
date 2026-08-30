@@ -52,6 +52,9 @@ var _camera: Camera2D
 var _finished: bool = false
 var _screenshot_tick: int = -1
 var _screenshot_path: String = ""
+var _course: bool = false
+var _zoom: float = 3.0
+var _look: MaterialLook = MaterialLook.new()
 
 
 func _ready() -> void:
@@ -61,14 +64,30 @@ func _ready() -> void:
 			_screenshot_tick = int(arg.trim_prefix("--screenshot-tick="))
 		elif arg.begins_with("--screenshot-out="):
 			_screenshot_path = arg.trim_prefix("--screenshot-out=")
-	_grid = HostileChamber.build()
-	_body = Body.new(
-		Fx.from_int(HostileChamber.SPAWN_START * CELL + Body.WIDTH_PX),
-		Fx.from_int(HostileChamber.FLOOR_ROW * CELL) - Body.HEIGHT_PX / 2 * Fx.SCALE)
+		elif arg.begins_with("--zoom="):
+			_zoom = maxf(0.5, float(arg.trim_prefix("--zoom=")))
+		elif arg == "--course":
+			_course = true
+	# `--course` swaps the terrain and the spawn, and nothing else: the input reading, the recording, the
+	# screenshot path and the camera are all unchanged, because a movement playground and an acceptance
+	# chamber differ only in what the ground is shaped like. Agent mode stays on `HostileChamber` --
+	# `ScriptedTraverse` encodes that chamber's own route and would walk off the first gap here.
+	_grid = MovementCourse.build() if _course else HostileChamber.build()
+	if _course:
+		_body = Body.new(MovementCourse.spawn_x(), MovementCourse.spawn_y())
+	else:
+		_body = Body.new(
+			Fx.from_int(HostileChamber.SPAWN_START * CELL + Body.WIDTH_PX),
+			Fx.from_int(HostileChamber.FLOOR_ROW * CELL) - Body.HEIGHT_PX / 2 * Fx.SCALE)
 	_camera = Camera2D.new()
 	add_child(_camera)
+	# Default zoom 1 shows 1280x720 world px, against a 16x40px body -- unreadable for a feel judgment,
+	# which is what this scene is for. 3.0 shows 427x240px: the 71px jump apex and the 133px running-jump
+	# span both sit inside the frame with room, so an arc can be watched whole rather than inferred.
+	_camera.zoom = Vector2(_zoom, _zoom)
 	_camera.make_current()
-	get_tree().root.title = "Sinkforge -- hostile chamber (%s mode)" % ("play" if _play_mode else "agent")
+	get_tree().root.title = "Sinkforge -- %s (%s mode)" % [
+		"movement course" if _course else "hostile chamber", "play" if _play_mode else "agent"]
 
 
 func _physics_process(_delta: float) -> void:
@@ -97,8 +116,11 @@ func _physics_process(_delta: float) -> void:
 		return
 
 	if not _play_mode:
+		# The course has no scripted route and so no "reached the end" -- `ScriptedTraverse` encodes
+		# HostileChamber's own. Agent mode on the course is only ever the plumbing check (screenshot,
+		# recording), so MAX_TICKS is its only stop.
 		var col: int = Body._px_to_cell(_body.pos_x)
-		if col >= HostileChamber.END_START or _tick_count >= MAX_TICKS:
+		if (not _course and col >= HostileChamber.END_START) or _tick_count >= MAX_TICKS:
 			_finish_and_quit()
 
 
@@ -136,8 +158,15 @@ func _draw() -> void:
 	var col_hi: int = mini(_grid.width, view_center_col + 200)
 	for col: int in range(col_lo, col_hi):
 		for row: int in range(0, _grid.height):
-			if _grid.is_solid(Vector2i(col, row)):
-				draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL), COLOR_TERRAIN, true)
+			var cell: Vector2i = Vector2i(col, row)
+			if not _grid.is_solid(cell):
+				continue
+			# Per-material colour rather than one flat brown (D0189's `MaterialLook`, already used by
+			# `reveal_scene`). It matters here specifically: the movement course marks every target that
+			# has to be READ before it is jumped to -- the perch, the pillars -- in `hardrock` against
+			# `clay` ground, and a single flat fill would throw that distinction away.
+			draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL),
+				_look.cell_color(_grid.get_material(cell), col, row), true)
 	var left: float = float(_body._left_x()) / float(Fx.SCALE)
 	var top: float = float(_body._top_y()) / float(Fx.SCALE)
 	draw_rect(Rect2(left, top, Body.WIDTH_PX, Body.HEIGHT_PX),
