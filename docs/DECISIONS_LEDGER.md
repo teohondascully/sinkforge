@@ -7385,3 +7385,58 @@ files are real recorded play and should not be deleted without checking with the
 
 **Reverse cost:** N/A for the finding itself (a fact about the tree); the six committed log files could be
 removed if the director ever wants them gone, per the same README policy that currently protects them.
+
+## D0187 · Phase 1 legacy-revival map committed as the pinned-hash record — with its own coverage gap stated in the file rather than inherited silently (Q5, Slice 0) · 2026-08-29
+
+**The director's Q5 ruling: commit the map to `docs/` as the pinned-hash record.** Done, as
+`docs/LEGACY_MIGRATION_MAP_2026-08-29.md`. Three judgment calls in how it was committed.
+
+**1. What was actually verified before committing, and what was not.** The map was produced by a separate
+analysis pass, not by this session. Committing an analysis this session did not perform, under this
+repository's own "verify a numeric claim against actual tool output" rule, means saying which claims were
+re-measured here:
+
+- **`666e551` (legacy) and `0be151f` (current) — VERIFIED.** With a correction worth recording: the first
+  check ran `git rev-parse pre-pivot` and got `eb54352`, which looked like the map was wrong. It is not.
+  `pre-pivot` is an *annotated* tag, so `rev-parse` returns the tag object; `git rev-parse pre-pivot^{commit}`
+  returns `666e5518dd6f881cd6d81799543d60e0a79773ae` exactly as claimed. The naive command is the trap, not
+  the map. Recorded in the committed file so the next reader does not repeat it.
+- **Godot 4.6.2.stable.official.71f334935 — VERIFIED** against `godot --version`.
+- **Every file named in Slice 0's scope — VERIFIED to exist at the claimed line count**:
+  `legacy/scenes/strata.gd` (55), `legacy/scenes/main.gd` (3003), `legacy/src/data/material_def.gd` (46),
+  16 `.tres` files under `legacy/src/data/materials/`, and `REACH_CELLS: float = 3.2` at
+  `legacy/scenes/main.gd:17`.
+- **The strata band arithmetic — VERIFIED independently.** `SURFACE_ROW = 20` and one legacy row = one
+  metre give TOPSOIL 0m, CLAYBAND 10m, SHALE REACH 24m, LONG DARK 40m; and reading
+  `legacy/src/core/layered_world_gen.gd` gives `DEEPSLATE_ROW = 76` (56m), `SEAL_TOP = 84` (64m),
+  `SEAL_ROWS = 2` so STONEREACH begins at row 86 (66m). Every one matches the depth ladder the director's
+  own copy of the report displays in its header. This is the one substantive claim re-derived from source
+  rather than accepted.
+- **The 432 verdicts — NOT re-derived.** Verdicts on files outside Slice 0's scope carry the original
+  pass's authority. The committed file says so in its own Provenance section rather than leaving a reader
+  to assume this repository stands behind all of them.
+
+**2. The committed file carries 265 verdicts, not 432, and says so.** The original rendered its manifest as
+two filterable tabs; only the legacy-side 265 rows were in the text handed over, the current-side 167 were
+not. Committing it under a "432 verdicts" banner without that note would make the file claim a coverage it
+does not have — the exact `docs/CORRECTIONS.md` failure class (a count with no recoverable membership).
+The Provenance section states the total describes the original pass and not this document, and says plainly:
+do not cite this file as the record of the current-side verdicts.
+
+**3. §12's stated weaknesses were reproduced unsoftened, and five are being closed by direct reads.** The
+map's own biggest admission is that `main.gd` (3,003) and `world_renderer.gd` (3,656) were never read in
+full and that every view/shell estimate inherits that. Rather than commit that gap and inherit it a third
+time (the 2026-08-25 compat audit flagged it first and did not close it either), five read-only audits were
+dispatched in parallel against the files the map could not read: `terrain_painter.gd` + view-side
+`fine_terrain.gd` (what Slice 0 must reproduce at half scale), `main.gd` + `controls.gd` (the mining charge
+loop and posable-pointer API, Slice 1's spec), `world_renderer.gd` (the coordinator's painter-facing
+surface and split plan), the map's own measured coupling claims (independently re-counted), and
+`visuals.gd` + `ui_theme.gd` + `sky_painter.gd` (the palette as data). Their findings land in later
+entries; §12 item 2 is annotated in place to point here.
+
+**Why commit it at all rather than treat it as conversation.** Every later slice's verdicts, hard stops and
+deferrals cite it. An uncommitted reference that six slices depend on is exactly the "declared state
+drifts" problem the event-sourced discipline exists to avoid, and the director asked for it explicitly.
+
+**Reverse cost:** trivial — one file, no code, no gate depends on it. Deleting it would strand the slice
+plan's citations, nothing more.
