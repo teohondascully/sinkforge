@@ -12,6 +12,30 @@ the only property that makes a before/after pair mean anything.
 is mechanically reproducible; a human session is not, and only a human session can answer a question about
 feel. `claims/C004` is populated by the director's judgment, never from this table.
 
+## Slice 2 — the L2 door, and the first cosmetic feedback
+
+| | |
+|---|---|
+| **Slice** | 2 — `interface/` exists; the score; chips and the draught |
+| **Commit** | `5f40ac1` |
+| **Recording** | [`tests/body/recordings/slice2_minedown_agent_2026-08-30.log`](../tests/body/recordings/slice2_minedown_agent_2026-08-30.log) — **AGENT-MODE**, scripted `--mine-down`, 228 ticks |
+| **Shows** | The same scripted shaft as Slice 1, now throwing chips of the broken material's own colour on every break. The two changes that carry this slice are not visible at all: `interface/` renders nothing, and `view/audio/score.gd` is sound. |
+| **Screenshots** | [surface](milestones/slice2_surface_5f40ac1.png) · [delve](milestones/slice2_delve_5f40ac1.png) · [aim](milestones/slice2_aim_5f40ac1.png) |
+
+**This slice's honest visual delta is `aim`, and only `aim`.** At zoom 13 the scattered dark flecks
+around the reticle are D0216's chips — the first cosmetic feedback this build has ever produced. Nothing
+else in the frame changed, which is the correct reading rather than a disappointing one: Slice 2's
+subject is a layer boundary, and a layer boundary that changed a pixel would be a bug.
+
+**The cross-milestone `delve` pair does NOT exist yet, and putting these two side by side would be
+wrong** (`docs/DECISIONS_LEDGER.md` D0219). Slice 1's `delve` is bite radius 0 at tick 940; this one is
+bite 2 at tick 216, because D0200 moved the bite default and the scripted run now reaches its target in
+228 ticks instead of 991. Those are two different worlds at two different moments, and every difference
+between the images would be attributed to whatever this slice changed. To build the real pair, re-capture
+**both** commits with the knobs pinned — `BITE=0 TICKS=2,940,40 tools/capture_moments.sh <label>` — which
+is what the SHA in every filename exists to make possible. Left undone deliberately rather than papered
+over with a caption.
+
 ## Slice 1 — the mining verb
 
 | | |
