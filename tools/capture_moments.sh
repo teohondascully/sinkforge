@@ -29,6 +29,20 @@ GODOT="${GODOT_BIN:-godot}"
 SEED=20260826
 SITE=reveal_test_dense
 RES=1920x1080
+# D0200. `BITE=n` pins the mining bite radius and stamps it into every filename, so the two halves of a
+# bite before/after pair cannot be told apart only by which order they were taken in. Unset means "whatever
+# the scene defaults to", which is what a milestone shot of the shipped build should be.
+BITE="${BITE:-}"
+BITE_ARG=""
+BITE_TAG=""
+if [ -n "$BITE" ]; then
+	BITE_ARG="--bite=$BITE"
+	BITE_TAG="_b${BITE}"
+fi
+# `TICKS=a,b,c` overrides the three capture ticks in MOMENTS order. A bite radius changes how fast the
+# scripted shaft sinks, so a pair shot at one fixed tick needs a tick BOTH radii actually reach -- and the
+# alternative (each half at its own tick) would compare two different moments and call it a before/after.
+TICKS="${TICKS:-}"
 
 SHA="$(git rev-parse --short HEAD)"
 if ! git diff --quiet || ! git diff --cached --quiet; then
@@ -64,15 +78,19 @@ MOMENTS=(
 )
 
 fail=0
+i=0
 for entry in "${MOMENTS[@]}"; do
 	name="${entry%%|*}"
 	rest="${entry#*|}"
 	args="${rest%%|*}"
 	tick="${rest##*|}"
-	png="$OUT_DIR/${SLICE}_${name}_${SHA}.png"
+	if [ -n "$TICKS" ]; then
+		tick="$(printf '%s' "$TICKS" | cut -d, -f$((i + 1)))"
+	fi
+	png="$OUT_DIR/${SLICE}_${name}${BITE_TAG}_${SHA}.png"
 	# shellcheck disable=SC2086
 	out="$("$GODOT" --resolution "$RES" --path . tests/body/reveal_scene.tscn -- \
-		--site="$SITE" --seed="$SEED" $args \
+		--site="$SITE" --seed="$SEED" $args $BITE_ARG \
 		--screenshot-tick="$tick" --screenshot-out="$png" 2>&1)"
 	if printf '%s\n' "$out" | grep -q "is blank or"; then
 		echo "capture_moments: FAIL - $name captured a blank frame; not counting it as a shot" >&2
@@ -86,7 +104,8 @@ for entry in "${MOMENTS[@]}"; do
 		continue
 	fi
 	colours="$(printf '%s\n' "$out" | grep -o "capture has [0-9]* distinct colours" | grep -o "[0-9]*" | head -1)"
-	echo "capture_moments: $name -> $png (${colours:-?} distinct colours, tick $tick)"
+	echo "capture_moments: $name -> $png (${colours:-?} distinct colours, tick $tick, bite ${BITE:-default})"
+	i=$((i + 1))
 done
 
 if [ "$fail" -eq 0 ]; then
