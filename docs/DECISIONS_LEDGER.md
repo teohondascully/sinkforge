@@ -7343,3 +7343,45 @@ re-flagging it as unreviewed rather than the exclusion looking like an oversight
 D-number appears somewhere in docs/CORRECTIONS.md`.
 
 **Reverse cost:** CHEAP — revert the one addition to `docs/CORRECTIONS.md`.
+
+## D0186 · First real human `--play` sessions against `reveal_scene.gd` — committed, `claims/C004` still unmeasured, and a real, reproducible replay-fidelity gap found · 2026-08-29
+
+**Not part of R1-R6, reported here because it's a real finding, not investigated further per this queue's
+own hard stops (collision-adjacent).** The director recorded 6 real sessions tonight: 2 against
+`play_scene.gd`'s own hostile-chamber dialect (1420 and 1404 ticks, not analyzed — different format, not
+`claims/C004`'s own subject) and 4 against `reveal_scene.gd --play`, the exact
+capture path D0173 (this same session) proved the pipeline for.
+
+**The 4 reveal sessions, replayed through the existing, unmodified pipeline:**
+- `reveal_play_2026-08-30T01-06-10.log` (dense, 252 ticks) — completely idle every tick, 0 dig events.
+  Likely a false start.
+- `reveal_play_2026-08-30T01-08-32.log` (sparse, 273 ticks) — real movement/jump captured, 0 dig events.
+  Replay throws `Invariants: body ... left the world`.
+- `reveal_play_2026-08-30T01-42-17.log` (dense, 722 ticks) — real dig input, 40 dig events. Replay ALSO
+  throws the same bounds-violation error.
+- `reveal_play_2026-08-30T01-42-32.log` (sparse, 467 ticks) — real dig input, 30 dig events. Replay throws
+  the bounds-violation error at the exact SAME reported position (`pos=(4980736,1086806)`) as the earlier
+  sparse-site session, despite a different actual input sequence.
+
+**`claims/C004`: still zero qualifying reveals across all four sessions.** No session produced a dig event
+with a full `RevealMetric.WINDOW_TICKS`-wide window on both sides. Status unchanged: BLOCKED.
+
+**The real finding: `reveal_test_sparse`'s replay reproducibly diverges from live play, same failure point
+across two independent sessions with different inputs.** This directly qualifies D0173's own "capture path
+proven end-to-end" claim from earlier this session — that proof ran against ONE synthetic, scripted
+recording; it has never been proven against real human input until tonight, and real input broke it. Not
+diagnosed further here: root-causing a bounds-violation inside replay risks touching the exact
+collision/`resolve_floor` territory this queue's own hard stops name as OUT. Reported as the finding, per
+the director's own explicit instruction elsewhere this session to report rather than paper over.
+
+**Agreed next step, not started:** a flag-gated verbose diagnostic capture (velocity, position deltas,
+touching-surface per tick, in a companion file that never feeds `RevealMetric.compute()`) plus a replay-
+fidelity checker that diffs live-recorded state against replayed state tick-by-tick — the tool needed to
+tell whether this is a live physics bug or a replay-reconstruction bug. Filed for the director as the
+next piece of work after this queue.
+
+**Committed, not deleted, per `tests/body/recordings/README.md`'s own standing policy** ("`*play_*.log`
+files are real recorded play and should not be deleted without checking with the director first").
+
+**Reverse cost:** N/A for the finding itself (a fact about the tree); the six committed log files could be
+removed if the director ever wants them gone, per the same README policy that currently protects them.
