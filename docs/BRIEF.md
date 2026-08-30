@@ -5,8 +5,8 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
 **Last updated: 2026-08-30. This round: the third teleport closed, then Slice 2 — `interface/` exists, the
-build makes a sound, and mining throws chips. 10 commits, `c953117`..HEAD.
-`docs/DECISIONS_LEDGER.md` D0213-D0222, `docs/adr/0007-l2-interface.md`.**
+build makes a sound, and mining throws chips. 11 commits, `c953117`..HEAD.
+`docs/DECISIONS_LEDGER.md` D0213-D0223, `docs/adr/0007-l2-interface.md`.**
 
 **Headline: the instant-translation class is closed at its third and last instance, and L2 is real.
 `interface/` and `sim/commands/` stop being skeletons, which was the literal blocker on the presentation
@@ -70,18 +70,23 @@ saving is a different half from the one needing a ruling. The fuzz probe's seeds
 design either: `HostileChamber.build()` runs once *above* the loop and every seed shares the object.
 **A parked item is a claim — the director schedules against "cheap, no ruling needed".**
 
-### The fuzzer presses dig 1,544 times and excavates nothing
+### Corroboration inside one window is one measurement, not three
 
-Found by checking whether that shared world actually bites. Over 6 seeds x 500 ticks, `dig_pressed` is
-true on **1,544 of 3,000 ticks** and `dig_event_this_tick` fires **0** times. Confirmed twice more,
-because one counter proving itself is not evidence: the chamber's solid-cell count is **1285 at the entry
-to every seed**, and the run totals **63 violations with digging and 63 with `--no-dig`**. So `--no-dig`
-(D0127) is currently a control that cannot fail; **the fuzz suite has never exercised mining**, the
-747,000-tick D0122 regression included; and seed independence holds by accident, expiring the day the
-fixture digs. This is the same shape as the corner finding above — `HostileChamber` now demonstrably
-fails to pose **two** mechanics. **Why `events=0` is deliberately not diagnosed**: three plausible
-mechanisms, no evidence between them, and this repo's own rule says remove the subject and re-run rather
-than pick one.
+Checking whether that shared world bites, I measured **1,544 dig presses and 0 excavations** over 6 seeds
+x 500 ticks and wrote it up as a dead code path (D0222). It is not. At the configurations that ship, gate
+26 (100x500) excavates **1 time in 50,000 ticks** and gate 29 (498x1500) **107 in 747,000** — at ~1 event
+per 25,000 presses, a 3,000-tick window is *expected* to be empty, so the null discriminated nothing.
+**Two corroborations did not save it**: the constant solid-cell count and the identical `--no-dig` A/B
+were the same 3,000 ticks reporting the same absence. And the refutation was already in the ledger —
+D0127 measured `bounds` at **805,397 dig-on against 18,157 dig-off**, which no dead path produces, in an
+entry I contradicted without re-reading. **Before a zero becomes a claim, state the rate that would make
+that zero unsurprising.** Corrected in D0223.
+
+**What survives is the better finding.** The per-commit fuzzer's entire mining exposure is **one
+excavation**, so nothing dig-caused is meaningfully gated per commit — a sharper argument for P004 than
+the false one, and it needs nothing to be broken. And the seeds are **not** independent: seed 45 digs a
+cell at tick 349 and seeds 46-99 inherit it, so P007's sharding proposal is inexact *today*, not fragile
+later.
 
 ### A milestone pair is only a pair if every knob was held
 
@@ -121,8 +126,8 @@ reference. **`claims/C004` still untouched on purpose**: whether a session quali
 for each. Seven items: P001 (ratchet the fuzz `bounds` count at 922 rather than leaving it ungated), P002
 (promote the recorded-session replay from scratch to a real CI test — makes every recording you make
 binding), P003 (the size gate lints gitignored files locally and none in CI), **P004 (point the fuzzer at
-a generated shaft — the chamber poses neither the corner mechanic nor its defect, and is now measured to
-pose no mining either: 1,544 dig presses, 0 excavations)**, **P005 (the
+a generated shaft — the chamber poses neither the corner mechanic nor its defect, and the per-commit
+fuzzer's whole mining exposure is measured at ONE excavation in 50,000 ticks)**, **P005 (the
 presentation batch — three options, and only option 3 changes how the game looks)**, P006 (the MODULE.md
 60-line cap is violated by 10 of 10 modules, two of them this session's), **P007 (the determinism suite
 is 93% string-building — `TileGrid.state_signature()` formats 28 million strings to checkpoint 60,000

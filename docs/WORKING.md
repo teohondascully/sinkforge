@@ -12,7 +12,7 @@ caught mechanically rather than relying on someone noticing later.
 what a future session needs that the ledger does not already say better. New this round:
 **`docs/NEEDS_DIRECTOR.md`**, the parked queue — read it FIRST if you are the director picking this up.
 
-## DONE THIS RUN — D0213 to D0222, grouped below into six
+## DONE THIS RUN — D0213 to D0223, grouped below into six
 
 Full accounts in `docs/DECISIONS_LEDGER.md`. What a future session needs to know:
 
@@ -75,11 +75,16 @@ deferred work sound safer. `test_reveal_spawn_bounds` calls `ShaftGenerator.gene
 ms each, 77.2s of its 81.1s** — four passes over the same 128 pairs, and the free half of the saving is a
 different half from the one that needs a ruling. And the fuzz probe's seeds are **not** independent by
 design: `HostileChamber.build()` runs once above the loop and all seeds share the object. Checking whether
-that bites found the real thing: **`dig_pressed` is true on 1,544 of 3,000 ticks and zero cells are ever
-excavated** (solid count 1285 at every seed's entry; 63 violations with digging and 63 with `--no-dig`).
-So `--no-dig` is currently a control that cannot fail, the fuzz suite has never exercised mining, and seed
-independence holds by accident. Recorded in P004; **the mechanism behind `events=0` is deliberately not
-diagnosed** — three plausible causes and no evidence between them is a unit of work, not a line in a wrap.
+that bites found the real thing, in two layers.
+
+**D0223 — and the first layer was wrong.** D0222 read a 6-seed sample of **1,544 dig presses, 0
+excavations** as a dead code path. It is not: gate 26 (100x500) excavates **1 time in 50,000 ticks**,
+gate 29 (498x1500) **107 times in 747,000**. At ~1 event per 25,000 presses a 3,000-tick window is
+*expected* to be empty, so the null discriminated nothing — and D0127 already held the refutation
+(`bounds` 805,397 dig-on vs 18,157 dig-off), unread. **Corroboration inside one window is one
+measurement, not three.** What survives is better than the false version: **the per-commit fuzzer's whole
+mining exposure is one excavation**, so nothing dig-caused is gated per commit; and the seeds are **not**
+independent — seed 45 digs a cell and seeds 46-99 inherit it, so P007's sharding is inexact *today*.
 
 ## THE PRESENTATION BATCH IS MOSTLY BLOCKED — read `docs/NEEDS_DIRECTOR.md` P005
 

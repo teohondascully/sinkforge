@@ -316,12 +316,35 @@ schedules against it. **Verification has to cover what you are declining to do, 
 shipped**, and the tell is that both errors ran the same direction: each made the deferred work sound
 safer and smaller than the measurement shows it to be.
 
-**What it turned up.** Checking whether the shared world actually bites found that the fuzzer presses
-`dig_pressed` on **1,544 of 3,000 ticks and excavates zero cells** — confirmed twice over, by a solid-cell
-count identical (1285) at the entry to all six seeds and by a violation total identical (63) with and
-without `--no-dig`. So seed independence does hold, for a reason that is nobody's design and expires the
-day the fixture digs. Consequences are recorded in P004; the mechanism behind `events=0` is deliberately
-left unmeasured rather than guessed at.
+**What it turned up.** Checking whether the shared world actually bites found that the fuzzer rarely
+excavates at all — and the first write-up of *that* was itself wrong, which is the next entry.
+
+## D0223 corrects D0222 — a zero from a window too small to contain the event, written in the same hour as the note warning about exactly that
+
+**What was claimed:** D0222 measured **1,544 `dig_pressed` presses and 0 excavations** over 6 seeds x 500
+ticks and concluded that `--no-dig` is a control that cannot fail, that the fuzz suite has never
+exercised mining, and that seed independence holds by accident.
+
+**Measured at the configurations that ship:** gate 26 (100 x 500) does **1** excavation in 50,000 ticks;
+gate 29 (498 x 1500) does **107** in 747,000. The dig path works. At roughly one event per 25,000
+presses, a 3,000-tick window is *expected* to be empty.
+
+**The error, precisely.** The null was predicted by a working dig path as surely as by a broken one, so
+it discriminated nothing — this page's own expected-null class, applied to the write-up of this page's
+own expected-null class. Two things made it feel verified rather than guessed. First, **corroboration
+inside one window is one measurement, not three**: the constant solid-cell count and the identical
+`--no-dig` A/B were the same 3,000 ticks reporting the same absence. Second, **the refutation was already
+in the ledger** — D0127's full-sweep A/B measured `bounds` at 805,397 dig-on against 18,157 dig-off,
+which no dead code path produces, and D0222 was written without re-reading the entry it contradicted.
+
+**Direction, again.** D0222's own lesson was that unverified claims lean toward whatever made stopping
+feel justified. This one leaned the same way: "the path is dead" is a tidier finding than "the path fires
+once in 50,000 ticks", and tidier was wrong.
+
+**What survives, and it is the better finding.** The per-commit fuzzer's entire mining exposure is one
+excavation, so nothing dig-caused is meaningfully gated per commit. And the seeds are **not** independent
+— the shared chamber is genuinely mutated mid-run (seed 45 digs a cell; seeds 46-99 inherit it), so
+P007's sharding proposal is inexact today rather than fragile later.
 
 ## What this page is not
 

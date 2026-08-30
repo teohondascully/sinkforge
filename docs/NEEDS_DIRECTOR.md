@@ -126,35 +126,39 @@ additional seed band, reusing `fixture_shaft_replay_probe.gd`'s own construction
 the violation types and the determinism all stay exactly as they are; only the geometry the body is
 dropped into changes, and the geometry is the thing that was missing.
 
-**The corner mechanic is not the only thing the chamber fails to pose — mining is not exercised at
-all.** Measured after the above, while checking an unrelated claim about sharding. Instrumenting the
-probe's own loop over 6 seeds x 500 ticks:
+**The corner mechanic is not the only thing the per-commit fuzzer barely poses — it excavates once in
+50,000 ticks.** Counted with `body.dig_event_this_tick` inside the probe's own loop, at the
+configurations that actually ship (D0223; an earlier six-seed sample read as "never" and is corrected
+there):
+
+| configuration | ticks | `dig_pressed` | dig events | rate |
+|---|---|---|---|---|
+| 100 x 500 — **gate 26, per commit** | 50,000 | 25,261 | **1** | 1 per 25,261 |
+| 498 x 1500 — gate 29, D0122 regression | 747,000 | 372,959 | **107** | 1 per 3,486 |
+
+`FuzzDriverCommon.random_input` rolls `dig_pressed` true on about half of all ticks; almost none of
+those presses land on anything. **The per-commit fuzzer's total mining exposure is one excavation.** It
+is not blind to dig by construction, but nothing dig-caused is meaningfully gated per commit — only
+gate 29 and the nightly sweep have real exposure, and D0127's full-sweep A/B (`bounds` **805,397**
+dig-on against **18,157** dig-off) shows how large the effect is once there *is* exposure.
+
+**And the seeds are not independent.** The grid is built once *outside* the seed loop
+(`fixture_body_fuzz_probe.gd:171`) and every seed shares that one object. Printing its solid-cell count
+at each seed's entry over the real per-commit window:
 
 ```
-TEMP_DIG pressed=1544 events=0
+TEMP_SOLID_CHANGED at entry to seed=0  solid=1285 (was -1)
+TEMP_SOLID_CHANGED at entry to seed=46 solid=1284 (was 1285)
 ```
 
-`FuzzDriverCommon.random_input` rolls `dig_pressed` true on about half of all ticks — 1,544 presses in
-3,000 ticks — and `body.dig_event_this_tick` fires **zero** times. Nothing is ever excavated. Two
-independent confirmations of the same fact: the chamber's solid-cell count is **1285 at the entry to
-every one of the six seeds**, unchanged; and the run's violation total is **63 with digging and 63 with
-`--no-dig`**, byte-identical.
+Seed 45 digs one cell at tick 349, and **seeds 46-99 run against a different world than they would run
+against alone.** So `--seeds=N` is already order-dependent: a seed reproduced in isolation does not
+match its own behaviour inside the full run, and sharding the sweep would not be exact (P007).
 
-Three consequences, none of them visible from any green:
-
-- **`--no-dig` (D0127) is currently a control that cannot fail.** It suppresses a field whose effect is
-  already nil, so an A/B across it can only ever come back "no difference" — which is the reading D0127
-  itself records, and which will stay true whatever the dig path does.
-- **The fuzz suite has never exercised mining**, including the 747,000-tick D0122 regression run.
-- **Seed independence is accidental.** The grid is built once *outside* the seed loop
-  (`fixture_body_fuzz_probe.gd:171`) and every seed shares that one object; seeds are independent only
-  because nothing mutates it. The moment digging works, `--seeds=N` becomes order-dependent, and any
-  attempt to shard or to reproduce a single seed in isolation silently stops matching the full run.
-
-The mechanism behind `events=0` is *not* diagnosed here and should not be assumed — `_dig_target_cell`
-may be landing out of bounds, or on an already-open column, or the chamber may have no solid cell
-adjacent to the body at its own centre height. That is the first thing to measure, not the first thing
-to fix.
+**A note for whoever reads a `--no-dig` result.** At 100 x 500 the flag reports **922 violations dig-on
+and 922 dig-off** — one excavation moves nothing. The control is real (D0127 used it at full-sweep scale
+to attribute an 805,397/18,157 split) but its domain at the per-commit scale is a single event, so a null
+from it there carries no information about dig.
 
 **Why this is yours.** It roughly doubles the nightly sweep, which is already the longest job in the
 harness, and it introduces a second population whose numbers are not comparable with the first — a
@@ -303,11 +307,13 @@ than done: **~23% is free, the other ~23% is a ruling.**
 
 **The fuzz probe cannot be sharded, and the reason is not the one first written here.** The claim was
 that each seed is fully independent because of `SplitRng.new(seed)`. The RNG is per-seed; the **world is
-not** — `HostileChamber.build()` is called once, above the loop, and every seed shares that object. It
-survives today only because the dig path excavates nothing (P004, measured: 1,544 presses, 0 events). A
-`--seed-start=` is still about four lines plus the summary line, and it would be **exact today and
-silently wrong the day mining starts working in the fixture** — which is P004's own proposed remedy. The
-two must be decided together, or the shard flag must refuse to run unless the world is rebuilt per seed.
+not** — `HostileChamber.build()` is called once, above the loop, and every seed shares that object,
+which digging then mutates mid-run (P004: seed 45 excavates a cell and seeds 46-99 inherit it). A
+`--seed-start=` is still about four lines plus the summary line, and it would be **inexact the day it
+lands**, not merely fragile later. Sharding needs the world rebuilt per seed first — which is a change to
+what gate 26 and gate 29 measure, so their standing numbers (922 and 440,652) would both move and both
+need re-baselining. That is the ruling, and it is entangled with P004's own remedy rather than separate
+from it.
 
 **A trap worth recording separately.** A local battery built by grepping `harness.yml` for
 `res://tests/test_*.gd` picks up `test_body_fuzz.gd` — which is `if: github.event_name == 'schedule'` and

@@ -9114,3 +9114,59 @@ judgment call to `docs/NEEDS_DIRECTOR.md`; test-suite throughput is neither. The
 and pushed at `fb1852d` when these were measured, and adding an unreviewed refactor of a bounds-guard
 suite to what the comprehensive sweep will read, for 19s of local wall-clock, is a bad trade offered
 without being asked for. The numbers are the deliverable here, not the diff.
+
+## D0223 · The fuzzer digs once in 50,000 ticks — and I read a six-seed zero as a dead code path while writing up that exact error · 2026-08-30 · corrects D0222
+**Decided:** D0222 reported "1,544 dig presses, 0 excavations" from a 6-seed x 500-tick run and drew
+three conclusions from it: that `--no-dig` is a control that cannot fail, that the fuzz suite has never
+exercised mining, and that seed independence holds by accident. **The first two are withdrawn and the
+third is wrong in the opposite direction.** D0127 already contained the refutation — its full-sweep A/B
+measured `bounds` at **805,397 dig-on against 18,157 dig-off**, which is not what a dead dig path
+produces. I wrote D0222 without re-reading the entry it was contradicting.
+
+**Measured at the configurations that actually ship**, counting `body.dig_event_this_tick` inside the
+probe's own loop:
+
+| configuration | ticks | `dig_pressed` | dig events | rate |
+|---|---|---|---|---|
+| 6 x 500 (D0222's sample) | 3,000 | 1,544 | **0** | — |
+| 100 x 500 — gate 26, per-commit | 50,000 | 25,261 | **1** | 1 per 25,261 |
+| 498 x 1500 — gate 29, D0122 regression | 747,000 | 372,959 | **107** | 1 per 3,486 |
+
+**The error, exactly.** At roughly one excavation per 25,000 presses, a 3,000-tick window is *expected*
+to contain zero. The null was predicted by a working dig path as surely as by a broken one, so it
+discriminated nothing — `docs/CORRECTIONS.md`'s own expected-null class, committed in the same hour I
+wrote that class up. Two corroborating measurements did not save it, because both inherited the same
+window: the solid-cell count was constant and the `--no-dig` A/B was identical **because there were no
+events in those 3,000 ticks**, not because events cannot happen. **Corroboration inside one window is
+one measurement, not three.**
+
+**Seeds are not independent — and not by accident either.** The direct probe, printing the chamber's
+solid-cell count at every seed's entry over the real 100 x 500 window:
+
+```
+TEMP_SOLID_CHANGED at entry to seed=0  solid=1285 (was -1)
+TEMP_SOLID_CHANGED at entry to seed=46 solid=1284 (was 1285)
+```
+
+Seed 45 excavates one cell at tick 349 and **seeds 46-99 run against a different world than they would
+alone.** `HostileChamber.build()` is called once above the loop and the object is shared, so the shared
+world is genuinely mutated mid-run. D0222 got the right verdict on P007's sharding claim for the wrong
+reason: `--seed-start=` is not "exact today and wrong later", it is **inexact now**, and a single seed
+reproduced in isolation already does not match its behaviour inside the full run.
+
+**What survives, restated as a finding about coverage rather than about a dead path.** Gate 26 — the
+per-commit fuzzer — excavates **once in 50,000 ticks**. It is not blind to mining by construction, but
+its exposure is a single event, so no dig-caused defect is meaningfully gated per commit; only gate 29
+and the nightly sweep have real exposure. That is a sharper argument for P004's generated-shaft world
+than the false one D0222 made, and it does not depend on anything being broken.
+
+**`--no-dig` is a real control with almost no domain at the fast scale.** At 100 x 500 it reports **922
+violations dig-on and 922 dig-off** — one excavation does not move the count. At the full sweep D0127
+measured the same flag moving `bounds` by 44x. The flag is fine; **a null from it at the per-commit scale
+carries no information, and that is worth stating where the flag is used.**
+
+**Process note, since this is the second layer of the same mistake.** D0222's own lesson was that
+verification stops at the work you are declining to do. The failure here is adjacent and worse: I
+verified enthusiastically, then generalised from a window I never checked was wide enough to contain the
+event. **Before a zero becomes a claim, state the rate at which the event would have to occur for that
+zero to be unsurprising** — and check whether a prior ledger entry already measured it.
