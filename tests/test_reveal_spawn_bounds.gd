@@ -32,8 +32,7 @@ const JUMP_TICKS: int = 90
 
 
 func _initialize() -> void:
-	_test_the_spawn_is_never_flush_against_the_world_edge()
-	_test_the_spawn_never_swallows_its_own_target_pocket()
+	_test_the_spawn_clears_the_world_edge_and_never_swallows_its_target()
 	_test_walking_left_from_the_real_spawn_never_leaves_the_world()
 	_test_the_control_walking_left_from_column_zero_DOES_leave_the_world()
 	_test_jumping_from_the_real_spawn_never_leaves_the_world_through_the_ceiling()
@@ -119,52 +118,59 @@ func _walk_left(body: Body, grid: TileGrid) -> Dictionary:
 	return {"violations": violations, "min_left": min_left}
 
 
-func _test_the_spawn_is_never_flush_against_the_world_edge() -> void:
+## The two read-only checks over the same 128 (site, seed) pairs, MERGED INTO ONE GENERATION PASS
+## (`docs/DECISIONS_LEDGER.md` D0229). They were two functions each calling `ShaftGenerator.generate` over
+## the identical loop, and generation is 149.3 ms -- measured, 517 calls and 77.2s of this suite's 81.1s.
+## Merging the two read-only passes removes 128 of those calls, about 19s.
+##
+## Safe to merge precisely because BOTH ARE READ-ONLY: each calls only `find_spawn`, which mutates
+## nothing. The other two passes go through `RevealSessionSetup.build`, which CARVES, and sharing one
+## carved grid between the walk and jump tests is a different question with an aliasing answer -- parked
+## as NEEDS_DIRECTOR P007 rather than folded in here on the grounds that it looks similar.
+##
+## Both assertions survive unchanged. The first is asserted against the DERIVED requirement (at least one
+## solid cell between the body's left edge and x=0), not against `RevealSessionSetup.MIN_SPAWN_COL` --
+## `spawn_col >= MIN_SPAWN_COL` is true by construction for any value of that constant, so it passes on
+## the very mutant it exists to catch (D0112's self-referential-assertion class). The second is the other
+## side of the same clamp: pushing the spawn right must never push it far enough to excavate the pocket
+## it exists to approach, or a later `MIN_SPAWN_COL` change would silently pre-reveal the target and
+## invalidate every reveal measurement taken after.
+func _test_the_spawn_clears_the_world_edge_and_never_swallows_its_target() -> void:
 	var worst: int = 1 << 30
 	var worst_at: String = ""
-	for site: StringName in SITES:
-		for i: int in SEEDS:
-			var seed_value: int = BASE_SEED + i
-			var grid: TileGrid = ShaftGenerator.generate(StrataData.get_site(site), seed_value)
-			var spawn_col: int = RevealSessionSetup.find_spawn(grid)["spawn_col"]
-			if spawn_col < worst:
-				worst = spawn_col
-				worst_at = "%s seed=%d" % [site, seed_value]
-	print("  [OBSERVED] minimum spawn_col over %d seeds x %d sites: %d (%s)" % [SEEDS, SITES.size(), worst, worst_at])
-	# Asserted against the DERIVED requirement (at least one solid cell between the body's left edge and
-	# x=0), not against `RevealSessionSetup.MIN_SPAWN_COL` -- `spawn_col >= MIN_SPAWN_COL` is true by
-	# construction for any value of that constant, so it passes on the very mutant it exists to catch. It
-	# did, when this was first written; the literal is the fix (D0112's self-referential-assertion class).
-	_check(worst >= 1,
-		"no (site, seed) spawns the body flush against the world's left edge -- at least one solid cell stands between them (worst spawn_col %d at %s)"
-		% [worst, worst_at])
-
-
-## The other side of the same clamp: pushing the spawn right must never push it far enough right to
-## excavate the pocket it exists to approach. `carve_entry_shaft` opens `[spawn_col, spawn_col+SHAFT_COLS)`,
-## so the target must sit at or beyond `spawn_col + SHAFT_COLS`. Without this, raising `MIN_SPAWN_COL`
-## later would silently pre-reveal the target and quietly invalidate every reveal measurement taken after.
-func _test_the_spawn_never_swallows_its_own_target_pocket() -> void:
 	var worst_gap: int = 1 << 30
-	var worst_at: String = ""
+	var gap_at: String = ""
 	var checked: int = 0
 	for site: StringName in SITES:
 		for i: int in SEEDS:
 			var seed_value: int = BASE_SEED + i
 			var grid: TileGrid = ShaftGenerator.generate(StrataData.get_site(site), seed_value)
 			var spawn: Dictionary = RevealSessionSetup.find_spawn(grid)
+			var spawn_col: int = int(spawn["spawn_col"])
+			if spawn_col < worst:
+				worst = spawn_col
+				worst_at = "%s seed=%d" % [site, seed_value]
 			if int(spawn["target_glimmer_col"]) < 0:
 				continue  # no shallow pocket this seed -- the width/2 fallback, nothing to swallow
 			checked += 1
-			var gap: int = int(spawn["target_glimmer_col"]) - (int(spawn["spawn_col"]) + SHAFT_COLS)
+			var gap: int = int(spawn["target_glimmer_col"]) - (spawn_col + SHAFT_COLS)
 			if gap < worst_gap:
 				worst_gap = gap
-				worst_at = "%s seed=%d (spawn %d, target %d)" % [site, seed_value, spawn["spawn_col"], spawn["target_glimmer_col"]]
+				gap_at = "%s seed=%d (spawn %d, target %d)" % [site, seed_value, spawn_col, spawn["target_glimmer_col"]]
+	print("  [OBSERVED] minimum spawn_col over %d seeds x %d sites: %d (%s)" % [SEEDS, SITES.size(), worst, worst_at])
 	print("  [OBSERVED] tightest target-outside-shaft gap over %d seeds with a pocket: %d cols (%s)"
-		% [checked, worst_gap, worst_at])
+		% [checked, worst_gap, gap_at])
+	_check(worst >= 1,
+		"no (site, seed) spawns the body flush against the world's left edge -- at least one solid cell stands between them (worst spawn_col %d at %s)"
+		% [worst, worst_at])
+	# A count, not just a minimum: if no seed in the corpus had a pocket, `worst_gap` would still hold its
+	# sentinel and the assertion below would pass having compared nothing.
+	_check(checked > 0,
+		"at least one (site, seed) actually has a shallow pocket to swallow -- %d of %d; 0 would make the gap assertion vacuous"
+		% [checked, SEEDS * SITES.size()])
 	_check(worst_gap >= 0,
 		"the carved entry shaft never reaches the target pocket, so the target is never pre-revealed at spawn (tightest %d at %s)"
-		% [worst_gap, worst_at])
+		% [worst_gap, gap_at])
 
 
 func _test_walking_left_from_the_real_spawn_never_leaves_the_world() -> void:

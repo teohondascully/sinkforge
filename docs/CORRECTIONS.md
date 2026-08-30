@@ -346,6 +346,30 @@ excavation, so nothing dig-caused is meaningfully gated per commit. And the seed
 — the shared chamber is genuinely mutated mid-run (seed 45 digs a cell; seeds 46-99 inherit it), so
 P007's sharding proposal is inexact today rather than fragile later.
 
+## D0233 corrects D0230 — the tool written to stop a quiet green shipped as one
+
+**What was claimed:** `tools/run_local_battery.sh` runs exactly the suites CI runs per commit, and closes
+the trap where a hand-written battery picks up the schedule-only 1.5M-tick sweep.
+
+**Measured:** run on this machine it printed `mapfile: command not found`, executed **zero suites**, and
+the pipeline it was called in reported success. macOS ships bash 3.2; `mapfile` is bash 4.
+
+**The error, precisely.** The file's entire subject is a battery that appears to work while covering the
+wrong population, and it shipped covering the empty one. Two things kept it invisible for as long as they
+did: `set -euo pipefail` did not save it because the failure was swallowed by the pipeline it was called
+in, and — the part worth carrying — **the only reason it was caught is that the tool was RUN rather than
+reported.** A commit message describing it would have been entirely accurate about the intent.
+
+**What that says about the guard.** The zero-suite check was written as belt-and-braces and turned out to
+be the only thing between a broken parse and a green report. A guard against the house failure class is
+not redundancy; it is the load-bearing part, and it deserves to be treated that way when the temptation
+is to trim it.
+
+**A number with a twenty-minute shelf life.** D0230 recorded 37 suites against a whole-file grep's 38.
+Adding `test_recorded_sessions` to CI in the same run made it 38 against 39 — the difference still exactly
+`test_body_fuzz.gd`. Corrected in four files. A count is only true against the tree that produced it, and
+writing one into prose while still editing that tree is how it goes stale before anyone reads it.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,
