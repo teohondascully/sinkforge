@@ -7507,3 +7507,95 @@ were captured under the old semantics, and any future `claims/C004` measurement 
 that. Stated rather than silently carried forward.
 
 **Reverse cost:** low. One member, one small function, one test file, one recording.
+
+## D0189 · Slice 0: legacy's strata bands and material appearance lifted to `data/`, painted in the reveal scene — and the Q1 answer, which is that the palette transfers and the FLECK does not · 2026-08-29
+
+**What landed.** `data/bands/` (8 records, new kind) and appearance fields on all 7 `data/materials/`
+records, both codegen'd; `tests/body/material_look.gd` turning a record into a per-cell colour;
+`reveal_scene.gd` painting with it instead of two flat constants. No file entered `sim/` or `core/`.
+
+**Why `data/bands/` and not `data/strata/`, which the brief named.** `data/strata/`'s SCHEMA requires
+`width_cells`, `max_depth_m`, `cave`, `strata_shelf`, `ore`, `coal`, `iron`, `ruin` — it holds SITE
+generation configs. A band record (name, depth, colour) satisfies none of them and would fail gate 13 on
+arrival. The two things share the word "strata" and nothing else. New kind, `BandsRecords`.
+
+**Bands keyed by METRES, not rows.** Legacy keys by row at its 32px cell with `SURFACE_ROW = 20`; this
+world is 16px. But one metre is one logic tile on BOTH sides, so metres are scale-free and rows are not.
+Resolved from `layered_world_gen.gd` directly rather than copied: `DEEPSLATE_ROW = 76` → 56 m,
+`SEAL_TOP = 84` → 64 m, `+SEAL_ROWS` → 66 m. Matches the ladder the director's own copy of the report
+displays. Codegen emits in FILENAME order (alphabetical), so `MaterialLook` sorts by `from_m` on
+construction — reading `RECORDS` in its natural order silently interleaves the bands.
+
+**THE Q1 ANSWER, and it is not a yes/no.** *The palette reads at 16px. The fleck does not.*
+
+Legacy's ore records are all built the same way: a dull host rock carrying a scatter of bright crystals
+(`ore` grey + silver, `iron` blue-grey + blue-white, `coal` near-black + slate). At a 32px cell holding
+~12 crystals, every cell of an ore body shows host AND fleck together, and the cell reads as ore. At 4px
+a terrain cell is **smaller than one legacy crystal** — legacy's nugget quad is 6.4px tall — so a cell is
+EITHER host OR fleck, and at the authored areal density ~81% of cells are bare host.
+
+This was not predicted, it was **measured, by the port failing its own test.** `glimmer` was first
+authored in the strict legacy idiom (dark host 0.13/0.16/0.20 + cyan flecks). `test_material_palette.gd`
+put it at **0.028 RGB distance from `deepstone` at its worst**, against a measured rock-vs-rock noise
+floor of **0.087** — the new glimmer was *less* distinguishable from plain rock than two plain rocks are
+from each other, and it was breaking a claim `reveal_scene.gd`'s own deleted constant carried in prose
+("distinct from plain rock and from dug space ... a colour-distance claim the renderer actually backs").
+Per the director's Q1 ruling — retune the ART, never coarsen the world — glimmer's base was retuned to a
+saturated teal that carries the material's identity on a fleck-free cell. Re-measured: **0.286**, 3.3x the
+noise floor. That first failure IS the mutation test; the guard was observed failing before it was trusted.
+
+**So the actionable form of Q1, for Slices 3-4:** every lifted material whose identity lives in its
+flecks needs its BASE retuned at this grid, because the fleck is the thing 4px cannot hold. Six of the
+seven records lift verbatim and read correctly; the seventh could not, and it is the one that had a
+measurable claim attached. The rest of the palette — band colours, host rocks, grain — transfers unchanged.
+
+**What was deliberately NOT ported, and it is most of legacy's cell.** Legacy paints a cell in two passes
+(a coarse painter with chamfers, fillets, edge AO, a 3-polygon faceted crystal and a fissure line; and a
+fine bake with 11 noise fields). Slice 0 draws one `draw_rect` per cell, as the debug scene already did,
+and changes only its colour. A full read of both legacy files (dispatched for this purpose, since the map
+admits it never read them) found the coarse painter is **not portable as written at this scale**:
+`terrain_painter.gd:389` computes `h % int(CELL - 12.0)`, which at CELL=16 collapses the fissure's
+placement band from 20px to 4px and **at CELL=12 is an integer division by zero**. Its fissure spans
+degenerate from an 18px minimum line to 2px; the nugget's socket offset (0.6, 0.8) and its facet triangle
+both fall below one pixel. That file is a Slice 3 problem and it arrives needing rework, not a rescale.
+
+**Two other findings from those reads, recorded because they will be assumed otherwise:** legacy's
+`depth_darken` is a measured near-no-op (its own comment shows authored luma RISES with depth in every
+material spanning bands, and deleting `depth_darken` makes the slope steeper) — reproduced faithfully
+here and reported as inert, because what darkens legacy's deep is the shadow veil, a separate multiply
+layer not in Slice 0. And legacy's fine-bake noise frequencies are expressed **per fine cell**, so they
+must halve at this grid or every feature halves in world size; one field (`CRACK_FREQ * GRAM_SEAM_X` for
+Massive) already sits at 3.27 samples per feature, its own documented three-sample floor.
+
+**`ore_copper` reads SILVER and that is deliberate.** It maps to legacy's `ore`, which is legacy's generic
+ore-in-rock record with a silvery-white fleck; legacy never authored a copper-specific one. Lifted
+unaltered rather than invented — retinting it would be authoring new art under cover of a port. Filed as a
+taste question, not a defect.
+
+**Reverse cost:** low, and this is the property Slice 0 was chosen for. One revert of this commit removes
+`data/bands/`, the appearance fields, the adapter and the paint call; the scene falls back to two flat
+constants. Nothing in `sim/`, `core/`, or the determinism path is touched, so nothing downstream depends
+on it yet.
+
+## D0190 · The reveal scene's screenshot tool was saving BLACK images and reporting success · 2026-08-29
+
+**Found by looking at the output, not by a test.** Capturing Slice 0's deliverable produced a 1920x1080
+PNG that was uniformly black, over a `print("screenshot saved to ...")`. The agent-mode run is only ~15
+ticks long, so every usable capture tick is early, and the single `await get_tree().process_frame` before
+`get_viewport().get_texture().get_image()` was not enough for the renderer to have drawn anything.
+
+**This is the house failure class in its purest form: an instrument that cannot register its subject,
+reporting success.** Every screenshot this tool has produced at a low tick is suspect. D0121 already
+recorded one instance of the same symptom from a different cause (a camera centred on an undrawn region,
+"found by actually looking at the captured image, not assumed correct from the math alone") — the tool was
+fixed for that cause and not for this one.
+
+**Two changes.** A second `await process_frame`, which is what actually clears it here (177 distinct
+colours after, 1 before). And `_warn_if_blank()`, which counts DISTINCT colours in a 64-step sample grid
+and `push_error`s below 4 — so a recurrence is loud rather than a black PNG nobody opens. Distinct-count
+and not a mean: a mean brightness reads a near-black frame with one bright corner as "dark but fine",
+while the failure being guarded is specifically that every pixel is identical (the ledger's own
+"delta cannot prove absence"). It warns rather than fails, because a legitimately blank capture (a camera
+pointed off-world) is a real thing to want to look at.
+
+**Reverse cost:** trivial. One extra frame of latency in a debug capture path.

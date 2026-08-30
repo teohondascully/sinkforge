@@ -5,3 +5,19 @@ layer: stonereach
 kind: ore
 hardness: 3.5
 display_name: Iron ore
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Appearance lifted from `legacy/src/data/materials/iron.tres` via `legacy/src/data/material_def.gd`'s
+# schema (D0189, Slice 0). Colors are [r, g, b] 0..1, verbatim from the .tres -- no conversion,
+# no retuning. `.tres` is a binary-ish resource format; gate 22 requires data/ be human-diffable
+# text, so the values move but the format does not.
+#
+# Legacy `iron`, lifted verbatim. Cool blue-white flecks on a blue-grey host.
+
+base_color: [0.21, 0.24, 0.31]
+grain: true
+grammar: clastic
+depth_darken: 0.3
+glitters: true
+nugget_color: [0.66, 0.76, 0.95]
+nugget_count: 6

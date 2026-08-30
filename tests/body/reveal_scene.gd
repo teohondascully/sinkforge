@@ -19,13 +19,20 @@ const MAX_TICKS: int = 3000  ## agent-mode-only safety cap, matching play_scene.
 const WIDE_VIEW_ROW_CAP: int = 180  ## `--wide-view` (D0121): both reveal-test sites' topsoil_shale_end
 ## is 40m = 160 rows (TERRAIN_CELLS_PER_METER=4); a little margin past it, not the whole grid.
 
+## D0189 (Slice 0): terrain and glimmer are no longer flat constants -- `MaterialLook` derives each
+## cell's fill from `data/materials`' lifted appearance records. The two removed constants were
+## `COLOR_TERRAIN = Color(0.42, 0.34, 0.24)` (kept as `MaterialLook`'s unmapped-material fallback, so an
+## id with no appearance block still draws) and `COLOR_GLIMMER = Color(0.35, 0.85, 0.85)`.
+##
+## COLOR_GLIMMER carried a real claim in its own comment -- "deliberately far from COLOR_TERRAIN's brown
+## and COLOR_BG's near-black, so 'distinct from plain rock and from dug space' is a color-distance claim
+## the renderer actually backs, not just an assertion". Replacing it with a data-driven colour would have
+## retired that claim silently. It is instead re-measured against the new records, over the real
+## depth range and both nugget branches, by `tests/test_material_palette.gd`.
 const COLOR_BG: Color = Color(0.16, 0.16, 0.18)
-const COLOR_TERRAIN: Color = Color(0.42, 0.34, 0.24)
-const COLOR_GLIMMER: Color = Color(0.35, 0.85, 0.85)  ## flat cyan -- deliberately far from COLOR_TERRAIN's
-## brown and COLOR_BG's near-black, so "distinct from plain rock and from dug space" is a color-distance
-## claim the renderer actually backs, not just an assertion
 const COLOR_BODY: Color = Color(0.85, 0.25, 0.25)
 const COLOR_BODY_GROUNDED: Color = Color(0.95, 0.75, 0.15)
+const BAND_TINT: float = 0.10  ## how far the background leans toward the current band's own colour
 
 var _grid: TileGrid
 var _body: Body
@@ -43,6 +50,7 @@ var _camera_zoom: float = 6.0
 var _wide_view: bool = false
 var _site_id: StringName = &""
 var _seed_value: int = 0
+var _look: MaterialLook = MaterialLook.new()  ## D0189: the lifted palette (Slice 0)
 
 
 func _ready() -> void:
@@ -101,16 +109,46 @@ func _physics_process(_delta: float) -> void:
 	queue_redraw()
 
 	if _screenshot_tick >= 0 and _tick_count == _screenshot_tick:
+		# D0189: was a single `await process_frame`, which silently captured a BLACK image on every
+		# early tick -- the agent-mode run is only ~15 ticks long, so every capture point is early, and
+		# the tool reported "screenshot saved" over a frame the renderer had not drawn yet. A capture
+		# tool that cannot register its own subject and calls that success is the house failure class;
+		# two frames is what actually clears it here, and the blankness check below is what makes a
+		# future recurrence loud instead of a black PNG nobody opens.
+		await get_tree().process_frame
 		await get_tree().process_frame
 		var img: Image = get_viewport().get_texture().get_image()
 		img.save_png(_screenshot_path)
 		print("reveal_scene: screenshot saved to %s at tick %d" % [_screenshot_path, _tick_count])
+		_warn_if_blank(img)
 		_flush_recording()
 		get_tree().quit(0)
 		return
 
 	if not _play_mode and (_tick_count >= MAX_TICKS or (_target_glimmer_col < 0)):
 		_finish_and_quit()
+
+
+## Counts DISTINCT colours in a coarse sample of the captured image and pushes an error if the frame is
+## effectively uniform. Distinct-count, not a mean: a mean brightness reads a nearly-black frame with one
+## bright corner as "dark but fine", while the failure this guards (nothing drawn yet) is specifically
+## that every pixel is the SAME. Threshold is 4 rather than 1 so an almost-empty frame -- background plus
+## a couple of stray cells -- still trips it. Reported via push_error so `tools/run_gd_test.sh` and a
+## human both see it; it deliberately does not fail the run, because a legitimately blank capture (a
+## camera pointed off-world) is a real thing to want to look at.
+func _warn_if_blank(img: Image) -> void:
+	var seen: Dictionary = {}
+	var step: int = maxi(1, img.get_width() / 64)
+	for x: int in range(0, img.get_width(), step):
+		for y: int in range(0, img.get_height(), step):
+			seen[img.get_pixel(x, y).to_rgba32()] = true
+	if seen.size() < 4:
+		push_error(("reveal_scene: the captured frame has only %d distinct colour(s) -- it is blank or " +
+			"near-blank. The screenshot was still written to %s, but do not read it as a picture of the " +
+			"world. Likeliest cause: the capture tick is too early for the renderer, or the camera is " +
+			"pointed off-world (docs/DECISIONS_LEDGER.md D0121, D0189).") % [seen.size(), _screenshot_path])
+	else:
+		print("reveal_scene: capture has %d distinct colours in a %d-px sample grid" % [seen.size(), step])
 
 
 func _read_play_input() -> InputFrame:
@@ -178,7 +216,13 @@ func _update_camera() -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(-4000, -4000, 12000, 12000), COLOR_BG, true)
+	# D0189: the ground the body stands in is tinted toward the band it is in, so depth reads as a change
+	# in the world rather than only as a number. Kept to BAND_TINT (0.10) because legacy's band colours
+	# were authored as ANNOUNCEMENT colours -- type on a dark plate, every one between 0.44 and 0.96 in
+	# its brightest channel -- and are far too bright to use as fills at full strength.
+	var band: Dictionary = _look.band_at(Body._px_to_cell(_body.pos_y))
+	var band_color: Color = Color(band["color"][0], band["color"][1], band["color"][2])
+	draw_rect(Rect2(-4000, -4000, 12000, 12000), COLOR_BG.lerp(band_color, BAND_TINT), true)
 	var view_center_col: int = Body._px_to_cell(_body.pos_x)
 	var col_lo: int = maxi(0, view_center_col - 60)
 	var col_hi: int = mini(_grid.width, view_center_col + 60)
@@ -195,8 +239,8 @@ func _draw() -> void:
 			var material: StringName = _grid.get_material(Vector2i(col, row))
 			if material == &"":
 				continue
-			var color: Color = COLOR_GLIMMER if material == &"glimmer" else COLOR_TERRAIN
-			draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL), color, true)
+			draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL),
+				_look.cell_color(material, col, row), true)
 	var left: float = float(_body._left_x()) / float(Fx.SCALE)
 	var top: float = float(_body._top_y()) / float(Fx.SCALE)
 	draw_rect(Rect2(left, top, Body.WIDTH_PX, Body.HEIGHT_PX),

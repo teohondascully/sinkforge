@@ -7,3 +7,21 @@ layer: topsoil_shale
 kind: curio
 hardness: 1.0
 display_name: Glimmer
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Appearance AUTHORED for this build (D0189, Slice 0), not lifted -- see the note below.
+#
+# NO LEGACY COUNTERPART -- glimmer is post-pivot (docs/GDD.md 12, claims/C004) and legacy never
+# had a reveal layer. Authored here, NOT lifted, and the file says so rather than implying provenance.
+# Constrained by an existing claim: reveal_scene.gd's own comment requires glimmer stay "distinct from
+# plain rock and from dug space" as a COLOR-DISTANCE the renderer backs, not an assertion. So it keeps a
+# high-contrast cyan in the legacy IDIOM (dark host + bright flecks) instead of the flat cyan blob, and
+# the distance is re-measured in tests/test_material_palette.gd rather than assumed to survive.
+
+base_color: [0.16, 0.52, 0.55]
+grain: true
+grammar: massive
+depth_darken: 0.1
+glitters: true
+nugget_color: [0.4, 0.94, 0.95]
+nugget_count: 12

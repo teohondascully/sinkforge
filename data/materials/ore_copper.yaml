@@ -5,3 +5,21 @@ layer: topsoil_shale
 kind: ore
 hardness: 2.0
 display_name: Copper ore
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Appearance lifted from `legacy/src/data/materials/ore.tres` via `legacy/src/data/material_def.gd`'s
+# schema (D0189, Slice 0). Colors are [r, g, b] 0..1, verbatim from the .tres -- no conversion,
+# no retuning. `.tres` is a binary-ish resource format; gate 22 requires data/ be human-diffable
+# text, so the values move but the format does not.
+#
+# Legacy `ore` -- its GENERIC ore-in-rock record. Legacy never authored a copper-specific one,
+# so this nugget is SILVERY-WHITE, not copper. Lifted unaltered rather than invented: retinting it would
+# be authoring new art under cover of a port. Filed as a taste question in docs/TASTE_QUEUE.md, not a bug.
+
+base_color: [0.29, 0.3, 0.34]
+grain: true
+grammar: clastic
+depth_darken: 0.25
+glitters: true
+nugget_color: [0.78, 0.81, 0.85]
+nugget_count: 6

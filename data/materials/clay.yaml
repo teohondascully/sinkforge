@@ -4,3 +4,19 @@ layer: topsoil_shale
 kind: rock
 hardness: 1.0
 display_name: Clay
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Appearance lifted from `legacy/src/data/materials/earth.tres` via `legacy/src/data/material_def.gd`'s
+# schema (D0189, Slice 0). Colors are [r, g, b] 0..1, verbatim from the .tres -- no conversion,
+# no retuning. `.tres` is a binary-ish resource format; gate 22 requires data/ be human-diffable
+# text, so the values move but the format does not.
+#
+# Legacy has no `clay`; `earth` IS its topsoil rock and the appearance transfers 1:1.
+# Keeps the grass cap -- the only capped material in either set.
+
+base_color: [0.34, 0.24, 0.155]
+grain: true
+grammar: clastic
+depth_darken: 0.38
+glitters: true
+cap_color: [0.34, 0.47, 0.22]

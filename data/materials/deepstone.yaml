@@ -5,3 +5,17 @@ layer: deep_works
 kind: rock
 hardness: 5.0
 display_name: Deepstone
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Appearance lifted from `legacy/src/data/materials/deepslate.tres` via `legacy/src/data/material_def.gd`'s
+# schema (D0189, Slice 0). Colors are [r, g, b] 0..1, verbatim from the .tres -- no conversion,
+# no retuning. `.tres` is a binary-ish resource format; gate 22 requires data/ be human-diffable
+# text, so the values move but the format does not.
+#
+# Legacy `deepslate`. Massive, and the darkest host rock in the set.
+
+base_color: [0.205, 0.19, 0.245]
+grain: true
+grammar: massive
+depth_darken: 0.35
+glitters: true

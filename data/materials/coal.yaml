@@ -5,3 +5,21 @@ layer: topsoil_shale
 kind: fuel
 hardness: 1.5
 display_name: Coal
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Appearance lifted from `legacy/src/data/materials/coal.tres` via `legacy/src/data/material_def.gd`'s
+# schema (D0189, Slice 0). Colors are [r, g, b] 0..1, verbatim from the .tres -- no conversion,
+# no retuning. `.tres` is a binary-ish resource format; gate 22 requires data/ be human-diffable
+# text, so the values move but the format does not.
+#
+# Legacy `coal`, lifted verbatim -- the one id present under the same name on both sides.
+# `glitters: false` is load-bearing and legacy states why: "glittering coal was being mistaken for a
+# blue crystal" (material_def.gd:34-35). Do not turn it on to make fuel easier to spot.
+
+base_color: [0.15, 0.16, 0.19]
+grain: true
+grammar: clastic
+depth_darken: 0.22
+glitters: false
+nugget_color: [0.34, 0.37, 0.44]
+nugget_count: 7

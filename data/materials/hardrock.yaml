@@ -4,3 +4,17 @@ layer: stonereach
 kind: rock
 hardness: 3.0
 display_name: Hardrock
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Appearance lifted from `legacy/src/data/materials/stone.tres` via `legacy/src/data/material_def.gd`'s
+# schema (D0189, Slice 0). Colors are [r, g, b] 0..1, verbatim from the .tres -- no conversion,
+# no retuning. `.tres` is a binary-ish resource format; gate 22 requires data/ be human-diffable
+# text, so the values move but the format does not.
+#
+# Legacy `stone`. Massive grammar: restrained speckle cut by steeply-dipping fracture seams.
+
+base_color: [0.355, 0.35, 0.335]
+grain: true
+grammar: massive
+depth_darken: 0.3
+glitters: true

@@ -112,6 +112,12 @@ immediate predecessor when the claim's real origin sits further back.
   correction (proven within-platform, not across) was right; the SCOPE was still an undercount — corrected
   to name all four sites, enumerated in D0183 itself.
 
+**D0185, read and deliberately excluded, not silently dropped:** it trips this page's own keyword scan
+because its header says "docs/CORRECTIONS.md updated with ... real corrections" — but D0185 IS the update,
+not a correction of anything. Listing it here would make the page cite itself. Noted so the freshness gate
+stops re-flagging it, and noted with the same reasoning as D0181 below rather than by widening the gate's
+pattern, which would blind it to real entries.
+
 **D0181, read and deliberately excluded, not silently dropped:** its own header matches this page's
 keyword scan ("7 files corrected"), but it is drift cleanup — annotating already-true comments as
 "parked, see D0153-D0155" — not a correction of a claim that was ever WRONG. Noted here so the freshness

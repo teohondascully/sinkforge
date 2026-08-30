@@ -1,0 +1,11 @@
+# Lifted from `legacy/scenes/strata.gd` (D0189, Slice 0). Legacy keyed bands by ROW at its own 32px
+# logic cell with SURFACE_ROW=20; this file keys them by METRES BELOW SURFACE, which is scale-free --
+# one metre is one logic tile on BOTH sides (legacy 32px/m, current 16px/m), so the ladder transfers
+# unchanged while the pixel size does not. Legacy row -> metres: row - 20.
+#
+# row 44.
+
+id: shale_reach
+display_name: SHALE REACH
+from_m: 24
+color: [0.58, 0.64, 0.74]

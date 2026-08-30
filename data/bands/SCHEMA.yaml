@@ -1,0 +1,5 @@
+fields:
+  id: {required: true, type: str}
+  display_name: {required: true, type: str}
+  from_m: {required: true, type: int}
+  color: {required: true, type: list}
