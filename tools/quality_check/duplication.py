@@ -50,8 +50,9 @@ def _normalize(tokens: list[tuple[str, str]]) -> tuple:
 def _is_trivial_main_dispatch(f) -> bool:
     """True for a Python function literally named `main`, taking this repo's own zero-argument CLI
     entry-point shape, at most `MAIN_BOILERPLATE_MAX_LINES` lines long -- the one structural pattern
-    this whole `tools/` tree repeats on purpose (every instrument here and in `tools/economy_check/`,
-    `tools/anvil/`, `tools/layer_lint/` ends `def main() -> int: ...` / `sys.exit(main())`), not logic
+    this whole `tools/` tree repeats on purpose (every instrument here and in `tools/layer_lint/` ends
+    `def main() -> int: ...` / `sys.exit(main())`; `tools/economy_check/` and `tools/anvil/` did too
+    before both were parked, `docs/DECISIONS_LEDGER.md` D0153-D0155), not logic
     duplication in the sense this detector exists to catch (`docs/DECISIONS_LEDGER.md` D0096's "the
     previous project carried six near-identical copies of one function... because nothing was
     looking"). Named and length-bounded, not a blanket "skip anything called main": checked against

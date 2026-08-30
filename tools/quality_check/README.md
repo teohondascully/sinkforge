@@ -61,9 +61,10 @@ disproving its reason to exist.
 
 `docs/DECISIONS_LEDGER.md` D0105: `duplication.py`'s GDScript scanner was silently `GAME_DIRS`-only for
 four rounds before D0102 fixed it — a sweep bounded by its own author's model of the corpus, the most
-reliable failure class this project has (`.anvil/log/2026-08-28T233251.702582Z-d3f72a5f.json`, naming
-this and three prior instances). This table exists so the next instrument built here does not repeat it
-silently — coverage stated, not assumed.
+reliable failure class this project has (originally logged as `.anvil/log/2026-08-28T233251.702582Z-
+d3f72a5f.json`, naming this and three prior instances -- Anvil is parked, D0153-D0155, this specific log
+no longer exists; the finding is D0105 itself). This table exists so the next instrument built here does
+not repeat it silently — coverage stated, not assumed.
 
 | instrument | GDScript scope | Python scope | notes |
 |---|---|---|---|
@@ -76,9 +77,10 @@ silently — coverage stated, not assumed.
 
 `function_length.analyze`, `complexity`'s functions, and `duplication.analyze` all accept an injectable
 list of synthetic `scan.Func` objects. `coupling.analyze` accepts an injectable `root` directory,
-mirroring `tools/anvil/check_integrity.py`'s own `check_integrity(log_dir)` parameter — this project's
-established fix for "a checker that can only be pointed at the real, live tree cannot be mutation-tested
-without risking it."
+mirroring `tools/anvil/check_integrity.py`'s own `check_integrity(log_dir)` parameter (Anvil is parked,
+`docs/DECISIONS_LEDGER.md` D0153-D0155, kept as a description of the convention this mirrors) — this
+project's established fix for "a checker that can only be pointed at the real, live tree cannot be
+mutation-tested without risking it."
 
 ## Mutation testing
 
@@ -91,8 +93,9 @@ pair not clustered, the SAME shape under non-`main` names still caught (the excl
 name, not on being short), and a real over-threshold `main()` duplicated verbatim still caught (the
 exclusion is keyed on length too, not on the name alone) (duplication), and — the trickiest logic in this
 round — `class_name`-only coupling being caught, local-import-resolution correctly beating a same-named
-module in a different subdirectory (the real `anvil`/`economy_check` `schema.py` collision, reproduced
-synthetically), and a name matching multiple other subdirectories with no local match being left
+module in a different subdirectory (the real `anvil`/`economy_check` `schema.py` collision -- both parked,
+`docs/DECISIONS_LEDGER.md` D0153-D0155 -- reproduced synthetically here since the real files are gone),
+and a name matching multiple other subdirectories with no local match being left
 uncounted rather than guessed (coupling). Also covers `duplication.gate_exit`'s three branches (0
 clusters exits 0, a cluster in either language exits 1) and `run_cli`'s `exit_fn` dispatch (no `exit_fn`
 given defaults to 0, `exit_fn` given is actually called rather than ignored), the frozen Python guardrails
@@ -139,10 +142,10 @@ itself has no CI consumer — it stays the read-the-whole-picture entry point fo
   module counts, for instance) become very sensitive — with most values at 0, the fence itself can land
   at 0, flagging any nonzero value as an "outlier." Real, not a bug, but worth reading the actual counts
   next to the outlier flag rather than trusting the flag alone on a small sample.
-- `coupling.py`'s `tools/` resolution is filename-based, not `sys.path`-aware. It gets the specific real
-  collision in this repo (`anvil/schema.py` vs `economy_check/schema.py`) right via local-first
-  resolution, but a more exotic `sys.path` manipulation than "insert my own parent directory" (this
-  repo's only pattern so far) could still fool it.
+- `coupling.py`'s `tools/` resolution is filename-based, not `sys.path`-aware. It got the specific real
+  collision in this repo (`anvil/schema.py` vs `economy_check/schema.py`, both now parked, `docs/
+  DECISIONS_LEDGER.md` D0153-D0155) right via local-first resolution, but a more exotic `sys.path`
+  manipulation than "insert my own parent directory" (this repo's only pattern so far) could still fool it.
 - Duplication's `MIN_LINES=4`/`MIN_TOKENS=15` floor is a judgment call, not derived from data the way the
   outlier fences are.
 - `duplication.py` carries a named, length-bounded exclusion for Python `main()` functions
@@ -150,5 +153,7 @@ itself has no CI consumer — it stays the read-the-whole-picture entry point fo
   across this directory's own instrument files clustered as an exact duplicate at D0096, and calibrated,
   not guessed, against every other `main()` in the repo (D0097). **Risk, stated per the director's own
   instruction rather than left implicit**: if a future `main()` is both genuinely duplicated AND fits
-  within the 8-line bound, this exclusion hides that duplication from the report. Logged as a real Anvil
-  `DECISION` event (`.anvil/log/2026-08-28T213152.609167Z-d61283eb.json`), not only here.
+  within the 8-line bound, this exclusion hides that duplication from the report. Originally logged as a
+  real Anvil `DECISION` event (`.anvil/log/2026-08-28T213152.609167Z-d61283eb.json`), not only here --
+  Anvil is parked, `docs/DECISIONS_LEDGER.md` D0153-D0155, this specific log no longer exists; the risk
+  itself stands regardless.

@@ -7163,3 +7163,54 @@ the disproven generic "moving sim/ aside" framing, citing this entry.
 
 **Reverse cost:** CHEAP — revert the docstring edit; nothing else changed. The experiment itself touched
 only a disposable clone, already deleted.
+
+## D0181 · Stale parking references swept beyond Codex's one named example — 7 files corrected, drift cleanup only (R3, fix queue) · 2026-08-29
+
+**The gap, as Codex found it (`coupling.py:32`):** the parked code itself is gone and preserved (verified,
+no live imports) — but comments/docs across several tool files still name `economy_check`/`anvil` paths
+and specific `.anvil/log/*.json` files as if they currently exist, with no "parked" marker for a reader
+who doesn't already know D0153-D0155.
+
+**Swept every live file (excluding `legacy/`, `docs/archive/`, `history/` — genuinely historical, exempt
+by convention — and `docs/DECISIONS_LEDGER.md`/`docs/BRIEF.md`/`docs/WORKING.md`, which already correctly
+say "parked"/"gone"/"now-parked" everywhere they mention this):** `grep -rln "economy_check|\.anvil\b|
+anvil\b|control_plane|control-plane"` across `*.md/*.gd/*.py/*.yml/*.sh` found 7 more files beyond the one
+Codex named, none referencing `control_plane` (that term doesn't appear live anywhere outside the already-
+correct WORKING.md/BRIEF.md entries):
+
+- `tools/check_fork_completion.py:10` — a specific `.anvil/log/...json` cited as if it still exists;
+  corrected to note it's gone (parked) and point at D0130 (the ledger entry preserving the finding).
+- `.claude/commands/wrap.md:10` — same specific log citation, same fix.
+- `tools/layer_lint/test_check_untracked_files.py:10,64` — cites `tools/anvil/test_check_integrity.py`'s
+  "own pattern" and "ANVIL step 1" as live precedent; both annotated parked.
+- `tools/quality_check/coupling.py:32-34,188` — Codex's own named file. The motivating `economy_check`/
+  `anvil` `schema.py` filename collision (the whole reason this resolution rule exists) is now historical;
+  annotated, past tense used where the collision is described as a fact about files that no longer exist.
+- `tools/quality_check/duplication.py:53-54` — a coding-convention citation naming `economy_check`/`anvil`
+  alongside the still-live `layer_lint/`; reworded so the still-live directory isn't lumped in with the
+  parked ones in the same present-tense claim.
+- `tools/quality_check/README.md` — 6 separate spots (two more specific `.anvil/log/*.json` citations, two
+  more "the anvil/economy_check collision" mentions, one `check_integrity.py` pattern citation) — all
+  annotated. One citation left untouched on purpose: "same as the Anvil cap adjustment (`docs/DECISIONS_
+  LEDGER.md` D0074)" already cites a permanent ledger entry, not a file that could go missing — nothing to
+  fix there.
+- `tools/quality_check/test_quality_check.py` — 2 spots (a docstring precedent citation, a test's own
+  `check()` label describing the synthetic collision), both annotated.
+
+**Verified nothing broke — comment/docstring edits only, confirmed by actually running the affected
+suites, not assumed from the diff being non-functional:**
+```
+test_quality_check: 41/41 cases observed correctly. test_quality_check: PASS.
+test_check_untracked_files: 5/5 cases observed correctly. test_check_untracked_files: PASS.
+coupling.py exit=0
+duplication.py exit=0
+```
+All five touched `.py` files also confirmed to parse (`ast.parse`) before running them.
+
+**Not touched, correctly:** `docs/DECISIONS_LEDGER.md` itself (append-only; D0153-D0155 already state the
+parking, nothing to retrofit), `docs/BRIEF.md`/`docs/WORKING.md` (already say "parked"/"gone" at every
+mention, checked directly), `legacy/`/`docs/archive/`/`history/` (historical by convention, exempt), and
+`docs/quality_check/README.md`'s one ledger-only citation (D0074, no missing file behind it).
+
+**Reverse cost:** CHEAP — every edit is an added parenthetical/clause in an existing comment or docstring;
+revert any subset independently, no functional code touched.

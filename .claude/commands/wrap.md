@@ -7,8 +7,9 @@ Run the end-of-session checklist, in this order:
    the fork's own report was wrong — resume it or redo the work yourself before treating anything it
    claimed as landed. This exists because a fork reported `completed` with a detailed summary while its
    diff touched neither of its two target files, caught only by hand (`docs/DECISIONS_LEDGER.md` D0105's
-   sweep-blindness law, `.anvil/log/2026-08-29T074921.640759Z-ad065cf8.json`) — this step is that
-   reconciliation made mechanical instead of relying on the director or the orchestrator noticing. A
+   sweep-blindness law, D0130's own account — originally logged as `.anvil/log/2026-08-29T074921.
+   640759Z-ad065cf8.json`, Anvil is parked, D0153-D0155, this specific log no longer exists) — this step is
+   that reconciliation made mechanical instead of relying on the director or the orchestrator noticing. A
    completion summary is a claim, not evidence; the tool call above is the evidence.
 2. **When reporting doc edits — GDD.md, CONTEXT.md, README.md, ARCHITECTURE.md, or any other normative
    doc — show the actual diff (`git diff <file>`), never a prose summary that the edits happened.**

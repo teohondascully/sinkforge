@@ -7,7 +7,9 @@ accompanying the gate. The 3/3 claim exists only in the brief." `docs/DECISIONS_
 
 Builds a disposable scratch git repository per case (`git init` in a `tempfile.TemporaryDirectory()`) and
 calls `check_untracked_files.find_violations(scratch_root)` directly -- never touches the real working
-tree, matching `tools/anvil/test_check_integrity.py`'s own pattern.
+tree, matching `tools/anvil/test_check_integrity.py`'s own pattern (Anvil is parked, `docs/DECISIONS_
+LEDGER.md` D0153-D0155 -- the pattern this mirrors no longer lives in the tree, kept as a description of
+why this file is shaped the way it is).
 """
 import subprocess
 import sys
@@ -61,8 +63,9 @@ def branch_negative_control() -> None:
 
 def branch_local_exclude_only_still_fails() -> None:
     """The property that actually matters: a file hidden ONLY via .git/info/exclude (never travels with
-    a clone) must still FAIL. This is the specific gap ANVIL step 1 found and this gate exists to close
-    -- a gate that trusted the local exclude file would reproduce the exact hole it was built to catch.
+    a clone) must still FAIL. This is the specific gap ANVIL step 1 found (Anvil is parked, `docs/
+    DECISIONS_LEDGER.md` D0153-D0155; the finding stands regardless) and this gate exists to close -- a
+    gate that trusted the local exclude file would reproduce the exact hole it was built to catch.
     """
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)

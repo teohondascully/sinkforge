@@ -29,10 +29,12 @@ cross-check, not something this instrument verifies.
   direction, not a missed edge).
 - `tools/`: Python `import`/`from...import` statements, resolved by filename against `tools/<subdir>/`
   directories. A name resolves LOCALLY first (matching how `sys.path.insert(0, .../parent)`, this
-  codebase's own convention, actually resolves it at runtime) -- `tools/economy_check/schema.py` and
-  `tools/anvil/schema.py` share a filename, and without local-first resolution this would wrongly count
-  every `from schema import ...` in `economy_check` as a reference to `anvil`. A name matching MULTIPLE
-  other subdirectories with no local match is ambiguous and is not counted, not guessed.
+  codebase's own convention, actually resolves it at runtime) -- the motivating case (both `economy_check`
+  and `anvil` are parked, `docs/DECISIONS_LEDGER.md` D0153-D0155, but this resolution rule is still live
+  and still needed for any future filename collision): `tools/economy_check/schema.py` and `tools/anvil/
+  schema.py` shared a filename, and without local-first resolution this would have wrongly counted every
+  `from schema import ...` in `economy_check` as a reference to `anvil`. A name matching MULTIPLE other
+  subdirectories with no local match is ambiguous and is not counted, not guessed.
 
 **Stub modules are excluded from the corpus, named explicitly in the report** (`_split_stubs`,
 `docs/DECISIONS_LEDGER.md` D0098): a module directory with zero code files of its own scope's language
@@ -185,8 +187,9 @@ def _tools_edges(root: Path) -> list[tuple[str, str]]:
 
 def analyze(root: Path | None = None) -> dict:
     """`root` defaults to the real repository (ROOT) -- pointable at a scratch directory for tests, the
-    same reason tools/anvil/check_integrity.py's check_integrity(log_dir) takes its directory as a
-    parameter rather than hardcoding it."""
+    same reason tools/anvil/check_integrity.py's check_integrity(log_dir) took its directory as a
+    parameter rather than hardcoding it (Anvil is parked, `docs/DECISIONS_LEDGER.md` D0153-D0155, kept
+    as a description of the convention this mirrors)."""
     root = ROOT if root is None else root
     result = {}
     for scope, module_list, edge_fn, ext in (("sim", _sim_modules, _sim_edges, "gd"),

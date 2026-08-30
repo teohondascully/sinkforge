@@ -6,9 +6,11 @@ actually appear in the tree's own diff.
 
 2026-08-29: a background fork reported `status: completed` with a detailed prose summary of work done
 against two target files -- `git diff` showed neither file had actually changed. Caught only because the
-orchestrating session happened to check the diff by hand instead of trusting the summary
-(`.anvil/log/2026-08-29T074921.640759Z-ad065cf8.json`, extending the sweep-blindness law,
-`docs/DECISIONS_LEDGER.md` D0105, into fork/subagent coordination for the first time). The director's own
+orchestrating session happened to check the diff by hand instead of trusting the summary (originally
+logged as `.anvil/log/2026-08-29T074921.640759Z-ad065cf8.json` -- Anvil is parked, `docs/DECISIONS_
+LEDGER.md` D0153-D0155, this specific log no longer exists; the finding itself is preserved in full in
+`docs/DECISIONS_LEDGER.md` D0130, which this checker exists to close), extending the sweep-blindness law
+(D0105) into fork/subagent coordination for the first time. The director's own
 words: "A report about a change is not the change. The tree is the change." This is that reconciliation
 made mechanical, per the director's explicit instruction that catching this by hand is exactly the manual
 vigilance the gates exist to replace -- see `.claude/commands/wrap.md`'s own checklist for where this is

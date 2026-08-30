@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Mutation tests for the four quality instruments. Same discipline as `tools/anvil/
-test_check_integrity.py` and `tools/economy_check/test_check_tier_rule.py`: write a case that SHOULD
-fire, observe it actually firing, before any of this is trusted. Dashboard tools get the same scrutiny
-as gates -- "reaching the check is not the same as the check firing" doesn't stop applying just because
-nothing here exits nonzero yet.
+test_check_integrity.py` and `tools/economy_check/test_check_tier_rule.py` used (both parked, `docs/
+DECISIONS_LEDGER.md` D0153-D0155): write a case that SHOULD fire, observe it actually firing, before any
+of this is trusted. Dashboard tools get the same scrutiny as gates -- "reaching the check is not the same
+as the check firing" doesn't stop applying just because nothing here exits nonzero yet.
 
     python3 tools/quality_check/test_quality_check.py
 
 Synthetic fixtures throughout, not the real tree -- `function_length.analyze`/`complexity.analyze`/
 `duplication.analyze` all accept an injectable `functions` list for exactly this reason, and
 `coupling.analyze` accepts an injectable `root` (a scratch directory), mirroring `tools/anvil/
-check_integrity.py`'s own `check_integrity(log_dir)` parameter -- this project's own established fix for
-"a checker that can only be pointed at the real, live tree cannot be mutation-tested without risking it."
+check_integrity.py`'s own `check_integrity(log_dir)` parameter (Anvil is parked, D0153-D0155, kept as a
+description of the convention this mirrors) -- this project's own established fix for "a checker that can
+only be pointed at the real, live tree cannot be mutation-tested without risking it."
 """
 import ast
 import sys
@@ -337,7 +338,8 @@ def branch_coupling_tools_import_resolution() -> None:
         check("coupling (tools): an import resolving to exactly one OTHER module is a real edge",
               ("sub2", "sub1") in edges and edges.count(("sub2", "sub1")) == 1, detail=str(edges))
         check("coupling (tools): a name that ALSO exists locally resolves locally, no cross-module edge "
-              "for it (the anvil/economy_check schema.py collision, synthetically reproduced)",
+              "for it (the anvil/economy_check schema.py collision -- both parked, D0153-D0155 -- "
+              "synthetically reproduced since the real files are gone)",
               edges.count(("sub2", "sub1")) == 1,  # only the helper.py edge, not one from schema.py too
               detail=str(edges))
         check("coupling (tools): a name matching MULTIPLE other modules with no local match is "
