@@ -8716,3 +8716,129 @@ now implemented rather than only written down: **`chamber=` is believed only in 
 first one was measured rather than hardcoded. Absent it, both worlds are replayed and the one without a
 bounds violation is the one that was played. A field that is WRONG is worse than a field that is missing,
 and the only thing separating them here is a second field's presence.
+
+---
+
+## D0214 · L2 exists, and an Observation is a COPY — the decision that makes the envelope enforceable · 2026-08-30 · Slice 2, ADR 0007
+**Decided:** `interface/` and `sim/commands/` stop being `MODULE.md`-only skeletons.
+`interface/interface.gd` implements `docs/ARCHITECTURE.md` §5's two operations, `sim/commands/command.gd`
+holds the vocabulary, `docs/adr/0007-l2-interface.md` is normative for the three judgment calls, and
+`tests/test_interface.gd` pins them. Nothing existing was migrated onto it.
+
+**Why now, and it is not "the plan said so".** `tools/layer_lint/layer_lint.py`'s own table gives `view`
+access to `interface` and `core` and NOTHING else. So every lifted renderer file is a gate failure until
+this door exists — not a style problem, a red CI. `docs/LEGACY_MIGRATION_MAP_2026-08-29.md` §9 calls
+Slice 2 the keystone for exactly that reason, and it is the literal blocker on the presentation batch.
+
+**The one decision everything else follows from: `observe()` COPIES.** An `Observation` holds a flat
+`PackedByteArray` over one window plus a legend, and no reference to `TileGrid`, `Body` or `Mining`.
+Handing back the grid would be cheaper by every measure and would **silently delete the envelope** — a
+consumer holding a live grid reads any cell it likes, fogged or not, and no filter inside `interface.gd`
+could stop it. `interface/MODULE.md` already asserted the invariant ("never bypassable by reaching around
+it"); a copy is what turns that sentence into something a test can fail. So the test attempts the
+reach-around rather than describing it: observe, excavate the grid, assert the observation still reports
+the old state, then assert a fresh one sees the change.
+
+**One envelope dimension, and three deliberately ABSENT rather than stubbed.** §5 names vision, planning,
+motor and priors. This build has a window and no fog, no planner, no motor-noise model, no priors table.
+A field per dimension would be four entries no code reads and no test can exercise, and a
+`vision: ORACLE` that never filters anything reads to the next person as a filter that has been checked.
+The same reasoning gives `Command` exactly two members, `MOVE` and `MINE`, one per verb that exists —
+and `sim/commands/MODULE.md`'s own gotcha is the precedent, recording that the Freight Winch regrew as ad
+hoc verbs once because a vocabulary existed before the thing it described.
+
+**`window` has no default, and there is no "everything" envelope reachable by omission.** The run that
+must never be handed perfect information by accident is the CONSTRAINED one measuring discoverability,
+and a defaulted whole-world window is exactly how that accident happens. `Envelope.oracle_over(grid)`
+makes the unfiltered case say its own name at the call site.
+
+**Validation moved up, and that is about telemetry, not safety.** `Mining.mine` already refuses an
+out-of-reach or non-solid target by doing nothing. `apply()` checks the same three conditions anyway and
+returns a named `Result.rejected(...)`, because §5 makes rejection reasons telemetry and **a silent no-op
+is not telemetry**. The distinction a discoverability run needs is between an agent that never tried and
+one that tried and could not reach; only a named rejection carries it.
+
+**A test bug found and fixed inside this same change, and it is this project's own recurring shape.** The
+first version of `test_interface.gd` filled its grid with `&"earth"` — a LEGACY material id, not one of
+this build's seven. `TileGrid.is_solid` is true for any non-empty string, so the fixture looked correct
+and every check passed; `Mining.break_cost` fell through to zero and the cell broke on the FIRST tick, so
+the charge path the test claimed to exercise was never touched. **A fixture built from a plausible name
+rather than a real one poses nothing and says it did.** Fixed to `clay` (hardness 1.0), and the repair is
+a control rather than a correction: the test now asserts its own budget is more than 4 ticks and that the
+command is accepted more than once, so a one-tick break is a failure instead of a pass. It took 17.
+
+**What this deliberately does NOT do.** No consumer migrated: `reveal_scene.gd`, `play_scene.gd` and the
+harness drivers still drive `sim/` directly, and bundling a new contract with a rewrite of its first
+consumer would have made both harder to judge. No renderer, no coordinator — this object owns no scene,
+draws nothing, runs no loop. No fog, no semantic action level (§5 puts `goto`/`haul_to` in the harness).
+
+**Why one unattended pass is a defensible way to land a "3-5 session keystone": nothing persists.** No
+save schema, no golden, no fixture depends on an `Observation`'s shape, because every one is derived
+fresh and discarded. Changing its fields later costs a recompile of its consumers and nothing else. That
+reversibility is the whole argument, and it is the property the migration map did not weigh when it
+budgeted the slice on the assumption that a keystone is expensive to get wrong.
+
+---
+
+## D0215 · The score, lifted — the build makes a sound, and the whole port is one line · 2026-08-30 · Slice 4 out of order, deliberately
+**Decided:** `legacy/scenes/score.gd` comes across as `view/audio/score.gd`, wired into
+`tests/body/reveal_scene.gd`. Three synthesised beds — a no-third chord, a minor third-and-seventh, and
+a sub sine under filtered noise — mixed and pitched by how far down the body is. This build has made no
+sound at all until now.
+
+**Out of the migration map's stated order, and that is the point of measuring first.**
+`docs/LEGACY_MIGRATION_MAP_2026-08-29.md` §9 puts `score.gd` in Slice 4, behind Slice 3's renderer.
+Measuring the actual dependency graph rather than trusting the slice numbers (below) showed it needs no
+renderer, no coordinator, and no `Observation`: **its entire interface with the game is one float.**
+`set_depth(t, delta)`, 0 at the surface and 1 at the bottom. So it was reachable now and most of Slice 3
+still is not.
+
+**The port is one line.** Legacy read the music slider straight off a `Settings` global.
+`tools/layer_lint/layer_lint.py` gives `view` access to `interface` and `core` only, and `Settings`
+belongs in `shell/`, so the level is injected as a `music_db` property instead. Default `0.0`, meaning no
+attenuation rather than silence — a caller that forgets to set it still hears the score, instead of
+producing a silent bug that looks like the lift failed. **That substitution is the shape every remaining
+lift needs: a global read becomes a property the layer above sets.**
+
+**The depth fraction is measured from the SPAWN row, not from row 0.** A shaft site starts the body
+partway down; against row 0 the score would begin halfway through its own arc and barely move during the
+descent. `DebugSceneCommon.depth_fraction` owns that, not `Score`, because a `view/` file may not read
+`Body` or `TileGrid` — the scene derives the number and hands it over.
+
+**Three Godot facts found while testing it, all of them the same shape: the test could not see its own
+failure.**
+1. `get_root().add_child(node)` from a `SceneTree` script's `_initialize()` does NOT run `_ready()` in
+   time. The three players stayed null and every access was a `SCRIPT ERROR` — which `_check()` cannot
+   see, exactly the D0115 masked-crash class, caught only because `tools/run_gd_test.sh` reads the raw
+   output. The suite builds a DETACHED `Score` and calls `_ready()` by hand; adding children to a
+   detached node works fine, so nothing is lost.
+2. `queue_free()` never runs in a suite that quits before the tree processes the queue, leaving an
+   ObjectDB leak that `run_gd_test.sh` reports as an engine-level failure. `free()`, not `queue_free()`.
+3. Constructing the `Score` at DECLARATION in `reveal_scene.gd` would leak on every
+   `RevealScene.new()` that `tests/test_reveal_scene_dig_edge.gd` makes without adding to a tree. Built
+   in `_ready()` instead.
+
+**What the suite actually checks, and why not the obvious thing.** The seam test measures the wrap
+discontinuity against a control that travels inside the same buffer — the largest step BETWEEN adjacent
+samples — rather than against a tolerance chosen here. The alternative was to re-derive the partial-ratio
+table in the test and assert each one completes whole cycles, which is a test fitted to the thing it
+checks: it would pass on a build where `_stack`'s frequency snap had been deleted. Measured: open wraps
+by 0.0403 against an in-buffer step of 0.0580; minor by 0.0209 against 0.0393.
+
+**The finding this lift was chosen from, and it contradicts the brief that ordered it.** The presentation
+run was briefed to work through "the 63 clean LIFT batch". Classifying all 21 code files in it by which
+legacy `class_name`s they reference **in code with comments stripped** — a scan of the raw text is
+useless here, since these files' comments are full of capitalised prose — gives:
+
+| Blocked on | Files | Lines |
+|---|---|---|
+| `WorldRenderer` / `MainView`, the coordinator | sky_painter, terrain_painter, water_view, rope_view, falling_items | ~1,540 |
+| `FactorySim`, legacy's sim | fine_terrain, sfx, water_flow, power_flow (+ overlaps above) | ~2,700 |
+| `MachineDef` / `RecipeDef`, entities that do not exist | visuals (1,850) + 13 machine records | ~2,050 |
+| Nothing — liftable today | art, particles, light_layer, settings, seams, score | ~945 |
+
+**The run's own non-negotiable ("no coordinator rebuilds — parked, judgment-dense") is what blocks most
+of its own queue**, and `visuals.gd` is blocked on machines and items rather than on any renderer. This
+is not an argument against the non-negotiable; it is the reason the batch cannot be worked as a batch,
+and it is recorded so the next session does not rediscover it by starting a lift that cannot compile.
+`docs/NEEDS_DIRECTOR.md` P005 carries the ruling this needs.

@@ -36,8 +36,30 @@ applies to them.
 
 ## Public API
 
-None yet. This directory is a skeleton — no code has been written.
+`interface/interface.gd`, `class_name Interface`. Constructed around a `TileGrid`, a `Body` and a
+`Mining` its caller already owns; owns no scene and runs no loop.
+
+- `observe(Envelope) -> Observation` — pure. Any number of calls leave `state_signature()` identical.
+- `apply(Command) -> Result` — the only mutator. A rejected command changes nothing at all.
+- `Envelope`, `Observation`, `Result` are inner classes, matching `Invariants`' own convention for
+  value types belonging to a module's public file.
+
+`docs/adr/0007-l2-interface.md` is normative for the three decisions behind that shape.
 
 ## Gotchas
 
-None yet.
+**An `Observation` is a COPY, and it must stay one.** It holds a flat byte array over its window plus a
+legend, and no reference to `TileGrid`, `Body` or `Mining`. Handing back a live grid would be cheaper
+and would silently delete the envelope — a consumer holding the grid reads any cell it likes and no
+filter here could stop it. `tests/test_interface.gd` tests this by attempting the reach-around
+(observe, then excavate, then assert the observation still reports the old state), so the shortcut
+cannot be reintroduced quietly.
+
+**`Envelope` has one dimension because one has a mechanism.** `docs/ARCHITECTURE.md` §5 names four
+(vision, planning, motor, priors); this build has a window and no fog, planner, motor model or priors
+table. The other three are absent rather than stubbed, deliberately: a `vision` field that never
+filters reads as a filter that has been checked.
+
+**`window` has no default and there is no reachable "everything" envelope.** The run that must never be
+handed perfect information by accident is the constrained one measuring discoverability.
+`Envelope.oracle_over(grid)` makes the unfiltered case name itself at the call site.

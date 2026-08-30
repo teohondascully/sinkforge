@@ -68,3 +68,17 @@ static func warn_if_blank(img: Image, path: String) -> void:
 static func finish_and_quit(flush: Callable, tree: SceneTree) -> void:
 	flush.call()
 	tree.quit(0)
+
+
+## D0215. How far down the body is, 0 at the row it spawned on and 1 at the world's floor -- the one
+## number `view/audio/score.gd` needs, and the reason that file could be lifted before any renderer
+## exists. It lives HERE rather than in `Score` because `tools/layer_lint/layer_lint.py` gives `view`
+## access to `interface` and `core` only: a `view/` file may not read `Body` or `TileGrid`, so the scene
+## derives the fraction and hands over a float. That is the same shape every remaining lift will need.
+##
+## Measured from the SPAWN row, not from row 0. A shaft site spawns the body partway down already, so
+## against row 0 the score would start halfway through its own arc and the descent would move it barely
+## at all -- the mix has to span the part of the world the player actually travels.
+static func depth_fraction(body_row: int, spawn_row: int, grid_rows: int) -> float:
+	var span: int = maxi(1, grid_rows - spawn_row)
+	return clampf(float(body_row - spawn_row) / float(span), 0.0, 1.0)

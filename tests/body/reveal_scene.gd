@@ -58,6 +58,11 @@ var _site_id: StringName = &""
 var _seed_value: int = 0
 var _look: MaterialLook = MaterialLook.new()  ## D0189: the lifted palette (Slice 0)
 var _mining: Mining = Mining.new()  ## D0195: the cursor-aim mining verb (Slice 1)
+## D0215: the first sound this build makes -- a pure function of depth. Constructed in `_ready`, NOT at
+## declaration: `tests/test_reveal_scene_dig_edge.gd` does `RevealScene.new()` without adding it to the
+## tree, and a `Node` built there would never be freed, leaking into the ObjectDB warning at exit that
+## `tools/run_gd_test.sh` reads as a bare ERROR.
+var _score: Score = null
 var _mine_down: bool = false  ## `--mine-down`: agent mode sinks a shaft instead of walking to glimmer
 var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the reticle from
 var _spawn_row: int = 0  ## the row the body started on -- `--mine-down`'s descent is measured against it
@@ -78,6 +83,8 @@ func _ready() -> void:
 	_body = session["body"]
 	_target_glimmer_col = session["target_glimmer_col"]
 	_spawn_row = Body._px_to_cell(_body.pos_y)
+	_score = Score.new()
+	add_child(_score)
 	_camera = Camera2D.new()
 	add_child(_camera)
 	_camera.make_current()
@@ -136,9 +143,11 @@ func _parse_args() -> Dictionary:
 	return {"site_id": site_id, "seed": seed_value}
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if _finished:
 		return
+	_score.set_depth(DebugSceneCommon.depth_fraction(
+		Body._px_to_cell(_body.pos_y), _spawn_row, _grid.height), delta)
 	var input: InputFrame = _read_play_input() if _play_mode else _scripted_approach_input()
 	_body.tick(input, _grid)
 	# Mining runs AFTER the body moves, so the reach test uses this tick's own position rather than the

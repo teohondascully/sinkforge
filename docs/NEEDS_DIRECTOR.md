@@ -132,3 +132,47 @@ permanent complication to every "the fuzzer says N" statement made afterward. It
 nobody has answered: whether `HostileChamber` should be *repaired* instead (its corner tile has been
 unreachable since D0055, so it is carrying a feature it no longer tests), which is a fixture-design call
 rather than a harness-throughput one.
+
+---
+
+## P005 · The "63 clean LIFT batch" is mostly blocked by this run's own non-negotiable
+
+**Status:** open · **Cost to apply:** a slice, not a session · **Raised by:** this session, 2026-08-30 (D0215)
+
+The presentation run was briefed to work through the migration map's 63 LIFT files, with "no coordinator
+rebuilds (world_renderer/hud splits) — parked, judgment-dense" as a non-negotiable. Those two
+instructions are in direct tension, and measurement rather than reading is what shows it.
+
+**The measurement.** All 21 code files in the LIFT set, scanned for the legacy `class_name`s they
+reference **in code with comments stripped** — a raw text scan is useless here, because these files'
+comments are full of capitalised prose that reads as type names.
+
+| Blocked on | Files | Lines |
+|---|---|---|
+| `WorldRenderer` / `MainView`, the coordinator | sky_painter, terrain_painter, water_view, rope_view, falling_items | ~1,540 |
+| `FactorySim`, legacy's sim | fine_terrain, sfx, water_flow, power_flow | ~2,700 |
+| `MachineDef` / `RecipeDef`, entities that do not exist here | visuals (1,850) + 13 machine records | ~2,050 |
+| One hop: needs `Visuals`' keycap metrics only | ui_theme, page_surface, payouts | ~394 |
+| Nothing — liftable today | art, particles, light_layer, settings, seams, score | ~945 |
+
+**So roughly 900 of 8,539 lines are reachable without building a coordinator, and `score.gd` was one of
+them** (now lifted, D0215). `visuals.gd` — the single largest file and the one everything HUD-flavoured
+hangs off — is not blocked on a renderer at all; it is 1,850 lines of machine and item glyphs for
+entities this build does not have.
+
+**Three ways forward, and the choice is yours.**
+
+1. **Lift the rest of the unblocked ~900 and stop.** `art`, `particles`, `light_layer`, `settings`,
+   `seams`, plus `ui_theme` if the three keycap metrics are extracted out of `visuals.gd` first. Real,
+   cheap, and it does not touch the fork below. Ends with the batch genuinely dry.
+2. **Lift the ~394 one-hop files by extracting a `Visuals` subset.** `ui_theme.gd` is "what makes the UI
+   read as 2026" and needs exactly three members (`keycap_height`, `KEYCAP_BASE`, `KEYCAP_DROP`). The
+   catch: there is no UI in this build to theme yet, so the value is banked, not realised.
+3. **Un-park the coordinator.** ~1,540 lines of world rendering unblock at once, and it is the only
+   route to the thing that would actually change how the game looks. This is the judgment-dense work the
+   run was told not to do, and `docs/LEGACY_MIGRATION_MAP_2026-08-29.md` §10 names it as the risk most
+   likely to bite: `world_renderer.gd` is 3,656 lines against a 400-line gate.
+
+**One thing that is already ruled and worth re-reading before option 3.** `docs/WORKING.md` records the
+Q1 finding that **the palette reads at 16px but the FLECK does not**, and that `terrain_painter.gd` is
+"not portable as written". That is 438 of the 1,540, and it needs an art pass, not a port.

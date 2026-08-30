@@ -36,7 +36,18 @@ that phase acts on.
 
 ## Public API
 
-None yet.
+`sim/commands/command.gd`, `class_name Command`. A tag plus a payload, no behaviour — two named
+constructors, `Command.move(InputFrame)` and `Command.mine(Vector2i)`, because a `Command.new()` with
+every payload defaulted would be a command with no kind and there is no valid one.
+
+**Two members because this build has two verbs.** `docs/ARCHITECTURE.md` §5 wants a vocabulary "small
+enough to read in one sitting"; writing the one the GDD eventually needs would put `Place`, `Haul` and
+`Craft` here as tags no submodule matches and no test can exercise, which is the failure this file's
+own gotcha below already records once. A third member arrives with a third verb.
+
+`MOVE` carries a whole `InputFrame` rather than decomposing into per-key commands: that is §5's "raw"
+action level, a first-class member of the vocabulary rather than a legacy path. One command per
+keypress would be the second, incompatible input format §5 names as the thing not to build.
 
 ## Gotchas
 

@@ -46,73 +46,67 @@ bug it was fitted against was fixed. The real witness is `fixture_shaft_replay_p
 shaft is walls, and every wall contact zeroes `vel_x`): **corner_unconsented 2 -> 0, corner_ok 18 -> 11**.
 That fixture now asserts it per commit. Remedy for the fuzzer is parked, not applied (P004).
 
-**Open, and expected:** the shaft-replay golden array is stale by construction — the resolver changed, so
-200 checkpoint hashes changed with it (first mismatch at checkpoint 30). It must be re-captured from CI's
-pinned **Linux** build, not locally: D0167/D0168 measured `ValueNoise` differing across platforms.
+**Golden re-captured and CI green on the fix.** Run 33331589523 on commit c953117 confirms
+`corner_ok=11, corner_unconsented=0` on Linux, matching local exactly; the golden array moved because the
+scenario really did contain the defect, and all 200 checkpoints are now the CI-captured values (f9216b2).
+
+## DONE THIS RUN — L2 exists (D0214, ADR 0007)
+
+**`interface/` and `sim/commands/` stop being skeletons.** `Interface.observe(Envelope) -> Observation`
+and `apply(Command) -> Result`, with `Command.move(InputFrame)` and `Command.mine(cell)`. This was the
+literal blocker on the presentation batch: `tools/layer_lint/layer_lint.py` gives `view` access to
+`interface` and `core` and nothing else, so every lifted renderer file is a red gate until the door exists.
+
+**The one decision the rest follows from: `observe()` COPIES.** An `Observation` holds a flat byte array
+over its window plus a legend, and no reference to `TileGrid`, `Body` or `Mining`. Handing back the grid
+would be cheaper and would silently delete the envelope — a consumer holding it reads any cell it likes.
+`tests/test_interface.gd` tests that by attempting the reach-around: observe, excavate, assert the
+observation still reports the old state. **One envelope dimension, three deliberately absent** — there is
+no fog, planner, motor model or priors table, and a `vision` field that never filters reads as a filter
+that has been checked. Same reasoning gives `Command` two members, one per verb that exists.
+
+**Safe to land in one unattended pass because nothing persists.** No save schema, no golden, no fixture
+depends on an `Observation`'s shape. Changing its fields later costs a recompile of its consumers and
+nothing else. **No consumer was migrated** — `reveal_scene`/`play_scene` still drive `sim/` directly.
+
+## DONE THIS RUN — the build makes a sound (D0215)
+
+**`view/audio/score.gd`, lifted from legacy, wired into `reveal_scene`.** Three synthesised beds mixed
+and pitched by depth. **The whole port is one line**: legacy read the music slider off a `Settings`
+global, and `Settings` is `shell/`, so the level is injected as `music_db`. That substitution is the shape
+every remaining lift needs.
+
+**Chosen by measuring, not by slice order.** The map puts it in Slice 4 behind a renderer; its entire
+interface with the game turned out to be one float (`set_depth(t, delta)`), so it needed neither.
+
+## THE PRESENTATION BATCH IS MOSTLY BLOCKED — read `docs/NEEDS_DIRECTOR.md` P005
+
+Classifying all 21 code files in the 63-file LIFT set by the legacy types they use **in code with
+comments stripped**: ~1,540 lines blocked on the `WorldRenderer` coordinator, ~2,700 on legacy's
+`FactorySim`, ~2,050 on `MachineDef`/`RecipeDef` entities this build does not have, and **~945 liftable
+today** (`art`, `particles`, `light_layer`, `settings`, `seams`, `score` — the last now done). The run's
+own "no coordinator rebuilds" non-negotiable is what blocks most of its own queue. P005 carries the three
+options and the numbers; option 1 (finish the unblocked ~900) needs no ruling and is the obvious next step.
 
 ## SLICE 1.5, the bite — delivered, still awaiting the director's play verdict
 
-**The brief's premise was false in both halves and the real defect was its opposite** (D0200, full account
-in the ledger): mining was already at the 4px resolution and collision already runs on it. What was wrong
-is that one blow removed 1/16th of a metre while being charged a full metre's worth of legacy
-hardness-seconds — **0.06x legacy per unit volume**, unmeasured because the check was in seconds-per-CELL
-and the two codebases' cells are different sizes.
+Full account in `docs/DECISIONS_LEDGER.md` D0199-D0205. **Result:** `Mining.bite_radius`, a Euclidean
+disc, default 2 (0.81 m^2, the largest disc under legacy's metre); `--bite=0` is bit-for-bit Slice 1 and
+is the control. The same 24-cell shaft takes **991 ticks at bite=0, 242 at bite=2**. The brief's premise
+was false in both halves and the real defect was its opposite (D0200): mining was already at 4px and
+collision already ran on it; what was wrong is that one blow removed a sixteenth of a metre while being
+charged a full metre's hardness-seconds, **0.06x legacy per unit volume**, unmeasured because the check
+was in seconds-per-CELL and the two codebases' cells are different sizes.
 
-**Delivered:** `Mining.bite_radius`, a Euclidean disc (areas 1/5/13/29 for r=0..3), default **2** (0.81 m²,
-the largest disc under legacy's metre). **`--bite=0` is bit-for-bit Slice 1 and is the control.**
-Determinism green; `bite=` joins `site=`/`seed=` in the recording header so an old log reconstructs at
-radius 0, never at the current default. The same 24-cell shaft takes **991 ticks at bite=0, 242 at bite=2**
-(`docs/MILESTONES.md`, `docs/TASTE_QUEUE.md` T004).
+**Two rules that outlived it.** D0204: a build handed over for a feel judgment gets played from a CLEAN
+CHECKOUT — the director's second session read 8 bad ticks clean and 268 in a dirty tree, 33x. D0201: four
+suites written across Slices 0 and 1 were passing locally and running in no CI job at all, including two
+mutation-tested bounds controls; gate 31 now reconciles the sets and prints members.
 
-**The probe's most useful output was a collision defect, now fixed** — D0202 escalated it, D0203 corrected
-its mechanism (the step succeeds and is undone inside its own tick), D0205 fixed that, and D0206 fixed the
-criterion flaw underneath it. `fixture_step_up_into_wall_probe` no longer reproduces and can be retired
-whenever the director wants; it is left in place as a one-command check.
-
-**D0204 stands as a rule, not an open item:** a build handed over for a feel judgment gets played from a
-clean checkout. The director's second session read 8 bad ticks on a clean tree and 268 in the D0139-dirty
-one — 33x — and that dirty tree no longer exists (see below).
-
-**Also fixed on the way in:** D0199, the vertical half of D0192. The entry shaft opened row 0, so the body
-spawned with its head ON y=0 and the first jump left the world — one bounds violation in the director's own
-session. Row 0 stays solid now; 64 seeds × 2 sites hold JUMP for 90 ticks with 0 violations, head stopped
-by ROCK at 4.15px, and the pre-fix carve is kept as a live control that still reproduces the director's own
-error line byte for byte.
-
-**D0201 — every suite written in Slices 0 and 1 ran nowhere.** `test_material_palette`, `test_mining`,
-`test_reveal_scene_dig_edge`, `test_reveal_spawn_bounds`: passing locally, in no CI job, including two
-deliberately mutation-tested bounds controls. Gate 31 (`check_suite_coverage.py`) now reconciles the
-tracked population against the workflow and reports MEMBERS — its first run printed 26 on each side while
-the sets differed.
-
-**WAITING ON THE DIRECTOR:** play it (`godot --path . tests/body/reveal_scene.tscn -- --play`, and sweep
-`--bite=0/1/2/3`) and rule. If the bite alone makes it read → Slice 2. If it reads better but the body is
-still too massive → Option 1 becomes a deliberate, collision-touching decision. **Note the third
-possibility the geometry raises:** the world is 48 cells / 12 m wide and the body is 8.3% of that and 33%
-of the screen's HEIGHT at zoom 6. Shrinking the body and widening the world are the same fix from two ends,
-and no mining change reaches either.
-
-**GATES.** All 29 suites pass on CI's Linux build (run `33303000919`), `test_shaft_replay_determinism`
-included with its re-captured golden. `check_size_limits` and `check_untracked_files` are green for the
-first time in weeks — both were red only on D0139's parked work.
-
-**Gate 7 (LOC velocity) is the one red, and D0207 is why that now matters more than a red gate usually
-does.** It runs early in the `structural gates` job, a failed step aborts the job, so **ten BLOCKING
-checks after it were reported `skipped` — not failed, not passed** — on the final run of this session:
-
-> gate 13 (schema validation) · gates 15-16 (claim references) · gate 22 (generated data freshness) ·
-> gate 23 (WORKING.md freshness) · gate 27 (no untracked files) · gate 30 (CORRECTIONS freshness) ·
-> `project.godot` load-bearing flags · gate mutation tests (BLOCKING) · duplication (BLOCKING)
-
-**None of those has been enforced by CI for as long as gate 7 has been red.** They pass locally right now —
-checked individually this session, not assumed — but "CI is green except gate 7" was never what was
-happening. This is a real hole, it is bigger than the duplication that revealed it, and fixing it means
-changing the CI topology (one job per gate, or `continue-on-error` plus an aggregation step), which is a
-director-level call, not something to slip into a body fix. **Gate 7 itself only falls when GAME LOC grows
-— its own message: "the next unit of work is game, not another check."**
-
-`check_claim_references` is VOID (zero scenarios exist to carry a reference), unchanged and by construction.
-
+**WAITING ON THE DIRECTOR:** play it (`godot --path . tests/body/reveal_scene.tscn -- --play`, sweeping
+`--bite=0/1/2/3`) and rule. **Note the geometry question underneath it:** the world is 48 cells / 12 m
+wide, the body is 8.3% of that and 33% of the screen's height at zoom 6. Shrinking the body and widening
+the world are the same fix from two ends, and no mining change reaches either.
 
 ## STANDING — carried forward, none of it closed by Slice 1.5
 
@@ -146,17 +140,14 @@ judgment, not a session's.
 
 ## CLOSED — D0139, reverted on the director's ruling; the diagnosis survived, the remedy did not
 
-Shelved on branch **`shelf/d0139-full-footprint`** (`f8186fb`, pushed) and reverted from the working tree.
-Recover with `git checkout shelf/d0139-full-footprint -- sim/body/vertical_resolve.gd tests/test_vertical_resolve.gd`.
+Shelved on branch **`shelf/d0139-full-footprint`** (`f8186fb`, pushed), reverted from the tree. Recover
+with `git checkout shelf/d0139-full-footprint -- sim/body/vertical_resolve.gd tests/test_vertical_resolve.gd`.
 Four measurements against it, three from its own investigation: its acceptance signal failed
-(`grounded_no_floor` stayed at 59, attribution flipping `resolve_floor` 55→0 / `grid_floor_backstop` 4→59
-— the flaw changing hands, the director's own anticipated "second bug"); it regressed
-`test_body_acceptance`'s HARD gate (`depenetration_events` 0→1, `stall_seconds` 0→0.017s); it broke
-`check_size_limits`; and it made real play 33x worse.
-
-**Its diagnosis was right and is now closed by D0206 instead** — the criterion really was the bug, but the
-fix is to make both paths share ONE full-footprint criterion, not to make `resolve_floor` refuse landings
-and leave the backstop holding the same flaw.
+(`grounded_no_floor` stayed at 59 while attribution flipped, the flaw changing hands); it regressed
+`test_body_acceptance`'s HARD gate; it broke `check_size_limits`; and it made real play 33x worse. **Its
+diagnosis was right and is closed by D0206 instead** — the criterion really was the bug, but the fix is
+one shared full-footprint criterion, not making `resolve_floor` refuse landings while the backstop keeps
+the same flaw.
 
 ## OPEN, NOT STARTED — the persistent-world GDD reversal
 
