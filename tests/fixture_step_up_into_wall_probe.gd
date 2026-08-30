@@ -35,10 +35,17 @@ extends SceneTree
 ##   r12 #....########
 ##   r13 #############
 ##
-## THE MECHANISM. Pressing right, the body's lower rows meet the column-5 ledge at rows 11-12. That ledge
-## is 2 cells tall, inside `STEP_UP_PX`, so `try_step` steps up -- but the destination it steps to is NOT
-## clear for the body's whole box: at 8px higher the box spans rows 1-10, and column 5 is SOLID on rows
-## 1, 3, 5, 6, 8 and 10. The step-up height is checked; the destination's fit is not.
+## THE MECHANISM (corrected -- D0203 supersedes D0202's account of it). Pressing right, the body's lower
+## rows meet the column-5 ledge at rows 11-12. That ledge is inside `STEP_UP_PX`, so `_try_step` runs --
+## and it DOES validate its destination, `_box_blocked` on the body's own box translated up by the lift,
+## half-open bounds and all. The step is legal when it is taken.
+##
+## What goes wrong is that it is undone inside its own tick. `Body.tick` runs `_integrate_horizontal` ->
+## `pos_x +=` -> `HorizontalResolve.resolve` (the step) -> `_integrate_vertical` -> `VerticalResolve`. The
+## vertical pass runs AFTER the step, moves the body again by one tick of gravity against the `vel_y` the
+## step had just zeroed, and leaves it inside rock without re-grounding it. The tell is on screen and
+## contradictory: the tick ends with `floor_source_this_tick = "try_step"` and `on_floor = false`, which
+## cannot both be true, because `_try_step` sets `on_floor = true` as it lifts.
 ##
 ## Run: godot --headless --path . --script res://tests/fixture_step_up_into_wall_probe.gd
 ## Prints one line per tick and a verdict. Exits 0 either way -- it reports, it does not gate.

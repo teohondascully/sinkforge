@@ -5,7 +5,7 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
 **Last updated: 2026-08-30. This round: LEGACY REVIVAL Slice 1.5 — the bite. 4 commits dated 2026-08-29
-(`7199940`, `627e24b`, `ea33549`, `1ac7939`), plus this wrap. `docs/DECISIONS_LEDGER.md` D0199-D0202.**
+(`7199940`, `627e24b`, `ea33549`, `1ac7939`), plus this wrap. `docs/DECISIONS_LEDGER.md` D0199-D0204.**
 
 **Headline: the Slice 1.5 brief's premise was false in both halves, and the real defect is the opposite
 of the one it describes. Mining was already at the 4px resolution and collision already runs on it; what
@@ -49,15 +49,29 @@ what size* (`docs/CORRECTIONS.md`, D0200).
 Replaying the director's session at radius 1 ejects the body from the world. The obvious read — "the bigger
 bite broke something" — is wrong, and `cleared=0` on the failing tick says so: the grid is byte-identical
 either side of it. It reproduces on a clean checkout without D0139's parked change, and then from a
-**hand-authored 15-row map with no `Mining` in the script at all**. Standing at a wall that juts one column
-at the body's feet and pressing toward it, `try_step` lifts the body INTO rock — **the step-up's HEIGHT is
-checked, the destination's FIT is not**. Reachable at radius 0 too, since any cell set one blow clears,
-single-cell blows clear one at a time. **Escalated, not fixed** (D0202); `tests/fixture_step_up_into_wall_probe.gd`
-is a one-command reproduction.
+**hand-authored 15-row map with no `Mining` in the script at all**. **Escalated, not fixed** (D0202);
+`tests/fixture_step_up_into_wall_probe.gd` is a one-command reproduction.
+
+**I then named the wrong mechanism, and the correction is the more useful finding** (D0203). I wrote that
+"the step-up's HEIGHT is checked, the destination's FIT is not." `_try_step` checks its destination —
+`_box_blocked` on the body's box translated up by the lift, half-open bounds correct. I inferred a missing
+guard from legacy HAVING one plus our outcome being wrong, across two files, one of which I had not read.
+The real tell was already in the trace: the tick ends with `floor_source = "try_step"` and
+`on_floor = false`, which `_try_step` cannot produce — **the step succeeds and is undone later in the same
+tick by the vertical pass.** That contradictory pair is a cheap general invariant nobody asserts yet.
 
 The lesson beyond the bug: Slice 1 named the fuzzer's blind spot (it never sets `mine_held`) and moved on.
 A bite radius is a shape generator, and it found a real resolver defect inside 987 ticks of one recorded
 session. Wiring the fuzzer to the mining verb is now a much better bet than it looked.
+
+### A build handed over for a feel judgment must be a clean checkout
+
+The director's second session (710 ticks, bite=2) replays to **8 bad ticks in 4 episodes (1%)** on a clean
+checkout and **268 in 12 episodes (38%)** in the working tree, because that tree carries D0139's parked
+`vertical_resolve.gd`. **33x.** I told them that difference was "immaterial for a feel judgment" — a guess
+generalised from D0198's 7% tick-count difference on a scripted `--mine-down` run, which never presses
+LEFT or RIGHT against a wall and therefore could not contain the effect I was ruling out. A third of the
+session they judged was spent inside rock, for a reason that is not in `main` (D0204).
 
 ### Every suite written in the last two slices ran nowhere
 
@@ -102,7 +116,9 @@ and the brief's Option 1 is only one of them.
 
 ## Blocked, and what it's waiting on
 
-- **D0202 / `try_step`** — new, yours, and a hard stop for anyone not on the collision arc.
+- **D0202 / D0203, the step-up undone inside its own tick** — new, yours, and a hard stop for anyone not
+  on the collision arc. It is NOT rare: the second `--play` session hits it 4 times in 710 ticks on a
+  clean tree, at the shipped bite radius.
 - **D0193 / the bounds invariant's magnitude** — unchanged, yours, gate 24's subject. It has now fired
   twice more (0.3125px, 3.4px) against the 15.85px it was built for.
 - **D0139 / `resolve_floor`** — unchanged, untouched, still dirty on purpose.

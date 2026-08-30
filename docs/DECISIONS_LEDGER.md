@@ -8106,3 +8106,74 @@ radius is a shape generator, and it found a real resolver defect in 987 ticks of
 
 **Reverse:** N/A — nothing was changed. The fixture retires itself when the defect is fixed, and says so
 in its own output.
+
+## D0203 · D0202's mechanism was wrong: `_try_step` DOES check its destination · 2026-08-30 · corrects D0202
+**Decided:** correct the mechanism, keep the finding, still do not touch the resolver.
+
+**What D0202 claimed:** "the step-up's HEIGHT is checked, the destination's FIT is not."
+
+**That is false, and reading the code says so.** `sim/body/horizontal_resolve.gd::_try_step` calls
+`body._box_blocked(grid, left, top - lift, right, bottom - lift)` — the body's own box translated up by
+the lift — and refuses the step if anything in it is solid. `_box_blocked` uses the half-open convention
+correctly (`_px_to_cell(right - 1)`, `_px_to_cell(bottom - 1)`, D0112). The destination is validated, at
+the body's post-integration x, before the lift commits. Legacy does the same thing
+(`legacy/scenes/player.gd`: `var lifted := Rect2(...); if not _aabb_blocked(lifted)`), so this is not even
+a divergence from the reference — I asserted a missing check by analogy to legacy's presence of one,
+without reading ours.
+
+**What the trace actually shows.** At the failing tick the body ends with `floor_source_this_tick =
+"try_step"` and `on_floor = false`, overlapping one solid cell. Those two are contradictory by
+construction: `_try_step` sets `on_floor = true` and `vel_y = 0` as it lifts. So the step succeeded and
+was then undone WITHIN THE SAME TICK — `Body.tick`'s order is `_integrate_horizontal` → `pos_x +=` →
+`HorizontalResolve.resolve` (where the step happens) → `_integrate_vertical` → `VerticalResolve`. The
+vertical pass runs after the step, moves the body again (0.15px, one tick of gravity from the vel_y the
+step had just zeroed), and leaves it inside rock without re-grounding it.
+
+**The contradictory telemetry is the tell, and it was already on screen.** `floor_source` naming the stage
+that grounded the body while `on_floor` says it is airborne cannot both be true at the end of a tick. That
+pair is a cheap, general invariant nobody is currently asserting.
+
+**What survives from D0202 unchanged:** the defect is real, it is in the collision resolver, the failing
+tick excavates nothing, it reproduces from a hand-authored map with no `Mining` in the script, and it is
+reachable at bite radius 0. Only the sentence naming the missing check was wrong.
+
+**And one claim from D0202 is now falsified by measurement rather than reasoning:** "the shipped radius 2
+happens to be clean on this session" was true of the session it was written against and is not a property
+of radius 2. A second `--play` session (`reveal_play_2026-08-30T07-31-23.log`, 710 ticks, bite=2) hits it
+in **4 separate episodes on a clean tree**. D0202 hedged this correctly at the time ("one seed and one
+input trace, and is not evidence that it is safe"); the hedge is now cashed.
+
+**Reverse:** N/A.
+
+## D0204 · D0139's parked change makes the resolver 33x worse, and I called it immaterial · 2026-08-30
+**Decided:** record the measurement and the misreport. Nothing changed; D0139's work stays parked.
+
+**The measurement.** The same recorded session (`reveal_play_2026-08-30T07-31-23.log`, 710 ticks, bite=2)
+replayed against two trees:
+
+| tree | bad ticks | episodes | share of session inside rock or outside the world |
+|---|---|---|---|
+| clean checkout at `ea33549` | 8 | 4 | **1%** |
+| working tree (+ D0139's uncommitted `vertical_resolve.gd`) | 268 | 12 | **38%** |
+
+**33x more bad ticks.** D0139's change is `_full_footprint_solid`, parked mid-investigation and already
+known not shippable (`docs/WORKING.md`: it breaks `test_body_acceptance`'s own hard gate and
+`check_size_limits`). This is a third, independent reason, and a much louder one than either.
+
+**The misreport, which is the part worth keeping.** Told how to play the build, I wrote: "you're playing a
+build that isn't quite `main` — it changes how the body settles. **Immaterial for a feel judgment**." That
+was a guess dressed as a finding. The only number I had was D0198's 7% tick-count difference on a scripted
+agent run, and I generalised from "7% on a shaft-sinking script" to "immaterial to a human playing." A
+scripted `--mine-down` run never presses LEFT or RIGHT against a wall, which is the entire input class the
+defect needs — **the evidence I extrapolated from could not have contained the effect I ruled out**
+(`docs/DECISIONS_LEDGER.md`'s "expected null carries no conclusion": check the treatment's DOMAIN before a
+null excludes a cause).
+
+**Consequence:** the director's second session is not a clean reading of the shipped build, and its 198
+bounds violations must not be quoted as one. The clean-tree numbers above are the quotable ones.
+
+**Standing remedy, cheap:** a build handed over for a feel judgment gets played from a clean checkout, or
+the dirty-tree difference gets MEASURED before it is described. `tools/capture_moments.sh` already refuses
+to let a dirty tree pass as reproducible (D0198); the same discipline had no equivalent for "go play it."
+
+**Reverse:** N/A.

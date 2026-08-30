@@ -29,27 +29,37 @@ never huge — it was so small that half a minute of holding dug a hole smaller 
 ends on the cell it just cleared, so the cursor is over air the moment it lands. The perception was right;
 the mechanism attributed to it was inverted.
 
-1. ~~**The bite**~~ **DONE (D0200)** — `Mining.bite_radius`, a Euclidean disc (areas 1/5/13/29 for r=0..3),
-   default **2**. DERIVED, and it **corrects D0195**: legacy's 32px cell is one square METRE and one charge
-   removes it; this world's metre is 16 terrain cells and Slice 1 charged a full metre of hardness-seconds
-   to remove one of them, so it mined at **0.06x legacy per unit volume**. D0195 checked seconds-per-CELL,
-   one paragraph after establishing that the metre is the portable unit. r=2 is 0.81 m², the largest disc
-   under legacy's metre. **`--bite=0` is bit-for-bit Slice 1 and is the control**; `--bite=N` sweeps it.
-2. ~~Collision untouched~~ **CONFIRMED BY DIFF** — nothing in `sim/body/` changed. Collision still runs on
-   the 4px grid, which is the only grid there is; no threshold rule was needed or added.
-3. ~~Determinism~~ **GREEN** — the disc is a nested integer `range`, never a `Dictionary` iteration; two
-   instances produce identical mining state, grid state AND clear ORDER. `bite=` joins `site=`/`seed=` in
-   the recording header and a log without it reconstructs at radius 0, never at the current default.
-4. ~~Recording + screenshots~~ **DONE** — `docs/MILESTONES.md`, Slice 1.5. Same shaft: **991 ticks at
-   bite=0, 242 at bite=2**. The before/after pair is same commit, seed, camera, zoom AND tick.
+**Delivered (D0200):** `Mining.bite_radius`, a Euclidean disc (areas 1/5/13/29 for r=0..3), default **2**.
+DERIVED, and it **corrects D0195**: legacy's 32px cell is one square METRE and one charge removes it; this
+world's metre is 16 terrain cells and Slice 1 charged a full metre of hardness-seconds to remove one of
+them, so it mined at **0.06x legacy per unit volume**. D0195 checked seconds-per-CELL, one paragraph after
+establishing that the metre is the portable unit. r=2 is 0.81 m², the largest disc under legacy's metre.
+**`--bite=0` is bit-for-bit Slice 1 and is the control**; `--bite=N` sweeps it. Collision untouched
+(confirmed by diff) and it needed no threshold rule, because there is only one grid. Determinism green: the
+disc is a nested integer `range`, and `bite=` joins `site=`/`seed=` in the recording header so a log
+without it reconstructs at radius 0, never at the current default. Milestone artifacts in
+`docs/MILESTONES.md`: the same 24-cell shaft takes **991 ticks at bite=0, 242 at bite=2**.
 
-**HARD STOP HIT — D0202, reported not fixed, and the most useful thing this probe produced.** Replaying at
-radius 1 ejects the body from the world. The failing tick **excavates nothing**; it reproduces on a clean
-checkout without D0139's parked change, and then from a **hand-authored 15-row map with no `Mining` in the
-script at all**. Pressing toward a wall that juts one column at the body's feet makes `try_step` lift it
-INTO rock: **the step-up's HEIGHT is checked, the destination's FIT is not.** Reachable at radius 0 too —
-any cell set one blow clears, single-cell blows clear one at a time — and the trigger is the first press of
-RIGHT. Reproduce: `godot --headless --path . --script res://tests/fixture_step_up_into_wall_probe.gd`.
+**HARD STOP HIT — D0202/D0203, reported not fixed, and the most useful thing this probe produced.** The
+failing tick **excavates nothing**; it reproduces on a clean checkout without D0139's parked change, and
+then from a **hand-authored 15-row map with no `Mining` in the script at all**. **Not rare:** the
+director's second `--play` session hits it **4 times in 710 ticks on a clean tree, at the shipped bite
+radius**. Reproduce: `godot --headless --path . --script res://tests/fixture_step_up_into_wall_probe.gd`.
+
+**The mechanism, corrected (D0203).** D0202 said "the step-up's HEIGHT is checked, the destination's FIT is
+not." That is false — `_try_step` calls `_box_blocked` on the body's box translated up by the lift, with
+the half-open bounds right. What actually happens: the step succeeds and is **undone inside its own tick**.
+`Body.tick` runs `_integrate_horizontal` → `pos_x +=` → `HorizontalResolve.resolve` (the step) →
+`_integrate_vertical` → `VerticalResolve`; the vertical pass moves the body again by one tick of gravity
+against the `vel_y` the step had just zeroed, and leaves it inside rock without re-grounding it. **The tell
+was already on screen:** the tick ends with `floor_source_this_tick = "try_step"` and `on_floor = false`,
+which cannot both be true. That pair is a cheap general invariant nobody asserts yet.
+
+**D0204 — do not read the director's second session as a reading of `main`.** Replayed against a clean
+checkout it is **8 bad ticks in 4 episodes (1%)**; in the working tree, which carries D0139's parked
+`vertical_resolve.gd`, it is **268 in 12 episodes (38%)**. 33x. The clean-tree numbers are the quotable
+ones. A build handed over for a feel judgment gets played from a clean checkout, or the dirty-tree
+difference gets measured before it is described.
 
 **Also fixed on the way in:** D0199, the vertical half of D0192. The entry shaft opened row 0, so the body
 spawned with its head ON y=0 and the first jump left the world — one bounds violation in the director's own
@@ -78,39 +88,33 @@ D0139's — checked, not assumed.
 
 ## STANDING — carried forward, none of it closed by Slice 1.5
 
-**D0193 — the bounds invariant has no magnitude. The director's call, because it is gate 24's subject.**
-It fired at 0.3125px for D0192 and 3.4px for D0199; D0055 built it for 15.85px. This world is 192px wide,
-so pressing into a wall is ordinary play, and an invariant that fires during ordinary play trains everyone
-to ignore it. The discriminator is written up: the body can only be outside by one tick of legal motion
-unless something teleported it, so overshoot against `|vel|/TICK_HZ` separates a wall-press from an escape
-without a threshold picked to silence a log.
+**D0193 — the bounds invariant has no magnitude. The director's call, gate 24's subject.** It fired at
+0.3125px (D0192) and 3.4px (D0199); D0055 built it for 15.85px, and this world is 192px wide, so pressing
+into a wall is ordinary play. The discriminator is written up: overshoot against `|vel|/TICK_HZ` separates
+a wall-press from an escape without a threshold picked to silence a log.
 
 **The fuzzer still never sets `mine_held`, and D0202 raises the price of that.** Gate 26 is green about
 cursor-aim mining only because it never exercises it. A bite radius is a shape generator and it found a
-real resolver defect inside 987 ticks of one recorded session; wiring the fuzzer to the mining verb is now
-a much better bet than it looked when Slice 1 named it. Still not done, still its own unit of work.
+real resolver defect in one recorded session; wiring the fuzzer to the verb is now a much better bet than
+it looked. Still not done, still its own unit of work.
 
 **Line of sight is not ported.** Legacy gates mining on a float DDA; without it a player can mine through
 one tile of rock. Real behaviour change, stated rather than dropped (D0195).
 
-**Standing instruction — milestone recordings.** Every slice, and any intermediary work that changes what a
-player sees or does, commits: the `--play` or agent trace `.log` in `tests/body/recordings/` named by slice
-+ timestamp; a screenshot of the resulting state; and the commit SHA it was produced against, recorded IN
-the artifact or a sibling note — **generated from the commit, never hand-typed**. Re-recordings name the new
-SHA and never overwrite: the sequence IS the migration's visual history. Agent-mode captures are fine but
-must be LABELLED agent-mode. `docs/MILESTONES.md` carries one row per milestone.
+**Standing instructions — milestone recordings and the screenshot set.** Every slice, and any intermediary
+work that changes what a player sees or does, commits the `--play`/agent `.log`, a screenshot, and the
+commit SHA it was produced against — **generated from the commit, never hand-typed**, never overwritten,
+agent-mode always LABELLED. Canonical moments at a FIXED 1920x1080 from a FIXED camera plus a before/after
+PAIR at each visual milestone. `docs/MILESTONES.md` carries a row per milestone and the full rationale;
+`tools/capture_moments.sh <slice-label>` is the driver, with `BITE=n` and `TICKS=a,b,c` pinning the two
+things a mining change moves.
 
-**Standing instruction — the screenshot set.** Canonical moments at a FIXED resolution (1920x1080) from a
-FIXED camera so milestone-to-milestone shots are directly comparable, plus a before/after PAIR at each
-visual milestone. `tools/capture_moments.sh <slice-label>` is the driver; `BITE=n` and `TICKS=a,b,c` pin
-the two things a mining change moves.
-
-**Slice 0 and Slice 1, both closed.** Slice 0's evidence is `docs/DECISIONS_LEDGER.md` D0187-D0191 and the
-Q1 answer that gates the expensive slices — **the palette reads at 16px; the FLECK does not** (legacy's
-nugget is 6.4px, this world's whole terrain cell is 4px). For Slices 3-4: any material whose identity lives
-in its flecks needs its base retuned, and `terrain_painter.gd` is not portable as written. Slice 1's is
-D0192-D0198 and `docs/MILESTONES.md`. **`claims/C004` is still untouched on purpose** — a real human
-session now exists, but deciding whether one qualifies is the director's judgment, not a session's.
+**Slice 0 and Slice 1, both closed.** Evidence: `docs/DECISIONS_LEDGER.md` D0187-D0198 and
+`docs/MILESTONES.md`. The Q1 answer that gates the expensive slices still stands — **the palette reads at
+16px; the FLECK does not**, so any material whose identity lives in its flecks needs its base retuned for
+Slices 3-4, and `terrain_painter.gd` is not portable as written. **`claims/C004` is still untouched on
+purpose:** two real human sessions now exist, but deciding whether one qualifies is the director's
+judgment, not a session's.
 
 ## OPEN, MID-INVESTIGATION — D0139's Option-2 `resolve_floor` fix hit a SECOND hard stop, uncommitted,
 awaiting the director's ruling

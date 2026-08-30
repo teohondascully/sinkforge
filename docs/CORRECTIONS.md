@@ -193,6 +193,50 @@ travels in, and the answer "seconds" or "cells" is not sufficient on its own —
 *of what size*. `docs/DECISIONS_LEDGER.md` D0195's own framing ("two codebases can share a constant's name
 and not its units") was right and was applied to only one of the two constants in front of it.
 
+## D0203 corrects D0202 — I asserted a missing check by analogy, without reading ours
+
+**What D0202 claimed** (2026-08-29): "the step-up's HEIGHT is checked, the destination's FIT is not."
+
+**What is actually there:** `sim/body/horizontal_resolve.gd::_try_step` calls
+`_box_blocked(grid, left, top - lift, right, bottom - lift)` and refuses the step if anything in that box
+is solid — the destination, validated, at the body's post-integration x, with the half-open bounds right.
+
+**How the wrong claim got made, which is the reusable part.** I read legacy's step-up first
+(`var lifted := Rect2(...); if not _aabb_blocked(lifted)`), saw a destination check, saw our body ending
+up inside rock, and concluded ours lacked one. That is an inference from a difference in OUTCOME to a
+difference in CODE, across two files, one of which I had read and one of which I had not. The trace was
+already showing the real tell and I did not use it: the tick ends with `floor_source_this_tick =
+"try_step"` and `on_floor = false`, which `_try_step` cannot produce, because it sets `on_floor = true`.
+The step is undone later in the same tick by the vertical pass.
+
+**The screen:** before naming a missing guard, open the function and look for it. A reference
+implementation having a check is evidence about the reference, not about us.
+
+**What survives:** the defect, its reproduction, its independence from mining, and its reachability at
+bite radius 0. Only the mechanism sentence was wrong — which matters, because that sentence is what tells
+whoever takes the collision arc where to look, and it pointed at the wrong stage of the tick.
+
+## D0204 corrects my own handover instruction — "immaterial for a feel judgment" was a guess
+
+**What I wrote** when telling the director how to play the build: the working tree carries D0139's
+uncommitted `vertical_resolve.gd`, "it changes how the body settles… **immaterial for a feel judgment**."
+
+**Measured after they played it:** the same 710-tick session replays to **8 bad ticks in 4 episodes (1%)**
+on a clean checkout and **268 bad ticks in 12 episodes (38%)** with D0139's change. **33x.** A third of
+the session they judged was spent inside rock or outside the world, for a reason that is not in `main`.
+
+**The error, precisely.** The only evidence I had was D0198's 7% tick-count difference on a scripted
+`--mine-down` agent run, and I generalised it to a human at the keyboard. A scripted mine-down run never
+presses LEFT or RIGHT against a wall — **the input class the defect requires is absent from the run I
+extrapolated from**. This is `docs/DECISIONS_LEDGER.md`'s "expected null carries no conclusion" applied to
+a null I did not even have: check the treatment's DOMAIN before letting an unrelated measurement stand in
+for it.
+
+**The remedy is procedural, not technical:** a build handed over for a feel judgment is played from a
+clean checkout, or the dirty-tree difference is measured before it is characterised.
+`tools/capture_moments.sh` already refuses to let a dirty tree pass as reproducible (D0198); "go play it"
+had no equivalent.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,
