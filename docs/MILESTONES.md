@@ -58,3 +58,38 @@ carried D0139's uncommitted `sim/body/vertical_resolve.gd`. Every artifact above
 a clean clone. An artifact produced over a dirty tree names a commit that cannot reproduce it, which is
 exactly the failure this file's commit column exists to catch; `capture_moments.sh` now suffixes such a
 capture `-dirty` rather than letting it pass as reproducible.
+
+## Slice 1.5 — the bite (a probe, revertible in one commit)
+
+| | |
+|---|---|
+| **Slice** | 1.5 — how much of the world one charged blow removes |
+| **Commit** | `ea33549` |
+| **Recording** | [`tests/body/recordings/slice15_minedown_bite2_agent_2026-08-30.log`](../tests/body/recordings/slice15_minedown_bite2_agent_2026-08-30.log) — **AGENT-MODE**, scripted `--mine-down --bite=2`, **242 ticks** |
+| **Shows** | The same 24-cell / 6.0 m shaft the Slice 1 recording sinks in **991** ticks, sunk in **242** — 4.1x. 20 blows, **144 cells removed** (3.6 body-volumes), 0 bounds violations. |
+| **Screenshots** | [surface](milestones/slice15_surface_b0_ea33549.png) · delve [b0](milestones/slice15_delve_b0_ea33549.png) → [b2](milestones/slice15_delve_b2_ea33549.png) · aim [b0](milestones/slice15_aim_b0_ea33549.png) → [b2](milestones/slice15_aim_b2_ea33549.png) |
+
+**The before/after pair is the `_b0` → `_b2` half of each moment**, and it is a stricter pair than Slice
+1's: same commit, same seed, same site, same camera, same zoom **and the same tick** — the only difference
+between the two frames is the bite radius, because `--bite=0` is bit-for-bit the Slice 1 blow. The capture
+tick (200) is one both radii reach; a larger bite sinks the shaft faster, and shooting each half at its own
+completion tick would compare two different moments and call it a before/after.
+
+**`surface` has no pair, and that is a result rather than an omission.** Nothing is mined at tick 2, so the
+frame cannot depend on the bite — captured at both radii it came back **byte-identical** (same SHA-256),
+which is also a free check that the fixed-camera capture is deterministic. One frame is kept.
+
+**What the pair actually shows.** At tick 200 the `b0` body is still near the surface with a shaft barely
+its own length; the `b2` body is most of the way down an open column that runs the full height of the
+frame. The `aim` pair is the closer look: the reach ring, the reticle, the crack bars on a part-charged
+cell, and the shape of the hole each radius leaves.
+
+**Read this against the frames, not instead of them.** The removed shape is still built out of 4px cells,
+so the wall stays finely divided — but a disc is a regular shape, so a swept column's sides come out
+straighter than Noita's, whose raggedness comes from irregular material rather than from a small bite. What
+these frames can settle is throughput and hole size. Whether the *edge* reads as rock is a Slice 3 question
+and these frames are not evidence about it: still no lighting, no shaders, no molded rock, no sprites, no
+HUD, and the body is a rectangle.
+
+**Cost:** the five frames total **0.17 MB**, consistent with Slice 1's 0.11 MB for three. Re-measure when
+Slice 3 adds lighting; do not carry this number past it.

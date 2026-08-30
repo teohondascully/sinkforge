@@ -44,7 +44,10 @@ func _initialize() -> void:
 	var session: Dictionary = RevealSessionSetup.build(parsed.site_id, parsed.seed_value)
 	var stats: Dictionary = _scan(parsed, session)
 	_report(parsed, stats)
-	_geometry(session["grid"], int(stats["broke"]))
+	# `cleared`, not `broke`: a blow is one charge, a cell is one unit of world removed, and the geometry
+	# section is about volume. Passing `broke` here reported "20 cells = 0.5 body-volumes" for a run that
+	# actually removed 144 cells and 3.6 of them.
+	_geometry(session["grid"], int(stats["cleared"]))
 	# The assertions are about the INSTRUMENT, not the session: a replay that broke nothing, or that
 	# diverged into a bounds violation, would make every number above describe something other than what
 	# was played. They are what makes this measurement quotable rather than merely printed.
