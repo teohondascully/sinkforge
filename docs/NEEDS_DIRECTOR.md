@@ -441,3 +441,46 @@ jump rather than as a bump.
 
 I did not pick. (a) is cheap mechanically and changes what every existing capture, recording and spawn-row
 derivation means, which is exactly the kind of change that is yours.
+
+## P019 · The depth tint is ported and unapplied, because Stonereach slate-blue and glimmer teal are the same hue
+
+**What it is.** `world_renderer.gd:1506-1523 ZONE_TINTS` — legacy's four-entry depth-tint ladder, the thing
+that gives the descent "a four-beat colour arc a player can feel without reading a depth gauge": warm
+ochre clay, a neutral middle, cold violet at the approach to the seal, slate-blue in Stonereach. It is
+ported, converted to metres, sitting in `view/visuals/material_look.gd` as `ZONE_TINTS` + `zone_tinted()`,
+and `cell_color()` does not call it (D0252).
+
+**Why it is parked, measured rather than asserted.** It collides with the glimmer-legibility floor that
+`tests/test_material_palette.gd` has enforced since D0189 — glimmer must stay >= 0.25 from every host rock
+at every depth. Three attempts, all measured over 64 rows x both nugget branches:
+
+| tint applied to | worst glimmer-vs-rock separation |
+|---|---|
+| everything | **0.061** (vs deepstone at 252 m) |
+| country rock only, ore exempt | **0.178** (vs deepstone at 152 m) |
+| country rock only, ore exempt from bedding too | **0.216** (vs deepstone at 212 m) |
+| **not applied (shipped)** | **0.273** |
+
+No exemption scheme reaches the floor, and the reason is not a bug: at 252 m all four bands clamp at full
+and only 32% of a material's own colour survives (`0.78 x 0.84 x 0.74 x 0.66`), and the deepest tint is
+Stonereach slate-BLUE `(0.42, 0.55, 0.90)` against glimmer's TEAL `(0.16, 0.52, 0.55)`. They are hue
+neighbours. The tint pulls all country rock toward the exact hue the ore already occupies.
+
+**Legacy never hit this**, and that is the whole explanation: glimmer is this build's own material and
+legacy had no teal ore. Legacy also had somewhere to put the difference that this grid does not — ore was
+drawn as separate untinted crystal polygons OVER the tinted rock (`_draw_lode`, `_draw_grain`), and
+legacy's smallest nugget mark is 6.4px, larger than this world's entire 4px terrain cell.
+
+**The call is a colour choice, not an engineering one, which is why it is here.** Three options:
+
+1. **Move glimmer off teal.** Cheapest, and it is a one-line data edit in `data/materials/glimmer.yaml`.
+   But glimmer's cyan is itself a measured claim (D0189 kept it "deliberately far from COLOR_TERRAIN's
+   brown and COLOR_BG's near-black") and it is the colour of the thing the player is hunting.
+2. **Move Stonereach's tint off slate-blue.** Keeps the ore, changes the deepest band's identity. Legacy
+   picked blue as the cold end of a warm-to-cold descent, so the arc's shape is at stake, not just a hue.
+3. **Ship without the tint.** What is in the tree now. The descent loses its colour arc and keeps only the
+   band ladder's announcement colours, which the HUD does not draw yet either.
+
+**What did NOT get resolved by lowering the floor**, and deliberately: the 0.25 is a measured legibility
+claim about whether a player can find ore, not a convenience. Landing the tint by relaxing it would have
+been the shipped-claim-retired-silently failure this project keeps finding.

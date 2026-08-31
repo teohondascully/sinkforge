@@ -10265,3 +10265,68 @@ run still fails -- and the run that raised P018 genuinely was one (756 instrumen
 its ten commits, which is a true statement about this session). The gate simply stops changing its mind
 about a tree nobody edited. The walk is bounded by `WINDOW_SCAN_CAP`, and hitting the cap is reported as
 unmeasurable rather than guessed at.
+
+## D0252 · Legacy's bedding and cell jitter ported in metres; the zone tint collides with glimmer and is parked · 2026-08-30 · raises P019
+
+`view/visuals/material_look.gd`. Ported `world_renderer.gd:1613-1629` (`_strata`, `_cell_jitter`) and
+`fine_terrain.gd:411-415` (`apply_tone`, `STRATA_WARM`/`STRATA_COOL`) — the terrain now carries
+sedimentary bedding instead of per-cell speckle.
+
+**The jitter was the defect, and legacy names it.** This file previously used a per-cell HASH at legacy's
+own ±0.06 amplitude as a stand-in. Legacy rules that out by name: a per-cell random *"seams at every tile
+edge and so redraws the grid"*. That is precisely what the pre-port capture shows — a field of
+individually-visible squares. Legacy's three low-frequency sines make neighbouring cells share tone in
+cloudy patches, so a fill reads as a mass. Replacing the hash with the sines is the whole of the
+improvement in the delve capture; the bedding is what makes it read as *layered* mass.
+
+**COMPUTED IN METRES, and that is the entire scale conversion.** Legacy's cell is 32px and one legacy
+cell is one metre; this world's terrain cell is 4px and `CELLS_PER_METRE = 4`. Feeding raw terrain rows
+into legacy's frequencies would give beds a quarter of their authored thickness — ~4.6 m instead of
+~18.5 m for the thick bed, which at any real zoom is a stripe pattern, not bedding. Dividing the
+coordinate by `CELLS_PER_METRE` and leaving every legacy constant untouched preserves the authored
+wavelength, and is the same scale-free trick `data/bands/*.yaml` already uses for the band ladder.
+
+**The depth boost is deliberately NOT ported.** Legacy multiplies both tone terms by `1 + depth * 2.2`
+for one stated reason: the shadow veil takes roughly half a cell's tonal range. There is no veil here, so
+the boost would compensate for nothing. It returns with the veil.
+
+**Measured, not asserted.** `tests/test_material_palette.gd`, unchanged, over 64 rows × both nugget
+branches. Every legibility metric it carries IMPROVED against the pre-change tree:
+
+| metric | before | after |
+|---|---|---|
+| glimmer vs every host rock (floor 0.25) | 0.250 | **0.273** |
+| glimmer vs dug background | 0.350 | **0.402** |
+| closest host-rock pair (the palette's own noise floor) | 0.003 | **0.064** |
+
+The third is the one worth noting: hardrock and deepstone were 0.003 apart — effectively one colour — and
+the bedding separates them 21x, because it is a function of position that two materials sample at
+different base colours. Distinct-colour count in the delve capture went 178 → 264.
+
+**BEDDING IS COUNTRY ROCK ONLY, and this is a judgment call.** Ore-bearing rock (legacy's
+`MaterialDef.has_nuggets()`, i.e. a `nugget_color` record — NOT `glitters`, which is true of plain
+deepstone and hardrock) takes the jitter but not the bedding. The jitter is a small achromatic drift; the
+bedding is a hue move toward `STRATA_WARM`/`STRATA_COOL` and is a claim about sedimentary structure. A
+vein is not bedded — it CUTS bedding. That is exactly why legacy drew ore as separate untinted polygons
+over the toned fill (`_draw_lode`, `_draw_grain`) rather than as a modulation of it, and at a 4px cell
+this is the only mechanism available: legacy's smallest nugget mark is 6.4px, larger than this world's
+entire terrain cell. Applied to everything, the bedding measures 0.244 against the 0.25 floor.
+
+**ZONE_TINTS IS PORTED AND NOT APPLIED — raised as P019.** `world_renderer.gd:1506-1523`'s four-entry
+depth-tint ladder is in the file, converted to metres, with `zone_tinted()` beside it, and `cell_color`
+does not call it. It is not a second copy of `data/bands`: that is `strata.gd:BANDS`, eight ANNOUNCEMENT
+bands; this is four TERRAIN tints with their own boundaries and quieter colours (the neutral middle
+starts at 28 m where SHALE REACH starts at 24, and its colour differs), and legacy's own comment notes
+the topsoil has no entry here while the band ladder does. Merging them would retune the depth readout to
+match the rock.
+
+It is parked because it collides with a shipped measured claim and the collision is a COLOUR CHOICE, not
+an engineering fault. At 252 m all four bands clamp at full and only 32% of a material's own colour
+survives (0.78·0.84·0.74·0.66); the deepest tint is Stonereach slate-BLUE `(0.42,0.55,0.90)` and glimmer
+is TEAL `(0.16,0.52,0.55)` — hue neighbours. Measured: glimmer/deepstone separation fell to **0.061**
+with the tint applied to everything, **0.178** with ore exempt from the tint, **0.216** with ore exempt
+from both tint and bedding. No exemption scheme reaches 0.25, because the tint pulls all country rock
+toward the hue glimmer already occupies. Legacy never hit this: glimmer is this build's own material and
+legacy had no teal ore. Either glimmer's colour moves or Stonereach's tint does, and both are the
+director's eye. Landing the tint anyway would have meant silently lowering a legibility floor that was
+measured on purpose.
