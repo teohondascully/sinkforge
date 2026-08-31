@@ -8,6 +8,12 @@ extends Node2D
 ##   godot --path . tests/body/reveal_scene.tscn -- --site=reveal_test_dense
 ##   godot --path . tests/body/reveal_scene.tscn -- --play --site=reveal_test_sparse
 ##
+## **`--play` IS WHAT GIVES YOU A WINDOW TO SIT IN.** Without it this scene drives itself for ~12 ticks
+## and exits, which looks like a broken launch if you were expecting to play (D0248 -- the director hit
+## exactly this following a line in `docs/NEEDS_DIRECTOR.md` that omitted the flag). To look at the sky:
+##
+##   godot --path . tests/body/reveal_scene.tscn -- --play --sky --zoom=6.5 --camera=24,4
+##
 ## Agent mode (default) drives a short, deterministic walk-and-dig sequence toward the nearest shallow
 ## glimmer pocket the generated seed actually placed -- built for this scene's own verification and for
 ## producing a reproducible screenshot, NOT a claims/C004 measurement driver: C004 needs recorded,
@@ -74,8 +80,7 @@ var _sky_view: WorldView = null  ## the real coordinator, so this proves the who
 
 
 func _ready() -> void:
-	_play_mode = "--play" in OS.get_cmdline_user_args()
-	var site: Dictionary = _parse_args()
+	var site: Dictionary = _parse_args()  ## sets `_play_mode` too, before the title below reads it
 	var site_id: StringName = site["site_id"]
 	var seed_value: int = site["seed"]
 	_site_id = site_id
@@ -137,6 +142,7 @@ func _parse_args() -> Dictionary:
 	_mine_down = cfg["mine_down"]
 	_wide_view = cfg["wide_view"]
 	_sky = cfg["sky"]
+	_play_mode = cfg["play"]
 	if int(cfg["bite_radius"]) >= 0:
 		_mining.bite_radius = int(cfg["bite_radius"])
 	return {"site_id": cfg["site_id"], "seed": cfg["seed"]}
@@ -366,6 +372,14 @@ func _finish_and_quit() -> void:
 	_finished = true
 	_flush_recording()
 	print("reveal_scene: agent-mode run finished at tick %d" % _tick_count)
+	# D0248: say what just happened in the words of someone who expected a WINDOW. This exit is correct
+	# behaviour and is indistinguishable from a crash -- the engine banner, a few lines, and the process
+	# is gone. The director hit it twice from a documented command, and the second time is what makes this
+	# a design defect rather than a typo: the mode that a human almost never wants is the default, and it
+	# announced itself only in a vocabulary ("agent-mode run") that already assumes you knew.
+	print("reveal_scene: this was AGENT mode (the default) -- it drives itself and exits. "
+		+ "For a window you can play in, add --play:")
+	print("  godot --path . tests/body/reveal_scene.tscn -- --play --sky --zoom=6.5 --camera=24,4")
 	get_tree().quit(0)
 
 

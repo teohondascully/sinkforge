@@ -355,8 +355,18 @@ rather than a scramble then; 120 would restore roughly the headroom 100 was mean
 `view/visuals/sky_painter.gd` is lifted, wired to the `Frame`, layer-clean, and **drawing**. Run it:
 
 ```
-SKY=1 bash tools/capture_moments.sh <label>     # or: godot --path . tests/body/reveal_scene.tscn -- --sky
+open docs/milestones/slice3_horizon_23b0ec4.png docs/milestones/slice3_horizon_sky_23b0ec4.png
+
+# or drive it yourself -- --play IS WHAT OPENS A WINDOW, and without it the scene runs itself for
+# ~12 ticks and exits (D0248: this line originally omitted it, and that is how the class was found):
+godot --path . tests/body/reveal_scene.tscn -- --play --sky --zoom=6.5 --camera=24,4
+
+SKY=1 bash tools/capture_moments.sh <label>     # or re-capture the whole set
 ```
+
+The `--zoom`/`--camera` pin is not decoration: the reveal sites spawn the body at row ~13 with the
+horizon off the top of the frame, so the default framing shows no sky at all. That is itself one of the
+four look calls below.
 
 The pair to compare is `slice3_horizon_<sha>.png` (no backdrop) against `slice3_horizon_sky_<sha>.png`,
 same seed, same camera, same tick — the backdrop is the only difference.
@@ -434,3 +444,46 @@ reported-not-gated, so nothing is blocked either way.
 it is now slack, (c) do the fuzz restructure D0184 deferred (decorrelate seeds from cumulative
 demolition), which makes the number mean what everyone reads it as meaning and is the only option that
 fixes the cause rather than the symptom. (c) is a real design cycle, not a Bin A task.
+
+---
+
+## P017 · The world has no sky to jump into — row 0 is the surface, the ceiling, and the horizon at once
+
+**Status:** open · **Cost to apply:** a band-ladder decision, then a regeneration · **Raised by:** the
+director in play, 2026-08-31 (D0249)
+
+**Reported from the chair, not from a test:** *"it wont let me jump up beyond the surface. like my head
+bumps at the surfaceline and i cant jump higher."* Correct, and it is two things stacked.
+
+**The rock lid is intentional.** D0199 made `carve_entry_shaft` leave row 0 SOLID (`CEILING_ROWS = 1`)
+and derived the spawn row from that ceiling, so your head is stopped by rock rather than by the
+world-edge clamp. Before it, the shaft was carved from row 0 and the FIRST JUMP of any session put the
+body's box at y = -3.4px, outside the world — found in your own `--play` recording. That fix is sound and
+is not what to undo.
+
+**What is NOT a decision anyone made is that there is no air above the surface at all.** Row 0 is
+simultaneously the surface datum, the top of the `TileGrid`, and `sky_painter.HORIZON_Y`. Legacy had
+`SURFACE_ROW = 20` — twenty rows of sky you could rise into. Re-keying the band ladder to metres-below-
+surface (`data/bands/topsoil.yaml`, `from_m: 0`) made the ladder scale-free, which was right, and dropped
+the headroom on the way, which nobody noticed because nothing above the surface had ever been drawn.
+
+**Measured, not inferred.** `_enforce_grid_bounds` clamps `_top_y() < 0` and zeroes upward velocity.
+Jump is 365px/s against 900px/s² — a **74px apex, ~18 rows** at this world's 4px cell. The capability is
+already there; the world ends one row above your head.
+
+**Why it lands now.** This is the run that put a sky on the screen. Ridges, stars, a moon arc, and the
+Sinkforge crown on the horizon are all drawn into a region the player cannot enter. `docs/GDD.md` §9
+rejected Sinkforge-as-consumer partly because it *"is invisible from anywhere the player stands, so it
+cannot carry emotional weight"* — legacy's answer was to put it on the horizon, and P015 asks you to
+judge how it reads. **A backdrop you can see but never rise toward is a different design object from one
+you can leave the ground into**, and which of the two this is decides several of P015's look calls with
+it (the ridges' angular size, the crown's anchor, whether `--sky` defaults on).
+
+**What you might rule:** (a) add N rows of air above the surface to the band ladder and regenerate — the
+`CEILING_ROWS` lid then sits at the top of the AIR rather than on the player's head, and D0199's
+invariant is preserved unchanged; (b) leave it: the game is about going DOWN, the sky is a backdrop, and
+headroom is content nobody will use; (c) something between — a few rows, enough that a jump reads as a
+jump rather than as a bump.
+
+I did not pick. (a) is cheap mechanically and changes what every existing capture, recording and spawn-row
+derivation means, which is exactly the kind of change that is yours.
