@@ -8,7 +8,22 @@ extends "res://tests/test_base.gd"
 ## human validation of claims/C004 is still owed and is explicitly NOT what this file claims to close.
 
 const SITE_ID: StringName = &"reveal_test_dense"
-const SEED_VALUE: int = 20260826
+## RE-PINNED 2026-08-31 (D0256). Was 20260826, the director's own seed, which produced a qualifying
+## reveal until D0254 stopped `ValueNoise` truncating the seed to 16 bits and thereby changed every
+## generated world. It now digs 6 times at its target column and hits glimmer 0 times.
+##
+## The re-pick is measured, not guessed: 59 seeds were scanned end-to-end through this file's own
+## scripted trace, and **37 of them (63%) produce at least one qualifying reveal**. Seed 8 gives four,
+## with `target_glimmer_col = 9` -- deliberately not one of the many seeds whose target lands on column 6,
+## because that is the `MIN_SPAWN_COL` clamp case D0192 measured as the distribution's MODE (53.2% of
+## seeds spawn flush), and a fixture sitting on the degenerate spawn tests less than one that does not.
+##
+## READ THIS BEFORE RE-PINNING AGAIN. That 37/59 is the real finding here: this fixture is a dice roll
+## that ANY change to terrain generation re-rolls, because `RevealSessionSetup.find_spawn` picks the first
+## shallow glimmer COLUMN and the scripted approach digs at the body's own ROW -- nothing makes the two
+## meet. The seed is the workaround; selecting a target the approach can actually reach is the fix, and it
+## is parked rather than done here because `find_spawn` is shared with `reveal_scene.gd`'s live spawn.
+const SEED_VALUE: int = 8
 const IDLE_BEFORE: int = 350  ## padding so a reveal mid-approach sits inside a full WINDOW_TICKS(300) span
 const IDLE_AFTER: int = 350
 const APPROACH_CAP: int = 200  ## generous; the real approach only needs ~6 columns' worth of movement

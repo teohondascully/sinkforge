@@ -10,6 +10,7 @@ func _initialize() -> void:
 	_test_base_fill_bands_by_depth()
 	_test_caves_never_carve_above_min_depth()
 	_test_caves_carve_something()
+	_test_carve_fraction_by_region()
 	_test_ore_appears_somewhere()
 	_test_coal_appears_somewhere()
 	_test_iron_only_appears_at_or_below_stonereach()
@@ -74,6 +75,97 @@ func _test_caves_carve_something() -> void:
 			if not grid.is_solid(Vector2i(col, row)):
 				open_count += 1
 	_check(open_count > 0, "cave carving opened at least one cell (%d opened)" % open_count)
+
+
+
+## THE INSTRUMENT `_test_caves_carve_something` IS NOT (WG-2/WG-3, docs/LEGACY_GAP.md Tier 0).
+##
+## That test's floor is `open_count > 0` -- "cave carving opened at least one cell". A floor of one cell
+## cannot distinguish a field carving the ~15% legacy aimed for from one carving 3%, and it cannot see a
+## shelf band that carves EXACTLY ZERO cells at every seed and every coordinate. Both were true, both
+## sat green, and nothing in this repository measured carve fraction until this function. That is the
+## house failure class in its usual costume: the quiet green.
+##
+## Measured in FOUR partitions, not one, because a single pooled number hides the defect that matters --
+## an overall fraction of 3.4% is equally consistent with "carving is uniformly thin" and with "carving
+## is normal outside shelves and impossible inside them", which are completely different bugs with
+## completely different fixes.
+##
+## `shelf_eligible > 0` and `open_eligible > 0` are asserted BEFORE any fraction is reported, and that is
+## the load-bearing line here rather than a courtesy: a shelf carve fraction of 0.0 has two causes --
+## the shelf is impermeable (the real one), or the sample contained no shelf cells at all, in which case
+## 0.0 is a division that never had a subject. Without the population check this instrument would report
+## the same headline number whether or not it had measured anything.
+## Counts carved cells in two partitions over several seeds. Split out of the assertion below purely so
+## each stays under the 50-line function limit -- but it earns the split: the measurement has no opinion
+## about what the numbers should be, which is what makes it reusable for the WG-3 octave port's
+## before/after comparison without editing an assertion to suit a result.
+static func _measure_carve(seeds: Array, cave_cfg: Dictionary, shelf_cfg: Dictionary) -> Dictionary:
+	var min_depth: int = int(cave_cfg["min_depth_cells"])
+	var band_height: int = int(shelf_cfg["band_height_cells"])
+	var shelf_every: int = int(shelf_cfg["shelf_every"])
+	var out: Dictionary = {"shelf_eligible": 0, "shelf_carved": 0, "open_eligible": 0, "open_carved": 0}
+	for seed: int in seeds:
+		var grid: TileGrid = TileGrid.new(48, 1024, 1)
+		ShaftGenerator._fill_base(grid, 40, 140)
+		var solid_before: Array[Vector2i] = []
+		for col: int in grid.width:
+			for row: int in range(min_depth, grid.height):
+				var cell: Vector2i = Vector2i(col, row)
+				if grid.is_solid(cell):
+					solid_before.append(cell)
+		ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, seed)
+		for cell: Vector2i in solid_before:
+			var shelf: bool = ShaftGenerator._is_shelf_band(cell.y, band_height, shelf_every)
+			var key: String = "shelf" if shelf else "open"
+			out[key + "_eligible"] = int(out[key + "_eligible"]) + 1
+			if not grid.is_solid(cell):
+				out[key + "_carved"] = int(out[key + "_carved"]) + 1
+	return out
+
+
+func _test_carve_fraction_by_region() -> void:
+	var m: Dictionary = _measure_carve([1, 20260826, 424242, 7, 99991, 31337],
+		StrataData.SHALLOW_CLAY["cave"], StrataData.SHALLOW_CLAY["strata_shelf"])
+	var shelf_eligible: int = int(m["shelf_eligible"])
+	var open_eligible: int = int(m["open_eligible"])
+
+	# Positive controls first -- see the docstring. A fraction computed over an empty population is not
+	# a small number, it is no number.
+	_check(shelf_eligible > 0,
+		"positive control: the sample actually contains shelf-band cells to carve (%d) -- without this, " % shelf_eligible
+		+ "a shelf carve fraction of 0.0 would mean 'nothing was measured', not 'nothing carves'")
+	_check(open_eligible > 0,
+		"positive control: the sample actually contains non-shelf cells to carve (%d)" % open_eligible)
+	if shelf_eligible == 0 or open_eligible == 0:
+		return
+
+	var shelf_carved: int = int(m["shelf_carved"])
+	var open_carved: int = int(m["open_carved"])
+	var shelf_frac: float = float(shelf_carved) / float(shelf_eligible)
+	var open_frac: float = float(open_carved) / float(open_eligible)
+	var total_frac: float = float(shelf_carved + open_carved) / float(shelf_eligible + open_eligible)
+	print("carve_fraction: overall %.4f | shelf-band %.4f (%d/%d) | non-shelf %.4f (%d/%d)" %
+		[total_frac, shelf_frac, shelf_carved, shelf_eligible, open_frac, open_carved, open_eligible])
+
+	# THE RATCHET. These three pin what the generator currently ships, measured 2026-08-31 over the six
+	# seeds above (97,920 shelf cells and 195,264 non-shelf cells actually examined, per the controls).
+	# Two of them assert a DEFECT, deliberately: WG-2 says shelf bands are impermeable by construction --
+	# the calibrated field is hard-bounded to +/-0.574 and the shelf threshold is 0.65-0.81 -- so the
+	# honest expectation today is exactly zero, and writing that down is what makes the WG-3 octave port
+	# flip this suite red instead of improving the world silently. When one of these fails, do not widen
+	# the band: read the printed line, decide whether the new number is the fix landing, and re-pin.
+	_check(shelf_frac == 0.0,
+		"WG-2 RATCHET: shelf bands carve EXACTLY ZERO cells (%d of %d over 6 seeds). This is a pinned " % [shelf_carved, shelf_eligible]
+		+ "DEFECT, not a property worth keeping -- legacy's shelf was a resistance gradient, not a wall. "
+		+ "If this line FAILS, WG-2 is fixed: re-pin it to the new fraction and say so in the ledger.")
+	_check(absf(open_frac - 0.0537) < 0.0060,
+		"non-shelf carve fraction %.4f stays near its measured 0.0537 (+/-0.0060)" % open_frac)
+	_check(total_frac < 0.15,
+		"WG-3 RATCHET: overall carve fraction is %.4f, against legacy's own stated target of ~15%%. " % total_frac
+		+ "Single-octave value noise where legacy ran 5-octave FBM (measured: FastNoiseLite defaults to "
+		+ "FRACTAL_FBM, octaves 5, lacunarity 2.0, gain 0.5). This bound is the gap, and porting the "
+		+ "octaves should close it -- when this fails, the port worked.")
 
 
 func _test_ore_appears_somewhere() -> void:
