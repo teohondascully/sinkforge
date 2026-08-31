@@ -50,6 +50,27 @@ class Envelope:
 	static func oracle_over(grid: TileGrid) -> Envelope:
 		return Envelope.new(Rect2i(0, 0, grid.width, grid.height))
 
+	## The window covering a world-PIXEL rectangle, grown by `margin_cells` on every side.
+	##
+	## THIS LIVES HERE BECAUSE THE CONVERSION NEEDS A `sim/` CONSTANT and its caller is `view/`, which may
+	## depend on `{interface, core}` and not on `sim`. The alternative -- re-declaring the terrain cell
+	## size in `view/` -- would put a second definition of a world-scale number in the tree, and the near
+	## miss is worth recording: `view/visuals/material_look.gd` already carries `CELLS_PER_METRE = 4`,
+	## which is a DIFFERENT quantity (cells per metre, not pixels per cell) that happens to share the
+	## value at 16px/m. Reaching for it would have been right by coincidence and wrong by construction.
+	##
+	## `floor` on the near edge and `ceil` on the far one, never `int()`: truncation toward zero drops
+	## the partially-visible row at the top and left of the screen, a one-cell strip of undrawn world
+	## that appears only at some camera positions and reads as flicker rather than as a missing feature.
+	static func covering(world_rect: Rect2, margin_cells: int) -> Envelope:
+		var cell: float = float(Heightfield.TERRAIN_CELL_PX)
+		var margin := Vector2i(margin_cells, margin_cells)
+		var lo := Vector2i(int(floor(world_rect.position.x / cell)),
+			int(floor(world_rect.position.y / cell))) - margin
+		var hi := Vector2i(int(ceil(world_rect.end.x / cell)),
+			int(ceil(world_rect.end.y / cell))) + margin
+		return Envelope.new(Rect2i(lo, hi - lo))
+
 
 ## One tick's readable state, as a value. Holds no reference into `sim/`.
 ##

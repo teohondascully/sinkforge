@@ -9717,3 +9717,62 @@ protects nothing in the other direction.
 **Found by an external audit** -- a Factory `droid` session reading the repo cold ran the gate,
 reported the failure with correct scoping, and flagged the right question (whether the identity was
 on a PR-merge ref or on main) without answering it. The diagnosis and fix are this session's.
+
+---
+
+## D0240 · Phase 1: the coordinator skeleton, built small on purpose · 2026-08-30
+**Decided:** `view/world_view.gd` (101 lines), `view/frame.gd` (57) and `view/paint_layer.gd` (45) land
+as the rebuild's skeleton, with `tests/test_world_view.gd` in CI. `MaterialLook` moves from
+`tests/body/` to `view/visuals/`. Nothing is ported from `legacy/scenes/world_renderer.gd`.
+
+**101 lines against a 400 cap, and the smallness is the design.** The brief's warning was specific:
+`tests/body/reveal_scene.gd` is the closest thing this tree has to a coordinator and it sits at **398
+against 400**, with `_physics_process` at **49 against 50** -- one or two lines from firing on both,
+which is `docs/QUALITY.md` §2's `body.gd`-at-exactly-400 shape already in progress. So the skeleton was
+not ported from it. The three concerns that make `reveal_scene` big -- argument parsing, the agent-drive
+modes, the recording flush -- are ~120 of its 398 lines and **none is coordinator work**. They stay in
+the debug scene. A renderer does not parse `--seed`.
+
+**`MaterialLook` had to MOVE, not merely be referenced, and the reason is a gate blind spot.**
+`Frame.look` is typed `MaterialLook`, which lived in `tests/body/`. `class_name` is path-independent, so
+a `view/` file can depend on a test file forever and `layer_lint.py` will never say a word: `tests` is
+in its `UNPOLICED` set and its class map is built "from the policed tree only". A shipped renderer
+depending on a test file is a real defect the layer gate is structurally unable to see. The file's own
+header had predicted this move since Slice 0 ("a seam to formalise, not a home").
+
+**A `view -> sim` edge in my own first draft, caught by the gate I had just relied on.** `_window_for()`
+used `Heightfield.TERRAIN_CELL_PX` to convert pixels to cells -- `Heightfield` is `sim/body/`. The fix
+is `Interface.Envelope.covering(world_rect, margin_cells)`: the conversion lives in `interface`, which
+may know both sides, and `view/` never learns the constant. **The near miss underneath it is the part
+worth keeping.** The obvious repair was to re-declare the cell size in `view/`, and
+`view/visuals/material_look.gd` already carries `CELLS_PER_METRE = 4` -- a DIFFERENT quantity (cells per
+metre, not pixels per cell) that happens to share the value at 16px/m. Copying it would have been right
+by coincidence and wrong by construction, and nothing would have failed.
+
+**The lint was mutation-tested on this file specifically, not trusted from last run's plant.** A
+`TileGrid` reference planted in `world_view.gd` produces `FAIL -- view/world_view.gd: references
+class_name TileGrid -- layer 'view' may not depend on layer 'sim'`, exit 1; removing it returns PASS.
+This is the first real outgoing `view/` edge set in the tree, which P008 named as the fixed lint's first
+genuine test, and it holds.
+
+**The suite's own first draft asserted something vacuous, which is recorded because it passed.**
+`_test_the_frame_carries_the_ruled_contract` checked that the observation window was "non-empty" -- and
+it PASSED over a 4x4 window that was **entirely `WINDOW_MARGIN_CELLS`**, because a Godot node is not
+really in the tree until a process frame has passed, so `get_viewport()` returned null and
+`view_world_rect()` returned `Rect2()`. An assertion about having seen a viewport, passing on having
+seen no viewport. Fixed with `await process_frame` and, more importantly, by asserting the window is
+wider than its own margin (now 324x184 over a real 1280x720) with the camera rect as a control.
+
+**Two discriminators the suite is built around**, since a coordinator's failures are all quiet:
+`seen[1] == layer and seen[1] != view` -- passing `self` to a painter would satisfy every other check in
+the file -- and the `floor`/`ceil` window boundary stated against the wrong answer `int()` would give
+((2,2) instead of (3,3)), because truncation drops the half-visible cell row at the top and left of the
+screen and reads as flicker rather than as a missing feature.
+
+**Gate 7 direction: this phase moves lines the right way.** `material_look.gd` (137) left `tests/`
+(INSTRUMENT) for `view/` (GAME), and 203 lines of new `view/` code are game LOC. Instrument grew only by
+the new suite.
+
+**Two architecture questions surfaced and parked rather than absorbed:** `view -> data` is now real,
+ungranted by §3's table and invisible to the lint (P013); and `core/MODULE.md` sits at exactly its
+100-line cap (P014).

@@ -4,10 +4,19 @@ extends RefCounted
 ## Slice 0's palette adapter: `data/materials` + `data/bands` records -> one Color per terrain cell.
 ## `docs/LEGACY_MIGRATION_MAP_2026-08-29.md` §9, `docs/DECISIONS_LEDGER.md` D0189.
 ##
-## WHERE THIS LIVES AND WHY IT IS TEMPORARY. Appearance is a view concern, but `view/` does not exist
-## until Slice 3 and Slice 0's own constraint is "no new layer". It sits beside the one scene that uses
-## it. **This is a seam to formalise, not a home** -- at Slice 3 it moves to `view/` behind the real
-## coordinator. It deliberately touches nothing in `sim/` or `core/`.
+## WHERE THIS LIVES. Appearance is a view concern. It spent Slices 0-2 in `tests/body/` beside the one
+## scene that used it, under a header that called that "a seam to formalise, not a home" and said it
+## would move to `view/` behind the real coordinator at Slice 3. **This is that move** (D0240): it is
+## `view/visuals/material_look.gd` now, and `Frame.look` is the seam it was waiting for.
+##
+## It had to move rather than merely being referenced from `view/`, and the reason is worth keeping:
+## `class_name` is path-independent, so a `view/` file could have gone on using `MaterialLook` from
+## `tests/` forever -- and `tools/layer_lint/layer_lint.py` would never have said a word, because its
+## `UNPOLICED` set contains `tests` and its class map is built "from the policed tree only". A shipped
+## renderer depending on a test file is a real defect the layer gate is structurally blind to.
+##
+## It touches nothing in `sim/` or `core/`. It DOES read `data/` (`BandsRecords`, `MaterialsRecords`),
+## which `view/README.md`'s dependency line does not currently grant -- see that file's note.
 ##
 ## WHAT IT DOES NOT DO, which matters more than what it does. Legacy paints a cell in TWO passes: a
 ## coarse `terrain_painter.gd` pass (chamfers, fillets, edge AO, a 3-polygon faceted nugget crystal, a

@@ -349,3 +349,53 @@ LOC reality would be identical, and that is gaming a measurement rather than ans
 (D0235). That is unrelated: `33d5109` is evicted from the unpinned merge-ref window too, checked on the
 ref itself. Gate 7 went red as the commit count grew, not because of the pin — the first CI run on this
 branch passed structural gates at one commit.
+
+---
+
+## P013 · `view/` reads `data/`, which the layer table does not grant and the lint cannot see
+
+**Status:** open · **Cost to apply:** one sentence in `docs/ARCHITECTURE.md` §3 · **Raised by:** this
+session, 2026-08-30 (D0240)
+
+`view/visuals/material_look.gd` reads `BandsRecords` and `MaterialsRecords` to turn a material id into
+a `Color`. It did this before it moved into `view/` and the move made the edge a `view -> data` one.
+
+**`docs/ARCHITECTURE.md` §3's table gives `view` exactly `{interface, core}`.** `shell` is the only
+layer granted `data`. So this edge is not permitted by the table — and it is not *forbidden* by the gate
+either, because `tools/layer_lint/layer_lint.py` lists `data` in `UNPOLICED` and never builds an edge
+for it. The gate is silent in both directions, which is the worst place for a rule to live.
+
+**My reading, offered rather than assumed.** It is content, not sim state: a static palette table, read
+cosmetically, with no route back to a mutator, so it cannot weaken the envelope the way a `view -> sim`
+edge would. A renderer that may not read material colours has to receive them through `Observation`
+instead, which would put authored art data inside the L2 door for no protection in return.
+
+**Two ways to answer.** Grant `view` the `data` dependency in §3's table (and say why it is safe, so the
+next reader does not have to re-derive it). Or rule that appearance data must arrive through
+`interface`, in which case `MaterialLook` needs rethinking before any painter lands on it.
+
+The same question is one step from arriving twice more: `terrain_painter` needs the same palette, and
+`art.gd` reads `res://assets/`.
+
+---
+
+## P014 · `core/MODULE.md` is at exactly its 100-line cap, so the next class added to `core/` is blocked
+
+**Status:** open · **Cost to apply:** a number, or a restructure · **Raised by:** this session,
+2026-08-30 (D0237)
+
+Two of your rulings collided, quietly and cheaply, and this is the record of how it was resolved.
+
+P006 set the `MODULE.md` cap at 100 (D0226) when `core/MODULE.md` was at **98** — a margin that ledger
+entry noted at the time. This run's Q3 ruling moved `Seams` into `core/`, and documenting a fifth public
+class does not fit in two lines.
+
+**Resolved by writing less, not by moving the cap.** I removed one genuine duplication (the D0097
+extraction story appeared nearly verbatim in both the `BitOps` API entry and its Gotcha) and wrote the
+`Seams` entry as a pointer, with its full rationale in `core/seams.gd`'s own header where a reader of
+that file will actually meet it. The file is now at **exactly 100**.
+
+**Which is the shape `docs/QUALITY.md` §2 warns about** — `sim/body/body.gd` sat at exactly 400 for
+three commits because it was trimmed rather than split — so it is debt, not comfort. **The next public
+class added to `core/` forces this open again**, with no duplication left to reclaim. Worth a number now
+rather than a scramble then; 120 would restore roughly the headroom 100 was meant to give.
