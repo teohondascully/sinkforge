@@ -139,3 +139,28 @@ one scripted route this project has pinned since D0038 is bit-for-bit unchanged 
 **Why the shaft got 14 ticks faster.** The body now rests on the highest solid face under its whole
 footprint rather than on a blend of three sample points, so each layer it opens drops it a slightly
 different amount. It reaches the same depth; it is not a throughput change and should not be read as one.
+
+## Slice 3 — the coordinator, and the first painter
+
+| | |
+|---|---|
+| **Slice** | 3 — `view/` has a coordinator; `sky_painter` draws through it |
+| **Commit** | `23b0ec4` |
+| **Ledger** | D0237-D0238 (the prerequisites), D0240 (the skeleton), D0243 (the `data` layer), D0244 (the painter) |
+| **Shots** | `slice3_horizon_23b0ec4.png` / `slice3_horizon_sky_23b0ec4.png`, plus `surface`, `delve`, `aim` in both modes |
+| **Pair** | `horizon` vs `horizon_sky` — same seed, same camera (row 4), same tick. **The backdrop is the only difference.** |
+
+**What the pair shows.** Before: flat `COLOR_BG` above the terrain, 168 distinct colours. After: a dusk
+sky gradient, a 42-star field, three parallax ridge ranges carrying aerial perspective, and the Sinkforge
+crown on the horizon — 199 distinct colours. Same world underneath, untouched.
+
+**`horizon` is a new moment** (D0244) and it exists because the backdrop is invisible from the others:
+`surface` sits at camera row 13, which puts the surface datum off the top of the frame. Row 4 puts the
+horizon about a third of the way down.
+
+**Read this before drawing a conclusion from these shots.** They are **structurally clean and
+semantically unjudged**. The painter is layer-clean, its starfield is provably non-empty and provably
+scattered, and `paint()` runs inside a real draw pass — none of which says the sky *reads* right. The
+pinned dusk values, the angular size of the ridges and the Sinkforge's anchor are all open look calls in
+`docs/NEEDS_DIRECTOR.md` P015. The first capture of this same painter was structurally perfect and
+visually blank, which is exactly why that distinction is written here rather than assumed.

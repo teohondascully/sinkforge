@@ -344,3 +344,50 @@ that file will actually meet it. The file is now at **exactly 100**.
 three commits because it was trimmed rather than split — so it is debt, not comfort. **The next public
 class added to `core/` forces this open again**, with no duplication left to reclaim. Worth a number now
 rather than a scramble then; 120 would restore roughly the headroom 100 was meant to give.
+
+---
+
+## P015 · sky_painter draws — and every remaining question about it is a look call
+
+**Status:** open, THE ◆ · **Cost to apply:** your eye on two images · **Raised by:** this session,
+2026-08-30 (D0244)
+
+`view/visuals/sky_painter.gd` is lifted, wired to the `Frame`, layer-clean, and **drawing**. Run it:
+
+```
+SKY=1 bash tools/capture_moments.sh <label>     # or: godot --path . tests/body/reveal_scene.tscn -- --sky
+```
+
+The pair to compare is `slice3_horizon_<sha>.png` (no backdrop) against `slice3_horizon_sky_<sha>.png`,
+same seed, same camera, same tick — the backdrop is the only difference.
+
+**What the suite can and cannot say.** `tests/test_sky_painter.gd` proves the starfield is non-empty (42
+of 42 stars clear the horizon), that it scatters (14 distinct x-gaps where legacy's linear form gave
+three), that the scale is derived from the world's cell size rather than typed in, and that `paint()`
+completes inside a real draw pass. **None of that is a claim that it looks right**, and the difference
+matters here more than usual: the first capture of this painter was structurally perfect and visually
+blank.
+
+**Four things I noticed and deliberately did not tune**, because tuning them is the judgment this gate
+exists for:
+
+1. **The pinned clock's VALUES.** Q5 ruled "pin it", which settles that the sky does not move. It does
+   not settle WHICH sky. `DAYLIGHT = 0.35` / `DAY_PHASE = 0.70` is dusk with the moon mid-transit,
+   chosen to put the most of the painter in one frame — stars need `dl < 0.85` to draw at all, so full
+   day would hide the one feature that proves the scatter. That is a reason to pick a value, not a claim
+   that it is the right one. Full night, overcast noon and dawn are all one constant away.
+2. **The ridges subtend a large angle.** Proportionally they are close to legacy's (they span ~44% of the
+   view height where legacy's spanned ~54%), but this world's camera shows ~111 world px against
+   legacy's ~720, so they read as *near* hills crowding the horizon rather than distant ranges. Whether
+   that is wrong depends on what you want the surface to feel like.
+3. **The Sinkforge crown is anchored at nothing.** `SINKFORGE_ANCHOR_X` is legacy's value scaled; it
+   pointed at the centre of legacy's spawn plateau, and this build has no authored surface for it to
+   point at. It currently lands near the middle of a 48-cell world by arithmetic, not by placement.
+4. **The sky is only visible near the surface**, and the reveal sites spawn the body at row ~13 with the
+   horizon off the top of the frame. The `horizon` moment (camera row 4) exists so the backdrop is in
+   shot at all. If the surface is going to matter, the default framing probably should too.
+
+**And one thing that is a real question rather than a taste one:** `--sky` is OFF by default. Every
+existing milestone shot, replay and suite was taken without it, and a backdrop appearing unasked would
+change what those captures mean. Turning it on by default is your call, and it is the difference between
+"the sky exists" and "the game has a sky".
