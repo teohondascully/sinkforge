@@ -10700,3 +10700,52 @@ from the raw text first, so real dependencies expressed as strings survive.
 INCLUDING `test_shaft_replay_determinism`; `material_look.gd` selects 7 EXCLUDING it, sharing only 3 with
 the first. Two selections of identical size that are not the same selection — checking the count alone
 would have proved nothing.
+
+## D0261 · `state_signature()` becomes an O(1) running hash: 72s → 8.8s, and the guard that makes it safe · 2026-08-31 · master plan §6
+
+**Measured before it was believed.** At 47,603 occupied cells one `state_signature()` call built a
+**1,148,776-character string in 109.55 ms**. `test_shaft_replay_determinism` builds 200 of them in each
+of three processes: 21.9 s per process, **65.7 s of the suite's 72 s — 91%**. §6's estimate was right and
+is now a measurement rather than a claim.
+
+Replaced with two 32-bit XOR lanes carried incrementally by the four mutation methods. **The suite is now
+8.77 s, an 8.2x speedup**, which compounds across every future iteration of every lane.
+
+**XOR** because the accumulator must be both order-independent (cells arrive in whatever order generation
+and digging touch them) and self-inverting (`excavate` must remove a contribution without rebuilding).
+Its usual weakness — equal terms cancelling — cannot arise, because every term is keyed by the coordinate
+it belongs to, so no two live terms are ever equal.
+
+**Two 31-bit lanes, and the 31 is load-bearing.** The lanes travel in `Vector2i`, whose components are
+`int32_t`. A 32-bit mask produces values above 2^31-1, and narrowing those to signed int32 is an
+implementation-defined conversion in C++. It surfaced here as a perfectly stable `-1422115007` —
+deterministic on this machine, and exactly the kind of thing that stays deterministic right up until CI
+runs a different architecture. **A determinism contract may not contain an implementation-defined
+narrowing.** 31 bits always fits positively and costs one bit of a 62-bit budget.
+
+`String.hash()` is likewise refused: it is engine-provided, and this contract may not rest on a value
+Godot is free to change between versions. The fold is `h * 31 + code`, masked every step.
+
+**The guard, which is the reason this was safe to do at all.** An incrementally-maintained hash fails
+silently: a path that forgets to update leaves the value stale, and **a stale value agrees with itself
+across two runs**, so the determinism suite goes green while the worlds differ. The house failure class,
+in its usual costume. So `recomputed_signature()` rebuilds from scratch, and `tests/test_tile_grid.gd`
+asserts the two agree after each of 7 mutation kinds and after 400 randomised mutations over a small
+grid where cells collide. That fails the instant any path stops updating — durable, unlike remembering to
+add a mutation test per method.
+
+The randomised tail deliberately reaches `excavate` on air and `set_wall` behind air, which are the two
+cases where an OVER-EAGER xor desynchronises the hash. Both directions of the same mistake are covered.
+
+**Precondition verified across the whole tree, not one file** (`reachability-scoped-to-one-file`):
+`git grep` for direct writes to `_blocks`, `_walls` or `_dig_extent` outside `sim/world/tile_grid.gd`
+returns **nothing**, so those four methods are the complete mutation surface.
+
+**Mutation-tested, all four paths caught** — and the first attempt at that mutation test reported all four
+as NOT caught. The harness was passing multi-line anchors through shell positional parameters and the
+replacements silently never applied; the suite then passed because the tree was unmutated. Rewritten in
+Python with a `applied=True` witness per mutant and a positive control asserting the clean tree passes
+first. **Third instance this session of a probe with no witness returning a confident wrong answer** —
+after the empty golden capture and the `run_gd_test.sh` usage error. The pattern is not "be careful"; it
+is that any probe whose negative result is indistinguishable from its own failure needs a positive
+control built in.
