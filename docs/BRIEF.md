@@ -4,110 +4,100 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-30. This round: gate hygiene and the last unblocked lifts, under a new
-PR workflow. Every PR merged by rebase; `git log --oneline 0c718eb..main` is the commit count, not a
-figure written here that goes stale the moment the next one lands — this one did, twice, because a brief
-that counts its own commit is never right after it is merged (`CONTEXT.md` solves its own line count the
-same way). `docs/DECISIONS_LEDGER.md` D0224-D0233.**
+**Last updated: 2026-08-30. This round: Phase 0 of the coordinator rebuild — the painter contract,
+measured and stopped for you. NO CODE WAS WRITTEN, deliberately; the brief's Phase 0 says produce the
+contract and stop, and this is the stop.** One PR, `git log --oneline main..run/coordinator-contract` for
+its commits. `docs/DECISIONS_LEDGER.md` D0234; the deliverable is `docs/COORDINATOR_CONTRACT.md`;
+`docs/NEEDS_DIRECTOR.md` **P011** indexes the five questions.
 
-**Headline: a REQUIRED CI check had never evaluated a single dependency edge.** `layer_lint` printed
-PASS on every commit for weeks while reporting, in its own output, `0 references checked` — it matched
-`res://` paths against a codebase that couples entirely through `class_name` globals. **38 edges resolve
-now and none is a violation**, so the boundaries genuinely hold; that is a measurement where there was an
-assumption. The last ~586 liftable lines came over and **the batch is genuinely dry.** `docs/NEEDS_DIRECTOR.md`
-is down to **6 items** and one of them, P010, is an operating rule you need before your next merge.
+**Headline: three of the five painters are not blocked on the contract, and no contract shape unblocks
+them.** `water_view`, `rope_view` and `falling_items` need `sim/fluid`, `sim/transport` and `sim/items` —
+**empty directories holding only a MODULE.md.** Nine of fifteen `sim/` modules are. Lifting them means
+writing a fluid simulation, a rope system and an item-flow system first, none of which is view work.
+**That resizes Phase 2 to `sky_painter` + `terrain_painter`**, and it is question 4 of five.
 
 ---
 
 ## What was learned
 
-### A caveat in a docstring does not travel with a verdict
+### The scanner that could not spell its subject's name
 
-`layer_lint.py` carried an explicit paragraph saying it could not see `class_name` coupling and that a
-PASS from it must not be read as "the dependency graph holds". That paragraph was **correct, prominent,
-and worth nothing**: the gate sat in CI as a required check named "structural gates (layer boundaries,
-…)", printed PASS, and had never once evaluated an edge. Nobody reads a tool's docstring at the moment
-they read its verdict. **The fix is not a better caveat — it is putting the number in the output**, so
-every run now prints the edges it actually resolved and the 14 it deliberately does not judge.
+The first pass at measuring painter reach-in hardcoded the coordinator's binding as `r`, and reported
+**0 private reach-in for `water_view`, `rope_view` and `machine_view`.** All three bind under `_wv`/`_wr`;
+the real counts are 2, 2 and 7. A clean zero from three files at once was the tell — the rewrite derives
+each binding from the file's own `var x: WorldRenderer` declaration and prints the derived set per file as
+its positive control. **This is the house failure arriving inside the measurement written to avoid it**,
+which is the second run in a row that has happened (D0233 was the same shape).
 
-### The insight was already in the repository, in the tool next door
+### Ten fields were four kinds, and five of them were one argument
 
-`tools/quality_check/coupling.py` had made this exact discovery earlier and written it down: a real check
-against this tree found "**ZERO res://-based sim/ references but 13 class_name declarations**", so it
-unions path edges with `class_name` edges. One tool knew the codebase's dominant coupling mechanism was
-invisible to path scanning; the gate whose entire job was policing that coupling never got the memo.
-**Two instruments over one subject, and only one of them was told.**
+The ten private members the painters demand collapse to four kinds once sorted by *what supplies them*:
+a cosmetic clock, a camera rect, the palette, and UI-marker positions. That last group — `_guide_targets`,
+`_aim`, `_aim_in_reach`, `_ghost_def`, `_ghost_material` — all feed **one local variable** inside
+`sky_painter._stars`: `marks`, the positions where stars fade so a UI marker stays legible. The painter
+does not need to know a build ghost exists; it needs to know where not to put stars. Passing `marks`
+severs its only route to the dead economy, because `_ghost_def` is a `MachineDef`.
 
-### The conversion that looks obviously equivalent
+**The lesson generalises past this file:** a reach-in count is an upper bound on a contract's width, not
+its width. Sort by supplier before designing anything against the raw list.
 
-`seams.gd` could only enter `sim/` if its float rates became integers — `sim/` is deterministic by
-contract and a float comparison is what differs between machines. The obvious form, `v < int(0.18 *
-65535)`, **disagrees with the original on exactly 3 inputs out of 196,608** — one per rate, invisible to
-any sample, and it would have silently re-grained one plane of every world. Caught by sweeping the whole
-domain instead of sampling, and the wrong form is kept in the suite as a control that must keep failing.
+### A missing door is not a missing capability
 
-### Branch protection made the merge button load-bearing
+`terrain_painter` wants the wall plane and a per-column surface, and neither is in `Observation`. But
+`TileGrid.get_wall` already holds the plane the lode migration put ore into, and
+`sim/body/heightfield.gd` already derives the surface. Both take a `TileGrid`, which `view/` may not
+touch. **So two gaps that looked like two design problems are one ruling about one door.** I had written
+them up as separate gaps and corrected it before this reached you rather than after.
 
-The authorship gate failed the first PR on a clean history: GitHub's synthetic merge commit is a second
-committer identity. Pinning the job to the PR's real head fixes that. **What it cannot fix:** a
-merge-commit or a squash-merge through the UI writes `noreply@github.com` permanently into `main`, and
-the gate reads `git log --all`, so authorship would then fail on **every commit afterwards** with no
-remedy short of a history rewrite. **Merge by rebase.** Verified: `main` still has one committer identity.
+### The first painter trips the boundary the lint just learned to see
 
-### Three of my own defects reached CI or nearly did, and two share a shape
-
-A coordinate-naming violation in the file I had just written (I ran the gate set *before* writing it), and
-an `ImportError` from inlining a function whose caller lived in another directory. **Both are "the corpus
-I checked was smaller than the corpus that matters"** — a stale gate run, and a grep scoped to the file I
-was editing. Now mirrored: the whole gates job, 27 checks, run locally before every push.
-
-The third is the one worth keeping. **`run_local_battery.sh` — the tool written to stop a battery
-silently covering the wrong population — shipped covering the empty one.** Written with `mapfile`, absent
-from macOS's bash 3.2, it executed **zero suites and still looked fine**. It was caught only because the
-tool was *run* rather than reported; a commit message describing it would have been entirely accurate
-about the intent. Its zero-suite guard, written as belt-and-braces, turned out to be the only thing
-between a broken parse and a green report (D0233).
+`sky_painter` calls `Seams.grain` five times, and we put `Seams` in `sim/world/` last round (D0227).
+`view` may reference only `{interface, core}`. **P008 predicted the first real outgoing `view/` edge would
+be the fixed lint's first genuine test — it arrives on file one**, earlier than that entry expected.
+`Seams` is measurably `core/`-shaped: zero project dependencies, and its only consumer is its own test.
+Moving it is near-free *right now*, purely because last round's lifts landed unused.
 
 ---
 
-## The three PRs, all merged
-
-**#1** gate hygiene + the lifts (had to ship together — see Gates). **#2** the recorded-session test, the
-battery tool, P007's free half. **#3** the migration map. **#4/#5** this file. Nothing is parked on
-gate 7; nothing was forced; branch protection was not touched, and `main` still carries exactly one
-committer identity after five rebase merges — which is P010's rule holding under test.
-
 ## Gates
 
-**All 38 suites pass**, including four new ones. **Gate 7 (LOC velocity) is GREEN and the lifts are why**:
-instrument +1,624 against game +1,249 over the window, **1.30x under a 2x limit**, game LOC 3,075 → 3,760.
-The gate fixes alone measured **2.24x and FAILED** — which is why the two themes had to ship together, and
-worth knowing before you plan a gates-only run.
+**All checks green on PR #6.** Gate 7 (LOC velocity) **PASS** — instrument +1,240 against game +687 over
+the window, **1.81x under a 2x limit**. This PR is docs-only and adds to neither side, so the ratio
+direction is **unchanged by this round**.
+
+**And Phase 1 should improve it.** The entire current renderer lives in `tests/body/` — an *instrument*
+directory — while `view/` is a *game* directory. Moving `material_look.gd` and `mining_overlay.gd` into
+`view/` moves lines off the numerator and onto the denominator at once. Both files already declare that
+move in their own headers, written by earlier sessions anticipating this rebuild.
+
+**One thing that felt wrong even though it passed.** `tools/check_trailers.sh` fails *locally* on
+`refs/t3/checkpoints/*` — session-checkpoint refs the background-job harness writes under a `t3code@`
+identity. They are local-only, on no branch, never pushed, and **CI's authorship check passed**, verified
+on this PR rather than assumed. But it is D0231's shape again: the gate reads `git log --all`, which
+includes refs that are not the project's history. Left untouched — deleting refs the tooling created is
+not mine to do — and worth a ruling before a future session sees authorship red and "fixes" it.
 
 ## The decisions this round is waiting on
 
-**`docs/NEEDS_DIRECTOR.md`, 6 items.** Closed and deleted this round: P002, P003, P005, P006, and P007's
-two free sub-items.
+**`docs/NEEDS_DIRECTOR.md`, 7 items. P011 is the one blocking live work** — everything else is parked by
+choice, this one has a run stopped behind it.
 
-- **P010 — read this before your next merge.** Rebase only; merge-commit and squash both poison
-  authorship permanently. You may prefer to disable those two buttons in repository settings.
-- **P008** — the layer lint resolves `class_name` edges but cannot judge 14 that cross a sim module
-  boundary, because `sim/world` has no `world.gd` and the convention says it should. Three ways to
-  answer, cheapest being to amend §3 to match what the code already does.
-- **P009** — `light_layer.gd` was lifted as ruled, and it is banked value for the parked coordinator,
-  which is the criterion you declined option 2 by. The two decisions ought to agree.
-- **P001, P004, P007** unchanged: the fuzz ratchet, the fuzzer's world, and the determinism-contract
-  running hash. All still entangled, all still yours.
+- **P011 · the contract, five questions.** (1) the `Frame` shape and the explicit-`CanvasItem`
+  convention; (2) the two L2 doors; (3) `Seams` to `core/`; (4) **Phase 2's real scope — the one that
+  resizes the run**; (5) whether a game starting underground wants a day/night clock at all.
+- **P010 — still read this before your next merge.** Rebase only.
+- **P008/P009, P001/P004/P007** unchanged: the sibling-reach-in convention, `light_layer`'s contradiction,
+  the fuzz ratchet, the fuzzer's world, the determinism running hash.
 
-Carried, unchanged: **`grounded_no_floor`'s residual** (46); **Slice 1.5's bite radius**, `docs/TASTE_QUEUE.md`
-T004; **the body/world proportion**; the **persistent-world GDD reversal** whose text exists only in
-pre-compaction history.
+Carried, unchanged: **`grounded_no_floor`'s residual** (46); **Slice 1.5's bite radius**,
+`docs/TASTE_QUEUE.md` T004; **the body/world proportion**; the **persistent-world GDD reversal** whose
+text exists only in pre-compaction history.
 
 ## Blocked, and what it's waiting on
 
-- **The coordinator rebuild is the keystone and it is the next thing we do together.** ~1,540 lines of
-  world rendering unblock at once and it is the only route to changing how the game looks. Everything this
-  run could reach without it has now been reached.
+- **The coordinator rebuild is stopped at its first gate, by design.** Phases 1-3 are ready to start the
+  moment P011 is ruled on. This is still the keystone and still the only route to changing how the game
+  looks — but the reachable half of it is smaller than the brief assumed, and that is question 4.
 - **`data/economy/` D1-D6**, **line of sight**, the **`ValueNoise` float gap** (D0171/D0172), **three GDD
   contradictions** (D0177), **`history/`'s 168-image cull** — all unchanged, all yours.
 
