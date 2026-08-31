@@ -107,7 +107,7 @@ and letting each painter decide clearance — spreads a UI-legibility rule acros
 | `sim.solid` (raw) | 3 | `obs.solid_at(c)` | clean, via the method |
 | `sim.in_bounds(c)` | 1 | `obs.in_window(c)` | ⚠ **not the same question** — see below |
 | `sim.wall` | 1 | `TileGrid.get_wall` exists; **`Observation` does not expose it** | **GAP** |
-| `sim.surface_row(x)` | 4 | nothing in `Observation` | **GAP** |
+| `sim.surface_row(x)` | 4 | `Heightfield` computes it; **`Observation` does not expose it** | **GAP** |
 | `sim.ramp_dir(c)` | 1 | no ramps in this build | **absent** |
 | `sim.deposits` | 1 | superseded by the lode/wall plane | **absent** |
 
@@ -116,6 +116,14 @@ in the world"; `in_window` asks "was I given this cell". `Observation.material_a
 `&""` outside the window — *not* "unknown" — and `interface.gd` says so explicitly, noting the difference
 starts mattering as soon as fog exists. A painter that swaps one for the other reads the world's edge and
 the window's edge as the same thing and draws a wall where the viewport stops.
+
+**Both gaps are the same gap, and it is smaller than it first looks.** Neither capability is missing from
+the sim — `TileGrid.get_wall` holds the wall plane, and `sim/body/heightfield.gd` derives a per-column
+surface (as an `Fx` world-y rather than legacy's row index, deliberately: *"named `_y` rather than
+`_cell`/`_row` throughout so a caller can't mistake one for the other"*). Both take a `TileGrid`, which a
+`view/` file may not touch. So the missing thing in both cases is **a door through L2**, not a
+computation, and both doors are the same shape: something `interface` derives per-window and hands over
+as part of the `Observation`.
 
 **The wall-plane gap is the one worth ruling on.** `TileGrid` has `get_wall`/`set_wall` and the lode
 migration put ore *into* that plane, so the data exists in the sim and simply has no door. Adding
@@ -219,8 +227,10 @@ Both were written by earlier sessions anticipating exactly this rebuild. Phase 1
 
 1. **The `Frame` contract** in §2 — and specifically the explicit-`CanvasItem` convention (a) over
    drawing through the coordinator.
-2. **The wall plane in `Observation`** (§3a). Add `walls`/`wall_legend` — widening the ADR-gated L2
-   surface — or accept that `terrain_painter` cannot draw the back wall and lift it without one?
+2. **The two missing doors through L2** (§3a) — the wall plane and the per-column surface. Neither is a
+   missing computation (`TileGrid.get_wall` and `sim/body/heightfield.gd` both exist); both are missing
+   an `Observation` field, and adding one widens an ADR-gated surface. Add them, or accept that
+   `terrain_painter` draws neither the back wall nor a contoured surface?
 3. **`Seams` to `core/`** (§4), or the coordinator owns a duplicate hash?
 4. **Phase 2's real scope** (§3b): confirm it ends after `sky_painter` + `terrain_painter`, since the
    other three are blocked on empty sim modules rather than on the contract.
