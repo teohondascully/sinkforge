@@ -262,204 +262,114 @@ jobs:
       - name: tools/run_gd_test.sh self-test (D0115/D0116 — must run before every suite below trusts it)
         run: bash tools/test_run_gd_test.sh ./godot
 
-      - name: test_fixed_point
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_fixed_point.gd
-
-      - name: test_split_rng
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_split_rng.gd
-
-      - name: test_entity_id_pool
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_entity_id_pool.gd
-
-      - name: test_replay_determinism (hash-and-replay mechanism check, not QUALITY gate 8's own subject -- see test_shaft_replay_determinism below)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_replay_determinism.gd
-
-      - name: test_tile_grid
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_tile_grid.gd
-
-      - name: test_world_materials
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_world_materials.gd
-
-      - name: test_value_noise
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_value_noise.gd
-
-      - name: test_shaft_generator
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_shaft_generator.gd
-
-      - name: test_heightfield
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_heightfield.gd
-
-      - name: test_body
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_body.gd
-
-      - name: test_hostile_chamber
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_hostile_chamber.gd
-
-      - name: test_shaft_replay_determinism (QUALITY gate 8 — real ShaftGenerator+TileGrid+Body sim, two-process replay)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_shaft_replay_determinism.gd
-
-      - name: test_cave_geometry
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_cave_geometry.gd
-
-      - name: test_body_acceptance (QUALITY gate 11 — movement acceptance suite)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_acceptance.gd
-
-      - name: test_bounds_invariant (QUALITY gate 24 — body never leaves the grid)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_bounds_invariant.gd
-
-      - name: test_reachability_sweep (QUALITY gate 25 — full reachable extent, not just the scripted route)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_reachability_sweep.gd
-
-      - name: test_body_fuzz_fast (QUALITY gate 26 — goalless input fuzzer, fast per-commit subset)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz_fast.gd
-
-      - name: test_body_fuzz_regression_d0122 (QUALITY gate 29 — D0122's nightly escape, now a per-commit case)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz_regression_d0122.gd
-
-      - name: test_reveal_metric (claims/C004's own dig-rate-lift instrument, D0114)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_metric.gd
-
-      - name: test_reveal_replay_driver (claims/C004's own replay driver, D0129)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_replay_driver.gd
-
-      - name: test_floor_source_telemetry (grounding-path telemetry, D0132)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_floor_source_telemetry.gd
-
-      # D0201. These four were written in Slices 0 and 1 and never wired in here, so every guard they
-      # carry — the Slice 0 palette's colour-distance claim, the mining verb, the dig edge latch, and
-      # D0192/D0199's own spawn-bounds controls — has been running nowhere. Found by reconciling the
-      # `tests/test_*.gd` population against this file's own list rather than by reading either alone;
-      # neither side looks wrong on its own, which is the whole shape of the failure.
-      - name: test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_material_palette.gd
-
-      - name: test_mining (cursor-aim, reach, hold-to-charge, the bite, the hollow tell — D0195/D0196/D0200)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_mining.gd
-
-      - name: test_mining_bite (one blow's volume against legacy's metre, D0200)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_mining_bite.gd
-
-      - name: test_reveal_scene_dig_edge (dig is edge-triggered, Defect B — D0188)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_scene_dig_edge.gd
-
-      - name: test_step_up_grounding (a climb owns its tick; the on_floor/floor_source pair — D0205)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_step_up_grounding.gd
-
-      - name: test_footprint_grounding (both grounding paths share one full-footprint criterion — D0206)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_footprint_grounding.gd
-
-      - name: test_movement_course (the agility playground still poses what it claims — D0208)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_movement_course.gd
-
-      - name: test_view_window (per-frame draw work is bounded by the viewport — D0211)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_view_window.gd
-
-      - name: test_corner_consent (an instant translation needs the body already moving — D0213)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_corner_consent.gd
-
-      - name: test_interface (L2 is a door — observe() is pure, an Observation is a copy, D0214)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_interface.gd
-
-      - name: test_score (the lifted score — seamless loop, deterministic beds, depth-driven mix, D0215)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_score.gd
-
-      - name: test_particles (the cosmetic layer is capped, retires, and cannot move the sim — D0216)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_particles.gd
-
-      - name: test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_spawn_bounds.gd
-      - name: test_seams (rock grain, now in core/ so view can reach grain() — D0227/D0237)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_seams.gd
-
-      - name: test_world_view (the coordinator skeleton — a painter gets its own canvas, D0240)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_world_view.gd
-
-      - name: test_sky_painter (the first painter — the starfield is non-empty and does not lattice, D0244)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_sky_painter.gd
-
-      - name: test_reveal_args (the scene's flags, parseable without launching a process — D0244)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_args.gd
-
-      - name: test_empty_population_guard (the vacuous-assertion guard refuses a TRUE condition over 0 — D0245)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_empty_population_guard.gd
-      - name: test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_view_lifts.gd
-      - name: test_settings (the split halves share one bindings map; persist=false writes nothing)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_settings.gd
-      - name: test_recorded_sessions (every director recording is binding until retired — P002/D0228)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_recorded_sessions.gd
-
-  # D0060: the deep companion to test_body_fuzz_fast above -- the full 1000-seed x 1500-tick sweep
-  # (~114s measured), which is why it runs nightly rather than on every push/PR. Only fires on the
-  # `schedule` trigger declared above; push/PR events skip this job entirely. Duplicates the Godot
-  # setup steps from `tests` rather than sharing them across jobs -- GitHub Actions jobs don't share
-  # filesystem state, and a `needs:` dependency here would make every push/PR wait on a job it never
-  # actually runs.
-  # The only job in this file that opens a WINDOW. Every other suite runs --headless, which is why the
-  # class D0248 found could exist: the reveal scene booted, rendered, and passed 42 headless suites while
-  # the command its own header tells a human to type ran in the wrong mode and quit without a window.
-  # Headless cannot see that, by construction -- there is no window for the flag to have failed to open.
-  #
-  # It gets its own job rather than a step in `tests` because it needs a display (xvfb) and a GL driver
-  # that the headless job deliberately does not install, and because a display-related failure here
-  # should be legible as such rather than mixed into 42 suite results.
-  headed_boot:
-    name: headed boot (the documented --play invocation actually opens a window)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      GODOT_VERSION: "4.6.2-stable"
-      GODOT_SHA512: "b6e4d5a716085e9649905be2afe77f723f97853544fb33392ce3d32594c730a95d9eb4d1042ed51508904c9e1d996bd36b7c7a2bf4f93f5b1885e98d81b792e7"
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Download and verify Godot ${{ env.GODOT_VERSION }}
+      # THE SUITES, RUN IN PARALLEL (docs/DECISIONS_LEDGER.md D0263, D0264).
+      #
+      # These were 43 sequential steps. Measured locally, serial was 794s and `jobs=8` was 350s over
+      # the identical result set -- and on this runner the sequential job had reached 45 minutes.
+      # The suites are independent headless processes: none asserts on duration (every
+      # `Time.get_ticks_usec()` in them builds a filename), and their `user://` paths are already
+      # uniquified per call site, so nothing serialises them. `tools/run_suites.sh` reports by EXIT
+      # CODE, never by matching output -- D0262 is what happens otherwise.
+      #
+      # WHAT IS LOST, stated plainly: one step instead of 43 means the CI UI no longer shows a
+      # green tick per suite. `run_suites.sh` prints every failure with its own FAIL lines and the
+      # six slowest suites, so the information survives in the log rather than in the step list.
+      # The annotations those step names carried are preserved verbatim below, because several of
+      # them record real findings and none of them should be lost to a refactor:
+      #
+      #   test_fixed_point.gd                            test_fixed_point
+      #   test_split_rng.gd                              test_split_rng
+      #   test_entity_id_pool.gd                         test_entity_id_pool
+      #   test_replay_determinism.gd                     test_replay_determinism (hash-and-replay mechanism check, not QUALITY gate 8's own subject -- see test_shaft_replay_determinism below)
+      #   test_tile_grid.gd                              test_tile_grid
+      #   test_world_materials.gd                        test_world_materials
+      #   test_value_noise.gd                            test_value_noise
+      #   test_shaft_generator.gd                        test_shaft_generator
+      #   test_heightfield.gd                            test_heightfield
+      #   test_body.gd                                   test_body
+      #   test_hostile_chamber.gd                        test_hostile_chamber
+      #   test_shaft_replay_determinism.gd               test_shaft_replay_determinism (QUALITY gate 8 — real ShaftGenerator+TileGrid+Body sim, two-process replay)
+      #   test_cave_geometry.gd                          test_cave_geometry
+      #   test_body_acceptance.gd                        test_body_acceptance (QUALITY gate 11 — movement acceptance suite)
+      #   test_bounds_invariant.gd                       test_bounds_invariant (QUALITY gate 24 — body never leaves the grid)
+      #   test_reachability_sweep.gd                     test_reachability_sweep (QUALITY gate 25 — full reachable extent, not just the scripted route)
+      #   test_body_fuzz_fast.gd                         test_body_fuzz_fast (QUALITY gate 26 — goalless input fuzzer, fast per-commit subset)
+      #   test_body_fuzz_regression_d0122.gd             test_body_fuzz_regression_d0122 (QUALITY gate 29 — D0122's nightly escape, now a per-commit case)
+      #   test_reveal_metric.gd                          test_reveal_metric (claims/C004's own dig-rate-lift instrument, D0114)
+      #   test_reveal_replay_driver.gd                   test_reveal_replay_driver (claims/C004's own replay driver, D0129)
+      #   test_floor_source_telemetry.gd                 test_floor_source_telemetry (grounding-path telemetry, D0132)
+      #   test_material_palette.gd                       test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
+      #   test_mining.gd                                 test_mining (cursor-aim, reach, hold-to-charge, the bite, the hollow tell — D0195/D0196/D0200)
+      #   test_mining_bite.gd                            test_mining_bite (one blow's volume against legacy's metre, D0200)
+      #   test_reveal_scene_dig_edge.gd                  test_reveal_scene_dig_edge (dig is edge-triggered, Defect B — D0188)
+      #   test_step_up_grounding.gd                      test_step_up_grounding (a climb owns its tick; the on_floor/floor_source pair — D0205)
+      #   test_footprint_grounding.gd                    test_footprint_grounding (both grounding paths share one full-footprint criterion — D0206)
+      #   test_movement_course.gd                        test_movement_course (the agility playground still poses what it claims — D0208)
+      #   test_view_window.gd                            test_view_window (per-frame draw work is bounded by the viewport — D0211)
+      #   test_corner_consent.gd                         test_corner_consent (an instant translation needs the body already moving — D0213)
+      #   test_interface.gd                              test_interface (L2 is a door — observe() is pure, an Observation is a copy, D0214)
+      #   test_score.gd                                  test_score (the lifted score — seamless loop, deterministic beds, depth-driven mix, D0215)
+      #   test_particles.gd                              test_particles (the cosmetic layer is capped, retires, and cannot move the sim — D0216)
+      #   test_reveal_spawn_bounds.gd                    test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
+      #   test_seams.gd                                  test_seams (rock grain, now in core/ so view can reach grain() — D0227/D0237)
+      #   test_world_view.gd                             test_world_view (the coordinator skeleton — a painter gets its own canvas, D0240)
+      #   test_sky_painter.gd                            test_sky_painter (the first painter — the starfield is non-empty and does not lattice, D0244)
+      #   test_reveal_args.gd                            test_reveal_args (the scene's flags, parseable without launching a process — D0244)
+      #   test_empty_population_guard.gd                 test_empty_population_guard (the vacuous-assertion guard refuses a TRUE condition over 0 — D0245)
+      #   test_view_lifts.gd                             test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
+      #   test_settings.gd                               test_settings (the split halves share one bindings map; persist=false writes nothing)
+      #   test_recorded_sessions.gd                      test_recorded_sessions (every director recording is binding until retired — P002/D0228)
+      #   test_body_fuzz.gd                              test_body_fuzz (full sweep, D0060 allowlist)
+      #
+      # `check_suite_coverage` still binds: it scans this file for `res://tests/test_*.gd` and requires
+      # every tracked suite to appear. Every one is listed in the command below -- and note that the
+      # preserved annotations above deliberately write the BARE filename with no `res://tests/` prefix,
+      # so a comment can never satisfy the gate on a suite the command has stopped running. Verified by
+      # mutation: deleting one suite from the command, while leaving its comment line intact, still gives
+      # `UNRUN tests/test_tile_grid.gd` and exit 1.
+      - name: all 43 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
-          curl -sSL -o godot.zip \
-            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
-          echo "${GODOT_SHA512}  godot.zip" | sha512sum -c -
-          unzip -q godot.zip
-          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
-          chmod +x godot
-
-      # xvfb for the display; mesa for a software GL/Vulkan driver, since the runner has no GPU. Without
-      # the driver Godot opens a window and renders nothing, which this check would correctly call blank.
-      - name: Install a display and a software renderer
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1 libglx-mesa0 mesa-vulkan-drivers
-
-      - name: Import project (populate .godot/ cache)
-        run: ./godot --headless --path . --import
-
-      - name: The documented headed invocations behave as documented (D0248)
-        run: xvfb-run -a bash tools/check_headed_boot.sh ./godot
-
-  fuzz_nightly:
-    name: fuzz nightly (full 1000x1500 sweep, allowlisted residual per D0060)
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      GODOT_VERSION: "4.6.2-stable"
-      GODOT_SHA512: "b6e4d5a716085e9649905be2afe77f723f97853544fb33392ce3d32594c730a95d9eb4d1042ed51508904c9e1d996bd36b7c7a2bf4f93f5b1885e98d81b792e7"
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Download and verify Godot ${{ env.GODOT_VERSION }} (headless-capable Linux build)
-        run: |
-          curl -sSL -o godot.zip \
-            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
-          echo "${GODOT_SHA512}  godot.zip" | sha512sum -c -
-          unzip -q godot.zip
-          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
-          chmod +x godot
-
-      - name: Import project (populate .godot/ cache)
-        run: ./godot --headless --path . --import
-
-      - name: tools/run_gd_test.sh self-test (D0115/D0116 — must run before the suite below trusts it)
-        run: bash tools/test_run_gd_test.sh ./godot
-
-      - name: test_body_fuzz (full sweep, D0060 allowlist)
-        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz.gd
+          bash tools/run_suites.sh ./godot 4 \
+            res://tests/test_fixed_point.gd \
+            res://tests/test_split_rng.gd \
+            res://tests/test_entity_id_pool.gd \
+            res://tests/test_replay_determinism.gd \
+            res://tests/test_tile_grid.gd \
+            res://tests/test_world_materials.gd \
+            res://tests/test_value_noise.gd \
+            res://tests/test_shaft_generator.gd \
+            res://tests/test_heightfield.gd \
+            res://tests/test_body.gd \
+            res://tests/test_hostile_chamber.gd \
+            res://tests/test_shaft_replay_determinism.gd \
+            res://tests/test_cave_geometry.gd \
+            res://tests/test_body_acceptance.gd \
+            res://tests/test_bounds_invariant.gd \
+            res://tests/test_reachability_sweep.gd \
+            res://tests/test_body_fuzz_fast.gd \
+            res://tests/test_body_fuzz_regression_d0122.gd \
+            res://tests/test_reveal_metric.gd \
+            res://tests/test_reveal_replay_driver.gd \
+            res://tests/test_floor_source_telemetry.gd \
+            res://tests/test_material_palette.gd \
+            res://tests/test_mining.gd \
+            res://tests/test_mining_bite.gd \
+            res://tests/test_reveal_scene_dig_edge.gd \
+            res://tests/test_step_up_grounding.gd \
+            res://tests/test_footprint_grounding.gd \
+            res://tests/test_movement_course.gd \
+            res://tests/test_view_window.gd \
+            res://tests/test_corner_consent.gd \
+            res://tests/test_interface.gd \
+            res://tests/test_score.gd \
+            res://tests/test_particles.gd \
+            res://tests/test_reveal_spawn_bounds.gd \
+            res://tests/test_seams.gd \
+            res://tests/test_world_view.gd \
+            res://tests/test_sky_painter.gd \
+            res://tests/test_reveal_args.gd \
+            res://tests/test_empty_population_guard.gd \
+            res://tests/test_view_lifts.gd \
+            res://tests/test_settings.gd \
+            res://tests/test_recorded_sessions.gd \
+            res://tests/test_body_fuzz.gd
