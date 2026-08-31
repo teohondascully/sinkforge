@@ -119,18 +119,22 @@ func _test_fuzz_finds_no_new_correctness_defects() -> void:
 		if line.begins_with("FUZZ_SUMMARY"):
 			summary_line = line
 	_check(summary_line != "", "the fuzz probe printed its own summary line (got none -- did it crash mid-run?)")
+	# The line above is a PRESENCE check and cannot see a sweep that ran nothing: `total_ticks=0` is a
+	# present summary line, and every `counts[kind] == 0` below is true over it (D0245). The tick count is
+	# the population those assertions actually range over, so it is read and carried into them.
+	var total_ticks: int = fuzz_total_ticks(combined)
 	print("body_fuzz coverage: %s -- bounds=%d floor_selection=%d (reported, not gated) -- residual: embedded=%d/%d -- design trade-off: grounded_no_floor=%d/%d" %
 		[summary_line, counts["bounds"], counts["floor_selection"],
 		counts["embedded"], RESIDUAL["embedded"], counts["grounded_no_floor"], DESIGN_TRADEOFF["grounded_no_floor"]])
 	for kind: String in ["overflow", "discontinuity", "deadlock"]:
-		_check(counts[kind] == 0,
+		_check_over(total_ticks, counts[kind] == 0,
 			"zero '%s' violations across the fuzz sweep (got %d) -- see this run's own stdout above for the first occurrences" %
 			[kind, counts[kind]])
 	for kind: String in RESIDUAL:
-		_check(counts[kind] <= RESIDUAL[kind],
+		_check_over(total_ticks, counts[kind] <= RESIDUAL[kind],
 			"'%s' violations stay within the documented D0059 RESIDUAL bound (got %d, bound %d) -- see this run's own stdout above; a count ABOVE the bound is a new regression, not the known residual" %
 			[kind, counts[kind], RESIDUAL[kind]])
 	for kind: String in DESIGN_TRADEOFF:
-		_check(counts[kind] <= DESIGN_TRADEOFF[kind],
+		_check_over(total_ticks, counts[kind] <= DESIGN_TRADEOFF[kind],
 			"'%s' violations stay within the documented D0061/D0128 DESIGN TRADE-OFF bound (got %d, bound %d) -- see this run's own stdout above; a count ABOVE the bound means the traded-off scenario is occurring more than measured, worth a fresh look at whether the trade-off still holds" %
 			[kind, counts[kind], DESIGN_TRADEOFF[kind]])

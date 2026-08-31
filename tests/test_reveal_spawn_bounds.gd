@@ -141,8 +141,10 @@ func _test_the_spawn_clears_the_world_edge_and_never_swallows_its_target() -> vo
 	var worst_gap: int = 1 << 30
 	var gap_at: String = ""
 	var checked: int = 0
+	var runs: int = 0
 	for site: StringName in SITES:
 		for i: int in SEEDS:
+			runs += 1
 			var seed_value: int = BASE_SEED + i
 			var grid: TileGrid = ShaftGenerator.generate(StrataData.get_site(site), seed_value)
 			var spawn: Dictionary = RevealSessionSetup.find_spawn(grid)
@@ -160,17 +162,17 @@ func _test_the_spawn_clears_the_world_edge_and_never_swallows_its_target() -> vo
 	print("  [OBSERVED] minimum spawn_col over %d seeds x %d sites: %d (%s)" % [SEEDS, SITES.size(), worst, worst_at])
 	print("  [OBSERVED] tightest target-outside-shaft gap over %d seeds with a pocket: %d cols (%s)"
 		% [checked, worst_gap, gap_at])
-	_check(worst >= 1,
+	_check_over(runs, worst >= 1,
 		"no (site, seed) spawns the body flush against the world's left edge -- at least one solid cell stands between them (worst spawn_col %d at %s)"
 		% [worst, worst_at])
-	# A count, not just a minimum: if no seed in the corpus had a pocket, `worst_gap` would still hold its
-	# sentinel and the assertion below would pass having compared nothing.
-	_check(checked > 0,
-		"at least one (site, seed) actually has a shallow pocket to swallow -- %d of %d; 0 would make the gap assertion vacuous"
-		% [checked, SEEDS * SITES.size()])
-	_check(worst_gap >= 0,
-		"the carved entry shaft never reaches the target pocket, so the target is never pre-revealed at spawn (tightest %d at %s)"
-		% [worst_gap, gap_at])
+	# The population is the seeds that HAVE a pocket, not the seeds that ran: a corpus where every seed took
+	# the `continue` above leaves `worst_gap` holding its sentinel, and the assertion passes having compared
+	# nothing. This was originally a hand-written `checked > 0` line bolted on beside the real assertion
+	# (D0229); `_check_over` is that same idea as one call, so the population cannot drift away from the
+	# assertion it protects (D0245).
+	_check_over(checked, worst_gap >= 0,
+		"the carved entry shaft never reaches the target pocket, so the target is never pre-revealed at spawn (tightest %d at %s, over %d of %d runs with a pocket)"
+		% [worst_gap, gap_at, checked, runs])
 
 
 func _test_walking_left_from_the_real_spawn_never_leaves_the_world() -> void:
@@ -178,8 +180,10 @@ func _test_walking_left_from_the_real_spawn_never_leaves_the_world() -> void:
 	var offender: String = ""
 	var worst_left: int = 1 << 60
 	var worst_at: String = ""
+	var runs: int = 0
 	for site: StringName in SITES:
 		for i: int in SEEDS:
+			runs += 1
 			var seed_value: int = BASE_SEED + i
 			var session: Dictionary = RevealSessionSetup.build(site, seed_value)
 			var walked: Dictionary = _walk_left(session["body"], session["grid"])
@@ -192,14 +196,18 @@ func _test_walking_left_from_the_real_spawn_never_leaves_the_world() -> void:
 					% [site, seed_value, walked["violations"], float(walked["min_left"]) / float(Fx.SCALE)])
 	print("  [OBSERVED] furthest-left any real spawn reached over %d seeds x %d sites: %.4f px (%s)"
 		% [SEEDS, SITES.size(), float(worst_left) / float(Fx.SCALE), worst_at])
-	_check(total_violations == 0,
+	# `total_violations == 0` is the shape D0245 guards: a sum over an empty corpus is zero, so a SITES list
+	# that lost its entries would read as the strongest possible pass. `runs` is COUNTED in the loop rather
+	# than computed as `SEEDS * SITES.size()`, because a product of two constants cannot register a loop body
+	# that never executed.
+	_check_over(runs, total_violations == 0,
 		("holding LEFT for %d ticks from the real spawn never leaves the world, on any of %d seeds x %d " +
 		"sites (%d violating ticks%s)")
 		% [WALK_TICKS, SEEDS, SITES.size(), total_violations, "" if offender == "" else ", first " + offender])
 	# The mechanism, not just the outcome: a body stopped by terrain never reaches x=0 at all, so its own
 	# furthest-left is strictly positive. A body stopped by the world-edge clamp sits at exactly 0. This is
 	# what distinguishes "the fix works" from "the clamp is quietly doing the work and not reporting it".
-	_check(worst_left > 0,
+	_check_over(runs, worst_left > 0,
 		"every real spawn is stopped by TERRAIN, strictly inside the world, never by the world-edge clamp (furthest-left %.4f px at %s; 0.0 would mean the clamp)"
 		% [float(worst_left) / float(Fx.SCALE), worst_at])
 
@@ -229,8 +237,10 @@ func _test_jumping_from_the_real_spawn_never_leaves_the_world_through_the_ceilin
 	var offender: String = ""
 	var worst_top: int = 1 << 60
 	var worst_at: String = ""
+	var runs: int = 0
 	for site: StringName in SITES:
 		for i: int in SEEDS:
+			runs += 1
 			var seed_value: int = BASE_SEED + i
 			var session: Dictionary = RevealSessionSetup.build(site, seed_value)
 			var jumped: Dictionary = _hold_jump(session["body"], session["grid"])
@@ -243,11 +253,11 @@ func _test_jumping_from_the_real_spawn_never_leaves_the_world_through_the_ceilin
 					% [site, seed_value, jumped["violations"], float(jumped["min_top"]) / float(Fx.SCALE)])
 	print("  [OBSERVED] highest any real spawn's head reached over %d seeds x %d sites: %.4f px (%s)"
 		% [SEEDS, SITES.size(), float(worst_top) / float(Fx.SCALE), worst_at])
-	_check(total_violations == 0,
+	_check_over(runs, total_violations == 0,
 		("holding JUMP for %d ticks from the real spawn never leaves the world through the ceiling, on any " +
 		"of %d seeds x %d sites (%d violating ticks%s)")
 		% [JUMP_TICKS, SEEDS, SITES.size(), total_violations, "" if offender == "" else ", first " + offender])
-	_check(worst_top > 0,
+	_check_over(runs, worst_top > 0,
 		"every real spawn's head is stopped by ROCK, strictly inside the world, never by the world-edge clamp (highest %.4f px at %s; 0.0 would mean the clamp)"
 		% [float(worst_top) / float(Fx.SCALE), worst_at])
 

@@ -68,7 +68,7 @@ func _test_the_starfield_is_not_empty_and_does_not_lattice() -> void:
 	for s: Dictionary in stars:
 		if (s["pos"] as Vector2).y < SkyPainter.HORIZON_Y:
 			above += 1
-	_check(above == stars.size(),
+	_check_over(stars.size(), above == stars.size(),
 		"and every one of them is ABOVE the horizon (%d of %d) -- a star under the ground is not a star"
 		% [above, stars.size()])
 	## THE ANTI-LATTICE CHECK. Legacy's first version used `i * 2654435761`, whose sorted x values had
@@ -82,6 +82,8 @@ func _test_the_starfield_is_not_empty_and_does_not_lattice() -> void:
 	var gaps: Dictionary = {}
 	for i: int in range(1, xs.size()):
 		gaps[roundi(float(xs[i]) - float(xs[i - 1]))] = true
+	## NOT `_check_over`, deliberately: `> 3` already FAILS on an empty field, so the guard could never fire
+	## here and adding it would only teach the idiom as decoration (D0245's direction rule).
 	_check(gaps.size() > 3,
 		"the field scatters: %d distinct x-gaps over %d stars (a linear i*K sequence gives 3)"
 		% [gaps.size(), stars.size()])

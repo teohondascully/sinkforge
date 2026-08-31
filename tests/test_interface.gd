@@ -125,6 +125,11 @@ func _test_every_rejection_is_named_and_changes_nothing() -> void:
 		{"cell": Vector2i(Body._px_to_cell(body.pos_x), 0), "want": Interface.REJECT_NOT_SOLID, "label": "open air overhead"},
 		{"cell": Vector2i(GRID_W - 1, FLOOR_ROW), "want": Interface.REJECT_OUT_OF_REACH, "label": "solid floor across the map"},
 	]
+	## Every assertion below lives INSIDE the loop, so an empty `cases` array would run zero of them and
+	## report success -- the D0245 shape, arriving as a loop that never executes rather than as an
+	## aggregate over nothing. Checked before the loop, where it cannot be forgotten to depend on it.
+	_check_over(cases.size(), true,
+		"the rejection cases are actually posed, so the checks inside the loop have something to run on")
 	for c: Dictionary in cases:
 		var before: String = _sig(grid, body)
 		var r: Interface.Result = iface.apply(Command.mine(c["cell"]))

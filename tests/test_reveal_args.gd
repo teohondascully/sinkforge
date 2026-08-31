@@ -67,6 +67,8 @@ func _test_every_flag_is_reachable() -> void:
 	for key: String in defaults:
 		if cfg[key] == defaults[key]:
 			unmoved.append(key)
-	_check(unmoved.is_empty(),
+	## `unmoved.is_empty()` is true of a `defaults()` that returned nothing at all, so the population is
+	## asserted before the property (D0245).
+	_check_over(defaults.size(), unmoved.is_empty(),
 		"every one of the %d settings moved off its default when its flag was passed (unmoved: %s)"
 		% [defaults.size(), unmoved])

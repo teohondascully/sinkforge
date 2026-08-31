@@ -379,6 +379,9 @@ jobs:
 
       - name: test_reveal_args (the scene's flags, parseable without launching a process — D0244)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_args.gd
+
+      - name: test_empty_population_guard (the vacuous-assertion guard refuses a TRUE condition over 0 — D0245)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_empty_population_guard.gd
       - name: test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_view_lifts.gd
       - name: test_settings (the split halves share one bindings map; persist=false writes nothing)
