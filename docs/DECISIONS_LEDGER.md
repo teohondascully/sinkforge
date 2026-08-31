@@ -10794,3 +10794,29 @@ shrinking that suite rather than from adding jobs. Note the O(1) signature hash 
 the tree for BOTH measurements — the determinism suite was 8.8s, not 72s, throughout, so it is not what
 bounds the sweep now. `run_suites.sh` therefore prints the six slowest suites on every run, so the actual
 ceiling is named rather than assumed.
+
+## D0264 · CI runs its 43 suites in parallel, and what that costs in visibility · 2026-08-31
+
+`.github/workflows/harness.yml` ran the suites as 43 sequential steps. On this runner that job had
+reached **45 minutes and was still going**, against ~15 minutes for earlier runs — the same
+one-long-suite ceiling measured locally in D0263, on a slower machine. Replaced with a single
+`tools/run_suites.sh ./godot 4 <all 43>` step.
+
+The soundness argument is D0263's, already checked rather than assumed: no suite asserts on duration, and
+`user://` paths are uniquified per call site. Locally the identical result set came back from serial and
+`jobs=8` runs.
+
+**What is lost, stated rather than glossed:** the CI UI shows one step instead of 43, so there is no
+per-suite tick. `run_suites.sh` prints each failure with its own `FAIL` lines and the six slowest suites,
+so the information moves into the log rather than disappearing — but a reader scanning the step list
+sees less than before, and that is a real trade taken deliberately for ~40 minutes a round trip.
+
+**The 43 step names are preserved verbatim as comments**, because several carried real findings (why
+`test_replay_determinism` is not gate 8's subject, and so on) and a refactor should not quietly delete
+documentation.
+
+**The comment block deliberately writes bare filenames with no `res://tests/` prefix.** That is
+load-bearing: `check_suite_coverage` scans this file for `res://tests/test_*.gd`, so a preserved comment
+must not be able to satisfy the gate for a suite the command has stopped running. Mutation-tested in the
+harder direction — one suite deleted from the command while its comment line stayed — and the gate still
+reported `UNRUN tests/test_tile_grid.gd`, exit 1. Restored, it passes 43/43.
