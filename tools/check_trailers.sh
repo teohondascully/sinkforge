@@ -155,13 +155,20 @@ fi
 # than the disease. a commit authored by a second identity states the same thing the trailer states, in a
 # field no message filter would ever look at. counting DISTINCT identities rather than matching known-bad
 # ones means an identity nobody thought to look for still fails this.
-authors="$(git log --format='%ae' --all | sort -u | wc -l | tr -d ' ')"
+# POPULATION: --branches --tags --remotes, deliberately NOT --all, and this must stay matched to the
+# ref set the trailer scan above iterates. They are two halves of one claim about "the history" and they
+# disagreed for a while: the scan looped refs/heads/refs/remotes/refs/tags while these two counted over
+# --all, which also reaches refs/tmp/, refs/t3/, refs/archive/ and refs/stash. Local scratch refs a fresh
+# clone never fetches. The effect was a gate that read RED locally and GREEN in CI off the same commit --
+# a verdict that depended on which machine's ref set it saw, which is the one property a gate may not have.
+# Found by an external audit 2026-08-30. If the scan's ref set above ever changes, change these with it.
+authors="$(git log --format='%ae' --branches --tags --remotes | sort -u | wc -l | tr -d ' ')"
 [ "$authors" -eq 1 ]; check $? "every commit shares one author identity ($authors distinct found)"
-committers="$(git log --format='%ce' --all | sort -u | wc -l | tr -d ' ')"
+committers="$(git log --format='%ce' --branches --tags --remotes | sort -u | wc -l | tr -d ' ')"
 [ "$committers" -eq 1 ]; check $? "every commit shares one committer identity ($committers distinct found)"
 if [ "$authors" -ne 1 ] || [ "$committers" -ne 1 ]; then
 	echo "  identities present:" >&2
-	git log --format='%ae%n%ce' --all | sort -u | sed 's/^/    /' >&2
+	git log --format='%ae%n%ce' --branches --tags --remotes | sort -u | sed 's/^/    /' >&2
 fi
 
 echo

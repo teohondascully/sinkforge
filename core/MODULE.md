@@ -4,9 +4,9 @@
 
 Fixed-point arithmetic (i32, 16 fractional bits), a seeded splittable RNG (one
 stream per subsystem; streams are serialized state, not wall-clock seeded),
-and generational-index entity IDs. Small, pure, fully unit-tested. Every
-other layer in the stack (sim, interface, harness, experiment, view, shell)
-depends on this one; this one depends on nothing.
+generational-index entity IDs, and the seam/grain hash. Small, pure, fully
+unit-tested. Every other layer in the stack (sim, interface, harness,
+experiment, view, shell) depends on this one; this one depends on nothing.
 
 ## Dependencies
 
@@ -41,8 +41,7 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   never a crash), `.is_valid(id) -> bool`, `.live_count()`.
 - `BitOps` (`bit_ops.gd`) — bit-level integer primitives with no domain concept of their own.
   `.ushr(x: int, n: int) -> int`, a logical (zero-fill) right shift of a 64-bit bit pattern held in a
-  signed GDScript int — extracted 2026-08-28 (`docs/DECISIONS_LEDGER.md` D0097) from `SplitRng` and
-  `EntityIdPool`, which each independently defined a byte-for-byte identical private `_ushr()` helper.
+  signed GDScript int. Why it is its own file rather than a helper: see Gotchas.
 - `Fx` (`fixed_point.gd`) — fixed-point scalar arithmetic, i32 with 16 fractional bits. World-scale
   constants and the range/precision check this format was validated against: `docs/ARCHITECTURE.md` §9
   ("The world scale"), `docs/adr/0003-fixed-point-representation.md`. `.from_int()`, `.to_float()`
@@ -53,6 +52,9 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   `mul()`'s i32 reduction — safe now for any pair of valid `Fx` deltas, with no reachable overflow
   boundary inside the range a valid `Fx` value can occupy. `mul()` ITSELF still has the ~181-per-axis
   limit when used to square a value directly; that's a `mul()` property, not a `length()` one.
+- `Seams` (`seams.gd`) — the rock's grain as a pure function of `(coordinate, world_seed)`. `.at()`,
+  `.terrain_axis()`, `.aligned()`, `.grain()`. Moved here from `sim/world/` so `view/` can reach
+  `grain()`; that move's caveats are in the file's own header and D0237, not repeated here.
 
 ## Gotchas
 

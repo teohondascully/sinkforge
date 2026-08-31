@@ -9,9 +9,15 @@ extends RefCounted
 ## THE SECOND INVARIANT IS WHY `Observation` COPIES. It would be far cheaper to hand back a `TileGrid`
 ## reference and let the caller index it, and that would silently delete the envelope: a consumer holding
 ## the grid can read any cell it likes, fogged or not, and no filter in this file could stop it. So an
-## `Observation` is a VALUE -- a flat byte array over one window, plus a legend -- built fresh per call
+## `Observation` is a VALUE -- flat arrays over one window, plus their legends -- built fresh per call
 ## and holding no reference to anything in `sim/`. That is the whole design, and the cost (a few KB per
 ## call for a screen-sized window) is what buys a capability envelope that cannot be worked around.
+##
+## THREE PLANES NOW, NOT ONE (D0238): blocks, the background wall, and a per-column surface height. The
+## second and third exist because `view/` needs them and cannot reach them -- `TileGrid.get_wall()` and
+## `Heightfield.column_surface_y()` both take a `TileGrid`, and a `view/` file may not hold one. Each is
+## derived HERE, per window, so it inherits the envelope rather than bypassing it; a wider scan would
+## make either one a second unfiltered channel into the grid.
 ##
 ## SMALL BECAUSE THE GAME IS SMALL. §5 names four envelope dimensions (vision, planning, motor, priors)
 ## and three standard envelopes (Oracle, Constrained, Language). Exactly one of those has a mechanism in
@@ -69,6 +75,23 @@ class Observation:
 	## material, so `solid_at` is a byte comparison and not a string one.
 	var materials: PackedByteArray
 	var legend: PackedStringArray
+	## THE BACKGROUND WALL PLANE, same shape and same encoding as `materials`/`legend` (D0238). This is
+	## the layer `TileGrid.get_wall()` holds -- what `excavate()` REVEALS rather than erases, and where
+	## the lode migration put ore. A renderer needs it to draw a mined-out room as a recessed back wall
+	## instead of a hole in a sheet; without it there is no depth behind the player at all.
+	var walls: PackedByteArray
+	var wall_legend: PackedStringArray
+	## One entry per COLUMN of `window`, left to right: the walkable surface height as an `Fx` world-y,
+	## or `Heightfield.NO_FLOOR`. Derived here rather than by the consumer because `Heightfield` takes a
+	## `TileGrid` and `view/` may not hold one.
+	##
+	## `_y`, never `_row`: this is a pixel height in `Fx`, not a cell index, and `heightfield.gd` names
+	## it that way for the same reason -- "so a caller can't mistake one for the other."
+	##
+	## SCANNED WITHIN THE WINDOW ONLY. A column whose only solid cell sits above the window reads
+	## `NO_FLOOR`, because the observer was not given those cells. That is the envelope working, not a
+	## bug: an observation must never answer from data it did not hand over.
+	var surface_y: PackedInt32Array
 
 	## True iff `c` holds solid material. Outside the window returns false -- NOT "unknown", and the
 	## distinction matters as soon as fog exists: a consumer asking about a cell it was not given should
@@ -78,13 +101,40 @@ class Observation:
 		return material_at(c) != &""
 
 	func material_at(c: Vector2i) -> StringName:
+		return _plane_at(legend, materials, c)
+
+	## The BACKGROUND material at `c`, or `&""` -- both for "no wall here" and for "outside the window",
+	## exactly as `material_at` conflates them. Same reasoning, and the same warning applies: a consumer
+	## that needs to tell those apart asks `in_window` FIRST.
+	func wall_at(c: Vector2i) -> StringName:
+		return _plane_at(wall_legend, walls, c)
+
+	## Shared body of the two plane readers. They are one function with two bindings, not two functions:
+	## written out separately they were byte-identical under identifier normalization and the BLOCKING
+	## duplication gate said so. Keeping the out-of-window `&""` in ONE place also means the two planes
+	## cannot drift on the question that matters most about them.
+	func _plane_at(plane_legend: PackedStringArray, bytes: PackedByteArray, c: Vector2i) -> StringName:
 		if not in_window(c):
 			return &""
-		var i: int = (c.y - window.position.y) * window.size.x + (c.x - window.position.x)
-		return legend[materials[i]]
+		return plane_legend[bytes[_offset_of(c)]]
 
 	func in_window(c: Vector2i) -> bool:
 		return window.has_point(c)
+
+	## The walkable surface height of one terrain column as an `Fx` world-y, or `Heightfield.NO_FLOOR`
+	## for a column outside the window or with no floor inside it.
+	##
+	## Takes a bare `int` column rather than a `Vector2i` on purpose: a surface is a property of a
+	## column, and passing a cell would invite a caller to believe the row mattered.
+	func surface_y_at_terrain_col(terrain_col: int) -> int:
+		if terrain_col < window.position.x or terrain_col >= window.end.x:
+			return Heightfield.NO_FLOOR
+		return surface_y[terrain_col - window.position.x]
+
+	## Row-major offset of `c` within the window. Callers must have checked `in_window` first -- this
+	## does no bounds checking and would happily index a neighbouring row for a cell one column outside.
+	func _offset_of(c: Vector2i) -> int:
+		return (c.y - window.position.y) * window.size.x + (c.x - window.position.x)
 
 
 ## `apply()`'s answer. `reason` is empty exactly when `ok` is true, and §5 makes it telemetry rather than
@@ -143,22 +193,54 @@ func observe(envelope: Envelope) -> Observation:
 	return o
 
 
-## Copies the window into `o.materials`/`o.legend`. Split out of `observe` so that function stays a flat
+## Copies the window into the three derived fields. Split out of `observe` so that function stays a flat
 ## list of field reads a reader can check against `Observation` by eye.
 func _fill_window(o: Observation) -> void:
+	var blocks: Array = _plane_over_window(o.window, _grid.get_material)
+	o.materials = blocks[0]
+	o.legend = blocks[1]
+	var background: Array = _plane_over_window(o.window, _grid.get_wall)
+	o.walls = background[0]
+	o.wall_legend = background[1]
+	_fill_surface(o)
+
+
+## One plane of the window as `[PackedByteArray, PackedStringArray]`, where `read` maps a terrain cell
+## to its material id.
+##
+## Shared by the block plane and the wall plane rather than written twice. The two loops would differ
+## only in which `TileGrid` getter they call, and `tools/quality_check/duplication.py` is a BLOCKING
+## gate that would reject the copy -- correctly, since the byte encoding, the legend-interning and the
+## row-major order are one contract that `Observation._offset_of` decodes for both.
+func _plane_over_window(window: Rect2i, read: Callable) -> Array:
 	var index_of: Dictionary = {&"": 0}
-	o.legend = PackedStringArray([&""])
-	o.materials = PackedByteArray()
-	o.materials.resize(o.window.size.x * o.window.size.y)
+	var legend: PackedStringArray = PackedStringArray([&""])
+	var bytes: PackedByteArray = PackedByteArray()
+	bytes.resize(window.size.x * window.size.y)
 	var i: int = 0
-	for row: int in range(o.window.position.y, o.window.end.y):
-		for col: int in range(o.window.position.x, o.window.end.x):
-			var m: StringName = _grid.get_material(Vector2i(col, row))
+	for row: int in range(window.position.y, window.end.y):
+		for col: int in range(window.position.x, window.end.x):
+			var m: StringName = read.call(Vector2i(col, row))
 			if not index_of.has(m):
-				index_of[m] = o.legend.size()
-				o.legend.append(m)
-			o.materials[i] = index_of[m]
+				index_of[m] = legend.size()
+				legend.append(m)
+			bytes[i] = index_of[m]
 			i += 1
+	return [bytes, legend]
+
+
+## One `Fx` surface height per window column, scanned WITHIN the window only.
+##
+## `scan_from_row` is the window's top and `max_rows` its height, so this can never report a floor the
+## observation did not also hand over as cells. Widening the scan past the window would make
+## `surface_y` a second, unfiltered channel into the grid -- which is precisely the reach-around
+## `Observation` copies in order to prevent.
+func _fill_surface(o: Observation) -> void:
+	o.surface_y = PackedInt32Array()
+	o.surface_y.resize(o.window.size.x)
+	for i: int in range(o.window.size.x):
+		o.surface_y[i] = Heightfield.column_surface_y(
+			_grid, o.window.position.x + i, o.window.position.y, o.window.size.y)
 
 
 ## The only mutator. Every rejection is a named reason, and a rejected command changes nothing at all --

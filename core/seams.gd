@@ -11,9 +11,22 @@ extends RefCounted
 ## world.
 ##
 ## Lifted from `legacy/src/data/seams.gd` (`docs/DECISIONS_LEDGER.md` D0227). One change, and it is the
-## reason this file could come to `sim/` at all: **the three rates and `_plane` were floats and are now
-## integers.** `sim/` is fixed-point and cross-platform-deterministic by contract (ARCHITECTURE §4), and
-## a float comparison is the one thing in this file that could have differed between two machines.
+## reason this file could leave `legacy/` at all: **the three rates and `_plane` were floats and are now
+## integers.** Both `core/` and `sim/` are fixed-point and cross-platform-deterministic by contract
+## (ARCHITECTURE §4), and a float comparison is the one thing here that could have differed between two
+## machines.
+##
+## **THIS FILE LIVES IN `core/`, AND ITS VOCABULARY IS AHEAD OF ITS ADDRESS** (D0237). It moved out of
+## `sim/world/` so `view/` could reach it -- `view` may depend on `{interface, core}` and not on `sim`,
+## and `sky_painter` needs `grain()` for its starfield. Every `core/` invariant holds here: no engine
+## type beyond `Vector2i`, no IO, no wall clock, no global mutable state, no transcendentals. What does
+## NOT fit is the *language*: `at()`, `aligned()`, `terrain_axis()` and `RUN_CAP` speak about swings,
+## grain and the Wedge bit, which are mining concepts, and `core/MODULE.md` describes its residents as
+## primitives "with no domain concept of their own". **Only `grain()` is genuinely domain-free, and
+## `grain()` is the only function `view/` calls.** The clean decomposition -- `grain()` in `core/`, the
+## seam/swing logic back in `sim/` -- is named in D0237 and deliberately NOT taken here, because the
+## integer conversion above is proven exact as a unit over all 196,608 inputs and splitting the file
+## splits that proof. Revisit when something actually calls `at()`; nothing does yet.
 ##
 ## THE CONVERSION IS EXACT, not rounded. `_plane` returned `(h & 0xffff) / 65535.0` and the caller asked
 ## `< 0.18`; it now returns the raw `h & 0xffff` (0..65535) and the caller asks

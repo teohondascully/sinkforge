@@ -9571,3 +9571,90 @@ to D0235's checkout pin having changed which window gate 7 reads. Checked on the
 commit count grew, and this branch's first CI run passed structural gates at one commit. Recorded because
 the wrong story was plausible, self-flattering in the wrong direction (it made my own change the culprit
 and the fix a revert), and would have sent the director to the wrong lever.
+
+---
+
+## D0237 · `Seams` moved to `core/`, and its vocabulary arrived somewhere its address does not fit · 2026-08-30
+**Decided:** `git mv sim/world/seams.gd core/seams.gd`, per the director's Q3 ruling. This resolves the
+`view -> sim` edge `sky_painter` would otherwise trip: `view` may depend on `{interface, core}` only,
+and the starfield calls `Seams.grain()` five times to keep itself a field rather than a lattice.
+
+**Verified, not assumed.** `class_name` is path-independent, so `tests/test_seams.gd` needed no edit and
+passes unchanged after a re-import. Layer lint, `no_engine_imports`, coordinate naming and size limits
+all green.
+
+**A correction to my own Phase-0 recommendation, which the move surfaced.** I argued `Seams` is
+"`core/`-shaped" on the evidence that it references only `RefCounted`, `Vector2i` and its own constants
+-- zero project dependencies. That is true and it is the wrong test. It describes what the file
+*imports*, not what it *means*: `at()`, `aligned()`, `terrain_axis()` and `RUN_CAP` talk about swings,
+grain and the Wedge bit, which are mining concepts, and `core/MODULE.md` describes its residents as
+primitives "with no domain concept of their own". **Only `grain()` is genuinely domain-free, and
+`grain()` is the only function `view/` calls.** The clean decomposition is `grain()` in `core/` and the
+seam/swing logic back in `sim/`; it was NOT taken, because the float->integer conversion is proven exact
+as a whole-file unit over all 196,608 inputs (D0227) and splitting the file splits that proof for a
+mechanic nothing calls yet. Recorded so the next reader meets the tension in the file's own header
+rather than discovering it.
+
+**A dependency scan is not an architecture argument.** The generalisable form: "what does this file
+reference" is cheap and answers a different question from "what layer does this file belong to". I
+reached for the cheap one and reported it as the expensive one.
+
+**Two documentation defects found on the way, neither caused by this move.** `Seams` was never listed in
+`sim/world/MODULE.md`'s Public API for the whole time it lived there -- a module index omitting its own
+file is the same shape as a gate that cannot see its subject, so it is named in that file rather than
+quietly closed. And `core/MODULE.md`'s first invariant reads "no engine imports (**no Godot types**,
+nodes, or singletons)" while `entity_id_pool.gd` uses `Array` and `split_rng.gd` uses `Dictionary`. The
+operative reading has long been "no engine COUPLING" -- Node types, IO, wall clock, unseeded RNG, which
+is exactly what `no_engine_imports.py` checks -- and `Vector2i` is the same POD-Variant category as the
+two already there. The written invariant is broader than both the practice and the gate; left alone as
+out of scope, flagged here.
+
+**`core/MODULE.md` now sits at EXACTLY its 100-line cap, and that is debt, not comfort.** Documenting a
+fifth public class did not fit: the file was at 98 when D0226 set the cap at 100, a margin that ledger
+entry noted at the time. I removed one genuine duplication (the D0097 extraction story appeared nearly
+verbatim in both the `BitOps` API entry and its Gotcha) and wrote the `Seams` entry as a pointer, with
+the full rationale in `seams.gd`'s own header where it belongs. Landing on exactly the cap is the shape
+`docs/QUALITY.md` §2 warns about -- `body.gd` at exactly 400 three commits running -- so: **the next
+public class added to `core/` forces either a cap ruling or a restructure of that file.** Flagged rather
+than absorbed.
+
+---
+
+## D0238 · Two doors through L2: the wall plane and the per-column surface · 2026-08-30
+**Decided:** `Observation` carries three planes now -- block materials, `walls`/`wall_legend`, and
+`surface_y` -- per the director's Q2 ruling. `docs/adr/0007-l2-interface.md` Decision 1 is amended in
+place, since widening an ADR-gated surface silently is the thing that gate exists to prevent.
+
+**Neither addition is a new computation.** `TileGrid.get_wall()` already held the background plane (what
+`excavate()` REVEALS rather than erases, and where the lode migration put ore) and
+`Heightfield.column_surface_y()` already derived the ground contour. Both take a `TileGrid`, which a
+`view/` file may not hold. What was missing was a door, and both doors have the same shape: something
+`interface` derives per window and hands over as part of the value.
+
+**The envelope is preserved by construction, and that is the load-bearing detail.** `surface_y` scans
+from the window's own top row for the window's own height and no further. A column whose only solid cell
+sits ABOVE the window reads `NO_FLOOR` -- the observer was not given those cells, so the observation
+must not answer about them. Widening that scan by even one row would turn `surface_y` into a second,
+unfiltered channel into the grid, which is precisely the reach-around `Observation` copies to prevent.
+`tests/test_interface.gd` poses that case directly, with a control asserting the hidden floor really is
+solid in the grid, so the assertion cannot pass by the floor simply not existing.
+
+**The discriminating test, because a second plane sharing the first's encoding has one characteristic
+failure: being wired to the same getter.** Every assertion about presence, shape and legend still passes
+if `_plane_over_window` is handed `get_material` twice. So the fixture sets a wall material DIFFERENT
+from the block material in the same cell and asserts `wall_at(c) != material_at(c)` -- which the wrong
+getter cannot satisfy -- then excavates and checks the block empties while the wall stays.
+
+**Two functions became one under the duplication gate, and it was right both times.** The two fill loops
+differ only in which getter they call, and the two readers differ only in which legend/array pair they
+index; written out they were byte-identical under identifier normalization and
+`tools/quality_check/duplication.py` (BLOCKING) said so. Extracting `_offset_of` alone was NOT enough --
+the remaining three-line bodies still matched -- and the fix is `_plane_at(legend, bytes, c)`. The
+by-product is the one that matters: the out-of-window `&""` rule now exists in ONE place, so the two
+planes cannot drift on the question a consumer is most likely to get wrong.
+
+**The trap this contract now hands to `view/`, stated where a painter author will meet it.**
+`in_bounds` asks whether a cell is in the world; `in_window` asks whether the caller was given it.
+`material_at` and `wall_at` both return `&""` outside the window -- *not* "unknown" -- so a painter that
+reaches for `in_bounds` reads the window's edge as the world's edge and draws a wall where the viewport
+stops. Both accessors say so in their own doc comments rather than only here.
