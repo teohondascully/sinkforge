@@ -4,128 +4,111 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-30. This round: Phase 0 of the coordinator rebuild — the painter contract,
-measured and stopped for you. NO CODE WAS WRITTEN, deliberately; the brief's Phase 0 says produce the
-contract and stop, and this is the stop.** One PR, `git log --oneline main..run/coordinator-contract` for
-its commits. `docs/DECISIONS_LEDGER.md` D0234-D0235; the deliverable is `docs/COORDINATOR_CONTRACT.md`;
-`docs/NEEDS_DIRECTOR.md` **P011** indexes the five questions.
+**Last updated: 2026-08-30. This round: your Phase-0 rulings applied, and the coordinator skeleton
+built. STOPPED at the Phase-1 ◆ — Phase 2 does not start until you look.** `docs/DECISIONS_LEDGER.md`
+D0237, D0238, D0240. Two PRs open and stacked: **#6** (Phase 0's contract, parked on gate 7 alone) and
+**#7** (prerequisites + skeleton), branched off #6 so the ledger stays sequential.
 
-**Headline: three of the five painters are not blocked on the contract, and no contract shape unblocks
-them.** `water_view`, `rope_view` and `falling_items` need `sim/fluid`, `sim/transport` and `sim/items` —
-**empty directories holding only a MODULE.md.** Nine of fifteen `sim/` modules are. Lifting them means
-writing a fluid simulation, a rope system and an item-flow system first, none of which is view work.
-**That resizes Phase 2 to `sky_painter` + `terrain_painter`**, and it is question 4 of five.
+**Headline: it is 101 lines against a 400 cap, and that is the whole point.** The brief warned the
+skeleton would be born at the size gate. `tests/body/reveal_scene.gd` — the closest thing this tree had
+to a coordinator — sits at **398/400** with `_physics_process` at **49/50**, one line from firing on
+both. So nothing was ported from it. Its argument parsing, agent-drive modes and recording flush are
+~120 of those 398 lines and **none is coordinator work**; they stayed in the debug scene where they
+belong. A renderer does not parse `--seed`.
 
 ---
+
+## What landed
+
+**P0a · `Seams` → `core/`** (D0237). `test_seams` passes unchanged — `class_name` is path-independent.
+
+**P0b · two doors through L2** (D0238). `Observation` now carries `walls`/`wall_legend` and a per-column
+`Fx` `surface_y`. Each is derived **per window**, so a window sitting above the floor reports `NO_FLOOR`
+rather than scanning past its own edge — the envelope is preserved by construction, not by promise. ADR
+0007 Decision 1 amended in place.
+
+**Phase 1 · the coordinator** (D0240). `world_view.gd` (101), `frame.gd` (57), `paint_layer.gd` (45),
+plus `MaterialLook` moved out of `tests/body/` into `view/visuals/`.
+
+**Evidence:** 39/39 suites pass, determinism included. **Gate 7 green and strongly positive —
+instrument +60 against game +464** (3,762 → 4,226 game LOC), exactly the direction you asked me to
+report. The layer lint was **mutation-tested on `world_view.gd` itself**, not trusted from last run's
+plant: a planted `TileGrid` reference fails with the precise message, removing it passes.
 
 ## What was learned
 
-### The scanner that could not spell its subject's name
+### A dependency scan is not an architecture argument
 
-The first pass at measuring painter reach-in hardcoded the coordinator's binding as `r`, and reported
-**0 private reach-in for `water_view`, `rope_view` and `machine_view`.** All three bind under `_wv`/`_wr`;
-the real counts are 2, 2 and 7. A clean zero from three files at once was the tell — the rewrite derives
-each binding from the file's own `var x: WorldRenderer` declaration and prints the derived set per file as
-its positive control. **This is the house failure arriving inside the measurement written to avoid it**,
-which is the second run in a row that has happened (D0233 was the same shape).
+I recommended `Seams` for `core/` on the evidence that it references only `RefCounted`, `Vector2i` and
+its own constants. That is true, and it answers a different question. It describes what the file
+**imports**, not what it **means**: `at()`, `aligned()` and `RUN_CAP` talk about swings, grain and the
+Wedge bit, and `core/MODULE.md` describes its residents as primitives "with no domain concept of their
+own". **Only `grain()` is domain-free — and `grain()` is the only function `view/` calls.** The clean
+split is named in D0237 and deliberately not taken: the integer conversion is proven exact as a
+whole-file unit over 196,608 inputs, and splitting the file splits the proof for a mechanic nothing
+calls yet.
 
-### Ten fields were four kinds, and five of them were one argument
+### Right by coincidence is still wrong
 
-The ten private members the painters demand collapse to four kinds once sorted by *what supplies them*:
-a cosmetic clock, a camera rect, the palette, and UI-marker positions. That last group — `_guide_targets`,
-`_aim`, `_aim_in_reach`, `_ghost_def`, `_ghost_material` — all feed **one local variable** inside
-`sky_painter._stars`: `marks`, the positions where stars fade so a UI marker stays legible. The painter
-does not need to know a build ghost exists; it needs to know where not to put stars. Passing `marks`
-severs its only route to the dead economy, because `_ghost_def` is a `MachineDef`.
+My first draft of the coordinator had a `view → sim` edge — `Heightfield.TERRAIN_CELL_PX`, to convert
+pixels to cells. The obvious repair was to re-declare the cell size in `view/`, and
+`view/visuals/material_look.gd` **already carries `CELLS_PER_METRE = 4`** — a *different* quantity
+(cells per metre, not pixels per cell) that happens to share the value at 16px/m. Copying it would have
+worked, forever, until the world scale changed. The real fix put the conversion in
+`Interface.Envelope.covering()`, where the constant legitimately lives and `view/` never learns it.
 
-**The lesson generalises past this file:** a reach-in count is an upper bound on a contract's width, not
-its width. Sort by supplier before designing anything against the raw list.
+### The gate cannot see a `view/ → tests/` dependency
 
-### A missing door is not a missing capability
+`Frame.look` is typed `MaterialLook`, which lived in `tests/body/`. Because `class_name` is
+path-independent, a shipped renderer could have depended on a test file **forever** with the layer lint
+silent throughout — `tests` is in its `UNPOLICED` set and its class map is built "from the policed tree
+only". That is why the file was physically moved rather than merely referenced. Same shape as the
+`view → data` edge now flagged in P013: the lint is silent in *both* directions, which is the worst
+place for a rule to live.
 
-`terrain_painter` wants the wall plane and a per-column surface, and neither is in `Observation`. But
-`TileGrid.get_wall` already holds the plane the lode migration put ore into, and
-`sim/body/heightfield.gd` already derives the surface. Both take a `TileGrid`, which `view/` may not
-touch. **So two gaps that looked like two design problems are one ruling about one door.** I had written
-them up as separate gaps and corrected it before this reached you rather than after.
+### My own new test asserted something vacuous, and passed
 
-### The first painter trips the boundary the lint just learned to see
-
-`sky_painter` calls `Seams.grain` five times, and we put `Seams` in `sim/world/` last round (D0227).
-`view` may reference only `{interface, core}`. **P008 predicted the first real outgoing `view/` edge would
-be the fixed lint's first genuine test — it arrives on file one**, earlier than that entry expected.
-`Seams` is measurably `core/`-shaped: zero project dependencies, and its only consumer is its own test.
-Moving it is near-free *right now*, purely because last round's lifts landed unused.
-
----
-
-## Gates — and PR #6 is parked, blocked on gate 7 alone
-
-**Authorship passes; all 15 structural checks pass locally; the PR is held by `check_loc_ratio` and
-nothing else.** Parked per your brief rather than forced, squashed or merged past protection. P012.
-
-**The PR adds zero instrument lines and zero game lines** — `git diff --stat main..HEAD` touches only
-`.github/` and five files in `docs/`. It is red because **gate 7's window is ten COMMITS**, and four
-docs-only commits evicted last round's `+685` game lift (`33d5109`) out the far end, leaving instrument
-growth against **zero** game growth in view. (`python3 tools/layer_lint/check_loc_ratio.py` for the
-current pair — amending a single commit moved it from `+344/+2` to `+326/+0` with no code changing
-anywhere, which is the same point one level down.)
-
-**The general form matters more than this PR.** A commit-count window means **writing documentation
-degrades the LOC ratio** — not by adding instrument, but by pushing game work out of sight. A ledger
-entry, a brief regeneration and a `NEEDS_DIRECTOR` update each spend a slot, and this project documents
-heavily on purpose. Any run ending in several docs commits tends to close red regardless of what it
-built. If you want a remedy, the faithful one is counting only commits that touched *either* population.
-
-**What I did not do:** squash the four commits to move the window. It goes green, the LOC reality is
-identical, and that is gaming a measurement rather than answering it.
-
-**And Phase 1 should improve it.** The entire current renderer lives in `tests/body/` — an *instrument*
-directory — while `view/` is a *game* directory. Moving `material_look.gd` and `mining_overlay.gd` into
-`view/` moves lines off the numerator and onto the denominator at once. Both files already declare that
-move in their own headers, written by earlier sessions anticipating this rebuild.
-
-**And one gate was genuinely broken, in a way that would have bitten you and not me.** All 15 gates
-passed locally; CI failed gate 23. The `gates` job checks out GitHub's synthetic merge commit, **which is
-committed at the moment CI runs** — so `check_working_freshness` compared a `WORKING.md` written this
-evening against a HEAD dated the next day, the run having crossed midnight UTC. The midnight case is the
-mild one: because that commit is re-dated on every run, **an open PR's gates job goes red with nobody
-having touched it.** Pinned to the PR head, exactly as `authorship` already was — D0231's root cause
-found in a second gate (D0235). I did not bump the date to go green; that would have left the defect and
-written a date wrong in the frame every other doc in the tree uses.
-
-**One thing that felt wrong even though it passed.** `tools/check_trailers.sh` fails *locally* on
-`refs/t3/checkpoints/*` — session-checkpoint refs the background-job harness writes under a `t3code@`
-identity. They are local-only, on no branch, never pushed, and **CI's authorship check passed**, verified
-on this PR rather than assumed. But it is D0231's shape again: the gate reads `git log --all`, which
-includes refs that are not the project's history. Left untouched — deleting refs the tooling created is
-not mine to do — and worth a ruling before a future session sees authorship red and "fixes" it.
+`test_world_view` first checked that the observation window was "non-empty". It **passed** — over a 4×4
+window that was *entirely* `WINDOW_MARGIN_CELLS`, because a Godot node is not really in the tree until a
+process frame has passed, so `get_viewport()` returned null and the camera rect was zero. An assertion
+about having seen a viewport, passing on having seen no viewport. Now it asserts the window is wider
+than its own margin (324×184 over a real 1280×720), with the camera rect as a control.
 
 ## The decisions this round is waiting on
 
-**`docs/NEEDS_DIRECTOR.md`, 7 items. P011 is the one blocking live work** — everything else is parked by
-choice, this one has a run stopped behind it.
+**`docs/NEEDS_DIRECTOR.md`, 9 items.** P011 is closed and deleted — your five rulings are applied.
 
-- **P011 · the contract, five questions.** (1) the `Frame` shape and the explicit-`CanvasItem`
-  convention; (2) the two L2 doors; (3) `Seams` to `core/`; (4) **Phase 2's real scope — the one that
-  resizes the run**; (5) whether a game starting underground wants a day/night clock at all.
-- **P010 — still read this before your next merge.** Rebase only.
-- **P008/P009, P001/P004/P007** unchanged: the sibling-reach-in convention, `light_layer`'s contradiction,
-  the fuzz ratchet, the fuzzer's world, the determinism running hash.
+- **The Phase-1 ◆ itself.** Review the skeleton and the split boundaries; Phase 2 (`sky_painter`) is
+  ready to start on your word.
+- **P013 — `view/` reads `data/`** for the palette. §3's table grants that only to `shell`, and the lint
+  cannot see the edge either way. One sentence, and it arrives twice more in Phase 2.
+- **P014 — `core/MODULE.md` is at exactly its 100-line cap.** Two of your rulings collided: P006 set the
+  cap when the file was at 98, and Q3 put a fifth class in `core/`. Resolved by writing less, with no
+  duplication left to reclaim — the next class added to `core/` forces the number open.
+- **P012 — PR #6 still parked on gate 7.** Unchanged.
+- **P001, P004, P007, P008, P009, P010** unchanged.
 
-Carried, unchanged: **`grounded_no_floor`'s residual** (46); **Slice 1.5's bite radius**,
-`docs/TASTE_QUEUE.md` T004; **the body/world proportion**; the **persistent-world GDD reversal** whose
-text exists only in pre-compaction history.
+## Anything that felt wrong even though it passed
+
+**A ledger-number collision happened and nothing detected it.** A second session committed **D0239** to
+this branch mid-run — the trailer gate counting identities over a wider ref set than it scanned, which
+also fixes the local-red flagged in the previous brief. **The director confirms this was deliberate and
+a one-off, so it is not a standing hazard and needs no protocol change.** Earlier claim keeps the
+address; the Phase-1 entry is **D0240**, with every citation moved.
+
+The mechanical lesson is the part that outlives the incident: **two entries can hold one number and no
+gate says so.** `docs/DECISIONS_LEDGER.md` is append-only prose, the commit-msg hook checks that an
+entry *exists* rather than that its number is unused, and both commits were green. It was caught by
+reading `git log` after committing, which is luck rather than method. A duplicate-number check is a
+handful of lines if a second writer is ever expected again.
 
 ## Blocked, and what it's waiting on
 
-- **The coordinator rebuild is stopped at its first gate, by design.** Phases 1-3 are ready to start the
-  moment P011 is ruled on. This is still the keystone and still the only route to changing how the game
-  looks — but the reachable half of it is smaller than the brief assumed, and that is question 4.
-- **`data/economy/` D1-D6**, **line of sight**, the **`ValueNoise` float gap** (D0171/D0172), **three GDD
-  contradictions** (D0177), **`history/`'s 168-image cull** — all unchanged, all yours.
+- **Phase 2 is `sky_painter` then `terrain_painter`, and then dry.** `water_view`, `rope_view` and
+  `falling_items` need `sim/fluid`, `sim/transport` and `sim/items` — still zero lines of code.
+- **`data/economy/` D1-D6**, **line of sight**, the **`ValueNoise` float gap**, **three GDD
+  contradictions**, **`history/`'s 168-image cull** — all unchanged, all yours.
 
 ## Taste queue
 
-**4 open**, unchanged. T001 (`ore_copper` reads silver), T002 (band tint at 0.10), T003 (mining times),
-T004 (the bite radius).
+**4 open**, unchanged. T001, T002, T003, T004.
