@@ -439,3 +439,45 @@ jump rather than as a bump.
 
 I did not pick. (a) is cheap mechanically and changes what every existing capture, recording and spawn-row
 derivation means, which is exactly the kind of change that is yours.
+
+---
+
+## P018 · Gate 7 now blocks the documentation of its own resolution, and this time it is right
+
+**Status:** open, BLOCKING PR #9 (documentation only) · **Cost to apply:** a ruling, or game work ·
+**Raised by:** this session, 2026-08-30 (D0250)
+
+P012 is closed — the arc merged, gate 7 passed on it at `+742 instrument / +717 game`. **The very next
+commit, which is pure documentation, fails it at `+756 / +348`.** Reproduced locally, not just in CI.
+
+**Why, mechanically.** The window is the last **10 commits**. A docs-only commit adds nothing to either
+side but still slides the window by one, and `22a6fdc` (the coordinator skeleton) fell off the end. The
+game baseline jumped 3857 → 4226 while the instrument baseline barely moved, so the same tree reads as a
+different verdict. **A commit that changes neither number can flip this gate**, which is the same property
+P012 documented — a verdict that depends on where the window happens to land.
+
+**But the number it is now reporting is TRUE, and that is the difference from P012.** Over those ten
+commits I really did write **756 lines of instrument against 348 of game**: the empty-population guard
+(D0245), the headed-boot check (D0248), and the argument tests. `docs/CLAIMS.md`'s rule — *"the next unit
+of work is game, not another check"* — is a fair description of this run. P012's block was an artifact;
+this one is a diagnosis, and it happens to be pointing at exactly what the ◆ is holding.
+
+**What is actually blocked is small and inert:** four documentation files recording the merge, closing
+P012, and carrying D0248/D0249/D0250. No code. Per the run brief's standing rule it is parked rather than
+forced, worked around, or merged past protection — the same treatment P012 got.
+
+**What you might rule:**
+
+(a) **Do the game work and the block dissolves on its own.** P015 and P017 are both game-side and both
+   yours; ruling either produces `view/`-or-`sim/`-side lines that put the window back in balance. This is
+   the option the gate is asking for and needs no change to it.
+(b) **Exempt documentation-only commits from sliding the window** — count the window over the last 10
+   commits *that touched either population*. One-line change, and it removes a whole class of verdicts
+   that depend on nothing the author did.
+(c) **Merge #9 with an admin override.** Listed for completeness and not recommended: it is the exact
+   move your own rule forbids, and the entry you would be landing is the one that says the rule was
+   honoured.
+
+I recommend (b) regardless of (a), because the property will recur every time documentation lands after
+an instrument-heavy stretch — and (b) does not weaken the gate. It still fails when instrument really has
+outgrown game; it simply stops changing its mind about a tree nobody edited.
