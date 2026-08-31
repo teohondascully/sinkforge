@@ -9838,3 +9838,48 @@ mixes a correctness fix into a live ruling. Recorded now, fixed deliberately.
 **Reverse cost: cheap** when applied -- the filter is written and tested in `gd_scan.py`.
 
 **Found by the same external audit as D0241**, verified by mutation test.
+
+---
+
+## D0243 · P013 ruled: `data` becomes a modelled layer, because a ruling needs an edge to be enforced on · 2026-08-30
+**Decided:** per the director's P013 ruling, `view/` may read appearance data from `data/`.
+`docs/ARCHITECTURE.md` §3's table is amended, `docs/adr/0008-data-is-a-modelled-layer.md` records it
+(§3's own header requires an ADR for changes to it), and **the lint now evaluates the edge** rather than
+having no opinion about it.
+
+**The ruling could not have been enforced by the gate that exists to enforce it.** `data` sat in
+`layer_lint.py`'s `UNPOLICED` set, so `layer_of()` returned `None` for every file under it and no edge to
+a generated record was ever built. **That is not permission -- it is silence.** The gate printed the same
+PASS whether `view -> data` existed or not, which is the vacuous shape this file's own D0224 is about,
+found in a second place. So the edge is MODELLED first and GRANTED second, in that order.
+
+**`ALLOWED["data"] = set()` is the load-bearing line, not the grant.** A leaf cannot launder a
+dependency, so `view -> data` provably cannot become a route to `sim`. Enforced, not observed: a planted
+`data -> sim` reference fails with `layer 'data' may not depend on layer 'sim' (allowed: nothing)`.
+Without that line, granting `view -> data` would open a route to anything a data file later imported,
+and "view cannot reach sim through data" would be prose.
+
+**Enforcing it revealed that `sim -> data` was equally invisible.** `WorldMaterials` reads
+`MaterialsRecords` and `StrataData` reads `StrataRecords` -- two shipped, documented edges (both
+MODULE.md files, ADR 0004) that the table never contained. **Granting only `view` and switching
+enforcement on would have turned them red**, which is exactly what adding one line and shipping would
+have done. Measured before touching anything: 2 `sim -> data` edges, 2 `view -> data` edges, and `data`
+itself referencing nothing outside its own files.
+
+**Mutation-tested four ways, and the first is the one usually skipped.** REVOKING the grant makes the
+real `material_look.gd` edges FAIL -- which proves the grant is doing work, where "it passes" alone
+would be equally true of an edge that is simply ignored. Then: an illegal `view -> sim` edge fails, the
+`data -> sim` laundering plant fails, and an `interface -> data` plant fails (the grant is per-layer, not
+a blanket "data is readable by anyone"). The last three are permanent branches in
+`tools/layer_lint/test_layer_lint.py`, now 11/11.
+
+**And my own exit codes were meaningless for three of them until I re-ran without a pipe.** I read
+`python3 layer_lint.py | tail -3; echo $?` and got `exit=0` on runs that had genuinely failed -- `$?` is
+`tail`'s. The FAIL text was real and the codes were not; CI gates on the code. Re-measured bare: 1 on
+violation, 0 clean. This is the same shape as the `| grep -q` SIGPIPE finding already in this ledger,
+and it cost nothing here only because the printed text disagreed with the number loudly enough to notice.
+
+**What is NOT enforceable, stated where the ruling is.** The ruling says *appearance* data.
+`MaterialsRecords` carries `base_color` and `hardness` in one record, so no class-granularity rule
+separates "view reads colours" from "view reads hardness". §3 carries that as a convention and says so.
+The lint guarantees containment, not intent.

@@ -43,9 +43,12 @@ CLEAN = {
     "interface/interface.gd": (
         "class_name Interface\nextends RefCounted\n\n"
         "func observe(body: Body) -> int:\n\treturn 1 if body else 0\n"),
+    "data/materials/generated.gd": (
+        "class_name MaterialsRecords\nextends RefCounted\n\nconst RECORDS: Dictionary = {}\n"),
     "view/hud.gd": (
         "class_name Hud\nextends RefCounted\n\n"
-        "func draw_from(door: Interface) -> void:\n\tprint(door)\n"),
+        "func draw_from(door: Interface) -> void:\n"
+        "\tprint(door, MaterialsRecords.RECORDS)\n"),
 }
 
 
@@ -122,6 +125,35 @@ def main() -> int:
                     "class_name TileGrid\nextends RefCounted\n\n"
                     "var width: int = Fx.SCALE\n"),
           0, "PASS")
+
+    # ---- P013 (D0243): `data` is a MODELLED layer now. It used to sit in UNPOLICED, where the lint
+    # could neither permit nor refuse an edge to it -- the vacuous state a ruling cannot be enforced in.
+
+    check("a legal view -> data appearance edge passes (the palette a renderer must be able to read)",
+          with_edit("view/hud.gd",
+                    "class_name Hud\nextends RefCounted\n\n"
+                    "func draw() -> Dictionary:\n\treturn MaterialsRecords.RECORDS\n"),
+          0, "PASS")
+
+    # THE LAUNDERING GUARD, and it is the reason `view -> data` is safe to grant at all. `data` is
+    # declared a leaf (`ALLOWED["data"] = set()`), so it cannot become a route from view to sim. Without
+    # this branch, "view cannot reach sim through data" would be a claim rather than a checked property.
+    check("PLANT: a data file referencing a sim class_name is CAUGHT (data is a leaf, so it cannot launder)",
+          with_edit("data/materials/generated.gd",
+                    "class_name MaterialsRecords\nextends RefCounted\n\n"
+                    "const RECORDS: Dictionary = {}\n"
+                    "static func rows(grid: TileGrid) -> int:\n\treturn grid.width\n"),
+          1, "layer 'data' may not depend on layer 'sim'")
+
+    # And the grant is PER-LAYER, not a blanket "data is readable by anyone". `interface` was not
+    # granted it, so it must still fail -- otherwise modelling the layer would have quietly opened it
+    # to every layer at once, which is a wider change than the one that was ruled.
+    check("PLANT: an interface file using a data class_name is CAUGHT (the grant is per-layer)",
+          with_edit("interface/interface.gd",
+                    "class_name Interface\nextends RefCounted\n\n"
+                    "func observe(body: Body) -> Dictionary:\n"
+                    "\treturn MaterialsRecords.RECORDS if body else {}\n"),
+          1, "layer 'interface' may not depend on layer 'data'")
 
     # THE ORIGINAL DEFECT, reproduced: globals exist, nothing references any of them, and the old gate
     # called that PASS. It must now be a control failure.

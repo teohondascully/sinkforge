@@ -17,14 +17,20 @@ around the envelope filter.
 
 `interface`, `core`.
 
-**And `data/`, in one narrow place, which this line did not previously admit.**
+**And `data`, for appearance** — ruled 2026-08-30, P013, D0243.
 `visuals/material_look.gd` reads `BandsRecords` and `MaterialsRecords` to turn a
-material id into a `Color`. `tools/layer_lint/layer_lint.py` does not police
-`data/` (it is in `UNPOLICED`), so this edge is invisible to the gate rather
-than permitted by it. It is content, not sim state -- a static palette table,
-read cosmetically, with no route back to a mutator -- so it does not weaken the
-envelope. Flagged for a ruling in `docs/NEEDS_DIRECTOR.md` P013 rather than
-quietly adopted, because `docs/ARCHITECTURE.md` §3's table does not grant it.
+material id into a `Color`, and `docs/ARCHITECTURE.md` §3 now grants that edge.
+
+It is **enforced**, not merely permitted: `data` used to sit in the lint's
+`UNPOLICED` set, where an edge to it could be neither allowed nor refused. It is
+a modelled layer now, declared to depend on nothing, which is what makes this
+grant safe — a leaf cannot launder `view -> sim`. A planted `data -> sim`
+reference fails the gate, and so does a `data` reference from `interface`, since
+the grant is per-layer rather than blanket.
+
+The lint cannot tell *appearance* data from the rest: `MaterialsRecords` carries
+`base_color` and `hardness` in one record. Reading colours here and leaving
+hardness to `sim` is a convention, not a check.
 
 ## Must-not
 

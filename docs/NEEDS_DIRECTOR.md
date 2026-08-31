@@ -17,7 +17,7 @@ one — D0225), P005 (the unblocked lifts landed and the batch is genuinely dry 
 MODULE.md cap is 100 and enforced — D0226), and P007's two free sub-items (D0229, D0230). Their entries
 are deleted per the rule above; the ledger carries the rulings.
 
-**Closed 2026-08-30 by the coordinator rebuild, ruled and applied:** P011 (the painter contract — all five questions answered; `Seams` to `core/` is D0237, the two L2 doors are D0238, the skeleton is D0240, Phase 2 is confirmed as `sky_painter` + `terrain_painter`, and the day/night clock is pinned).
+**Closed 2026-08-30 by the coordinator rebuild, ruled and applied:** P011 (the painter contract — all five questions answered; `Seams` to `core/` is D0237, the two L2 doors are D0238, the skeleton is D0240, Phase 2 is confirmed as `sky_painter` + `terrain_painter`, and the day/night clock is pinned). **P013** (view/ may read appearance data; `data` is a modelled layer now and the edge is enforced with a laundering guard rather than merely permitted — D0243).
 
 ---
 
@@ -322,34 +322,7 @@ LOC reality would be identical, and that is gaming a measurement rather than ans
 ref itself. Gate 7 went red as the commit count grew, not because of the pin — the first CI run on this
 branch passed structural gates at one commit.
 
----
-
-## P013 · `view/` reads `data/`, which the layer table does not grant and the lint cannot see
-
-**Status:** open · **Cost to apply:** one sentence in `docs/ARCHITECTURE.md` §3 · **Raised by:** this
-session, 2026-08-30 (D0240)
-
-`view/visuals/material_look.gd` reads `BandsRecords` and `MaterialsRecords` to turn a material id into
-a `Color`. It did this before it moved into `view/` and the move made the edge a `view -> data` one.
-
-**`docs/ARCHITECTURE.md` §3's table gives `view` exactly `{interface, core}`.** `shell` is the only
-layer granted `data`. So this edge is not permitted by the table — and it is not *forbidden* by the gate
-either, because `tools/layer_lint/layer_lint.py` lists `data` in `UNPOLICED` and never builds an edge
-for it. The gate is silent in both directions, which is the worst place for a rule to live.
-
-**My reading, offered rather than assumed.** It is content, not sim state: a static palette table, read
-cosmetically, with no route back to a mutator, so it cannot weaken the envelope the way a `view -> sim`
-edge would. A renderer that may not read material colours has to receive them through `Observation`
-instead, which would put authored art data inside the L2 door for no protection in return.
-
-**Two ways to answer.** Grant `view` the `data` dependency in §3's table (and say why it is safe, so the
-next reader does not have to re-derive it). Or rule that appearance data must arrive through
-`interface`, in which case `MaterialLook` needs rethinking before any painter lands on it.
-
-The same question is one step from arriving twice more: `terrain_painter` needs the same palette, and
-`art.gd` reads `res://assets/`.
-
----
+--
 
 ## P014 · `core/MODULE.md` is at exactly its 100-line cap, so the next class added to `core/` is blocked
 
