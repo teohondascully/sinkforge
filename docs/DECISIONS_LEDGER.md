@@ -9469,8 +9469,11 @@ allows, and then the batch is dry for the same reason the last one was: missing 
 
 **Two gaps in `observe()`, and one is a trap.** `terrain_painter`'s 8 sim demands: 3 map cleanly
 (`is_solid`/`material_at`/`solid` -> `solid_at`/`material_at`), 2 are absent from this build (`ramp_dir`,
-`deposits`), and 2 are real gaps -- `surface_row`, and `wall`, whose data EXISTS (`TileGrid.get_wall`,
-where the lode migration put ore) with no door through L2. The trap is the eighth: `in_bounds` is not
+`deposits`), and 2 are real gaps -- `wall` and `surface_row`. Both are the SAME gap and neither is a
+missing computation: `TileGrid.get_wall` holds the wall plane the lode migration put ore into, and
+`sim/body/heightfield.gd` derives a per-column surface. Both take a `TileGrid`, which `view/` may not
+touch, so what is missing in both cases is a DOOR through L2, not a calculation. The trap is the eighth:
+`in_bounds` is not
 `in_window`. One asks whether a cell is in the world, the other whether the caller was given it, and
 `interface.gd` deliberately returns `&""` rather than "unknown" outside the window. A painter that swaps
 them draws a wall where the viewport stops.

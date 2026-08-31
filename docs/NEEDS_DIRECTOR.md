@@ -280,10 +280,12 @@ is the stop. Read that document; this entry is the index to what it asks.
 
 1. **The `Frame` contract** (§2), and specifically that painters take an explicit `ci: CanvasItem` rather
    than drawing through the coordinator. Legacy has both conventions; the rebuild must pick one.
-2. **The wall plane in `Observation`** (§3a). The data exists — `TileGrid.get_wall`, where the lode
-   migration put ore — and has no door through L2. Adding `walls`/`wall_legend` mirrors the existing
-   `materials`/`legend` pair in ~15 lines but widens an ADR-gated surface. Without it `terrain_painter`
-   cannot draw the back wall, which is much of what makes legacy's rooms read as rooms.
+2. **Two missing doors through L2** (§3a): the wall plane and the per-column surface. Neither is a
+   missing computation — `TileGrid.get_wall` holds the plane the lode migration put ore into, and
+   `sim/body/heightfield.gd` derives the surface — but both take a `TileGrid`, which `view/` may not
+   touch. Adding `walls`/`wall_legend` mirrors the existing `materials`/`legend` pair in ~15 lines and
+   widens an ADR-gated surface. Without the wall door `terrain_painter` cannot draw the back wall, which
+   is much of what makes legacy's rooms read as rooms rather than holes in a sheet.
 3. **`Seams` to `core/`** (§4). `sky_painter` calls `Seams.grain` and `Seams` is in `sim/world/`, so the
    first painter lifted is a `view → sim` violation the newly-fixed lint will catch. `Seams` has zero
    project dependencies and one consumer (its own test), so the move is near-free *now*.
