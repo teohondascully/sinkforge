@@ -10401,3 +10401,67 @@ metres, making the body 2x faster and 2x heavier in metres than legacy's.
 written; `Interface.observe()` never touches `_mining` so every mining-feedback row is blocked on one
 door; and `world_seed` is not on the `Observation`, so `core/seams.gd` — ported, integer-exact over all
 196,608 inputs, and called by nothing — stays inert.
+
+## D0254 · The noise seed was truncated to 16 bits: 65,536 worlds, not 2^64 · 2026-08-31 · WG-1
+
+`sim/terrain_gen/value_noise.gd`. `_lattice_hash` folded the seed in as `(seed & 0xFFFF) * 2246822519`.
+A 16-bit mask on a coordinate is headroom; on a seed it is truncation. **Every pair of seeds congruent
+mod 65,536 generated a bit-identical world**, and `core/split_rng.gd` hands out full 64-bit values, so 48
+bits were being discarded before they reached a single cell.
+
+**Verified, not inferred.** `ValueNoise.sample(3.7, 11.3, s)` returned exactly `-0.0519986834` for
+`s = 1337`, `1337 + 2^16` and `1337 + 2^20`. After the fix those are `-0.4206`, `+0.1857`, `-0.1228`, and
+a fourth seed at `+2^32` — which the old code could not have distinguished from the base at all — gives
+`+0.0338`.
+
+**The fix is `_seed32`**, a four-step avalanche folding the full 64-bit seed into 32 bits.
+`(s & 0x7FFFFFFF) * 2246822519` is the widest multiply that provably fits signed 64-bit (4.83e18 against
+a 9.22e18 ceiling); masking to 32 instead gives 9.65e18 and wraps — still deterministic, but
+deterministic nonsense of the kind that surfaces later as an untraceable distribution defect. The
+reference script asserts that bound rather than assuming it. The `x`/`y` masks are NOT the same mistake
+and stay: a terrain coordinate is genuinely bounded at 48 x 1024.
+
+**Goldens regenerated from a from-scratch Python reference**, per the rule `tests/test_value_noise.gd`'s
+own header already states — not read back out of the code under test. Every `seed: 0` golden is
+**unchanged**, which is the evidence the change is surgical: `_seed32(0) == 0`, so only the seed path
+moved.
+
+**THE GUARD THAT WAS MISSING, and why it was missing.** `_test_different_seeds_diverge` compares seeds
+**1 and 2** — differing in their lowest bits, where the defect never lived. A divergence check is only as
+wide as the bits it actually moves, and this one moved the one bit that could not fail. The new
+`_test_high_seed_bits_reach_the_field` walks offsets `2^16` (the old mask boundary), `2^20` and `2^32`
+(which also exercises the `seed >> 32` fold), and asserts the four results are **pairwise distinct** —
+the weaker each-differs-from-the-base form passes on a hash that maps every offset to one other value.
+Mutation-tested: restoring the mask makes it report **1 distinct value from 4 seeds**.
+
+**A SECOND, OLDER BUG THE RESEEDING EXPOSED.** `test_shaft_generator`'s
+`_test_glimmer_never_appears_at_or_below_topsoil_end` went red with 2 violations. `_grow_vein` carried a
+`min_row` floor and **no ceiling**, while `_scatter_reveal_material` bounds only where a vein is SEEDED
+(`cy` in `[0, topsoil_end - 1]`) and not where it GROWS — so a vein seeded on the last topsoil row
+accretes straight through the boundary, `hardrock` being in `_HOST_ROCK` and waving it past. Fixed with a
+symmetric exclusive `max_row`.
+
+That bug was always there. The old 16-bit field simply never seeded a glimmer vein close enough to the
+boundary to cross it, and the test had been green on that coincidence since it was written. **A
+fixed-seed generation test is a sample, not a proof** — and the sample it draws is chosen by the very
+hash this entry is about. Worth remembering the next time a generation assertion is green: it is green
+about one world.
+
+**What did NOT change.** The two-process replay property is intact and re-measured: two separately
+`OS.execute`d engines replaying the same seed produce bit-identical checkpoint hashes (first mismatch
+`-1`), and a different seed still diverges by checkpoint 0. `test_cave_geometry`, `test_bounds_invariant`,
+`test_body_acceptance`, `test_reachability_sweep` and `test_material_palette` all pass unchanged.
+
+**The golden checkpoint array is deliberately NOT regenerated in this commit.** It pins the generated
+world, so it must move — but `tests/test_shaft_replay_determinism.gd`'s own header records the rule
+(D0167/D0168): the array is captured from **CI's own pinned Linux build**, never from a local macOS run,
+because "a golden array captured on a different platform/architecture is exactly the" wrong thing. So
+this lands through a PR, the new hashes are read out of CI's own failure output, and a follow-up commit
+carries them. Regenerating locally would be the faster path and the wrong one.
+
+**Still open from WG-1's siblings** (`docs/LEGACY_GAP.md` Tier 0): WG-2 (shelf bands are impermeable —
+the calibrated field is hard-bounded to +/-0.574 against a 0.65 threshold), WG-3 (single-octave where
+legacy is 5-octave FBM), WG-4 (cell-denominated constants never converted, every feature 4x undersized).
+WG-2 and WG-3 interact — adding octaves changes the distribution shape and therefore the calibration —
+so they want one measured pass together, with a carve-fraction instrument built first. The instrument is
+the point: nothing in this repository measures carve fraction, which is why four defects sat green.

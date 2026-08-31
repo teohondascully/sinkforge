@@ -9,6 +9,7 @@ func _initialize() -> void:
 	_test_sample_stays_in_range()
 	_test_same_inputs_same_output()
 	_test_different_seeds_diverge()
+	_test_high_seed_bits_reach_the_field()
 	_test_calibrated_distribution_matches_fastnoiselite()
 	_finish("value_noise")
 
@@ -18,8 +19,8 @@ func _test_corner_hashes_match_reference() -> void:
 		{"x": 0, "y": 0, "seed": 0, "expected": 0},
 		{"x": 1, "y": 0, "seed": 0, "expected": 1447796004},
 		{"x": 0, "y": 1, "seed": 0, "expected": 4065948945},
-		{"x": 5, "y": 7, "seed": 42, "expected": 3568898538},
-		{"x": 47, "y": 1023, "seed": 20260826, "expected": 3929133372},
+		{"x": 5, "y": 7, "seed": 42, "expected": 446790201},
+		{"x": 47, "y": 1023, "seed": 20260826, "expected": 4098068227},
 	]
 	for c: Dictionary in cases:
 		var got: int = ValueNoise._lattice_hash(c["x"], c["y"], c["seed"])
@@ -34,10 +35,10 @@ func _test_sample_matches_reference() -> void:
 		{"seed": 0, "x": 100.05, "y": 500.9, "expected": -0.7996665834014892},
 		{"seed": 0, "x": 47.99, "y": 1023.01, "expected": -0.43441079387090215},
 		{"seed": 0, "x": 0.001, "y": 0.001, "expected": -0.9999923025406601},
-		{"seed": 42, "x": 0.0, "y": 0.0, "expected": -0.4941857176586487},
-		{"seed": 42, "x": 3.7, "y": 12.2, "expected": -0.588743680687817},
-		{"seed": 20260826, "x": 100.05, "y": 500.9, "expected": 0.5857218396852522},
-		{"seed": 20260826, "x": 47.99, "y": 1023.01, "expected": -0.6824269880668973},
+		{"seed": 42, "x": 0.0, "y": 0.0, "expected": -0.9061786811580366},
+		{"seed": 42, "x": 3.7, "y": 12.2, "expected": -0.43373889976460017},
+		{"seed": 20260826, "x": 100.05, "y": 500.9, "expected": -0.85649048485134},
+		{"seed": 20260826, "x": 47.99, "y": 1023.01, "expected": -0.9756363880094472},
 	]
 	for c: Dictionary in cases:
 		var got: float = ValueNoise.sample(c["x"], c["y"], c["seed"])
@@ -64,6 +65,32 @@ func _test_different_seeds_diverge() -> void:
 	var a: float = ValueNoise.sample(12.34, 56.78, 1)
 	var b: float = ValueNoise.sample(12.34, 56.78, 2)
 	_check(a != b, "different seeds sample differently at the same point")
+
+
+## THE GUARD THAT WAS MISSING (D0254). `_test_different_seeds_diverge` above compares seeds 1 and 2,
+## which differ in their LOWEST bits -- and the defect it failed to catch lived entirely in the HIGH
+## ones. `_lattice_hash` masked `seed & 0xFFFF`, so every pair of seeds congruent mod 65,536 generated a
+## bit-identical world, and a test that only ever varies the bottom bit of a seed can never observe that.
+## A divergence check is only as wide as the bits it actually moves.
+##
+## The offsets below are chosen to walk a bit up through the word rather than to be "big numbers":
+## 2^16 is the old mask boundary itself, 2^20 and 2^32 sit above it, and 2^32 additionally exercises the
+## `seed >> 32` fold that carries the high half of a 64-bit seed in at all. `SplitRng` supplies full
+## 64-bit seeds, so that half is real input, not a hypothetical.
+##
+## Asserted as PAIRWISE-DISTINCT over the whole set rather than each-differs-from-the-base, because the
+## weaker form passes on a hash that maps every offset seed to one single other value.
+func _test_high_seed_bits_reach_the_field() -> void:
+	var offsets: Array[int] = [0, 1 << 16, 1 << 20, 1 << 32]
+	var base: int = 1337
+	var seen: Dictionary = {}
+	for off: int in offsets:
+		var v: float = ValueNoise.sample(3.7, 11.3, base + off)
+		seen[v] = int(seen.get(v, 0)) + 1
+	_check_over(offsets.size(), seen.size() == offsets.size(),
+		"seeds differing only ABOVE bit 16 sample differently: %d distinct values from %d seeds "
+		% [seen.size(), offsets.size()]
+		+ "(before D0254 all four returned -0.0519986834, because the seed was masked to 16 bits)")
 
 
 ## D0045: `FASTNOISELITE_SD_CALIBRATION` exists so a threshold ported from a `FastNoiseLite`-tuned
