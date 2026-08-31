@@ -150,6 +150,9 @@ jobs:
       - name: Every scenario and harness layer names a claim (QUALITY gates 15-16)
         run: python3 tools/layer_lint/check_claim_references.py
 
+      - name: The CI check set has not SHRUNK (QUALITY gate 30, D0265/D0266)
+        run: python3 tools/layer_lint/check_ci_not_shrunk.py
+
       - name: Generated data/ records are fresh (QUALITY gate 22, ADR 0004)
         run: python3 tools/data_codegen/generate.py --check
 

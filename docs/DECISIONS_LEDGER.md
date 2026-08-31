@@ -10899,3 +10899,44 @@ mapping already yields independent state.
 `RevealSessionSetup.build` was SPLIT rather than duplicated: `build_on(grid)` is everything except
 generating, and `build` is now one line calling it. One definition of what a reveal session's starting
 state is, which is that file's stated reason to exist.
+
+## D0266 · A standing gate against "green by absence": the CI check set may not shrink · 2026-08-31 · QUALITY gate 30
+
+D0265 was a one-off catch by eye. This makes it mechanical.
+
+`tools/layer_lint/check_ci_not_shrunk.py` compares the job set and suite set of every workflow under
+`.github/workflows/` against the merge base. Removal FAILS. Addition passes. **A rename FAILS
+deliberately** — it is one removal plus one addition, indistinguishable from delete-plus-unrelated-add to
+anything but a human, and the cost of the gate being wrong in that direction is one line of marker.
+
+**The intent marker lives in the COMMIT MESSAGE, not in a file**, and that is the load-bearing design
+choice. A file-based allowlist sits in the same tree as the workflow, so the careless range-replace that
+deleted two jobs would have been just as capable of editing the allowlist — which would then agree with
+the deletion and report green. A commit message cannot be edited by a text-range bug in a YAML file.
+
+    CI-Check-Removed: <name> -- <why>
+
+**Scope stated honestly.** It compares NAMES. A job kept in name but gutted to `run: true` passes here,
+and this gate says so rather than implying more. `check_suite_coverage` covers the neighbouring property
+and demonstrably did NOT catch D0265: all 43 suites were still *named*, one of them inside the very job
+that had been deleted. Two gates over two properties, neither evidence for the other.
+
+Three exit codes, not two: 0 clean, 1 shrunk, **2 cannot-compare** (no merge base, no workflows,
+unparseable YAML). "I could not compare" must not look like "nothing was removed" — an empty population
+would otherwise make every set difference empty and the gate green forever.
+
+**Mutation-tested four ways**, then re-run after the file had to be rewritten: delete a job → exit 1;
+delete a suite → exit 1; add a job → exit 0; rename a job → exit 1. The marker was tested in both
+directions on a scratch branch — the same deletion passes with `CI-Check-Removed:` lines present and
+fails with them removed, which proves the escape hatch is real rather than decorative.
+
+**Also re-verified on request: D0262's exit-code detector.** A deliberately failing assertion injected
+into `test_fixed_point.gd` makes `run_suites.sh` exit 1 and report `0 passed, 1 failed`. On that same
+failing output, the old detector `grep -c 'ALL PASS'` returns **1** — the bug demonstrated live rather
+than described.
+
+**A cost worth recording.** While testing the marker on a scratch branch, `git add -A` swept up this
+gate's own then-untracked file, and `git branch -D` on that branch took it with it; a `git show` into the
+same path then truncated it to zero bytes, destroying the recovery target. Rewritten from scratch and
+re-verified. `untracking-is-deferred-deletion` has a sibling: an untracked file committed to a throwaway
+branch is a file that only exists on the branch you are about to delete.
