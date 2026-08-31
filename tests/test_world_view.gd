@@ -62,7 +62,13 @@ func _test_a_painter_gets_the_frame_and_its_own_canvas() -> void:
 	var layer: PaintLayer = view.add_painter(
 		func(f: Frame, ci: CanvasItem) -> void: seen.append([f, ci]))
 	view.refresh()
-	layer._draw()
+	# A REAL redraw pass, not a direct `layer._draw()` call. This suite's painter is a stub that draws
+	# nothing, so the direct call worked -- but Godot refuses `draw_*` outside the draw notification, and
+	# it refuses as an engine-level ERROR that neither stops execution nor changes the exit code. The
+	# first `test_sky_painter` reproduced exactly that with a painter that DOES draw: eight errors, and
+	# still "ALL PASS". Fixed here too so the idiom is not copied out of this file (D0244).
+	for _i: int in 3:
+		await process_frame
 	_check(seen.size() == 1, "the painter slot dispatched exactly once (got %d)" % seen.size())
 	_check(seen[0][0] == view.current_frame(),
 		"the painter is handed the coordinator's current frame, not a copy of it")

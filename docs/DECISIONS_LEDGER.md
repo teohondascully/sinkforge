@@ -9883,3 +9883,58 @@ and it cost nothing here only because the printed text disagreed with the number
 `MaterialsRecords` carries `base_color` and `hardness` in one record, so no class-granularity rule
 separates "view reads colours" from "view reads hardness". §3 carries that as a convention and says so.
 The lint guarantees containment, not intent.
+
+---
+
+## D0244 · sky_painter lifted and DRAWING, structurally clean and semantically unjudged · 2026-08-30
+**Decided:** `view/visuals/sky_painter.gd` lands as the first painter on the `Frame` contract, drawn
+through the real coordinator behind `reveal_scene`'s `--sky`. **It is parked at the ◆ for the director's
+eye.** This entry records that it draws and is layer-clean; it does NOT claim the sky reads right, which
+is not a thing a green can say.
+
+**Two adaptations, both derived rather than dialled.** Legacy authored the sky for a 32px cell against a
+surface 22 rows down. `SCALE = TERRAIN_CELL_PX / 32` shrinks every world-space length so the sky subtends
+the same fraction of a screenful of CELLS; `INV_SCALE` is its reciprocal, because a frequency is 1/length
+and multiplying it by `SCALE` would have stretched every ridge wavelength 64x instead of shrinking it 8x.
+`HORIZON_Y = 0` because this world's grid STARTS at the datum -- `data/bands/topsoil.yaml` is `from_m: 0`
+and `MaterialLook.depth_m(0)` is 0 -- where legacy's was `SURFACE_LINE(22) * CELL(32)`.
+
+**`view/` cannot see `TERRAIN_CELL_PX`, so `Interface` re-exports it.** A second declaration in `view/`
+was the obvious move and would have been wrong: `material_look.gd` already carries `CELLS_PER_METRE = 4`,
+a DIFFERENT quantity that shares the value at 16px/m, and reaching for it would have been correct by
+coincidence. One number, re-exported through the layer `view` is allowed to read.
+
+**THE FIRST CAPTURE LOOKED EXACTLY LIKE A PAINTER THAT HAD NOT RUN, and it had.** Flat grey above the
+terrain, 168 distinct colours, no error anywhere. `reveal_scene._draw()` opens with an OPAQUE 12000px
+`COLOR_BG` rect, so the sky was drawn at `z_index -100` and then completely covered. `z_index` was right
+the whole time. Found by looking at the image; no amount of reasoning about draw order would have got
+there, because the reasoning was correct. `--sky` now REPLACES that fill instead of layering under it.
+
+**My own smoke test printed eight engine errors and still said ALL PASS.** It called `layer._draw()`
+directly; Godot refuses `draw_*` outside the draw notification, and refuses as an engine-level `ERROR:`
+that neither halts execution nor changes the exit code. `tools/run_gd_test.sh` failed it anyway -- the
+D0149 masked-crash guard doing exactly its job, on a suite I had written to be careful. The fix is a real
+redraw pass with a counter incremented AFTER the call. **`tests/test_world_view.gd` had the same call**
+and passed only because its painter is a stub that draws nothing; fixed there too, so the idiom is not
+copied out of a green file.
+
+**The empty-state trap, posed for this painter specifically.** The rescale's characteristic failure is
+not a crash -- it is every star landing below the horizon and being culled, leaving `paint()` to run
+cleanly and draw nothing. So `visible_stars()` is public and the suite asserts the field is NON-EMPTY
+(42 of 42 survive) before asserting anything about it, then checks it SCATTERS: 14 distinct x-gaps, where
+legacy's original `i * 2654435761` gave exactly three -- a three-distance lattice reading as a comb.
+
+**Two seams left `reveal_scene.gd`, which was at 398/400 with nothing to spend.** `RevealArgs` (argument
+parsing, now a pure function of argv and therefore testable for the first time -- `test_reveal_args`
+covers the cells->pixels conversion that would fail quietly) and `RevealRecording` (the log writer, which
+is a file FORMAT and belongs beside the reader). 383 lines now, with real headroom rather than the
+exactly-at-the-cap shape `docs/QUALITY.md` §2 warns about.
+
+**Gate 7 direction: game LOC up.** `sky_painter` (341) and the `Interface` re-export are game; the two
+new suites and the two extracted `tests/body/` helpers are instrument.
+
+**What is NOT decided and is the whole point of the ◆:** whether it looks right. `DAYLIGHT`/`DAY_PHASE`
+are pinned at dusk with the moon mid-transit, chosen to put the MOST of the painter in one frame rather
+than because they read well; the ridges are proportionally close to legacy's but subtend a large angle in
+this world's tighter camera; and the Sinkforge anchor is legacy's scaled, pointing at a spawn plateau
+this build does not have. `docs/NEEDS_DIRECTOR.md` P015.

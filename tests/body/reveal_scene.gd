@@ -69,6 +69,8 @@ var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the 
 var _spawn_row: int = 0  ## the row the body started on -- `--mine-down`'s descent is measured against it
 var _fixed_camera: Vector2 = Vector2.ZERO  ## `--camera=col,row`, for comparable milestone frames
 var _has_fixed_camera: bool = false  ## a real bool, not a Vector2 compared against null (D0194's note)
+var _sky: bool = false  ## `--sky` (D0244): draw the lifted SkyPainter behind the world
+var _sky_view: WorldView = null  ## the real coordinator, so this proves the whole contract
 
 
 func _ready() -> void:
@@ -102,51 +104,49 @@ func _ready() -> void:
 		# actually looking at the captured image, not assumed correct from the math alone.
 		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
 		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
+	if _sky:
+		_build_sky()
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
 
 
-## Every `--flag` this scene takes. Split out of `_ready()` when the two together crossed QUALITY gate 4's
-## 50-line function limit; the flags kept growing and the setup did not.
+## `--sky` (D0244). Drives the lifted `SkyPainter` through the REAL coordinator rather than a hand-built
+## `Frame`, which is the whole point: `SkyPainter` reads nothing from `observe()`, so a shortcut frame
+## would have drawn the same picture while proving none of the contract. This way the shot is evidence
+## that observe() -> Frame -> painter -> canvas works end to end.
+##
+## `z_index` well behind everything: this scene paints terrain in its own `_draw` at the default 0.
+func _build_sky() -> void:
+	_sky_view = WorldView.new()
+	add_child(_sky_view)
+	_sky_view.setup(Interface.new(_grid, _body, _mining), _look, _camera)
+	_sky_view.add_painter(SkyPainter.paint).z_index = -100
+
+
+## Applies `RevealArgs.parse()` to this scene's fields, and returns the two the caller needs by name.
+##
+## PARSING left this file (D0244): it was 37 lines of non-scene work in a file at 398 against a 400 cap,
+## and it could not be tested where it was because it read `OS.get_cmdline_user_args()` directly.
+## Applying stays, because deciding what a flag DOES to a scene is scene work.
 func _parse_args() -> Dictionary:
-	var site_id: StringName = &"reveal_test_dense"
-	var seed_value: int = 20260826
-	for arg: String in OS.get_cmdline_user_args():
-		if arg.begins_with("--screenshot-tick="):
-			_screenshot_tick = int(arg.trim_prefix("--screenshot-tick="))
-		elif arg.begins_with("--screenshot-out="):
-			_screenshot_path = arg.trim_prefix("--screenshot-out=")
-		elif arg.begins_with("--site="):
-			site_id = StringName(arg.trim_prefix("--site="))
-		elif arg.begins_with("--seed="):
-			seed_value = int(arg.trim_prefix("--seed="))
-		elif arg.begins_with("--zoom="):
-			_camera_zoom = float(arg.trim_prefix("--zoom="))
-		elif arg.begins_with("--camera="):
-			# `--camera=col,row` pins the camera to a stated terrain cell and leaves it there. Milestone
-			# captures need a FIXED frame across commits -- a body-following camera makes two shots of the
-			# same world incomparable, which defeats the whole point of a before/after pair.
-			var parts: PackedStringArray = arg.trim_prefix("--camera=").split(",")
-			_fixed_camera = Vector2(float(parts[0]) * CELL, float(parts[1]) * CELL)
-			_has_fixed_camera = parts.size() == 2
-		elif arg.begins_with("--bite="):
-			# D0200 (Slice 1.5). The probe's own dial, and its own control: `--bite=0` is exactly the Slice 1
-			# single-cell blow, so a director sweeping this flag is running the experiment rather than
-			# reading a verdict on it.
-			_mining.bite_radius = int(arg.trim_prefix("--bite="))
-		elif arg == "--mine-down":
-			_mine_down = true  ## D0195: agent mode aims straight down and holds, so the mining verb has a
-			## deterministic, headless, reproducible proof that needs no human at the keyboard
-		elif arg == "--wide-view":
-			_wide_view = true  ## D0121: camera centers on the whole generated area (grid midpoint), not
-			## the body -- the body-following camera at zoom 6.0 shows ~28% of the topsoil band's own
-			## vertical extent in one frame, which is why the first density-contrast screenshots (D0109's
-			## round) read as nearly identical regardless of the real underlying count difference.
-	return {"site_id": site_id, "seed": seed_value}
+	var cfg: Dictionary = RevealArgs.parse(OS.get_cmdline_user_args())
+	_screenshot_tick = cfg["screenshot_tick"]
+	_screenshot_path = cfg["screenshot_path"]
+	_camera_zoom = cfg["camera_zoom"]
+	_fixed_camera = cfg["fixed_camera"]
+	_has_fixed_camera = cfg["has_fixed_camera"]
+	_mine_down = cfg["mine_down"]
+	_wide_view = cfg["wide_view"]
+	_sky = cfg["sky"]
+	if int(cfg["bite_radius"]) >= 0:
+		_mining.bite_radius = int(cfg["bite_radius"])
+	return {"site_id": cfg["site_id"], "seed": cfg["seed"]}
 
 
 func _physics_process(delta: float) -> void:
 	if _finished:
 		return
+	if _sky_view != null:
+		_sky_view.refresh()
 	_score.set_depth(DebugSceneCommon.depth_fraction(
 		Body._px_to_cell(_body.pos_y), _spawn_row, _grid.height), delta)
 	var input: InputFrame = _read_play_input() if _play_mode else _scripted_approach_input()
@@ -328,7 +328,12 @@ func _draw() -> void:
 	# its brightest channel -- and are far too bright to use as fills at full strength.
 	var band: Dictionary = _look.band_at(Body._px_to_cell(_body.pos_y))
 	var band_color: Color = Color(band["color"][0], band["color"][1], band["color"][2])
-	draw_rect(Rect2(-4000, -4000, 12000, 12000), COLOR_BG.lerp(band_color, BAND_TINT), true)
+	# `--sky` REPLACES this fill rather than layering under it (D0244). This rect is opaque and spans
+	# 12000px, so with the sky layer behind it the backdrop was drawn and then completely covered -- the
+	# first capture showed flat COLOR_BG above the terrain and looked exactly like a painter that had not
+	# run. Found by looking at the image, not by reasoning about z_index, which was correct all along.
+	if not _sky:
+		draw_rect(Rect2(-4000, -4000, 12000, 12000), COLOR_BG.lerp(band_color, BAND_TINT), true)
 	var view_center_col: int = Body._px_to_cell(_body.pos_x)
 	var col_lo: int = maxi(0, view_center_col - 60)
 	var col_hi: int = mini(_grid.width, view_center_col + 60)
@@ -375,24 +380,4 @@ func _notification(what: int) -> void:
 ## stored in the header comment (D0129) so `reveal_replay_driver.gd` can rebuild the exact grid a
 ## recording was played against; `play_scene.gd`'s own recordings need no such field.
 func _flush_recording() -> void:
-	if _recording.is_empty():
-		return
-	var dir_path: String = "res://tests/body/recordings"
-	if not DirAccess.dir_exists_absolute(dir_path):
-		DirAccess.make_dir_recursive_absolute(dir_path)
-	var prefix: String = "play" if _play_mode else "agent"
-	var stamp: String = Time.get_datetime_string_from_system(true).replace(":", "-")
-	var path: String = "%s/reveal_%s_%s.log" % [dir_path, prefix, stamp]
-	var f: FileAccess = FileAccess.open(path, FileAccess.WRITE)
-	if f == null:
-		push_error("reveal_scene: could not open %s for writing (%s)" % [path, error_string(FileAccess.get_open_error())])
-		return
-	# `bite=` is as load-bearing as `site=`/`seed=` (D0200): the same inputs at a different bite radius
-	# diverge on the first break, so a log that cannot restate it cannot be replayed as played.
-	f.store_line("# sinkforge reveal-scene input recording -- mode=%s ticks=%d site=%s seed=%d bite=%d" %
-		[prefix, _recording.size(), _site_id, _seed_value, _mining.bite_radius])
-	f.store_line(RevealReplayDriver.COLUMN_HEADER_V2)
-	for row: PackedStringArray in _recording:
-		f.store_line(",".join(row))
-	f.close()
-	print("reveal_scene: wrote %d ticks to %s" % [_recording.size(), path])
+	RevealRecording.write(_recording, _play_mode, _site_id, _seed_value, _mining.bite_radius)

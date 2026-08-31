@@ -373,6 +373,12 @@ jobs:
 
       - name: test_world_view (the coordinator skeleton — a painter gets its own canvas, D0240)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_world_view.gd
+
+      - name: test_sky_painter (the first painter — the starfield is non-empty and does not lattice, D0244)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_sky_painter.gd
+
+      - name: test_reveal_args (the scene's flags, parseable without launching a process — D0244)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_args.gd
       - name: test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_view_lifts.gd
       - name: test_settings (the split halves share one bindings map; persist=false writes nothing)

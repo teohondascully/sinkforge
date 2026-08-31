@@ -43,6 +43,16 @@ fi
 # scripted shaft sinks, so a pair shot at one fixed tick needs a tick BOTH radii actually reach -- and the
 # alternative (each half at its own tick) would compare two different moments and call it a before/after.
 TICKS="${TICKS:-}"
+# D0244. `SKY=1` draws the lifted SkyPainter behind the world and stamps `_sky` into every filename, so
+# the two halves of a backdrop before/after cannot be told apart only by which order they were taken in.
+# Same shape as BITE above, and for the same reason.
+SKY="${SKY:-}"
+SKY_ARG=""
+SKY_TAG=""
+if [ -n "$SKY" ]; then
+	SKY_ARG="--sky"
+	SKY_TAG="_sky"
+fi
 
 SHA="$(git rev-parse --short HEAD)"
 if ! git diff --quiet || ! git diff --cached --quiet; then
@@ -84,6 +94,11 @@ MOMENTS=(
 	"surface|--zoom=6.5 --camera=24,13|2"
 	"delve|--mine-down --zoom=6.5 --camera=24,17|216"
 	"aim|--mine-down --zoom=13.0 --camera=12,12|40"
+	# D0244. `horizon` frames the surface datum (row 0) about a third of the way down the frame, which is
+	# the only moment where the backdrop is visible at all -- `surface` at row 13 puts the horizon off the
+	# top edge. Captured in BOTH modes so `SKY=1` and the plain run are a true pair: same seed, same
+	# camera, same tick, and the backdrop the only difference.
+	"horizon|--zoom=6.5 --camera=24,4|2"
 )
 
 fail=0
@@ -107,10 +122,10 @@ for entry in "${MOMENTS[@]}"; do
 	if [ -n "$TICKS" ]; then
 		tick="$(printf '%s' "$TICKS" | cut -d, -f$((i + 1)))"
 	fi
-	png="$OUT_DIR/${SLICE}_${name}${BITE_TAG}_${SHA}.png"
+	png="$OUT_DIR/${SLICE}_${name}${BITE_TAG}${SKY_TAG}_${SHA}.png"
 	# shellcheck disable=SC2086
 	out="$("$GODOT" --resolution "$RES" --path . tests/body/reveal_scene.tscn -- \
-		--site="$SITE" --seed="$SEED" $args $BITE_ARG \
+		--site="$SITE" --seed="$SEED" $args $BITE_ARG $SKY_ARG \
 		--screenshot-tick="$tick" --screenshot-out="$png" 2>&1)"
 	if printf '%s\n' "$out" | grep -q "is blank or"; then
 		echo "capture_moments: FAIL - $name captured a blank frame; not counting it as a shot" >&2
