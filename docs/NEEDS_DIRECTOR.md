@@ -527,3 +527,37 @@ not in spelling, and the overnight queue reserves those for you.
 I would take (1): the 15% gap and the impermeable shelf are the same defect wearing two faces, and (2)
 fixes the face rather than the cause. But it re-rolls every fixture pinned to a generated world — this run
 has already re-pinned two of them (D0255, D0256) — so it is worth your explicit yes.
+
+## P021 · The 15% carve target survives the octave port, and closing it is a threshold move
+
+**P020 is DONE and this is what it did not fix.** Porting legacy's 5 octaves and re-deriving the
+calibration by measurement (D0258) made the shelf permeable — 0 → 15 cells of 97,920 — and moved overall
+carve **0.0358 → 0.0329**. It went slightly *down*, not up to legacy's stated "near 15% of the
+underground".
+
+**That is the correct outcome, and it means the 15% figure was never a noise-field problem.** The field
+now matches FastNoiseLite's crossing rates at legacy's own thresholds — 0.31 at 0.1157 vs 0.1214, 0.47 at
+0.0230 vs 0.0276, 0.65 at 0.0021 vs 0.0012. The field is right. So if legacy really carved 15%, the
+difference is in the thresholds, the depth lerp, or in what "15%" counted — cave carving alone, or cave
+plus ruins plus chambers plus entry shafts.
+
+**Three candidates, and I cannot pick between them without your ruling** because every one is a threshold
+move, which the queue reserves for you:
+
+1. **The thresholds are cell-denominated too (WG-4's sibling).** `threshold_top 0.47` / `threshold_deep
+   0.31` came over verbatim. If legacy's 15% was measured at one-cell-per-metre, our 4x-finer grid
+   changes what fraction those numbers select. This is the explanation I find most likely and it merges
+   with WG-4 rather than competing with it.
+2. **"Near 15%" counted more than cave carving.** Ruins, chambers and the entry shaft all excavate. If
+   legacy's figure was total void rather than cave void, 3.3% cave + everything else may already be it,
+   and there is nothing to fix.
+3. **The number is legacy's aspiration, not its measurement.** It appears in a comment. `range-read-as-
+   observations` applies: I have not found the measurement behind it in legacy's own source.
+
+**My recommendation: rule (2)/(3) first by measuring, not by moving thresholds.** Before touching a
+single constant, the cheap decision-free step is to instrument TOTAL void fraction (caves + ruins +
+chambers + shafts) and compare that against 15%. If it lands near 15%, this item closes with no threshold
+move at all. I will run that measurement in the decision-free lane and report it — but the *remedy*, if
+one is needed, is yours.
+
+**Nothing is blocked on this.** WG-2 and WG-3 are closed, PR #10 is unblocked on its merits.

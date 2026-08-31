@@ -30,20 +30,52 @@ extends RefCounted
 ## same cell always hashes the same way regardless of scan order). Verified against a from-scratch Python
 ## reference before this file was trusted -- see the commit message for how.
 
-## Multiply a raw `sample()` by this before comparing it against a threshold that was tuned against
+## Multiply a raw `sample_fbm()` by this before comparing it against a threshold that was tuned against
 ## `FastNoiseLite` (any `data/*.yaml` value ported from `legacy/`, which used
-## `FastNoiseLite.TYPE_SIMPLEX_SMOOTH` throughout) -- measured directly (D0045), not derived: pooled
-## 244,800 samples across 20 seeds at the real cave-carving frequency/x_stretch gave `FastNoiseLite`
-## SD ~0.2487, this file's own raw SD ~0.4336; 0.2487/0.4336 = 0.574. Deliberately NOT applied inside
-## `sample()` itself -- that would break every golden-vector assertion in `tests/test_value_noise.gd`
-## (bit-exact against a from-scratch Python reference of the RAW hash/interpolation math, unrelated to
-## this calibration), and would silently narrow this file's own real, wider distribution for any FUTURE
-## consumer that has no reason to want FastNoiseLite parity at all. A ratio, not a shape match: same
-## standard deviation does not guarantee identical skew/kurtosis between two differently-generated noise
-## fields, only that a fixed threshold clears at approximately the same rate, which is what a ported
-## threshold constant actually depends on. `tests/test_value_noise.gd`'s distribution test re-measures
-## this against real `FastNoiseLite` output so a hash or interpolation change that drifts it is caught.
-const FASTNOISELITE_SD_CALIBRATION: float = 0.574
+## `FastNoiseLite.TYPE_SIMPLEX_SMOOTH` throughout). Applied by callers, never inside the sampler itself:
+## baking it in would break every golden-vector assertion in `tests/test_value_noise.gd` (bit-exact
+## against a from-scratch Python reference of the RAW hash/interpolation math, unrelated to any
+## calibration) and would narrow this file's own real distribution for a future consumer with no reason
+## to want FastNoiseLite parity at all.
+##
+## **THE PREVIOUS VERSION OF THIS COMMENT NAMED ITS OWN DEFECT AND SHIPPED ANYWAY.** It said, correctly:
+## "same standard deviation does not guarantee identical skew/kurtosis between two differently-generated
+## noise fields, only that a fixed threshold clears at approximately the same rate". That word
+## *approximately* was carrying one third of every shaft. The crossing rates matched to three decimals in
+## the body of the distribution and to *nothing at all* in the tail, where the shelf thresholds live. A
+## caveat written in prose beside a constant does not constrain the constant; the test below now measures
+## the tail directly, which is what the prose should have been from the start.
+##
+## RE-DERIVED 2026-08-31 against `sample_fbm` (D0258, closes WG-2 and WG-3). Was 0.574, and that number
+## was never a guess -- D0045 measured it honestly. It calibrated the wrong field.
+##
+## The old constant matched STANDARD DEVIATION between single-octave `sample()` and `FastNoiseLite`. A
+## threshold does not read standard deviation, it reads the TAIL, and matching spread between two
+## differently-shaped distributions does not match their tails. Measured at the real cave-carving
+## frequency/x_stretch, 244,800 samples per field across 20 seeds, the calibrated single-octave field
+## cleared 0.31 at 0.1167 (against FastNoiseLite's 0.1164 -- an excellent match) while clearing 0.65 at
+## **0.0000** against FastNoiseLite's 0.0009. Same spread, one field with a tail and one without. The
+## shelf thresholds live entirely in that tail, which is why one third of every shaft was a wall.
+##
+## Five octaves fixes it at the source rather than by widening a constant until caves appear:
+##
+##   threshold   FastNoiseLite   fbm5 @ 0.9644   1-octave @ 0.5779
+##   0.31           0.1164          0.1107            0.1167
+##   0.47           0.0250          0.0252            0.0213
+##   0.65           0.0009          0.0015            0.0000
+##   0.81           0.0000          0.0000            0.0000
+##
+## Derived the same way the old one was, so the two are comparable: `FastNoiseLite` SD 0.2486 over this
+## file's own `sample_fbm` SD 0.2578 = 0.9644. It sits near 1.0 because a 5-octave sum of this file's
+## noise is already close to `FastNoiseLite`'s shape -- the constant is small now precisely BECAUSE the
+## field is right, and a calibration far from 1.0 should read as a warning that something upstream is
+## being compensated for rather than fixed.
+##
+## READ THE 0.81 ROW BEFORE "FIXING" THE SHELF FURTHER. FastNoiseLite clears it 0.0000 of the time too.
+## Legacy's shelf was never uniformly permeable: it is a GRADIENT, solid near the surface (threshold 0.81)
+## and breachable at depth (0.65). A shelf that carves at the open-rock rate is not a fixed shelf, it is
+## a deleted one. `tests/test_shaft_generator.gd`'s ratchet asserts the gradient, not equality.
+const FASTNOISELITE_SD_CALIBRATION: float = 0.9644
 
 
 ## The seed, avalanched into 32 bits. **This exists because the previous form TRUNCATED it** (D0254).
@@ -89,6 +121,61 @@ static func _corner_value(x: int, y: int, seed: int) -> float:
 
 static func _smooth(t: float) -> float:
 	return t * t * (3.0 - 2.0 * t)
+
+
+## `FastNoiseLite`'s own fBm defaults, ported (D0258, WG-3). Legacy NEVER SET THESE -- `layered_world_gen.gd`
+## configures only seed/type/frequency, so its cave field ran at Godot's defaults, and those defaults are
+## a 5-octave fractal. Confirmed by printing them rather than trusting the plan:
+## `FastNoiseLite.new()` reports `fractal_type = 1 (FRACTAL_FBM)`, `fractal_octaves = 5`,
+## `fractal_lacunarity = 2.0`, `fractal_gain = 0.5`. Corroborated twice inside legacy itself --
+## `src/core/fine_terrain.gd:102` and `scenes/fine_terrain.gd:488` both explicitly set `FRACTAL_NONE`
+## *because* the default is 5-octave FBM, which is only worth writing down if you know it bites.
+const FBM_OCTAVES: int = 5
+const FBM_LACUNARITY: float = 2.0
+const FBM_GAIN: float = 0.5
+
+
+## `FastNoiseLite::CalculateFractalBounding`, evaluated for the constants above rather than left as a
+## literal: `ampFractal = 1 + 0.5 + 0.25 + 0.125 + 0.0625 = 1.9375`, and the bounding is its reciprocal.
+## Derived at load, not written as 0.516129, because a hand-copied reciprocal is a constant nobody can
+## check against the octave count it belongs to -- change `FBM_OCTAVES` and this follows.
+static func _fractal_bounding() -> float:
+	var amp: float = absf(FBM_GAIN)
+	var amp_fractal: float = 1.0
+	for _i: int in range(1, FBM_OCTAVES):
+		amp_fractal += amp
+		amp *= absf(FBM_GAIN)
+	return 1.0 / amp_fractal
+
+
+## Five octaves of `sample()`, summed exactly the way `FastNoiseLite::GenFractalFBm` sums them.
+##
+## THIS IS THE PORT, AND `sample()` BELOW IS DELIBERATELY UNTOUCHED. `sample()`'s golden vectors in
+## `tests/test_value_noise.gd` are bit-exact against a from-scratch Python reference of the raw
+## hash-and-interpolate math; folding octaves into it would have destroyed that verification to gain
+## nothing, since the fractal is a *composition* of the primitive and not a change to it. One octave is
+## still a legitimate field for any future consumer that wants one.
+##
+## Faithful to `GenFractalFBm` in the three places it would be easy to get wrong:
+##   - the seed ADVANCES PER OCTAVE (`GenNoiseSingle(seed++, ...)`). Reusing one seed would stack five
+##     scaled copies of the SAME field, whose sum is that field again with a different amplitude -- it
+##     would look like a working port and produce a single-octave distribution.
+##   - amplitude starts at `_fractal_bounding()`, not at 1.0, which is what keeps the output in roughly
+##     the same range as one octave instead of 1.9375x wider.
+##   - `weighted_strength` is Godot's default 0, so FastNoiseLite's per-octave amplitude reweighting
+##     (`Lerp(1, min(noise+1, 2) * 0.5, weightedStrength)`) collapses to `Lerp(1, _, 0) == 1` and is
+##     omitted here rather than implemented as a no-op multiply.
+static func sample_fbm(x: float, y: float, seed: int) -> float:
+	var sum: float = 0.0
+	var amp: float = _fractal_bounding()
+	var fx: float = x
+	var fy: float = y
+	for i: int in FBM_OCTAVES:
+		sum += sample(fx, fy, seed + i) * amp
+		fx *= FBM_LACUNARITY
+		fy *= FBM_LACUNARITY
+		amp *= FBM_GAIN
+	return sum
 
 
 ## Sample the field at a continuous (x, y). Two lattice points passed the same (x, y, seed) always hash
