@@ -13,15 +13,61 @@ and three checks are required to merge. **Merge by REBASE, never merge-commit or
 those writes `noreply@github.com` permanently into `main` and the authorship gate then fails on every
 later commit, with no remedy short of a history rewrite. `docs/NEEDS_DIRECTOR.md` P010, D0231.
 
-**Reset this round:** the parked queue `docs/NEEDS_DIRECTOR.md` is at **9 items** — read it FIRST if you
-are the director picking this up. P011 is CLOSED (you ruled it); P013 and P014 are new and cheap.
+**Reset this round:** the parked queue `docs/NEEDS_DIRECTOR.md` is at **10 items** — read it FIRST if you
+are the director picking this up. P011 and P013 are CLOSED (you ruled both). **P015 is THE ◆** and is two
+images and your eye. P014 and P016 are each one number.
 
 **TWO PRs OPEN, STACKED.** #6 carries Phase 0 (the contract) and is parked on gate 7 alone — P012.
 #7 carries the prerequisites + Phase 1 and is branched off #6, so the ledger stays sequential.
 
-## STOPPED AT ◆ — Phase 1 delivered, awaiting your review (D0237, D0238, D0240)
+## STOPPED AT ◆ — sky_painter draws, and Bin A is exhausted (D0243–D0247)
 
-**The prerequisites landed and the skeleton is built. Phase 2 does not start until you look.**
+**The ◆ is P015 and it is your eye on two images.** `view/visuals/sky_painter.gd` is lifted, wired to the
+`Frame`, layer-clean, drawing, and milestone-captured — `docs/milestones/slice3_horizon_23b0ec4.png`
+(168 colours) against `docs/milestones/slice3_horizon_sky_23b0ec4.png` (199), four pairs in all, and
+`docs/MILESTONES.md` carries the row. What is NOT decided is whether it looks right;
+four look calls are itemised in P015 and none of them was tuned, only derived. **Phase 2
+(`terrain_painter`) does not start until you look.**
+
+**P013 ruled and ENFORCED, not just written down** (D0243). `view/` may read appearance data from `data/`,
+so `data` became a modelled layer rather than an unpoliced one — an unmodelled edge cannot be enforced,
+which is the vacuous-gate shape. Mutation-tested both directions: a legal `view→data` edge passes, a
+planted `view→sim` edge fails, and `data: set()` is the load-bearing line that stops `data` laundering a
+dependency. ADR 0008; the lint's own suite went 8 → 11 branches.
+
+**The recurring test-over-empty-state bug is now a caught class** (D0245). It had landed four times, each
+time in a test written by someone being careful. `TestBase.over()` / `_check_over()` refuse an assertion
+whose population is EMPTY even when the condition is true, and say VACUOUS rather than an ordinary red.
+Mutation-tested: disabling the count check turns the new suite red on 3 assertions and flips its
+deliberately-failing line to PASS. **14 call sites across 7 suites.** Two rules came out of the retrofit
+and live in the guard's docstring — only assertions that PASS on empty need it (`gaps.size() > 3` already
+fails, so wrapping it is decoration), and the population must be COUNTED in the loop, never computed as a
+product of constants.
+
+**It found a live one on its first outing.** The three fuzz suites gate on `counts[kind] == 0` and their
+only population guard was `summary_line != ""` — a PRESENCE check. A probe that simulated nothing still
+prints a summary line, so `total_ticks=0` passes it and satisfies every hard-zero beneath it. The full
+sweep now reads `over 1500000 item(s)` where it previously reported nothing at all.
+
+**And that made a second finding fall out** (D0247, P016). The sweep reports `grounded_no_floor=46`
+against a bound of **59**, and `bounds=1179015` against a recorded 805,397. **Measured twice,
+byte-identical** — so it is a stable count at a moved trajectory, not noise and not a determinism
+regression. Nothing is red, which is the point: 13 counts of slack is 13 counts of regression the gate
+will not catch. NOT ratcheted, because D0184 is your own ruling that 59 is provisional and moves for
+non-regression reasons; P016 has the three options. The `bounds` growth is reported as a number and NOT
+diagnosed — a plausible mechanism exists and asserting it without measuring is the move this ledger keeps
+correcting.
+
+**Bin A verification pass** (D0246): P014 confirmed (`core/MODULE.md` at exactly 100, cap enforced, zero
+headroom — and `check_size_limits.py`'s own header still claimed "98 … two lines", now fixed); refs/t3
+cleanup verified positively (0 t3 refs; the one identity separating `--all` from the scanned population is
+located, not assumed — `refs/tmp/pr6merge{,2}`); two stale `seams.gd` addresses in the migration map fixed
+after D0237 moved it to `core/`, and `sky_painter`'s "reads 8 private fields" caveat closed. One null
+result: the cold-read audit's `test_body_fuzz.gd` row was already fixed by D0150.
+
+## Also this run — Phase 1: the coordinator (D0237, D0238, D0240)
+
+**The prerequisites landed and the skeleton is built.**
 
 **P0a — `Seams` is in `core/`** (D0237). `view` may depend on `{interface, core}` and not `sim`, and
 `sky_painter` calls `Seams.grain()` five times. `class_name` is path-independent so `test_seams` passes
@@ -39,7 +85,7 @@ scanning past its own edge. ADR 0007 amended in place.
 `_physics_process` at 49/50 — its arg parsing, agent-drive modes and recording flush are ~120 lines of
 non-coordinator work and stayed put. `MaterialLook` moved `tests/body/` → `view/visuals/`.
 
-**Evidence:** 39/39 suites pass, determinism included. Layer lint **mutation-tested on `world_view.gd`
+**Evidence:** 42/42 suites pass as of `f38eb03`, determinism included. Layer lint **mutation-tested on `world_view.gd`
 itself** — a planted `TileGrid` ref fails with the exact message, removing it passes. **Gate 7 green and
 positive: instrument +60 against game +464** (3,762 → 4,226).
 

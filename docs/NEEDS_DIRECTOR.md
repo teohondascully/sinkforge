@@ -391,3 +391,46 @@ exists for:
 existing milestone shot, replay and suite was taken without it, and a backdrop appearing unasked would
 change what those captures mean. Turning it on by default is your call, and it is the difference between
 "the sky exists" and "the game has a sky".
+
+---
+
+## P016 · The fuzz bound is 13 above what the sweep now measures, and its sibling counter grew 46%
+
+**Status:** open · **Cost to apply:** a number, or a decision to leave it · **Raised by:** this session,
+2026-08-30 (D0247)
+
+Found while retrofitting the empty-population guard into the fuzz suites (D0245), not by looking for it.
+
+**Measured twice, byte-identical, both runs full 1000x1500 sweeps:**
+
+| | recorded | measured 2026-08-30 |
+|---|---|---|
+| `grounded_no_floor` | **59** — the `DESIGN_TRADEOFF` bound | **46** |
+| `bounds` (reported, not gated) | 805,397 | **1,179,015** |
+| `embedded` | 1 — the `RESIDUAL` bound | 0 |
+| `discontinuity` / `deadlock` / `overflow` | 0 | 0 |
+
+The 59 was calibrated in D0122/D0127/D0128 and appears as 59 in every prior record I can find
+(`docs/DECISIONS_LEDGER.md:5362`, `docs/archive/working/WORKING-2026-08-29.md:261`). Nothing is red: 46
+is under 59 and 0 is under 1, so the gate passes. **That is the point — a bound 13 above the measurement
+is 13 counts of regression it will not catch.**
+
+**Two things I did NOT do, and why.**
+
+I did not ratchet it to 46. D0184 is your own ruling that 59 is *"a cumulative-trajectory count at this
+seed ORDER, not an independent-trial resolver rate"* and *"provisional as a regression baseline pending
+fuzz restructure"* — a count conditioned on the trajectory can move for reasons that are not regressions,
+and tightening it would hand the next session a red CI over an unrelated game change. Ratcheting what
+shipping decided is usually right; ratcheting a number you explicitly labelled provisional is your call,
+not mine.
+
+I did not diagnose the `bounds` growth. A plausible mechanism is sitting right there — D0184 notes the
+1,000 seeds share ONE `TileGrid` built outside the seed loop, so more excavation over one cumulative
+trajectory means more ticks spent where the world used to be — and it is plausible enough that asserting
+it without measuring would be the exact move this project's ledger is full of corrections for. It is
+reported-not-gated, so nothing is blocked either way.
+
+**What you might rule:** (a) ratchet to 46 and accept occasional false reds, (b) leave 59 and record that
+it is now slack, (c) do the fuzz restructure D0184 deferred (decorrelate seeds from cumulative
+demolition), which makes the number mean what everyone reads it as meaning and is the only option that
+fixes the cause rather than the symptom. (c) is a real design cycle, not a Bin A task.
