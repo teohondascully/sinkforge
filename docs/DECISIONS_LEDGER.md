@@ -9436,3 +9436,57 @@ grep's 38. Adding `test_recorded_sessions` to CI in the same run made it **38 ag
 difference is still exactly `test_body_fuzz.gd`. Corrected in the ledger, the tool, `NEEDS_DIRECTOR` and
 `WORKING` -- a count is only true against the tree that produced it, and this one had a shelf life of
 about twenty minutes.
+
+---
+
+## D0234 · The painter reach-in is four kinds, not fourteen fields; and three painters are blocked on empty sim · 2026-08-30
+**Decided:** Phase 0 of the coordinator rebuild produces `docs/COORDINATOR_CONTRACT.md` -- a proposed
+`Frame` contract, the measured reach-in surface, and the `observe()` mapping -- and stops there for the
+director. Nothing is built. Five questions go to the ruling; the fourth changes the shape of the run.
+
+**The measurement, and the scanner defect found on the way.** The first scanner hardcoded the coordinator
+binding as `r|_r` and reported **0 private reach-in for `water_view`, `rope_view` and `machine_view`**.
+All three bind under `_wv`/`_wr`; the real counts are 2, 2 and 7. A scanner that cannot spell its
+subject's name returns a quiet green, so the rewritten version DERIVES each binding from the file's own
+`var x: WorldRenderer` and `WorldRenderer`-typed parameters, and prints the derived set per file as its
+positive control. 14 distinct private members across six painters, comments and strings blanked first.
+
+**The finding that shrinks the contract.** Sorting the ten members the brief's five painters demand by
+what SUPPLIES them collapses them to four kinds: a cosmetic clock, a camera rect, the palette, and
+UI-marker positions. The last group is five fields (`_guide_targets`, `_aim`, `_aim_in_reach`,
+`_ghost_def`, `_ghost_material`) that all feed ONE local in `sky_painter._stars`: `marks`, the positions
+where stars fade so a UI marker stays legible. `sky_painter` does not need to know a build ghost exists;
+it needs to know where not to put stars. Passing `marks` severs its only route to the dead economy --
+`_ghost_def` is a `MachineDef` -- and the array is empty in this build, which legacy already handles as
+its designed path.
+
+**The finding that corrects the brief.** `water_view`, `rope_view` and `falling_items` are not blocked on
+the contract. They are blocked on `sim/fluid`, `sim/transport` and `sim/items`, which are **empty
+directories holding only a MODULE.md** -- nine of fifteen sim modules are, measured by `.gd` count. No
+contract shape unblocks them; lifting them means writing a fluid sim, a rope system and an item-flow
+system first. Reachable Phase 2 is `sky_painter`, then `terrain_painter` as far as the wall ruling
+allows, and then the batch is dry for the same reason the last one was: missing sim, not missing view.
+
+**Two gaps in `observe()`, and one is a trap.** `terrain_painter`'s 8 sim demands: 3 map cleanly
+(`is_solid`/`material_at`/`solid` -> `solid_at`/`material_at`), 2 are absent from this build (`ramp_dir`,
+`deposits`), and 2 are real gaps -- `surface_row`, and `wall`, whose data EXISTS (`TileGrid.get_wall`,
+where the lode migration put ore) with no door through L2. The trap is the eighth: `in_bounds` is not
+`in_window`. One asks whether a cell is in the world, the other whether the caller was given it, and
+`interface.gd` deliberately returns `&""` rather than "unknown" outside the window. A painter that swaps
+them draws a wall where the viewport stops.
+
+**A `view -> sim` violation arrives on the FIRST painter.** `sky_painter` calls `Seams.grain` five times;
+`Seams` is in `sim/world/` (we put it there, D0227) and the layer table gives `view` only
+`{interface, core}`. D0224's fix means the lint will now actually catch it -- P008 predicted the first
+real `view/` outgoing edge would be the lint's first genuine test, and this is it, earlier than expected.
+Recommendation is `git mv sim/world/seams.gd core/seams.gd`: measured, `Seams` references only
+`RefCounted`, `Vector2i` and its own constants, zero project dependencies, and its only consumer is its
+own test. `class_name` is path-independent, so the move costs two MODULE.md edits and nothing else. It is
+near-free ONLY because the file still has no consumers -- the one advantage of last run's finding that
+three of four lifts landed unused.
+
+**Gate 7 direction: this phase is docs-only (neither instrument nor game), and Phase 1 improves it.** The
+entire current renderer lives in `tests/body/` -- an INSTRUMENT directory -- while `view/` is a GAME
+directory. Moving `material_look.gd` and `mining_overlay.gd` into `view/` moves lines off the numerator
+and onto the denominator at once. Both files already declare that move in their own headers, written by
+earlier sessions anticipating this rebuild.
