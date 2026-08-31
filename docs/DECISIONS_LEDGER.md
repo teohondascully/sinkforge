@@ -10465,3 +10465,38 @@ legacy is 5-octave FBM), WG-4 (cell-denominated constants never converted, every
 WG-2 and WG-3 interact — adding octaves changes the distribution shape and therefore the calibration —
 so they want one measured pass together, with a carve-fraction instrument built first. The instrument is
 the point: nothing in this repository measures carve fraction, which is why four defects sat green.
+
+## D0255 · The determinism golden re-captured from CI, and the cross-platform check that says which thing changed · 2026-08-31 · WG-1
+
+D0254 changed what `ValueNoise` computes, so `tests/test_shaft_replay_determinism.gd`'s 200 committed
+checkpoint hashes were stale by construction. Re-captured from CI's own pinned Linux build (run
+33367080354, job 99409885089), per the array's own standing rule that it is captured there and never from
+a local macOS run — D0167 made that mistake once already and the file's docstring records it.
+
+**The judgment call is what evidence was required before believing the new array.** A golden mismatch has
+two very different causes that produce the identical CI output: the world genuinely changed (expected
+here), or the probe stopped exercising the same surface and is now hashing a shorter or different run.
+The count matching 200 does not separate them — a probe that crashed at tick 20,000 for a new reason
+still emits 200 checkpoints. Three things were checked instead:
+
+- The two-process replay assertion **passed** in the same run — two independently started engines
+  produced bit-identical hashes. Whatever changed is deterministic.
+- The scenario coverage line is **byte-identical** across the re-capture and across platforms:
+  `jumps=895 mantles=0 stepups=0 digs=261 corner_ok=9`. Same input surface, same exercise, different
+  world.
+- The local macOS run was captured and diffed **elementwise** against CI's: 200 of 200 identical, first
+  divergence `None`. Recorded as a fact about this change, explicitly NOT as a licence to capture locally
+  next time.
+
+Divergence at checkpoint **0** rather than partway through is itself the corroborating shape: the seed
+reaches the noise field before the first cell is written, so the world differs from the first tile rather
+than drifting apart after some triggering event. A D0213-style mid-run divergence would have been evidence
+*against* the stated cause.
+
+**Also caught here, and worth more than the re-capture:** the first local verification run was invoked as
+`run_gd_test.sh res://tests/...`, omitting the required godot-binary argument. The wrapper printed a usage
+line and exited; the harvest pipeline found no mismatch dump and produced an empty file. Piped through
+`grep`, the shell reported **exit 0**. An empty capture is indistinguishable from a passing run unless
+something positively witnesses that the run happened — this is `existence-probe-has-no-witness` reproduced
+exactly, by the session that had just written the memory. The second attempt asserted the local capture
+was non-empty before comparing, which is the positive control the first lacked.
