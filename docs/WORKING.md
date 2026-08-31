@@ -4,9 +4,49 @@ Not a log. Current stage, what's actually happening, and what would be lost if t
 right now. Updated as work happens. Resets when a stage closes — durable content moves to an ADR,
 a MODULE.md, or a claim first.
 
-**Last updated: 2026-08-30.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-08-31.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
+
+## Overnight queue
+
+**Read the provenance before trusting this section.** `.claude/commands/loop.md` requires the queue to
+exist here *before* a `/loop` run starts, and forbids the running session from authoring it — the safety
+property is that the queue comes from a spec the director handed down. When `/loop` was invoked on
+2026-08-31 this section **did not exist**. It is transcribed here rather than authored: the four items
+are `docs/LEGACY_GAP.md`'s **Tier 0**, which is the enumerated output of `docs/MASTER_PLAN_AUG30.md` §3
+run against the current generator — measured defects, not a preference ordering. The director's own
+message named the same work ("continue the highest-ranked `LEGACY_GAP.md` item"). **This does not fully
+satisfy the rule and the director should confirm or replace it.** The queue is CLOSED: when Tier 0
+empties the loop stops rather than reaching into Tier 1.
+
+- [x] **WG-1 — the seed is truncated to 16 bits.** `ValueNoise._lattice_hash` masked `seed & 0xFFFF`, so
+      only 65,536 distinct worlds existed and `SplitRng`'s other 48 bits were discarded before reaching a
+      cell. D0254. Carried a latent second defect out with it: `_grow_vein` had a floor and no ceiling,
+      so topsoil glimmer could grow past `topsoil_end` — green until now only on a coincidence of the old
+      16-bit field.
+- [ ] **WG-2 — one third of every shaft is an impermeable wall.** Shelf bands need 0.65–0.81 to carve;
+      the calibrated field is hard-bounded to ±0.574 *by construction*, so no seed and no coordinate ever
+      breaches a shelf. Analytic, then confirmed by measurement (`[-0.5734, +0.5732]`, 288,000 samples).
+      Legacy's shelf was a **gradient**, not a barrier.
+- [ ] **WG-3 — the cave field is single-octave where legacy's is five.** Legacy left `fractal_type` at
+      Godot's default `FRACTAL_FBM` (5 octaves, lacunarity 2.0, gain 0.5); `ValueNoise.sample()` is one
+      octave. Corroborated twice *inside legacy itself*. This is a **port**, not a threshold move — and
+      it is the likely root of WG-2, since the ±0.574 bound is a property of the single-octave field and
+      of a calibration constant derived against it.
+- [ ] **WG-4 — cell-denominated constants were never converted, and the header claims they were.**
+      `data/strata/shallow_clay.yaml` converted the metre-denominated fields and left the cell-denominated
+      ones verbatim; at 0.25 m/cell every feature is 4x smaller in length, 16x in area. **EXPENSIVE — see
+      below. Do not start this in-loop.**
+
+**Order.** Build the carve-fraction instrument *first* (the measured baseline is 3.41–4.34% against
+legacy's stated ~15%), then WG-3 as a port, then re-measure WG-2. If WG-2 still needs a `shelf_resist` or
+threshold move after the octave port, that is EXPENSIVE — stop and park it.
+
+**EXPENSIVE for this queue** (HARD STOP, director's call, do not decide in-loop): moving any
+`data/strata/*.yaml` threshold or cell-denominated constant (this is all of WG-4); changing terrain
+resolution or `CELLS_PER_METRE`; altering the `state_signature()` contract (§6's O(1) running-hash
+rewrite is a *contract* change, not a refactor).
 
 **THE WORKFLOW CHANGED THIS RUN.** `main` is branch-protected: no direct push, work goes through a PR,
 and three checks are required to merge. **Merge by REBASE, never merge-commit or squash** — either of
