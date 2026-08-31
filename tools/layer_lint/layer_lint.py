@@ -42,18 +42,38 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # docs/ARCHITECTURE.md §3 -- the allowed dependency set for each layer. A layer may always reference
 # itself (internal cross-references are a sibling-reach-in question, handled separately).
+#
+# `data` IS A MODELLED LAYER AS OF D0243, AND IT USED TO BE INVISIBLE. It sat in `UNPOLICED` below, so
+# `layer_of()` returned None for it and no edge to a `data` class was ever built. That is not "data
+# edges are allowed" -- it is the vacuous-gate state this file's own history is about: an edge the model
+# has no opinion about can be neither permitted nor refused, and the lint printed the same PASS either
+# way. The director's P013 ruling ("view/ MAY read appearance data") could not be enforced by a gate
+# that could not see the edge, so the edge is modelled first and granted second.
+#
+# `"data": set()` IS THE LOAD-BEARING LINE. It says data may reference NOTHING, and that is what makes
+# `view -> data` safe to grant: a leaf cannot launder a dependency. Without it, granting `view -> data`
+# would open a route to anything a data file chose to import, and "view cannot reach sim through data"
+# would be a hope rather than a checked property. Measured at the time of writing: the three generated
+# record files reference only `Dictionary`, `RefCounted` and their own class names.
+#
+# `sim -> data` IS PRE-EXISTING AND DOCUMENTED, not a second ruling smuggled in here. `WorldMaterials`
+# reads `MaterialsRecords` and `StrataData` reads `StrataRecords`; both are described in their MODULE.md
+# files and in `docs/adr/0004-data-codegen.md`. Granting only `view -> data` while switching enforcement
+# on would have turned two legitimate, shipped edges red -- worth stating because the temptation was to
+# add exactly one entry and ship it.
 ALLOWED = {
     "core": set(),
-    "sim": {"core"},
+    "data": set(),
+    "sim": {"core", "data"},
     "interface": {"sim", "core"},
     "harness": {"interface", "sim", "core"},
     "experiment": {"harness"},
-    "view": {"interface", "core"},
+    "view": {"interface", "core", "data"},
     "shell": {"core", "sim", "interface", "harness", "experiment", "view", "data"},
 }
 # Directories the lint does not police: not part of the dependency graph, or explicitly excluded
 # (legacy/ is pre-pivot code, frozen and out of scope per ARCHITECTURE's build-path exclusion).
-UNPOLICED = {"legacy", "data", "docs", "tools", "tests", "scenarios", "claims", "incoming"}
+UNPOLICED = {"legacy", "docs", "tools", "tests", "scenarios", "claims", "incoming"}
 
 RES_PATH_RE = re.compile(r'res://([\w./-]+\.gd)')
 

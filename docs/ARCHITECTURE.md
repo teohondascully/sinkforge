@@ -86,13 +86,42 @@ Agent proposes, instrument evaluates, human decides. That is the whole pitch, an
 Lint-enforced. A violation is a build failure, not a code smell. The lint lives in `tools/layer_lint` and runs in CI.
 
 - `core` depends on nothing.
-- `sim` depends only on `core`. **No engine imports. No file IO. No wall clock. No global mutable state.**
+- `data` depends on nothing. Generated records only (`tools/data_codegen`, `docs/adr/0004-data-codegen.md`).
+- `sim` depends on `core` and `data`. **No engine imports. No file IO. No wall clock. No global mutable state.**
 - `interface` depends on `sim` and `core`.
 - `harness` depends on `interface`, `sim`, `core`. May do file IO and process control. May not depend on `view`.
 - `experiment` depends on `harness`. May not depend on `sim` directly.
-- `view` depends on `interface` and `core`. Reads observations, emits commands, never calls a sim mutator.
+- `view` depends on `interface`, `core`, and `data`. Reads observations, emits commands, never calls a sim mutator.
 - `shell` depends on everything.
 - **No module imports a sibling's internal files.** Each module exposes exactly one public interface file.
+
+### `data` as a layer, and why `view` may read it (P013, ruled 2026-08-30; D0243)
+
+**`data` was not in this list until 2026-08-30, and its absence was not permission — it was silence.**
+The lint kept `data` in its `UNPOLICED` set, so no edge to a generated record was ever built. An edge the
+model has no opinion about can be neither allowed nor refused, and the gate printed the same PASS in
+both cases. That is the vacuous-gate shape `docs/QUALITY.md` §2 is about, and it meant the ruling below
+could not have been enforced by the gate that exists to enforce this section.
+
+**The ruling: a renderer may read appearance data.** `view/visuals/material_look.gd` turns a material id
+into a `Color` from `MaterialsRecords` and `BandsRecords`. A rule forbidding that is a wrong rule, not a
+violation being tolerated: the alternative is pushing authored palette data through `interface` and into
+`Observation`, which puts art inside the L2 door and buys no protection.
+
+**What makes it safe is that `data` depends on NOTHING.** That is the load-bearing half. A leaf cannot
+launder a dependency, so `view -> data` cannot become a route to `sim`. It is enforced, not assumed:
+`tools/layer_lint/test_layer_lint.py` plants a `data -> sim` reference and asserts it fails.
+
+**The grant is per-layer.** `sim -> data` was already real and documented (`WorldMaterials` reads
+`MaterialsRecords`; `StrataData` reads `StrataRecords`) and is written down here for the first time —
+switching enforcement on while granting only `view` would have turned two shipped, legitimate edges red.
+`interface`, `harness` and `experiment` are NOT granted it, and a plant proves each still fails.
+
+**What is not enforceable, stated plainly.** The ruling says *appearance* data. `MaterialsRecords`
+carries `base_color` and `hardness` in one record, so no class-granularity rule can separate "view reads
+colours" from "view reads hardness". The distinction is a convention this paragraph carries, not a check
+the lint can make. What the lint does guarantee is the containment: whatever `view` reads from `data`,
+it cannot reach `sim` through it.
 
 ---
 
