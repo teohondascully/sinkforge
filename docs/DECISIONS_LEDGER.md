@@ -9473,8 +9473,8 @@ allows, and then the batch is dry for the same reason the last one was: missing 
 missing computation: `TileGrid.get_wall` holds the wall plane the lode migration put ore into, and
 `sim/body/heightfield.gd` derives a per-column surface. Both take a `TileGrid`, which `view/` may not
 touch, so what is missing in both cases is a DOOR through L2, not a calculation. The trap is the eighth:
-`in_bounds` is not
-`in_window`. One asks whether a cell is in the world, the other whether the caller was given it, and
+`in_bounds` is not `in_window`. One asks whether a cell is in the world, the other whether the caller was
+given it, and
 `interface.gd` deliberately returns `&""` rather than "unknown" outside the window. A painter that swaps
 them draws a wall where the viewport stops.
 
@@ -9529,3 +9529,45 @@ recorded offset, not the runner's: the same commit reads `2026-08-30` under `TZ=
 `TZ=Australia/Sydney` and locally. So the pin makes the gate deterministic rather than merely moving
 which timezone it is wrong in -- which was worth checking, because "pin it and hope" would have left a
 gate whose verdict depended on where it ran.
+
+---
+
+## D0236 · PR #6 parked on gate 7, and the eviction property behind it · 2026-08-30
+**Decided:** PR #6 (Phase 0 of the coordinator rebuild) is **parked as ready-and-blocked**, per the run
+brief's explicit instruction, rather than forced, squashed, or merged past branch protection.
+`docs/NEEDS_DIRECTOR.md` P012 carries the ruling options.
+
+**The PR adds nothing to either side of the ratio.** `git diff --stat main..HEAD` touches
+`.github/workflows/harness.yml` and five files under `docs/`, and **nothing** in
+`core/sim/interface/view/shell` or `harness/experiment/tools/tests`. It is red anyway.
+
+**Why: gate 7's window is ten COMMITS, not ten lines or ten days.** This branch's docs-only commits evict
+real ones from the far end, including last round's `+685` game lift (`33d5109`). What is left in view is
+instrument growth against **zero** game growth. The gate is behaving exactly as written; the property
+belongs to the window.
+
+**The figure is deliberately not written here, because it moves under its own subject.** AMENDING a
+commit on this branch changed the reading from `+344 instrument / +2 game` to `+326 / +0` -- without a
+line of code changing anywhere, in either population. The window simply slid. Run
+`python3 tools/layer_lint/check_loc_ratio.py` for the current pair; a number quoted in prose is true only
+of the tree that produced it, which is this entry's own point arriving one level down.
+
+**The general form is worth more than this instance.** A commit-count window means **writing
+documentation degrades the LOC ratio** -- not by adding instrument, but by pushing game work out of
+sight. This project documents heavily and deliberately: a ledger entry, a brief regeneration and a
+`NEEDS_DIRECTOR` update each spend a slot. Any run ending in several docs commits tends to close red
+regardless of what it built. The most faithful remedy, if the director wants one, is to count only
+commits that touched EITHER population -- a docs commit has no opinion about instrument-vs-game and
+arguably should not consume a slot -- but that is a gate change and needs mutation-testing first.
+
+**What I did not do, and why it is recorded.** Squashing the four commits into one would have moved the
+window back far enough to go green while leaving the LOC reality byte-for-byte identical. That is gaming
+a measurement rather than answering it, and the temptation is worth naming because the action is
+one command and looks like tidiness.
+
+**A wrong first diagnosis, corrected inside the same investigation.** I initially attributed the failure
+to D0235's checkout pin having changed which window gate 7 reads. Checked on the merge ref itself:
+`33d5109` is evicted from the **unpinned** window too. The pin is unrelated -- gate 7 went red as the
+commit count grew, and this branch's first CI run passed structural gates at one commit. Recorded because
+the wrong story was plausible, self-flattering in the wrong direction (it made my own change the culprit
+and the fix a revert), and would have sent the director to the wrong lever.

@@ -163,7 +163,34 @@ So the reachable Phase 2 is **`sky_painter`, then as much of `terrain_painter` a
 and then the batch is dry again for the same reason the last one was: the blocker is missing sim, not
 missing view.
 
-### 3c. `sky_painter` needs nothing from `observe()` at all — measured, 0 `sim.` reads
+### 3c. What each painter drags in besides the coordinator
+
+Measured against legacy's own `class_name` declarations, coordinator excluded:
+
+| painter | non-coordinator dependencies |
+|---|---|
+| `sky_painter` | **`Seams` only** |
+| `terrain_painter` | `FineTerrain` (5 sites), `Art` (1), `FactorySim`, `MaterialDef` |
+| `water_view` | `FactorySim` |
+| `rope_view` | `Controls`, `Grapple` |
+| `falling_items` | `FactorySim`, `Visuals` |
+
+**`sky_painter` reduces to one dependency once the coordinator is replaced**, which is what makes it the
+right proof-of-contract — and that one dependency is §4's `Seams` problem, so file one is gated on
+question 3 and nothing else.
+
+**`terrain_painter` does not drag in all 1,402 lines of `FineTerrain`.** It uses exactly two members —
+`walked_surface` x4 and `NO_SURFACE` x1 — the surface-contour path, which is the same thing the
+`surface_row` door in §3a is about. `MaterialDef` is referenced only as a type annotation (0 member
+accesses) and is replaced by `MaterialLook` outright.
+
+**And `Art` is already in the tree.** `terrain_painter` calls `Art.tex` — `view/visuals/art.gd`, lifted
+last round (D0227) and flagged in **P009** as banked value with no consumer. *This is its consumer*, and
+it arrives in Phase 2. That is not a full answer to P009 (the entry's real question is whether
+`light_layer.gd` and `art.gd` are the same kind of bet) but it is evidence on `art.gd`'s side, and it was
+not available when P009 was written.
+
+### 3d. `sky_painter` needs nothing from `observe()` at all — measured, 0 `sim.` reads
 
 Which makes it a genuinely clean proof-of-contract, exactly as the brief guessed. Its full demand is
 `anim_time`, `marks`, and two clock functions. But:
@@ -220,6 +247,26 @@ ratio from both ends at once. Two files have already declared this move in their
   observation."*
 
 Both were written by earlier sessions anticipating exactly this rebuild. Phase 1 should collect them.
+
+**One caveat learned by landing this document.** The improvement above is real but it is not automatic,
+because gate 7's window counts **commits**, not lines — so the docs commits a phase writes can evict the
+game commits it also wrote, and the phase closes red having genuinely moved lines the right way. That is
+what happened to *this* PR, which adds zero lines to either side and is red anyway
+(`docs/NEEDS_DIRECTOR.md` P012, D0236). Phase 1 should land its code and its documentation in as few
+commits as honestly possible, and the ratio should be read from the diff rather than from the gate.
+
+### The skeleton will be born at the size gate, and that is a Phase-1 warning
+
+The brief says *"if the skeleton alone is near 400, the split boundaries are wrong."* The closest thing
+this tree has to the new coordinator is `tests/body/reveal_scene.gd`, and it is **398 lines against the
+400-line cap**, with `_physics_process` at **49 against the 50-line function cap**. Both are one or two
+lines from firing.
+
+That is exactly `docs/QUALITY.md` §2's recorded pattern — `sim/body/body.gd` landing at *exactly* 400
+three commits running because it was trimmed rather than split. **So Phase 1 cannot port `reveal_scene`
+and add to it.** The skeleton has to be split at real seams from its first commit: the arg parsing, the
+agent-drive modes and the recording flush are three obvious ones that are not coordinator work at all,
+and together they are over 120 lines of that 398.
 
 ---
 

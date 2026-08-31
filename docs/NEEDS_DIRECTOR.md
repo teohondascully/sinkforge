@@ -237,6 +237,11 @@ So it is banked against parked work, which is the criterion option 2 was decline
 ought to agree and only you can say which way.** Landed as instructed rather than quietly skipped; it is
 25 lines and `git rm` closes it if the answer is that option 2's reasoning applies here too.
 
+**Update, 2026-08-30 (D0234): `art.gd` now has a known consumer.** Phase 0's dependency scan finds
+`terrain_painter.gd` calling `Art.tex`, so the file stops being consumerless in Phase 2. That is evidence
+on `art.gd`'s side of the question below; it says nothing about `light_layer.gd`, whose lighting math is
+still in the parked coordinator.
+
 `art.gd` (26 lines) is a weaker case of the same thing — it points at an `assets/` directory this tree
 does not have — but it differs in a way that may matter to you: it is the **seam the art pass lands
 through**, and its empty state is a designed behaviour (`has_any()` false keeps every renderer on its
@@ -296,3 +301,51 @@ is the stop. Read that document; this entry is the index to what it asks.
 5. **The cosmetic day/night clock** (§3c). `sky_painter` needs `daylight()`/`day_phase()`, which have no
    counterpart here. Does a game that starts underground want a day cycle, or does the sky land with its
    clock pinned?
+
+---
+
+## P012 · PR #6 is ready and blocked on gate 7 alone — and the reason is a property of the gate
+
+**Status:** open, BLOCKING a finished PR · **Cost to apply:** a ruling, not work · **Raised by:** this
+session, 2026-08-30
+
+`https://github.com/teohondascully/sinkforge/pull/6` carries Phase 0 of the coordinator rebuild. It is
+**otherwise green** — authorship passes, every one of the 15 structural checks passes locally, and the
+suites are unaffected. It is held by `check_loc_ratio` (gate 7) and nothing else. Per the run brief's own
+instruction it is parked here rather than forced, worked around, or merged past protection.
+
+**The PR adds zero instrument lines and zero game lines.** Measured: `git diff --stat main..HEAD` touches
+`.github/workflows/harness.yml` and five files in `docs/`, and **nothing at all** in
+`core/sim/interface/view/shell` or `harness/experiment/tools/tests`. Both sides of the ratio are
+untouched by it.
+
+**So why is it red?** Gate 7's window is **the last 10 COMMITS**, not the last N lines or days. Four
+docs-only commits push four real commits out the far end — including `33d5109`, last round's `+685` game
+lift. What remains in view is instrument growth against **zero** game growth, so the gate fires. **The
+gate is working exactly as written; it is the window that has the property.**
+
+Run `python3 tools/layer_lint/check_loc_ratio.py` for the current pair rather than trusting a figure
+written here — amending one commit on this branch moved the reading from `+344/+2` to `+326/+0` with no
+line of code changing in either population, which is this entry's own point arriving one level down.
+
+**The general shape, which outlives this PR.** A commit-count window means *writing documentation makes a
+project's LOC ratio worse* — not by adding instrument, but by evicting game work from view. This repo
+writes a great deal of documentation on purpose, and every ledger entry, every brief regeneration and
+every `NEEDS_DIRECTOR` update spends a window slot. Any run that ends with several docs commits will tend
+to close red regardless of what it built. That is worth knowing before the next run is planned around it.
+
+**Three ways to answer, none of them applied.**
+1. **Rule this PR through** as a one-off — it genuinely adds nothing to either side.
+2. **Change the window to lines, days, or "commits that touched either population"** — the last is the
+   most faithful to the gate's intent, since a docs commit has no opinion about instrument-vs-game and
+   arguably should not consume a slot. This is a gate change and needs mutation-testing before trust.
+3. **Leave it.** The gate is chronically red by design as a standing prompt that the next unit of work is
+   game content (`docs/CLAIMS.md`), and this is that prompt firing.
+
+I have deliberately not squashed the four commits to move the window. It would go green, the underlying
+LOC reality would be identical, and that is gaming a measurement rather than answering it.
+
+**Note on what did NOT cause this.** The same run pinned the `gates` job's checkout to the PR head
+(D0235). That is unrelated: `33d5109` is evicted from the unpinned merge-ref window too, checked on the
+ref itself. Gate 7 went red as the commit count grew, not because of the pin — the first CI run on this
+branch passed structural gates at one commit.
