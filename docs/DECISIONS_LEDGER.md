@@ -10820,3 +10820,42 @@ load-bearing: `check_suite_coverage` scans this file for `res://tests/test_*.gd`
 must not be able to satisfy the gate for a suite the command has stopped running. Mutation-tested in the
 harder direction — one suite deleted from the command while its comment line stayed — and the gate still
 reported `UNRUN tests/test_tile_grid.gd`, exit 1. Restored, it passes 43/43.
+
+## D0265 · A line-range edit deleted two CI jobs, and the checks went GREEN because they no longer existed · 2026-08-31
+
+D0264's first attempt replaced lines 265..465 of `.github/workflows/harness.yml`, intending the `tests`
+job's suite steps. It also deleted the `headed_boot` and `fuzz_nightly` jobs entirely.
+
+**CI then reported all green, and PR #10 reported `MERGEABLE / CLEAN`.** The two missing checks did not
+report as failing or as pending — they were simply absent from the rollup, and a rollup of three passing
+checks looks exactly like a rollup of five passing checks unless you know how many there should be. It
+was caught only by noticing that "headed boot" had stopped appearing in a list where it used to appear.
+One more step and a branch that silently stopped running its headed-boot gate would have been on `main`.
+
+**The mechanism.** The region was bounded by the LAST file-wide match of
+`run_gd_test.sh ./godot res://tests/`. That match is not in the `tests` job — `fuzz_nightly` runs
+`test_body_fuzz.gd` the same way. So the range ran from inside one job to inside the last one, taking two
+whole jobs with it. A confirming detail was misread at the time: probing `lines[end+2]` raised
+`IndexError`, which was taken as "the region ends at the file's end" when it only meant the printed
+window ended there.
+
+**This is `destructive-command-must-assert-its-target` on a text range.** A range computed from a pattern
+is a claim about where a structure ends, and it was never checked against the structure. The redo bounds
+the search to the `tests` job by finding the next `^  [a-z_]+:` job header, and — the part that actually
+matters — asserts two invariants across the edit:
+
+    list(before["jobs"]) == list(after["jobs"])
+    set(suites in before) == set(suites in after)
+
+Both are properties of the WHOLE file, so they hold regardless of whether the range was computed
+correctly. The first would have failed instantly on the original attempt.
+
+**The lesson generalises past workflows.** `check_suite_coverage` did not catch this and could not: it
+verifies every suite is *named* in the file, and all 43 still were — `test_body_fuzz.gd` was named inside
+the `fuzz_nightly` job that had just been deleted, since the deletion took the job but the gate reads
+text. A gate over one property is no evidence about another. And note the direction of the failure:
+deleting a check produces a green, never a red, which is why the absent-check case needs an explicit
+count rather than a glance at the rollup.
+
+Corrected: the `tests` job holds **42** suites; `fuzz_nightly` holds `test_body_fuzz.gd`, and conflating
+the two is what caused this.
