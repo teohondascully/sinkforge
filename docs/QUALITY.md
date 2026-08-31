@@ -181,6 +181,10 @@ trimmed back to the limit rather than split, and the pattern repeated a fourth t
 
 ---
 
+30. **The CI check set may not SHRINK without saying so.** A deleted check does not go red — it stops existing, and a run reports green over a smaller set. `docs/DECISIONS_LEDGER.md` D0265: a line-range edit to `harness.yml` deleted the `headed_boot` and `fuzz_nightly` jobs, CI reported **all green**, and the pull request reported `MERGEABLE / CLEAN`; three passing checks are indistinguishable from five passing checks unless something knows how many there should be, and it was caught only by a human noticing a job name had stopped appearing. This is the most dangerous shape in the repository, because every other gate answers "is this property true" while a deleted gate answers nothing at all in the same voice. `tools/layer_lint/check_ci_not_shrunk.py` compares the job set and the suite set of every workflow against the merge base: removal FAILS, addition passes, and a rename FAILS deliberately (indistinguishable from delete-plus-unrelated-add to anything but a human, and the cost of being wrong that way is one line). An intended removal is declared in the **commit message** — `CI-Check-Removed: <name> -- <why>`, one per name — and not in a file, because a file-based allowlist would be edited by the same careless range-replace that deletes the job and would then agree with it. It compares NAMES only: a job gutted to `run: true` passes here. `check_suite_coverage` (a neighbouring property) did NOT catch D0265, because all 43 suites were still named — one of them inside the job that had just been deleted. Two gates, two properties, neither evidence for the other. `docs/DECISIONS_LEDGER.md` D0266.
+
+---
+
 ## 6. Repository hygiene
 
 The portfolio surface is part of the product.
