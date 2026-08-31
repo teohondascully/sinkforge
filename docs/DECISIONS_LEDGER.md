@@ -10330,3 +10330,74 @@ toward the hue glimmer already occupies. Legacy never hit this: glimmer is this 
 legacy had no teal ore. Either glimmer's colour moves or Stonereach's tint does, and both are the
 director's eye. Landing the tint anyway would have meant silently lowering a legibility floor that was
 measured on purpose.
+
+## D0253 · The whole legacy-to-current gap, read and ranked; four measured generator defects found · 2026-08-31
+
+`docs/LEGACY_GAP.md`, per `docs/MASTER_PLAN_AUG30.md` §3. All 28,522 lines of legacy game code read in
+nine parallel passes, each closing its findings against the current tree rather than against the
+migration map's verdicts. **~667 capabilities, ~527 of them live and absent.**
+
+**The map's §12 gap is closed.** It named two files never read in full by any audit — `main.gd` (3,003)
+and `world_renderer.gd` (3,656), 6,659 lines with every `view`/`shell` estimate inheriting the gap. Both
+are now read whole, and closing the first corrected a wrong attribution the map had been propagating: the
+head-lamp and darkness-veil math is **not in `main.gd`**. A full-text search for `lamp|light|dark|veil|
+glow` there returns 40 hits, every one a comment, a z-index note, or the 5-entry `LAMP_TINTS` palette. The
+lighting is `world_renderer.gd:2769-3660`. A ticket written against the map would have found nothing.
+Second correction: `hud.gd` reads **15** sim accessors, not 16 — the sixteenth appears only inside a `##`
+doc comment — and those 15 sites live in five surfaces, so the entire world-furniture HUD set needs **no
+new sim accessor at all**.
+
+**THE FINDING: the world generator is measurably broken, in four ways, all quiet greens.** These are not
+porting gaps. They are the current build being wrong where nothing reports it, and they outrank every
+visual port because a visual judgement made against this terrain is a judgement about a broken world.
+
+1. **Only 65,536 distinct worlds exist.** `value_noise.gd:50` masks the seed to `seed & 0xFFFF`.
+   *Verified directly:* `ValueNoise.sample(3.7, 11.3, s)` returns `-0.0519986834` for `s = 1337`,
+   `1337 + 2^16` and `1337 + 2^20` — bit-identical. `SplitRng` supplies 64 bits; 48 are discarded.
+2. **A third of every shaft is impermeable.** Shelf bands add `shelf_resist 0.34`, giving a 0.65 floor,
+   and `_carve_caves:122` multiplies each sample by `FASTNOISELITE_SD_CALIBRATION 0.574` over a
+   `_corner_value` range of [-1, 1] — so the field is **hard-bounded to ±0.574 by construction** and can
+   never reach it. Analytic, not statistical. *Re-measured for the doc:* 288,000 samples over 20 seeds
+   give [-0.5734, +0.5732]; the non-shelf thresholds clear, the shelf thresholds do not.
+3. **The cave field is single-octave where legacy's is five.** Legacy leaves `fractal_type` at Godot's
+   default `FRACTAL_FBM`/5/2.0/0.5 — corroborated twice inside legacy itself, at two sites that set
+   `FRACTAL_NONE` explicitly *because* of that default.
+4. **Cell-denominated constants were never converted, and the yaml header claims they were.**
+   `shallow_clay.yaml` converted the metre-denominated fields and left `frequency 0.11`,
+   `min_depth_cells 6`, `band_height_cells 4`, `size_min`/`size_depth_bonus` verbatim from a world where
+   one cell was one metre. At 0.25 m/cell every feature is **4x smaller in length, 16x in area** than
+   tuned for. `HollowTell`'s docstring diagnoses this exact class ("not a rescale, a rewrite").
+
+Net: the shaft carves **3.4-4.3%** against legacy's stated ~15% target, in 40 pockets of median 21 cells
+(~1.3 m²) — **smaller than the player**. The build does not over-cave; it under-caves and fragments, which
+is the worse failure against dig-your-factory because slightly-rotten-rock-everywhere removes the choice
+that opt-in pockets exist to offer.
+
+**How the calibration hid it, which is the reusable part.** `FASTNOISELITE_SD_CALIBRATION` matches
+standard deviation and does so *exactly* (0.2477 against a 0.2487 target). Its own comment even states
+the limit — "same standard deviation does not guarantee identical skew/kurtosis… only that a fixed
+threshold clears at approximately the same rate". But a threshold reads a **tail**, not a spread, and
+SD-matching two differently-shaped **bounded** distributions cannot match tails. The instrument was
+correct about what it measured and silent about what mattered. `caveat-in-prose-does-not-protect`, again:
+the limit was written down and then the number was used as though it had not been.
+
+**A verification note worth keeping.** The first probe written to check defect 2 called
+`ValueNoise.sample()` *without* the calibration, measured ±0.999, and appeared to refute it. The
+calibration is applied by the caller — which `value_noise.gd:25` states in its own header. The subagent's
+claim was right and my check was wrong. Measure what the code computes, not what the constant is named
+after.
+
+**Other findings that are current-build defects, not gaps:** the deafness switch is 3/4 non-functional
+(both debug scenes poll `Input.is_physical_key_pressed` directly, so `Controls.deaf = true` silences only
+mining — exactly the failure its own docstring warns about, by exactly the mechanism it names); the
+posable pointer has **zero callers** in a tree that ported it verbatim; the draught particle fires on
+breach after the break with direction hardcoded down, where legacy fires it during the charge at the near
+face along `swing_dir()`, a function made public *specifically* for that and called by nothing; and the
+scale convention was applied **inconsistently** — movement constants ported in pixels, `Mining.REACH` in
+metres, making the body 2x faster and 2x heavier in metres than legacy's.
+
+**Four prerequisites gate large fractions of the backlog and are each small:** `Frame.anim_time` is a
+`const 0.0` and 28+ rows are inert until it moves; `Fx` has no vector layer so the grapple cannot be
+written; `Interface.observe()` never touches `_mining` so every mining-feedback row is blocked on one
+door; and `world_seed` is not on the `Observation`, so `core/seams.gd` — ported, integer-exact over all
+196,608 inputs, and called by nothing — stays inert.
