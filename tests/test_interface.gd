@@ -28,6 +28,8 @@ func _initialize() -> void:
 	_test_a_move_command_advances_exactly_one_tick()
 	_test_every_rejection_is_named_and_changes_nothing()
 	_test_a_mine_command_inside_reach_actually_breaks_ground()
+	_test_the_wall_plane_is_its_own_plane()
+	_test_the_surface_answers_in_fx_and_only_from_inside_the_window()
 	_finish("interface")
 
 
@@ -156,3 +158,64 @@ func _test_a_mine_command_inside_reach_actually_breaks_ground() -> void:
 			break
 	_check(accepted > 1, "the in-reach mine command is accepted repeatedly while charging (%d times)" % accepted)
 	_check(not grid.is_solid(target), "and holding it eventually breaks the cell")
+
+
+## The wall plane must be the WALL plane. The characteristic failure of adding a second plane that
+## shares the block plane's encoding is wiring it to the same getter: every assertion about presence,
+## shape and legend still passes, and the field is a duplicate of the one beside it.
+##
+## So the wall material is deliberately DIFFERENT from the block material in the same cell, and the
+## discriminating assertion is `wall_at != material_at` -- which `get_material` in place of `get_wall`
+## cannot satisfy. Excavating then checks the property the plane exists for: `excavate()` REVEALS the
+## wall rather than erasing it, so the cell goes empty in one plane and stays in the other.
+func _test_the_wall_plane_is_its_own_plane() -> void:
+	var parts: Array = _build()
+	var grid: TileGrid = parts[0]
+	var iface: Interface = parts[2]
+	var c := Vector2i(GRID_W / 2, FLOOR_ROW + 2)
+	grid.set_wall(c, &"deepstone")
+	var o: Interface.Observation = iface.observe(Interface.Envelope.oracle_over(grid))
+	_check(o.material_at(c) == &"clay", "control: the block plane still reads its own material")
+	_check(o.wall_at(c) == &"deepstone",
+		"the wall plane reads the wall material (%s)" % o.wall_at(c))
+	_check(o.wall_at(c) != o.material_at(c),
+		"DISCRIMINATOR: wall and block disagree in the same cell, so the wall plane is not a copy "
+		+ "of the block plane -- get_material() in place of get_wall() would fail here and nowhere else")
+	grid.excavate(c)
+	var after: Interface.Observation = iface.observe(Interface.Envelope.oracle_over(grid))
+	_check(after.material_at(c) == &"" and after.wall_at(c) == &"deepstone",
+		"excavate empties the block and REVEALS the wall: block=%s wall=%s"
+		% [after.material_at(c), after.wall_at(c)])
+	var outside := Vector2i(0, 0)
+	var narrow: Interface.Observation = iface.observe(
+		Interface.Envelope.new(Rect2i(GRID_W / 2 - 1, FLOOR_ROW, 3, 3)))
+	_check(narrow.wall_at(outside) == &"" and not narrow.in_window(outside),
+		"a wall outside the window reads &\"\", the same conflation material_at makes on purpose")
+
+
+## The surface is an `Fx` world-y and it is scanned inside the window only.
+##
+## Two assertions carry this. The first pins the UNIT: a row index would read 20, an unscaled pixel
+## height 80, and the correct answer is 80 << 16 -- three values a laxer check would not separate.
+## The second poses the envelope: a window sitting entirely ABOVE the floor must report NO_FLOOR, not
+## the floor it could have found by scanning past its own edge, because a column the observer was not
+## given cells for is a column it cannot answer about.
+func _test_the_surface_answers_in_fx_and_only_from_inside_the_window() -> void:
+	var parts: Array = _build()
+	var grid: TileGrid = parts[0]
+	var iface: Interface = parts[2]
+	var col: int = GRID_W / 2
+	var o: Interface.Observation = iface.observe(Interface.Envelope.oracle_over(grid))
+	var want: int = Fx.from_int(FLOOR_ROW * Heightfield.TERRAIN_CELL_PX)
+	_check(o.surface_y_at_terrain_col(col) == want,
+		"the surface is an Fx world-y: got %d, want %d (a row index would be %d, raw px %d)"
+		% [o.surface_y_at_terrain_col(col), want, FLOOR_ROW, FLOOR_ROW * Heightfield.TERRAIN_CELL_PX])
+	var above: Interface.Observation = iface.observe(
+		Interface.Envelope.new(Rect2i(0, 0, GRID_W, FLOOR_ROW - 2)))
+	_check(grid.is_solid(Vector2i(col, FLOOR_ROW)),
+		"control: the floor this window cannot see IS solid in the grid")
+	_check(above.surface_y_at_terrain_col(col) == Heightfield.NO_FLOOR,
+		"a window above the floor reports NO_FLOOR rather than scanning past its own edge (got %d)"
+		% above.surface_y_at_terrain_col(col))
+	_check(o.surface_y_at_terrain_col(GRID_W + 5) == Heightfield.NO_FLOOR,
+		"and a column outside the window entirely is NO_FLOOR, not an out-of-range index")

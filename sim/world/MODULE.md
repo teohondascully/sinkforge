@@ -49,6 +49,12 @@ phases — not itself one of the fixed tick phases.
 - `WorldMaterials` (`materials.gd`) — hardness by material id. `.hardness()`, `.exists()`. Reads
   `data/materials/generated.gd`, codegen'd from `data/materials/*.yaml` — see Gotchas.
 
+**`Seams` is NOT here any more.** It landed in this module 2026-08-30 (D0227) and left the same day
+(D0237) for `core/seams.gd`, because `view/` may depend on `{interface, core}` but never on `sim`, and
+`sky_painter`'s starfield calls `Seams.grain()`. It was never listed in this section while it was
+here — a gap worth naming rather than quietly closing, since a public-API list that omits a module's own
+file is the same shape as a gate that cannot see its subject. Nothing in `sim/world` referenced it.
+
 ## Gotchas
 
 - **Not chunked.** `TileGrid` is a sparse `Dictionary`, not the fixed-size chunk array the Purpose line

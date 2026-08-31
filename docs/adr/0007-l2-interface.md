@@ -21,8 +21,29 @@ is blocked on this door existing.
 
 ## Decision 1: an `Observation` is a copied value, and that is the whole design
 
-`observe()` returns a flat `PackedByteArray` over one window plus a `PackedStringArray` legend. It holds
+`observe()` returns flat arrays over one window plus their `PackedStringArray` legends. It holds
 no reference to `TileGrid`, `Body`, or `Mining`.
+
+> **AMENDED 2026-08-30 (D0238), and the amendment is the point of the rule rather than an exception to
+> it.** The observation carried one plane when this ADR landed. It now carries three: block materials,
+> the **background wall plane** (`walls`/`wall_legend`, the layer `TileGrid.excavate()` reveals rather
+> than erases, and where the lode migration put ore), and a **per-column surface height**
+> (`surface_y`, an `Fx` world-y, or `Heightfield.NO_FLOOR`).
+>
+> Both were added because `view/` needs them and structurally cannot reach them: `TileGrid.get_wall()`
+> and `Heightfield.column_surface_y()` both take a `TileGrid`, and the layer table gives `view` only
+> `{interface, core}`. Without the wall door a renderer draws a mined-out room as a hole in a sheet
+> rather than a recessed plane, which is a large part of what legacy's underground read as.
+>
+> **What did NOT change is the invariant.** Each new plane is derived HERE, per window, from the same
+> `Rect2i` the block plane uses — `surface_y` scans from the window's top for the window's height and
+> no further. A wider scan would make it a second, unfiltered channel into the grid, which is exactly
+> the reach-around this decision exists to prevent. `Observation` still holds no reference into `sim/`,
+> and `tests/test_interface.gd` pins both new planes, including that a window sitting above the floor
+> reports `NO_FLOOR` rather than answering from cells it was never given.
+>
+> This is the amendment path this ADR predicted in Consequences: nothing persists, so widening the
+> shape cost a recompile of its consumers and nothing else.
 
 The cheap alternative — hand back the grid and let the consumer index it — **silently deletes the
 envelope**. A consumer holding a live `TileGrid` can read any cell it likes, fogged or not, and no
