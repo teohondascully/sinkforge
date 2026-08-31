@@ -9658,3 +9658,62 @@ planes cannot drift on the question a consumer is most likely to get wrong.
 `material_at` and `wall_at` both return `&""` outside the window -- *not* "unknown" -- so a painter that
 reaches for `in_bounds` reads the window's edge as the world's edge and draws a wall where the viewport
 stops. Both accessors say so in their own doc comments rather than only here.
+
+## D0239 · the authorship gate counted identities over a wider ref set than it scanned · 2026-08-30
+**Decided:** `tools/check_trailers.sh`'s two identity assertions now count over `--branches --tags
+--remotes` instead of `--all`, matching the ref set the trailer scan directly above them already
+iterates. Five `refs/t3/checkpoints/*` refs left behind by agent tooling were deleted, backed up first.
+
+**The gate was red locally and green in CI off the same commit.** The trailer scan loops
+`refs/heads refs/remotes refs/tags` and argues for that choice in its own comment. The identity
+counters twenty lines below used `--all`, which also reaches `refs/tmp/`, `refs/t3/`, `refs/archive/`
+and `refs/stash` -- local scratch a fresh clone never fetches. Two halves of one claim about "the
+history", disagreeing about what the history is, and only one half had written down its reasoning.
+What tripped it: `refs/tmp/pr6merge{,2}` (GitHub merge previews, committer `noreply@github.com`) and
+the five t3 checkpoint refs (`t3code@users.noreply.github.com`). **No branch, tag or remote was ever
+contaminated** -- `docs/WORKING.md`'s warning that `noreply@github.com` in main is unrecoverable had
+not triggered, and still has not.
+
+**Alternative:** an exclusion list of local-only namespaces. Rejected for the reason `.gitignore`'s
+own comments already give about allowlists -- one that can grow quietly is how a guard becomes a
+formality. Matching the two populations is the smaller change and the one the script's existing
+reasoning already implies.
+
+**Why: a false-positive gate is the failure mode this repository is organised against.** Its own
+header says "a guard that gets walked past as a matter of habit is decoration." A verdict that
+depends on which machine's ref set it saw is worse than a wrong verdict, because it is unfalsifiable
+from either side alone.
+
+**Mutation-tested, three cells, before being trusted.** Baseline one identity: 1/1. A second identity
+**on a branch**: the narrowed form still reports 2 and still FAILS -- the fix did not blind the gate,
+which was the only real risk in narrowing a population. Second identity only on `refs/tmp`: new form
+1 (correct), old form 2 (the bug, reproduced on demand).
+
+**The t3 refs were orphan full-tree snapshots**, five parentless commits of 3,992 files each whose
+trees reference blobs the repo already had. Marginal cost to `.git` was five commits and a few trees.
+Backed up to `~/sinkforge-ref-backups/` and the restore **verified by fetching into a fresh repo with
+a negative control**, not merely by `git bundle verify`. `view/visuals/art.gd`, the one piece of work
+they captured that was untracked at the time, is in `HEAD` via `33d5109` and was never at risk.
+
+**A third population in the same file, found by the director asking why the gate said 2,860 when
+GitHub says 1,271.** Both were right and neither was the checked set: GitHub reports `main`, the
+script's `total` reported `--all`, and after the fix above the checks covered `--branches --tags
+--remotes` -- **2,418**. So the PASS line credited the verdict to 442 commits nobody had looked at,
+all of them reachable only from `refs/archive/2026-08-21/agent-*`. `total` now counts the same
+population as the checks. Those 442 were scanned directly for trailers while resolving this: **zero**.
+Unscanned is still unscanned, and whether the archive belongs in the trailer scan's population at all
+is a separate question this entry does not settle.
+
+**Reverse cost: cheap.** One-line revert of each counter. The deleted refs restore from the bundle.
+
+**Where the code actually landed, stated because the commit boundary is misleading.** The two-line
+change to `tools/check_trailers.sh` is in **`1843da1`** (`feat(prereqs): Seams to core, and two doors
+through L2`), not in this entry's own commit. It was sitting uncommitted in a shared working tree
+while a concurrent session staged and committed, and it rode along. That commit's message does not
+mention the gate, so a reader tracing the 13-line diff in an unrelated file should come here. The
+hazard generalises: `git commit --only` protects the committer from a co-tenant's staged work, and
+protects nothing in the other direction.
+
+**Found by an external audit** -- a Factory `droid` session reading the repo cold ran the gate,
+reported the failure with correct scoping, and flagged the right question (whether the identity was
+on a PR-merge ref or on main) without answering it. The diagnosis and fix are this session's.

@@ -84,7 +84,11 @@ if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
 fi
 check 0 "the repository is not a shallow clone, so the whole history is visible"
 
-total="$(git rev-list --count --all)"
+# same population as the scan and the identity counters below -- this number appears in the PASS line,
+# and a total counted over a WIDER ref set than the checks actually cover is a count with no membership:
+# it credits the verdict to commits nobody looked at. --all reaches 442 commits under refs/archive/ that
+# the scan has never iterated (checked 2026-08-30: 0 trailers there, but unscanned is unscanned).
+total="$(git rev-list --count --branches --tags --remotes)"
 [ "$total" -ge 100 ]; check $? "$total commits were scanned (floor 100 - a scan of a handful is not a sweep)"
 
 # --- the guard on the ordinary path has to be installed ---
