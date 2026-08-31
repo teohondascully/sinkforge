@@ -17,6 +17,11 @@ later commit, with no remedy short of a history rewrite. `docs/NEEDS_DIRECTOR.md
 `docs/NEEDS_DIRECTOR.md` is at **7 items** — read it FIRST if you are the director picking this up, and
 P011 is the one blocking live work.
 
+**PR #6 IS READY AND PARKED, BLOCKED ON GATE 7 ALONE.** It adds **zero** instrument and **zero** game
+lines — only `.github/` and `docs/` — but gate 7's window is ten *commits*, so four docs commits evicted
+last round's `+685` game lift from view. Parked per the brief rather than squashed to move the window.
+`docs/NEEDS_DIRECTOR.md` P012, D0236.
+
 ## IN FLIGHT — the coordinator rebuild, stopped at its first gate (D0234)
 
 **Phase 0 is done and the run is STOPPED for the director, which is the brief's own instruction.** The

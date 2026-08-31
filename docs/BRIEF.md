@@ -59,11 +59,26 @@ Moving it is near-free *right now*, purely because last round's lifts landed unu
 
 ---
 
-## Gates
+## Gates — and PR #6 is parked, blocked on gate 7 alone
 
-**All checks green on PR #6.** Gate 7 (LOC velocity) **PASS** — instrument +1,240 against game +687 over
-the window, **1.81x under a 2x limit**. This PR is docs-only and adds to neither side, so the ratio
-direction is **unchanged by this round**.
+**Authorship passes; all 15 structural checks pass locally; the PR is held by `check_loc_ratio` and
+nothing else.** Parked per your brief rather than forced, squashed or merged past protection. P012.
+
+**The PR adds zero instrument lines and zero game lines** — `git diff --stat main..HEAD` touches only
+`.github/` and five files in `docs/`. It is red because **gate 7's window is ten COMMITS**, and four
+docs-only commits evicted last round's `+685` game lift (`33d5109`) out the far end, leaving instrument
+growth against **zero** game growth in view. (`python3 tools/layer_lint/check_loc_ratio.py` for the
+current pair — amending a single commit moved it from `+344/+2` to `+326/+0` with no code changing
+anywhere, which is the same point one level down.)
+
+**The general form matters more than this PR.** A commit-count window means **writing documentation
+degrades the LOC ratio** — not by adding instrument, but by pushing game work out of sight. A ledger
+entry, a brief regeneration and a `NEEDS_DIRECTOR` update each spend a slot, and this project documents
+heavily on purpose. Any run ending in several docs commits tends to close red regardless of what it
+built. If you want a remedy, the faithful one is counting only commits that touched *either* population.
+
+**What I did not do:** squash the four commits to move the window. It goes green, the LOC reality is
+identical, and that is gaming a measurement rather than answering it.
 
 **And Phase 1 should improve it.** The entire current renderer lives in `tests/body/` — an *instrument*
 directory — while `view/` is a *game* directory. Moving `material_look.gd` and `mining_overlay.gd` into
