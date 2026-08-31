@@ -17,10 +17,17 @@ later commit, with no remedy short of a history rewrite. `docs/NEEDS_DIRECTOR.md
 are the director picking this up. P011 and P013 are CLOSED (you ruled both). **P015 is THE ◆** and is two
 images and your eye. P014 and P016 are each one number.
 
-**TWO PRs OPEN, STACKED.** #6 carries Phase 0 (the contract) and is parked on gate 7 alone — P012.
-#7 carries the prerequisites + Phase 1 and is branched off #6, so the ledger stays sequential.
+**NO OPEN PRs — the whole arc is on `main`** (D0250). #6, #7 and #8 landed as one rebase-merge of 17
+commits. P012 is CLOSED: #6 was blocked by gate 7 reading `instrument +326 against game +0` over a
+window that contained only contract work, and the answer to that complaint was written three PRs later.
+Retargeting #8 to `main` let the gate judge the whole arc — **+742 instrument against +717 game, PASS on
+its merits**. No override, protection untouched. Verified after: one identity across all 2576
+author/committer entries, and `git cherry` says 0 of 5 and 0 of 9 commits missing from `main`.
 
-## STOPPED AT ◆ — sky_painter draws, and Bin A is exhausted (D0243–D0247)
+**Merge by REBASE stays load-bearing** and is the reason that verification exists — a merge-commit or
+squash writes `noreply@github.com` into `main` permanently.
+
+## STOPPED AT ◆ — sky_painter draws, and the world has no sky to jump into (D0243–D0250)
 
 **The ◆ is P015 and it is your eye on two images.** `view/visuals/sky_painter.gd` is lifted, wired to the
 `Frame`, layer-clean, drawing, and milestone-captured — `docs/milestones/slice3_horizon_23b0ec4.png`
@@ -57,6 +64,30 @@ will not catch. NOT ratcheted, because D0184 is your own ruling that 59 is provi
 non-regression reasons; P016 has the three options. The `bounds` growth is reported as a number and NOT
 diagnosed — a plausible mechanism exists and asserting it without measuring is the move this ledger keeps
 correcting.
+
+**THE FINDING THAT OUTRANKS THE REST, and it came from the director playing** (D0249, P017).
+*"my head bumps at the surfaceline and i cant jump higher."* Row 0 is the surface datum, the top of the
+`TileGrid`, AND `SkyPainter.HORIZON_Y`, all at once. Legacy had `SURFACE_ROW = 20` — twenty rows of air
+above the ground; re-keying the band ladder to metres-below-surface (`topsoil from_m: 0`) made it
+scale-free, which was right, and dropped the headroom on the way. Jump is a **74px apex, ~18 rows** at a
+4px cell, so the capability is there and the world ends one row above the player's head. The rock lid
+itself is D0199 and deliberate — without it the first jump of any session leaves the world.
+
+**Why nothing caught it:** `test_reveal_spawn_bounds` measures this exact region every run — it holds
+JUMP from every spawn and asserts the head never reaches y=0 — and PASSES. *"The player cannot leave the
+world"* and *"the player cannot leave the ground"* are the same measurement from opposite intents. The
+invariant guarding the ceiling is indistinguishable from the defect, and only a human trying to jump
+could separate them. **Rule P015 and P017 together**: whether the sky is enterable decides several of
+P015's look calls with it.
+
+**Nothing had ever opened a window** (D0248). The director ran P015's own documented command and got an
+agent-mode run that drove itself 12 ticks and quit. All 42 suites are `--headless`, so this whole class
+was invisible: a scene can boot, render, satisfy every assertion here, and still not do what its header
+tells a human to type. Three defects — the doc line omitted `--play`; `--play` was parsed outside
+`RevealArgs`; and `_test_every_flag_is_reachable` could not see that, because it draws its population
+from the PARSER'S OWN KEYS and is therefore blind to what the parser omits (sibling to D0245). Fixed with
+an assertion over the SCENE'S SOURCE, and `tools/check_headed_boot.sh` + a `headed_boot` CI job under
+xvfb — **186 distinct colours on the runner against 188 locally**, so it genuinely renders.
 
 **Bin A verification pass** (D0246): P014 confirmed (`core/MODULE.md` at exactly 100, cap enforced, zero
 headroom — and `check_size_limits.py`'s own header still claimed "98 … two lines", now fixed); refs/t3

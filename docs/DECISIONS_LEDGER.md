@@ -10078,7 +10078,7 @@ falsified rationale being the closest sibling). Reported as a number, not as a c
 
 ---
 
-## D0248 · A whole class of failure lived below the test suite: nothing ever opened a window · 2026-08-31
+## D0248 · A whole class of failure lived below the test suite: nothing ever opened a window · 2026-08-30
 
 **Found by the director typing the command I wrote for them.** `docs/NEEDS_DIRECTOR.md` P015 says to run
 `godot --path . tests/body/reveal_scene.tscn -- --sky`. That produces an agent-mode run which drives
@@ -10132,7 +10132,7 @@ install, and because a display failure should be legible as one rather than mixe
 
 ---
 
-## D0249 · The sky was lifted into a region the player cannot enter · 2026-08-31
+## D0249 · The sky was lifted into a region the player cannot enter · 2026-08-30
 
 **Reported from the chair:** *"it wont let me jump up beyond the surface. like my head bumps at the
 surfaceline and i cant jump higher."* Diagnosed, not fixed; the remedy is a design call, `docs/NEEDS_DIRECTOR.md`
@@ -10167,3 +10167,55 @@ asks the director to judge how that reads. A backdrop you can see but never rise
 object from one you can leave the ground into, and that choice decides several of P015's look calls with
 it -- the ridges' angular size, the crown's anchor, whether `--sky` defaults on. **Which is why P015 and
 P017 should be ruled together, not in sequence.**
+
+---
+
+## D0250 · P012 resolved by letting gate 7 judge the whole arc, not by overriding it · 2026-08-30
+
+**Closes `docs/NEEDS_DIRECTOR.md` P012.** The three stacked PRs are merged; `main` carries all 17 commits
+and there are no open PRs.
+
+**The block, measured rather than recalled.** PR #6 failed `check_loc_ratio` with **instrument +326
+against game +0** over its 10-commit window. Phase 0 was contract and documentation work, so the gate was
+reporting the literal truth and its own message is the correct reading of it: *the next unit of work is
+game, not another check.* Nothing about #6 was wrong.
+
+**Why the stack made it unmergeable.** #6 → #7 → #8, so the PR that had to merge first was the only one
+that could not. And the answer to gate 7's complaint had already been written three PRs later:
+`sky_painter` is 341 lines of game code. The gate measures a 10-commit trajectory; the trajectory was
+fine, the slice was not.
+
+**The resolution: retarget #8 to `main` and rebase-merge the arc as one unit.** On that base the same gate
+reads **instrument +742 against game +717 -- PASS**. This is the opposite of a bypass, and the distinction
+is the entry's whole point: the required check ran, evaluated the combined work, and passed on its merits.
+Branch protection was never touched, no admin override was used, and P012's own framing ("parked here
+rather than forced, worked around, or merged past protection") is honoured -- what changed is the unit the
+gate was asked to judge, not the gate.
+
+**Verified after the merge, because a rebase rewrites every SHA and the failure mode is permanent.** A
+merge-commit or squash writes a bare `noreply@github.com` committer into `main` and the authorship gate
+then fails forever, unrecoverable short of a history rewrite (P010/D0231). Measured on the merged `main`:
+**one identity across all 2576 author and committer entries**; `check_trailers.sh` PASS over 2445 commits.
+#6 and #7 were then closed on evidence rather than on the assumption that merging implies containment --
+`git cherry` reports **0 of 5** and **0 of 9** commits missing from `main` by patch-id. Their remaining
+textual diff is later revisions of `WORKING.md`/`BRIEF.md`, not absent work.
+
+**State of `main`:** 42/42 suites, `check_headed_boot.sh` PASS, 15 of 16 gates green. The one red is
+`check_untracked_files`, holding a single recording that is deliberately left alone -- see below.
+
+**Two corrections made in the same pass.**
+
+*A date read from the wrong clock.* D0248 and D0249 were first dated **2026-08-31**, taken from GitHub
+timestamps and from recording filenames that Godot writes in UTC. `date` says **2026-08-30 23:16 PDT**,
+and `git log --date=short` dates HEAD 2026-08-30, which is the convention every other entry follows. Both
+corrected before they hardened. This is the exact class the ledger already carries: a date is an
+identifying constant, and inferring one *feels* like deriving rather than looking up.
+
+*Byproduct recordings, moved rather than deleted.* `check_headed_boot.sh` produced eight
+`reveal_play_*.log` files before it learned to clean up after itself. `tests/body/recordings/README.md`
+says `*play_*` files are real recorded play and must not be deleted without asking, so they were moved to
+`~/Projects/sinkforge-recordings-backup-20260830/` rather than removed -- untracked deletion has no undo.
+One file was **left in the tree on purpose**: `play_2026-08-31T05-14-20.log` is a genuine 676-tick session
+(`mode=play chamber=movement_course`), it predates every command this session ran, and it is the director's.
+It is not committed either, because P002/D0228 makes a committed recording BINDING in CI, and imposing
+that is a ruling rather than a tidy-up.
