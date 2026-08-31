@@ -9493,3 +9493,39 @@ entire current renderer lives in `tests/body/` -- an INSTRUMENT directory -- whi
 directory. Moving `material_look.gd` and `mining_overlay.gd` into `view/` moves lines off the numerator
 and onto the denominator at once. Both files already declare that move in their own headers, written by
 earlier sessions anticipating this rebuild.
+
+---
+
+## D0235 · The synthetic merge commit again, in a second gate: an open PR goes red by the passage of time · 2026-08-30
+**Decided:** the `gates` job's checkout is pinned to `github.event.pull_request.head.sha` exactly as the
+`authorship` job already was (D0231). One line, and the same root cause found in a second place.
+
+**What failed, and it was not the doc.** `check_working_freshness.py` (gate 23) compares
+`docs/WORKING.md`'s stated date against `git log -1 --format=%cd HEAD`. On a `pull_request` run the
+unpinned `gates` job checks out GitHub's synthetic `refs/pull/N/merge` commit -- and **that commit is
+committed at the moment CI runs**. Verified on the ref itself: `f096153 2026-08-31 noreply@github.com
+"Merge 142e996 into f4c841a"`. My commit is dated 2026-08-30 and the run crossed midnight UTC, so the
+gate compared a document written that evening against a HEAD dated the next day. All 15 gates passed
+locally; only CI failed.
+
+**The severity is not the midnight case.** The synthetic commit is re-created and re-dated on every run,
+so **an open PR's gates job turns red with nobody having touched it** -- reopen or re-run tomorrow and a
+document that was fresh when written is now stale by definition. The gate's own docstring calls itself a
+proxy that "a session can still bump the date without saying anything true"; what it did not anticipate
+is a HEAD that is not a session's commit at all.
+
+**Why the fix is the pin and not a date bump.** Bumping `WORKING.md` to 2026-08-31 would have gone green
+and left the defect in place, while writing a date that is wrong in the frame every other document in the
+tree uses (the ledger entries beside it say 2026-08-30). D0231 established that the synthetic merge
+commit is the thing to route around; this is the same route.
+
+**The trade, stated rather than hidden.** `gates` now reads the PR's own head rather than the merge
+result, so a violation introduced BY the merge is caught by the `tests` job -- still unpinned, and
+correctly so -- instead of here. With rebase-only merges (P010) the two commits differ only while a PR is
+behind `main`, and two jobs silently testing different commits was itself a defect.
+
+**Confirmed timezone-stable before applying.** `git log --date=short` renders in the commit's OWN
+recorded offset, not the runner's: the same commit reads `2026-08-30` under `TZ=UTC`,
+`TZ=Australia/Sydney` and locally. So the pin makes the gate deterministic rather than merely moving
+which timezone it is wrong in -- which was worth checking, because "pin it and hope" would have left a
+gate whose verdict depended on where it ran.

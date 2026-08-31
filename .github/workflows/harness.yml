@@ -94,9 +94,23 @@ jobs:
       # the totals on disk. A depth-1 checkout would make that history read empty on every run, which
       # the script itself detects and reports as ADVISORY rather than silently mismeasuring — but a
       # gate that can never actually gate in its own CI environment is the failure worth avoiding here.
+      #
+      # `ref` pinned to the PR's real head for the SAME reason the authorship job pins it (D0231), found
+      # a second time in a second gate (D0235). Unpinned, a `pull_request` run checks out GitHub's
+      # synthetic `refs/pull/N/merge` commit -- and that commit is COMMITTED AT THE MOMENT CI RUNS. So
+      # `check_working_freshness.py`, which compares docs/WORKING.md's stated date against HEAD's commit
+      # date, was reading a HEAD dated *now* instead of the commit under test: it failed a PR whose
+      # WORKING.md was written the same evening, purely because the run crossed midnight UTC. Worse, it
+      # means an OPEN PR goes red by the passage of time alone, with nobody having touched it.
+      #
+      # The trade this accepts: gates now read the PR's own head rather than the merge result, so a
+      # violation introduced by the merge itself is caught by the `tests` job (still unpinned, and
+      # correctly so) rather than here. Worth it -- with rebase-only merges the two differ only while a
+      # PR is behind main, and two jobs silently testing different commits is its own defect.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
