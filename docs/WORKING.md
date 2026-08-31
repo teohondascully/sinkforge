@@ -24,6 +24,13 @@ Retargeting #8 to `main` let the gate judge the whole arc — **+742 instrument 
 its merits**. No override, protection untouched. Verified after: one identity across all 2576
 author/committer entries, and `git cherry` says 0 of 5 and 0 of 9 commits missing from `main`.
 
+**Gate 7's window changed, by your ruling** (D0251, closes P018). It counts the last 10 commits **that
+touched either population**, not the last 10 commits. `docs/` was never counted — but a docs commit still
+SLID the window, pushing a game-heavy commit off the far end, so prose could flip a verdict it
+contributed nothing to. Measured: `+742/+717 PASS`, then four doc files later `+756/+348 FAIL`, same
+counted code. Now `+1185/+812 PASS`. Mutation-tested with the branch that matters —
+**an instrument-only window must still FAIL** — because the change was made by the session it unblocked.
+
 **Merge by REBASE stays load-bearing** and is the reason that verification exists — a merge-commit or
 squash writes `noreply@github.com` into `main` permanently.
 

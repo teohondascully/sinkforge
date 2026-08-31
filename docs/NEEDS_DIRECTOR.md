@@ -17,6 +17,8 @@ one — D0225), P005 (the unblocked lifts landed and the batch is genuinely dry 
 MODULE.md cap is 100 and enforced — D0226), and P007's two free sub-items (D0229, D0230). Their entries
 are deleted per the rule above; the ledger carries the rulings.
 
+**Closed 2026-08-30 by the merge and the ruling that followed it:** **P012** (the three stacked PRs merged as one arc; gate 7 judged the whole trajectory at +742/+717 and passed on its merits, with no override — D0250). **P018** (gate 7's window now counts only commits that TOUCHED either population, so documentation stops moving a verdict it contributes nothing to — D0251, mutation-tested with an instrument-only window that must still FAIL).
+
 **Closed 2026-08-30 by the coordinator rebuild, ruled and applied:** P011 (the painter contract — all five questions answered; `Seams` to `core/` is D0237, the two L2 doors are D0238, the skeleton is D0240, Phase 2 is confirmed as `sky_painter` + `terrain_painter`, and the day/night clock is pinned). **P013** (view/ may read appearance data; `data` is a modelled layer now and the edge is enforced with a laundering guard rather than merely permitted — D0243).
 
 ---
@@ -439,45 +441,3 @@ jump rather than as a bump.
 
 I did not pick. (a) is cheap mechanically and changes what every existing capture, recording and spawn-row
 derivation means, which is exactly the kind of change that is yours.
-
----
-
-## P018 · Gate 7 now blocks the documentation of its own resolution, and this time it is right
-
-**Status:** open, BLOCKING PR #9 (documentation only) · **Cost to apply:** a ruling, or game work ·
-**Raised by:** this session, 2026-08-30 (D0250)
-
-P012 is closed — the arc merged, gate 7 passed on it at `+742 instrument / +717 game`. **The very next
-commit, which is pure documentation, fails it at `+756 / +348`.** Reproduced locally, not just in CI.
-
-**Why, mechanically.** The window is the last **10 commits**. A docs-only commit adds nothing to either
-side but still slides the window by one, and `22a6fdc` (the coordinator skeleton) fell off the end. The
-game baseline jumped 3857 → 4226 while the instrument baseline barely moved, so the same tree reads as a
-different verdict. **A commit that changes neither number can flip this gate**, which is the same property
-P012 documented — a verdict that depends on where the window happens to land.
-
-**But the number it is now reporting is TRUE, and that is the difference from P012.** Over those ten
-commits I really did write **756 lines of instrument against 348 of game**: the empty-population guard
-(D0245), the headed-boot check (D0248), and the argument tests. `docs/CLAIMS.md`'s rule — *"the next unit
-of work is game, not another check"* — is a fair description of this run. P012's block was an artifact;
-this one is a diagnosis, and it happens to be pointing at exactly what the ◆ is holding.
-
-**What is actually blocked is small and inert:** four documentation files recording the merge, closing
-P012, and carrying D0248/D0249/D0250. No code. Per the run brief's standing rule it is parked rather than
-forced, worked around, or merged past protection — the same treatment P012 got.
-
-**What you might rule:**
-
-(a) **Do the game work and the block dissolves on its own.** P015 and P017 are both game-side and both
-   yours; ruling either produces `view/`-or-`sim/`-side lines that put the window back in balance. This is
-   the option the gate is asking for and needs no change to it.
-(b) **Exempt documentation-only commits from sliding the window** — count the window over the last 10
-   commits *that touched either population*. One-line change, and it removes a whole class of verdicts
-   that depend on nothing the author did.
-(c) **Merge #9 with an admin override.** Listed for completeness and not recommended: it is the exact
-   move your own rule forbids, and the entry you would be landing is the one that says the rule was
-   honoured.
-
-I recommend (b) regardless of (a), because the property will recur every time documentation lands after
-an instrument-heavy stretch — and (b) does not weaken the gate. It still fails when instrument really has
-outgrown game; it simply stops changing its mind about a tree nobody edited.

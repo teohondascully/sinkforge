@@ -10219,3 +10219,49 @@ One file was **left in the tree on purpose**: `play_2026-08-31T05-14-20.log` is 
 (`mode=play chamber=movement_course`), it predates every command this session ran, and it is the director's.
 It is not committed either, because P002/D0228 makes a committed recording BINDING in CI, and imposing
 that is a ruling rather than a tidy-up.
+
+---
+
+## D0251 · Gate 7's window counts population-touching commits, so documentation stops moving a verdict it contributes nothing to · 2026-08-30 · closes P018
+
+**Decided:** `check_loc_ratio.py`'s window is the last `WINDOW_COMMITS` commits **that touched either
+population**, rather than the last `WINDOW_COMMITS` commits. Ruled by the director.
+
+**`docs/` was never counted, and that was the confusing part.** `INSTRUMENT_DIRS` is
+`harness/experiment/tools/tests`, `GAME_DIRS` is `core/sim/interface/view/shell`; documentation is
+neither and never contributed a line to the ratio. The penalty was indirect and therefore invisible: a
+docs commit adds nothing to either side **but still slides a commit-counted window by one**, so writing
+prose pushed a game-heavy commit off the far end and could flip the answer. Documentation was punished
+not for being counted, but for displacing what was.
+
+**Measured on this repository, which is what made it a fix rather than a preference.** PR #8 merged with
+this gate reading `+742 instrument / +717 game` -- PASS. The very next commit, four documentation files
+and no code, read `+756 / +348` -- FAIL. Same tree of counted code, opposite verdict. **A commit that
+changes neither number could change this gate's answer.** After the change: `+1185 / +812`, PASS, with
+the window reaching back past the documentation to the tenth commit that actually edited counted code.
+
+**`_touches_a_population` shares `_is_counted` with the measurement, deliberately.** A commit editing
+only `tools/README.md` contributes zero lines to the ratio, so admitting it to the window would
+reintroduce this exact class one level down. Branch 4 of the new suite is that case.
+
+**Mutation-tested before being trusted, and the reason is a conflict of interest worth naming.** This
+change was made by a session whose own documentation PR the gate was blocking; a gate relaxation that
+unblocks its author is the last change anyone should take on trust. So the load-bearing branch of
+`tools/layer_lint/test_check_loc_ratio.py` is not one that passes -- it is
+**`an instrument-only window still FAILS`**. If that branch ever goes green, this gate has been turned
+off, and that file is what says so. 8 branches, all observed:
+
+- an instrument-only window still FAILS, and still cites `docs/CLAIMS.md`'s own words;
+- a balanced window PASSES, so the gate is not simply always-red;
+- **the differential**: identical population history with and without interleaved documentation gives the
+  same verdict AND the same numbers (`+500/+600` both ways) -- the property the change exists for, stated
+  as a test rather than as prose;
+- an uncounted file under `tools/` does not admit its commit either;
+- a history without enough population-touching commits reports CANNOT MEASURE and marks itself ADVISORY,
+  rather than returning the passing value from an error path.
+
+**What is NOT weakened.** Same populations, same `RATIO_LIMIT`, same `GROWTH_FLOOR`. An instrument-heavy
+run still fails -- and the run that raised P018 genuinely was one (756 instrument against 348 game over
+its ten commits, which is a true statement about this session). The gate simply stops changing its mind
+about a tree nobody edited. The walk is bounded by `WINDOW_SCAN_CAP`, and hitting the cap is reported as
+unmeasurable rather than guessed at.

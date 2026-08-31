@@ -59,6 +59,7 @@ SCRATCH_PREFIX = "tools/scratch"
 CODE_EXTENSIONS = (".gd", ".py", ".sh")
 
 WINDOW_COMMITS = 10
+WINDOW_SCAN_CAP = 400  ## how far back to look for WINDOW_COMMITS population-touching commits
 RATIO_LIMIT = 2.0
 GROWTH_FLOOR = 50
 
@@ -109,17 +110,56 @@ def loc_at_commit(commit: str, dirname: str) -> int:
     return total
 
 
-def resolve_window_start() -> str | None:
-    """The commit WINDOW_COMMITS back from HEAD, or None if history is shorter than that (a shallow
-    clone, or a young repo) -- both are real conditions this gate must say it can't measure, not
-    silently treat as a zero-growth window."""
+def _touches_a_population(commit: str) -> bool:
+    """Whether `commit` changed any file this gate actually counts. Uses the SAME `_is_counted` filter
+    and the same directory lists as the measurement, so a commit can never be admitted to the window on
+    the strength of a file whose lines are then not counted."""
     try:
-        commits = _run_git(["log", "--format=%H", f"-n{WINDOW_COMMITS + 1}"]).splitlines()
+        changed = _run_git(
+            ["diff-tree", "--no-commit-id", "--name-only", "-r", "-m", commit]).splitlines()
+    except RuntimeError:
+        return False
+    for rel in changed:
+        if not _is_counted(rel):
+            continue
+        top = rel.split("/", 1)[0]
+        if top in INSTRUMENT_DIRS or top in GAME_DIRS:
+            return True
+    return False
+
+
+def resolve_window_start() -> str | None:
+    """The WINDOW_COMMITS-th most recent commit THAT TOUCHED EITHER POPULATION, or None if history does
+    not hold that many (a shallow clone, or a young repo) -- both are real conditions this gate must say
+    it cannot measure, not silently treat as a zero-growth window.
+
+    WHY POPULATION-TOUCHING AND NOT SIMPLY THE LAST N COMMITS (D0251, closes NEEDS_DIRECTOR P018).
+    The window is a commit count, and it used to slide on EVERY commit. So a documentation-only commit --
+    which adds nothing to either side of the ratio -- still pushed one commit off the far end, and if that
+    commit happened to be game-heavy the verdict flipped. Measured, not hypothesised: PR #8 merged with
+    this gate reading `+742 instrument / +717 game`, and the very next commit, four documentation files
+    and no code, read `+756 / +348` and FAILED. **A commit that changes neither number could change this
+    gate's answer**, which makes the verdict a property of where the window happened to land rather than
+    of the work.
+
+    Counting only commits that touched a counted file removes that entire class. It does NOT weaken the
+    gate: the same ratio, floor and populations apply, and an instrument-heavy run still fails -- it
+    simply stops changing its mind about a tree nobody edited. `tools/layer_lint/test_check_loc_ratio.py`
+    holds the mutation proof, including a synthetic instrument-only window that must still FAIL.
+
+    Bounded so a repository whose recent history is entirely documentation cannot make this walk the
+    whole log; hitting the cap is reported as unmeasurable rather than guessed at."""
+    found: list[str] = []
+    try:
+        commits = _run_git(["log", "--format=%H", f"-n{WINDOW_SCAN_CAP}"]).splitlines()
     except RuntimeError:
         return None
-    if len(commits) <= WINDOW_COMMITS:
-        return None
-    return commits[-1]
+    for commit in commits:
+        if _touches_a_population(commit):
+            found.append(commit)
+            if len(found) > WINDOW_COMMITS:
+                return found[-1]
+    return None
 
 
 def main() -> int:
@@ -151,8 +191,9 @@ def main() -> int:
 
     window_start = resolve_window_start()
     if window_start is None:
-        print(f"check_loc_ratio: fewer than {WINDOW_COMMITS} commits of history available "
-              "(shallow clone or a young repo) -- cannot measure a trailing-window trend. "
+        print(f"check_loc_ratio: fewer than {WINDOW_COMMITS} population-touching commits in the last "
+              f"{WINDOW_SCAN_CAP} (shallow clone, young repo, or a long documentation-only stretch) "
+              "-- cannot measure a trailing-window trend. "
               "ADVISORY: not gating on velocity this run.")
         return 0
 
@@ -161,7 +202,8 @@ def main() -> int:
     instrument_growth = instrument_total - instrument_then
     game_growth = game_total - game_then
 
-    print(f"check_loc_ratio: over the last {WINDOW_COMMITS} commits ({window_start[:8]}..HEAD): "
+    print(f"check_loc_ratio: over the last {WINDOW_COMMITS} commits that touched either population "
+          f"({window_start[:8]}..HEAD): "
           f"instrument {instrument_then} -> {instrument_total} ({instrument_growth:+d}), "
           f"game {game_then} -> {game_total} ({game_growth:+d})")
 
@@ -172,7 +214,8 @@ def main() -> int:
 
     if violates_velocity:
         print(f"check_loc_ratio: FAIL -- instrument grew {instrument_growth} lines against game's "
-              f"{game_growth} over the last {WINDOW_COMMITS} commits, more than {RATIO_LIMIT:.0f}x. "
+              f"{game_growth} over the last {WINDOW_COMMITS} commits that touched either population, "
+              f"more than {RATIO_LIMIT:.0f}x. "
               "Per docs/CLAIMS.md, the next unit of work is game, not another check.")
         return 1
 
