@@ -95,7 +95,8 @@ class to `core/` would have been told yes by the thing enforcing no.
 ## The decisions this round is waiting on
 
 **`docs/NEEDS_DIRECTOR.md`, 10 items.** P011 and P013 closed by your rulings; **P012 closed by the merge**
-(D0250).
+(D0250); **P018 closed by your ruling on gate 7's window** (D0251) — it now counts only commits that
+touched either population, so documentation no longer moves a verdict it contributes nothing to.
 
 - **P017 — new, and I'd rule it WITH P015.** There is no air above the surface: row 0 is the surface, the
   grid's ceiling, and the horizon. Your jump has a 74px apex (~18 rows) and nowhere to spend it. Whether
