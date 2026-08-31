@@ -169,7 +169,20 @@ static func _scatter_iron(grid: TileGrid, rng: SplitRng, cfg: Dictionary, stoner
 ## still host rock, and queue its neighbours. `min_row` floors the body so an iron vein seeded just below
 ## `stonereach_end` can't accrete upward into hardrock, mirroring legacy's seal-floor reasoning
 ## retargeted to this port's actual layer boundary.
-static func _grow_vein(grid: TileGrid, rng: SplitRng, seed_cell: Vector2i, size: int, material: StringName, min_row: int = 0) -> void:
+## `max_row` is EXCLUSIVE and defaults to unbounded, mirroring `min_row`'s inclusive floor. It exists
+## because a seeding range is not a growth bound (D0254): `_scatter_reveal_material` picks
+## `cy` in `[0, topsoil_end - 1]`, entirely inside topsoil, and then this function accretes in all four
+## directions with nothing stopping it — so a vein seeded on the last topsoil row grows straight through
+## the boundary its caller was written to respect. `hardrock` is in `_HOST_ROCK`, so the host-rock check
+## waves it past.
+##
+## Found by changing the noise seed hash, not by reading the code: the old 16-bit seed mask happened to
+## produce a field under which no glimmer vein was seeded close enough to the boundary to cross it, and
+## `_test_glimmer_never_appears_at_or_below_topsoil_end` had been green on that coincidence. Two cells
+## crossed on the first genuinely different field. The bug was always there; only one arrangement of the
+## world made it visible, which is what makes a fixed-seed generation test a sample rather than a proof.
+static func _grow_vein(grid: TileGrid, rng: SplitRng, seed_cell: Vector2i, size: int, material: StringName,
+		min_row: int = 0, max_row: int = 0x7FFFFFFF) -> void:
 	var filled: Dictionary = {}
 	var frontier: Array[Vector2i] = [seed_cell]
 	var placed: int = 0
@@ -177,7 +190,7 @@ static func _grow_vein(grid: TileGrid, rng: SplitRng, seed_cell: Vector2i, size:
 		var idx: int = rng.next_range(0, frontier.size() - 1)
 		var cell: Vector2i = frontier[idx]
 		frontier.remove_at(idx)
-		if filled.has(cell) or not grid.in_bounds(cell) or cell.y < min_row:
+		if filled.has(cell) or not grid.in_bounds(cell) or cell.y < min_row or cell.y >= max_row:
 			continue
 		if not _HOST_ROCK.has(grid.get_material(cell)):
 			continue  # only replace host rock -- never a carved cave, never another vein's cell
@@ -205,7 +218,8 @@ static func _scatter_reveal_material(grid: TileGrid, rng: SplitRng, cfg: Diction
 	for _i: int in attempts:
 		var cx: int = rng.next_range(0, grid.width - 1)
 		var cy: int = rng.next_range(0, topsoil_end - 1)
-		_grow_vein(grid, rng, Vector2i(cx, cy), int(cfg["size_min"]), &"glimmer")
+		# `topsoil_end` bounds the GROWTH, not just the seed -- see `_grow_vein` (D0254).
+		_grow_vein(grid, rng, Vector2i(cx, cy), int(cfg["size_min"]), &"glimmer", 0, topsoil_end)
 
 
 ## One guaranteed empty chamber per shaft (D0018): a carved disc, no earlier than `min_depth_m`. Nothing

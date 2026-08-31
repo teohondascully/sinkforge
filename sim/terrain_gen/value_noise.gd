@@ -46,8 +46,35 @@ extends RefCounted
 const FASTNOISELITE_SD_CALIBRATION: float = 0.574
 
 
+## The seed, avalanched into 32 bits. **This exists because the previous form TRUNCATED it** (D0254).
+##
+## `_lattice_hash` used to fold the seed in as `(seed & 0xFFFF) * 2246822519`, and a 16-bit mask does not
+## mean "cheaply mixed", it means **only 65,536 distinct noise fields exist in this entire game**. Any two
+## seeds congruent mod 65,536 produced a bit-identical world: `sample(3.7, 11.3, 1337)`,
+## `sample(3.7, 11.3, 1337 + 2^16)` and `sample(3.7, 11.3, 1337 + 2^20)` all returned exactly
+## `-0.0519986834`. `core/split_rng.gd` hands out full 64-bit values and 48 of them were being discarded
+## before they reached a single cell.
+##
+## The masks on `x` and `y` are NOT the same mistake and stay: a terrain coordinate is genuinely bounded
+## (this world is 48 x 1024 cells), so 16 bits is headroom rather than truncation. A seed is not bounded.
+##
+## Why the fold is shaped like this. `(s & 0x7FFFFFFF) * 2246822519` is the widest multiply that provably
+## fits: 2^31 x 2246822519 = 4.83e18, against a signed-64 ceiling of 9.22e18. Masking to 32 bits instead
+## would give 9.65e18 and silently wrap -- still deterministic, but deterministic nonsense, and the kind
+## that shows up as a distribution defect nobody can trace. `tools/.../ref.py`'s own assert states that
+## bound rather than assuming it. The `seed >> 32` fold in the first line is what carries the high half
+## in at all, and it is a no-op for the small seeds this game actually uses, which is why the whole
+## defect stayed invisible: every seed anyone typed was already under 2^16 or looked fine next to one.
+static func _seed32(seed: int) -> int:
+	var s: int = (seed ^ (seed >> 32)) & 0xFFFFFFFF
+	s = (s ^ (s >> 16)) & 0xFFFFFFFF
+	s = ((s & 0x7FFFFFFF) * 2246822519) & 0xFFFFFFFF
+	s = (s ^ (s >> 15)) & 0xFFFFFFFF
+	return s
+
+
 static func _lattice_hash(x: int, y: int, seed: int) -> int:
-	var h: int = ((x & 0xFFFF) * 374761393) + ((y & 0xFFFF) * 668265263) + ((seed & 0xFFFF) * 2246822519)
+	var h: int = ((x & 0xFFFF) * 374761393) + ((y & 0xFFFF) * 668265263) + _seed32(seed)
 	h = h & 0xFFFFFFFF
 	h = (h ^ (h >> 15)) & 0xFFFFFFFF
 	h = (h * 0x2545F491) & 0xFFFFFFFF
