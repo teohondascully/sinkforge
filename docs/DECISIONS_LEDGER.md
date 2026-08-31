@@ -10500,3 +10500,69 @@ line and exited; the harvest pipeline found no mismatch dump and produced an emp
 something positively witnesses that the run happened — this is `existence-probe-has-no-witness` reproduced
 exactly, by the session that had just written the memory. The second attempt asserted the local capture
 was non-empty before comparing, which is the positive control the first lacked.
+
+## D0256 · A reveal fixture was pinned to a coincidence of the truncated noise field, and 37/59 seeds is the real finding · 2026-08-31 · WG-1
+
+`tests/test_reveal_replay_driver.gd` asserts that its site/seed/padding "reliably produces at least one
+qualifying reveal, exercising the lift branch". After D0254 it produced zero: the scripted approach still
+reached its target column, still fired 6 dig events, and hit glimmer **0 times**.
+
+Re-pinned `SEED_VALUE` from 20260826 to 8, chosen by measurement rather than by trying the next number:
+59 seeds were run end-to-end through the file's own scripted trace. Seed 8 gives four qualifying reveals
+with `target_glimmer_col = 9`, deliberately not one of the many seeds targeting column 6 — that is the
+`MIN_SPAWN_COL` clamp case D0192 measured as the distribution's mode (53.2% spawn flush), and a fixture
+sitting on the degenerate spawn exercises less than one that does not.
+
+**The seed is the workaround. The finding is that 37 of 59 seeds (63%) qualify at all**, which makes this
+fixture a dice roll that any terrain-generation change re-rolls. The mechanism:
+`RevealSessionSetup.find_spawn` selects the first shallow glimmer **column**, and the scripted approach
+digs at the body's own **row** — nothing in the setup makes the two intersect. It worked for four months
+because one seed happened to put them together. Selecting a target the approach can actually reach is the
+fix; it is parked, not done, because `find_spawn` is shared with `reveal_scene.gd`'s live spawn and
+changing it moves the debug scene's own starting state.
+
+Note what did NOT distinguish these cases: `dig_events` was 6 both before and after, and the
+"scripted approach reaches the target column" sanity check passed both times. Every legible number stayed
+green; only `dug_material == glimmer` moved. `glimmer_digs` turned out to equal `qualifying_reveals` at
+every one of the 59 seeds, so the 350-tick padding was never the constraint — a reading that would have
+been invisible without printing both.
+
+## D0257 · Carve fraction measured for the first time: shelf bands carve 0 of 97,920 cells · 2026-08-31 · WG-2, WG-3
+
+`tests/test_shaft_generator.gd`'s cave coverage was `_test_caves_carve_something`, asserting
+`open_count > 0` — "cave carving opened at least one cell". A floor of one cell cannot distinguish
+legacy's intended ~15% carve from 3%, and cannot see a shelf band that carves exactly zero at every seed.
+Both were true and both sat green. Nothing in this repository measured carve fraction until now.
+
+Measured over six seeds, in partitions rather than pooled:
+
+| partition | carved / eligible | fraction |
+|---|---|---|
+| shelf bands | **0 / 97,920** | **0.0000** |
+| non-shelf | 10,488 / 195,264 | 0.0537 |
+| overall | 10,488 / 293,184 | 0.0358 |
+
+WG-2 is confirmed empirically, not just analytically. A pooled 3.58% is equally consistent with "carving
+is uniformly thin" and "carving is normal except inside shelves, where it is impossible" — different bugs
+with different fixes, which is why the partition is the point.
+
+`shelf_eligible > 0` and `open_eligible > 0` are asserted **before** any fraction is reported. This is
+load-bearing, not courtesy: a shelf fraction of 0.0 has two causes — the shelf is impermeable, or the
+sample contained no shelf cells and 0.0 is a division that never had a subject. Without the control the
+instrument prints the same headline either way, which is precisely the house failure class it was built
+to catch.
+
+Both ratchets were mutation-tested before being trusted:
+
+- **shelf resistance removed** (`threshold += 0.0`): WG-2 ratchet FAILS (5,895/97,920 carve), the
+  non-shelf figure stays at **exactly 0.0537**, and the WG-3 ratchet correctly still passes. The
+  unchanged control is the useful half — it proves the two partitions are independent measurements and
+  not one number wearing two hats.
+- **calibration widened to 1.60**: all three fail (overall 0.2469).
+
+Two of the three assertions pin a DEFECT on purpose. Writing today's wrong number down is what makes the
+WG-3 octave port turn this suite red instead of improving the world silently; the failure messages say so,
+and say to re-pin rather than widen the band.
+
+Also confirmed by direct print rather than trusted from the plan: `FastNoiseLite` really does default to
+`FRACTAL_FBM`, octaves 5, lacunarity 2.0, gain 0.5. WG-3's premise holds.
