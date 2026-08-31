@@ -179,6 +179,13 @@ class Result:
 		return r
 
 
+## The terrain grid's pixel size, RE-EXPORTED for `view/` (D0244). A painter sizes world-space drawing in
+## these and may not reference `sim/`, where the constant lives. This is a re-export, not a second
+## definition: it reads `Heightfield`'s, so there is still exactly one number. `view/` reaching for its
+## own copy is the near miss D0240 already recorded -- `material_look.gd` carries `CELLS_PER_METRE = 4`,
+## a different quantity that happens to share the value, and copying it would be right by coincidence.
+const TERRAIN_CELL_PX: int = Heightfield.TERRAIN_CELL_PX
+
 const REJECT_UNKNOWN_KIND: StringName = &"unknown_command_kind"
 const REJECT_OUT_OF_BOUNDS: StringName = &"target_out_of_bounds"
 const REJECT_NOT_SOLID: StringName = &"target_not_solid"
