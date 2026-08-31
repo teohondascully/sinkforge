@@ -31,7 +31,52 @@ const SHAFT_COLS: int = 4  ## `carve_entry_shaft`'s own `range(0, 4)`
 const JUMP_TICKS: int = 90
 
 
+
+## D0267. THE SAME 128 (site, seed) WORLDS WERE GENERATED THREE TIMES -- once per assertion pass -- and
+## `ShaftGenerator.generate` is ~858 ms for a 48x1024 shaft (~414 ms of it five-octave noise). 384
+## generations is ~329 s, which measured as 347 s of a 351 s full sweep: this one suite WAS the sweep.
+##
+## Now each world is built once and handed out as a `clone()`. Cloning is a shallow duplicate of three
+## dictionaries of immutable values, so every caller still gets a grid sharing no state with any other --
+## which is what keeps this away from the aliasing question parked as `docs/NEEDS_DIRECTOR.md` P007. P007
+## asks whether two passes may SHARE one carved grid; this shares nothing, it copies.
+##
+## The cache is keyed on (site, seed) and holds PRISTINE, uncarved worlds. `build_on` carves, so handing
+## out the cached instance itself would let the first caller's entry shaft appear in every later pass --
+## the exact defect this suite exists to measure, injected by its own optimisation. `_pristine` therefore
+## never returns the stored grid, only a copy of it, and `_test_the_cache_hands_out_independent_worlds`
+## below asserts that with a mutation rather than trusting the comment.
+var _world_cache: Dictionary = {}
+
+
+func _pristine(site: StringName, seed_value: int) -> TileGrid:
+	var key: String = "%s|%d" % [site, seed_value]
+	if not _world_cache.has(key):
+		_world_cache[key] = ShaftGenerator.generate(StrataData.get_site(site), seed_value)
+	return (_world_cache[key] as TileGrid).clone()
+
+
+## The guard for the cache, and the reason it is safe. Carves one handed-out world, then asks for the same
+## (site, seed) again and asserts the second copy is untouched -- by SIGNATURE, which is the cheapest
+## complete statement of a grid's contents this project has. A cache that returned the stored instance
+## would fail here; one that returned a copy of an already-carved grid would too.
+func _test_the_cache_hands_out_independent_worlds() -> void:
+	var first: TileGrid = _pristine(SITES[0], BASE_SEED)
+	var untouched: String = first.state_signature()
+	RevealSessionSetup.carve_entry_shaft(first, 1)
+	_check(first.state_signature() != untouched,
+		"positive control: carving an entry shaft actually changes a grid's signature -- without this, "
+		+ "the independence check below passes on a signature that never moves for any reason")
+	var second: TileGrid = _pristine(SITES[0], BASE_SEED)
+	_check(second.state_signature() == untouched,
+		"the cache hands out INDEPENDENT worlds: carving one leaves the next copy of the same (site, seed) "
+		+ "pristine (%s vs %s)" % [second.state_signature(), untouched])
+	_check(second.state_signature() == second.recomputed_signature(),
+		"and a clone's running signature agrees with a from-scratch rebuild of itself")
+
+
 func _initialize() -> void:
+	_test_the_cache_hands_out_independent_worlds()
 	_test_the_spawn_clears_the_world_edge_and_never_swallows_its_target()
 	_test_walking_left_from_the_real_spawn_never_leaves_the_world()
 	_test_the_control_walking_left_from_column_zero_DOES_leave_the_world()
@@ -146,7 +191,7 @@ func _test_the_spawn_clears_the_world_edge_and_never_swallows_its_target() -> vo
 		for i: int in SEEDS:
 			runs += 1
 			var seed_value: int = BASE_SEED + i
-			var grid: TileGrid = ShaftGenerator.generate(StrataData.get_site(site), seed_value)
+			var grid: TileGrid = _pristine(site, seed_value)
 			var spawn: Dictionary = RevealSessionSetup.find_spawn(grid)
 			var spawn_col: int = int(spawn["spawn_col"])
 			if spawn_col < worst:
@@ -185,7 +230,7 @@ func _test_walking_left_from_the_real_spawn_never_leaves_the_world() -> void:
 		for i: int in SEEDS:
 			runs += 1
 			var seed_value: int = BASE_SEED + i
-			var session: Dictionary = RevealSessionSetup.build(site, seed_value)
+			var session: Dictionary = RevealSessionSetup.build_on(_pristine(site, seed_value))
 			var walked: Dictionary = _walk_left(session["body"], session["grid"])
 			total_violations += int(walked["violations"])
 			if int(walked["min_left"]) < worst_left:
@@ -242,7 +287,7 @@ func _test_jumping_from_the_real_spawn_never_leaves_the_world_through_the_ceilin
 		for i: int in SEEDS:
 			runs += 1
 			var seed_value: int = BASE_SEED + i
-			var session: Dictionary = RevealSessionSetup.build(site, seed_value)
+			var session: Dictionary = RevealSessionSetup.build_on(_pristine(site, seed_value))
 			var jumped: Dictionary = _hold_jump(session["body"], session["grid"])
 			total_violations += int(jumped["violations"])
 			if int(jumped["min_top"]) < worst_top:

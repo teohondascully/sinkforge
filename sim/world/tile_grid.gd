@@ -191,6 +191,31 @@ func _xor_term(t: Vector2i) -> void:
 	_sig_b ^= t.y
 
 
+## A deep copy: same cells, same walls, same dig extents, same signature, sharing no state with the
+## original. Exists for tests that need N independent copies of one expensive world (D0267) --
+## `ShaftGenerator.generate` is ~858 ms for a 48x1024 shaft, of which ~414 ms is five-octave noise, so a
+## suite regenerating the same (site, seed) once per assertion pass pays that repeatedly for worlds it has
+## already built.
+##
+## `Dictionary.duplicate()` is used WITHOUT `true` (no recursive deep copy) and that is correct rather
+## than a shortcut: the values are `StringName` and `Vector2i`, both immutable value types in GDScript, so
+## a shallow copy of the mapping already gives the clone its own independent state. A recursive duplicate
+## would copy nothing further and cost more.
+##
+## The signature lanes are copied rather than recomputed, and `tests/test_tile_grid.gd` asserts a clone's
+## `state_signature()` equals the original's AND equals its own `recomputed_signature()` -- so a clone
+## that silently dropped a layer would be caught by the same guard that catches a forgotten mutation
+## update, rather than by a separate promise.
+func clone() -> TileGrid:
+	var copy: TileGrid = TileGrid.new(width, height, seed)
+	copy._blocks = _blocks.duplicate()
+	copy._walls = _walls.duplicate()
+	copy._dig_extent = _dig_extent.duplicate()
+	copy._sig_a = _sig_a
+	copy._sig_b = _sig_b
+	return copy
+
+
 ## O(1). The whole grid's signature, carried incrementally by the four mutation methods.
 func state_signature() -> String:
 	return "%d:%d" % [_sig_a, _sig_b]

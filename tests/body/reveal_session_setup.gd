@@ -86,7 +86,14 @@ static func spawn_row_for_ceiling() -> int:
 ## spawns a `Body` exactly the way `reveal_scene.gd::_ready()` does. Returns
 ## `{"grid": TileGrid, "body": Body, "spawn_col": int, "target_glimmer_col": int}`.
 static func build(site_id: StringName, seed_value: int) -> Dictionary:
-	var grid: TileGrid = ShaftGenerator.generate(StrataData.get_site(site_id), seed_value)
+	return build_on(ShaftGenerator.generate(StrataData.get_site(site_id), seed_value))
+
+
+## The whole of `build` EXCEPT generating the world, so a caller holding an already-generated grid can
+## reuse it (D0267). Split rather than duplicated: `build` above is now one line, so there is exactly one
+## definition of what a reveal session's starting state is, which is this file's stated reason to exist.
+## The grid is MUTATED (`carve_entry_shaft`) -- pass a `clone()` if the original must survive.
+static func build_on(grid: TileGrid) -> Dictionary:
 	var spawn: Dictionary = find_spawn(grid)
 	var spawn_col: int = spawn["spawn_col"]
 	carve_entry_shaft(grid, spawn_col)
