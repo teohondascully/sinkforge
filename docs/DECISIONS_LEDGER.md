@@ -10749,3 +10749,48 @@ first. **Third instance this session of a probe with no witness returning a conf
 after the empty golden capture and the `run_gd_test.sh` usage error. The pattern is not "be careful"; it
 is that any probe whose negative result is indistinguishable from its own failure needs a positive
 control built in.
+
+## D0262 · The sweep harness reported a false green, because its detector matched its own failure text · 2026-08-31
+
+**A sweep script I wrote this session reported "43/43 PASS" for a tree whose determinism golden was
+genuinely red, and I reported that number to the director before catching it.** The detector was
+`echo "$out" | grep -q 'ALL PASS'`. `tools/run_gd_test.sh`'s own failure message is:
+
+    run_gd_test: FAIL - res://tests/x.gd never printed its own ALL PASS line
+
+which **contains the substring `ALL PASS`**. Every failure of that shape counted as a pass.
+
+This is the house failure class inside the instrument: the detector could not distinguish its subject
+from its own failure text, and it failed in the direction that produces a green. It is also
+`wrap-defeats-a-phrase-rule` in a new form — the rule and the text it scans shared the phrase.
+
+The fix is not a better regex. `run_gd_test.sh` already exits non-zero on every failure shape it knows
+about, so `tools/run_suites.sh` reads the **exit code** and does no string matching at all. Verified with
+a positive control before being trusted: pointed at the known-red golden suite, it reports FAIL.
+
+Corrected numbers: the sweep that was reported as 43/43 was **42 passed, 1 failed**.
+
+`tools/run_suites.sh` also refuses to report a green over an empty suite list (`exit 2`), because a
+selector or a glob that matches nothing would otherwise print "0 failed" — the same false green in a
+different costume.
+
+## D0263 · Suites run in parallel: 794s → 350s, same result set · 2026-08-31
+
+The 43 suites are headless Godot processes and were being run one at a time. The standing memory that the
+harness is not concurrency-safe is about the `.anvil` sweep with its **timing layers**, which must run
+alone; it does not describe these suites. Checked rather than assumed, on the two hazards that would make
+parallelism unsound:
+
+- **Duration assertions.** None. Every `Time.get_ticks_usec()` in the suites builds a unique filename;
+  not one is asserted on.
+- **Shared `user://` paths.** Already uniquified per call site (`user://test_reveal_replay_e2e_%d.log`).
+
+Measured, and compared by RESULT SET rather than by count or by wall time alone: serial gave 42 passed /
+1 failed in **794s**; `jobs=8` gave 42 passed / 1 failed in **350s**, the same suite failing. 2.3x.
+
+**It is 2.3x and not 8x, and the reason matters for what to do next.** With the work spread across cores
+the sweep is bounded by its LONGEST SINGLE SUITE, not by total work, so the next second comes from
+shrinking that suite rather than from adding jobs. Note the O(1) signature hash (D0261) was already in
+the tree for BOTH measurements — the determinism suite was 8.8s, not 72s, throughout, so it is not what
+bounds the sweep now. `run_suites.sh` therefore prints the six slowest suites on every run, so the actual
+ceiling is named rather than assumed.
