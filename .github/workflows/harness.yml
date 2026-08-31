@@ -368,8 +368,11 @@ jobs:
 
       - name: test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_reveal_spawn_bounds.gd
-      - name: test_seams (rock grain lifted to sim, its float rates now exact integers — D0227)
+      - name: test_seams (rock grain, now in core/ so view can reach grain() — D0227/D0237)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_seams.gd
+
+      - name: test_world_view (the coordinator skeleton — a painter gets its own canvas, D0240)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_world_view.gd
       - name: test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
         run: bash tools/run_gd_test.sh ./godot res://tests/test_view_lifts.gd
       - name: test_settings (the split halves share one bindings map; persist=false writes nothing)
