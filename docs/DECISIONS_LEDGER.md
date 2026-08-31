@@ -9997,3 +9997,49 @@ nothing." The GDScript side had no equivalent until now.
 deliberately NOT retrofitted and says so at the call site: what was empty there is a RECT, not a
 population, and the guard cannot help with a scalar -- its remedy is a floor derived from the
 subject-removed value, which is what `margin_only` already is.
+
+---
+
+## D0246 · Bin A verification pass: three claims re-measured, two drifts fixed, one already closed · 2026-08-30
+
+Not new work -- a check of four things earlier sessions LEFT AS CLAIMS, each re-measured against the tree
+rather than trusted from the document that asserted it. Recorded because two of the four had drifted and
+one had been fixed without its record being updated, and because the null results are worth as much as
+the hits.
+
+**P014 confirmed, and the gate documenting it had drifted off its own subject.** `core/MODULE.md` is at
+**exactly 100** (measured), the cap IS enforced (`check_size_limits.py`, `MODULE_DOC_LIMIT = 100`), and
+the second-largest MODULE.md is `sim/terrain_gen/` at 91 -- so this is one file's problem, not the tree's.
+But that gate's own header still read *"`core/MODULE.md` is 98, so the headroom on the largest file is two
+lines"*, written when D0226 set the cap. A reader of the gate would have believed there were two lines of
+room where there are ZERO. Corrected in place, pointed at P014, with an explicit instruction not to
+resolve it by trimming prose again -- which is exactly how `sim/body/body.gd` sat at 400 for three commits.
+
+**The cold-read audit's `test_body_fuzz.gd` row is MOOT -- a null result.**
+`AUDIT_COLD_READ_2026-08-29.md` line 770 says the suite "still carries the falsified D0059f
+justification". It does not: D0150/queue D3 rewrote that comment block, and it now states the falsified
+claim AS falsified, with D0135's real 7-of-91 split and D0137's diagnosed `mini()`/`NO_FLOOR` mechanism.
+Checked before editing anything; nothing to fix.
+
+**refs/t3 cleanup verified, positively rather than by absence.** Zero `refs/t3/*` remain. The two identity
+populations now differ by exactly one address, and the difference is located, not assumed: `--all` still
+reaches `noreply@github.com` and the ONLY refs carrying it are `refs/tmp/pr6merge{,2}` -- local-only
+GitHub merge previews a fresh clone never fetches. `--branches --tags --remotes`, the population the gate
+actually scans, holds one identity. D0239's fix is doing what it claimed.
+
+**Two stale addresses in `LEGACY_MIGRATION_MAP_2026-08-29.md`, plus a caveat closed.** `seams.gd` was
+recorded as landed at `sim/world/seams.gd` in two places; D0237 moved it to `core/` and neither row
+followed. And `scenes/sky_painter.gd` still read `LIFT` with the note *"reads 8 private fields off the
+coordinator"* -- the paragraph that made the coordinator rebuild look expensive. Marked LANDED, and the
+caveat closed with what actually measured: the reach-in is FOUR KINDS across all five painters, five of
+sky_painter's own eight fields are one `marks` array, and the state object is `view/frame.gd`.
+
+**What was left alone, deliberately.** The map's Finding 02 counts (*"view/ 1 files 0 code"*) are now
+false, and stay. That document is a PINNED-HASH record of two specific commits; its verdict column is
+living (existing rows already carry `**LANDED**`), its measurements are history. Editing the measurements
+would destroy the thing the pin exists for.
+
+**Population check on the map itself:** every one of the 7 `**LANDED**` addresses it names resolves in the
+tree. A broader sweep of all current-side paths flagged 7 more as missing and all 7 were false positives
+-- legacy-manifest rows are written relative to `legacy/`, where each exists. Recorded so the next person
+running that sweep does not re-derive the same false alarm.

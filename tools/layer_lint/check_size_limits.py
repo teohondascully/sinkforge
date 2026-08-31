@@ -9,7 +9,12 @@
   **10 of the 18 tracked MODULE.md files exceeded, with nothing checking it** -- a rule no instance obeys
   is not a cap, it is a comment. The director ruled the number up to one the tree can meet rather than
   spending an hour deleting prose somebody wrote on purpose. Worth knowing when it next fires:
-  `core/MODULE.md` is 98, so the headroom on the largest file is two lines.
+  `core/MODULE.md` is at **exactly 100** as of 2026-08-30 (D0237 moved `Seams` into `core/` and the
+  entry was written as a pointer to fit), so the headroom on the largest file is ZERO and the next
+  public class added to `core/` trips this gate. That is deliberate debt, raised as NEEDS_DIRECTOR
+  P014 with the choice a number owes -- do not resolve it by trimming prose again, which is how
+  `sim/body/body.gd` sat at exactly 400 for three commits (docs/QUALITY.md §2). Second-largest is
+  `sim/terrain_gen/MODULE.md` at 91, so this is one file's problem, not the tree's.
 - No function over 50 lines. Cyclomatic complexity is NOT checked here
   (this script only counts lines); if that gate is wanted later it needs a
   real branch-counting pass, not a line-based approximation pretending to
