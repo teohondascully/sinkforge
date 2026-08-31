@@ -10670,3 +10670,33 @@ the docs exclusion is not over-broad.
 
 The honesty test the ruling named — a pure-instrument PR with no game and no docs must still be caught —
 is branch 1, and it still fails the build. Nothing was loosened into silence.
+
+## D0260 · Suite selection for the inner loop, and the comment that made it useless · 2026-08-31
+
+The local sweep is ~9 minutes for 43 suites, and after a `view/` change nearly all of it is measuring
+things the change cannot reach. `tools/select_suites.py` builds the class-reference graph, takes the
+transitive closure of each suite, and runs only the suites a changed file lies inside.
+
+**Scoped deliberately as an accelerator, never a gate.** The full sweep still runs before every push and
+CI still runs all 43. Every ambiguity resolves toward selecting more: an unmodelled path, anything under
+`data/`, shared machinery (`test_base.gd`, `run_gd_test.sh`, the selector itself) and any non-`.gd` file
+all select the whole tree and print why. The reason for that asymmetry is that a suite selector's failure
+mode IS this project's house failure class — it returns a green that means "not run" in the same voice it
+uses for "passed", and nothing downstream can tell the two apart.
+
+**The finding worth keeping is why the first version was useless.** It selected all 43 suites for every
+input. The cause was `sim/body/body.gd:70` — a docstring recounting a D0042 reachability analysis, which
+names `ShaftGenerator` in prose. Token matching read that as a dependency, so `body.gd` depended on
+`shaft_generator.gd`, which depends on `value_noise.gd`; `test_base.gd` depends on `body.gd`, and every
+suite extends `test_base`. One sentence in one comment welded the entire graph shut.
+
+That is `clustering-fuses-on-the-coordinator` in a new costume: a shared node makes everything reachable
+from everything, and here the shared node was *prose*, not code. It is a specific hazard of this
+repository, whose WHY-comment density is deliberately high and whose comments routinely name classes they
+do not call. The fix strips comments and string literals before matching; `res://` preloads are extracted
+from the raw text first, so real dependencies expressed as strings survive.
+
+**Verified by set, not by count** (`equal-counts-different-sets`): `value_noise.gd` selects 7 suites
+INCLUDING `test_shaft_replay_determinism`; `material_look.gd` selects 7 EXCLUDING it, sharing only 3 with
+the first. Two selections of identical size that are not the same selection — checking the count alone
+would have proved nothing.
