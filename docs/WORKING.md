@@ -74,7 +74,40 @@ counted code. Now `+1185/+812 PASS`. Mutation-tested with the branch that matter
 **Merge by REBASE stays load-bearing** and is the reason that verification exists — a merge-commit or
 squash writes `noreply@github.com` into `main` permanently.
 
-## STOPPED AT ◆ — sky_painter draws, and the world has no sky to jump into (D0243–D0250)
+## STOPPED AT ◆ — PR #10 is parked on gate 7, and the queue's next item is on the EXPENSIVE line
+
+**PR #10 (`run/generator-defects`, 7 commits) is green on authorship, all 43 test suites, and headed
+boot. It is red on gate 7 only** — instrument +1148 against game +542 over the last 10 population-touching
+commits. Per `docs/MASTER_PLAN_AUG30.md` §10 that is **park, never bypass**, so it is held open with the
+reason recorded on the PR. The gate's own message names the remedy: "the next unit of work is game, not
+another check." That is WG-3. This is the same shape that unblocked #6 (P012/D0250) — let the gate judge
+the whole arc, no override, protection untouched.
+
+**Why the loop stopped rather than starting WG-3.** The octave port requires re-deriving
+`FASTNOISELITE_SD_CALIBRATION`, and that constant governs how *every* threshold ported from legacy
+behaves. Re-deriving it is a threshold move in effect if not in spelling, which the queue's own EXPENSIVE
+list reserves for you. **This is the ◆ and it is one ruling.**
+
+**What landed on the branch this run:**
+
+- **D0255** — gate 8's determinism golden re-captured from CI's pinned Linux build. Cross-checked against
+  the local macOS run **elementwise, 200 of 200 identical**. Divergence at checkpoint 0 (not partway) is
+  the corroborating shape for a seed that reaches the field before the first cell is written.
+- **D0256** — `test_reveal_replay_driver`'s seed was pinned to a coincidence of the truncated noise field.
+  It still reached its target column and still fired 6 digs, but hit glimmer **0 times**. Re-picked by
+  scanning 59 seeds. **The finding is that only 37 of 59 (63%) qualify at all** — `find_spawn` picks a
+  glimmer COLUMN, the approach digs at the body's ROW, and nothing makes them meet. The durable fix is
+  parked because `find_spawn` is shared with `reveal_scene.gd`'s live spawn.
+- **D0257** — carve fraction measured for the first time in this repository. **Shelf bands carve 0 of
+  97,920 cells** over six seeds; non-shelf 5.37%; overall 3.58% against legacy's stated ~15%. WG-2 is now
+  confirmed empirically, not only analytically. Both ratchets mutation-tested.
+
+**The instrument that was not there.** Cave coverage was `open_count > 0` — "opened at least one cell".
+That floor cannot separate 15% from 3%, and cannot see a band that carves exactly zero at every seed.
+Four defects sat green behind it. The new measurement partitions rather than pools, because 3.58% is
+equally consistent with "uniformly thin" and "normal except impossible inside shelves".
+
+## Earlier — sky_painter draws, and the world has no sky to jump into (D0243–D0250)
 
 **The ◆ is P015 and it is your eye on two images.** `view/visuals/sky_painter.gd` is lifted, wired to the
 `Frame`, layer-clean, drawing, and milestone-captured — `docs/milestones/slice3_horizon_23b0ec4.png`

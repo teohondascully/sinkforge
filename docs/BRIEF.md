@@ -4,146 +4,136 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-30. This round: P013 ruled and enforced, `sky_painter` lifted and DRAWING, Bin A
-run to exhaustion — and then you played it, which found more than the run did.**
-`docs/DECISIONS_LEDGER.md` D0243–D0250. **NO OPEN PRs**: #6, #7 and #8 are merged as one rebase of 17
-commits, P012 closed with them. **STOPPED at P015, the ◆** — and P015 should now be ruled together with
-**P017**, because you found that the sky has no air in it.
+**Last updated: 2026-08-31. This round: the legacy gap read and ranked, four generator defects found, and
+the instrument built that should have caught them years ago.** `docs/DECISIONS_LEDGER.md` D0252–D0257.
+**One open PR (#10), parked on gate 7, not bypassed.** **STOPPED at P020, the ◆** — one ruling, and it
+unblocks WG-2, WG-3 and the PR together.
 
-**Headline: the sky is on the screen, and you cannot jump into it.** `sky_painter` runs through the
-`Frame` contract, draws to its own canvas, and is layer-clean. Then you played it and found that row 0 is
-the surface, the top of the world, and the horizon simultaneously — so the backdrop this run lifted is
-drawn into a region the player is physically barred from entering (D0249, P017).
+**Headline: shelf bands carve 0 of 97,920 cells, and the test that was supposed to notice asserted
+"at least one cell".** Cave coverage was `open_count > 0`. That floor cannot separate legacy's intended
+~15% carve from our 3.58%, and it cannot see a band that carves exactly zero at every seed and every
+coordinate. Four defects sat behind it. Nothing in this repository measured carve fraction until this run.
 
 ---
 
 ## What landed
 
-**P013 · ruled AND enforced** (D0243). `view/` may read appearance data from `data/`. The ruling is the
-cheap half; the load-bearing half is that `data` is now a **modelled** layer — an unmodelled edge cannot be
-enforced, which is the vacuous-gate shape this project keeps finding. Mutation-tested both directions: a
-legal `view→data` edge passes, a planted `view→sim` edge fails. `data: set()` is the line that stops
-`data` laundering a dependency onward. ADR 0008; the lint's suite went 8 → 11 branches.
+**`docs/LEGACY_GAP.md` (D0253)** — the complete ranked backlog `docs/MASTER_PLAN_AUG30.md` §3 asked for.
+The honest fraction is **16.0%**: of roughly 667 legacy capabilities, ~527 still live, and the migration
+map overstated what had crossed. Four measured generator defects outrank everything in it.
 
-**`sky_painter` lifted** (D0244). ~341 lines, split for the 50-line gate. Two adaptations, both **derived
-rather than dialled**: `SCALE = TERRAIN_CELL_PX / LEGACY_CELL_PX` (this world's cell is 4px, legacy's was
-32), and the horizon pinned to the surface datum rather than legacy's `SURFACE_LINE * CELL`. Four
-before/after milestone pairs at `docs/milestones/slice3_*_23b0ec4.png`; the horizon pair goes 168 → 199
-distinct colours over the same world. Two seams also left `tests/body/reveal_scene.gd`, which was at
-398/400 — `RevealArgs` (now a pure function of argv, and therefore testable at all) and `RevealRecording`.
+**WG-1 · Only 65,536 distinct worlds existed (D0254).** `_lattice_hash` masked `seed & 0xFFFF`. Any two
+seeds congruent mod 65,536 produced a bit-identical world; `SplitRng` hands out 64 bits and 48 were
+discarded before reaching a cell. The existing divergence test compared seeds **1 and 2** — the defect
+lived entirely in the high bits, and a test that only ever moves the bottom bit can never see it.
 
-**The empty-state class, caught** (D0245). It had landed **four times**, each time in a test written by
-someone being careful. `TestBase.over()` / `_check_over()` refuse an assertion whose population is EMPTY
-even when the condition is true, and say VACUOUS rather than reporting an ordinary red — *"your fixture
-built nothing"* and *"your code is wrong"* must not read alike in a log. **14 call sites, 7 suites.**
+It carried a second, older bug out with it: `_grow_vein` had a floor and no ceiling, so topsoil glimmer
+could grow past `topsoil_end`. That test was green on a coincidence of the old 16-bit field.
 
-**Bin A verification pass** (D0246). P014 confirmed; refs/t3 verified; two stale `seams.gd` addresses and
-`sky_painter`'s "8 private fields" caveat fixed in the migration map; one null result.
+**D0257 · The carve-fraction instrument.** Partitioned, not pooled — 3.58% overall is equally consistent
+with "carving is uniformly thin" and "carving is normal except impossible inside shelves", which are
+different bugs with different fixes:
 
-**Evidence:** 42/42 suites pass, determinism included. **16 gates green**, each run bare so the exit code
-is the gate's own.
+| partition | carved / eligible | fraction |
+|---|---|---|
+| shelf bands | **0 / 97,920** | **0.0000** |
+| non-shelf | 10,488 / 195,264 | 0.0537 |
+| overall | 10,488 / 293,184 | 0.0358 |
+
+Both ratchets mutation-tested before being trusted. Two of the three assertions pin a **defect** on
+purpose, so the octave port turns the suite red instead of improving the world silently.
+
+**D0252 · Legacy's bedding and cell jitter, ported in metres.** The depth-zone tint came with them and is
+**parked, not shipped** — it collided with glimmer legibility (P019). Final palette: 0.273 against a
+0.244 baseline, all three metrics improved.
+
+**D0255, D0256 · Two fixtures re-pinned**, both broken by the seed fix, both green beforehand on
+coincidence.
+
+---
 
 ## What was learned
 
-### The invariant guarding the ceiling is indistinguishable from the defect
+**A divergence test is only as wide as the bits it actually moves.** `_test_different_seeds_diverge`
+compared 1 against 2. The defect was a 16-bit mask. Four months of green. The replacement walks a bit up
+through the word — 2^16, 2^20, 2^32 — and asserts the results are **pairwise distinct**, because the
+weaker "each differs from the base" form passes on a hash that maps every offset to one single value.
 
-You could not jump above the surface. `test_reveal_spawn_bounds` measures that exact region on every run
-— it holds JUMP from every spawn and asserts the head never reaches y=0 — and **passes**. "The player
-cannot leave the world" and "the player cannot leave the ground" are the same measurement taken from
-opposite intents, so no amount of test-writing would have surfaced this. Only someone trying to jump
-could. Row 0 is the surface datum, the top of the grid, and `HORIZON_Y` at once; legacy had 20 rows of
-air and re-keying the band ladder to metres-below-surface dropped them silently, because nothing had ever
-been drawn up there to notice.
+**A fixture can be green on a coincidence, and the legible numbers stay green when it stops being one.**
+`test_reveal_replay_driver` still reached its target column and still fired **6 dig events** after the
+seed fix. Only `dug_material == glimmer` moved, from some to **zero**. The real finding is not the new
+seed: only **37 of 59 seeds (63%)** qualify at all, because `find_spawn` picks a glimmer COLUMN and the
+scripted approach digs at the body's ROW, and nothing in the setup makes them meet.
 
-### Nothing in this repository had ever opened a window
+**Measure what the code computes, not what the constant is named after.** Checking WG-2, the first probe
+called `ValueNoise.sample()` without the calibration, measured ±0.999, and appeared to *refute* the claim.
+The calibration is applied by the caller — which `value_noise.gd:25` states in its own header. Re-measured
+correctly: `[-0.5734, +0.5732]` over 288,000 samples. The claim was right and the check was wrong.
 
-42 suites, 16 gates, three CI checks — all `--headless`. So a scene could boot, render, satisfy every
-assertion here, and still not do what its own header tells a human to type. That is what you hit. The
-deepest of the three defects was that `_test_every_flag_is_reachable` **could not see** the missing
-`--play`: it drew its population from the parser's own keys, making it complete about what the parser
-declares and blind to what it omits — the same shape as the vacuous-population class I'd spent the run
-building a guard for, one level up.
+**An empty result is indistinguishable from a passing one without a positive control** — and this session
+proved it on itself. The first local golden capture invoked `run_gd_test.sh` without its required
+godot-binary argument. The wrapper printed usage and exited; the harvest pipeline found nothing; piped
+through `grep`, the shell reported **exit 0**. That is `existence-probe-has-no-witness`, reproduced by the
+session that had just written the memory. The same shape is why the carve instrument asserts
+`shelf_eligible > 0` **before** reporting a fraction: 0.0 over an empty population is not a small number,
+it is no number.
 
-### The guard found a live instance of its own bug on its first outing
+**The useful half of a mutation test can be the assertion that did NOT move.** Removing the shelf
+resistance failed WG-2's ratchet and left the non-shelf figure at **exactly 0.0537** — which is what
+proves the two partitions are independent measurements rather than one number wearing two hats.
 
-The three fuzz suites gate on `counts[kind] == 0` across the probe's whole output. Their only population
-guard was `summary_line != ""` — a **presence** check. A probe that simulated nothing *still prints a
-summary line*, so `total_ticks=0` passes it and then satisfies every hard-zero assertion beneath it. The
-full sweep now reads `over 1500000 item(s)` where it previously reported nothing at all. This is the house
-failure class (an instrument that cannot register its subject) sitting inside the fuzzer, found only
-because something made the population print.
+**Divergence shape is evidence about cause.** The golden diverged at checkpoint **0**, not partway
+through — correct for a seed that reaches the field before the first cell is written. A D0213-style
+mid-run divergence would have been evidence *against* the stated cause. Coverage stayed byte-identical
+across both platforms (`jumps=895 digs=261 corner_ok=9`), which separates "the world changed" from "the
+probe stopped exercising the same surface".
 
-### Two rules that stop a guard becoming decoration
-
-Both came out of the retrofit and both now live in the guard's own docstring. **Direction:** only
-assertions that PASS on empty need it. `gaps.size() > 3` already fails on an empty field, so wrapping it
-adds a guard that can never fire — one retrofit was reverted on this ground, with the reason left at the
-call site so it doesn't read as an oversight. **Counted, not computed:** `SEEDS * SITES.size()` is a
-product of two constants and cannot register a loop body that never executed.
-
-### Mutation-testing the guard is what made it a guard
-
-Disabling `if count <= 0` turned the new suite red on 3 assertions — and flipped its *deliberately
-failing* line to PASS, which is the vacuous pass made visible. Reaching a check is not the check firing.
-
-### A stale number in a gate's own header is worse than one in a doc
-
-`check_size_limits.py` still read *"`core/MODULE.md` is 98, so the headroom is two lines."* It is at
-**exactly 100** and the headroom is **zero**. Someone reading the gate to decide whether they could add a
-class to `core/` would have been told yes by the thing enforcing no.
+---
 
 ## The decisions this round is waiting on
 
-**`docs/NEEDS_DIRECTOR.md`, 10 items.** P011 and P013 closed by your rulings; **P012 closed by the merge**
-(D0250); **P018 closed by your ruling on gate 7's window** (D0251) — it now counts only commits that
-touched either population, so documentation no longer moves a verdict it contributes nothing to.
+**`docs/NEEDS_DIRECTOR.md` is at 12 items. P020 is THE ◆ and it is one ruling.**
 
-- **P017 — new, and I'd rule it WITH P015.** There is no air above the surface: row 0 is the surface, the
-  grid's ceiling, and the horizon. Your jump has a 74px apex (~18 rows) and nowhere to spend it. Whether
-  the sky is enterable decides several of P015's look calls — the ridges' angular size, the crown's
-  anchor, whether `--sky` defaults on. Three options in the entry; I picked none, because adding air rows
-  changes what every existing capture, recording and spawn-row derivation means.
+**P020 · Port legacy's 5 octaves — and re-derive the constant that governs every ported threshold.**
+Confirmed by printing it, not by trusting the plan: `FastNoiseLite` defaults to `FRACTAL_FBM`, **octaves
+5**, lacunarity 2.0, gain 0.5, and legacy left it there. Ours is single-octave. The port is mechanical;
+`FASTNOISELITE_SD_CALIBRATION = 0.574` is not — it was measured against the single-octave distribution, so
+porting forces re-deriving it, and that constant sets the rate at which **every** legacy-ported threshold
+clears. Three options are written out in full in P020. I would take (1), port faithfully and re-derive by
+measurement, because the 15% gap and the impermeable shelf are the same defect wearing two faces.
 
-- **P015 — THE ◆.** Two images and your eye. Four things I noticed and deliberately did **not** tune: the
-  pinned dusk values, the ridges' angular size in this world's tighter camera, the Sinkforge crown
-  anchored at a spawn plateau this build doesn't have, and whether `--sky` should be on by default.
-- **P016 — new.** The fuzz sweep measures `grounded_no_floor=46` against a bound of **59**, and
-  `bounds=1179015` against a recorded 805,397. **Measured twice, byte-identical** — a stable count at a
-  moved trajectory, not noise. Nothing is red, which is the point: 13 counts of slack is 13 counts of
-  regression the gate won't catch. Not ratcheted, because D0184 is your own ruling that 59 is provisional.
-- **P014 — `core/MODULE.md` at exactly 100, zero headroom.** One number. 120 restores the margin 100 meant.
-- **P001, P004, P007, P008, P009, P010** unchanged.
+**P019 · The depth tint is ported and unapplied**, because Stonereach slate-blue and glimmer teal are
+hue neighbours. Two images and your eye.
+
+**P015, P017** still open and still worth ruling together.
+
+---
 
 ## Anything that felt wrong even though it passed
 
-**Everything I shipped this round was green, and you found two real things in about ten minutes of
-playing.** Not by reading the code — by typing the command I documented and then trying to jump. Both
-findings are in classes this repository has written extensively about, and both sat under a full green
-board: one because no instrument opened a window, one because the test covering the region reads the
-defect and the invariant identically. The lesson I'd carry is not "write more tests" — it is that **a
-green board is evidence about the instruments, and the instruments here had a shared blind spot that only
-a person at the keyboard could stand outside of.**
+**The overnight queue did not exist.** `.claude/commands/loop.md` requires it in `docs/WORKING.md` before
+a `/loop` run starts and **forbids the running session from authoring it** — the safety property is that
+the queue comes from a spec you handed down. There was no such section. I transcribed Tier 0 with its
+provenance stated and closed it to extension rather than inventing one, and your own message named the
+same work. **It does not fully satisfy the rule.** Confirm or replace it.
 
-**I also dated two ledger entries 2026-08-31**, taken from GitHub timestamps and from recording filenames
-Godot writes in UTC. `date` says 2026-08-30 23:16 PDT and every other entry follows the local commit
-date. Corrected before they hardened — but it is the same class as the path I invented earlier in the
-run: a constant that *feels* derived rather than looked up.
+**Gate 7 is red on PR #10 and I did not merge.** Instrument +1148 against game +542. §10 says park, never
+bypass, so it is held open with the reason recorded on the PR. The gate's own message names the remedy —
+"the next unit of work is game, not another check" — and that unit is WG-3, which is blocked on P020.
+Same shape that unblocked #6: let the gate judge the whole arc, no override.
 
+**WG-4 is untouched on purpose.** `data/strata/shallow_clay.yaml` converted its metre-denominated fields
+and left every cell-denominated one verbatim, so at 0.25 m/cell every feature is 4x smaller in length and
+16x in area than the constant was tuned for — while the file's own header claims "SAME ratios/behavior".
+It is squarely inside the EXPENSIVE list. It is yours.
 
-**I wrote two capture paths into `WORKING.md` that did not exist**, from memory rather than from the tree
-(`history/` instead of `docs/milestones/`), and caught it only because I ran `ls` before shipping the
-sentence. The colour counts beside them were right; the addresses were not. Nothing downstream consumed
-them, but a doc that names a path nobody checks is exactly the drift this round spent a commit fixing —
-the D0246 pass found the same shape in the migration map, written by an earlier session for the same
-reason. **The rule that catches it is cheap: resolve every path you type against the filesystem, in the
-same breath as typing it.**
+---
 
 ## Blocked, and what it's waiting on
 
-- **Phase 2 is `terrain_painter`, and then dry.** `water_view`, `rope_view` and `falling_items` need
-  `sim/fluid`, `sim/transport` and `sim/items` — still zero lines of code.
-- **`data/economy/` D1-D6**, **line of sight**, the **`ValueNoise` float gap**, **three GDD
-  contradictions**, **`history/`'s 168-image cull** — all unchanged, all yours.
+**PR #10** — 7 commits, green on authorship, all 43 suites and headed boot. Gate 7 only. Waiting on P020.
+
+**43 of 43 suites pass locally**; every structural gate except 7 passes locally and on CI.
 
 ## Taste queue
 
