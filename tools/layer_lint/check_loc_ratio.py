@@ -211,13 +211,39 @@ def main() -> int:
         instrument_growth > GROWTH_FLOOR
         and instrument_growth > RATIO_LIMIT * max(game_growth, 0)
     )
+    # D0259. The velocity signal is real and stays; BLOCKING on it was wrong, because it cannot tell a
+    # run that has stopped building the game from a run that is deliberately building the instrument the
+    # game needs. PR #10 was the case in point: +1148 instrument against +542 game, every line of it
+    # infrastructure that FOUND four generator defects, blocked by a gate whose own remedy line said
+    # "the next unit of work is game" -- advice that was already being followed in the same branch.
+    #
+    # So: warn always, block only on the condition the gate is actually named for. "You have stopped
+    # building the game" is not a ratio, it is game growth of ZERO. If game grew at all, porting is
+    # happening and the ratio is a matter of pace, not of direction.
+    #
+    # GROWTH_FLOOR is REUSED rather than a second threshold invented, and that is the whole diagnosis:
+    # it already answers "is this window big enough to judge at all", which is the same question an
+    # egregious-bloat floor would have to answer. What the block admits, stated plainly: any window in
+    # which game LOC grew by even one line, and any window whose instrument growth is under
+    # GROWTH_FLOOR lines. What it catches: a window that added more than GROWTH_FLOOR lines of
+    # instrument and not one line of game.
+    stopped_building_the_game = instrument_growth > GROWTH_FLOOR and game_growth <= 0
 
-    if violates_velocity:
-        print(f"check_loc_ratio: FAIL -- instrument grew {instrument_growth} lines against game's "
-              f"{game_growth} over the last {WINDOW_COMMITS} commits that touched either population, "
-              f"more than {RATIO_LIMIT:.0f}x. "
+    if stopped_building_the_game:
+        print(f"check_loc_ratio: FAIL -- instrument grew {instrument_growth} lines and game grew "
+              f"{game_growth} over the last {WINDOW_COMMITS} commits that touched either population. "
+              "Not a ratio complaint: game LOC did not move AT ALL while the instrument did. "
               "Per docs/CLAIMS.md, the next unit of work is game, not another check.")
         return 1
+
+    if violates_velocity:
+        print(f"check_loc_ratio: WARNING (not blocking) -- instrument grew {instrument_growth} lines "
+              f"against game's {game_growth} over the last {WINDOW_COMMITS} commits that touched either "
+              f"population, more than {RATIO_LIMIT:.0f}x. This is the polish-the-machine-neglect-the-game "
+              "signal and it is worth reading, but game LOC IS growing, so it does not block. It blocks "
+              "only when game growth reaches zero.")
+        print("check_loc_ratio: PASS (with velocity warning)")
+        return 0
 
     print("check_loc_ratio: PASS")
     return 0

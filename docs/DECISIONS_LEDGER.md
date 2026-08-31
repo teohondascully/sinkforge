@@ -10626,3 +10626,47 @@ load-bearing row is the nonzero check, not the ratio.
 said, correctly, that matching SD guarantees only that "a fixed threshold clears at approximately the
 same rate". That word *approximately* was carrying one third of every shaft. A caveat written in prose
 beside a constant does not constrain the constant — the test now measures the tail directly.
+
+## D0259 · Gate 7 warns on pace and fails only on direction; two of the three requested changes were already landed · 2026-08-31
+
+The director asked for three gate-7 changes. **Two of them were already in the tree, and the honest
+report is that they did not need doing** — verified by reading the code and by the gate's own tests, not
+by assuming:
+
+- **Change A, exclude docs from both populations.** Already landed. `INSTRUMENT_DIRS` is
+  `[harness, experiment, tools, tests]` and `GAME_DIRS` is `[core, sim, interface, view, shell]`; `docs`
+  appears in neither, and `.md` is not in `CODE_EXTENSIONS` — excluded twice over. The gate's own
+  differential test builds two repositories with identical population history, one with docs commits
+  interleaved, and asserts the measured window is identical: `instrument 953 -> 1453 (+500), game 840 ->
+  1440 (+600)` both ways. Over the real window that tripped this run, `docs` moved **+1923 lines with
+  zero effect on the verdict**.
+- **Change B, de-gate the absolute ratio.** Already landed, by the director's own earlier ruling
+  (D0147). The script prints `absolute ratio = 3.365 (instrument / game) -- informational, does not gate`
+  and has only ever gated on velocity, at any point in its history.
+
+**Change C is the real one, and it was a genuine defect.** The velocity condition blocked. It cannot
+distinguish a run that has stopped building the game from a run deliberately building the instrument the
+game needs — and PR #10 was the second kind: +1148 instrument against +542 game, every instrument line
+part of the measurement that found four generator defects, blocked by a gate whose own remedy text reads
+"the next unit of work is game" while the branch it blocked was doing that in the same commits.
+
+So: **warn on pace, fail on direction.** The velocity warning fires and stays visible whenever instrument
+outgrows game by more than `RATIO_LIMIT`. The build fails only on `instrument_growth > GROWTH_FLOOR and
+game_growth <= 0` — game LOC not moving *at all*.
+
+`GROWTH_FLOOR` is reused rather than a second threshold invented, and that reuse is the whole diagnosis:
+it already answers "is this window big enough to judge", which is the same question an egregious-bloat
+floor would have to answer, and inventing a second number would have meant defending a magnitude nobody
+measured. Stated plainly, the block **admits** any window in which game LOC grew by even one line, and any
+window whose instrument growth is under `GROWTH_FLOOR`; it **catches** a window that added more than
+`GROWTH_FLOOR` lines of instrument and not one line of game.
+
+Proven in both directions, four ways, in `tools/layer_lint/test_check_loc_ratio.py` (13 branches):
+instrument-only still FAILS *and* now asserts it failed on the zero-game condition rather than on a
+ratio; instrument at 3x game with game growing PASSES **and** prints `WARNING (not blocking)`; a balanced
+window passes and prints **no** warning at all, so the warning is conditional rather than decoration; and
+a commit touching only an uncounted file under `tools/` still does not admit a commit to the window, so
+the docs exclusion is not over-broad.
+
+The honesty test the ruling named — a pure-instrument PR with no game and no docs must still be caught —
+is branch 1, and it still fails the build. Nothing was loosened into silence.

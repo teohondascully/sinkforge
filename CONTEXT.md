@@ -60,10 +60,11 @@ Two rules that follow from this, and they are the most important process rules i
 
 - **No harness surface without a claim it serves.** Every check must trace to a claim ID. This is the direct fix for the failure mode that produced the previous codebase, where instrumentation grew 90% in five days while the game grew 9%.
 - **Instrument LOC growth may not outpace game LOC growth.** A trailing-window velocity check
-  (`docs/QUALITY.md` gate 7, `tools/layer_lint/check_loc_ratio.py`), enforced in CI. The absolute
+  (`docs/QUALITY.md` gate 7, `tools/layer_lint/check_loc_ratio.py`), reported in CI. The absolute
   instrument/game ratio is reported alongside it, not itself a gate — see gate 7's own text for why that
-  distinction is load-bearing, not a downgrade. When the velocity check fails, the next unit of work is
-  game.
+  distinction is load-bearing, not a downgrade. The velocity condition **warns**; it **blocks only when
+  game LOC growth is zero** (D0259). Pace is a signal worth reading; direction is the only one worth
+  failing a build over. When it fails, the next unit of work is game.
 
 Format and workflow: `docs/CLAIMS.md`.
 
