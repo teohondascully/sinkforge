@@ -10859,3 +10859,43 @@ count rather than a glance at the rollup.
 
 Corrected: the `tests` job holds **42** suites; `fuzz_nightly` holds `test_body_fuzz.gd`, and conflating
 the two is what caused this.
+
+## D0267 · One suite was 347s of a 351s sweep, because it generated the same 128 worlds three times · 2026-08-31
+
+`tests/test_reveal_spawn_bounds.gd` makes three assertion passes over the same 64 seeds x 2 sites, and
+each pass called `ShaftGenerator.generate` again — **384 generations**. Measured, and the decomposition
+is the useful part:
+
+| | |
+|---|---|
+| `ShaftGenerator.generate`, 48x1024 | **858 ms** |
+| of which `sample_fbm` (5 octaves) | 414 ms |
+| of which signature upkeep (D0261) | 91 ms per 49,152 writes, ~1.9 µs each |
+
+384 x 858 ms = 329 s, against the 347 s this suite actually took. **The suite was the sweep**, and the
+cost is world generation, not test logic — which also answers why unremarkable-looking suites sit at 17 s:
+they build ~20 worlds. The five-octave port (D0258) made each world ~1.7x costlier, and that is a real
+price paid for matching legacy's field, not a regression to undo.
+
+Each `(site, seed)` world is now built once and handed out as a `TileGrid.clone()`. **347 s → 120 s**,
+2.9 x, and 128 x 858 ms = 110 s is now the floor: the remaining work is simulation, not generation.
+Going below it means generating fewer worlds, which means asserting over fewer, which is not on offer.
+
+**Same coverage, proven rather than claimed.** Every `[OBSERVED]` line and every assertion from before
+the change was captured and diffed against after: **17 of 17 identical**, the only difference being three
+NEW assertions guarding the cache itself.
+
+**The cache holds PRISTINE worlds and never hands out the stored instance.** `build_on` carves an entry
+shaft, so returning the cached grid would let the first caller's shaft appear in every later pass — the
+exact defect this suite exists to detect, injected by its own optimisation. `_pristine` returns a clone,
+and `_test_the_cache_hands_out_independent_worlds` proves it by carving one copy and asserting the next
+copy's signature is untouched, with a positive control first that carving moves a signature at all.
+
+This stays clear of `docs/NEEDS_DIRECTOR.md` P007, which asks whether two passes may SHARE one carved
+grid. Nothing is shared here; it is copied. `Dictionary.duplicate()` without `true` is correct rather
+than sloppy — the values are `StringName` and `Vector2i`, immutable in GDScript, so a shallow copy of the
+mapping already yields independent state.
+
+`RevealSessionSetup.build` was SPLIT rather than duplicated: `build_on(grid)` is everything except
+generating, and `build` is now one line calling it. One definition of what a reveal session's starting
+state is, which is that file's stated reason to exist.
