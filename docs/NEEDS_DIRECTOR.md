@@ -484,3 +484,46 @@ legacy's smallest nugget mark is 6.4px, larger than this world's entire 4px terr
 **What did NOT get resolved by lowering the floor**, and deliberately: the 0.25 is a measured legibility
 claim about whether a player can find ore, not a convenience. Landing the tint by relaxing it would have
 been the shipped-claim-retired-silently failure this project keeps finding.
+
+## P020 · The cave field is single-octave where legacy's is five, and porting it re-derives a constant that governs every ported threshold
+
+**One ruling. It unblocks WG-2, WG-3 and PR #10 together.**
+
+Legacy left `FastNoiseLite.fractal_type` at Godot's default. Confirmed by printing it rather than
+trusting the plan: `FRACTAL_FBM`, **octaves 5**, lacunarity 2.0, gain 0.5. Corroborated twice inside
+legacy itself — `src/core/fine_terrain.gd:102` and `scenes/fine_terrain.gd:488` both explicitly set
+`FRACTAL_NONE` *because* the default is 5-octave FBM. `ValueNoise.sample()` is one octave.
+
+**What that costs today, now measured** (`tests/test_shaft_generator.gd`, six seeds):
+
+| partition | carved / eligible | fraction |
+|---|---|---|
+| shelf bands | **0 / 97,920** | **0.0000** |
+| non-shelf | 10,488 / 195,264 | 0.0537 |
+| overall | 10,488 / 293,184 | 0.0358 |
+
+against legacy's own stated target of "near 15% of the underground". Shelf bands need 0.65–0.81 to carve
+and the calibrated field is hard-bounded to ±0.574 **by construction**, so no seed and no coordinate ever
+breaches one. Legacy's shelf was a resistance gradient. Ours is a wall, and nothing said so.
+
+**Why this is yours and not mine.** The port itself is mechanical — five octaves, halving amplitude,
+doubling frequency, a different seed per octave, FastNoiseLite's own `fractalBounding` normalisation.
+The problem is `FASTNOISELITE_SD_CALIBRATION = 0.574`. It was measured against the *single-octave*
+distribution, and a 5-octave field has a different one, so the port forces re-deriving it — and that
+constant is what makes **every threshold ported from legacy** clear at the rate it was tuned for. Changing
+it moves cave density, shelf permeability and ore exposure at once. That is a threshold move in effect if
+not in spelling, and the overnight queue reserves those for you.
+
+**Three ways to go:**
+
+1. **Port the octaves and re-derive the calibration by measurement**, then re-pin the ratchets to whatever
+   the numbers turn out to be. Faithful to legacy, biggest blast radius, needs a golden re-capture.
+2. **Port the octaves and re-derive the calibration to hold the current carve fraction**, so the field
+   gains legacy's character without changing how much rock is removed. Smaller blast radius; declines the
+   3.58%-vs-15% question rather than answering it.
+3. **Rule that ~3.6% is the game you want** and delete the 15% target as a legacy artefact. Cheapest,
+   and WG-2 still needs a separate answer because a shelf that never carves is a bug either way.
+
+I would take (1): the 15% gap and the impermeable shelf are the same defect wearing two faces, and (2)
+fixes the face rather than the cause. But it re-rolls every fixture pinned to a generated world — this run
+has already re-pinned two of them (D0255, D0256) — so it is worth your explicit yes.
