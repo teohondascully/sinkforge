@@ -13,33 +13,42 @@ and three checks are required to merge. **Merge by REBASE, never merge-commit or
 those writes `noreply@github.com` permanently into `main` and the authorship gate then fails on every
 later commit, with no remedy short of a history rewrite. `docs/NEEDS_DIRECTOR.md` P010, D0231.
 
-**Reset this round:** D0213-D0223 are compressed to their results in the ledger. The parked queue
-`docs/NEEDS_DIRECTOR.md` is at **7 items** — read it FIRST if you are the director picking this up, and
-P011 is the one blocking live work.
+**Reset this round:** the parked queue `docs/NEEDS_DIRECTOR.md` is at **9 items** — read it FIRST if you
+are the director picking this up. P011 is CLOSED (you ruled it); P013 and P014 are new and cheap.
 
-**PR #6 IS READY AND PARKED, BLOCKED ON GATE 7 ALONE.** It adds **zero** instrument and **zero** game
-lines — only `.github/` and `docs/` — but gate 7's window is ten *commits*, so four docs commits evicted
-last round's `+685` game lift from view. Parked per the brief rather than squashed to move the window.
-`docs/NEEDS_DIRECTOR.md` P012, D0236.
+**TWO PRs OPEN, STACKED.** #6 carries Phase 0 (the contract) and is parked on gate 7 alone — P012.
+#7 carries the prerequisites + Phase 1 and is branched off #6, so the ledger stays sequential.
 
-## IN FLIGHT — the coordinator rebuild, stopped at its first gate (D0234)
+## STOPPED AT ◆ — Phase 1 delivered, awaiting your review (D0237, D0238, D0240)
 
-**Phase 0 is done and the run is STOPPED for the director, which is the brief's own instruction.** The
-deliverable is `docs/COORDINATOR_CONTRACT.md`: the measured painter reach-in surface, a proposed `Frame`
-contract, and the `observe()` mapping. **No code was written.** `docs/NEEDS_DIRECTOR.md` P011 indexes the
-five questions the ruling has to answer.
+**The prerequisites landed and the skeleton is built. Phase 2 does not start until you look.**
 
-**The two findings that matter most if you read nothing else.** The ten private fields the five painters
-reach for collapse to **four kinds**, and one of those — five separate UI fields in `sky_painter` — is a
-single `marks` array of "where not to draw stars"; passing it severs `sky_painter`'s only route to the
-dead economy. And **`water_view`, `rope_view` and `falling_items` are not blocked on the contract at
-all**: they need `sim/fluid`, `sim/transport` and `sim/items`, which hold **zero lines of code**. Nine of
-fifteen `sim/` modules are empty directories. That resizes Phase 2 to `sky_painter` + `terrain_painter`.
+**P0a — `Seams` is in `core/`** (D0237). `view` may depend on `{interface, core}` and not `sim`, and
+`sky_painter` calls `Seams.grain()` five times. `class_name` is path-independent so `test_seams` passes
+unchanged. **A correction to my own Phase-0 argument:** I called `Seams` "core-shaped" on the evidence
+that it references nothing — that tests what a file *imports*, not what it *means*. `at`/`aligned`/
+`RUN_CAP` are mining vocabulary; only `grain()` is domain-free, and it is the only thing `view/` calls.
 
-**The first painter trips a `view → sim` edge.** `sky_painter` calls `Seams.grain`, and `Seams` is in
-`sim/world/` (D0227). P008 predicted the first real outgoing `view/` edge would be the fixed lint's first
-genuine test; it arrives on the first file. Recommended fix is moving `Seams` to `core/` while it still
-has no consumers.
+**P0b — two doors through L2** (D0238). `Observation` carries `walls`/`wall_legend` and a per-column
+`Fx` `surface_y`. Neither is a new computation; both existed behind a `TileGrid` that `view/` may not
+hold. Each is derived **per window**, so a window above the floor reports `NO_FLOOR` rather than
+scanning past its own edge. ADR 0007 amended in place.
+
+**Phase 1 — the coordinator** (D0240). `view/world_view.gd` (101 lines), `view/frame.gd` (57),
+`view/paint_layer.gd` (45). **Nothing ported from `reveal_scene.gd`**, which sits at 398/400 with
+`_physics_process` at 49/50 — its arg parsing, agent-drive modes and recording flush are ~120 lines of
+non-coordinator work and stayed put. `MaterialLook` moved `tests/body/` → `view/visuals/`.
+
+**Evidence:** 39/39 suites pass, determinism included. Layer lint **mutation-tested on `world_view.gd`
+itself** — a planted `TileGrid` ref fails with the exact message, removing it passes. **Gate 7 green and
+positive: instrument +60 against game +464** (3,762 → 4,226).
+
+**Two things I got wrong and fixed inside the run.** My first draft had a `view → sim` edge
+(`Heightfield.TERRAIN_CELL_PX`), fixed by moving the conversion into `Interface.Envelope.covering()` —
+and the tempting repair, copying `material_look.gd`'s `CELLS_PER_METRE = 4`, would have been right by
+coincidence and wrong by construction. And the new suite's first draft asserted the observation window
+was "non-empty" over a window that was **entirely margin**, because a Godot node is not in the tree until
+a process frame passes.
 
 ## DONE LAST RUN — D0224 to D0233, five PRs
 

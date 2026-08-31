@@ -17,6 +17,8 @@ one — D0225), P005 (the unblocked lifts landed and the batch is genuinely dry 
 MODULE.md cap is 100 and enforced — D0226), and P007's two free sub-items (D0229, D0230). Their entries
 are deleted per the rule above; the ledger carries the rulings.
 
+**Closed 2026-08-30 by the coordinator rebuild, ruled and applied:** P011 (the painter contract — all five questions answered; `Seams` to `core/` is D0237, the two L2 doors are D0238, the skeleton is D0240, Phase 2 is confirmed as `sky_painter` + `terrain_painter`, and the day/night clock is pinned).
+
 ---
 
 ## P001 · The fast fuzz suite gates 5 of its 7 violation types
@@ -272,37 +274,7 @@ through later.
 The ruling you may want to make instead: disable merge-commit and squash-merge in the repository
 settings, so the constraint is enforced by the button rather than by remembering.
 
----
-
-## P011 · The coordinator→painter contract, Phase 0 — five questions, one of which resizes the run
-
-**Status:** open · **Cost to apply:** the ruling is five sentences; what it unblocks is Phases 1-3 ·
-**Raised by:** this session, 2026-08-30 (D0234)
-
-The full deliverable is `docs/COORDINATOR_CONTRACT.md` — measured reach-in surface, a proposed `Frame`
-contract, and the `observe()` mapping. **Nothing is built.** The brief's Phase 0 says stop here, so this
-is the stop. Read that document; this entry is the index to what it asks.
-
-1. **The `Frame` contract** (§2), and specifically that painters take an explicit `ci: CanvasItem` rather
-   than drawing through the coordinator. Legacy has both conventions; the rebuild must pick one.
-2. **Two missing doors through L2** (§3a): the wall plane and the per-column surface. Neither is a
-   missing computation — `TileGrid.get_wall` holds the plane the lode migration put ore into, and
-   `sim/body/heightfield.gd` derives the surface — but both take a `TileGrid`, which `view/` may not
-   touch. Adding `walls`/`wall_legend` mirrors the existing `materials`/`legend` pair in ~15 lines and
-   widens an ADR-gated surface. Without the wall door `terrain_painter` cannot draw the back wall, which
-   is much of what makes legacy's rooms read as rooms rather than holes in a sheet.
-3. **`Seams` to `core/`** (§4). `sky_painter` calls `Seams.grain` and `Seams` is in `sim/world/`, so the
-   first painter lifted is a `view → sim` violation the newly-fixed lint will catch. `Seams` has zero
-   project dependencies and one consumer (its own test), so the move is near-free *now*.
-4. **Phase 2's real scope** (§3b) — **this is the one that resizes the run.** `water_view`, `rope_view`
-   and `falling_items` are blocked on `sim/fluid`, `sim/transport` and `sim/items`, which contain **zero
-   lines of code**. They are not blocked on the contract and no contract shape unblocks them. Confirm
-   Phase 2 ends after `sky_painter` + `terrain_painter`.
-5. **The cosmetic day/night clock** (§3c). `sky_painter` needs `daylight()`/`day_phase()`, which have no
-   counterpart here. Does a game that starts underground want a day cycle, or does the sky land with its
-   clock pinned?
-
----
+--
 
 ## P012 · PR #6 is ready and blocked on gate 7 alone — and the reason is a property of the gate
 
