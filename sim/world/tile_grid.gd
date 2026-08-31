@@ -59,9 +59,7 @@ func get_material(terrain_cell: Vector2i) -> StringName:
 
 
 func set_material(terrain_cell: Vector2i, material_id: StringName) -> void:
-	_xor_cell(terrain_cell)  # out with the old term (no-op if the cell was not occupied)
-	_blocks[terrain_cell] = material_id
-	_xor_cell(terrain_cell)  # in with the new
+	_write_layer(_blocks, terrain_cell, material_id)
 
 
 func get_wall(terrain_cell: Vector2i) -> StringName:
@@ -70,13 +68,11 @@ func get_wall(terrain_cell: Vector2i) -> StringName:
 
 ## The wall only reaches the signature THROUGH an occupied cell -- `state_signature()` reads
 ## `get_wall()` for cells in `_blocks` and nowhere else. So setting a wall behind air legitimately
-## changes nothing, and `_xor_cell` is a no-op there by the same test the signature itself uses. Getting
+## changes nothing, and `_cell_term` returns zero there by the same test the signature itself uses. Getting
 ## this wrong in the other direction (always xoring) would desynchronise the running hash from the
 ## recomputed one, which is exactly what `_recomputed_signature()` exists to catch.
 func set_wall(terrain_cell: Vector2i, material_id: StringName) -> void:
-	_xor_cell(terrain_cell)
-	_walls[terrain_cell] = material_id
-	_xor_cell(terrain_cell)
+	_write_layer(_walls, terrain_cell, material_id)
 
 
 func is_solid(terrain_cell: Vector2i) -> bool:
@@ -86,7 +82,7 @@ func is_solid(terrain_cell: Vector2i) -> bool:
 ## Removes the block, revealing whatever wall sits behind it -- the "hole is a conveyor belt" moment's
 ## other half (`docs/GDD.md` §10): digging never leaves a void with nothing drawn behind it.
 func excavate(terrain_cell: Vector2i) -> void:
-	_xor_cell(terrain_cell)
+	_xor_term(_cell_term(terrain_cell))
 	_blocks.erase(terrain_cell)
 
 
@@ -112,9 +108,9 @@ func extend_terrain_dig_extent(col: int, touch_top: int, touch_bottom: int) -> V
 	if _dig_extent.has(col):
 		var existing: Vector2i = _dig_extent[col]
 		merged = Vector2i(mini(existing.x, touch_top), maxi(existing.y, touch_bottom))
-	_xor_dig(col)
+	_xor_term(_dig_term(col))
 	_dig_extent[col] = merged
-	_xor_dig(col)
+	_xor_term(_dig_term(col))
 	return merged
 
 
@@ -160,7 +156,7 @@ static func _fold(text: String, h0: int) -> int:
 
 
 ## One occupied cell's contribution, or ZERO if the cell holds no block. The zero case is what makes
-## `_xor_cell` safe to call unconditionally on both sides of a mutation: xoring zero is a no-op, so a
+## `_write_layer` safe to xor unconditionally on both sides of a mutation: xoring zero is a no-op, so a
 ## cell that was air before and after contributes nothing either time, and a cell that changed occupancy
 ## contributes on exactly the side where it was occupied.
 func _cell_term(terrain_cell: Vector2i) -> Vector2i:
@@ -179,14 +175,18 @@ func _dig_term(col: int) -> Vector2i:
 	return Vector2i(_fold(body, 2166136261), _fold(body, 486187739))
 
 
-func _xor_cell(terrain_cell: Vector2i) -> void:
-	var t: Vector2i = _cell_term(terrain_cell)
-	_sig_a ^= t.x
-	_sig_b ^= t.y
+## Both layers maintain the running signature the same way, and saying that ONCE is the point: the
+## sandwich below (xor out, write, xor in) is the invariant every cell-layer write must honour, and two
+## copies of it are two places for a future layer to be added wrong. `_blocks` and `_walls` differ only in
+## which dictionary they land in -- `_cell_term` already reads both, so the maintenance is identical by
+## construction rather than by coincidence. A duplication gate caught this the moment it appeared.
+func _write_layer(layer: Dictionary, terrain_cell: Vector2i, material_id: StringName) -> void:
+	_xor_term(_cell_term(terrain_cell))  # out with the old (zero, and a no-op, if the cell held no block)
+	layer[terrain_cell] = material_id
+	_xor_term(_cell_term(terrain_cell))  # in with the new
 
 
-func _xor_dig(col: int) -> void:
-	var t: Vector2i = _dig_term(col)
+func _xor_term(t: Vector2i) -> void:
 	_sig_a ^= t.x
 	_sig_b ^= t.y
 
