@@ -14,9 +14,29 @@ those writes `noreply@github.com` permanently into `main` and the authorship gat
 later commit, with no remedy short of a history rewrite. `docs/NEEDS_DIRECTOR.md` P010, D0231.
 
 **Reset this round:** D0213-D0223 are compressed to their results in the ledger. The parked queue
-`docs/NEEDS_DIRECTOR.md` is down to **6 items** — read it FIRST if you are the director picking this up.
+`docs/NEEDS_DIRECTOR.md` is at **7 items** — read it FIRST if you are the director picking this up, and
+P011 is the one blocking live work.
 
-## DONE THIS RUN — D0224 to D0232, two PRs
+## IN FLIGHT — the coordinator rebuild, stopped at its first gate (D0234)
+
+**Phase 0 is done and the run is STOPPED for the director, which is the brief's own instruction.** The
+deliverable is `docs/COORDINATOR_CONTRACT.md`: the measured painter reach-in surface, a proposed `Frame`
+contract, and the `observe()` mapping. **No code was written.** `docs/NEEDS_DIRECTOR.md` P011 indexes the
+five questions the ruling has to answer.
+
+**The two findings that matter most if you read nothing else.** The ten private fields the five painters
+reach for collapse to **four kinds**, and one of those — five separate UI fields in `sky_painter` — is a
+single `marks` array of "where not to draw stars"; passing it severs `sky_painter`'s only route to the
+dead economy. And **`water_view`, `rope_view` and `falling_items` are not blocked on the contract at
+all**: they need `sim/fluid`, `sim/transport` and `sim/items`, which hold **zero lines of code**. Nine of
+fifteen `sim/` modules are empty directories. That resizes Phase 2 to `sky_painter` + `terrain_painter`.
+
+**The first painter trips a `view → sim` edge.** `sky_painter` calls `Seams.grain`, and `Seams` is in
+`sim/world/` (D0227). P008 predicted the first real outgoing `view/` edge would be the fixed lint's first
+genuine test; it arrives on the first file. Recommended fix is moving `Seams` to `core/` while it still
+has no consumers.
+
+## DONE LAST RUN — D0224 to D0233, five PRs
 
 **D0224 — the layer lint had never evaluated an edge.** A REQUIRED CI check printed PASS for weeks while
 its own output read `22 files scanned, 0 res://*.gd references checked`. It matched only `res://` paths

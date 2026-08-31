@@ -266,3 +266,31 @@ through later.
 
 The ruling you may want to make instead: disable merge-commit and squash-merge in the repository
 settings, so the constraint is enforced by the button rather than by remembering.
+
+---
+
+## P011 · The coordinator→painter contract, Phase 0 — five questions, one of which resizes the run
+
+**Status:** open · **Cost to apply:** the ruling is five sentences; what it unblocks is Phases 1-3 ·
+**Raised by:** this session, 2026-08-30 (D0234)
+
+The full deliverable is `docs/COORDINATOR_CONTRACT.md` — measured reach-in surface, a proposed `Frame`
+contract, and the `observe()` mapping. **Nothing is built.** The brief's Phase 0 says stop here, so this
+is the stop. Read that document; this entry is the index to what it asks.
+
+1. **The `Frame` contract** (§2), and specifically that painters take an explicit `ci: CanvasItem` rather
+   than drawing through the coordinator. Legacy has both conventions; the rebuild must pick one.
+2. **The wall plane in `Observation`** (§3a). The data exists — `TileGrid.get_wall`, where the lode
+   migration put ore — and has no door through L2. Adding `walls`/`wall_legend` mirrors the existing
+   `materials`/`legend` pair in ~15 lines but widens an ADR-gated surface. Without it `terrain_painter`
+   cannot draw the back wall, which is much of what makes legacy's rooms read as rooms.
+3. **`Seams` to `core/`** (§4). `sky_painter` calls `Seams.grain` and `Seams` is in `sim/world/`, so the
+   first painter lifted is a `view → sim` violation the newly-fixed lint will catch. `Seams` has zero
+   project dependencies and one consumer (its own test), so the move is near-free *now*.
+4. **Phase 2's real scope** (§3b) — **this is the one that resizes the run.** `water_view`, `rope_view`
+   and `falling_items` are blocked on `sim/fluid`, `sim/transport` and `sim/items`, which contain **zero
+   lines of code**. They are not blocked on the contract and no contract shape unblocks them. Confirm
+   Phase 2 ends after `sky_painter` + `terrain_painter`.
+5. **The cosmetic day/night clock** (§3c). `sky_painter` needs `daylight()`/`day_phase()`, which have no
+   counterpart here. Does a game that starts underground want a day cycle, or does the sky land with its
+   clock pinned?
