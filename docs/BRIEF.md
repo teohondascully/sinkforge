@@ -7,7 +7,7 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 **Last updated: 2026-08-30. This round: Phase 0 of the coordinator rebuild — the painter contract,
 measured and stopped for you. NO CODE WAS WRITTEN, deliberately; the brief's Phase 0 says produce the
 contract and stop, and this is the stop.** One PR, `git log --oneline main..run/coordinator-contract` for
-its commits. `docs/DECISIONS_LEDGER.md` D0234; the deliverable is `docs/COORDINATOR_CONTRACT.md`;
+its commits. `docs/DECISIONS_LEDGER.md` D0234-D0235; the deliverable is `docs/COORDINATOR_CONTRACT.md`;
 `docs/NEEDS_DIRECTOR.md` **P011** indexes the five questions.
 
 **Headline: three of the five painters are not blocked on the contract, and no contract shape unblocks
@@ -69,6 +69,15 @@ direction is **unchanged by this round**.
 directory — while `view/` is a *game* directory. Moving `material_look.gd` and `mining_overlay.gd` into
 `view/` moves lines off the numerator and onto the denominator at once. Both files already declare that
 move in their own headers, written by earlier sessions anticipating this rebuild.
+
+**And one gate was genuinely broken, in a way that would have bitten you and not me.** All 15 gates
+passed locally; CI failed gate 23. The `gates` job checks out GitHub's synthetic merge commit, **which is
+committed at the moment CI runs** — so `check_working_freshness` compared a `WORKING.md` written this
+evening against a HEAD dated the next day, the run having crossed midnight UTC. The midnight case is the
+mild one: because that commit is re-dated on every run, **an open PR's gates job goes red with nobody
+having touched it.** Pinned to the PR head, exactly as `authorship` already was — D0231's root cause
+found in a second gate (D0235). I did not bump the date to go green; that would have left the defect and
+written a date wrong in the frame every other doc in the tree uses.
 
 **One thing that felt wrong even though it passed.** `tools/check_trailers.sh` fails *locally* on
 `refs/t3/checkpoints/*` — session-checkpoint refs the background-job harness writes under a `t3code@`
