@@ -17,6 +17,7 @@ func _initialize() -> void:
 	_test_camera_converts_cells_to_pixels()
 	_test_unknown_arguments_are_ignored_not_rejected()
 	_test_every_flag_is_reachable()
+	_test_the_scene_reads_no_flag_behind_this_parser_s_back()
 	_finish("reveal_args")
 
 
@@ -61,7 +62,8 @@ func _test_unknown_arguments_are_ignored_not_rejected() -> void:
 func _test_every_flag_is_reachable() -> void:
 	var cfg: Dictionary = RevealArgs.parse(PackedStringArray([
 		"--screenshot-tick=7", "--screenshot-out=/tmp/x.png", "--site=reveal_test_sparse",
-		"--seed=5", "--zoom=2.5", "--camera=1,2", "--bite=3", "--mine-down", "--wide-view", "--sky"]))
+		"--seed=5", "--zoom=2.5", "--camera=1,2", "--bite=3", "--mine-down", "--wide-view", "--sky",
+		"--play"]))
 	var unmoved: Array = []
 	var defaults: Dictionary = RevealArgs.defaults()
 	for key: String in defaults:
@@ -72,3 +74,33 @@ func _test_every_flag_is_reachable() -> void:
 	_check_over(defaults.size(), unmoved.is_empty(),
 		"every one of the %d settings moved off its default when its flag was passed (unmoved: %s)"
 		% [defaults.size(), unmoved])
+
+
+## THE CHECK THAT WOULD HAVE CAUGHT `--play`, and the reason the one above could not (D0248).
+##
+## `_test_every_flag_is_reachable` draws its population from `defaults()` -- the parser's OWN keys. That
+## makes it complete about what the parser declares and blind to what the parser OMITS, which is the one
+## thing "every flag is reachable" is read as promising. `--play` sat outside `RevealArgs` from before the
+## D0244 split, the scene read it with its own `OS.get_cmdline_user_args()` scan, and the test passed the
+## whole time because a flag the parser never heard of is not a key it can find unmoved.
+##
+## So this asserts over the SCENE's source instead: the file may reach for the command line exactly once,
+## to hand it to `RevealArgs`. A second reach is a flag going around the parser, whatever it is called.
+func _test_the_scene_reads_no_flag_behind_this_parser_s_back() -> void:
+	var path := "res://tests/body/reveal_scene.gd"
+	var src: String = FileAccess.get_file_as_string(path)
+	_check(not src.is_empty(),
+		"control: the scene source was actually read (%d bytes) -- an unreadable path would make every "
+		% src.length() + "count below 0 and pass by construction")
+	var reads: int = 0
+	var parses: int = 0
+	for line: String in src.split("\n"):
+		var code: String = line.split("##")[0].split("#")[0]  ## comments discuss the call; only code counts
+		if code.contains("get_cmdline_user_args()"):
+			reads += 1
+			if code.contains("RevealArgs.parse("):
+				parses += 1
+	_check_over(reads, reads == 1 and parses == 1,
+		"the scene reaches for the command line exactly once and hands it straight to RevealArgs "
+		+ "(%d read(s), %d of them a parse call) -- any other read is a flag going around this parser"
+		% [reads, parses])

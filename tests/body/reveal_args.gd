@@ -35,6 +35,7 @@ static func defaults() -> Dictionary:
 		"mine_down": false,
 		"wide_view": false,
 		"sky": false,
+		"play": false,   ## the MODE flag -- see `parse()`'s note on why it arrived late
 	}
 
 
@@ -75,6 +76,13 @@ static func parse(argv: PackedStringArray) -> Dictionary:
 			## not the body -- the body-following camera at zoom 6.0 shows ~28% of the topsoil band's own
 			## vertical extent in one frame, which is why the first density-contrast screenshots (D0109's
 			## round) read as nearly identical regardless of the real underlying count difference.
+		elif arg == "--play":
+			# THE MODE FLAG, and it lived outside this parser until 2026-08-31 (D0248) -- the scene read
+			# `"--play" in OS.get_cmdline_user_args()` directly, from before the D0244 split, and the split
+			# did not notice because it was moving a FUNCTION rather than enumerating a surface. Found when
+			# the director ran the documented command and got an agent-mode run that drove itself 12 ticks
+			# and quit. Without it this scene scripts its own approach; with it, a human drives.
+			cfg["play"] = true
 		elif arg == "--sky":
 			cfg["sky"] = true  ## D0244: draw the lifted `SkyPainter` behind the world. OFF by default,
 			## deliberately -- every existing milestone shot, replay and suite was taken without it, and a

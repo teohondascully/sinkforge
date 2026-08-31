@@ -10075,3 +10075,95 @@ notes the 1,000 seeds share one `TileGrid` built outside the seed loop, so a cum
 digs more spends more ticks where the world used to be. That is a hypothesis with an obvious appeal and
 no measurement behind it, and this ledger is full of entries correcting exactly that move (D0135's
 falsified rationale being the closest sibling). Reported as a number, not as a cause.
+
+---
+
+## D0248 · A whole class of failure lived below the test suite: nothing ever opened a window · 2026-08-31
+
+**Found by the director typing the command I wrote for them.** `docs/NEEDS_DIRECTOR.md` P015 says to run
+`godot --path . tests/body/reveal_scene.tscn -- --sky`. That produces an agent-mode run which drives
+itself twelve ticks, writes a recording, and quits. No window, nothing to look at. The scene defaults to
+agent mode and `--play` is what asks for a window; my line omitted it.
+
+**Nothing was broken and nothing was red, which is the finding.** 42 suites, 16 gates, three CI checks,
+all green -- and every one of them runs `--headless`. A scene can boot, render, satisfy every assertion in
+the repository, and still not do what its own header tells a human to type, because **no instrument in
+this project had ever opened a window**. Headless cannot see this class by construction: there is no
+window for a flag to have failed to open.
+
+**Three defects, of increasing seriousness.**
+
+1. *The documented command was wrong.* Mine, this session. Fixed in P015 and the scene header.
+2. *`--play` was parsed outside `RevealArgs`* -- a direct `"--play" in OS.get_cmdline_user_args()` scan
+   predating the D0244 split. Inherited, not introduced. But D0244 wrote a `RevealArgs` whose docstring
+   claims it holds *"every `--flag` the scene takes"*, which was false the moment it was written.
+3. **`test_reveal_args._test_every_flag_is_reachable` could not see (2), and this is the real lesson.**
+   It draws its population from `defaults()` -- *the parser's own keys*. That makes it complete about what
+   the parser DECLARES and blind to what the parser OMITS, which is precisely what "every flag is
+   reachable" is read as promising. A flag the parser never heard of is not a key it can find unmoved. The
+   population came from the subject, so the subject's omissions were outside it. Sibling to D0245's
+   vacuous-population class and to the house failure class generally: an instrument that cannot register
+   its subject, arriving as a quiet green.
+
+**Fixed:** `--play` moved into `RevealArgs`, the scene reads `cfg["play"]`, and a new assertion checks
+the SCENE'S SOURCE rather than the parser's keys -- the file may reach for the command line exactly once,
+to hand it to `RevealArgs`. A second reach is a flag going around the parser whatever it is called.
+Mutation-tested by restoring the original direct scan: 2 reads, 1 parse, fails.
+
+**`tools/check_headed_boot.sh`, and why it needs two runs.** Agent mode headed must PRINT
+`agent-mode run finished`; `--play` headed must NOT, and must capture a non-blank frame. Control A is not
+decoration -- alone, B's silence would pass on a boot that crashed early, on a renamed message, and on a
+binary that cannot open a window at all. Mutation-tested three ways, each exiting 1: the original `--play`
+defect (all three assertions fire), the colour floor raised above the measured value, and the
+discriminator message renamed -- where A correctly REFUSES to report rather than letting B pass vacuously.
+
+**A control that reached for a known-broken path.** The first draft compared the headed capture against a
+headless one, reasoning that headless renders blank so the sizes would differ. It hung for five minutes.
+Headless capture does not render blank here -- `get_viewport().get_texture().get_image()` returns null,
+`save_png` fails on it, and the scene never reaches its own `quit()`. `tools/capture_moments.sh` line 19
+already says "NOT --headless" and D0190 already established why. **I built a control out of a path this
+repository had documented as unusable, in a file I had read this same session.** Replaced with the scene's
+own blankness instrument (D0189), which prints the distinct-colour count of a sample grid: 188 on a real
+frame, 1 on a window that never drew.
+
+**CI:** a new `headed_boot` job, the only one in the workflow that opens a window -- its own job rather
+than a step, because it needs xvfb and a software GL driver the headless job deliberately does not
+install, and because a display failure should be legible as one rather than mixed into 42 suite results.
+
+---
+
+## D0249 · The sky was lifted into a region the player cannot enter · 2026-08-31
+
+**Reported from the chair:** *"it wont let me jump up beyond the surface. like my head bumps at the
+surfaceline and i cant jump higher."* Diagnosed, not fixed; the remedy is a design call, `docs/NEEDS_DIRECTOR.md`
+P017.
+
+**Two things stacked, and only the first was a decision.**
+
+The rock lid is D0199, deliberate: `carve_entry_shaft` leaves row 0 solid (`CEILING_ROWS = 1`) and
+`spawn_row_for_ceiling()` derives the spawn from that ceiling, so the head is stopped by rock rather than
+by `_enforce_grid_bounds`. It exists because the pre-fix carve opened row 0 and the FIRST JUMP of any
+session put the box at y = -3.4px, outside the world -- found in the director's own `--play` recording.
+Sound, and not the thing to undo.
+
+**The second is an omission nobody made on purpose.** Row 0 is the surface datum, the top of the
+`TileGrid`, AND `SkyPainter.HORIZON_Y`, all at once. Legacy had `SURFACE_ROW = 20` -- twenty rows of air
+above the ground. Re-keying the band ladder to metres-below-surface (`topsoil.yaml`, `from_m: 0`) made it
+scale-free, which was right, and dropped the headroom in passing. Jump is 365 px/s against 900 px/s^2, a
+**74px apex -- about 18 rows** at this world's 4px cell, so the capability is fully there and the world
+ends one row above the player's head.
+
+**Why it surfaced now, and the lesson in that.** The headroom has been missing for as long as the band
+ladder has existed, and nothing noticed: no suite asserts it, because a suite would have to know to ask.
+`test_reveal_spawn_bounds` even measures this exact region every run -- it holds JUMP from every spawn and
+asserts the head never reaches y=0 -- and PASSES, because "the player cannot leave the world" and "the
+player cannot leave the ground" are the same measurement from opposite intents. **The invariant guarding
+the ceiling is indistinguishable from the defect, and only a human trying to jump could tell them apart.**
+
+**And it changes the subject of the work this run just did.** Ridges, stars, a moon arc and the Sinkforge
+crown are drawn into a region the player is barred from. `docs/GDD.md` §9 rejected Sinkforge-as-consumer
+because it *"is invisible from anywhere the player stands"*; legacy's answer was the horizon, and P015
+asks the director to judge how that reads. A backdrop you can see but never rise toward is a different
+object from one you can leave the ground into, and that choice decides several of P015's look calls with
+it -- the ridges' angular size, the crown's anchor, whether `--sky` defaults on. **Which is why P015 and
+P017 should be ruled together, not in sequence.**
