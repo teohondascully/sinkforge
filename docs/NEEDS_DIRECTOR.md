@@ -274,55 +274,7 @@ through later.
 The ruling you may want to make instead: disable merge-commit and squash-merge in the repository
 settings, so the constraint is enforced by the button rather than by remembering.
 
---
-
-## P012 · PR #6 is ready and blocked on gate 7 alone — and the reason is a property of the gate
-
-**Status:** open, BLOCKING a finished PR · **Cost to apply:** a ruling, not work · **Raised by:** this
-session, 2026-08-30
-
-`https://github.com/teohondascully/sinkforge/pull/6` carries Phase 0 of the coordinator rebuild. It is
-**otherwise green** — authorship passes, every one of the 15 structural checks passes locally, and the
-suites are unaffected. It is held by `check_loc_ratio` (gate 7) and nothing else. Per the run brief's own
-instruction it is parked here rather than forced, worked around, or merged past protection.
-
-**The PR adds zero instrument lines and zero game lines.** Measured: `git diff --stat main..HEAD` touches
-`.github/workflows/harness.yml` and five files in `docs/`, and **nothing at all** in
-`core/sim/interface/view/shell` or `harness/experiment/tools/tests`. Both sides of the ratio are
-untouched by it.
-
-**So why is it red?** Gate 7's window is **the last 10 COMMITS**, not the last N lines or days. Four
-docs-only commits push four real commits out the far end — including `33d5109`, last round's `+685` game
-lift. What remains in view is instrument growth against **zero** game growth, so the gate fires. **The
-gate is working exactly as written; it is the window that has the property.**
-
-Run `python3 tools/layer_lint/check_loc_ratio.py` for the current pair rather than trusting a figure
-written here — amending one commit on this branch moved the reading from `+344/+2` to `+326/+0` with no
-line of code changing in either population, which is this entry's own point arriving one level down.
-
-**The general shape, which outlives this PR.** A commit-count window means *writing documentation makes a
-project's LOC ratio worse* — not by adding instrument, but by evicting game work from view. This repo
-writes a great deal of documentation on purpose, and every ledger entry, every brief regeneration and
-every `NEEDS_DIRECTOR` update spends a window slot. Any run that ends with several docs commits will tend
-to close red regardless of what it built. That is worth knowing before the next run is planned around it.
-
-**Three ways to answer, none of them applied.**
-1. **Rule this PR through** as a one-off — it genuinely adds nothing to either side.
-2. **Change the window to lines, days, or "commits that touched either population"** — the last is the
-   most faithful to the gate's intent, since a docs commit has no opinion about instrument-vs-game and
-   arguably should not consume a slot. This is a gate change and needs mutation-testing before trust.
-3. **Leave it.** The gate is chronically red by design as a standing prompt that the next unit of work is
-   game content (`docs/CLAIMS.md`), and this is that prompt firing.
-
-I have deliberately not squashed the four commits to move the window. It would go green, the underlying
-LOC reality would be identical, and that is gaming a measurement rather than answering it.
-
-**Note on what did NOT cause this.** The same run pinned the `gates` job's checkout to the PR head
-(D0235). That is unrelated: `33d5109` is evicted from the unpinned merge-ref window too, checked on the
-ref itself. Gate 7 went red as the commit count grew, not because of the pin — the first CI run on this
-branch passed structural gates at one commit.
-
---
+---
 
 ## P014 · `core/MODULE.md` is at exactly its 100-line cap, so the next class added to `core/` is blocked
 
@@ -450,7 +402,7 @@ fixes the cause rather than the symptom. (c) is a real design cycle, not a Bin A
 ## P017 · The world has no sky to jump into — row 0 is the surface, the ceiling, and the horizon at once
 
 **Status:** open · **Cost to apply:** a band-ladder decision, then a regeneration · **Raised by:** the
-director in play, 2026-08-31 (D0249)
+director in play, 2026-08-30 (D0249)
 
 **Reported from the chair, not from a test:** *"it wont let me jump up beyond the surface. like my head
 bumps at the surfaceline and i cant jump higher."* Correct, and it is two things stacked.
