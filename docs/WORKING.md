@@ -10,69 +10,71 @@ caught mechanically rather than relying on someone noticing later.
 
 ## Overnight queue
 
-**Read the provenance before trusting this section.** `.claude/commands/loop.md` requires the queue to
-exist here *before* a `/loop` run starts, and forbids the running session from authoring it — the safety
-property is that the queue comes from a spec the director handed down. When `/loop` was invoked on
-2026-08-31 this section **did not exist**. It is transcribed here rather than authored: the four items
-are `docs/LEGACY_GAP.md`'s **Tier 0**, which is the enumerated output of `docs/MASTER_PLAN_AUG30.md` §3
-run against the current generator — measured defects, not a preference ordering. The director's own
-message named the same work ("continue the highest-ranked `LEGACY_GAP.md` item"). **This does not fully
-satisfy the rule and the director should confirm or replace it.** The queue is CLOSED: when Tier 0
-empties the loop stops rather than reaching into Tier 1.
+**Authored 2026-08-31 on the director's explicit instruction** ("author the missing ## section properly
+— this is setup, not a decision"). `.claude/commands/loop.md` requires this section to exist before a
+`/loop` run and forbids the running session from inventing one; the director's LOOP CONTROL FIX
+supersedes that by handing the classification rule down directly. Items come from `docs/LEGACY_GAP.md`,
+which is `docs/MASTER_PLAN_AUG30.md` §3's own output.
 
-- [x] **WG-1 — the seed is truncated to 16 bits.** `ValueNoise._lattice_hash` masked `seed & 0xFFFF`, so
-      only 65,536 distinct worlds existed and `SplitRng`'s other 48 bits were discarded before reaching a
-      cell. D0254. Carried a latent second defect out with it: `_grow_vein` had a floor and no ceiling,
-      so topsoil glimmer could grow past `topsoil_end` — green until now only on a coincidence of the old
-      16-bit field.
-- [ ] **WG-2 — one third of every shaft is an impermeable wall.** Shelf bands need 0.65–0.81 to carve;
-      the calibrated field is hard-bounded to ±0.574 *by construction*, so no seed and no coordinate ever
-      breaches a shelf. Analytic, then confirmed by measurement (`[-0.5734, +0.5732]`, 288,000 samples).
-      Legacy's shelf was a **gradient**, not a barrier.
-- [ ] **WG-3 — the cave field is single-octave where legacy's is five.** Legacy left `fractal_type` at
-      Godot's default `FRACTAL_FBM` (5 octaves, lacunarity 2.0, gain 0.5); `ValueNoise.sample()` is one
-      octave. Corroborated twice *inside legacy itself*. This is a **port**, not a threshold move — and
-      it is the likely root of WG-2, since the ±0.574 bound is a property of the single-octave field and
-      of a calibration constant derived against it.
-- [ ] **WG-4 — cell-denominated constants were never converted, and the header claims they were.**
-      `data/strata/shallow_clay.yaml` converted the metre-denominated fields and left the cell-denominated
-      ones verbatim; at 0.25 m/cell every feature is 4x smaller in length, 16x in area. **EXPENSIVE — see
-      below. Do not start this in-loop.**
+### The rule that governs this queue
 
-**Order.** Build the carve-fraction instrument *first* (the measured baseline is 3.41–4.34% against
-legacy's stated ~15%), then WG-3 as a port, then re-measure WG-2. If WG-2 still needs a `shelf_resist` or
-threshold move after the octave port, that is EXPENSIVE — stop and park it.
+**A parked decision pauses a LANE, never the RUN.** When an item needs a director ruling — a threshold or
+calibration move, a collision-resolver touch, a design/taste call, a gate bypass — write it to
+`docs/NEEDS_DIRECTOR.md`, mark the item BLOCKED-ON-DIRECTOR, and **immediately pull the next
+DECISION-FREE item from any lane**. "I hit a decision, so I stopped" is the failure mode this queue
+exists to prevent.
 
-**EXPENSIVE for this queue** (HARD STOP, director's call, do not decide in-loop): moving any
-`data/strata/*.yaml` threshold or cell-denominated constant (this is all of WG-4); changing terrain
-resolution or `CELLS_PER_METRE`; altering the `state_signature()` contract (§6's O(1) running-hash
-rewrite is a *contract* change, not a refactor).
+**The run stops only on:** (a) a determinism two-process replay divergence, (b) genuine exhaustion of
+decision-free work, (c) 10h. A parked ruling, a gate-7 block, a resolver touch and a taste call are
+**not** stop conditions.
 
-**THE WORKFLOW CHANGED THIS RUN.** `main` is branch-protected: no direct push, work goes through a PR,
-and three checks are required to merge. **Merge by REBASE, never merge-commit or squash** — either of
-those writes `noreply@github.com` permanently into `main` and the authorship gate then fails on every
-later commit, with no remedy short of a history rewrite. `docs/NEEDS_DIRECTOR.md` P010, D0231.
+### DECISION-FREE — work to exhaustion, low-decision lanes first
 
-**Reset this round:** the parked queue `docs/NEEDS_DIRECTOR.md` is at **10 items** — read it FIRST if you
-are the director picking this up. P011 and P013 are CLOSED (you ruled both). **P015 is THE ◆** and is two
-images and your eye. P014 and P016 are each one number.
+- [x] **WG-1 · seed truncated to 16 bits** (D0254). Only 65,536 worlds existed. Carried out a latent
+      `_grow_vein` ceiling bug with it.
+- [x] **WG-3 · single-octave where legacy is 5-octave FBM** (D0258). Ported `FastNoiseLite`'s own
+      `GenFractalFBm` onto the existing `sample()` primitive, which is left untouched so its from-scratch
+      Python goldens survive.
+- [x] **WG-2 · shelf bands impermeable** (D0258). Closed by WG-3, not by a threshold move: 0 → 15 of
+      97,920. The wall was a field with no tail, not a line set too high.
+- [ ] **LANE C · sprites/visuals** — miner, pickaxe + swing, tool/item/machine sprites, particles,
+      post-fx, glimmer. Pure view, self-tested by capture. Highest item count in the backlog.
+- [ ] **LANE F · HUD/UI** — depth readout, strata bands, hotbar, objective card, key hints, map, theme
+      grammar. Port-and-refactor, trim dead content.
+- [ ] **LANE G · audio** — synthesized SFX (hollow tell, breach, blow-against-material), depth-mixed
+      score. Synthesized at boot, no assets.
+- [ ] **LANE A · camera/framing/zoom/sprite-scale.** View only — body collision width is a resolver
+      touch and parks.
+- [ ] **LANE D · determinism fast-track** (§6) — `state_signature()` to an O(1) running hash, ~74s → ~5s.
+      **Guard:** the hash IS the determinism contract; it must update on every mutation path, and a
+      forgotten update must be mutation-proven to break a test, or it does not ship.
+- [ ] **LANE B, view-side only** — depth shading, light pool, shadow veil, parallax, back-wall. No
+      constant, no threshold; runs while B's sim-side sits parked.
+- [ ] **P021 measurement (decision-free half)** — instrument TOTAL void fraction (caves + ruins +
+      chambers + entry shafts) against legacy's "near 15%". Measuring is free; the remedy is the
+      director's.
+- [ ] **Standing backlog tails** (§9) — gate 2 filter, Seams doc-drift, empty-state guard rollout,
+      the cheap gate fixes, headed-boot CI on Ubuntu.
 
-**NO OPEN PRs — the whole arc is on `main`** (D0250). #6, #7 and #8 landed as one rebase-merge of 17
-commits. P012 is CLOSED: #6 was blocked by gate 7 reading `instrument +326 against game +0` over a
-window that contained only contract work, and the answer to that complaint was written three PRs later.
-Retargeting #8 to `main` let the gate judge the whole arc — **+742 instrument against +717 game, PASS on
-its merits**. No override, protection untouched. Verified after: one identity across all 2576
-author/committer entries, and `git cherry` says 0 of 5 and 0 of 9 commits missing from `main`.
+### NEEDS-RULING — parked, and NOT a reason to stop
 
-**Gate 7's window changed, by your ruling** (D0251, closes P018). It counts the last 10 commits **that
-touched either population**, not the last 10 commits. `docs/` was never counted — but a docs commit still
-SLID the window, pushing a game-heavy commit off the far end, so prose could flip a verdict it
-contributed nothing to. Measured: `+742/+717 PASS`, then four doc files later `+756/+348 FAIL`, same
-counted code. Now `+1185/+812 PASS`. Mutation-tested with the branch that matters —
-**an instrument-only window must still FAIL** — because the change was made by the session it unblocked.
+- **P021** · the 15% carve gap. Survived the octave port (0.0358 → 0.0329). Closing it is a threshold
+  move. Three candidates written out; my recommendation is to measure total void first.
+- **WG-4** · cell-denominated constants never converted, every feature 4x undersized in length and 16x in
+  area. Squarely a threshold move.
+- **P019** · the depth tint, parked on a glimmer hue clash.
+- **P015, P017** · the sky. Two images and the director's eye.
+- **The terminal economy** · redesign, not port. Sequenced separately, out of this run's scope.
 
-**Merge by REBASE stays load-bearing** and is the reason that verification exists — a merge-commit or
-squash writes `noreply@github.com` into `main` permanently.
+### EXPENSIVE — never decided in-loop
+
+Moving any `data/strata/*.yaml` threshold or cell-denominated constant; changing terrain resolution or
+`CELLS_PER_METRE`; any collision-resolver touch; bypassing a gate.
+
+**Gate 7 is not on this list and never was.** Verified 2026-08-31: `docs` is in neither population and
+`.md` is not in `CODE_EXTENSIONS`, so the docs-exclusion fix has already landed (D0251). A gate-7 red
+means the instrument genuinely outgrew the game, and the remedy is game work — which is why the WG-3 port
+belongs in the same arc as the instruments that found it.
 
 ## STOPPED AT ◆ — PR #10 is parked on gate 7, and the queue's next item is on the EXPENSIVE line
 

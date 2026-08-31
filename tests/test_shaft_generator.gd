@@ -148,24 +148,26 @@ func _test_carve_fraction_by_region() -> void:
 	print("carve_fraction: overall %.4f | shelf-band %.4f (%d/%d) | non-shelf %.4f (%d/%d)" %
 		[total_frac, shelf_frac, shelf_carved, shelf_eligible, open_frac, open_carved, open_eligible])
 
-	# THE RATCHET. These three pin what the generator currently ships, measured 2026-08-31 over the six
-	# seeds above (97,920 shelf cells and 195,264 non-shelf cells actually examined, per the controls).
-	# Two of them assert a DEFECT, deliberately: WG-2 says shelf bands are impermeable by construction --
-	# the calibrated field is hard-bounded to +/-0.574 and the shelf threshold is 0.65-0.81 -- so the
-	# honest expectation today is exactly zero, and writing that down is what makes the WG-3 octave port
-	# flip this suite red instead of improving the world silently. When one of these fails, do not widen
-	# the band: read the printed line, decide whether the new number is the fix landing, and re-pin.
-	_check(shelf_frac == 0.0,
-		"WG-2 RATCHET: shelf bands carve EXACTLY ZERO cells (%d of %d over 6 seeds). This is a pinned " % [shelf_carved, shelf_eligible]
-		+ "DEFECT, not a property worth keeping -- legacy's shelf was a resistance gradient, not a wall. "
-		+ "If this line FAILS, WG-2 is fixed: re-pin it to the new fraction and say so in the ledger.")
-	_check(absf(open_frac - 0.0537) < 0.0060,
-		"non-shelf carve fraction %.4f stays near its measured 0.0537 (+/-0.0060)" % open_frac)
-	_check(total_frac < 0.15,
-		"WG-3 RATCHET: overall carve fraction is %.4f, against legacy's own stated target of ~15%%. " % total_frac
-		+ "Single-octave value noise where legacy ran 5-octave FBM (measured: FastNoiseLite defaults to "
-		+ "FRACTAL_FBM, octaves 5, lacunarity 2.0, gain 0.5). This bound is the gap, and porting the "
-		+ "octaves should close it -- when this fails, the port worked.")
+	# THE RATCHET, re-pinned 2026-08-31 after the WG-3 octave port (D0258). The previous version asserted
+	# `shelf_frac == 0.0` as a pinned DEFECT and said "if this line FAILS, WG-2 is fixed". It failed. The
+	# shelf carves 15 cells where it carved 0, so this now asserts the SHAPE legacy actually had rather
+	# than the equality the acceptance criteria asked for -- see the failure message on the gradient check.
+	_check(shelf_frac > 0.0,
+		"WG-2 CLOSED: shelf bands are permeable at last (%d of %d over 6 seeds, was 0). " % [shelf_carved, shelf_eligible]
+		+ "The wall was never a threshold that was too high -- it was a single-octave field with no tail "
+		+ "to clear it with. If this returns to zero, the octave port has been undone.")
+	_check(shelf_frac < open_frac,
+		"WG-2 SHAPE: the shelf is a GRADIENT, not open rock -- shelf %.4f stays below non-shelf %.4f. " % [shelf_frac, open_frac]
+		+ "Measured against real FastNoiseLite at legacy's own thresholds, this is what legacy did too: it "
+		+ "clears 0.31 at 0.1164 and 0.65 at 0.0009, a 130x difference, and clears the 0.81 top-shelf "
+		+ "threshold 0.0000 of the time. A shelf carving at the open-rock rate is not a fixed shelf, it is "
+		+ "a deleted one -- do NOT 'fix' this by raising the calibration until the two numbers meet.")
+	_check(absf(open_frac - 0.0493) < 0.0060,
+		"non-shelf carve fraction %.4f stays near its measured 0.0493 (+/-0.0060)" % open_frac)
+	_check(absf(total_frac - 0.0329) < 0.0060,
+		"overall carve fraction %.4f stays near its measured 0.0329 (+/-0.0060). NOTE: legacy's own " % total_frac
+		+ "stated target is ~15%%, and the octave port did NOT close that -- it moved 0.0358 -> 0.0329. "
+		+ "That gap is a THRESHOLD question, not a noise-field one, and is parked as P021.")
 
 
 func _test_ore_appears_somewhere() -> void:

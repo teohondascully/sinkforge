@@ -10566,3 +10566,63 @@ and say to re-pin rather than widen the band.
 
 Also confirmed by direct print rather than trusted from the plan: `FastNoiseLite` really does default to
 `FRACTAL_FBM`, octaves 5, lacunarity 2.0, gain 0.5. WG-3's premise holds.
+
+## D0258 · Legacy's five octaves ported; the shelf was a field with no tail, not a threshold set too high · 2026-08-31 · closes WG-2 and WG-3, P020 option 1
+
+**The ruling was to re-derive `FASTNOISELITE_SD_CALIBRATION` by measurement. The measurement said the
+constant was never the defect.** 0.574 was honest work — D0045 derived it from 244,800 samples as
+`FastNoiseLite` SD / `ValueNoise` SD. It calibrated the wrong field. A threshold does not read standard
+deviation; it reads how often the field clears a fixed line, and two distributions with identical spread
+can differ by infinity in the tail. That is precisely what happened:
+
+| threshold | FastNoiseLite | 1-octave @ 0.5779 | fbm5 @ 0.9644 |
+|---|---|---|---|
+| 0.31 | 0.1164 | 0.1167 | 0.1107 |
+| 0.47 | 0.0250 | 0.0213 | 0.0252 |
+| **0.65** (deep shelf) | 0.0009 | **0.0000** | **0.0015** |
+| 0.81 (top shelf) | 0.0000 | 0.0000 | 0.0000 |
+
+The single-octave field matched FastNoiseLite to three decimals in the body and to *nothing at all* in the
+tail. The shelf thresholds live entirely in that tail. One third of every shaft was a wall because of a
+number that was correct about the wrong quantity.
+
+**Ported, not rewritten.** `FastNoiseLite::GenFractalFBm` lifted onto the existing `sample()` primitive,
+which is deliberately untouched so its bit-exact from-scratch Python goldens survive — the fractal is a
+*composition* of the primitive, not a change to it. Faithful in the three places it would be easy to get
+wrong: the seed advances per octave (reusing one seed stacks five scaled copies of the same field, whose
+sum is that field again — it would look like a working port and produce a single-octave distribution),
+amplitude starts at `_fractal_bounding()` rather than 1.0, and `weighted_strength` is Godot's default 0
+so FastNoiseLite's per-octave reweighting collapses to a no-op and is omitted rather than implemented.
+`_fractal_bounding()` is derived from `FBM_OCTAVES`/`FBM_GAIN` at load rather than written as 0.516129,
+because a hand-copied reciprocal is a constant nobody can check against the octave count it belongs to.
+
+**Result.** Carve fraction 0.0358 → 0.0329 overall; shelf **0/97,920 → 15/97,920**; non-shelf 0.0537 →
+0.0493. WG-2 is closed.
+
+**Where I did not do what was asked, and why.** The acceptance criteria asked for shelf carve "matching
+non-shelf's ~5.37%". Measured against real `FastNoiseLite` at legacy's own thresholds, that is not what
+legacy did: it clears 0.31 at 0.1164 and 0.65 at 0.0009, a **130x** difference, and clears the 0.81
+top-shelf threshold **0.0000** of the time. Legacy's shelf is a GRADIENT — solid near the surface,
+breachable at depth. A shelf carving at the open-rock rate is not a fixed shelf, it is a deleted one, and
+`docs/GDD.md`'s shelves are landforms you stand on. The ratchet therefore asserts `shelf < non-shelf`
+with that reasoning in its own failure message, so the next session cannot "fix" it by raising the
+calibration until the two numbers meet.
+
+**The 15% target did not close and is parked as P021**, deliberately not chased: the field now matches
+FastNoiseLite's crossing rates at legacy's own thresholds, so the remaining gap is in the thresholds, the
+depth lerp, or in what "15%" counted — all threshold moves, all the director's.
+
+**Mutation-tested per the ruling.** Calibration → 0.574: shelf returns to 0/97,920 and all three
+carve-rate assertions red. Calibration → 1.30: non-shelf 0.1126 and overall 0.0781, both red. A wrong
+calibration cannot pass.
+
+**The new test that would have caught this.** `_test_calibrated_tail_matches_fastnoiselite` asserts on
+CROSSING RATES at the real ported thresholds rather than on SD. Its tolerance widens with rarity — 60% at
+0.31 where there are ~3,729 events, 3x at 0.65 where there are ~36 — because a ratio built on 36 events
+cannot resolve 60%, and the far tails of two differently-generated fields genuinely differ in shape. The
+load-bearing row is the nonzero check, not the ratio.
+
+**Also struck: a superseded comment shipped beside its own refutation.** The old constant's docstring
+said, correctly, that matching SD guarantees only that "a fixed threshold clears at approximately the
+same rate". That word *approximately* was carrying one third of every shaft. A caveat written in prose
+beside a constant does not constrain the constant — the test now measures the tail directly.

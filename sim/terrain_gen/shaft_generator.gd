@@ -119,7 +119,7 @@ static func _carve_caves(grid: TileGrid, cave_cfg: Dictionary, shelf_cfg: Dictio
 			# ValueNoise's wider real distribution (D0045) carves at a different rate than the ported
 			# thresholds were tuned to produce, silently, since both a raw and a mismatched-calibration
 			# sample look equally plausible without measuring the actual carve density either way.
-			var noise: float = ValueNoise.sample(noise_x, noise_y, seed) * ValueNoise.FASTNOISELITE_SD_CALIBRATION
+			var noise: float = ValueNoise.sample_fbm(noise_x, noise_y, seed) * ValueNoise.FASTNOISELITE_SD_CALIBRATION
 			if noise > threshold:
 				grid.excavate(cell)  # block erased, wall kept -- a carved room, not a void
 

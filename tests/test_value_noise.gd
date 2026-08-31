@@ -11,6 +11,7 @@ func _initialize() -> void:
 	_test_different_seeds_diverge()
 	_test_high_seed_bits_reach_the_field()
 	_test_calibrated_distribution_matches_fastnoiselite()
+	_test_calibrated_tail_matches_fastnoiselite()
 	_finish("value_noise")
 
 
@@ -117,7 +118,7 @@ func _test_calibrated_distribution_matches_fastnoiselite() -> void:
 			var nx: float = float(col) / x_stretch * frequency
 			for row: int in range(6, 1024, 8):
 				var ny: float = float(row) * frequency
-				var vn: float = ValueNoise.sample(nx, ny, seed) * ValueNoise.FASTNOISELITE_SD_CALIBRATION
+				var vn: float = ValueNoise.sample_fbm(nx, ny, seed) * ValueNoise.FASTNOISELITE_SD_CALIBRATION
 				var fnl_v: float = fnl.get_noise_2d(float(col) / x_stretch, float(row))
 				vn_sum += vn
 				vn_sq_sum += vn * vn
@@ -136,3 +137,63 @@ func _test_calibrated_distribution_matches_fastnoiselite() -> void:
 	_check(fnl_sd > 0.0 and absf(vn_sd - fnl_sd) / fnl_sd < 0.15,
 		"calibrated ValueNoise SD (%.4f) stays within 15%% of FastNoiseLite's real measured SD (%.4f) -- ratio %.3f" %
 		[vn_sd, fnl_sd, vn_sd / fnl_sd])
+
+
+## THE TEST THAT WOULD HAVE CAUGHT WG-2 (D0258). The distribution test above matches STANDARD DEVIATION,
+## and it passed for months while one third of every shaft was an impermeable wall. A threshold does not
+## read spread; it reads how often the field clears a fixed line, and two fields with identical SD can
+## differ by infinity in the tail -- which is exactly what happened: at 0.65 the single-octave field
+## cleared 0.0000 against FastNoiseLite's 0.0009. Zero versus nonzero is not a small error, it is a
+## different world with a wall in it.
+##
+## So this asserts on the CROSSING RATES at the real ported thresholds, which is the quantity
+## `_carve_caves` actually computes. The two shelf thresholds are the load-bearing rows: 0.65 is the deep
+## shelf and must be clearable, 0.81 is the top shelf and legitimately is not -- FastNoiseLite clears it
+## 0.0000 of the time too, which is what makes legacy's shelf a gradient rather than either a wall or a
+## hole. Asserting only "shelf carves sometimes" would pass on a field that carved everything.
+func _test_calibrated_tail_matches_fastnoiselite() -> void:
+	var x_stretch: float = 2.1
+	var frequency: float = 0.11
+	var thresholds: Array[float] = [0.31, 0.47, 0.65]
+	# Tolerance widens with rarity, and that is a statement about what each row can support rather than a
+	# band loosened until it passed. At 0.31 the rate is ~0.12 over 30,720 samples -- thousands of events,
+	# so 60% is loose. At 0.65 it is ~0.002: about 37 events for FastNoiseLite and 64 for us. A ratio built
+	# on 37 events cannot resolve 60%, and the far tails of two differently-generated fields genuinely
+	# differ in shape even when their bodies agree. So the far-tail row asserts ORDER OF MAGNITUDE (within
+	# 3x), which is the strongest claim the sample size supports -- and the nonzero check above it, not
+	# this ratio, is the row that actually guards WG-2.
+	var tolerance: Array[float] = [0.60, 0.60, 2.00]
+	var vn_over: Array[int] = [0, 0, 0]
+	var fnl_over: Array[int] = [0, 0, 0]
+	var n: int = 0
+	for seed_i: int in range(5):
+		var seed: int = 300000 + seed_i * 7919
+		var fnl := FastNoiseLite.new()
+		fnl.seed = seed
+		fnl.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		fnl.frequency = frequency
+		for col: int in range(0, 48):
+			var nx: float = float(col) / x_stretch * frequency
+			for row: int in range(6, 1024, 8):
+				var vn: float = ValueNoise.sample_fbm(nx, ny_of(row, frequency), seed) * ValueNoise.FASTNOISELITE_SD_CALIBRATION
+				var fv: float = fnl.get_noise_2d(float(col) / x_stretch, float(row))
+				for i: int in thresholds.size():
+					if vn > thresholds[i]:
+						vn_over[i] += 1
+					if fv > thresholds[i]:
+						fnl_over[i] += 1
+				n += 1
+	_check(n > 10000, "sanity: measured over a real sample size (got %d)" % n)
+	for i: int in thresholds.size():
+		var vr: float = float(vn_over[i]) / float(n)
+		var fr: float = float(fnl_over[i]) / float(n)
+		_check(fr > 0.0 and vr > 0.0,
+			"BOTH fields clear %.2f at least once (ours %.4f, FastNoiseLite %.4f) -- a zero here on the " % [thresholds[i], vr, fr]
+			+ "0.65 row is WG-2 exactly: the shelf threshold sitting outside the field's reachable range")
+		_check(fr <= 0.0 or absf(vr - fr) / fr < tolerance[i],
+			"crossing rate at %.2f: ours %.4f vs FastNoiseLite %.4f (ratio %.2f, tolerance %.0f%%, ~%d events)" %
+			[thresholds[i], vr, fr, vr / maxf(fr, 1e-9), tolerance[i] * 100.0, fnl_over[i]])
+
+
+static func ny_of(row: int, frequency: float) -> float:
+	return float(row) * frequency
