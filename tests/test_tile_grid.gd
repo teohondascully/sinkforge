@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_test_extend_terrain_dig_extent_merges_across_touches_closing_the_gap()
 	_test_extend_terrain_dig_extent_is_per_column()
 	_test_state_signature_sensitive_to_dig_extent()
+	_test_running_signature_agrees_with_a_from_scratch_rebuild()
 	_finish("tile_grid")
 
 
@@ -144,3 +145,74 @@ func _test_state_signature_sensitive_to_dig_extent() -> void:
 	b.extend_terrain_dig_extent(4, 10, 12)
 	_check(a.state_signature() == b.state_signature(),
 		"state_signature matches once both grids reach the same merged extent, regardless of touch order")
+
+
+## THE GUARD FOR D0261'S O(1) SIGNATURE, and the reason that optimisation is safe to make.
+##
+## `state_signature()` is now carried incrementally by the four mutation methods instead of rebuilt.
+## Its failure mode is silent and total: a path that forgets to update leaves the running value stale,
+## and **a stale value agrees with itself across two runs**, so `test_shaft_replay_determinism` goes
+## green while the two worlds genuinely differ. That is this project's house failure class arriving in
+## its usual costume, and no amount of care while editing prevents it.
+##
+## So the running value is checked against a from-scratch rebuild of the same state after EVERY kind of
+## mutation, and then after a long randomised sequence of them. A forgotten update in any path makes
+## this fail immediately -- which is a durable guard, unlike remembering to write a mutation test each
+## time someone adds a method.
+##
+## The randomised tail is not decoration. The per-method checks below all mutate a cell that was in a
+## known state; the sequence reaches combinations nobody enumerated -- excavating an already-air cell,
+## setting a wall behind air and then filling the block in front of it, re-digging a column that already
+## has an extent. `excavate` on air and `set_wall` behind air are exactly the two no-op cases where an
+## over-eager xor (rather than a forgotten one) desynchronises the hash, so the sequence tests both
+## directions of the same mistake.
+func _test_running_signature_agrees_with_a_from_scratch_rebuild() -> void:
+	var grid: TileGrid = TileGrid.new(16, 16, 7)
+	_check(grid.state_signature() == grid.recomputed_signature(),
+		"an empty grid's running signature already agrees with a rebuild (%s)" % grid.state_signature())
+
+	var steps: Array[String] = []
+	grid.set_material(Vector2i(2, 3), &"clay")
+	steps.append("set_material")
+	grid.set_wall(Vector2i(2, 3), &"slate")
+	steps.append("set_wall behind a block")
+	grid.set_wall(Vector2i(9, 9), &"slate")
+	steps.append("set_wall behind AIR (must change nothing)")
+	grid.excavate(Vector2i(2, 3))
+	steps.append("excavate")
+	grid.excavate(Vector2i(5, 5))
+	steps.append("excavate AIR (must change nothing)")
+	grid.extend_terrain_dig_extent(2, 3, 6)
+	steps.append("extend_terrain_dig_extent, first touch")
+	grid.extend_terrain_dig_extent(2, 1, 9)
+	steps.append("extend_terrain_dig_extent, merging")
+	for label: String in steps:
+		pass
+	_check_over(steps.size(), grid.state_signature() == grid.recomputed_signature(),
+		"after each of %d mutation kinds (%s) the running signature still equals a rebuild -- running %s, rebuilt %s"
+		% [steps.size(), ", ".join(steps), grid.state_signature(), grid.recomputed_signature()])
+
+	# A long pseudo-random sequence over a small grid, so cells collide and every path is re-entered on
+	# state it did not create. SplitRng, not randi(): this file is a determinism test and may not seed
+	# itself from the clock.
+	var rng: SplitRng = SplitRng.new(20260831)
+	var mats: Array[StringName] = [&"clay", &"slate", &"glimmer"]
+	var mutations: int = 0
+	for _i: int in 400:
+		var c: Vector2i = Vector2i(rng.next_range(0, 7), rng.next_range(0, 7))
+		var pick: int = rng.next_range(0, 3)
+		if pick == 0:
+			grid.set_material(c, mats[rng.next_range(0, mats.size() - 1)])
+		elif pick == 1:
+			grid.set_wall(c, mats[rng.next_range(0, mats.size() - 1)])
+		elif pick == 2:
+			grid.excavate(c)
+		else:
+			grid.extend_terrain_dig_extent(c.x, c.y, c.y + rng.next_range(0, 4))
+		mutations += 1
+	_check_over(mutations, grid.state_signature() == grid.recomputed_signature(),
+		"and after %d randomised mutations -- running %s, rebuilt %s"
+		% [mutations, grid.state_signature(), grid.recomputed_signature()])
+	_check(grid.state_signature() != "0:0",
+		"positive control: the sequence actually left a non-empty signature (%s) -- two ZEROS would " % grid.state_signature()
+		+ "agree with each other while proving nothing at all")
