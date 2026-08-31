@@ -43,6 +43,6 @@ func _test_d0122_reproducing_prefix_finds_no_discontinuity() -> void:
 		summary_line)
 	var discontinuity_count: int = combined.count("type=discontinuity ")
 	print("body_fuzz_regression_d0122 coverage: %s -- discontinuity=%d" % [summary_line, discontinuity_count])
-	_check(discontinuity_count == 0,
+	_check_over(fuzz_total_ticks(combined), discontinuity_count == 0,
 		"zero 'discontinuity' violations across seeds 0-497 (the D0122 reproducing prefix) -- got %d; see this run's own stdout above for the first occurrence" %
 		discontinuity_count)

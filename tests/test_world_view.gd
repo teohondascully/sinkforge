@@ -119,6 +119,11 @@ func _test_the_frame_carries_the_ruled_contract() -> void:
 		"and a second refresh does not advance it -- there is no time source to advance")
 	## Wider than the margin ALONE, which is the assertion the first draft of this suite failed to make:
 	## `size > 0` is true of a window that is nothing but margin over a zero-sized viewport.
+	##
+	## Deliberately NOT `_check_over` (D0245), though this suite is one of the four that motivated it. The
+	## thing that was empty here is a RECT, not a population -- there is no count to range over, and the
+	## guard says so itself. The remedy for a scalar is a floor derived from what the scalar would read
+	## with the subject removed, which is exactly what `margin_only` is.
 	var margin_only: int = 2 * WorldView.WINDOW_MARGIN_CELLS
 	_check(f.obs.window.size.x > margin_only and f.obs.window.size.y > margin_only,
 		"the window is wider than its own margin (%s vs %d), so a real viewport rect reached it"

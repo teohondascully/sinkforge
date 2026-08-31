@@ -9938,3 +9938,62 @@ are pinned at dusk with the moon mid-transit, chosen to put the MOST of the pain
 than because they read well; the ridges are proportionally close to legacy's but subtend a large angle in
 this world's tighter camera; and the Sinkforge anchor is legacy's scaled, pointing at a spawn plateau
 this build does not have. `docs/NEEDS_DIRECTOR.md` P015.
+
+---
+
+## D0245 · The vacuous-assertion guard: a recurring papercut made into a caught class · 2026-08-30
+
+**The class.** `for x in EMPTY: assert(p(x))` is true by construction, and so is every aggregate over an
+empty collection -- `all()`, `violations == 0`, `unmoved.is_empty()`, `max <= bound`. The assertion is not
+wrong; it has no SUBJECT. This is the house failure class (an instrument that cannot register its subject)
+arriving inside the instrument built to catch it, which is why it keeps getting written by someone being
+careful.
+
+It has now landed four times in this repository:
+
+- `test_world_view` asserted an observation window was non-empty and PASSED over a window that was
+  entirely `WINDOW_MARGIN_CELLS`, because a Godot node is not in the tree until a process frame passes.
+- `test_sky_painter`'s starfield would have satisfied every property check with all 42 stars culled below
+  the horizon by a wrong rescale -- the exact failure the suite exists for.
+- `test_reveal_spawn_bounds` needed a `checked > 0` line bolted on beside the real assertion (D0229).
+- `test_interface`'s first fixture used a legacy material id, so the path it was written to exercise broke
+  on tick one and the suite reported success.
+
+**The remedy.** `TestBase.over(count, condition, label) -> [ok, label]`, a pure static predicate, plus the
+`_check_over(count, condition, label)` wrapper suites call. An empty population FAILS even when the
+condition is true, and says VACUOUS rather than reporting an ordinary red -- the two are different bugs
+("your code is wrong" vs "your fixture built nothing") and must not read alike in a log.
+
+Split pure-from-wrapper so the guard could be **mutation-tested in-process rather than trusted**:
+`tests/test_empty_population_guard.gd` poses all three branches, and `if count <= 0` was disabled to
+confirm the suite goes RED (3 failures, and the deliberately-failing line flipped to PASS -- the vacuous
+pass, visible). Reaching a check is not the check firing.
+
+**The direction rule, found during the retrofit and written into the guard's own docstring.** Only
+assertions that PASS on empty need it. `stars.size() > 20`, `gaps.size() > 3`, `found >= 1` already FAIL
+on an empty population, and wrapping one adds a guard that can never fire -- an idiom becoming decoration.
+One retrofit was reverted on this ground (`test_sky_painter`'s anti-lattice check), with the reason left
+at the call site so it does not look like an oversight.
+
+**And the population must be COUNTED, not computed.** `SEEDS * SITES.size()` is a product of two constants
+and cannot register a loop body that never executed; `test_reveal_spawn_bounds` now increments a `runs`
+counter inside each of its three sweeps instead.
+
+**A live instance the retrofit found, not one of the four above.** The fuzz suites' real assertions are
+all `counts[kind] == 0` over the probe's whole output, and their only population guard was
+`summary_line != ""` -- a PRESENCE check. A probe that simulated nothing still prints a summary line, so
+`total_ticks=0` passes it and satisfies every hard-zero assertion beneath it. `TestBase.fuzz_total_ticks()`
+now reads the real number off `FUZZ_SUMMARY` and carries it into all three fuzz suites; the full sweep
+reports `over 1500000 item(s)` where it previously reported nothing at all. Shared on `TestBase` rather
+than copied three times because `duplication.py` would find the copies, the same reason `_flat_grid` lives
+there (D0102).
+
+**Prior art worth naming:** `check_suite_coverage.py` already carries this idea in Python -- it refuses to
+report a verdict when its own suite list comes back empty, "or this gate would pass forever while checking
+nothing." The GDScript side had no equivalent until now.
+
+**Scope.** 14 call sites across 7 suites: `test_reveal_spawn_bounds` (6, replacing D0229's hand-written bolt-on),
+`test_sky_painter`, `test_reveal_args`, `test_interface`, and the three fuzz suites. `test_world_view` is
+deliberately NOT retrofitted and says so at the call site: what was empty there is a RECT, not a
+population, and the guard cannot help with a scalar -- its remedy is a floor derived from the
+subject-removed value, which is what `margin_only` already is.

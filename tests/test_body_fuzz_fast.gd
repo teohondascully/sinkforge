@@ -57,8 +57,11 @@ func _test_fast_fuzz_finds_no_correctness_defects() -> void:
 	# read its PASS for what it is: measured 0 with the D0213 defect present as well as absent, because
 	# random input never leaves the body at horizontal rest. `fixture_body_fuzz_probe.gd` carries the
 	# isolation; `tests/test_corner_consent.gd` is where this class is actually witnessed.
+	# `seeds=100`/`ticks_per_seed=500` above already prove this sweep ran, so the population guard is not
+	# closing a hole here the way it is in `test_body_fuzz.gd` -- it is carried for the same reason the
+	# string check is: two ways of saying the same thing, one of which survives a change to the flag names.
 	for kind: String in ["embedded", "grounded_no_floor", "overflow", "discontinuity", "deadlock",
 			"translation_consent"]:
-		_check(counts[kind] == 0,
+		_check_over(fuzz_total_ticks(combined), counts[kind] == 0,
 			"zero '%s' violations across the fast fuzz sweep (got %d) -- see this run's own stdout above for the first occurrences" %
 			[kind, counts[kind]])

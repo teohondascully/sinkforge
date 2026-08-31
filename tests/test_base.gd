@@ -35,6 +35,75 @@ func _check(condition: bool, label: String) -> void:
 		printerr("  FAIL: %s" % label)
 
 
+## THE VACUOUS-ASSERTION GUARD (D0245). Assert `condition` over a population of `count` items, and FAIL
+## when that population is EMPTY -- even if `condition` is true.
+##
+## This exists because the same defect has now landed four separate times in this repository, each time
+## in a test written by someone being careful:
+##
+##   * `test_world_view` asserted an observation window was "non-empty" and PASSED over a window that was
+##     entirely margin, because a Godot node is not in the tree until a process frame has passed.
+##   * `test_sky_painter`'s starfield would have passed every property check with all 42 stars culled
+##     below the horizon by a wrong rescale.
+##   * `test_reveal_spawn_bounds` needed a `checked > 0` guard bolted on after the fact (D0229).
+##   * `test_interface`'s first fixture used a legacy material id, so the charge path it was written to
+##     exercise broke on tick one and the suite reported success.
+##
+## They share one shape: **`for x in EMPTY: assert(p(x))` is true by construction**, and so is every
+## aggregate over an empty collection -- `all()`, `max() == expected`, `count == 0`. The assertion is not
+## wrong; it simply has no subject, which is this project's dominant failure class arriving inside the
+## instrument meant to catch it.
+##
+## THE DIRECTION RULE, and the reason this is not simply sprinkled everywhere a loop appears. Only
+## assertions that PASS on an empty population need it. `all_above == count`, `violations == 0`,
+## `unmoved.is_empty()`, `max <= limit` -- all true over nothing. Their mirrors are already safe:
+## `stars.size() > 20`, `gaps.size() > 3`, `found >= 1` FAIL on an empty population by construction, and
+## wrapping one of those adds a guard that can never fire, which is how an idiom becomes decoration.
+## Sort the assertion by direction first; if emptiness would make it RED, leave it as `_check`.
+##
+## Pass a COUNTED population, not a computed one. `SEEDS * SITES.size()` is a product of two constants and
+## cannot register a loop body that never executed -- increment a counter inside the loop instead.
+##
+## Use it wherever an assertion ranges over something that could be empty. It cannot help with a scalar.
+func _check_over(count: int, condition: bool, label: String) -> void:
+	var verdict: Array = over(count, condition, label)
+	_check(bool(verdict[0]), String(verdict[1]))
+
+
+## `_check_over`'s decision, as a PURE function returning `[ok, label]`.
+##
+## Static and separate so the guard can be mutation-tested in-process rather than trusted: a guard that
+## has never been observed refusing an empty population is exactly the kind of check `docs/QUALITY.md` §2
+## says is not a check. `tests/test_empty_population_guard.gd` poses all three branches, and the one that
+## matters is `over(0, true, ...)` -- a condition that WOULD have passed, refused because it had nothing
+## to range over.
+static func over(count: int, condition: bool, label: String) -> Array:
+	if count <= 0:
+		return [false, "VACUOUS -- \"%s\" was asserted over %d item(s), which is true by construction "
+			% [label, count] + "whatever the code does. The population is the bug, not the assertion."]
+	return [condition, "%s (over %d item(s))" % [label, count]]
+
+
+## How many ticks a `fixture_body_fuzz_probe.gd` run actually simulated, read off its own FUZZ_SUMMARY
+## line. Returns 0 when the line is absent, malformed, or reports nothing -- all three of which mean the
+## same thing to a caller: there is no population, so no verdict about the sweep is available.
+##
+## This exists because the fuzz suites' real assertions are `counts[kind] == 0` over the probe's whole
+## output, and **a probe that simulated nothing satisfies every one of them**. The guard those suites had
+## was `summary_line != ""`, which is a PRESENCE check: a summary line reading `total_ticks=0` is present,
+## and passes it. Shared here rather than copied into each suite because
+## `tools/quality_check/duplication.py` would find two identical copies byte-for-byte after normalization,
+## which is exactly why `_flat_grid` below lives here too (D0102).
+static func fuzz_total_ticks(combined: String) -> int:
+	for line: String in combined.split("\n"):
+		if not line.begins_with("FUZZ_SUMMARY"):
+			continue
+		for field: String in line.split(" "):
+			if field.begins_with("total_ticks="):
+				return int(field.trim_prefix("total_ticks="))
+	return 0
+
+
 ## A flat `hardrock` floor at `floor_row`, `width` columns wide, with 2 columns of margin on either
 ## side and 5 rows of headroom above. Moved here 2026-08-28 (`docs/DECISIONS_LEDGER.md` D0102) from
 ## `test_body.gd`/`test_heightfield.gd`, which each defined an identical private copy independently --
