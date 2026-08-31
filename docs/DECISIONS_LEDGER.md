@@ -9776,3 +9776,65 @@ the new suite.
 **Two architecture questions surfaced and parked rather than absorbed:** `view -> data` is now real,
 ungranted by §3's table and invisible to the lint (P013); and `core/MODULE.md` sits at exactly its
 100-line cap (P014).
+
+## D0241 · gate 26 claimed hard-zero on every invariant while the fuzzer ran green on 922 of them · 2026-08-30
+**Decided:** `docs/QUALITY.md` gate 26 now states what the code enforces -- six invariants hard-zero,
+with `bounds` and `floor_selection` reported-not-gated and the reason written down. The code is
+unchanged. **Make the claim true; do not fake the check.**
+
+**Measured at `0d4165d`, by running the gate rather than reading it:** `FUZZ_SUMMARY seeds=100
+ticks_per_seed=500 total_ticks=50000 violations=922`, of which **`bounds=922`** and every gated type
+**0**. The suite prints `ALL PASS`. So every violation the per-commit fuzzer actually finds is of the
+one type it does not assert on, and the contract's phrase "asserts every invariant hard-zero" was
+carried entirely by types that did not fire.
+
+**The exemption itself is correct and was already disclosed in the code.** `test_body_fuzz_fast.gd`
+counts eight types, prints two as "(reported, not gated)", and its own comment explains that `bounds`
+has no principled zero -- unlike `translation_consent`, whose exemptions are exactly the two recovery
+paths. Under random input the body walks into the world edge constantly and the clamp is the intended
+recovery. The defect was never the exemption; it was that `docs/QUALITY.md` did not carry it.
+
+**Alternative:** give `bounds` a principled bound now. **Rejected** -- `bounds` being ungated is
+entangled with the parked diagnosis that the fuzzer poses the wrong world (`docs/NEEDS_DIRECTOR.md`
+P001/P004). A bound fitted to a world that does not pose the mechanic would be a number with no
+subject. The real fix is downstream of that work; the immediate fix is an honest contract.
+
+**Why: a gate whose stated claim is wider than its assertions is the vacuous-green class this
+document exists to prevent.** `docs/QUALITY.md` §1 already warns that it is "exactly the kind of
+hand-typed claim that drifts." This is one, found by drift.
+
+**Reverse cost: cheap.** One sentence.
+
+**Found by an external audit** -- a Factory `droid` session reading the repo cold at a pinned hash,
+which located the counted-vs-gated split, cited the lines, and ran the suite. Verified independently
+by re-running it: 922, exact.
+
+## D0242 · gate 7 subtracts two different populations, so its verdict depends on the machine · 2026-08-30
+**Decided:** recorded, not yet fixed. `tools/layer_lint/check_loc_ratio.py` compares
+`loc_under_worktree` (`base.rglob`, every `.gd`/`.py`/`.sh` on disk -- tracked or not, gitignored or
+not, excluding only `tools/scratch/`) against `loc_at_commit` (`git ls-tree`, tracked files only).
+The two sides of one subtraction do not draw from the same population.
+
+**Mutation-tested, not inferred.** A `tools/_scratch_mutant.gd` that `git check-ignore` confirms is
+ignored (`.gitignore:137`) moved the reported ratio **3.573 -> 3.620**. A file CI can never see
+changes this gate's number.
+
+**Why it is worse than asymmetric:** gitignored code under an instrument directory is *permanent*
+one-sided growth. It can enter the "now" total forever and can never enter the "then" total, because
+the "then" side reads tracked files at a commit.
+
+**This gate is the one whose arithmetic spans two commits**, so a population mismatch moves a number
+rather than a file list -- harder to notice than a wrong file in a listing.
+
+**The fix already exists in this repo and was not applied here.** D0225 removed exactly this defect
+from the size gate by adding the `git check-ignore` filter in `gd_scan.py:18-43`, whose own comment
+states the reason: "Same gate name, two populations: a local run could FAIL for a reason CI can never
+see, and -- the sharper half -- could be made to PASS by deleting an untracked file."
+
+**Alternative:** fix it in the same commit as this entry. **Rejected** -- gate 7 is currently the gate
+blocking PR #6 (D0236), and changing what it counts while it is load-bearing on a parked decision
+mixes a correctness fix into a live ruling. Recorded now, fixed deliberately.
+
+**Reverse cost: cheap** when applied -- the filter is written and tested in `gd_scan.py`.
+
+**Found by the same external audit as D0241**, verified by mutation test.
