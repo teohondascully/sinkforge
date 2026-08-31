@@ -34,6 +34,39 @@ extends RefCounted
 
 const CELLS_PER_METRE: int = 4  ## ShaftGenerator.TERRAIN_CELLS_PER_METER -- 4px cells, 16px/m.
 
+## Legacy `world_renderer.gd:1506-1512 ZONE_TINTS` and `:1573-1629 _cell_tone/_strata/_cell_jitter`,
+## ported in METRES (D0252). Everything below this line arrived together because legacy computes them
+## together: `_cell_fill_color = apply_tone(_cell_base_color(...), _cell_tone(...))`.
+##
+## THE ZONE TINTS ARE NOT `data/bands`, and the near-miss is worth stating because both are
+## eight-or-fewer rows of `{depth, colour}` and this file already holds the other one. `data/bands` is
+## legacy's `strata.gd:BANDS` -- EIGHT bands carrying the name and colour the HUD *announces* a depth in.
+## This is `world_renderer.gd:ZONE_TINTS` -- FOUR terrain tints with their own boundaries and their own
+## quieter colours. Three of the four rows prove they are separate tables rather than one table copied:
+## the neutral middle starts at 28 m where SHALE REACH starts at 24, and its colour is (0.55,0.58,0.66)
+## against that band's (0.58,0.64,0.74). Legacy's own comment says the topsoil has NO entry here --
+## "Topsoil keeps its warm material colours, since no entry means no tint" -- while the band ladder
+## does carry a TOPSOIL row. Merging them would silently retune the depth readout to match the rock, or
+## the rock to match the readout.
+##
+## Kept as a `const` here rather than promoted to `data/`, because that is the form legacy gave it: the
+## bands were a `.tres`-backed table and became `data/bands`, and these were renderer constants and stay
+## renderer constants. Promoting them would be an unrequested design change, not a port.
+##
+## Legacy rows are 32px logic cells with `SURFACE_ROW = 20`, so `metres = row - 20` -- exactly the
+## conversion `data/bands/*.yaml` already documents for the other ladder.
+const ZONE_TINTS: Array[Dictionary] = [
+	{"from_m": 10.0, "to_m": 26.0, "color": Color(0.86, 0.58, 0.30), "strength": 0.22},  # Clayband warmth to lose
+	{"from_m": 28.0, "to_m": 42.0, "color": Color(0.55, 0.58, 0.66), "strength": 0.16},  # the honest neutral middle
+	{"from_m": 44.0, "to_m": 64.0, "color": Color(0.40, 0.30, 0.62), "strength": 0.26},  # the approach to the seal
+	{"from_m": 66.0, "to_m": 98.0, "color": Color(0.42, 0.55, 0.90), "strength": 0.34},  # Stonereach, below the seal
+]
+
+## Legacy `fine_terrain.gd:405-406`. The two ends the bedding pulls toward.
+const STRATA_WARM: Color = Color(0.86, 0.74, 0.52)  ## the sandy band
+const STRATA_COOL: Color = Color(0.15, 0.16, 0.21)  ## the cool clay/silt band
+const STRATA_AMOUNT: float = 0.17  ## legacy `world_renderer.gd:1611` -- how far a band pulls
+
 ## Legacy's own `_cell_base_color` normalises depth by `FactorySim.GRID_ROWS` (128 rows == 128 m) before
 ## applying `depth_darken`. Kept as metres so it survives the grid change; this world runs to 256 m, so
 ## a cell at 128 m darkens exactly as legacy's bottom row did, and everything below sits at the clamp.
@@ -78,16 +111,136 @@ static func depth_m(row: int) -> int:
 ## RNG, so two runs of the same seed paint identically -- this is a debug scene, not the sim, but a
 ## renderer whose output moves between runs cannot be screenshot-compared, which Slice 0's whole
 ## deliverable depends on.
+## Legacy's order exactly (`_cell_fill_color` -> `_cell_base_color` -> `apply_tone`): base, darkened with
+## depth, zone-tinted, then the (jitter, bedding) tone. The nugget lift is applied LAST and UNTONED,
+## because in legacy the crystal is a polygon drawn ON TOP of the finished fill rather than part of it --
+## toning it would shade a mineral face with the bedding of the rock behind it.
+##
+## ORE-BEARING ROCK IS NOT ZONE-TINTED, and this is the one place the port had to decide something legacy
+## never had to. Legacy tints the country rock and then draws the ore as SEPARATE untinted crystal
+## polygons over the top (`world_renderer.gd:1181 _draw_lode`, `:1223 _draw_grain`) -- so a vein keeps its
+## own mineral colour however deep it sits. This world's terrain cell is 4px and legacy's smallest nugget
+## mark is 6.4px, so there is no room to draw a crystal ON a cell; the cell IS the mark, which is the
+## whole basis of `_speck_lift`. That leaves the ore's own body colour going through the tint, and the
+## measured consequence was severe: at 252 m all four zone bands are clamped at full strength and only
+## 32% of a material's own colour survives (0.78*0.84*0.74*0.66), which collapsed glimmer-vs-deepstone
+## separation from 0.25 to **0.061** and would have made a vein unfindable in Stonereach.
+##
+## So the exemption is not a workaround for a failing test -- it is the same rule legacy enforced by
+## drawing order, re-expressed as the only mechanism this grid has. The predicate is legacy's own
+## `MaterialDef.has_nuggets()` (`material_def.gd:45`), NOT `glitters`: `glitters` gates the glint FLARE
+## and is true of plain deepstone and hardrock, which are country rock and must keep tinting. Four
+## materials are exempt (coal, glimmer, ore_copper, ore_iron); three are not (clay, deepstone, hardrock).
+## `tests/test_material_palette.gd`'s distinctness floor is what holds this honest.
 func cell_color(material: StringName, col: int, row: int) -> Color:
 	var rec: Dictionary = MaterialsRecords.RECORDS.get(material, {})
 	if rec.is_empty() or not rec.has("base_color"):
 		return Color(0.42, 0.34, 0.24)  # the pre-Slice-0 debug brown: an unmapped material stays visible
 	var base: Color = _to_color(rec["base_color"])
 	base = _depth_darkened(base, rec, row)
+	var country_rock: bool = not rec.has("nugget_color")
+	base = apply_tone(base, cell_tone(col, row, country_rock))
 	base = _speck_lift(base, rec, col, row)
-	if bool(rec.get("grain", false)):
-		base = _grained(base, col, row)
 	return base
+
+
+## Legacy `world_renderer.gd:1516-1523 _zone_tinted`. Ease `base` toward every zone tint whose band this
+## depth has ENTERED, cumulatively -- so a cell deep in the world carries the sum of every band above it,
+## and a band is a stretch you travel rather than a step you cross.
+##
+## Public because the wall plane needs the identical answer: legacy applies this to terrain AND walls so
+## the whole stratum shifts together, and two copies of the ladder is exactly how the foreground and the
+## background come to disagree about what depth they are at.
+func zone_tinted(base: Color, row: int) -> Color:
+	var m: float = depth_m_exact(row)
+	var out: Color = base
+	for z: Dictionary in ZONE_TINTS:
+		var lo: float = float(z["from_m"])
+		if m <= lo:
+			continue
+		var t: float = clampf((m - lo) / (float(z["to_m"]) - lo), 0.0, 1.0)
+		out = out.lerp(z["color"] as Color, float(z["strength"]) * smoothstep(0.0, 1.0, t))
+	return out
+
+
+## Legacy `world_renderer.gd:1596 _cell_tone`, as `(jitter, bedding)`.
+##
+## THE DEPTH BOOST IS DELIBERATELY NOT PORTED. Legacy multiplies both terms by `1 + depth * 2.2` for one
+## stated reason: the shadow veil takes roughly half a cell's tonal range, so the compensation must
+## exceed 2x by the deep band or bedding does not read down there at all. This build has no veil (see
+## `_depth_darkened` below, which reports the same finding from the other direction), so the boost would
+## not be compensating for anything -- it would just make deep rock louder than shallow rock for no
+## reason a player could name. It comes back WITH the veil, not before it.
+## `bedded` is false for ore-bearing rock, which takes the JITTER but not the BEDDING -- see the note on
+## `cell_color`. The jitter is a small achromatic value drift and breaks a flat fill either way; the
+## bedding is a hue move toward `STRATA_WARM`/`STRATA_COOL` and is a statement about sedimentary
+## structure. A vein is not bedded, it CUTS bedding, which is exactly why legacy drew it as separate
+## polygons over the top rather than as a modulation of the fill.
+func cell_tone(col: int, row: int, bedded: bool = true) -> Vector2:
+	return Vector2(_cell_jitter(col, row), _strata(col, row) if bedded else 0.0)
+
+
+## Legacy `fine_terrain.gd:411-415 apply_tone` -- THE single authority for what a tone means to a pixel.
+##
+## Legacy states three times, in three files, that only one place may own this, because the coarse pass
+## and the fine pass have to reconstruct the same colour and a second copy is how they drift. There is
+## only a coarse pass here today, so the rule costs nothing to keep and would cost a repaint to recover.
+##
+## Applied RELATIVE to the cell's own colour, never toward an absolute band target. Legacy tried the
+## absolute form and recorded why it failed: a dark clay target sits almost exactly on deep stone's own
+## colour, so half the bedding became a no-op in the place that needed it most.
+static func apply_tone(base: Color, tone: Vector2) -> Color:
+	var col: Color = base.lightened(tone.x) if tone.x > 0.0 else base.darkened(-tone.x)
+	if tone.y > 0.0:
+		return col.lightened(tone.y * 0.85).lerp(STRATA_WARM, tone.y * 0.30)
+	return col.darkened(-tone.y * 1.05).lerp(STRATA_COOL, -tone.y * 0.20)
+
+
+## Legacy `world_renderer.gd:1613-1619 _strata`. Sedimentary banding: the ground's own structure.
+##
+## Bands run horizontally -- the direction you cut across as you sink -- at three INCOMMENSURABLE
+## frequencies, so fine laminations and thick beds overlap and the pattern never visibly repeats down a
+## shaft. They are warped slowly along x by two more sines so a layer dips and rises like real bedding
+## instead of ruling a straight line across the world.
+##
+## COMPUTED IN METRES, which is the whole of the scale conversion. Legacy's `c` is a 32px logic cell and
+## one legacy cell is one metre; this world's cell is 4px and four of them are one metre, so feeding raw
+## terrain rows into legacy's frequencies would give beds a quarter of their authored thickness -- ~4.6
+## metres instead of ~18.5 for the thick bed, which at any real zoom is a stripe pattern and not bedding.
+## Dividing the coordinate by `CELLS_PER_METRE` and leaving every legacy constant untouched keeps the
+## authored wavelength in the units the director's "keep 16px, adapt the art" ruling preserves.
+func _strata(col: int, row: int) -> float:
+	var xm: float = float(col) / float(CELLS_PER_METRE)
+	var ym: float = float(row) / float(CELLS_PER_METRE)
+	var y: float = ym + sin(xm * 0.055) * 2.4 + sin(xm * 0.021) * 3.6
+	# Periods of roughly 18, 7 and 4 metres. A screen holds about 22 metres at the default zoom, so you
+	# always see a thick bed, the layers inside it, and the fine laminations between: the whole scale
+	# ladder at once, which is what makes ground read as ground.
+	var n: float = sin(y * 0.34) * 0.46 + sin(y * 0.88) * 0.36 + sin(y * 1.62) * 0.18
+	return n * STRATA_AMOUNT
+
+
+## Legacy `world_renderer.gd:1624-1629 _cell_jitter`. A smooth, spatially-coherent value nudge over
+## roughly [-0.06, +0.06].
+##
+## LOW-FREQUENCY SINES, NOT A HASH, and that is the entire point of the function. This file previously
+## carried a per-cell hash at the same +/-0.06 amplitude as a stand-in. Legacy's own comment rules the
+## hash out by name: a per-cell random "seams at every tile edge and so redraws the grid" -- it re-draws
+## the very lattice the renderer is trying to hide, which is exactly what the pre-port capture shows as
+## a field of individually-visible speckled squares. Neighbouring cells must SHARE tone in cloudy
+## patches for a fill to read as a mass rather than as tiles. Same metres conversion as `_strata`.
+func _cell_jitter(col: int, row: int) -> float:
+	var x: float = float(col) / float(CELLS_PER_METRE)
+	var y: float = float(row) / float(CELLS_PER_METRE)
+	var n: float = sin(x * 0.37 + y * 0.21) + sin(x * 0.13 - y * 0.41) + sin((x + y) * 0.27)
+	return n / 3.0 * 0.06
+
+
+## Depth in metres as a FLOAT. `depth_m` floors to an int because a depth READOUT is a whole number; a
+## tint that stepped on integer metres would band at four-cell intervals, which is the stripe artefact
+## `_strata`'s comment above is about.
+static func depth_m_exact(row: int) -> float:
+	return float(row) / float(CELLS_PER_METRE)
 
 
 ## Legacy `_cell_base_color`: `base.darkened(depth_frac * depth_darken)`, linear, clamped at 1.0.
