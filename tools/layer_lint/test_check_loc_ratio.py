@@ -98,6 +98,8 @@ def branch_instrument_only_window_still_fails() -> None:
         check(rc == 1, "an instrument-only window still FAILS (exit %d) -- the gate is not turned off" % rc)
         check("FAIL" in out and "next unit of work is game" in out,
               "and it still says why, in CLAIMS.md's own words")
+        check("did not move AT ALL" in out,
+              "and it blocks on the RIGHT condition -- zero game growth, not a ratio (D0259)")
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
@@ -185,6 +187,50 @@ def branch_too_few_population_commits_is_unmeasurable_not_a_pass() -> None:
         shutil.rmtree(root, ignore_errors=True)
 
 
+
+# --- 6. D0259: instrument-heavy but game IS growing -- WARNS without BLOCKING ----------------------
+# The case that stalled a real run. PR #10 grew instrument +1148 against game +542 -- more than the 2x
+# velocity limit, so the old rule blocked it -- while every one of those instrument lines was building
+# the measurement that found four generator defects, and game LOC was growing in the same branch. A gate
+# whose remedy line says "the next unit of work is game" must not block a branch that is doing game work.
+#
+# The distinction this asserts is the whole of the change: instrument outpacing game is a PACE signal
+# (warn), game not moving at all is a DIRECTION signal (block). Both are checked here against the same
+# repository shape so the pair cannot drift apart -- 300 instrument lines per commit against 100 game
+# lines is 3x, comfortably over RATIO_LIMIT, with game growth strictly positive.
+def branch_instrument_heavy_with_game_growth_warns_but_passes() -> None:
+    root = new_repo()
+    try:
+        for i in range(WINDOW + 1):
+            commit_lines(root, f"tools/thing_{i}.py", 300, f"instrument {i}")
+            commit_lines(root, f"core/thing_{i}.gd", 100, f"game {i}")
+        rc, out = run_gate(root)
+        check(rc == 0,
+              "instrument growing 3x game PASSES when game is growing (exit %d) -- the pace signal "
+              "does not block the direction" % rc)
+        check("WARNING (not blocking)" in out,
+              "but it WARNS -- the polish-the-machine signal stays visible, it just stops being a wall")
+        check("FAIL" not in out, "and says nothing that reads as a failure")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+# --- 7. D0259: the warning is not free -- silence here would mean the signal was over-loosened -------
+# The honesty test the ruling names: a PR that is pure instrument bloat with no game and no docs must
+# STILL be caught. Branch 1 proves it blocks; this proves the WARNING text itself is reachable and is not
+# printed unconditionally, by checking a balanced window stays silent.
+def branch_balanced_window_emits_no_warning() -> None:
+    root = new_repo()
+    try:
+        for i in range(WINDOW + 1):
+            commit_lines(root, f"tools/thing_{i}.py", 100, f"instrument {i}")
+            commit_lines(root, f"core/thing_{i}.gd", 100, f"game {i}")
+        rc, out = run_gate(root)
+        check(rc == 0 and "WARNING" not in out,
+              "a balanced window emits NO warning (exit %d) -- the warning is conditional, not decoration" % rc)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
 def main() -> int:
     print("test_check_loc_ratio: the window counts population-touching commits (D0251)")
     branch_instrument_only_window_still_fails()
@@ -192,6 +238,8 @@ def main() -> int:
     branch_documentation_commits_do_not_move_the_window()
     branch_uncounted_file_under_a_population_dir_does_not_admit_a_commit()
     branch_too_few_population_commits_is_unmeasurable_not_a_pass()
+    branch_instrument_heavy_with_game_growth_warns_but_passes()
+    branch_balanced_window_emits_no_warning()
     print()
     if failures:
         print(f"test_check_loc_ratio: FAIL -- {len(failures)} of {observed} branches")

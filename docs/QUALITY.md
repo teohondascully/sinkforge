@@ -51,7 +51,17 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
    the absolute ratio while the only code that ever existed to enforce it (`check_loc_ratio.py`) has only
    ever gated on the velocity condition above, at any point in its history; the absolute ratio being
    >1 from the first commit of real code onward is not, on its own, evidence of anything this gate exists
-   to catch. When the velocity check fails, the next unit of work is game.
+   to catch.
+
+   **The velocity condition WARNS; it BLOCKS only when game growth is zero** (D0259, director's ruling).
+   Instrument outpacing game is a *pace* signal and stays visible on every run that trips it. Game LOC not
+   moving at all is a *direction* signal, and that is the only one that fails the build. The distinction
+   was paid for: PR #10 grew instrument +1148 against game +542 and was blocked by a gate whose own remedy
+   line reads "the next unit of work is game" -- while the branch it blocked was doing exactly that, and
+   the instrument it counted against itself was the measurement that found four generator defects. A gate
+   that cannot tell "building the tools the game needs" from "no longer building the game" is measuring
+   pace and reporting direction. When the velocity check **fails**, the next unit of work is game; when it
+   **warns**, read it and carry on.
 
 ### Correctness
 
