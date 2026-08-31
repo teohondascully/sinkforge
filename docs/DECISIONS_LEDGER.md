@@ -10043,3 +10043,35 @@ would destroy the thing the pin exists for.
 tree. A broader sweep of all current-side paths flagged 7 more as missing and all 7 were false positives
 -- legacy-manifest rows are written relative to `legacy/`, where each exists. Recorded so the next person
 running that sweep does not re-derive the same false alarm.
+
+---
+
+## D0247 · The fuzz bound is 13 counts slack, found by a guard looking for something else · 2026-08-30
+
+**Measured, twice, byte-identical:** the full 1000x1500 sweep reports `grounded_no_floor=46` against a
+`DESIGN_TRADEOFF` bound of **59**, and `bounds=1179015` against a recorded 805,397. `embedded=0` against a
+`RESIDUAL` of 1. Nothing is red -- 46 < 59 and 0 < 1 -- which is exactly why this needed finding rather
+than waiting to be reported.
+
+**Found sideways.** D0245's retrofit made the fuzz suites print the population their assertions range
+over, and the coverage line came back carrying numbers that did not match the two places the repository
+records them. The guard was built for a different failure; this is what looking at the output got.
+
+**Reproducibility established before conclusions, and it is the whole basis for treating this as real.**
+Two independent full sweeps, identical in every field. A single sweep would have left "the count moved"
+and "the count is noisy" indistinguishable, and the brief's own hard stop says a determinism regression
+parks the run -- so the first question had to be which of the two this was. It is neither: it is a stable
+count at a moved trajectory.
+
+**Not ratcheted, and the reason is the director's own ruling.** D0184 labels 59 *"a cumulative-trajectory
+count at this seed ORDER, not an independent-trial resolver rate"* and *"provisional pending fuzz
+restructure"*. Ratcheting what shipping decided is usually right (and this project's ledger says refusing
+to guess a bound is not a reason to refuse to ratchet one) -- but a number the director explicitly marked
+provisional, on a metric they explicitly said moves for non-regression reasons, is theirs to move.
+`docs/NEEDS_DIRECTOR.md` P016 carries the three options.
+
+**And the `bounds` growth is NOT diagnosed, deliberately.** A mechanism is sitting in plain sight: D0184
+notes the 1,000 seeds share one `TileGrid` built outside the seed loop, so a cumulative trajectory that
+digs more spends more ticks where the world used to be. That is a hypothesis with an obvious appeal and
+no measurement behind it, and this ledger is full of entries correcting exactly that move (D0135's
+falsified rationale being the closest sibling). Reported as a number, not as a cause.

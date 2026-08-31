@@ -4,108 +4,103 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-08-30. This round: your Phase-0 rulings applied, and the coordinator skeleton
-built. STOPPED at the Phase-1 ◆ — Phase 2 does not start until you look.** `docs/DECISIONS_LEDGER.md`
-D0237, D0238, D0240. Two PRs open and stacked: **#6** (Phase 0's contract, parked on gate 7 alone) and
-**#7** (prerequisites + skeleton), branched off #6 so the ledger stays sequential.
+**Last updated: 2026-08-30. This round: P013 ruled and enforced, `sky_painter` lifted and DRAWING, and
+Bin A run to exhaustion.** `docs/DECISIONS_LEDGER.md` D0243–D0247. **STOPPED at P015, the ◆** — Phase 2
+(`terrain_painter`) does not start until you look at two images. Three PRs open and stacked: **#6**
+(Phase 0's contract, parked on gate 7 alone), **#7** (prerequisites + skeleton), and this round's branch
+off #7.
 
-**Headline: it is 101 lines against a 400 cap, and that is the whole point.** The brief warned the
-skeleton would be born at the size gate. `tests/body/reveal_scene.gd` — the closest thing this tree had
-to a coordinator — sits at **398/400** with `_physics_process` at **49/50**, one line from firing on
-both. So nothing was ported from it. Its argument parsing, agent-drive modes and recording flush are
-~120 of those 398 lines and **none is coordinator work**; they stayed in the debug scene where they
-belong. A renderer does not parse `--seed`.
+**Headline: the sky is on the screen.** `view/visuals/sky_painter.gd` runs through the `Frame` contract,
+draws to its own canvas, and is layer-clean. Acceptance was deliberately *"it draws, it is clean, it is
+captured"* — **not** *"it is correct"*, which is the one thing only your eye decides.
 
 ---
 
 ## What landed
 
-**P0a · `Seams` → `core/`** (D0237). `test_seams` passes unchanged — `class_name` is path-independent.
+**P013 · ruled AND enforced** (D0243). `view/` may read appearance data from `data/`. The ruling is the
+cheap half; the load-bearing half is that `data` is now a **modelled** layer — an unmodelled edge cannot be
+enforced, which is the vacuous-gate shape this project keeps finding. Mutation-tested both directions: a
+legal `view→data` edge passes, a planted `view→sim` edge fails. `data: set()` is the line that stops
+`data` laundering a dependency onward. ADR 0008; the lint's suite went 8 → 11 branches.
 
-**P0b · two doors through L2** (D0238). `Observation` now carries `walls`/`wall_legend` and a per-column
-`Fx` `surface_y`. Each is derived **per window**, so a window sitting above the floor reports `NO_FLOOR`
-rather than scanning past its own edge — the envelope is preserved by construction, not by promise. ADR
-0007 Decision 1 amended in place.
+**`sky_painter` lifted** (D0244). ~341 lines, split for the 50-line gate. Two adaptations, both **derived
+rather than dialled**: `SCALE = TERRAIN_CELL_PX / LEGACY_CELL_PX` (this world's cell is 4px, legacy's was
+32), and the horizon pinned to the surface datum rather than legacy's `SURFACE_LINE * CELL`. Four
+before/after milestone pairs at `docs/milestones/slice3_*_23b0ec4.png`; the horizon pair goes 168 → 199
+distinct colours over the same world. Two seams also left `tests/body/reveal_scene.gd`, which was at
+398/400 — `RevealArgs` (now a pure function of argv, and therefore testable at all) and `RevealRecording`.
 
-**Phase 1 · the coordinator** (D0240). `world_view.gd` (101), `frame.gd` (57), `paint_layer.gd` (45),
-plus `MaterialLook` moved out of `tests/body/` into `view/visuals/`.
+**The empty-state class, caught** (D0245). It had landed **four times**, each time in a test written by
+someone being careful. `TestBase.over()` / `_check_over()` refuse an assertion whose population is EMPTY
+even when the condition is true, and say VACUOUS rather than reporting an ordinary red — *"your fixture
+built nothing"* and *"your code is wrong"* must not read alike in a log. **14 call sites, 7 suites.**
 
-**Evidence:** 39/39 suites pass, determinism included. **Gate 7 green and strongly positive —
-instrument +60 against game +464** (3,762 → 4,226 game LOC), exactly the direction you asked me to
-report. The layer lint was **mutation-tested on `world_view.gd` itself**, not trusted from last run's
-plant: a planted `TileGrid` reference fails with the precise message, removing it passes.
+**Bin A verification pass** (D0246). P014 confirmed; refs/t3 verified; two stale `seams.gd` addresses and
+`sky_painter`'s "8 private fields" caveat fixed in the migration map; one null result.
+
+**Evidence:** 42/42 suites pass, determinism included. **16 gates green**, each run bare so the exit code
+is the gate's own.
 
 ## What was learned
 
-### A dependency scan is not an architecture argument
+### The guard found a live instance of its own bug on its first outing
 
-I recommended `Seams` for `core/` on the evidence that it references only `RefCounted`, `Vector2i` and
-its own constants. That is true, and it answers a different question. It describes what the file
-**imports**, not what it **means**: `at()`, `aligned()` and `RUN_CAP` talk about swings, grain and the
-Wedge bit, and `core/MODULE.md` describes its residents as primitives "with no domain concept of their
-own". **Only `grain()` is domain-free — and `grain()` is the only function `view/` calls.** The clean
-split is named in D0237 and deliberately not taken: the integer conversion is proven exact as a
-whole-file unit over 196,608 inputs, and splitting the file splits the proof for a mechanic nothing
-calls yet.
+The three fuzz suites gate on `counts[kind] == 0` across the probe's whole output. Their only population
+guard was `summary_line != ""` — a **presence** check. A probe that simulated nothing *still prints a
+summary line*, so `total_ticks=0` passes it and then satisfies every hard-zero assertion beneath it. The
+full sweep now reads `over 1500000 item(s)` where it previously reported nothing at all. This is the house
+failure class (an instrument that cannot register its subject) sitting inside the fuzzer, found only
+because something made the population print.
 
-### Right by coincidence is still wrong
+### Two rules that stop a guard becoming decoration
 
-My first draft of the coordinator had a `view → sim` edge — `Heightfield.TERRAIN_CELL_PX`, to convert
-pixels to cells. The obvious repair was to re-declare the cell size in `view/`, and
-`view/visuals/material_look.gd` **already carries `CELLS_PER_METRE = 4`** — a *different* quantity
-(cells per metre, not pixels per cell) that happens to share the value at 16px/m. Copying it would have
-worked, forever, until the world scale changed. The real fix put the conversion in
-`Interface.Envelope.covering()`, where the constant legitimately lives and `view/` never learns it.
+Both came out of the retrofit and both now live in the guard's own docstring. **Direction:** only
+assertions that PASS on empty need it. `gaps.size() > 3` already fails on an empty field, so wrapping it
+adds a guard that can never fire — one retrofit was reverted on this ground, with the reason left at the
+call site so it doesn't read as an oversight. **Counted, not computed:** `SEEDS * SITES.size()` is a
+product of two constants and cannot register a loop body that never executed.
 
-### The gate cannot see a `view/ → tests/` dependency
+### Mutation-testing the guard is what made it a guard
 
-`Frame.look` is typed `MaterialLook`, which lived in `tests/body/`. Because `class_name` is
-path-independent, a shipped renderer could have depended on a test file **forever** with the layer lint
-silent throughout — `tests` is in its `UNPOLICED` set and its class map is built "from the policed tree
-only". That is why the file was physically moved rather than merely referenced. Same shape as the
-`view → data` edge now flagged in P013: the lint is silent in *both* directions, which is the worst
-place for a rule to live.
+Disabling `if count <= 0` turned the new suite red on 3 assertions — and flipped its *deliberately
+failing* line to PASS, which is the vacuous pass made visible. Reaching a check is not the check firing.
 
-### My own new test asserted something vacuous, and passed
+### A stale number in a gate's own header is worse than one in a doc
 
-`test_world_view` first checked that the observation window was "non-empty". It **passed** — over a 4×4
-window that was *entirely* `WINDOW_MARGIN_CELLS`, because a Godot node is not really in the tree until a
-process frame has passed, so `get_viewport()` returned null and the camera rect was zero. An assertion
-about having seen a viewport, passing on having seen no viewport. Now it asserts the window is wider
-than its own margin (324×184 over a real 1280×720), with the camera rect as a control.
+`check_size_limits.py` still read *"`core/MODULE.md` is 98, so the headroom is two lines."* It is at
+**exactly 100** and the headroom is **zero**. Someone reading the gate to decide whether they could add a
+class to `core/` would have been told yes by the thing enforcing no.
 
 ## The decisions this round is waiting on
 
-**`docs/NEEDS_DIRECTOR.md`, 9 items.** P011 is closed and deleted — your five rulings are applied.
+**`docs/NEEDS_DIRECTOR.md`, 10 items.** P011 and P013 are closed — both your rulings, both applied.
 
-- **The Phase-1 ◆ itself.** Review the skeleton and the split boundaries; Phase 2 (`sky_painter`) is
-  ready to start on your word.
-- **P013 — `view/` reads `data/`** for the palette. §3's table grants that only to `shell`, and the lint
-  cannot see the edge either way. One sentence, and it arrives twice more in Phase 2.
-- **P014 — `core/MODULE.md` is at exactly its 100-line cap.** Two of your rulings collided: P006 set the
-  cap when the file was at 98, and Q3 put a fifth class in `core/`. Resolved by writing less, with no
-  duplication left to reclaim — the next class added to `core/` forces the number open.
+- **P015 — THE ◆.** Two images and your eye. Four things I noticed and deliberately did **not** tune: the
+  pinned dusk values, the ridges' angular size in this world's tighter camera, the Sinkforge crown
+  anchored at a spawn plateau this build doesn't have, and whether `--sky` should be on by default.
+- **P016 — new.** The fuzz sweep measures `grounded_no_floor=46` against a bound of **59**, and
+  `bounds=1179015` against a recorded 805,397. **Measured twice, byte-identical** — a stable count at a
+  moved trajectory, not noise. Nothing is red, which is the point: 13 counts of slack is 13 counts of
+  regression the gate won't catch. Not ratcheted, because D0184 is your own ruling that 59 is provisional.
+- **P014 — `core/MODULE.md` at exactly 100, zero headroom.** One number. 120 restores the margin 100 meant.
 - **P012 — PR #6 still parked on gate 7.** Unchanged.
 - **P001, P004, P007, P008, P009, P010** unchanged.
 
 ## Anything that felt wrong even though it passed
 
-**A ledger-number collision happened and nothing detected it.** A second session committed **D0239** to
-this branch mid-run — the trailer gate counting identities over a wider ref set than it scanned, which
-also fixes the local-red flagged in the previous brief. **The director confirms this was deliberate and
-a one-off, so it is not a standing hazard and needs no protocol change.** Earlier claim keeps the
-address; the Phase-1 entry is **D0240**, with every citation moved.
-
-The mechanical lesson is the part that outlives the incident: **two entries can hold one number and no
-gate says so.** `docs/DECISIONS_LEDGER.md` is append-only prose, the commit-msg hook checks that an
-entry *exists* rather than that its number is unused, and both commits were green. It was caught by
-reading `git log` after committing, which is luck rather than method. A duplicate-number check is a
-handful of lines if a second writer is ever expected again.
+**I wrote two capture paths into `WORKING.md` that did not exist**, from memory rather than from the tree
+(`history/` instead of `docs/milestones/`), and caught it only because I ran `ls` before shipping the
+sentence. The colour counts beside them were right; the addresses were not. Nothing downstream consumed
+them, but a doc that names a path nobody checks is exactly the drift this round spent a commit fixing —
+the D0246 pass found the same shape in the migration map, written by an earlier session for the same
+reason. **The rule that catches it is cheap: resolve every path you type against the filesystem, in the
+same breath as typing it.**
 
 ## Blocked, and what it's waiting on
 
-- **Phase 2 is `sky_painter` then `terrain_painter`, and then dry.** `water_view`, `rope_view` and
-  `falling_items` need `sim/fluid`, `sim/transport` and `sim/items` — still zero lines of code.
+- **Phase 2 is `terrain_painter`, and then dry.** `water_view`, `rope_view` and `falling_items` need
+  `sim/fluid`, `sim/transport` and `sim/items` — still zero lines of code.
 - **`data/economy/` D1-D6**, **line of sight**, the **`ValueNoise` float gap**, **three GDD
   contradictions**, **`history/`'s 168-image cull** — all unchanged, all yours.
 
