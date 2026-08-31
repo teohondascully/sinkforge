@@ -262,20 +262,24 @@ jobs:
       - name: tools/run_gd_test.sh self-test (D0115/D0116 — must run before every suite below trusts it)
         run: bash tools/test_run_gd_test.sh ./godot
 
-      # THE SUITES, RUN IN PARALLEL (docs/DECISIONS_LEDGER.md D0263, D0264).
+      # THE SUITES, RUN IN PARALLEL (docs/DECISIONS_LEDGER.md D0263, D0264, D0265).
       #
-      # These were 43 sequential steps. Measured locally, serial was 794s and `jobs=8` was 350s over
-      # the identical result set -- and on this runner the sequential job had reached 45 minutes.
-      # The suites are independent headless processes: none asserts on duration (every
-      # `Time.get_ticks_usec()` in them builds a filename), and their `user://` paths are already
-      # uniquified per call site, so nothing serialises them. `tools/run_suites.sh` reports by EXIT
-      # CODE, never by matching output -- D0262 is what happens otherwise.
+      # These were 42 sequential steps. Measured locally, serial was 794s and `jobs=8` was 350s over the
+      # identical result set -- and on this runner the sequential job had reached 45 minutes. The suites
+      # are independent headless processes: none asserts on duration (every `Time.get_ticks_usec()` in
+      # them builds a filename) and their `user://` paths are uniquified per call site, so nothing
+      # serialises them. `tools/run_suites.sh` reports by EXIT CODE, never by matching output -- D0262 is
+      # what happens otherwise.
       #
-      # WHAT IS LOST, stated plainly: one step instead of 43 means the CI UI no longer shows a
-      # green tick per suite. `run_suites.sh` prints every failure with its own FAIL lines and the
-      # six slowest suites, so the information survives in the log rather than in the step list.
-      # The annotations those step names carried are preserved verbatim below, because several of
-      # them record real findings and none of them should be lost to a refactor:
+      # WHAT IS LOST, stated plainly: one step instead of 42, so no per-suite tick in the CI UI.
+      # `run_suites.sh` prints each failure's own FAIL lines and the six slowest suites, so it moves into
+      # the log rather than vanishing. The annotations are preserved verbatim below because several record
+      # real findings, and they use the BARE filename with no `res://tests/` prefix on purpose:
+      # `check_suite_coverage` scans for that prefix, so a comment must never be able to satisfy the gate
+      # for a suite the command has stopped running. Mutation-tested both ways (D0264).
+      #
+      # `test_body_fuzz.gd` is NOT here: it belongs to the `fuzz_nightly` job below, and conflating the
+      # two is precisely the mistake D0265 records.
       #
       #   test_fixed_point.gd                            test_fixed_point
       #   test_split_rng.gd                              test_split_rng
@@ -319,15 +323,7 @@ jobs:
       #   test_view_lifts.gd                             test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
       #   test_settings.gd                               test_settings (the split halves share one bindings map; persist=false writes nothing)
       #   test_recorded_sessions.gd                      test_recorded_sessions (every director recording is binding until retired — P002/D0228)
-      #   test_body_fuzz.gd                              test_body_fuzz (full sweep, D0060 allowlist)
-      #
-      # `check_suite_coverage` still binds: it scans this file for `res://tests/test_*.gd` and requires
-      # every tracked suite to appear. Every one is listed in the command below -- and note that the
-      # preserved annotations above deliberately write the BARE filename with no `res://tests/` prefix,
-      # so a comment can never satisfy the gate on a suite the command has stopped running. Verified by
-      # mutation: deleting one suite from the command, while leaving its comment line intact, still gives
-      # `UNRUN tests/test_tile_grid.gd` and exit 1.
-      - name: all 43 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 42 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           bash tools/run_suites.sh ./godot 4 \
             res://tests/test_fixed_point.gd \
@@ -371,5 +367,79 @@ jobs:
             res://tests/test_empty_population_guard.gd \
             res://tests/test_view_lifts.gd \
             res://tests/test_settings.gd \
-            res://tests/test_recorded_sessions.gd \
-            res://tests/test_body_fuzz.gd
+            res://tests/test_recorded_sessions.gd
+
+  # D0060: the deep companion to test_body_fuzz_fast above -- the full 1000-seed x 1500-tick sweep
+  # (~114s measured), which is why it runs nightly rather than on every push/PR. Only fires on the
+  # `schedule` trigger declared above; push/PR events skip this job entirely. Duplicates the Godot
+  # setup steps from `tests` rather than sharing them across jobs -- GitHub Actions jobs don't share
+  # filesystem state, and a `needs:` dependency here would make every push/PR wait on a job it never
+  # actually runs.
+  # The only job in this file that opens a WINDOW. Every other suite runs --headless, which is why the
+  # class D0248 found could exist: the reveal scene booted, rendered, and passed 42 headless suites while
+  # the command its own header tells a human to type ran in the wrong mode and quit without a window.
+  # Headless cannot see that, by construction -- there is no window for the flag to have failed to open.
+  #
+  # It gets its own job rather than a step in `tests` because it needs a display (xvfb) and a GL driver
+  # that the headless job deliberately does not install, and because a display-related failure here
+  # should be legible as such rather than mixed into 42 suite results.
+  headed_boot:
+    name: headed boot (the documented --play invocation actually opens a window)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GODOT_VERSION: "4.6.2-stable"
+      GODOT_SHA512: "b6e4d5a716085e9649905be2afe77f723f97853544fb33392ce3d32594c730a95d9eb4d1042ed51508904c9e1d996bd36b7c7a2bf4f93f5b1885e98d81b792e7"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download and verify Godot ${{ env.GODOT_VERSION }}
+        run: |
+          curl -sSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          echo "${GODOT_SHA512}  godot.zip" | sha512sum -c -
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+
+      # xvfb for the display; mesa for a software GL/Vulkan driver, since the runner has no GPU. Without
+      # the driver Godot opens a window and renders nothing, which this check would correctly call blank.
+      - name: Install a display and a software renderer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1 libglx-mesa0 mesa-vulkan-drivers
+
+      - name: Import project (populate .godot/ cache)
+        run: ./godot --headless --path . --import
+
+      - name: The documented headed invocations behave as documented (D0248)
+        run: xvfb-run -a bash tools/check_headed_boot.sh ./godot
+
+  fuzz_nightly:
+    name: fuzz nightly (full 1000x1500 sweep, allowlisted residual per D0060)
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GODOT_VERSION: "4.6.2-stable"
+      GODOT_SHA512: "b6e4d5a716085e9649905be2afe77f723f97853544fb33392ce3d32594c730a95d9eb4d1042ed51508904c9e1d996bd36b7c7a2bf4f93f5b1885e98d81b792e7"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download and verify Godot ${{ env.GODOT_VERSION }} (headless-capable Linux build)
+        run: |
+          curl -sSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          echo "${GODOT_SHA512}  godot.zip" | sha512sum -c -
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+
+      - name: Import project (populate .godot/ cache)
+        run: ./godot --headless --path . --import
+
+      - name: tools/run_gd_test.sh self-test (D0115/D0116 — must run before the suite below trusts it)
+        run: bash tools/test_run_gd_test.sh ./godot
+
+      - name: test_body_fuzz (full sweep, D0060 allowlist)
+        run: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz.gd
