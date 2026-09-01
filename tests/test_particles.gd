@@ -25,6 +25,7 @@ func _initialize() -> void:
 	_test_a_busy_particle_layer_cannot_move_the_sim()
 	_test_a_real_break_actually_reaches_the_particle_layer()
 	_test_the_draught_warns_during_the_charge_not_after_the_break()
+	_test_the_draught_reads_the_swing_and_the_hollow_rather_than_two_literals()
 	_finish("particles")
 
 
@@ -148,6 +149,25 @@ func _test_the_draught_warns_during_the_charge_not_after_the_break() -> void:
 	broken.mining_breach = true
 	_check(DebugSceneCommon.draught_plan(broken, cp).is_empty(),
 		"and the tick the rock BREAKS produces none -- the old wiring fired only here")
+	# The threshold and the tick gate. Both are absences, so both lean on the positive row above.
+	_check(DebugSceneCommon.draught_plan(
+		_hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_RING - 1, true), cp).is_empty(),
+		"below the ring threshold there is no cue at all")
+	_check(DebugSceneCommon.draught_plan(
+		_hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_FULL, false), cp).is_empty(),
+		"and on a charging tick that is NOT the swing there is none either -- per blow, not per tick, or "
+		+ "it is sixty a second")
+	_check(DebugSceneCommon.draught_plan(null, cp).is_empty()
+			and DebugSceneCommon.draught_plan(charging, 0).is_empty(),
+		"and neither a missing observation nor a missing cell size produces a puff at the origin")
+
+
+## The other half of D0293's four, split from the one above at QUALITY gate 4's 50-line limit. The seam
+## is real: above is WHEN the cue fires, here is WHERE it goes and HOW MUCH of it there is.
+func _test_the_draught_reads_the_swing_and_the_hollow_rather_than_two_literals() -> void:
+	var cell := Vector2i(10, 20)
+	var cp: int = Heightfield.TERRAIN_CELL_PX
+	var charging: Interface.Observation = _hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_FULL / 2, true)
 	# (2) THE DIRECTION IS THE SWING'S, not hardcoded down.
 	var right: Dictionary = DebugSceneCommon.draught_plan(charging, cp)
 	var up: Dictionary = DebugSceneCommon.draught_plan(
@@ -176,17 +196,6 @@ func _test_the_draught_warns_during_the_charge_not_after_the_break() -> void:
 		% [loud["amount"], faint["amount"]])
 	_check(int(faint["amount"]) > 0, "and the faintest audible reading still shows something (%d)"
 		% faint["amount"])
-	# The threshold itself, and the tick gate. Both are absences, so both need the positive control above.
-	_check(DebugSceneCommon.draught_plan(
-		_hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_RING - 1, true), cp).is_empty(),
-		"below the ring threshold there is no cue at all")
-	_check(DebugSceneCommon.draught_plan(
-		_hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_FULL, false), cp).is_empty(),
-		"and on a charging tick that is NOT the swing there is none either -- per blow, not per tick, or "
-		+ "it is sixty a second")
-	_check(DebugSceneCommon.draught_plan(null, cp).is_empty()
-			and DebugSceneCommon.draught_plan(charging, 0).is_empty(),
-		"and neither a missing observation nor a missing cell size produces a puff at the origin")
 
 
 ## An observation posing one charging swing at `cell`, hollow `reading`, swinging along `dir`.
