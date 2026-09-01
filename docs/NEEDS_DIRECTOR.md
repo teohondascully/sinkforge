@@ -721,3 +721,69 @@ the only one of the three that can carry a timed one-shot like crumble.
 **What it blocks right now:** the crumble half of T1 #5, which is otherwise ready — the sim already
 reports `broke_cells` through the door as of D0274, so the four quadrant chunks over `CRUMBLE_DUR 0.24`
 are a straight port the moment there is a clock to run them against.
+
+---
+
+## P026 · `cave.frequency` — the metre-correct answer may be the wrong answer, and it is arithmetic rather than taste
+
+**The one WG-4 constant that is not a mechanical conversion**, held out of Batch A (D0305) on your own
+ruling that it is a FEEL target. The arithmetic is not in doubt; what it implies for *this* world is.
+
+Legacy authored `CAVE_FREQ = 0.11` for a **128 m-wide open world**. This build is a **12 m-wide shaft**.
+Frequency is 1/length, so the metre-correct value scales the other way: **0.11 → 0.0275**.
+
+**Measured, across 48 columns at `x_stretch 2.1`:**
+
+| | lateral periods across the shaft | vertical periods |
+|---|---|---|
+| current `0.11` | 2.51 | 112.6 |
+| metre-correct `0.0275` | **0.63** | 28.2 |
+
+**At the metre-correct value the entire shaft width sits inside less than ONE noise period.** The field
+becomes essentially monotone across x: lateral cave structure disappears completely while vertical
+structure stays rich. That is arithmetically right and may still be the wrong number for a world ten
+times narrower than the one it was tuned in.
+
+**Three options, and the middle one is mine.**
+
+1. **Take `0.0275`.** Defensible on its own terms — "the player's own shaft is the vertical structure
+   now" (D0017) — and it accepts a world with no lateral cave structure at all.
+2. **Derive an intermediate from THIS world's width.** Periods scale linearly with frequency, so
+   `freq = 0.11 × N / 2.51` for N lateral periods across the shaft. One and a half periods across 12 m
+   gives **0.066**; one period gives **0.044**. A stated choice about this world rather than a value
+   inherited from a different one.
+3. **Leave `0.11`.** Rejected: it is four times too fine in metres, and it is what makes the caves
+   fragment into the many small pockets `docs/LEGACY_GAP.md` already describes.
+
+**My recommendation is (2) at N = 1.5, `freq ≈ 0.066`** — enough lateral variation that a cave reads as a
+room you can move sideways through, without the 2.5-period churn that fragments them today.
+
+**This is BUILT-PARKED work, not blocked work**: I will build (2), capture it beside the current field,
+and put both images in front of you. If you prefer (1) it is a one-line change to the same commit.
+
+---
+
+## P027 · The veil is shipped and half-lit, and the two missing halves are different KINDS of missing
+
+D0302 landed the veil (T1 #2) and D0306 landed the lamp that cuts it. The deep is legible around the
+miner now and dark beyond, which is what a lamp does. Two things legacy has that this does not, and they
+are not the same kind of gap:
+
+**1. The amber TINT — known remedy, deliberately not guessed.** Legacy's `_veil_cut` lifts each channel
+toward `255 × tint`, "so lamp-lit rock comes out amber and lift-lit rock comes out teal through the
+multiply, each carrying its own material hue underneath". That needs a light layer with
+`BLEND_MODE_MUL`; this build's veil is a black-alpha overlay, so the cut here is a pure luminance
+reveal. **The remedy is known and scoped** — change the veil layer's blend mode and draw a colour
+instead of an alpha — and it is a rendering change I would rather land on its own commit with a capture
+than fold into a port.
+
+**2. `_skylight_alpha` — I do not know where it goes, and I am not going to assert an answer.** Legacy's
+constants are `AMBIENT_DARK 0.66`, `SKY_REACH 12`, `SKY_FADE 16`. But **all three of its call sites scale
+light SOURCES** (`glint_dark`, the lamp's own `lamp_scale`, `seam_dark`) — none of them is the veil's
+base darkness, which comes from `_bake_veil_base`'s tint times the openness multiplier. So "port
+`_skylight_alpha` into the veil" is a sentence I can write and cannot currently justify. Reading
+`_bake_veil_base`'s colour source properly is the next step, and it is a reading job rather than a
+ruling.
+
+**No decision is needed from you on either** unless you want the tint sooner than the reading. Recorded
+so the gap is visible rather than implied by a screenshot that is darker than you expected.
