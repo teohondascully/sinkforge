@@ -334,6 +334,7 @@ jobs:
       #   test_veil_painter.gd                           test_veil_painter (mass occlusion + the key light — D0302, T1 #2)
       #   test_arrival_plate.gd                          test_arrival_plate (the stratum arrival ceremony — D0288, LEGACY_GAP T1 #8)
       #   test_sfx_bank.gd                               test_sfx_bank (the hollow ring + the breach, synthesised and measured — D0296, LEGACY_GAP T1 #6)
+      #   test_sfx_driver.gd                             test_sfx_driver (note_frame's five branches + the actuator — D0303)
       #   test_material_palette.gd                       test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
       #   test_mining.gd                                 test_mining (cursor-aim, reach, hold-to-charge, the bite, the hollow tell — D0195/D0196/D0200)
       #   test_mining_bite.gd                            test_mining_bite (one blow's volume against legacy's metre, D0200)
@@ -382,6 +383,7 @@ jobs:
             res://tests/test_reveal_replay_driver.gd \
             res://tests/test_floor_source_telemetry.gd \
             res://tests/test_sfx_bank.gd \
+            res://tests/test_sfx_driver.gd \
             res://tests/test_material_palette.gd \
             res://tests/test_miner_look.gd \
             res://tests/test_key_legend.gd \

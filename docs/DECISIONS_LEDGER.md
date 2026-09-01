@@ -12578,3 +12578,47 @@ looked like. Screenshot: `d0302_veil_delve`.
 
 **Reverse cost:** drop the `add_stateful_painter(VeilPainter.new(), &"paint_frame")` line. The margin can
 stay at 9 or go back to 3; nothing else on the stack reaches past 3.
+## D0303 · 2026-08-31 · Lane S — the driver, and a function that reported a playback the engine refused
+
+**`tests/test_sfx_bank.gd` proves the SOUNDS are right and says nothing about whether anything plays one.**
+
+That gap has a name in this repository's own source material. `legacy/tools/check_pump.gd` records it as
+the lesson that generalises past audio: *"every generator, every stream and the whole `set_line` driver
+shipped and went green in check_voice, which called `set_line` by hand — while the controller never
+called it once."* `view/audio/sfx.gd` had no suite at all; `Sfx.note_frame` is the controller.
+
+`note_frame` splits into `voice_for_frame` (static, pure, returns `{}` for silence or the voice as data)
+and the `play` that actuates it — the same decision/actuation split every painter in `view/` already
+makes, and for the same reason: only one of the two halves can be asserted without an audio device.
+`tests/test_sfx_driver.gd` takes the five branches on one side and the pooled player on the other.
+
+**THE DEFECT: `play()` RETURNED TRUE ON A PLAYBACK THE ENGINE DECLINED.** `AudioStreamPlayer2D.play()`
+requires the node to be INSIDE the tree. Outside it, the engine prints `Playback can only happen when a
+node is inside the scene tree` — an **engine-level error that never changes an exit code** (the D0149
+masked-crash sibling) — and plays nothing. `play`'s return value was the only other signal, and it said
+`true`. A function that reports success on a failed native call is how a silent library ships.
+
+**And the harness fact that produced it, which is worth more than the fix.** In a suite's `_initialize`,
+**`get_root().add_child(x)` leaves `x.is_inside_tree()` FALSE** — the SceneTree's own root is not yet in
+the tree that early. Probed directly rather than inferred: parent `inside_tree=false`, child
+`inside_tree=false`, `get_parent()` correct. One `await process_frame` and both are true. **Every
+`extends SceneTree` suite that parents a node in `_initialize` is in this state**, whether or not it
+happens to depend on it — which is a fresh instance of the standing observation that layers opting out of
+the base class are the ones with protocol defects.
+
+The first version of this suite printed `ALL PASS` above four engine errors. The exit code was 0. The
+masked-crash detector is the only reason it was not committed that way, and that is now three catches
+from that detector in one night.
+
+**Mutation-proven, both guards.** Removing the `is_inside_tree` refusal fails the honest-refusal
+assertion and brings the engine error back. Turning the swing EDGE into a LEVEL — dropping
+`obs.mining_swing` from the gate — rings **40 times over 40 charging ticks** where it must ring once, and
+fails two assertions. That second one is the assertion worth having: sixty rings a second is not a louder
+version of the right behaviour, and every single-frame assertion in the suite passes either way.
+
+**Null result, stated because it is one:** `mining_swing` really is an edge and `note_frame` really is
+called — `reveal_scene.gd:196`. Both were checked because check_pump's lesson says to, and both were
+already correct. The gap was that nothing had ever asserted it.
+
+**Reverse cost:** `voice_for_frame` can be folded back into `note_frame`; the `is_inside_tree` guard
+should not be, and the suite would catch its removal.
