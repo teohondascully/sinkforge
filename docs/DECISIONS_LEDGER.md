@@ -12346,3 +12346,62 @@ The sed/`uniq -c` version of that same count disagreed with the Python one (294 
 multibyte locale matched a byte, not the `·`. Two instruments, two numbers, and the shell one was wrong.
 
 **Reverse cost:** delete `.gitattributes` and the gate, drop the workflow step. Rebases conflict again.
+
+## D0299 · 2026-08-31 · Lane C/V, LEGACY_GAP T1 #3 tail
+
+**The wall plane was toning the one thing legacy deliberately keeps out of its tone.**
+
+Legacy paints exposed ore in TWO passes, not one. `apply_wall_tone` finishes the wall's rock, and
+`_draw_lode` (`world_renderer.gd:1194`) then draws the ore's grains **on top of it** — its own comment
+says why: "the matrix is baked into the wall plane; what is left for the live pass is the metal in it,
+and how much of it is left, which is the reason this draw exists." A vein in a mined-out room keeps its
+mineral colour however far back the plane sits, because the recess lands on the rock *around* the grain.
+
+This grid cannot draw a grain on a 4px cell — D0189 settled that, and `MaterialLook` makes the CELL the
+mark instead. But the mark was applied *inside* `cell_color`, and `WallPainter.wall_color` called
+`cell_color` and then darkened and cooled the result. Both of legacy's passes went through one function,
+so the grain took the wall tone. Measured over 0–100 m: a vein's mark separated from the rock it sits in
+by **0.127** at worst, against **0.299** now; glimmer's lit facet arrived at `4d828c` where one plane
+forward it is `88f3f5`. Exposed ore was reading as slightly-off wall.
+
+`MaterialLook` splits into `matrix_color` / `is_speck` / `speck_color`, and `cell_color` is now those
+three composed — byte-identical output, verified by `test_material_palette` and `test_view_lifts` passing
+untouched. `wall_color` recesses the matrix and returns the mark unrecessed, which is legacy's ordering
+expressed in the only mechanism this grid has.
+
+**THE COST IS REAL AND IS BOUNDED RATHER THAN DENIED.** Taking the mark out of the recess costs an ore
+patch some of its plane cue: retained separation runs 0.478 (coal) to 0.774 (ore_copper). That is the
+trade, not a side effect — in legacy the plane reads from the rock *between* the grains, and here from
+the ~90% of cells carrying no mark. **Country rock retains it at exactly 1.000**, and that exactness is
+the control proving the change is scoped to ore rather than quietly lightening the whole plane.
+
+**Three instruments, two of them wrong, and each was wrong in a way that read as a real finding.**
+
+1. *Pooled both branches, "ore vs country rock".* Worst case 0.006 — coal's own MATRIX against
+   deepstone's. The matrix **is** country rock, by construction and on purpose. The instrument had the
+   subject inside the population it was comparing against.
+2. *Narrowed to the mark, kept the cross-material comparison.* Failed on coal's mark vs hardrock at
+   0.116. Also the wrong question: seeing a vein means seeing it against the rock it is **in**, and
+   coal's mineral is a dark blue-grey deliberately. Legibility is a PAIR property and I had the wrong
+   pair. Reported now, never gated.
+3. *An absolute RGB floor on the patch separation.* This palette darkens with depth **by design**, so a
+   fixed distance measures the depth: coal's patch separation is 0.026 at 81 m and deepstone — a country
+   rock, untouched by this change — is 0.040 at the same row. Replaced by a ratio against the pre-change
+   formula computed on the same strip in the same run, which is a control that travels *inside* the
+   measurement instead of beside it.
+
+**The sweep started fifteen metres up in the sky.** It began at the wall suite's `FLOOR_ROW = 20`, and
+P017/D0292 put the surface at row 80 — `backs()` draws no wall above it, so the binding case for two
+floors was a colour no player can ever see. Surface-relative now, and it moved the numbers (0.282 →
+0.299): a fixture inherited a constant whose meaning had changed under it.
+
+**Mutation-proven, both directions.** Restoring the old one-pass `wall_color` fails 5 assertions;
+deleting the recess entirely — the way to satisfy a separation floor without doing the work — fails 4,
+two of them the painter's pre-existing darker/cooler pair.
+
+`tests/test_wall_lode.gd` is a split, not a new subject: `test_wall_painter` hit the 400-line cap, and
+the seam is real — that suite is about the CAST (does a hole read as a room), this one about the MARK
+(does a vein read as ore). They share a painter and share no fixture.
+
+**Reverse cost:** `wall_color` back to one `cell_color` call; the `MaterialLook` split can stay, it is
+inert on its own.

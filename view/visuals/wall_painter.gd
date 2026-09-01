@@ -68,11 +68,31 @@ const PROBES: Array[Dictionary] = [
 
 ## The wall's own colour: the same rock the foreground would paint here, pushed down in value and drifted
 ## cool, which are the two moves distance makes. Legacy's `apply_wall_tone`, minus its bedding argument —
-## `MaterialLook.cell_color` already carries the bedding, because it is the same ground seen a plane back.
+## `MaterialLook.matrix_color` already carries the bedding, because it is the same ground seen a plane back.
+##
+## **THE MINERAL MARK DOES NOT TAKE THE WALL TONE, AND THAT IS THE WHOLE ORDERING** (D0299). Legacy runs
+## two passes here, not one: `apply_wall_tone` finishes the wall's rock, and `_draw_lode`
+## (`world_renderer.gd:1194`) then draws the ore's grains ON TOP of it — "the matrix is baked into the
+## wall plane; what is left for the live pass is the metal in it, and how much of it is left, which is the
+## reason this draw exists." A vein in a mined-out room keeps its mineral colour however far back the
+## plane sits, because the recess is applied to the rock AROUND the grain and never to the grain.
+##
+## This function used to call `cell_color`, which applies the mark INSIDE itself, so both passes went
+## through the recess and the cool drift. Measured cost, over 0–100 m: a vein's mark separated from the
+## rock it sits in by **0.127** at worst against **0.299** now, and glimmer's lit facet arrived at
+## `4d828c` against the `88f3f5` it is drawn as one plane forward. Exposed ore was reading as
+## slightly-off wall — which is what it literally was.
+##
+## The plane still reads as a plane because ~90% of an ore cell's neighbours are matrix and still take the
+## full recess — which is the same thing that carries it in legacy, where the cue lives in the rock
+## between the grains rather than in the grains. `test_wall_painter.gd` measures that as a patch mean, so
+## the separation assertion cannot be satisfied by quietly dropping the recess.
 static func wall_color(look: MaterialLook, material: StringName, col: int, row: int) -> Color:
 	if look == null:
 		return COOL
-	return look.cell_color(material, col, row).darkened(RECESS).lerp(COOL, COOL_MIX)
+	if look.is_speck(material, col, row):
+		return look.speck_color(material, col, row)
+	return look.matrix_color(material, col, row).darkened(RECESS).lerp(COOL, COOL_MIX)
 
 
 ## How dark the cast is on one wall cell, in 0..1. Split out of `paint` and returned as a number for the
