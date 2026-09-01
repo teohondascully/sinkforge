@@ -986,3 +986,56 @@ darkens). That is a real improvement and it is not the full port.
 
 **This is a taste trade with a measured frontier, not a bug.** The table is the frontier; which side of
 it you want is the part I should not pick.
+
+---
+
+## P030 · The same commit rendered two materially different pictures, and every guard called both fine
+
+**Status:** open · **Cost to apply:** unknown until the mechanism is found · **Raised by:** D0315's
+before/after, 2026-09-01
+
+**The observation, and it was found by accident.** Capturing the milestone moments to illustrate D0315,
+two runs of **the same commit** (`c7d50bee`) produced frames differing by **201,050 / 204,210 / 283,400 /
+0 / 191,835** pixels at a >20% threshold. Not a subtle difference: exposed ore is scattered across the
+surface in one and almost absent in the other.
+
+**The renderer is otherwise exactly reproducible, which is what makes this sharp.** Every other pairing
+measured **0 px on all five moments** — and there are four of them:
+
+| pair | result |
+|---|---|
+| `708e3b57` run A vs run B (back-to-back) | 0, 0, 0, 0, 0 |
+| `c7d50bee` re-captured now vs `708e3b57` with the flip line reverted | 0, 0, 0, 0, 0 |
+| `c7d50bee` re-captured now vs the anomalous earlier run of `c7d50bee` | **201050, 204210, 283400, 0, 191835** |
+
+So this is not run-to-run noise (there is none — see the re-derivation appended to the capture-diff
+notes) and not a difference between commits. One specific *run* rendered a different world.
+
+**AND IT PASSED EVERYTHING.** That run reported **673 distinct colours** against a floor of 120; the
+correct run reports **674**. The `grain` positive control fired at `visible=3` strokes. `capture_moments.sh`
+said `all moments captured`. D0316 had just made this same guard fail closed on an ABSENT count — and an
+absent count is not the failure here. **The floor cannot see a wrong picture that is still a picture**,
+which is exactly what D0304's own comment says it was never sized to do ("deliberately far below any real
+frame rather than tuned close to one"). Seventh instance of the house class, and the first one where the
+guard is working as designed and is still blind.
+
+**What is NOT claimed.** The mechanism. The obvious suspect is a stale Godot import cache after branch
+switching — `capture_moments.sh`'s own MIN_COLOURS comment names that failure — but the direction is
+wrong for the simple form of it: a build where `class_name` globals fail to resolve draws FEWER painters,
+and the anomalous frame draws MORE ore, not less. `[[remove-the-subject-before-explaining-spread]]` — do
+not theorise, reproduce it. Also unexplained: `grain` read **0** while the other four moved, so whatever
+this is did not touch that moment at all.
+
+**Why it matters beyond a tidy explanation.** Every milestone image in `docs/milestones/` and `history/`
+was produced by this tool, and any of them could have been taken in this state; nothing in the file or
+its filename would say so. A before/after pair is the project's main instrument for "did this change the
+picture", and this run would have made a no-op look like a large visual change — the D0315 pair, read
+against the contaminated run, gave 185k–299k px and a plausible-sounding magnitude argument to match. The
+correct, controlled number is 52k–104k.
+
+**Recommendation.** Cheap first move: capture twice with a forced `godot --headless --path . --import`
+between, and twice without, and see which pairing reproduces. If it reproduces, the fix is for
+`capture_moments.sh` to import before shooting and to record a fingerprint of what it drew (a
+per-painter draw count, not a colour total) alongside each PNG, so a frame carries evidence of the build
+that made it. **Not decided in-loop:** adding a fingerprint changes what a milestone image IS, and every
+committed pair predates it.
