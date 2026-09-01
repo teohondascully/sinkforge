@@ -18,7 +18,39 @@ func _initialize() -> void:
 	_test_the_chip_lays_itself_out_where_legacy_put_it()
 	_test_an_incomplete_frame_paints_nothing_rather_than_crashing()
 	_test_the_host_puts_its_chips_above_the_world()
+	_test_the_authoring_canvas_is_the_canvas_that_is_actually_drawn_into()
 	_finish("hud")
+
+
+## D0290. `UiTheme.CANVAS` said 640x360 while `project.godot`'s base viewport was 1280x720 — a HUD laid
+## out for half the canvas it draws into. **Nothing caught it for two commits**, because the only chip
+## that existed anchors to the TOP-LEFT, where the two canvases agree exactly; the first thing to CENTRE
+## itself landed a quarter of the way across the screen.
+##
+## So the constant is read back from the project rather than trusted, and the two are compared. A HUD
+## constant that names the viewport is the same shape as `docs/LEGACY_GAP.md`'s WG-4 — a number authored
+## against one denomination and used against another — and it fails the same silent way.
+func _test_the_authoring_canvas_is_the_canvas_that_is_actually_drawn_into() -> void:
+	var w: int = ProjectSettings.get_setting("display/window/size/viewport_width", 0)
+	var h: int = ProjectSettings.get_setting("display/window/size/viewport_height", 0)
+	_check(w > 0 and h > 0, "sanity: the project declares a base viewport (%dx%d)" % [w, h])
+	_check(UiTheme.CANVAS == Vector2(w, h),
+		"UiTheme.CANVAS (%s) is the project's base viewport (%dx%d) -- `stretch/mode=canvas_items` means "
+		% [UiTheme.CANVAS, w, h] + "a CanvasLayer child draws into exactly that many pixels")
+	# The scale carrying legacy's numbers across is DERIVED from the two canvases, not written down.
+	_check(is_equal_approx(UiTheme.UI_SCALE, UiTheme.CANVAS.x / UiTheme.AUTHORED.x),
+		"and UI_SCALE (%.3f) is the ratio of the two canvases (%.3f)"
+		% [UiTheme.UI_SCALE, UiTheme.CANVAS.x / UiTheme.AUTHORED.x])
+	# ONE factor is only honest if the two canvases share an aspect. If they ever stop, a single scale
+	# silently stretches every ported layout on one axis.
+	_check(is_equal_approx(UiTheme.CANVAS.x / UiTheme.CANVAS.y,
+			UiTheme.AUTHORED.x / UiTheme.AUTHORED.y),
+		"and the two canvases share an aspect (%.4f vs %.4f), which is what makes ONE scale factor "
+		% [UiTheme.CANVAS.x / UiTheme.CANVAS.y, UiTheme.AUTHORED.x / UiTheme.AUTHORED.y]
+		+ "correct rather than an approximation")
+	_check(UiTheme.pt(15) == 30 and is_equal_approx(UiTheme.px(10.0), 20.0),
+		"CONTROL: the two converters actually convert (pt(15)=%d, px(10)=%.1f) -- an identity scale would "
+		% [UiTheme.pt(15), UiTheme.px(10.0)] + "satisfy every row above")
 
 
 ## THE ONE BEHAVIOUR MOST LIKELY TO BE "FIXED" INTO A BUG. `depth_m` is negative above the surface
@@ -78,9 +110,11 @@ func _test_the_chip_width_grows_with_its_contents_and_has_a_floor() -> void:
 		return
 	var narrow: float = DepthChip.width_for(font, 0, "")
 	var wide: float = DepthChip.width_for(font, 999 * MaterialLook.CELLS_PER_METRE, "THE VERY LONG DARK")
-	_check(is_equal_approx(narrow, DepthChip.MIN_WIDTH + DepthChip.PAD * 2.0),
+	# The floor is a legacy-authored number, so it is compared through the same converter the chip uses
+	# (D0290) -- restating it raw here would assert the authoring canvas rather than ours.
+	_check(is_equal_approx(narrow, UiTheme.px(DepthChip.MIN_WIDTH) + UiTheme.px(DepthChip.PAD) * 2.0),
 		"an empty chip sits exactly on the floor (%.1f vs %.1f)"
-		% [narrow, DepthChip.MIN_WIDTH + DepthChip.PAD * 2.0])
+		% [narrow, UiTheme.px(DepthChip.MIN_WIDTH) + UiTheme.px(DepthChip.PAD) * 2.0])
 	_check(wide > narrow,
 		"a long band name and a three-digit depth widen it past the floor (%.1f vs %.1f)" % [wide, narrow])
 
@@ -101,8 +135,9 @@ func _test_the_chip_lays_itself_out_where_legacy_put_it() -> void:
 	if l.is_empty():
 		return
 	var chip: Rect2 = l["chip"]
-	_check(chip.position == DepthChip.MARGIN,
-		"the chip sits at legacy's own top-left margin (%s vs %s)" % [chip.position, DepthChip.MARGIN])
+	_check(chip.position.is_equal_approx(DepthChip.MARGIN * UiTheme.UI_SCALE),
+		"the chip sits at legacy's own top-left margin, carried onto our canvas (%s vs %s)"
+		% [chip.position, DepthChip.MARGIN * UiTheme.UI_SCALE])
 	_check(l["label"] == "12 m", "it reads the body's own row as depth (got %s)" % l["label"])
 	_check(String(l["band"]).strip_edges() != "",
 		"and names the band it is in (got %s)" % l["band"])

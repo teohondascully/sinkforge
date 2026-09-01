@@ -23,7 +23,55 @@ func _initialize() -> void:
 	await _test_a_painter_gets_the_frame_and_its_own_canvas()
 	_test_the_window_covers_partial_cells_rather_than_truncating()
 	await _test_the_frame_carries_the_ruled_contract()
+	await _test_a_stateful_painter_outlives_the_expression_that_created_it()
 	_finish("world_view")
+
+
+## D0289, WRITTEN AFTER IT BIT AND ONLY BECAUSE A CAPTURE CAUGHT IT.
+##
+## `add_painter(CrumblePainter.new().paint)` reads as obviously correct and is not: a `Callable` built
+## from a method on a `RefCounted` stores an OBJECT ID and does not keep the object alive, so the painter
+## was freed at the end of that expression — before `add_painter` was entered. `PaintLayer._draw` then
+## found `not _paint.is_valid()` and returned. **Nothing drew for four commits, and every suite passed**,
+## because a suite builds its painter and holds it in a local.
+##
+## Two assertions, because the fix has two halves: the retaining form must keep the object, and the
+## bound-Callable form must FAIL LOUDLY rather than silently binding a corpse.
+func _test_a_stateful_painter_outlives_the_expression_that_created_it() -> void:
+	var view: WorldView = await _mount()
+	var layer: PaintLayer = view.add_stateful_painter(Counter.new(), &"paint")
+	_check(layer.painter_is_live(),
+		"a stateful painter handed over as an object is still alive after the call that added it")
+	# CONTROL, and it is the whole finding: the same painter passed as a bound Callable is ALREADY DEAD.
+	# Without this row the one above passes on a Callable that happened to keep anything alive at all.
+	var corpse: Callable = Counter.new().paint
+	_check(not corpse.is_valid(),
+		"CONTROL: the same painter as a bound Callable is already freed -- a Callable does not keep a "
+		+ "RefCounted alive, which is the bug this API exists to make impossible")
+	# And the bind refuses it rather than drawing nothing in silence.
+	var dead: PaintLayer = view.add_painter(corpse)
+	_check(not dead.painter_is_live(),
+		"binding a dead callable leaves the layer unbound rather than silently painting nothing forever")
+	# The painter must actually RUN, not merely be alive: a retained object bound to the wrong method
+	# name would satisfy every row above.
+	var counter: Counter = Counter.new()
+	view.add_stateful_painter(counter, &"paint")
+	view.refresh()
+	await process_frame
+	await process_frame
+	_check(counter.calls > 0,
+		"and it is actually called by the coordinator (%d draws) -- being alive is not being wired"
+		% counter.calls)
+	view.queue_free()
+
+
+## A stateful painter that records being called. Deliberately trivial: this suite is about the LIFETIME,
+## and a painter that drew anything would need a mounted canvas to prove it.
+class Counter extends RefCounted:
+	var calls: int = 0
+
+	func paint(_frame: Frame, _ci: CanvasItem) -> void:
+		calls += 1
 
 
 func _build_iface() -> Interface:

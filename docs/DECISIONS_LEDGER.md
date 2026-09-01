@@ -11904,3 +11904,95 @@ of it. Same argument D0275 made for the cracks and D0244 made for `--sky`.
 
 **Reverse cost:** drop the sixth argument (it defaults to the sentinel, so every existing call site is
 already the old behaviour), and remove the field from `Observation`.
+
+
+## D0288 · The stratum arrival ceremony — the one moment the descent gets to be an event · 2026-08-31 · Lane F, LEGACY_GAP T1 #8
+
+Ported from `legacy/scenes/hud.gd:252-323` (`announce`, `announcing`, `plate_on_screen`) and `870-940`
+(`ARRIVAL_*`, `SCRIM_*`, `_draw_arrival`). The other half of the depth readout D0271 landed: the chip
+says where you are, continuously and quietly; this says you have ARRIVED somewhere, once.
+
+**No panel, deliberately, and legacy's reasoning is the finding rather than the styling.** Its first
+version was a full-width plate and it read as a modal the player's first instinct was to dismiss. What
+shipped: half the type, letters tracked apart so small type reads as engraved, a kicker above, hairlines
+only as wide as the words, and a soft field of dusk with no edge to read as a shape. That is
+`docs/QUALITY.md`'s "menus must read 2026" arrived at from the other end.
+
+**The contrast is per glyph, not per plate, and that is a measurement.** Legacy ran its scrim at 0.80
+until it measured the cost: across the plate a rope moved 26.5 dE of the 41.4 separating it from its
+backing while the rock behind it moved 6.6 — four times more taken from the thing the player is hanging
+on than from the background it was drawn to suppress. Ported at 0.28 WITH the per-glyph shadow, not at
+0.80 without it. Porting the number without the shadow would have been a faithful-looking port of the
+version legacy rejected.
+
+**What is not ported, and why that is not a shortcut.** Legacy holds a ceremony while the large map is
+open or a grapple line is live. This build has neither, so `_announce_held()` is omitted rather than
+stubbed: a branch that can never be true is a branch nobody can test and it would read as supported.
+`announcing()` and `plate_on_screen()` would also be identical here — and their being different is
+exactly what caused legacy's own bug at this spot, where `main.gd` gated lessons on the predicate that is
+not the one that draws. One predicate, reading what `layout` returns on.
+
+**Tracking is per-glyph placement or it is nothing** — `draw_string` has no letter-spacing.
+
+**Reverse cost:** delete `view/hud/arrival_plate.gd` and its suite, drop the `add_stateful_chip` line.
+
+
+## D0289 · A `Callable` does not keep a `RefCounted` alive — the crumble painter has never drawn anything · 2026-08-31 · view, harness
+
+**`view.add_painter(CrumblePainter.new().paint)` freed the painter at the end of that expression.** A
+`Callable` built from a method on a `RefCounted` stores an OBJECT ID, not a reference, so the instance's
+refcount hit zero before `add_painter` was even entered. `PaintLayer._draw` then found
+`not _paint.is_valid()`, returned, and painted nothing — every frame, in silence, since D0278.
+
+**Every suite passed the whole time**, because a suite constructs its painter and holds it in a local.
+`tests/test_crumble_painter.gd` asserts the lifecycle correctly and completely; what it cannot see is
+that the shipped path never gets there. This is the house failure class exactly — an instrument that
+cannot register its subject, arriving as a quiet green — and it is the second time in four commits that
+the thing which actually caught it was a CAPTURE (D0276 was the first). It surfaced because
+`ArrivalPlate` has the same shape and its ceremony did not appear on screen.
+
+**The remedy is an API that cannot express the mistake**, not a note. `WorldView.add_stateful_painter`
+and `HudLayer.add_stateful_chip` take the OBJECT and a method name, and hold it. Retrofitting a fix
+inside `add_painter` is impossible: by the time it is entered, the argument's object is already gone.
+
+**And the silence is now loud.** `PaintLayer.bind_to` refuses a dead callable with a `push_error` naming
+the fix, instead of `_draw` quietly returning forever. `painter_is_live()` exists so a test can ask —
+D0289's whole shape was a layer that looked mounted and drew nothing, and "looked mounted" was
+unaskable. `tests/test_world_view.gd` asserts both halves, plus that a retained painter is actually
+CALLED, since a retained object bound to a wrong method name would satisfy the lifetime rows alone.
+
+**Reverse cost:** none worth taking. The bound-Callable form still works for the stateless painters,
+which are the majority.
+
+
+## D0290 · The HUD was laid out for a canvas half the size of the one it draws into · 2026-08-31 · Lane F
+
+`UiTheme.CANVAS` said 640x360. `project.godot`'s base viewport is **1280x720** — `window/stretch/mode`
+is `canvas_items`, so a `CanvasLayer` child draws into exactly that many pixels. The constant was written
+against the old base resolution and did not follow the bump, which `project.godot`'s own comment records.
+
+**Nothing caught it for two commits, and the reason is worth more than the fix.** The only chip that
+existed anchors to the TOP-LEFT corner, where the two canvases agree exactly. Every assertion about it
+passed and every capture looked right. The stratum plate is the first thing in the build to CENTRE
+itself, and it landed a quarter of the way across the screen — the defect was invisible until something
+measured from the far edge.
+
+**Legacy's numbers stay legacy's numbers.** `UiTheme.AUTHORED` (640x360) names legacy's canvas,
+`UiTheme.UI_SCALE` carries a value across, and `px()`/`pt()` apply it AT THE POINT OF USE. Baking the
+factor into each constant would have deleted the provenance: the value in the file would no longer be the
+value in the file it was ported from, and the next port would have to guess which convention this one
+used. `pt()` returns an `int` and is separate from `px()` on purpose — a font size is rasterised, so 30
+is a crisp glyph where a chip scaled by a node transform would be a blurred 15.
+
+**The test reads the project setting rather than trusting the constant**, checks `UI_SCALE` is the
+canvases' ratio rather than a written-down 2.0, checks the two share an aspect (one factor is only honest
+if they do), and carries a control that both converters actually convert — an identity scale would
+satisfy every other row.
+
+Same shape as `docs/LEGACY_GAP.md` WG-4: a number authored against one denomination and used against
+another, failing silently. Worth noting that WG-4's audit listed screen-space HUD pixels among the
+constants that were already CORRECT. They were correct relative to `UiTheme.CANVAS`; `UiTheme.CANVAS` was
+the one that was wrong.
+
+**Reverse cost:** put `CANVAS` back to 640x360 and drop the two converters; the chips read their numbers
+raw again.

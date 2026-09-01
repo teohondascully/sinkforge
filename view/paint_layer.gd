@@ -22,7 +22,21 @@ var _view: WorldView = null
 var _paint: Callable = Callable()
 
 
+## THE BIND REFUSES A DEAD CALLABLE, LOUDLY, and D0289 is why that guard is here rather than in a
+## comment. A `Callable` bound to a method on a `RefCounted` stores an object ID and **does not keep the
+## object alive**, so `add_painter(CrumblePainter.new().paint)` frees its painter at the end of the
+## expression — before `add_painter` is even entered. `_draw` below then found `not _paint.is_valid()`,
+## returned, and drew nothing, every frame, in silence. Every suite passed, because a suite constructs
+## its painter and holds it.
+##
+## Failing at bind time turns that into one loud line at startup instead of an invisible layer. Use
+## `WorldView.add_stateful_painter` / `HudLayer.add_stateful_chip` for a painter that keeps state; they
+## retain the object.
 func bind_to(view: WorldView, paint: Callable) -> void:
+	if not paint.is_valid():
+		push_error("PaintLayer.bind_to: the callable is already dead. A Callable does not keep a "
+			+ "RefCounted alive -- use add_stateful_painter/add_stateful_chip for a painter with state.")
+		return
 	_view = view
 	_paint = paint
 
@@ -34,10 +48,17 @@ func bind_to(view: WorldView, paint: Callable) -> void:
 ## world as the tick that built it. A cached frame would go stale silently and only under exactly those
 ## conditions, which is the kind of defect that reproduces on someone else's machine and not on mine.
 ##
+## Is this layer actually going to paint anything? For a test and for a caller asserting it wired what it
+## meant to — `bind_to` refusing a dead callable is only useful if something can ask afterwards, and
+## D0289's whole shape was a layer that looked mounted and drew nothing.
+func painter_is_live() -> bool:
+	return _view != null and _paint.is_valid()
+
+
 ## A null frame is a no-op, not an error: `refresh()` has simply not run yet. Painting nothing for one
 ## frame at startup is correct; erroring would turn an ordinary ordering into a crash.
 func _draw() -> void:
-	if _view == null or not _paint.is_valid():
+	if not painter_is_live():
 		return
 	var frame: Frame = _view.current_frame()
 	if frame == null:

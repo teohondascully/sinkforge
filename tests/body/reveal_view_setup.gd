@@ -19,7 +19,8 @@ extends RefCounted
 ##      0  cracks     (D0275) -- over the terrain it cracks, under the body doing the cracking
 ##      0  crumble    (D0278) -- debris from a cell that has just gone, so it sits over the hole
 ##      0  the scene's own `_draw`: the body sprite and the mining overlay
-##     10  the HUD    (a `CanvasLayer`, so the camera does not move it)
+##     10  the HUD    (a `CanvasLayer`, so the camera does not move it): the depth chip, then the
+##                     stratum arrival plate over it (D0288)
 ##
 ## Driven through the REAL coordinator rather than a hand-built `Frame`, which is the whole point and was
 ## D0244's own argument for `--sky`: `SkyPainter` reads nothing from `observe()`, so a shortcut frame
@@ -50,9 +51,13 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_painter(WallPainter.paint).z_index = WALL_Z
 	view.add_painter(TerrainPainter.paint).z_index = TERRAIN_Z
 	view.add_painter(CrackPainter.paint_frame)
-	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so this is an INSTANCE
-	# and a bound method rather than a static Callable. The instance is owned by the layer it is bound
-	# to; nothing else needs to reach it, because it spawns from the frame rather than being poked.
-	view.add_painter(CrumblePainter.new().paint)
+	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
+	# rather than as a bound Callable. D0289: `add_painter(CrumblePainter.new().paint)` freed the painter
+	# at the end of that expression -- a Callable does not keep a RefCounted alive -- and this layer drew
+	# nothing for four commits while every suite passed.
+	view.add_stateful_painter(CrumblePainter.new(), &"paint")
+	# The plate keeps state too: an arrival is one event and the ceremony is two hundred frames. Added
+	# after the depth chip so the ceremony draws over the readout it is announcing, not under it.
 	view.add_hud().add_chip(DepthChip.paint)
+	view.add_hud().add_stateful_chip(ArrivalPlate.new(), &"paint")
 	return view

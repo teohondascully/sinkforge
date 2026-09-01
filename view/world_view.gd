@@ -65,6 +65,9 @@ var _iface: Interface = null
 var _look: MaterialLook = null
 var _camera: Camera2D = null
 var _layers: Array[PaintLayer] = []
+## Painters that keep state, held so they outlive the expression that created them. See
+## `add_stateful_painter` — nothing reads this array, it exists to be a reference.
+var _owned: Array[RefCounted] = []
 var _frame: Frame = null
 var _hud: HudLayer = null
 
@@ -90,6 +93,19 @@ func add_painter(paint: Callable) -> PaintLayer:
 	_layers.append(layer)
 	add_child(layer)
 	return layer
+
+
+## A painter that KEEPS STATE, handed over as an object rather than as a bound `Callable` — and the
+## difference is not a style preference, it is D0289. A `Callable` built from a method on a `RefCounted`
+## stores an object ID and does not keep the object alive, so `add_painter(CrumblePainter.new().paint)`
+## freed its painter at the end of that expression and the layer drew nothing for the rest of the
+## session, silently, while every suite passed.
+##
+## Taking the object means this can hold it. `_owned` is the only reason the array exists: nothing reads
+## it, and that is the point — it is a lifetime, not a registry.
+func add_stateful_painter(painter: RefCounted, method: StringName) -> PaintLayer:
+	_owned.append(painter)
+	return add_painter(Callable(painter, method))
 
 
 ## The screen-space half. A `HudLayer` is a `CanvasLayer`, so its children are not moved by the camera
