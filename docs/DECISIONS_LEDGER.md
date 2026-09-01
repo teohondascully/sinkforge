@@ -12801,3 +12801,80 @@ not going to assert an answer to.
 **BUILT-PARKED with a capture.** Distinct colours: delve 592 -> 673, surface 631 -> 779.
 
 **Reverse cost:** delete the lamp block and the one `s += (1.0 - s) * lamp_lift(...)` line.
+
+## D0307 · 2026-09-01 · Lane B, WG-4's last constant — `cave.frequency`, and a guard that is passing on six cells
+
+**The ruling this executes.** `cave.frequency` was the one constant held out of WG-4 Batch A (D0305) on
+the director's ruling that it is *"a FEEL target, not a mechanical conversion — tune for lateral cave
+structure and PARK it BUILT-for-director's-eye."* This is the tune, the measurement behind it, and the
+two things the measurement falsified.
+
+**The relation, derived rather than inherited.** `docs/NEEDS_DIRECTOR.md` P026 carried the figure "2.51
+lateral periods across the shaft" from an earlier session. Re-derived from the generator instead of
+trusted: `noise_x = col / x_stretch * frequency`, so `periods_x = width * frequency / x_stretch` =
+48 × 0.11 / 2.1 = **2.514**. The inherited number was right; it is now right *and* checked.
+
+**The sweep** (`_carve_caves` alone, 3 seeds, SHALLOW_CLAY, 48 columns, `x_stretch 2.1`):
+
+| `freq` | periods | void | pockets | median pocket | shelf carved |
+|---|---|---|---|---|---|
+| `0.11000` (before) | 2.51 | 0.0866 | 271 | 7 | 1 / 46080 |
+| `0.08750` | 2.00 | 0.0848 | 187 | 12 | 15 / 46080 |
+| **`0.06560` (shipped)** | **1.50** | **0.0845** | **139** | **15** | **6 / 46080** |
+| `0.04375` | 1.00 | 0.0871 | 103 | 26 | 17 / 46080 |
+| `0.02750` (metre-correct) | 0.63 | 0.0822 | 47 | **121** | **0 / 46080** |
+
+**TWO PREDICTIONS FALSIFIED, both of them mine, and the second one matters more than this constant.**
+
+1. **P026 said the metre-correct value made lateral cave structure "disappear entirely".** It does not.
+   Caves at `0.0275` are *fewer and vastly larger* — 271 pockets of median 7 cells become 47 of median
+   121, a seventeen-fold rise in the size of the room you stand in. I predicted an absence and measured a
+   consolidation. The prediction was reasoned from "less than one period across the width", which is true
+   and says nothing about what the field does instead — `[[limit-is-not-a-description]]` in its exact
+   form: *a limit on what something can represent is not a description of its output.*
+2. **`docs/MASTER_PLAN_AUG30.md` names `cave.frequency` as "the explanation I find most likely" for
+   P021's missing 15% of void.** **Void fraction is FLAT across the whole sweep** — 0.0822 to 0.0871, a
+   6% spread over a 4× frequency change with no monotone trend. Frequency *redistributes* carved volume;
+   it does not create or destroy it. The plan's most-likely explanation is excluded, and it should not
+   survive into the next plan as a live hypothesis.
+
+**The judgment call: `0.0656`, not `0.0275`.** The metre-correct value is the better world on every axis
+the sweep measures except one: at `0.0275` the shelf bands carve **exactly zero** cells, which is the
+impermeable-wall defect WG-2 existed to close, and `tests/test_shaft_generator.gd` fails on it. A loop
+does not get to redefine a Tier-0 closure criterion to let its own change through. So the shipped value
+is option (2) of P026 at N = 1.5 — the largest step toward room-scale caves available without touching
+that criterion: median pocket 7 → 15, pockets 271 → 139.
+
+**The carve ratchets were NOT re-pinned, because they did not need to be.** Non-shelf 0.0561 → 0.0591 and
+overall 0.0381 → 0.0402, both inside the unchanged ±0.0060 band. Recorded because "the ratchet still
+passes" is a result about the size of the change, not a formality: this moved the world by half a band.
+
+**AND THE THING FOUND ON THE WAY, which is worth more than the constant** (`docs/NEEDS_DIRECTOR.md`
+P028). The WG-2 closure assertion is `shelf_frac > 0.0`. Read the shelf column above: **0, 1, 6, 15, 17
+cells out of 46,080.** There is no trend — the rate moves by 17× between adjacent rows and lands on zero
+once. **That is a noise floor, and a `> 0.0` guard against a noise floor is sampling its subject and
+reporting the sample as a verdict.** When D0258 declared WG-2 closed at `freq 0.11`, the evidence
+carrying the sentence *"the wall was never a threshold that was too high — it was a single-octave field
+with no tail to clear it with"* was **one carved cell**. One cell cannot separate "the octave port gave
+the field a tail" from "one seed got lucky at one coordinate".
+
+The claim may still be true. The instrument cannot say. This is `[[unstable-threshold-statistics]]` and
+`[[guards-that-cannot-be-false]]` meeting at their shared edge — not a guard that cannot fail, but one
+whose margin is smaller than its own noise, which fails and passes for the same reason.
+
+**What was deliberately NOT done about it.** The assertion was not loosened, tightened, re-pinned, or
+re-worded. It is a shipped acceptance criterion for a Tier-0 gap; changing what "closed" means is the
+director's call. P028 carries the three ways out and recommends the cheap one — run 200 seeds and find
+out whether the true shelf rate is 0.0002 or zero. **If it is zero, `0.0275` never re-opened WG-2 at all;
+it only stopped a coin flip from landing heads, and the seventeen-fold better world is one line away.**
+
+**Determinism, checked at the world change and not assumed.** Two separate OS processes replaying the
+same seed: bit-identical, first mismatch at checkpoint **-1**. The seed+1 control diverges at checkpoint
+**0**. The golden sequence mismatches at checkpoint 0, which is what a world change looks like and what a
+determinism regression does not (D0165). Goldens re-pin from this PR's own CI Linux build per D0167,
+never locally.
+
+**Scope.** `cave.frequency 0.11 → 0.0656` in all three strata files and the generated table.
+`reveal.*` and `pending_sim_economy.*` untouched. `tools/probe_cave_freq.gd` was a throwaway sweep
+harness and is deleted rather than shipped — its output is the table above, which is the part worth
+keeping.

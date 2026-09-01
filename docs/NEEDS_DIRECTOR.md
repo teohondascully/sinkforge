@@ -739,27 +739,42 @@ Frequency is 1/length, so the metre-correct value scales the other way: **0.11 �
 | current `0.11` | 2.51 | 112.6 |
 | metre-correct `0.0275` | **0.63** | 28.2 |
 
-**At the metre-correct value the entire shaft width sits inside less than ONE noise period.** The field
-becomes essentially monotone across x: lateral cave structure disappears completely while vertical
-structure stays rich. That is arithmetically right and may still be the wrong number for a world ten
-times narrower than the one it was tuned in.
+**BUILT at option (2), N = 1.5, `freq 0.0656`** (D0307). The paragraph that used to stand here predicted
+that at the metre-correct value "lateral cave structure disappears completely". **I swept it instead of
+believing it, and it is false** — the table below is the measurement, three seeds, `_carve_caves` alone.
 
-**Three options, and the middle one is mine.**
+| `freq` | lateral periods | void fraction | pockets | median pocket | **shelf carved** |
+|---|---|---|---|---|---|
+| `0.11000` (before) | 2.51 | 0.0866 | 271 | 7 | 1 / 46080 |
+| `0.08750` | 2.00 | 0.0848 | 187 | 12 | 15 / 46080 |
+| **`0.06560` (built)** | **1.50** | **0.0845** | **139** | **15** | **6 / 46080** |
+| `0.04375` | 1.00 | 0.0871 | 103 | 26 | 17 / 46080 |
+| `0.02750` (metre-correct) | 0.63 | 0.0822 | 47 | **121** | **0 / 46080** |
 
-1. **Take `0.0275`.** Defensible on its own terms — "the player's own shaft is the vertical structure
-   now" (D0017) — and it accepts a world with no lateral cave structure at all.
-2. **Derive an intermediate from THIS world's width.** Periods scale linearly with frequency, so
-   `freq = 0.11 × N / 2.51` for N lateral periods across the shaft. One and a half periods across 12 m
-   gives **0.066**; one period gives **0.044**. A stated choice about this world rather than a value
-   inherited from a different one.
-3. **Leave `0.11`.** Rejected: it is four times too fine in metres, and it is what makes the caves
-   fragment into the many small pockets `docs/LEGACY_GAP.md` already describes.
+**Three things this changes, and only the third is a question for you.**
 
-**My recommendation is (2) at N = 1.5, `freq ≈ 0.066`** — enough lateral variation that a cave reads as a
-room you can move sideways through, without the 2.5-period churn that fragments them today.
+1. **Caves do not vanish at `0.0275`; they consolidate.** 271 pockets of median 7 cells become 47 of
+   median 121 — a *seventeen-fold* rise in the size of the room you stand in. That is the direction the
+   whole conversion wanted, and my own prediction had the sign of the effect right and its character
+   completely wrong.
+2. **Void fraction is FLAT across the entire range** (0.0822–0.0871, a 6% spread over a 4× frequency
+   change). Frequency redistributes carved volume; it does not create or destroy it. So `cave.frequency`
+   **cannot** be the explanation for P021's missing 15% — `docs/MASTER_PLAN_AUG30.md` names it as "the
+   explanation I find most likely" and this rules it out. That line should not survive into the next plan.
+3. **The real cost of `0.0275` is that WG-2 re-opens.** At the metre-correct value the shelf bands carve
+   **exactly zero** cells, which is the impermeable-wall defect WG-2 existed to close, and
+   `tests/test_shaft_generator.gd` fails on it. That is why I did not ship it. But see **P028** — the
+   assertion it fails is passing today on *six cells in ninety-two thousand*, and the honest reading is
+   that shelf permeability is at the noise floor everywhere in this table, `0.11` included.
 
-**This is BUILT-PARKED work, not blocked work**: I will build (2), capture it beside the current field,
-and put both images in front of you. If you prefer (1) it is a one-line change to the same commit.
+**So the built value is `0.0656`**: it doubles median pocket size (7 → 15), keeps the existing carve
+ratchets inside their unchanged ±0.0060 bands (non-shelf 0.0561 → 0.0591, overall 0.0381 → 0.0402), and
+does not trip WG-2. It is the largest step toward room-scale caves that is available without first
+settling P028.
+
+**If P028 resolves as "the shelf assertion is measuring noise", `0.0275` becomes available and I would
+take it** — it is metre-correct, it is the seventeen-fold improvement, and its only objection is a guard
+whose margin is six cells. One line, one re-pin. Your call on the images, not on the arithmetic.
 
 ---
 
@@ -787,3 +802,59 @@ ruling.
 
 **No decision is needed from you on either** unless you want the tint sooner than the reading. Recorded
 so the gap is visible rather than implied by a screenshot that is darker than you expected.
+
+---
+
+## P028 · WG-2 is "CLOSED" on six cells in ninety-two thousand, and I cannot tell you it is really closed
+
+Found while sweeping P026, not while looking for it. `tests/test_shaft_generator.gd` carries the
+assertion that closed WG-2 (D0258):
+
+```gdscript
+_check(shelf_frac > 0.0,
+    "WG-2 CLOSED: shelf bands are permeable at last (%d of %d over 6 seeds, was 0). ...
+     If this returns to zero, the octave port has been undone.")
+```
+
+**It is a `> 0.0` test on a quantity whose entire observed range is 0 to 17 cells out of 46,080.** Here
+is that quantity across the P026 frequency sweep, three seeds each — the same table as P026, one column
+of it:
+
+| `freq` | shelf cells carved | rate |
+|---|---|---|
+| `0.11000` (shipped when WG-2 was declared closed) | **1** / 46080 | 0.00002 |
+| `0.08750` | 15 / 46080 | 0.00033 |
+| `0.06560` (built today) | 6 / 46080 | 0.00013 |
+| `0.04375` | 17 / 46080 | 0.00037 |
+| `0.02750` | **0** / 46080 | 0.00000 |
+
+**There is no trend here. This is a noise floor.** The rate does not move monotonically with frequency,
+it moves by a factor of 17 between adjacent rows, and one row lands on exactly zero. A guard reading
+`> 0.0` against a population like this is not measuring shelf permeability — it is sampling it, and
+reporting the sample as a verdict.
+
+**Why this matters beyond tidiness.** The prose that ships beside the assertion makes a strong causal
+claim: *"The wall was never a threshold that was too high — it was a single-octave field with no tail to
+clear it with."* That claim may well be true. But the evidence carrying it, at the moment it was written,
+was **one carved cell**, and a single cell cannot distinguish "the octave port gave the field a tail"
+from "one seed got lucky at one coordinate". This is the house failure class wearing its other face: not
+a green that cannot see its subject, but a green whose subject is smaller than its own noise.
+
+**What I did NOT do.** I did not loosen this, tighten it, or re-pin it. It is a shipped acceptance
+criterion for a Tier-0 gap and changing what counts as "closed" is your call, not a loop's.
+
+**Three ways out, and the first is cheap.**
+
+1. **Raise n until the rate is a rate.** 6 seeds is the current sample; at ~1 carved cell per seed the
+   estimate is worthless. 200 seeds costs minutes and would say whether the true rate is 0.0002 or zero.
+   **This is the one I recommend, and it is decision-free once you say the number matters.**
+2. **Re-state what WG-2 closure means** — e.g. "the shelf carves at ≥1% of the non-shelf rate", a claim
+   with a denominator, replacing a claim with a coin flip. That is a criteria change and needs you.
+3. **Accept it as a canary rather than a measurement.** Keep `> 0.0` explicitly as a *tripwire for the
+   octave port being undone* — which is what its failure message actually says — and stop reading it as
+   evidence that shelf bands are permeable. Cheapest, honest, and changes only the prose.
+
+**The dependency:** P026 wants `cave.frequency 0.0275`, which is metre-correct and multiplies median cave
+size seventeen-fold. The *only* thing blocking it is this assertion going to zero. If (1) shows the true
+shelf rate was never meaningfully above zero at `0.11` either, then `0.0275` does not re-open WG-2 — it
+just stops a knife-edge from landing on the lucky side, and the better world is one line away.

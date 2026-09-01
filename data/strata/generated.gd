@@ -16,7 +16,7 @@ const RECORDS: Dictionary = {
 			"stonereach_end": 140,
 		},
 		"cave": {
-			"frequency": 0.11,
+			"frequency": 0.0656,
 			"threshold_top": 0.47,
 			"threshold_deep": 0.31,
 			"min_depth_cells": 24,
@@ -82,7 +82,7 @@ const RECORDS: Dictionary = {
 			"stonereach_end": 140,
 		},
 		"cave": {
-			"frequency": 0.11,
+			"frequency": 0.0656,
 			"threshold_top": 0.47,
 			"threshold_deep": 0.31,
 			"min_depth_cells": 24,
@@ -148,7 +148,7 @@ const RECORDS: Dictionary = {
 			"stonereach_end": 140,
 		},
 		"cave": {
-			"frequency": 0.11,
+			"frequency": 0.0656,
 			"threshold_top": 0.47,
 			"threshold_deep": 0.31,
 			"min_depth_cells": 24,
