@@ -11597,3 +11597,74 @@ its checks, so neither the exit-code reading (D0262) nor the whole-log dump (D02
 
 **Reverse cost:** one line — restore the grep. The local default goes back to running a nightly-sized
 sweep and claiming it is the per-commit set.
+
+
+## D0284 · Gate 30 compared job NAMES; a job gutted to `run: true` kept its name and passed · 2026-08-31 · harness
+
+**The defect, as measured, not as feared.** D0266's own docstring named this hole in the gate it was
+shipping: "a job gutted to `run: true` passes here." Measured against the real
+`.github/workflows/harness.yml` at this commit, the pre-strengthening gate **passes on all four gutting
+shapes**, and each one leaves every job name and every suite name intact:
+
+| mutation of the real workflow | old name-only gate | strengthened gate |
+|---|---|---|
+| both `authorship` steps gutted to `run: true`, names kept | passes | FIRES |
+| the `layer_lint.py` step deleted from `gates` | passes | FIRES |
+| `continue-on-error: true` added to the BLOCKING duplication step | passes | FIRES |
+| `if: false` added to the `gates` job | passes | FIRES |
+| the tokenless gate-mutation-test loop gutted to `run: true` | passes | FIRES |
+| `headed_boot` deleted outright (D0265's own shape) | FIRES | FIRES |
+
+Same failure class as D0265, one level down: green by absence, except what is absent is the enforcement
+rather than the name, so even the human who caught D0265 — by noticing a job name had stopped appearing
+— would have had nothing to notice.
+
+**Decided: a per-job enforcement FINGERPRINT that may not shrink, added beside the name sets rather than
+replacing them.** Three components, each earning its place against a mutation the others miss:
+
+- **Work tokens** — what the job's enforcing steps invoke: `res://`/`https://` URIs, words ending
+  `.py`/`.sh`/`.gd`/`.bash`/`.yml`/`.yaml`, `./binary`, and `uses:` actions with their `with:` KEY names.
+  On this tree that is 89 tokens across 5 jobs; `tests` holds all 47 of the CI suite paths.
+- **Count of enforcing run-steps that do work** (33 here). This exists because tokens cannot see every
+  gutting: the `Gate mutation tests` step's work is a `find`-driven loop with no path-shaped token in
+  it, and the Godot download step's is `curl`/`unzip`/`mv`/`chmod`. Gut either and the token sets are
+  byte-identical. A count is a weak instrument on its own (this ledger's own "count without
+  membership"), so it is never the only property, and the failure prints both sides' numbers.
+- **Job-level `if:` gained** — `if: false` on a job is the most surgical way to switch CI off with every
+  name in place, and it changes no token and no count.
+
+**A step counts as enforcing only if it has no `if:` and no truthy `continue-on-error:`.** That is the
+vector no text comparison can reach: the name, the step and the command all survive, and the job stops
+being able to fail. `harness.yml`'s three deliberate report-only steps (D0096/D0098) therefore contribute
+nothing on either side and are stable; flipping a blocking step to join them fires.
+
+**Deliberately NOT done.** No comparison of what the tools DO — a step rewritten to run a different tool
+of the same name, or a tool that has itself been gutted, is out of reach, and the docstring says so
+rather than letting the gate's name imply otherwise. No file-based allowlist: the second marker is
+`CI-Enforcement-Changed: <job-name> -- <why>` in the commit message, for D0266's original reason, and it
+is **job-granular** rather than token-granular because a list of paths in a commit message is a
+file-based allowlist wearing a disguise and nobody would read it. The wrong job named in the marker does
+not cover the gutted one — tested. The 0/1/2 exit contract is unchanged, including all three
+CANNOT-COMPARE branches, each of which now prints a message the other two cannot produce, so three cases
+cannot pass on one shared substring.
+
+**Mutation-tested twice, in both directions.** Against the real `harness.yml`: 11 mutants, every one
+carrying an `applied=True` witness with its anchor occurrence count, a positive control on the unmutated
+tree first, and `git diff --exit-code` verifying the byte-for-byte restore after each — 0 mismatches,
+and the workflow file is unchanged in the final diff. The witness is not decoration: a replacement that
+matches nothing produces a file identical to the base, which PASSES, so a silently-missed anchor reports
+every mutant "not caught" for a reason that has nothing to do with the gate. Then the mirror, because a
+green self-test proves nothing until it has been seen going red: six mutations **of the gate** run
+against the committed self-test, each turning red exactly the branches it should — neutering the whole
+enforcement comparison reds 8, the token check alone 5, the work-step count alone **1** (the case built
+to isolate it), the job-`if:` check alone 1, `continue-on-error` alone 1, and the original name
+comparison 3.
+
+**Committed as `tools/layer_lint/test_check_ci_not_shrunk.py`**, 21 branches, run by CI's existing
+`find tools -name 'test_*.py'` step. It includes the case QUALITY §2 requires of every gate — the gate's
+own subject tripping the gate: deleting the workflow step that runs `check_ci_not_shrunk.py` is caught
+by `check_ci_not_shrunk.py`.
+
+**Reverse cost:** delete `compare_enforcement` and its three properties from
+`tools/layer_lint/check_ci_not_shrunk.py`, and the eight enforcement branches from the self-test. The
+name checks stand alone again, and the row-1-to-5 column of the table above goes back to "passes".
