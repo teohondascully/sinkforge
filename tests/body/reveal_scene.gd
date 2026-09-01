@@ -335,8 +335,16 @@ func _draw() -> void:
 func _draw_body() -> void:
 	var left: float = float(_body._left_x()) / float(Fx.SCALE)
 	var top: float = float(_body._top_y()) / float(Fx.SCALE)
+	# The swing phase comes through the L2 door rather than off `_mining` directly, even though this scene
+	# holds both: D0287's whole claim is that the pick animation is a function of the SIM's swing, and
+	# reading the sim object here would draw the identical picture while proving none of that. A frame the
+	# coordinator has not built yet leaves the sentinel, and the animation falls back to legacy's clock.
+	var swing_phase: int = MinerLook.SWING_PHASE_NONE
+	var frame: Frame = _sky_view.current_frame() if _sky_view != null else null
+	if frame != null and frame.obs != null:
+		swing_phase = frame.obs.mining_swing_phase
 	var key: String = MinerLook.sprite_key(_last_input.dig_pressed, _body.on_floor,
-		_body.vel_x, _body.vel_y, _tick_count)
+		_body.vel_x, _body.vel_y, _tick_count, swing_phase)
 	var tex: Texture2D = MinerLook.resolve(key)
 	if tex == null:
 		draw_rect(Rect2(left, top, Body.WIDTH_PX, Body.HEIGHT_PX),

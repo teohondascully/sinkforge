@@ -41,6 +41,15 @@ const WALK_SPEED_MIN: int = 10 * Fx.SCALE
 const DIG_TICKS_PER_FRAME: int = 8
 const WALK_TICKS_PER_FRAME: int = 6
 
+## Passed when the caller has no swing to read — a preview, a fixture, a caller written before D0287 —
+## and the dig frames fall back to legacy's free-running alternation. A sentinel rather than 0, because 0
+## is a REAL phase (the tick a blow lands) and the two must not be the same value.
+const SWING_PHASE_NONE: int = -1
+
+## Which half of the stroke shows the struck frame. Half, as legacy's alternation is, so the cadence
+## reads as a steady chop rather than a twitch.
+const DIG_STRUCK_UNTIL: int = 500
+
 
 ## `digging` MUST come from the player's INPUT, not from `Body.dig_event_this_tick`. The event is true
 ## only on the tick a cell was actually excavated, so animating from it would flash one dig frame at the
@@ -54,9 +63,10 @@ const WALK_TICKS_PER_FRAME: int = 6
 ## The logical frame key for a motion state, in legacy's own priority order: digging, airborne, walking,
 ## idle. A pure function of its arguments -- no `Body`, no textures, no clock -- so
 ## `tests/test_miner_look.gd` can assert the whole table without building a world.
-static func sprite_key(digging: bool, on_floor: bool, vel_x: int, vel_y: int, anim_ticks: int) -> String:
+static func sprite_key(digging: bool, on_floor: bool, vel_x: int, vel_y: int, anim_ticks: int,
+		swing_phase: int = SWING_PHASE_NONE) -> String:
 	if digging:
-		return "miner_dig_0" if (anim_ticks / DIG_TICKS_PER_FRAME) % 2 == 0 else "miner_dig_1"
+		return dig_key(swing_phase, anim_ticks)
 	if not on_floor:
 		# Up and down are different beats: the rise is a tuck, the drop streams the legs out behind.
 		# `vel_y > 0` is DOWNWARD here, as it is in legacy -- y grows toward the world's bottom.
@@ -64,6 +74,25 @@ static func sprite_key(digging: bool, on_floor: bool, vel_x: int, vel_y: int, an
 	if absi(vel_x) > WALK_SPEED_MIN:
 		return "miner_walk_%d" % ((anim_ticks / WALK_TICKS_PER_FRAME) % 4)
 	return "miner_idle"
+
+
+## WHICH DIG FRAME, AND WHY IT IS NOT A CLOCK. Legacy alternates on `int(_anim_time * 8.0) % 2` — a
+## free-running 8 Hz that has no idea when the pick actually lands. It gets away with it because 8 Hz is
+## a half-cycle of 0.125 s against its own `SWING_PERIOD` of 0.28 s, so at rest the two very nearly
+## agree; they drift apart exactly as `RHYTHM_SWING` speeds the swing up and the animation does not
+## follow. **This build computes the real period** (D0279: 16 ticks at rest, 10 at full rhythm) and
+## `Mining.swing_phase_per_mille()` reports where in the stroke the arms are, so the frame is a function
+## of the swing rather than of a clock that resembles it.
+##
+## `miner_dig_1` is the STRUCK pose (`legacy/tools/bake_miner.gd:449`, arms `dig_down`) and it shows from
+## phase 0 — the tick the rock takes damage — through the follow-through; `miner_dig_0` (`dig_up`) covers
+## the wind-up and ends at the next impact. That the two agree at rest is a check, not a coincidence:
+## `DIG_TICKS_PER_FRAME` is 8 and the at-rest period is 16, so the fallback below and the phase-locked
+## path draw the same cadence when rhythm is zero. `tests/test_miner_look.gd` asserts exactly that.
+static func dig_key(swing_phase: int, anim_ticks: int) -> String:
+	if swing_phase == SWING_PHASE_NONE:
+		return "miner_dig_0" if (anim_ticks / DIG_TICKS_PER_FRAME) % 2 == 0 else "miner_dig_1"
+	return "miner_dig_1" if swing_phase < DIG_STRUCK_UNTIL else "miner_dig_0"
 
 
 ## The best drawn texture for a key: walk the fallback chain until something resolves. Returns null when

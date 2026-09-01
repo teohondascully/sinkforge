@@ -11,7 +11,84 @@ func _initialize() -> void:
 	_test_the_fallback_chain_terminates_and_reaches_a_real_file()
 	_test_feet_sit_on_the_aabb_bottom()
 	_test_dug_headroom_covers_the_sprites_overhang()
+	_test_the_struck_frame_shows_on_the_tick_the_rock_takes_damage()
+	_test_the_free_running_fallback_is_the_at_rest_swing_by_construction()
+	_test_a_shorter_swing_makes_the_pick_swing_faster()
 	_finish("miner_look")
+
+
+## D0287. The pick's two frames are `dig_up` and `dig_down` (`legacy/tools/bake_miner.gd:448-449`), and
+## the whole point of phase-locking them is that `dig_down` is on screen on the tick the rock actually
+## takes damage. Phase 0 IS that tick — `Mining` zeroes its swing counter as it fires.
+func _test_the_struck_frame_shows_on_the_tick_the_rock_takes_damage() -> void:
+	_check(MinerLook.dig_key(0, 0) == "miner_dig_1",
+		"at phase 0, the tick the blow lands, the pick is DOWN (got %s)" % MinerLook.dig_key(0, 0))
+	_check(MinerLook.dig_key(999, 0) == "miner_dig_0",
+		"and at the top of the wind-up it is UP (got %s)" % MinerLook.dig_key(999, 0))
+	# Both frames over the whole range, and each covering half of it. A mapping that returned one frame
+	# everywhere would satisfy either row above on its own.
+	var struck: int = 0
+	for p: int in range(0, 1001):
+		if MinerLook.dig_key(p, 0) == "miner_dig_1":
+			struck += 1
+	_check_over(1001, absi(struck - 500) <= 1,
+		"and the stroke is split evenly -- %d of 1001 phases show the struck frame" % struck)
+	# The sentinel is not a phase. Passing it must reach legacy's clock, not be read as "just struck".
+	_check(MinerLook.dig_key(MinerLook.SWING_PHASE_NONE, 0)
+			!= MinerLook.dig_key(MinerLook.SWING_PHASE_NONE, MinerLook.DIG_TICKS_PER_FRAME),
+		"CONTROL: with no swing to read, the frames still alternate on the clock -- the sentinel falls "
+		+ "back rather than freezing on one frame")
+
+
+## CONSTANT MUST DOMINATE CONSTANT. Legacy's free-running 8 Hz alternation is not arbitrary: it is a
+## half-cycle of 0.125 s against its own 0.28 s swing. Ported here, `DIG_TICKS_PER_FRAME * 2` must equal
+## the at-rest period `Mining` computes, or the fallback path and the phase-locked path draw two different
+## cadences from the same rest state. Read off a real `Mining` rather than written down, so moving
+## `SWING_TICKS_X100` fails here instead of silently desynchronising the animation.
+func _test_the_free_running_fallback_is_the_at_rest_swing_by_construction() -> void:
+	var at_rest: int = Mining.new().swing_period_ticks()
+	_check(MinerLook.DIG_TICKS_PER_FRAME * 2 == at_rest,
+		"the fallback's full cycle (%d ticks) is the at-rest swing period (%d)"
+		% [MinerLook.DIG_TICKS_PER_FRAME * 2, at_rest])
+	# And the two paths really do agree over a run, not merely in their arithmetic.
+	var disagreements: int = 0
+	for t: int in at_rest * 4:
+		var phase: int = ((t % at_rest) * 1000) / at_rest
+		# The clock's cycle starts on the UP frame and the swing's starts on the DOWN one -- the blow
+		# lands at phase 0 -- so the clock is compared half a period out of step, which is what the two
+		# being the same cadence means.
+		if MinerLook.dig_key(phase, 0) != MinerLook.dig_key(MinerLook.SWING_PHASE_NONE,
+				t + MinerLook.DIG_TICKS_PER_FRAME):
+			disagreements += 1
+	_check_over(at_rest * 4, disagreements == 0,
+		"and the phase-locked and free-running frames match tick for tick at rest (%d differ)"
+		% disagreements)
+
+
+## THE PAYOFF, AND THE REASON THIS IS NOT A CLOCK. `Mining`'s period shortens as rhythm builds (D0279,
+## asserted against real breaks in `tests/test_mining.gd`); legacy's animation could not follow, because
+## nothing told it. Asserted as a property over a range of periods rather than at two measured values, so
+## it is a claim about the mapping and not about the two numbers D0279 happened to measure.
+func _test_a_shorter_swing_makes_the_pick_swing_faster() -> void:
+	var window: int = 240
+	var last_flips: int = -1
+	var readings: Array[int] = []
+	for period: int in [Mining.new().swing_period_ticks(), 14, 12, 10]:
+		var flips: int = 0
+		var previous: String = ""
+		for t: int in window:
+			var key: String = MinerLook.dig_key(((t % period) * 1000) / period, t)
+			if previous != "" and key != previous:
+				flips += 1
+			previous = key
+		readings.append(flips)
+		_check(flips > last_flips,
+			"a %d-tick swing flips the pick more often over %d ticks than the longer one before it "
+			% [period, window] + "(%d vs %d)" % [flips, last_flips])
+		last_flips = flips
+	_check(readings[0] > 0,
+		"CONTROL: the at-rest swing flips at all (%d over %d ticks) -- a mapping that never changed frame "
+		% [readings[0], window] + "would make every row above vacuously ordered at zero")
 
 
 ## Legacy's order is digging > airborne > walking > idle, and the order is the assertion: a state that
