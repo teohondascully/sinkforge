@@ -158,6 +158,12 @@ class Observation:
 	var mining_hollow: int = 0
 	var mining_breach: bool = false
 
+	## True on the tick the pick LANDS, false on the ticks between blows (D0279). An edge, not a level:
+	## legacy's ring, draught and pick animation all fire per blow, and firing them per charging tick
+	## would be sixty a second. The period shortens as `Mining`'s rhythm builds, which is that system's
+	## first outward sign.
+	var mining_swing: bool = false
+
 	## The terrain cell's size in world pixels. **Not a mining field** — it belongs to whatever a painter
 	## does with `window`, `materials` and `walls`, all of which are cell-denominated while every draw
 	## call is in pixels. `view/` may not name `Heightfield.TERRAIN_CELL_PX`, and until now every painter
@@ -302,6 +308,7 @@ func _fill_mining(o: Observation) -> void:
 	o.mining_broke_cells = _mining.broke_cells.duplicate()
 	o.mining_hollow = _mining.hollow_this_tick
 	o.mining_breach = _mining.breach_this_tick
+	o.mining_swing = _mining.swing_this_tick
 	o.mining_blow_px = (2 * _mining.bite_radius + 1) * Mining.CELL_PX
 
 

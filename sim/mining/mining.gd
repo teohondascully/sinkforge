@@ -67,6 +67,18 @@ const RHYTHM_DECAY_PER_TICK: int = 11  ## 0.55/s, exactly
 ## `CHARGE_UNIT + (CHARGE_UNIT * rhythm) / RHYTHM_SPEED_DEN`, with RHYTHM_SPEED_DEN = RHYTHM_FULL / 0.60.
 const RHYTHM_SPEED_DEN: int = 2000
 
+## Legacy's swing cadence, converted rather than re-picked. `SWING_PERIOD` is 0.28 s and the sim runs at
+## a fixed 60 Hz, so the base period is 16.8 ticks -- carried x100 so the division below stays integer
+## and the same on every machine. `RHYTHM_SWING = 0.55` is the rational 11/20.
+##
+## `period = BASE / (1 + rhythm_fraction * 11/20)`, and `rhythm_fraction` is `_rhythm / RHYTHM_FULL`.
+## Multiplied out to keep it in integers, that is the expression in `swing_period_ticks()`. Measured at
+## the two ends: **16 ticks at rest, 10 ticks at full rhythm** -- a blow every 0.27 s becomes one every
+## 0.17 s, which is the speed-up legacy wanted to be "visible and audible".
+const SWING_TICKS_X100: int = 1680
+const SWING_RHYTHM_NUM: int = 11
+const SWING_RHYTHM_DEN: int = 20
+
 ## THE BITE (Slice 1.5, D0200). How far the breaking blow reaches around the cell that was charged,
 ## in TERRAIN CELLS, as a Euclidean disc: `dx*dx + dy*dy <= r*r`. 0 clears exactly the target and is
 ## bit-for-bit the Slice 1 behaviour, which is what makes it the probe's own control.
@@ -111,6 +123,38 @@ var breach_this_tick: bool = false  ## the break opened into a void -- `HollowTe
 ## is what makes the tell RISE as you approach; computing it only at the moment rock gives way would
 ## deliver the whole crescendo as a single note at the end. 0 whenever nothing is being worked.
 var hollow_this_tick: int = 0
+
+## THE SWING EDGE: true on the tick the pick actually LANDS, false on the 9-to-15 ticks between blows.
+##
+## Ported from `legacy/scenes/main.gd:216`, `234` and `1587`, which is the point — `docs/LEGACY_GAP.md`
+## PRE-3 asked for "a swing edge" and I nearly invented a cadence for it. Legacy already had one:
+## `SWING_PERIOD 0.28s`, shortened by `1 / (1 + rhythm * RHYTHM_SWING)` with `RHYTHM_SWING = 0.55`, and
+## the clock primed on release so the first blow of a fresh charge lands instantly.
+##
+## WHY IT MATTERS THAT THIS IS AN EDGE AND NOT `charging_cell != NO_CELL`. Legacy's hollow ring, its
+## draught and its pick animation all fire per BLOW. Firing them per charging tick would be sixty rings a
+## second; firing them only on the break gives one note where legacy gives a crescendo. The repetition IS
+## the tell — it is what makes closing on a cavity read as "a crescendo you can act on rather than a flag
+## that flips" (legacy's own words at `main.gd:1600-1609`).
+##
+## The director ruled the rhythm-driven option specifically, over a fixed period and over charge-fraction
+## edges, because `_rhythm` is already ported and tested and until now had **no outward sign at all**.
+## This is its first: the pick visibly speeds up as you find a groove.
+var swing_this_tick: bool = false
+
+## Ticks since the last blow landed. NOT in `state_signature()`, deliberately, and this is a judgment
+## call rather than an oversight: it is a pure function of `_rhythm` and of whether a cell was workable,
+## both of which the signature already covers, and it can change nothing about which cell breaks when.
+## Including it would re-pin `GOLDEN_HASHES` for a counter that cannot cause a divergence it would be the
+## only witness to.
+##
+## STARTS PRIMED, not at zero. Legacy sets `_swing_clock = SWING_PERIOD` on release so the first blow of
+## a fresh charge lands instantly, and a freshly-constructed `Mining` is in exactly that state -- nothing
+## has been released yet, but nothing is mid-swing either. Initialised at zero, the very first tap of the
+## mine button swung at nothing for a quarter second, which a test caught before this shipped.
+## `SWING_TICKS_X100 / 100` is the at-rest period, the longest one, so it primes at any rhythm.
+var _swing_ticks: int = SWING_TICKS_X100 / 100
+
 ## Every cell this tick's blow actually cleared, target first, in the deterministic scan order `_clear_bite`
 ## walks. A view wanting to spray debris per cleared cell reads this rather than re-deriving the disc, which
 ## would be a second copy of the shape free to drift from the one that ran.
@@ -133,6 +177,16 @@ func state_signature() -> String:
 	# wrong radius diverges on its first break, and without it in the signature the divergence would surface
 	# only as a mismatched GRID, several hundred cells later, attributed to whatever ran in between.
 	return "b%d,r%d,i%d|%s" % [bite_radius, _rhythm, _rhythm_idle, ";".join(parts)]
+
+
+## Ticks between pick-blows at the current rhythm. Integer throughout: a float period would put the
+## swing cadence on the wrong side of the determinism line for the sake of a fraction of a tick.
+##
+## Public because it is the number a test has to compare against -- asserting "a blow every 16 ticks"
+## with 16 written in the test would assert the test's own constant, not this conversion.
+func swing_period_ticks() -> int:
+	var scaled_rhythm: int = (_rhythm * SWING_RHYTHM_NUM) / SWING_RHYTHM_DEN
+	return (SWING_TICKS_X100 * RHYTHM_FULL) / (100 * (RHYTHM_FULL + scaled_rhythm))
 
 
 ## How much charge a cell has banked, 0 if none. The renderer's crack overlay reads this.
@@ -215,6 +269,7 @@ func mine(grid: TileGrid, body_x: int, body_y: int, target: Vector2i, held: bool
 	broke_material = &""
 	breach_this_tick = false
 	hollow_this_tick = 0
+	swing_this_tick = false
 	broke_cells.clear()
 
 	_rhythm_idle += 1
@@ -224,10 +279,17 @@ func mine(grid: TileGrid, body_x: int, body_y: int, target: Vector2i, held: bool
 	var working: bool = held and _workable(grid, body_x, body_y, target)
 	_heal_cracks(grid, target if working else NO_CELL)
 	if not working:
+		# PRIMED, not zeroed -- legacy's `_swing_clock = SWING_PERIOD` on release, so the first blow of the
+		# next charge lands instantly instead of the player waiting a quarter second for the pick to start.
+		_swing_ticks = swing_period_ticks()
 		return NO_CELL
 
 	charging_cell = target
 	hollow_this_tick = hollow_at(grid, target, swing_dir(body_x, body_y, target))
+	_swing_ticks += 1
+	if _swing_ticks >= swing_period_ticks():
+		_swing_ticks = 0
+		swing_this_tick = true
 	var material: StringName = grid.get_material(target)
 	var charge: int = banked(target) + CHARGE_UNIT + (CHARGE_UNIT * _rhythm) / RHYTHM_SPEED_DEN
 	if charge < break_cost(material):

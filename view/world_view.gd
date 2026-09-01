@@ -22,10 +22,31 @@ extends Node2D
 ## around the sim objects ITS caller owns. `view/` may depend on `{interface, core}` and on nothing in
 ## `sim/`, so there is structurally no way for a painter to reach past the envelope through this object.
 
-## The pinned cosmetic clock (Q5, ruled). One value, forever, because this build starts underground and
-## no time system was authored -- see `Frame.anim_time`. It is a `const` rather than a `var` so that
-## "the clock does not advance" is a property of the type instead of a promise in a comment.
-const ANIM_TIME: float = 0.0
+## THE COSMETIC CLOCK. Q5 pinned this to a `const 0.0` and that was correct at the time: the build starts
+## underground, no time system was authored, and a clock nothing could use is a field that only drifts.
+## D0277 re-opens it on the director's ruling, because the animated backlog arrived —
+## `docs/LEGACY_GAP.md` PRE-1 counts **28+ rows** that port, are correct, and then sit frozen: crumble
+## chunks, the status pulse, working-machine glyphs, the construction overlay, the need bubble, rope sway,
+## payout rise, godrays, glint flares, the lamp flicker, surface life.
+##
+## **A COSMETIC TICK COUNTER, NOT A WALL CLOCK, and the difference is the whole ruling.** Legacy used
+## `Time.get_ticks_msec()`. That would make two captures of the same tick differ, and this project's
+## entire screenshot-comparison discipline rests on the renderer being a function of state
+## (`docs/QUALITY.md`). Counting rendered ticks instead means `--screenshot-tick=N` reproduces exactly the
+## same frame it did yesterday, while an animation still advances for a player watching it.
+##
+## It is a `var` on the instance rather than a `const`, so "the clock does not advance" is no longer a
+## property of the type. `PINNED_ANIM_TIME` below is what a test poses when it wants the old guarantee,
+## which is most of them: an animated painter asserted at an arbitrary clock value is asserting the clock.
+const PINNED_ANIM_TIME: float = 0.0
+
+## Seconds per rendered tick. The sim runs at a fixed 60Hz (`docs/ARCHITECTURE.md` §4) and `refresh()` is
+## called once per rendered tick by whoever owns the render cadence, so this is that cadence expressed as
+## a duration — NOT a measured frame time. A measured `delta` would reintroduce exactly the run-to-run
+## variation the tick counter exists to remove.
+const SECONDS_PER_TICK: float = 1.0 / 60.0
+
+var _anim_ticks: int = 0
 
 ## How far past the camera rect to observe, in terrain cells. A painter deciding a cell's edges legitimately
 ## probes the ring just outside its own view, and `interface/interface.gd` says so: reading past the window
@@ -93,6 +114,7 @@ func current_frame() -> Frame:
 func refresh() -> void:
 	if _iface == null:
 		return
+	_anim_ticks += 1
 	_frame = _build_frame()
 	for layer: PaintLayer in _layers:
 		layer.queue_redraw()
@@ -100,11 +122,27 @@ func refresh() -> void:
 		_hud.refresh()
 
 
+## The cosmetic clock's current value, in seconds. Monotonic, deterministic in the number of rendered
+## ticks, and never read from a wall clock.
+##
+## Public so a test can assert the clock ADVANCES without reaching into `_anim_ticks` — an animation bug
+## and a frozen clock look identical in a still frame, so the two have to be separable.
+func anim_time() -> float:
+	return float(_anim_ticks) * SECONDS_PER_TICK
+
+
+## Puts the clock back to zero. For a capture that must reproduce a previous one exactly, and for a test
+## that wants Q5's original guarantee: a painter asserted at an arbitrary clock value is asserting the
+## clock rather than the painter.
+func reset_anim_clock() -> void:
+	_anim_ticks = 0
+
+
 func _build_frame() -> Frame:
 	var f: Frame = Frame.new()
 	var rect: Rect2 = view_world_rect()
 	f.obs = _iface.observe(Interface.Envelope.covering(rect, WINDOW_MARGIN_CELLS))
-	f.anim_time = ANIM_TIME
+	f.anim_time = anim_time()
 	f.view_world_rect = rect
 	f.zoom = _camera.zoom.x if _camera != null else 1.0
 	f.look = _look
