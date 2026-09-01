@@ -52,6 +52,15 @@ class Observation:
 	var facing: int
 	var cell: Vector2i  ## the terrain cell the body's centre is in
 	var window: Rect2i
+	## THE WORLD'S OWN SIZE IN CELLS, so a consumer can tell the EDGE OF THE WORLD from a hole in it
+	## (D0302). `window` may extend past the world — the margin is added without clamping — and every
+	## plane accessor answers `&""` outside the data it was given, so "outside the world" and "open air"
+	## arrive as the same byte. That is fine for a painter drawing one cell at a time and wrong for any
+	## consumer that AVERAGES over a neighbourhood: `VeilPainter` blurs openness over 8 cells, read the
+	## out-of-world ring as air, and lit a false halo along the world's own left, right and bottom edges.
+	##
+	## A copy like every other field here, never a reference to the grid (ARCHITECTURE §3).
+	var world_cells: Vector2i
 	## Row-major over `window`, one byte per cell: an index into `legend`. 0 is always the empty
 	## material, so `solid_at` is a byte comparison and not a string one.
 	var materials: PackedByteArray
@@ -265,6 +274,7 @@ func observe(envelope: Envelope) -> Observation:
 	o.facing = _body.facing
 	o.cell = Vector2i(Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y))
 	o.window = envelope.window
+	o.world_cells = Vector2i(_grid.width, _grid.height)
 	o.cell_px = Heightfield.TERRAIN_CELL_PX
 	_fill_window(o)
 	_fill_mining(o)

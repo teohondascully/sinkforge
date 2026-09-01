@@ -331,6 +331,7 @@ jobs:
       #   test_wall_painter.gd                           test_wall_painter (the background wall plane + its recess cast — D0286, LEGACY_GAP T1 #3)
       #   test_wall_lode.gd                              test_wall_lode (the mineral mark in that plane, untoned as legacy draws it — D0299)
       #   test_glint_painter.gd                          test_glint_painter (the discovery twinkle on an exposed vein — D0300)
+      #   test_veil_painter.gd                           test_veil_painter (mass occlusion + the key light — D0302, T1 #2)
       #   test_arrival_plate.gd                          test_arrival_plate (the stratum arrival ceremony — D0288, LEGACY_GAP T1 #8)
       #   test_sfx_bank.gd                               test_sfx_bank (the hollow ring + the breach, synthesised and measured — D0296, LEGACY_GAP T1 #6)
       #   test_material_palette.gd                       test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
@@ -392,6 +393,7 @@ jobs:
             res://tests/test_wall_painter.gd \
             res://tests/test_wall_lode.gd \
             res://tests/test_glint_painter.gd \
+            res://tests/test_veil_painter.gd \
             res://tests/test_arrival_plate.gd \
             res://tests/test_mining.gd \
             res://tests/test_mining_bite.gd \

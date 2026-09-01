@@ -12510,3 +12510,71 @@ between two runs of the same commit while the three static moments moved zero. D
 sound instrument for a still layer and needs a duty-period argument for a moving one.
 
 **Reverse cost:** drop the `GlintPainter.paint` line from `reveal_view_setup` and the file with it.
+
+## D0302 · 2026-08-31 · Lane A/T, LEGACY_GAP T1 #2 — the veil
+
+**"The single largest visual gap in the project", and its blocker was a measurement, not a decision.**
+
+`legacy/scenes/world_renderer.gd:3002-3051 _bake_openness`. Rock is not uniformly dark; it is dark in
+proportion to how BURIED it is. Two halves, and the second is the one a depth ramp cannot fake:
+
+* **Mass** — a blurred openness field. How much air is near a cell decides how much light reaches it.
+* **The key** — burial says how much light reaches a cell and nothing about which way its mass FACES,
+  "so a floor and a ceiling at the same burial depth come out at the same brightness and a cavern reads
+  as a dark patch rather than as a space with a lit floor and a shadowed roof". The vertical gradient of
+  the openness field is that missing information.
+
+Measured, with the confound held: chamber floor **1.1059** against ceiling **0.8941** at openness
+**0.4706 on both**. Identical burial, 1.24x brightness from facing alone. The matched-openness check is
+the assertion, not the brightness gap — without it the gap could be depth, which is exactly the confound
+the key exists to separate from. Face vs buried mass is 0.8854 vs 0.4500, and 0.4500 is `1 - MASS_SHADE`
+exactly, so the constant is reached rather than approached.
+
+**THE "WINDOW-VS-WORLD SCOPE DECISION" WAS A NUMBER ALL ALONG.** `docs/LEGACY_GAP.md` parked T1 #2 on it
+— legacy bakes over the whole world and `view/` holds a window. The blur has a bounded reach, so the
+question has an answer: `field[r][c]` is a vertical blur of a horizontal blur, which reads a BOX of
+radius REACH — **not 2\*REACH; the two passes are on different axes and my first arithmetic added them**,
+which would have widened the observation window for nothing. Plus the key's one row: **9 cells**.
+`WorldView.WINDOW_MARGIN_CELLS` goes 3 -> 9, derived in the test from the veil's own constants. Nothing
+about this needed the director.
+
+**`Interface.Observation` could not tell the edge of the world from a hole in it.** The window carries
+its margin unclamped, so it hangs past the world; every plane accessor answers `&""` outside its data;
+so "outside the world" and "open air" arrive as the same byte. Fine for a painter drawing one cell at a
+time and wrong for anything that AVERAGES: the blur read the out-of-world ring as air and lit a false
+halo along the world's left, right and bottom edges. Caught because buried mass measured 0.6635 where
+the constants say 0.4500 — the assertion was written against the constant, so the world edge had nowhere
+to hide. `world_cells` is on the observation now, and the raw sample clamps into the world, which is
+what legacy's own `clampi(col + d, 0, cols - 1)` does — invisible there because its window WAS the world.
+
+**The performance half is part of the port, not an optimisation on top of it.** Legacy's signature is
+`_bake_openness(cols, rows, dug_from, dug_to)` and it returns the band it refreshed: it CACHES and
+re-bakes incrementally. Ported without that, a bake measured **3.63 ms on a 68x46 window, 21.8% of a
+16.67 ms frame**, every frame, for a field usually identical to last frame's. Two changes:
+
+* the box blur runs on a RUNNING SUM rather than re-summing `2R+1` per cell. Asserted equal to a direct
+  transcription of legacy's loop — worst delta **0.000000000** over 12,996 cells, with a witness that the
+  reference field is populated, because an all-zero field would match any implementation at all;
+* the field is cached on `(window rect, hash(materials))`. **3.60 ms -> 0.001 ms, 3120x.**
+
+That hit time was too good to accept, so `hash()` on a `PackedByteArray` was checked directly rather than
+assumed: same content in different objects hashes equal, one byte differing hashes different, 0.0009 ms
+for 3,000 bytes. Content-based, and the cache is sound. Keyed on the hash rather than a dug-cell count or
+a tick — a count is equal across a dig that removed one cell and added another, and a tick re-bakes
+whether or not anything moved.
+
+**The masked-crash detector earned its keep twice in one unit.** `PackedByteArray` has no `.hash()`
+method and a typed-array argument was wrong; both printed `ALL PASS` alongside a `SCRIPT ERROR`, exit 0.
+Without D0115/D0149's detector this would have shipped with the cache assertions never running.
+
+**BUILT-PARKED, AND THE PICTURE IS WHY.** The veil does what it says — the flat brown field is gone, mass
+reads as mass, and distinct colours rise across every moment (delve 393 -> 592, surface 390 -> 631,
+horizon 329 -> 526, aim 286 -> 390). It also makes the deep MUCH darker, because legacy's veil never
+worked alone: `_skylight_alpha` (AMBIENT_DARK 0.66, SKY_REACH 12, SKY_FADE 16) lifts the near-surface,
+and the head-lamp and seam pools lift the rest. Those are the same lighting system and they are not
+ported. **The measured next item is the skylight term**, and it is named here rather than papered over by
+tuning `MASS_SHADE` away from legacy's value — which is what "self-certifying a feel item" would have
+looked like. Screenshot: `d0302_veil_delve`.
+
+**Reverse cost:** drop the `add_stateful_painter(VeilPainter.new(), &"paint_frame")` line. The margin can
+stay at 9 or go back to 3; nothing else on the stack reaches past 3.

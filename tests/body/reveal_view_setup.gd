@@ -35,6 +35,11 @@ const TERRAIN_Z: int = -50
 ## the terrain's own z, "every flare was scaled by `_dark`, the LightLayer with BLEND_MODE_MUL that makes
 ## rock dark", so the compensation and the attenuation cancelled exactly. There is no veil here yet (T1
 ## #2), but the ordering is what has to be right when it lands -- the glint sits above the rock it marks.
+## The veil goes ABOVE the terrain and the wall and BELOW the glint. It is a light layer, so everything
+## it dims has to already be on the canvas; and legacy draws the glint from `_paint_lights` POST-veil for
+## a measured reason its own header records -- drawn under the veil, "every flare was scaled by `_dark`",
+## so the flare's darkness compensation and the veil's attenuation were the same number and cancelled.
+const VEIL_Z: int = -45
 const GLINT_Z: int = -40
 
 
@@ -55,6 +60,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 		view.add_painter(BackdropPainter.paint).z_index = BACKDROP_Z
 	view.add_painter(WallPainter.paint).z_index = WALL_Z
 	view.add_painter(TerrainPainter.paint).z_index = TERRAIN_Z
+	view.add_stateful_painter(VeilPainter.new(), &"paint_frame").z_index = VEIL_Z
 	view.add_painter(GlintPainter.paint).z_index = GLINT_Z
 	view.add_painter(CrackPainter.paint_frame)
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT

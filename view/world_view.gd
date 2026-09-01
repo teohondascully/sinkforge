@@ -59,7 +59,19 @@ var _anim_ticks: int = 0
 ## column at each screen edge lost its cast shadow — a defect that only appears at the very edge of the
 ## frame and only in one direction, which is the kind a screenshot does not settle.
 ## `tests/test_wall_painter.gd` derives this from those two constants rather than restating it.
-const WINDOW_MARGIN_CELLS: int = 3
+##
+## **NINE, since D0302.** `VeilPainter` reads further than anything else on the stack: its openness field
+## is a separable box blur of radius `REACH_CELLS` (legacy's 2 m, which is 8 cells here) and the key light
+## then reads that field one row either side, so a drawn cell depends on the observation `REACH + 1` cells
+## out. `docs/LEGACY_GAP.md` listed T1 #2 as blocked on a "window-vs-world scope decision"; the blur has a
+## bounded reach, so the question had a NUMBER, and this is it. At a margin of 3 the outermost drawn cells
+## would blur against cells the observation never handed over — `solid_at` answers false for those — and
+## every screen edge would grow a false halo of openness, brightest exactly where the frame is cropped.
+##
+## The cost is real and bounded: the window grows from (view + 6) to (view + 18) cells on each axis, which
+## at the reveal camera is ~1,980 cells copied per observation against ~3,200. `tests/test_veil_painter.gd`
+## derives this from the veil's own constants rather than restating it.
+const WINDOW_MARGIN_CELLS: int = 9
 
 var _iface: Interface = null
 var _look: MaterialLook = null
