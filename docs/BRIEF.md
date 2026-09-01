@@ -4,8 +4,8 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-01. This round: the overnight run — fifteen PRs merged green (#16–#31), ledger
-D0286–D0313, every one rebase-merged with authorship clean.** WG-4 fully converted, three legacy ports
+**Last updated: 2026-09-01. This round: the overnight run — seventeen PRs merged green (#16–#33), ledger
+D0286–D0314, every one rebase-merged with authorship clean.** WG-4 fully converted, three legacy ports
 landed with their sources named, and **five separate greens found to be measuring nothing.**
 
 **Headline: a capture diff of ZERO pixels has two causes — the painter drew nothing, or the moment did
@@ -76,13 +76,19 @@ right procedure in the wrong regime.
 
 ## The decisions this round is waiting on
 
-**P028 · WG-2 is "CLOSED" on six cells in ninety-two thousand.** The assertion is `shelf_frac > 0.0`
-against a quantity measured at **0, 1, 6, 15, 17** cells out of 46,080 — no trend, 17× between adjacent
-rows, one landing on exactly zero. **That is a noise floor.** When D0258 declared WG-2 closed, the
-evidence under the sentence was **one carved cell**. Not loosened, tightened or re-worded — re-stating a
-Tier-0 criterion is yours. **Cheap resolution: 200 seeds.** *It gates P026: if the true rate was never
-above zero at `0.11` either, the metre-correct `cave.frequency` never re-opened WG-2, and the
-seventeen-fold larger cave is one line away.*
+**P028 · ANSWERED, and the answer changes P026 (D0314).** The 200-seed run is done. **990 shelf cells of
+3,072,000 — the mechanism is REAL**, WG-3's octave port genuinely gave the field a tail, and D0258's
+sentence is correct. **And 62.5% of individual seeds carve no shelf cell at all**, so `shelf_frac > 0.0`
+over six of them is a lottery: the shipped suite passes on **1 of its 6 seeds**, now printed every run.
+
+*What is yours:* whether to replace it with a rate criterion. My own P028 proposed "≥1% of the non-shelf
+rate" — **measured, it is 0.52%**, so my recommendation would have failed a correct build. Derived, the
+threshold is ~0.3%.
+
+***And this un-blocks P026.*** D0307 read "0 of 46,080 over 3 seeds at `cave.frequency` 0.0275" as WG-2
+re-opening. Against a base rate where 62.5% of seeds carve nothing, **three zeros is expected ~24% of the
+time at the shipped frequency**. **The blocker on the seventeen-fold larger cave was a sample size, not a
+defect** — and that reasoning was mine, hours earlier, drawing a categorical conclusion from n=3.
 
 **P029 · legacy's bedding boost and this build's glimmer floor cannot both be satisfied.** Legacy's 2×
 requirement needs a constant ≥1.83; anything above ~1.0 pushes deepstone inside glimmer's shipped **0.25**
@@ -110,7 +116,13 @@ once already, within an hour. It now carries its own positive control and the to
 does not contain the subject — but the underlying fragility is unfixed: the right answer is a shutter
 that holds until its subject is posed, and I did not build one.
 
-**Four of the five "instrument measured nothing" findings were in code I wrote this session.** The rate
+**A probe I wrote to answer P028 was wrong by a factor of fifteen, and only parity caught it.** Its first
+version carved an already-carved grid; it reported 66 shelf cells where the truth is 990. What exposed it
+was routing the *suite* through the same function and finding the six-seed numbers no longer reproduced.
+**A shared implementation is a parity check that runs itself** — two copies would have let the tool be
+confidently wrong forever.
+
+**Five of the six "instrument measured nothing" findings were in code I wrote this session.** The rate
 is not obviously falling. The one structural improvement that came out of it is worth more than the
 individual fixes: *when a verification reads zero, the second move is an ungated full-strength version of
 the same thing* — it separates "the mechanism is dead" from "the gate is closed" in a single run.
@@ -119,8 +131,8 @@ the same thing* — it separates "the mechanism is dead" from "the gate is close
 
 ## Blocked, and what it's waiting on
 
-**Nothing is in flight.** Every branch this run opened is merged and deleted; `origin/main` is at the
-bedding merge with CI green.
+**Nothing is in flight.** Every branch this run opened is merged and deleted; **zero open PRs**, and
+`origin/main` is green.
 
 **Determinism held at every world and body change** — two processes bit-identical (first mismatch −1),
 seed+1 control diverging at checkpoint 0, at all three re-pins. Goldens harvested from CI's own Linux
