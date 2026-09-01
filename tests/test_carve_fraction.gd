@@ -1,5 +1,8 @@
 extends "res://tests/test_base.gd"
 
+## Named so the printed line can say how many of them carved anything (D0314).
+const CARVE_SEEDS: Array[int] = [1, 20260826, 424242, 7, 99991, 31337]
+
 ## THE CARVE-FRACTION INSTRUMENT, split out of `tests/test_shaft_generator.gd` at the 400-line file cap
 ## (D0307). The seam is the right one and not merely the convenient one: everything left behind asks
 ## "does the generator produce the right KIND of thing" -- bands, veins, glimmer, sky -- and this file
@@ -32,36 +35,15 @@ func _initialize() -> void:
 ## the shelf is impermeable (the real one), or the sample contained no shelf cells at all, in which case
 ## 0.0 is a division that never had a subject. Without the population check this instrument would report
 ## the same headline number whether or not it had measured anything.
-## Counts carved cells in two partitions over several seeds. Split out of the assertion below purely so
-## each stays under the 50-line function limit -- but it earns the split: the measurement has no opinion
-## about what the numbers should be, which is what makes it reusable for the WG-3 octave port's
-## before/after comparison without editing an assertion to suit a result.
-static func _measure_carve(seeds: Array, cave_cfg: Dictionary, shelf_cfg: Dictionary) -> Dictionary:
-	var min_depth: int = int(cave_cfg["min_depth_cells"])
-	var band_height: int = int(shelf_cfg["band_height_cells"])
-	var shelf_every: int = int(shelf_cfg["shelf_every"])
-	var out: Dictionary = {"shelf_eligible": 0, "shelf_carved": 0, "open_eligible": 0, "open_carved": 0}
-	for seed: int in seeds:
-		var grid: TileGrid = TileGrid.new(48, 1024, 1)
-		ShaftGenerator._fill_base(grid, 0, 40, 140)
-		var solid_before: Array[Vector2i] = []
-		for col: int in grid.width:
-			for row: int in range(min_depth, grid.height):
-				var cell: Vector2i = Vector2i(col, row)
-				if grid.is_solid(cell):
-					solid_before.append(cell)
-		ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, seed, 0)
-		for cell: Vector2i in solid_before:
-			var shelf: bool = ShaftGenerator._is_shelf_band(cell.y, band_height, shelf_every)
-			var key: String = "shelf" if shelf else "open"
-			out[key + "_eligible"] = int(out[key + "_eligible"]) + 1
-			if not grid.is_solid(cell):
-				out[key + "_carved"] = int(out[key + "_carved"]) + 1
-	return out
+## THE MEASUREMENT MOVED TO `tools/test_carve_probe.gd` (D0314), and the reason is that a second caller
+## appeared: `tools/probe_shelf_rate.gd` asks this same question over two hundred seeds, which is far too
+## slow for CI and is exactly the sample P028 needed. Two copies of a carve walk would be two instruments
+## that could drift, and the whole point of the 200-seed run is that its numbers are comparable with this
+## suite's six-seed ones. One walk, two callers.
 
 
 func _test_carve_fraction_by_region() -> void:
-	var m: Dictionary = _measure_carve([1, 20260826, 424242, 7, 99991, 31337],
+	var m: Dictionary = TestCarveProbe.measure(CARVE_SEEDS,
 		StrataData.SHALLOW_CLAY["cave"], StrataData.SHALLOW_CLAY["strata_shelf"])
 	var shelf_eligible: int = int(m["shelf_eligible"])
 	var open_eligible: int = int(m["open_eligible"])
@@ -81,8 +63,11 @@ func _test_carve_fraction_by_region() -> void:
 	var shelf_frac: float = float(shelf_carved) / float(shelf_eligible)
 	var open_frac: float = float(open_carved) / float(open_eligible)
 	var total_frac: float = float(shelf_carved + open_carved) / float(shelf_eligible + open_eligible)
-	print("carve_fraction: overall %.4f | shelf-band %.4f (%d/%d) | non-shelf %.4f (%d/%d)" %
-		[total_frac, shelf_frac, shelf_carved, shelf_eligible, open_frac, open_carved, open_eligible])
+	# `seeds_hit` is printed on every run because it is the number that makes the WG-2 assertion below
+	# legible: 6 carved cells could be one seed carving six, and 200 seeds say 62.5% of seeds carve NONE.
+	print("carve_fraction: overall %.4f | shelf-band %.4f (%d/%d, %d of %d seeds) | non-shelf %.4f (%d/%d)" %
+		[total_frac, shelf_frac, shelf_carved, shelf_eligible, int(m["seeds_hit"]), CARVE_SEEDS.size(),
+			open_frac, open_carved, open_eligible])
 
 	_check_carve_ratchets(shelf_frac, open_frac, total_frac, shelf_carved, shelf_eligible)
 

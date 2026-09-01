@@ -13258,3 +13258,52 @@ any comparison is read. `[[error-path-returns-passing-value]]`.
 because `run_gd_test.sh`'s failure line is *"never printed its own ALL PASS line"* — which contains the
 string being searched for. This is recorded in my own notes from an earlier run of exactly this mistake,
 and I made it again. **Use the exit code.** The corrected sweep is the table above.
+
+## D0314 · 2026-09-01 · P028 answered — the shelf mechanism is real and the assertion is still a lottery
+
+**The 200-seed run D0307 asked for.** `tools/probe_shelf_rate.gd`, using the suite's own carve walk so
+the numbers are comparable rather than merely similar.
+
+| | value |
+|---|---|
+| shelf cells carved, 200 seeds | **990** of 3,072,000 → rate **0.000322** |
+| non-shelf cells carved | 406,142 of 6,528,000 → rate **0.0622** |
+| **shelf : open ratio** | **0.00518** — 193× less permeable |
+| **seeds carving ANY shelf cell** | **75 of 200** |
+
+**BOTH HALVES ARE TRUE AND THEY ARE NOT IN TENSION.** 990 cells is not noise — WG-3's octave port really
+did give the field a tail that clears the shelf threshold, and D0258's sentence is correct. **And**
+62.5% of individual seeds carve no shelf cell at all, so `shelf_frac > 0.0` over six of them is a
+lottery: P(all six zero) ≈ 6%. The shipped suite passes on **1 of its 6 seeds**, which
+`tests/test_carve_fraction.gd` now prints on every run so the margin is visible rather than inferable.
+
+**MY OWN RECOMMENDED REPLACEMENT WAS WRONG, AND THE MEASUREMENT IS WHAT SAYS SO.** P028 proposed *"the
+shelf carves at ≥1% of the non-shelf rate"*. It is **0.52%** — that criterion would fail on a correct
+build. Derived rather than guessed, the threshold is about **≥0.3%**, which clears 0.518% with margin and
+still fails hard if the octave port is undone (that returns the rate to zero, not to 0.4%).
+`[[parked-item-is-a-claim]]`: the unverified number was in the remedy I declined to implement.
+
+**AND THE CONSEQUENCE FOR P026.** At the metre-correct `cave.frequency` 0.0275 the three-seed sample
+carved 0 of 46,080, and D0307 treated that as WG-2 re-opening. Against a base rate where **62.5% of seeds
+carve nothing**, three zeros is the expected outcome about **24%** of the time *at the shipped frequency*.
+**The blocker on the seventeen-fold larger cave was a sample size, not a defect** — and D0307's own
+reasoning, written by me hours earlier, drew a categorical conclusion from n=3 on a quantity it had
+already established was sparse.
+
+**THE INSTRUMENT FAILED FIRST, AND CAUGHT ITSELF ON PARITY.** The probe's first version called
+`ShaftGenerator.generate()` and then `_carve_caves` on the result — a grid the generator had **already
+carved**, and filled with ore. It reported shelf 0 and non-shelf 0.0031 against the suite's 0.0561, and
+its first 200-seed answer was **66 cells, wrong by a factor of fifteen**. What exposed it was routing the
+suite through the same function: the six-seed numbers had to reproduce 6/92,160 and 0.0591 exactly, and
+they did not. **A shared implementation is a parity check that runs itself** — two copies of this walk
+would have let the tool report a confident wrong number forever, because nothing would ever have compared
+them. `[[driver-failure-reads-as-subject-failure]]`.
+
+**One methodological note worth keeping.** Across the broken and the correct populations the absolute
+rates differ by ~19×, and the **shelf : open RATIO barely moved** (0.00530 → 0.00518). A ratio survived a
+population error that destroyed both of its own inputs. That is an argument for reporting the ratio as
+the headline and the counts as evidence, not the other way round — and it is also a warning, because a
+ratio that stable will not tell you your population is wrong.
+
+**Nothing was changed about WG-2.** Replacing `shelf_frac > 0.0` with a rate criterion changes what
+"closed" means for a Tier-0 gap, which stays with the director. The knife-edge is merely visible now.
