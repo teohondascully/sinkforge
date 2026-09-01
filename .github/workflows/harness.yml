@@ -206,6 +206,15 @@ jobs:
       - name: Capture colour floor fails CLOSED on an absent count (D0316) — BLOCKING
         run: bash tools/test_capture_moments.sh
 
+      # D0320. `.githooks/pre-commit` is the file with this repository's worst record of silently dead
+      # gates -- the base-class namespace gate no-op'd for 119 commits (D0117/D0119) and the identity
+      # gate was dead twice over -- and D0319 restructured its early return so a new gate could be
+      # reached. That correctness is a property of statement ORDER and of which extensions each block
+      # globs, which nothing else here checks. Needs git and python3, no engine and no display, so it
+      # belongs in `gates` rather than `tests`.
+      - name: .githooks/pre-commit mutation tests (D0320) — BLOCKING
+        run: bash tools/test_pre_commit_hook.sh
+
       # tools/quality_check/ (docs/DECISIONS_LEDGER.md D0096-D0099). Duplication is the one instrument
       # that gates -- BLOCKING per D0099, since 0 clusters is this project's verified-clean state and a
       # regression is a fact about the tree a build should refuse. The other three are `continue-on-
