@@ -13149,3 +13149,53 @@ methods that no longer existed. The suite printed **`ALL PASS`** and exited **0*
 silently doing nothing; only the D0115/D0116 masked-crash detector in `run_gd_test.sh` failed the run.
 Every call site is updated, including the prose references, so a reader searching for the old name still
 lands somewhere real.
+## D0313 · 2026-09-01 · A blow sounds like what it lands on, and four voices this session cannot hear
+
+**Ported from `legacy/scenes/sfx.gd:26-35 STRIKE`.** Legacy's reason is about a session rather than a
+sound, and it is the whole argument for the feature: *"Terrain material -> the strike that material
+makes, so an hour of digging soil, coal, ore and the deep band is not one noise several hundred times
+over."*
+
+**ONE PARAMETERISED SYNTH, NOT FOUR BESPOKE ONES, AND THE REASON IS AN HONEST LIMIT.** Legacy renders
+each strike separately and can audition them. **This session cannot hear anything it makes**, so four
+hand-tuned voices would be four unverifiable claims dressed as work. What ports faithfully without ears
+is the DISTINCTION legacy draws — how bright the fracture is, how fast it dies, whether anything rings
+after it — expressed as three parameters over the strike shape `hollow()` already establishes. A director
+with speakers moves a row of a table instead of re-deriving a synth.
+
+| voice | `lp` | `decay` | `ring` | measured early rms | measured tail ratio |
+|---|---|---|---|---|---|
+| `hit_earth` | 0.12 | 9.0 | 0.00 | 0.0904 | 0.0000 |
+| `hit_coal` | 0.34 | 13.0 | 0.00 | 0.1418 | 0.0000 |
+| `hit_metal` | 0.46 | 6.0 | 0.30 | 0.3152 | 0.0448 |
+| `hit_slate` | 0.55 | 11.0 | 0.12 | 0.2175 | 0.0260 |
+
+Metal is the only voice with a real tail, which is legacy's own choice and is the point: a vein
+announces itself through the pick before the eye finds it.
+
+**THE FALLBACK IS `hollow`, AND THAT IS STRUCTURE RATHER THAN CONVENIENCE.** Legacy: an absent material
+*"falls back to the plain `crunch`, which is itself the stone voice: a dry fracture."* So `hardrock` and
+anything unmapped keep exactly the behaviour they shipped with, every existing branch assertion in
+`tests/test_sfx_driver.gd` is untouched, and the change cannot regress what was already there. Pitch and
+level still come from `voice_for_hollow`: **what** you hit chooses the timbre, **how hollow** the rock
+behind it is still chooses the pitch and the volume. Two facts about one blow, kept separate.
+
+**WHAT IS ASSERTED IS DELIBERATELY NOT "IT SOUNDS RIGHT."** Three things checkable without ears, each of
+them a way this could be wrong while everything else stayed green:
+
+* **The two tables agree.** `Sfx.STRIKE` names voices, `SfxBank.STRIKES` builds them, and a name in one
+  and not the other is a blow that plays nothing on a path where the map, the pool and the driver all
+  look correct. `setup()` builds the streams from the BANK's table rather than from the map's values, so
+  a mismatch reaches `play`'s refusal instead of vanishing.
+* **The voices are measurably distinct**, compared on two axes that move independently and rendered from
+  the same seed so the comparison is the timbre and not the noise draw. Four names rendering identical
+  samples is the entire feature failing silently.
+* **The fallback is the stone voice**, in both directions — `hardrock` and an invented material both fall
+  to `hollow`, and a mapped material does not, so the fallback is a fallback and not an unconditional
+  answer.
+
+**Mutation-tested, both caught:** making `hit_coal` identical to `hit_earth` fails the distinctness
+check; pointing `coal` at a voice the bank does not build fails the table-agreement check.
+
+**BUILT-PARKED, NOT DONE.** Whether these four are the right four sounds is a judgement no assertion in
+this repository can make. The table is arranged so that judgement is cheap to act on.

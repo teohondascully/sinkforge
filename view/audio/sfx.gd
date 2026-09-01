@@ -35,6 +35,17 @@ const DB_HOLLOW: float = -9.0
 
 ## The breach is one event rather than a reading, so it plays at a fixed level — the loudest thing the
 ## mining verb produces, because it is the payoff the crescendo was building to.
+## Material -> the strike it makes. `legacy/scenes/sfx.gd:29-35`, re-expressed in this build's own
+## material ids: legacy's `earth`/`gravel` are `clay` here, its three ore ids collapse to two plus the
+## reveal material, and `deepslate`/`sealrock` are `deepstone`. `hardrock` is deliberately ABSENT -- it is
+## the plain fracture, which is what `hollow` already is.
+const STRIKE: Dictionary = {
+	&"clay": &"hit_earth",
+	&"coal": &"hit_coal",
+	&"ore_copper": &"hit_metal", &"ore_iron": &"hit_metal", &"glimmer": &"hit_metal",
+	&"deepstone": &"hit_slate",
+}
+
 const BREACH_DB: float = -7.0
 const BREACH_PITCH: float = 1.0
 
@@ -63,6 +74,11 @@ func setup(seed_value: int = 20260901) -> void:
 	var rng: SplitRng = SplitRng.new(seed_value).split("sfx")
 	_streams[&"hollow"] = SfxBank.to_stream(SfxBank.hollow(rng))
 	_streams[&"breach"] = SfxBank.to_stream(SfxBank.breach(rng))
+	# Built from the BANK's own table rather than from `STRIKE`'s values, so the two dictionaries have to
+	# agree and a material mapped to a voice that does not exist is a refusal from `play` rather than a
+	# silent miss. `tests/test_sfx_driver.gd` asserts the agreement directly.
+	for voice: StringName in SfxBank.STRIKES:
+		_streams[voice] = SfxBank.to_stream(SfxBank.strike(rng, voice))
 	for _i: int in VOICES:
 		var player := AudioStreamPlayer2D.new()
 		add_child(player)
@@ -127,7 +143,25 @@ static func voice_for_frame(frame: Frame) -> Dictionary:
 	if obs.mining_hollow < Interface.HOLLOW_RING:
 		return {}
 	var v: Dictionary = voice_for_hollow(obs.mining_hollow, Interface.HOLLOW_FULL)
-	return {"voice": &"hollow", "at": at, "pitch": v["pitch"], "db": v["db"]}
+	return {"voice": strike_voice(obs.material_at(obs.mining_charging_cell)),
+		"at": at, "pitch": v["pitch"], "db": v["db"]}
+
+
+## THE STRIKE MAP, from `legacy/scenes/sfx.gd:26-35 STRIKE` (D0313). Legacy's reason is about a session
+## rather than a sound: *"an hour of digging soil, coal, ore and the deep band is not one noise several
+## hundred times over."*
+##
+## **THE FALLBACK IS `hollow`, AND THAT IS LEGACY'S STRUCTURE RATHER THAN A CONVENIENCE.** Legacy says an
+## absent material *"falls back to the plain `crunch`, which is itself the stone voice: a dry fracture"* --
+## the default is not silence and not a fifth voice, it is the one already there. So `hardrock` and
+## anything unmapped keep the exact behaviour they shipped with, and this file's existing branch
+## assertions in `tests/test_sfx_driver.gd` are untouched by the change.
+##
+## The pitch and the level still come from `voice_for_hollow`: WHAT you hit chooses the timbre, HOW
+## hollow the rock behind it is still chooses the pitch and the volume. Two different facts about one
+## blow, and legacy keeps them separate too.
+static func strike_voice(material: StringName) -> StringName:
+	return STRIKE.get(material, &"hollow")
 
 
 static func _cell_centre(cell: Vector2i, cell_px: int) -> Vector2:
