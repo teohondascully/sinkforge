@@ -24,6 +24,7 @@ func _initialize() -> void:
 	_test_particles_retire_and_the_layer_empties()
 	_test_a_busy_particle_layer_cannot_move_the_sim()
 	_test_a_real_break_actually_reaches_the_particle_layer()
+	_test_the_draught_warns_during_the_charge_not_after_the_break()
 	_finish("particles")
 
 
@@ -104,16 +105,96 @@ func _test_a_real_break_actually_reaches_the_particle_layer() -> void:
 	var particles: Particles = Particles.new()
 	var look: MaterialLook = MaterialLook.new()
 	var target: Vector2i = Vector2i(Body._px_to_cell(body.pos_x), FLOOR_ROW)
+	# The draught half of the feedback reads the OBSERVATION now (D0293), so this drives the real door
+	# rather than a hand-built one -- the same argument D0275 and D0287 make for their own consumers.
+	var iface: Interface = Interface.new(grid, body, mining)
 	var breaks: int = 0
 	for _i: int in Mining.ticks_to_break(&"clay") * 4:
 		body.tick(InputFrame.new(), grid)
 		mining.mine(grid, body.pos_x, body.pos_y, target, true)
 		if mining.broke_this_tick:
 			breaks += 1
-		DebugSceneCommon.step_mining_feedback(particles, mining, look, Heightfield.TERRAIN_CELL_PX, 0.0)
+		var obs: Interface.Observation = iface.observe(
+			Interface.Envelope.covering(Rect2(0.0, 0.0, float(GRID_W * Heightfield.TERRAIN_CELL_PX),
+			float(GRID_H * Heightfield.TERRAIN_CELL_PX)), 0))
+		DebugSceneCommon.step_mining_feedback(particles, mining, obs, look,
+			Heightfield.TERRAIN_CELL_PX, 0.0)
 		if breaks > 0:
 			break
 	_check(breaks > 0, "control: the cell really did break (%d breaks)" % breaks)
 	_check(particles.size() > 0,
 		"and the break reached the particle layer through the same call the scene makes (%d particles)" %
 		particles.size())
+
+
+## D0293. `docs/LEGACY_GAP.md` T1 #6 called the old draught "lifted and MIS-WIRED", and it was wrong four
+## ways at once — each of which reads as a plausible cue on its own, which is why none of them was caught
+## by looking at the screen. Every one of the four is a row here.
+##
+## Asserted against `draught_plan`, which returns the decision as data: `Particles` reports only its own
+## size, so a test written against the emitter could tell that SOMETHING was emitted and nothing about
+## where it went, which way it drifted, or how much of it there was.
+func _test_the_draught_warns_during_the_charge_not_after_the_break() -> void:
+	var cell := Vector2i(10, 20)
+	var cp: int = Heightfield.TERRAIN_CELL_PX
+	# (1) IT FIRES DURING THE CHARGE. The old wiring fired on `breach`, after the rock broke -- telling
+	# the player something they had just found out for themselves. The cue is a WARNING or it is nothing.
+	var charging: Interface.Observation = _hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_FULL / 2, true)
+	_check(not DebugSceneCommon.draught_plan(charging, cp).is_empty(),
+		"a swing into a hollow face during the charge produces a draught")
+	var broken: Interface.Observation = _hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_FULL / 2, true)
+	broken.mining_is_charging = false
+	broken.mining_broke = true
+	broken.mining_breach = true
+	_check(DebugSceneCommon.draught_plan(broken, cp).is_empty(),
+		"and the tick the rock BREAKS produces none -- the old wiring fired only here")
+	# (2) THE DIRECTION IS THE SWING'S, not hardcoded down.
+	var right: Dictionary = DebugSceneCommon.draught_plan(charging, cp)
+	var up: Dictionary = DebugSceneCommon.draught_plan(
+		_hollow_obs(cell, Vector2i(0, -1), Interface.HOLLOW_FULL / 2, true), cp)
+	_check(right["dir"] == Vector2(1, 0) and up["dir"] == Vector2(0, -1),
+		"the drift follows the swing direction (%s, %s), and is not hardcoded down"
+		% [right["dir"], up["dir"]])
+	# (3) IT SITS ON THE NEAR FACE, offset BACK along the swing from the cell's centre. A puff on the
+	# cell's own centre reads as dust coming out of the rock; this has to read as air drawn INTO it.
+	var centre: Vector2 = Vector2(float(cell.x) + 0.5, float(cell.y) + 0.5) * float(cp)
+	_check((right["at"] as Vector2).x < centre.x and is_equal_approx((right["at"] as Vector2).y, centre.y),
+		"a rightward swing places the puff LEFT of the cell's centre -- on the face being hit (%s vs %s)"
+		% [right["at"], centre])
+	_check((up["at"] as Vector2).y > centre.y,
+		"and an upward swing places it BELOW the centre (%s)" % up["at"])
+	_check((right["at"] as Vector2).distance_to(centre) < float(cp),
+		"and within the cell it belongs to (%.2f px of %d)" % [(right["at"] as Vector2).distance_to(centre), cp])
+	# (4) THE AMOUNT RIDES THE READING. `sim/mining/mining.gd` quotes legacy on exactly this: "closing on
+	# a cavity is a crescendo you can act on rather than a flag that flips". A fixed 6 IS the flag.
+	var faint: Dictionary = DebugSceneCommon.draught_plan(
+		_hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_RING, true), cp)
+	var loud: Dictionary = DebugSceneCommon.draught_plan(
+		_hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_FULL, true), cp)
+	_check(int(loud["amount"]) > int(faint["amount"]),
+		"a nearly-open face throws more dust than a barely-hollow one (%d vs %d)"
+		% [loud["amount"], faint["amount"]])
+	_check(int(faint["amount"]) > 0, "and the faintest audible reading still shows something (%d)"
+		% faint["amount"])
+	# The threshold itself, and the tick gate. Both are absences, so both need the positive control above.
+	_check(DebugSceneCommon.draught_plan(
+		_hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_RING - 1, true), cp).is_empty(),
+		"below the ring threshold there is no cue at all")
+	_check(DebugSceneCommon.draught_plan(
+		_hollow_obs(cell, Vector2i(1, 0), Interface.HOLLOW_FULL, false), cp).is_empty(),
+		"and on a charging tick that is NOT the swing there is none either -- per blow, not per tick, or "
+		+ "it is sixty a second")
+	_check(DebugSceneCommon.draught_plan(null, cp).is_empty()
+			and DebugSceneCommon.draught_plan(charging, 0).is_empty(),
+		"and neither a missing observation nor a missing cell size produces a puff at the origin")
+
+
+## An observation posing one charging swing at `cell`, hollow `reading`, swinging along `dir`.
+func _hollow_obs(cell: Vector2i, dir: Vector2i, reading: int, swinging: bool) -> Interface.Observation:
+	var o: Interface.Observation = Interface.Observation.new()
+	o.mining_is_charging = true
+	o.mining_charging_cell = cell
+	o.mining_swing_dir = dir
+	o.mining_hollow = reading
+	o.mining_swing = swinging
+	return o

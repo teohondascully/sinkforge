@@ -11996,3 +11996,58 @@ the one that was wrong.
 
 **Reverse cost:** put `CANVAS` back to 640x360 and drop the two converters; the chips read their numbers
 raw again.
+
+
+## D0293 · The draught was wrong in four ways at once, and each one looked plausible alone · 2026-08-31 · Lane E/G, LEGACY_GAP T1 #6
+
+`docs/LEGACY_GAP.md` T1 #6 called `particles.gd::draught` "lifted and **mis-wired**". Reading legacy's
+own site (`legacy/scenes/main.gd:1600-1609`) against ours, it was wrong four separate times:
+
+1. **It fired on BREACH — after the rock broke.** Legacy fires it during the CHARGE, while you are still
+   hitting a face with a void behind it. That is the whole cue: it is a WARNING. Firing it afterwards
+   tells the player something they have just found out for themselves.
+2. **Direction hardcoded down**, where legacy uses the true swing direction. `Mining.swing_dir` has been
+   public "specifically for this" since it was written and **nothing had ever called it** — the gap doc
+   names that directly.
+3. **Amount hardcoded 6**, where legacy's is `1 + int(2 * hollow)`. `sim/mining/mining.gd` already quotes
+   legacy on why: "closing on a cavity is a crescendo you can act on rather than a flag that flips." A
+   fixed 6 **is** the flag. The build carried the sentence and not the behaviour.
+4. **Placed on the broken cell's centre**, where legacy places it on the NEAR FACE, offset back along the
+   swing by 0.4 of a cell — so the air reads as being drawn INTO the wall rather than puffing out of it.
+
+Each of those reads as a plausible cue in isolation, which is why looking at the screen never caught it.
+
+**Gated on the SWING, not the tick**, for the reason D0279 records: legacy's ring, draught and pick
+animation all fire per blow, and per charging tick would be sixty a second.
+
+**`mining_swing_dir` and the hollow thresholds come through the door.** `mining_hollow`'s own note says a
+consumer given the magnitude "can derive the boolean" — true only if it also has the threshold, which
+lived on `HollowTell` in `sim/`. `Interface.HOLLOW_RING`/`HOLLOW_FULL` publish the scale with the reading.
+Deriving the swing direction a second time in the view would have been a second copy of something the sim
+already decided.
+
+**`draught_plan` returns the decision as data**, because `Particles` reports only its own size: a test
+written against the emitter can tell that SOMETHING was emitted and nothing about where it went, which
+way it drifted, or how much of it there was — which is exactly the blindness that let four wrong answers
+sit there. All four are rows in `tests/test_particles.gd` now.
+
+**Reverse cost:** delete `draught_plan`/`draught_for` and put the breach-gated call back; drop
+`mining_swing_dir` and the two threshold constants.
+
+
+## D0294 · `Interface.Envelope` moved to its own file — a cap met by splitting, not by trimming · 2026-08-31 · interface
+
+`interface/interface.gd` hit 414 of its 400-line cap when D0293 added three fields and their reasoning.
+`docs/QUALITY.md` §2 records what happens when a cap is met by shaving WHY-comments instead of splitting:
+`sim/body/body.gd` sat at exactly 400 for three commits running. So `Envelope` — always a self-contained
+thing that happened to live inside another one — became `interface/envelope.gd`, and the file went to 378.
+
+**No call site moved.** `interface.gd` holds `const Envelope = preload(...)`, so `Interface.Envelope`
+resolves exactly as before across all 21 uses.
+
+**It does carry a `class_name`, and the first attempt not to was wrong.** A script with no global name
+cannot name itself in a signature, so `oracle_over` and `covering` came out returning `RefCounted` — which
+silently threw away the type checking that is most of what those factories are for. The header says which
+name to use instead of relying on there being only one.
+
+**Reverse cost:** paste the class back and delete the const. Nothing else refers to the file.
