@@ -60,4 +60,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	# after the depth chip so the ceremony draws over the readout it is announcing, not under it.
 	view.add_hud().add_chip(DepthChip.paint)
 	view.add_hud().add_stateful_chip(ArrivalPlate.new(), &"paint")
+	# The legend keeps state too -- which verbs the player has demonstrated -- and it is added LAST so a
+	# ceremony never draws under it. It removes itself from the picture entirely once it is done.
+	view.add_hud().add_stateful_chip(KeyLegend.new(), &"paint")
 	return view
