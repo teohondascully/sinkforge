@@ -4,8 +4,11 @@ extends "res://tests/test_base.gd"
 ## `TrivialStub` is explicitly NOT `sim/` (its own docstring says so) and stays as a mechanism check for
 ## the hash-and-replay plumbing itself; THIS file is what gate 8 actually certifies now -- a real
 ## `ShaftGenerator`-generated `TileGrid` and a real `Body`, driven through `tests/
-## fixture_shaft_replay_probe.gd`'s ~20,000 ticks of seeded random input (jump/mantle/dig all real input
-## surface), run as TWO SEPARATE `OS.execute`d PROCESSES (not two in-process calls -- process-level
+## fixture_shaft_replay_probe.gd`'s ~20,000 ticks of seeded random input (jump/mantle/dig are all real
+## INPUT surface here -- D0281: what this suite ASSERTS is narrower than what it drives, and the two are
+## not the same claim; `_test_scenario_actually_jumps_and_digs_and_reports_the_rest` below is the
+## authority on which verbs `docs/QUALITY.md` gate 8 may be cited for), run as TWO SEPARATE
+## `OS.execute`d PROCESSES (not two in-process calls -- process-level
 ## nondeterminism, e.g. leaked static/global RNG state between calls in the same process, cannot show up
 ## in an in-process double-run the way it can across two independently-started engines).
 ##
@@ -26,6 +29,17 @@ extends "res://tests/test_base.gd"
 const FIXED_SEED: int = 20260826
 const EXPECTED_CHECKPOINTS: int = 200
 
+## **SUPERSEDED (D0281), and left in place rather than deleted because the re-pin history is the point of
+## these paragraphs.** THIS PARAGRAPH DOES NOT DESCRIBE THE ARRAY BELOW IT. The re-capture notes here are
+## stacked newest-first, and the D0269 paragraph two down broke that order by landing beneath this one:
+## `git log -S` on the array's own first element and on that paragraph's own text both name the SAME
+## commit, `8faddd0`, which is newer than this note's `4dd3626`. So the coverage tuple below --
+## `jumps=937 ... digs=206 corner_ok=11` -- belongs to a golden array that has since been replaced, and a
+## reader taking the topmost note as current gets numbers no run produces. Measured against the array
+## actually committed here: `jumps=847 mantles=0 stepups=0 digs=321 corner_ok=6 corner_unconsented=0`,
+## macOS, ALL PASS at all 200 of 200 checkpoints. **Whichever note is newest must say so from now on**;
+## this is the ledger's own "superseded draft above its amendment", in a docstring.
+##
 ## Re-captured 2026-08-31 from CI's OWN pinned Linux Godot build (job 99622409399), after D0258 ported
 ## legacy's five octaves into the cave field and re-derived `FASTNOISELITE_SD_CALIBRATION` against it.
 ## The world changed for the second time in one session, which is the expected and correct cost of a
@@ -167,7 +181,7 @@ func _initialize() -> void:
 	_test_same_seed_replays_bit_identical_across_two_processes(a, b)
 	_test_seed_plus_one_diverges_at_checkpoint_zero(a, c)
 	_test_matches_committed_golden_hashes(a)
-	_test_scenario_actually_exercises_jump_mantle_step_and_dig(a)
+	_test_scenario_actually_jumps_and_digs_and_reports_the_rest(a)
 	_finish("shaft_replay_determinism")
 
 
@@ -214,10 +228,14 @@ func _test_matches_committed_golden_hashes(a: Dictionary) -> void:
 
 
 ## The stub's own `_test_stub_state_actually_varies` proves its trivial state isn't frozen; this is that
-## same principle applied to jump/step/dig (mantle is reported, not gated -- see D0168 below) -- a
-## scenario that never once exercises them would make every check above pass vacuously on a body that
-## only ever falls or stands still.
-func _test_scenario_actually_exercises_jump_mantle_step_and_dig(a: Dictionary) -> void:
+## same principle applied to the verbs this scenario can actually stand behind. **ASSERTED: jumps, digs,
+## and zero unconsented corner nudges. REPORTED ONLY: mantles and step-ups**, each for its own reason
+## given at its own NOTE below. A prior version of this line said "jump/step/dig ... mantle is reported",
+## which was wrong about step-up in the same direction gate 8 was wrong about mantle (D0281) -- BOTH are
+## reports. A scenario that never once exercised the asserted verbs would make every check above pass
+## vacuously on a body that only ever falls or stands still; that is what the two `_check`s are for, and
+## it is the whole of what they establish.
+func _test_scenario_actually_jumps_and_digs_and_reports_the_rest(a: Dictionary) -> void:
 	_check(a.summary != "", "the golden run printed its own summary line (got none -- did it crash mid-run?)")
 	var jumps: int = 0
 	var mantles: int = 0
@@ -284,5 +302,9 @@ func _check_corner_consent(summary: String) -> void:
 		elif field.begins_with("corner_unconsented="): unconsented = int(field.trim_prefix("corner_unconsented="))
 	_check(unconsented == 0,
 		"no corner nudge moved the body in a direction it had no velocity for (got %d, was 2 before D0213)" % unconsented)
-	print("shaft_replay_determinism NOTE: corner_ok=%d on this platform (D0213: 11 locally, 18 before the " % ok +
-		"gate; the deletion-proofing pair lives in test_corner_consent.gd, which is platform-independent)")
+	# D0281: the two historic figures are labelled as history, not as what this platform produces now.
+	# They were measured against a different golden world (three re-pins ago) and this line read as a
+	# live claim about the local run, which was 6 the day that was noticed.
+	print("shaft_replay_determinism NOTE: corner_ok=%d on this platform now (D0213 measured 11 locally " % ok +
+		"and 18 before the gate, against the world of the day; the deletion-proofing pair lives in " +
+		"test_corner_consent.gd, which is platform-independent)")

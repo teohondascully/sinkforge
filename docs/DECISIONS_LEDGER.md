@@ -11712,3 +11712,50 @@ counter was added, so the instrumentation did not perturb the sweep it measures.
 
 **Reverse cost:** trivial. Drop the `corner_corrections` counter from the probe (one variable, one `if`,
 one format field) and restore gate 26's previous sentence. Nothing depends on the new field.
+
+## D0281 · Gate 8 claimed mantle coverage the suite has never asserted; narrowed until it is true · 2026-08-31 · Codex audit FIX 2
+
+**The defect, measured.** `docs/QUALITY.md` gate 8 described its subject as "a real
+`ShaftGenerator`+`TileGrid`+`Body` sim run (jumps/mantles/digs)". `tests/test_shaft_replay_determinism.gd`
+asserts `jumps > 0` and `digs > 0` and nothing about mantles: mantle and step-up are `print()` NOTEs, and
+this run measures `jumps=847 mantles=0 stepups=0 digs=321 corner_ok=6 corner_unconsented=0` (macOS, ALL
+PASS against the committed golden at all 200 checkpoints). A verb whose count is zero on the canonical run
+was being cited as covered by a green gate.
+
+**Decided: option (a), make the documentation match the code.** Gate 8 now names jumps and digs as what it
+covers, plus its hard zero on unconsented corner nudges, and says outright that mantle and step-up are not
+covered here. Option (b) — a real witness inside this scenario — was considered and rejected on the
+evidence already in the file: both verbs were downgraded to report-only BECAUSE they were platform-
+sensitive, this scenario's world comes from a generator D0167/D0168 measured to differ between macOS and
+CI's Linux, and D0209 established that all 11 step-ups this scenario ever produced were the airborne
+defect. Asserting step-up here would mean keeping a bug to keep an assertion green.
+
+**Where mantle actually lives, established by mutation rather than by citation.** No suite asserts a
+`mantled_this_tick` count directly — that was checked across the whole `tests/` tree, not assumed. The real
+coverage is `tests/test_body_acceptance.gd`'s `_test_reached_the_end`, and it is load-bearing rather than
+incidental: holding `mantle_hold` false in `ScriptedTraverse` takes that run from `mantles=1,
+reached_end=true, end_tick=225, ALL PASS` to `mantles=0, reached_end=false, end_tick=-1` and the suite to
+**5 FAILURE(S)** — the body stalls at the wall for 2851 ticks. The step it must clear is asserted by
+`tests/test_hostile_chamber.gd` to be exactly `MANTLE_PX` and taller than `STEP_UP_PX`, so only a mantle
+clears it. That indirection is a real remaining gap and gate 8 now names it instead of implying otherwise.
+Step-up's four suites were each RUN, not cited: `test_step_up_grounding`, `test_floor_source_telemetry`,
+`test_movement_course`, `test_body_acceptance` — all green here.
+
+**A second, unasked-for find in the same file, and it is the more dangerous shape.** The docstring's
+re-capture notes are stacked newest-first, and the newest one is not on top: `git log -S` on the golden
+array's own first element and on the D0269 paragraph's own text name the same commit, `8faddd0`, newer than
+the topmost note's `4dd3626`. So the topmost paragraph states a full coverage tuple —
+`jumps=937 ... digs=206 corner_ok=11` — for an array that has since been replaced, and a reader taking the
+top note as current gets numbers no run produces. That is the ledger's own "superseded draft above its
+amendment", in a docstring, and it is how a stale number survives review: it was true when written and
+nothing about it looks wrong. Marked in place rather than deleted, since the re-pin history is the point of
+those paragraphs. Two smaller instances of the same thing corrected alongside: the `corner_ok` NOTE read
+"11 locally" as a live claim when the local run is 6, and the coverage function was named
+`..._exercises_jump_mantle_step_and_dig` while asserting two of the four.
+
+**Deliberately NOT done.** No golden re-pin, no scenario change, no new assertion. Every edit here is
+prose, one function rename, and one `print()` string; the simulation and the 200-hash array are untouched,
+which is why this commit cannot move the gate it documents.
+
+**Reverse cost:** trivial and purely textual. Restore gate 8's one-line form, revert the docstring banner
+and the rename. No behavior to unwind.
