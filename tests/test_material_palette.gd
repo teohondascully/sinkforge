@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_every_generated_material_has_an_appearance_record()
 	_test_the_palette_is_deterministic_in_cell_coordinates()
 	_test_the_band_ladder_is_ordered_and_total()
+	_test_the_two_depth_conversions_agree_at_every_row()
 	_finish("material_palette")
 
 
@@ -182,3 +183,40 @@ func _test_the_band_ladder_is_ordered_and_total() -> void:
 		% look.band_at(MAX_ROW)["display_name"])
 	_check(String(look.band_at(-40)["display_name"]) == "OPEN SKY",
 		"a row above the surface datum reads as OPEN SKY (got %s)" % look.band_at(-40)["display_name"])
+
+
+## THE TWO DEPTH CONVERSIONS MUST AGREE, and for twenty metres they did not (D0301).
+##
+## `depth_m` floors to an int for the readout; `depth_m_exact` keeps the fraction for the tint. They are
+## the same measurement at two precisions, so `floor(exact)` must equal `depth_m` at every row — and it
+## did not, because D0252 wrote `depth_m_exact` as `row / CELLS_PER_METRE` when the surface datum was
+## row 0, and P017/D0292 moved the datum to row 80 while updating only the other one.
+##
+## Nothing failed. Every suite stayed green, the readout stayed correct, and the terrain quietly took its
+## zone tints twenty metres early — an instrument-shaped defect where the two halves of one quantity drift
+## apart and each looks right on its own. Asserted over the whole world rather than at a probe row,
+## because an offset is invisible at any single row you happen to pick.
+func _test_the_two_depth_conversions_agree_at_every_row() -> void:
+	var worst_row: int = -1
+	var worst: int = 0
+	for row: int in range(0, MAX_ROW):
+		var d: int = MaterialLook.depth_m(row)
+		var e: int = int(floor(MaterialLook.depth_m_exact(row)))
+		if absf(d - e) > worst:
+			worst = absi(d - e)
+			worst_row = row
+	_check(worst == 0,
+		"floor(depth_m_exact) == depth_m at all %d rows (worst disagreement %d m at row %d)"
+		% [MAX_ROW, worst, worst_row])
+	# ...and both must read ZERO at the datum itself, which is what makes them a DEPTH rather than a row
+	# index in disguise. Either one drifting off the datum is what D0301 was.
+	_check(MaterialLook.depth_m(MaterialLook.SURFACE_ROW) == 0,
+		"depth_m is 0 at the surface datum (got %d)" % MaterialLook.depth_m(MaterialLook.SURFACE_ROW))
+	_check(is_zero_approx(MaterialLook.depth_m_exact(MaterialLook.SURFACE_ROW)),
+		"depth_m_exact is 0.0 at the surface datum (got %.3f)"
+		% MaterialLook.depth_m_exact(MaterialLook.SURFACE_ROW))
+	# The sky above the datum reads NEGATIVE in both, deliberately -- legacy's own rule, "standing on a
+	# hilltop reads as a negative depth rather than a clamped zero, so the number is never fudged."
+	_check(MaterialLook.depth_m(0) < 0 and MaterialLook.depth_m_exact(0) < 0.0,
+		"both read negative above the datum (%d, %.1f)"
+		% [MaterialLook.depth_m(0), MaterialLook.depth_m_exact(0)])
