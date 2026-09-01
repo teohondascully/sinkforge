@@ -66,10 +66,31 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
 ### Correctness
 
 8. **Determinism.** `test_shaft_replay_determinism` green -- a real `ShaftGenerator`+`TileGrid`+`Body`
-   sim run (jumps/mantles/digs), replayed bit-identical across two separate OS processes, checked
-   against committed golden hashes (`docs/DECISIONS_LEDGER.md` D0165). `test_replay_determinism`'s own
-   stub remains a standing mechanism check for the hash-and-replay plumbing itself, not this gate's
-   subject.
+   sim run, replayed bit-identical across two separate OS processes, checked against committed golden
+   hashes (`docs/DECISIONS_LEDGER.md` D0165).
+
+   **The verbs this gate covers are JUMPS and DIGS.** Those are the two the suite asserts (`jumps > 0`,
+   `digs > 0`), alongside a hard zero on unconsented corner nudges. **Mantle and step-up are NOT covered
+   here**, and this line claimed they were until D0281: the suite prints a NOTE for each and asserts
+   neither, because both measure zero on CI's own canonical run -- mantle to the platform-float gap
+   D0167/D0168 found in `ValueNoise`, and step-up because D0209 established that all 11 step-ups this
+   scenario had ever produced were the airborne defect, so asserting it would mean keeping the bug to keep
+   the assertion green. Narrowed rather than repaired: a witness for either verb inside THIS scenario would
+   have to be platform-independent, and the scenario's world comes from a generator already measured to
+   differ between macOS and CI's Linux.
+
+   Their real coverage, each verified green rather than cited from memory (D0281) -- **step-up**:
+   `tests/test_step_up_grounding.gd`, `tests/test_floor_source_telemetry.gd`'s
+   `_test_auto_step_up_names_try_step`, `tests/test_movement_course.gd`, and `tests/test_body_acceptance.gd`'s
+   `step_up_success_rate`. **Mantle**: `tests/test_body_acceptance.gd`'s `_test_reached_the_end`, which is
+   load-bearing rather than incidental -- mutation-tested in D0281, holding `mantle_hold` false in
+   `ScriptedTraverse` takes that run to `mantles=0, reached_end=false` and the suite to 5 FAILURE(S) --
+   over a step `tests/test_hostile_chamber.gd` asserts is exactly `MANTLE_PX` and taller than `STEP_UP_PX`,
+   so only a mantle clears it. **No suite asserts a `mantled_this_tick` count directly**; that indirection
+   is the shape of the remaining gap, named here so the next reader does not have to rediscover it.
+
+   `test_replay_determinism`'s own stub remains a standing mechanism check for the hash-and-replay
+   plumbing itself, not this gate's subject.
 9. **Conservation.** Property test: over 10,000 random ticks with fuzzed commands, total material is conserved modulo declared sinks.
 10. **No softlock.** From any reachable state, the player can reach the surface.
 11. **Movement acceptance suite** green against the hostile chamber. See `docs/ARCHITECTURE.md` §9.
