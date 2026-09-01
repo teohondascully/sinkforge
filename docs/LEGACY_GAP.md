@@ -77,7 +77,16 @@ world-furniture HUD set is buildable with **no new sim accessors at all**.
 
 Ranked before any feature, because each one blocks a large fraction of the backlog and each is small.
 
-### PRE-1 · `Frame.anim_time` is a `const 0.0` — 28+ rows are inert until it moves
+**Three of the four are now closed** (D0277, D0279/D0293, D0308) and this section had recorded none of
+it — the closures were made by the sessions working those lanes, and updating the prerequisite list
+belongs to no lane. **PRE-2, the `Fx` vector layer, is the only one still open**, and it is the one that
+gates the grapple. Verified in the tree 2026-09-01: `core/fixed_point.gd` still has no `normalize`,
+`dot` or `limit_length`.
+
+### PRE-1 · CLOSED 2026-08-31 by D0277 · `Frame.anim_time` is a `const 0.0` — 28+ rows are inert until it moves
+
+**CLOSED.** `WorldView.anim_time()` returns `_anim_ticks * SECONDS_PER_TICK`, with `reset_anim_clock()` preserving Q5's original guarantee for captures. Option (1) of `docs/NEEDS_DIRECTOR.md` P025, the cosmetic tick counter.
+
 `view/world_view.gd:28`. Q5 was ruled "pin it", correctly, when nothing animated. Every animated
 capability in the backlog — every working-machine glyph, the construction overlay, the status pulse, the
 need bubble, rope sway, payout rise, godrays, glint flares, the lamp flicker, surface life — ports and
@@ -93,7 +102,10 @@ Fx literals — `1.05*65536 → 68812` and `1/1.05*65536 → 62415` are not inve
 reel/pay sequence biases tangential speed down by ~1.6e-5 per pair. Store the rational `21/20` and use
 integer mul/div, exactly as `AIR_CONTROL_NUM/DEN` and `Mining.REACH_NUM/DEN` already do.
 
-### PRE-3 · The mining sim computes three things it throws away at L2
+### PRE-3 · CLOSED 2026-08-31 by D0279/D0293 · The mining sim computes three things it throws away at L2
+
+**CLOSED.** `observe()` reads `_mining`; the `Observation` carries the cracks, the break, the hollow reading as an **int**, the breach, and the swing as an **edge** with a direction and a phase. All three of the wanted extras landed with it.
+
 `sim/mining/mining.gd` holds `charging_cell`, `banked(cell)`, `cracked_cells()`, `broke_this_tick`,
 `broke_material`, `broke_cells`, `breach_this_tick` — and **`Interface.observe()` reads `_grid` and
 `_body` and never touches `_mining`.** Every mining feedback capability in the backlog (cracks, crumble,
@@ -102,7 +114,10 @@ Two more fields are wanted while that door is open: the hollow reading as an **i
 boolean `breach_this_tick` (both audio laws are functions of the magnitude), and a **swing edge**, because
 legacy's ring fires per *blow* and the repetition is what makes the tell rise rather than flip.
 
-### PRE-4 · `world_seed` is not on the `Observation`
+### PRE-4 · CLOSED 2026-09-01 by D0308 · `world_seed` is not on the `Observation`
+
+**CLOSED, and its first caller shipped with it.** `Observation.world_seed` is one `int` copied from `TileGrid.seed`, and `view/visuals/seam_painter.gd` is the first thing in this repository ever to call `Seams.at` — the grain reveal at the worked cell, ported from `world_renderer.gd:2262-2344`.
+
 `core/seams.gd` is fully ported, integer-exact over all 196,608 inputs, and — by its own header —
 **called by nothing** except `sky_painter`'s starfield hash. `Seams.at(cell, world_seed)` needs the seed;
 `TileGrid.seed` exists and `Observation` does not carry it. One `int` field unblocks the seam-grain
@@ -130,7 +145,7 @@ the legacy address given; the addresses are the durable artifact of this pass.
 | **1** | **The miner sprite** | `player.gd:664-793`, `legacy/assets/sprites/*.png`, `legacy/tools/bake_miner.gd` | The body is a red rectangle. This is the single most player-visible gap in the project, and it is **far cheaper than anyone thought** — see below. | nothing | 120 | **LANDED (D0268/D0269); the discovery glint on it, D0300.**
 | **2** | **The veil: mass occlusion + key light** | `world_renderer.gd:3002-3051 _bake_openness` | ~50 lines, four linear passes over a flat float array, no engine types. It is what makes carved space read AS space: measured 0.182 vs 0.052 luma against a row-gradient's 0.148 vs 0.127 — a 3.5x separation where the naive version gives 1.2x. | ~~window-vs-world scope decision~~ **NOT A DECISION — a measurement, and the answer is 9 cells** (D0302). The blur is separable with a bounded reach, so a drawn cell depends on the observation `REACH + 1` out; `WorldView.WINDOW_MARGIN_CELLS` went 3 → 9. | **LANDED 2026-09-01 (D0302), lamp D0306** |
 | **3** | **The wall plane, drawn** | `world_renderer.gd:2194-2260 _draw_background`, `2685-2766 _wall_*` | `Interface.observe()` already ships `walls`/`wall_legend`, `test_interface.gd` asserts it, and **zero renderers read it**. The dug space in every capture is a flat fill. Recess AO is 4 neighbour lookups: `WALL_AO_UNDER 0.62`, `SIDE 0.34`, `ABOVE 0.16`. | a terrain painter on the coordinator | 65 | **LANDED (D0286); the mineral mark in that plane, D0299.**
-| **4** | **Terrain painter onto `WorldView`** | `terrain_painter.gd` (438) | `reveal_scene._draw` draws one `draw_rect` per cell; `WorldView` carries exactly one painter (sky) and only under `--sky`. Moving terrain onto the coordinator is the structural unlock for every painter below it. | nothing | 90 |
+| **4** | **Terrain painter onto `WorldView`** | `terrain_painter.gd` (438) | `reveal_scene._draw` draws one `draw_rect` per cell; `WorldView` carries exactly one painter (sky) and only under `--sky`. Moving terrain onto the coordinator is the structural unlock for every painter below it. | nothing | 90 | | **LANDED (D0276): `tests/body/reveal_view_setup.gd` builds the REAL coordinator and every painter since — wall, veil, glint, seam — hangs off it.**
 | **5** | **Mine cracks + crumble** | `world_renderer.gd:944-968`, `2471-2502` | The sim side is *already computed and discarded*. Cracks are `2 + int(frac*5)` deterministic elbowed fractures per cell; crumble is four quadrant chunks over `CRUMBLE_DUR 0.24`. Mining currently has no feedback at all. | PRE-1, PRE-3 | 55 | **LANDED (D0275 cracks, D0289 crumble).**
 | **6** | **The hollow ring + breach + draught** | `main.gd:1600-1609`, `1671-1678`; `sfx.gd:732-764` | `sim/mining/hollow_tell.gd` is written, tested, correct, and **`HollowTell.RING` is referenced by nothing.** `particles.gd::draught` is lifted and **mis-wired** (fires on breach after the break, direction hardcoded down, amount hardcoded 6, where legacy fires it during the charge at the near face along the true swing direction). `Mining.swing_dir()` is public *specifically* for this and nothing calls it. | PRE-3 | 45 | **LANDED (D0293/D0296).**
 | **7** | **`UiTheme` + `PageSurface`** | `ui_theme.gd` (236), `page_surface.gd` (81) | 16 colour tokens, each carrying a measured WCAG ratio and a rejected alternative. This is a design asset a rewrite cannot recover by trying harder, and it is the whole of "the menus read 2026". One dependency, both LIFT. | a `CanvasLayer` host | 325 |
