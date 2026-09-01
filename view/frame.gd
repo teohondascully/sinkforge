@@ -28,10 +28,14 @@ extends RefCounted
 ## is where a painter author meets it.
 var obs: Interface.Observation
 
-## The cosmetic clock. **PINNED, and pinned on purpose** (Q5, ruled): this build starts underground and
-## a day cycle would be invisible, so no time system was authored. `WorldView.ANIM_TIME` is the single
-## fixed value every frame carries. Painters may read it and animate against it; they will simply see it
-## never move. If sky variation is wanted later it is depth-driven, not wall-clock-driven.
+## The cosmetic clock, in seconds. **A DETERMINISTIC TICK COUNTER, never a wall clock** (D0277, on the
+## director's ruling re-opening Q5). It advances one `SECONDS_PER_TICK` per rendered tick, so an
+## animation moves for a player watching it while two captures of the same tick remain byte-comparable —
+## which `docs/QUALITY.md`'s whole screenshot discipline depends on.
+##
+## A painter may animate against this freely. What it may NOT do is treat it as a time of day: there is
+## no day cycle, this build starts underground, and sky variation was ruled depth-driven rather than
+## clock-driven. This is a cosmetic phase, not a calendar.
 var anim_time: float = 0.0
 
 ## The camera's world-space rectangle in pixels, already margined. Painters cull against this rather

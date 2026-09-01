@@ -34,6 +34,7 @@ func _initialize() -> void:
 	_test_the_world_edge_does_not_read_as_a_cavity()
 	_test_the_tell_normalisation_reproduces_legacys_own_constant()
 	_test_the_hollow_magnitude_survives_the_tick_that_computes_it()
+	_test_the_pick_lands_on_a_cadence_that_quickens_with_rhythm()
 	_finish("mining")
 
 
@@ -289,3 +290,66 @@ func _test_the_hollow_magnitude_survives_the_tick_that_computes_it() -> void:
 	loud.mine(hollow_grid, body_x, body_y, face, false)
 	_check(loud.hollow_this_tick == 0,
 		"a tick that works nothing clears the reading (%d)" % loud.hollow_this_tick)
+
+
+## D0279 (`docs/NEEDS_DIRECTOR.md` P024, director-ruled): the swing edge, ported from legacy's
+## `SWING_PERIOD` / `RHYTHM_SWING` rather than invented. The properties that matter are all about WHEN it
+## fires, so every one of them is measured by counting edges over a run of ticks rather than by reading
+## the flag once.
+func _test_the_pick_lands_on_a_cadence_that_quickens_with_rhythm() -> void:
+	var grid: TileGrid = _solid_grid(&"deepstone")
+	var body_x: int = Fx.from_int(32 * CELL)
+	var body_y: int = Fx.from_int(30 * CELL)
+	var face := Vector2i(32, 32)
+	var m: Mining = _charge_mechanic_mining()
+
+	# THE FIRST BLOW LANDS INSTANTLY. Legacy primes `_swing_clock` on release for exactly this: a player
+	# who taps mine should feel the pick hit, not wait a quarter second for the cadence to come round.
+	m.mine(grid, body_x, body_y, face, true)
+	_check(m.swing_this_tick, "the first tick of a fresh charge lands a blow immediately")
+
+	# ...and then NOT on the very next tick, which is the half that separates an edge from a level. A
+	# `swing_this_tick` wired to `charging_cell != NO_CELL` would pass the row above and fail this one.
+	m.mine(grid, body_x, body_y, face, true)
+	_check(not m.swing_this_tick, "and the tick straight after it does not -- this is an edge, not a level")
+
+	# The cadence itself. On a FRESH `Mining`, so the count starts at the blow rather than partway through
+	# a period -- the first version measured 15 against a period of 16 because the two assertions above had
+	# already consumed a tick, which is a bug in the counting and not in the cadence.
+	var cadence: Mining = _charge_mechanic_mining()
+	var idle_period: int = cadence.swing_period_ticks()
+	cadence.mine(grid, body_x, body_y, face, true)
+	_check(cadence.swing_this_tick, "sanity: the fresh painter's first tick is the blow we count from")
+	var gap: int = 0
+	while gap < idle_period * 3:
+		cadence.mine(grid, body_x, body_y, face, true)
+		gap += 1
+		if cadence.swing_this_tick:
+			break
+	# Compared against `swing_period_ticks()` rather than a literal: a literal would assert the test's own
+	# arithmetic instead of legacy's 0.28s/60Hz conversion.
+	_check(gap == idle_period,
+		"the next blow lands exactly %d ticks later, the period at this rhythm (got %d)" % [idle_period, gap])
+
+	# RHYTHM SHORTENS IT. Posed by driving the rhythm up with real breaks rather than by writing to
+	# `_rhythm`, so this measures the mechanism legacy shipped and not a field poke.
+	var fast: Mining = Mining.new()
+	var soft: TileGrid = _solid_grid(&"topsoil")
+	var breaks: int = 0
+	var ticks: int = 0
+	# Columns spaced past the default bite's own diameter. At `DEFAULT_BITE_RADIUS` a blow clears a disc
+	# of neighbours, so consecutive columns would already be air by the time the next one is aimed at --
+	# the loop would then never charge again and the rhythm would sit at whatever one break gave it.
+	# Found by measuring: the first version of this reached 1 break in 4000 ticks.
+	var spacing: int = Mining.DEFAULT_BITE_RADIUS * 2 + 2
+	while breaks < 6 and ticks < 4000:
+		var col: int = 30 + breaks * spacing
+		if fast.mine(soft, Fx.from_int(col * CELL), body_y, Vector2i(col, 32), true) != Mining.NO_CELL:
+			breaks += 1
+		ticks += 1
+	_check(breaks == 6, "sanity: the rhythm was actually driven up by real breaks (%d of 6)" % breaks)
+	var quick_period: int = fast.swing_period_ticks()
+	_check(quick_period < idle_period,
+		"a built-up rhythm shortens the swing period (%d ticks vs %d at rest)" % [quick_period, idle_period])
+	_check(quick_period > 0,
+		"and never to zero, which would fire a blow every single tick (%d)" % quick_period)

@@ -111,12 +111,31 @@ func _test_the_frame_carries_the_ruled_contract() -> void:
 	_check(f.look != null, "the palette is on the frame, so a painter never constructs one")
 	_check(f.marks.is_empty(),
 		"marks is empty in this build -- no objectives and no build ghost exist to clear stars for")
-	_check(f.anim_time == WorldView.ANIM_TIME and WorldView.ANIM_TIME == 0.0,
-		"the cosmetic clock is pinned (Q5 ruled): anim_time=%f" % f.anim_time)
+	# D0277 RE-PINS THIS RATCHET RATHER THAN LOOSENING IT. It asserted `anim_time == 0.0` forever, which
+	# was Q5's ruling and was correct while nothing animated. The director re-opened it, so the property
+	# under test changed -- from "the clock never moves" to "the clock moves, deterministically, and only
+	# because a tick was rendered". Deleting the assertion would have been the loosening; this is the same
+	# subject at its new value.
+	_check(f.anim_time > 0.0,
+		"the cosmetic clock advances once a tick has been rendered (anim_time=%f)" % f.anim_time)
 	var before: float = f.anim_time
 	view.refresh()
-	_check(view.current_frame().anim_time == before,
-		"and a second refresh does not advance it -- there is no time source to advance")
+	var after: float = view.current_frame().anim_time
+	_check(after > before,
+		"and a second refresh advances it further (%f -> %f)" % [before, after])
+	_check(is_equal_approx(after - before, WorldView.SECONDS_PER_TICK),
+		"by exactly one tick's worth -- a wall clock would give an arbitrary delta here, and that is the "
+		+ "difference the ruling turned on (%f vs %f)" % [after - before, WorldView.SECONDS_PER_TICK])
+	# THE DETERMINISM HALF, which is the reason this is a counter and not `Time.get_ticks_msec()`: the
+	# same number of rendered ticks must give the same clock, or two captures of one tick stop being
+	# comparable and every screenshot in `docs/QUALITY.md`'s discipline becomes a fresh sample.
+	view.reset_anim_clock()
+	view.refresh()
+	_check(is_equal_approx(view.current_frame().anim_time, before),
+		"and resetting then re-rendering reproduces the earlier value exactly (%f vs %f)"
+		% [view.current_frame().anim_time, before])
+	_check(WorldView.PINNED_ANIM_TIME == 0.0,
+		"the pinned value a test poses for a still frame is still available, and is still zero")
 	## Wider than the margin ALONE, which is the assertion the first draft of this suite failed to make:
 	## `size > 0` is true of a window that is nothing but margin over a zero-sized viewport.
 	##

@@ -11388,3 +11388,116 @@ would make the gap doc lie about what is done.
 
 **Reverse cost:** the painters delete as a unit and `RevealTerrainDraw` comes back from git. The ±60/120
 caps come back with it, and the wide view needs its special case again.
+## D0277 · The cosmetic clock un-pinned — a deterministic tick counter, not a wall clock · 2026-08-31 · P025 ruled, LEGACY_GAP PRE-1
+
+`view/world_view.gd` carried `const ANIM_TIME: float = 0.0`, and Q5 had ruled that correctly: the build
+starts underground, no time system was authored, and a clock nothing could use is a field that only
+drifts. It was a `const` rather than a `var` specifically so "the clock does not advance" was a property
+of the type instead of a promise in a comment.
+
+**What changed is that the animated backlog arrived.** `docs/LEGACY_GAP.md` PRE-1 counts **28+ rows**
+that port, are correct, and then sit frozen — crumble chunks, the status pulse, working-machine glyphs,
+the construction overlay, the need bubble, rope sway, payout rise, godrays, glint flares, the lamp
+flicker, surface life. Every one would be `view/visuals/art.gd` again: shipped, tested, referenced by
+nothing.
+
+**A TICK COUNTER, NOT A WALL CLOCK, and that is the whole of the ruling.** Legacy used
+`Time.get_ticks_msec()`. Two captures of the same tick would then differ, and this project's entire
+screenshot-comparison discipline rests on the renderer being a function of state. Counting rendered ticks
+means `--screenshot-tick=N` reproduces yesterday's frame exactly while an animation still advances for a
+player watching it. The third candidate — depth-driven variation — was right for sky ambience and cannot
+carry a timed one-shot like a 0.24s crumble, so it was not the mechanism for this.
+
+`SECONDS_PER_TICK` is the fixed 60Hz cadence expressed as a duration, **not a measured frame time**. A
+measured `delta` would reintroduce exactly the run-to-run variation the counter exists to remove.
+
+**The ratchet in `test_world_view` was MOVED, not loosened.** It asserted `anim_time == 0.0` forever,
+which was true and load-bearing while nothing animated. The subject changed — from "the clock never
+moves" to "the clock moves, deterministically, and only because a tick was rendered" — so the assertion
+changed with it: advances on refresh, advances by exactly one tick's worth (a wall clock gives an
+arbitrary delta there, which is the difference the ruling turned on), and reproduces its earlier value
+after a reset. Deleting the assertion would have been the loosening. `PINNED_ANIM_TIME` survives as the
+value a test poses for a still frame, because a painter asserted at an arbitrary clock value is asserting
+the clock.
+
+**Reverse cost:** restore the `const`. Crumble stops animating and the 28 rows go back to frozen.
+
+
+## D0278 · Rock shatters when it breaks — crumble, the half of T1 #5 that needed a clock · 2026-08-31 · Lane E
+
+Ported from `legacy/scenes/world_renderer.gd:2471-2502`. Held back at D0275 because it needs a clock;
+D0277 supplied one.
+
+**It keeps state, which no other painter here does, and that is inherent.** A crumble outlives the tick
+that caused it — the break is one event, the animation is fifteen frames. So it is an instance with a
+list and `paint` is a bound method; `PaintLayer.bind_to` takes a `Callable`, so that drops straight in.
+
+**It spawns from the FRAME rather than being poked.** Legacy has `MainView` call `note_mined()`. Here
+`obs.mining_broke_cells` already arrives through the L2 door (D0274), so there is no second path that
+could disagree with the first. The guard making that safe is the tick check: **Godot redraws a canvas for
+reasons the coordinator did not initiate** — a resize, a focus change — and each hands the painter the
+same observation again. Without it, every such redraw re-spawns the same debris, and the bug appears only
+on someone else's machine when they resize a window. Spawning is gated on the observation's TICK, not on
+the draw. The suite asserts both halves: five redraws of one tick spawn nothing further, AND the next
+tick still spawns, because a guard that blocked everything after the first would pass the first check.
+
+**Age is derived, not accumulated.** Legacy mutates an `age` field every frame. This stores the spawn
+time and subtracts, so there is no per-frame ageing pass to forget, a redraw cannot advance the
+animation, and the whole thing is a pure function of `(list, anim_time)` — which is what makes it
+assertable at all.
+
+**`advance()` is split out of `paint()` because Godot refuses `draw_rect` outside a node's own `_draw()`.**
+The first lifecycle test went through `paint` and the masked-crash detector failed it with exactly that
+engine error — D0149's sibling doing its job on my own test. The split is better on its own terms and is
+the same one `view/hud/depth_chip.gd` makes: the lifecycle is the part that can be wrong (spawning per
+redraw, never retiring, dropping the newest), the drawing is a transcription.
+
+**Sizes are fractions of the cell, never legacy's pixels.** `t * 5.0` and `t * t * 11.0` were written
+against a 32px cell; on a 4px cell they would throw debris eight cells clear of the hole it came from.
+Carried as 5/32 and 11/32, so this file is correct at either denomination and survives whatever WG-4 is
+ruled to be — the same approach `view/visuals/crack_painter.gd` took.
+
+**Reverse cost:** delete the painter and its suite. Mining goes back to rock vanishing silently.
+
+
+## D0279 · The pick lands on a cadence, and it quickens with rhythm · 2026-08-31 · P024 ruled, LEGACY_GAP PRE-3
+
+**I nearly invented this, and legacy already had it.** `docs/NEEDS_DIRECTOR.md` P024 laid out three
+candidate cadences as though the mechanism were an open design question. It is not:
+`legacy/scenes/main.gd:216` has `SWING_PERIOD = 0.28`, `:234` has `RHYTHM_SWING = 0.55`, and `:1587`
+fires a blow when `_swing_clock >= SWING_PERIOD / (1.0 + _rhythm * RHYTHM_SWING)`. The director ruled the
+rhythm-driven option, which turns out to be the port. A reminder that the first move on any "design
+question" here is to go and read what legacy did — `docs/MASTER_PLAN_AUG30.md` §0.
+
+**Converted, not re-picked.** 0.28s at a fixed 60Hz is 16.8 ticks, carried x100 so the division stays
+integer and identical on every machine; `RHYTHM_SWING = 0.55` is the rational 11/20. **Measured at both
+ends: 16 ticks at rest, 10 at full rhythm** — a blow every 0.27s becoming one every 0.17s, which is the
+speed-up legacy called "visible and audible". This is `Mining._rhythm`'s **first outward sign**: it has
+been ported, tested and correct while affecting nothing a player could see or hear.
+
+**An EDGE, not a level, and the suite separates them.** `swing_this_tick` wired to
+`charging_cell != NO_CELL` would satisfy "the first tick lands a blow" and fail "the tick straight after
+it does not". Both are asserted.
+
+**The counter starts PRIMED, not at zero, and a test caught that before it shipped.** Legacy sets
+`_swing_clock = SWING_PERIOD` on release so a fresh charge's first blow lands instantly. A
+freshly-constructed `Mining` is in that same state, and initialised at zero the very first tap of the
+mine button swung at nothing for a quarter second.
+
+**`_swing_ticks` is deliberately NOT in `state_signature()`.** It is a pure function of `_rhythm` and of
+whether a cell was workable, both already covered, and it cannot change which cell breaks when. Including
+it would re-pin `GOLDEN_HASHES` for a counter that could not cause a divergence it would be the only
+witness to — and the determinism suite stayed green through this change, which is the check on that
+reasoning rather than the reasoning itself.
+
+**One measurement fixture was wrong and said so loudly.** Driving the rhythm up by breaking consecutive
+columns reached **1 break in 4000 ticks**: at the default bite radius a blow clears a disc of neighbours,
+so the next column was already air and never charged. Spaced past the bite's diameter it reaches 6 of 6.
+The failure was in the fixture, not the subject, and the number is what showed it.
+
+**What is NOT here:** the hollow ring itself. There is no SFX system in this build — `view/audio/` holds
+only `Score` — so the ring is its own unit (`legacy/scenes/sfx.gd:732-764`). The swing edge is the thing
+it was blocked on, and it now also unblocks the draught's re-wiring (T1 #6).
+
+**Reverse cost:** drop `swing_this_tick`, `_swing_ticks` and `swing_period_ticks()`. T1 #6 goes back to
+having no per-blow edge to fire on.
