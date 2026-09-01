@@ -129,3 +129,11 @@ func draw(canvas: CanvasItem) -> void:
 		col.a = clampf(t, 0.0, 1.0)
 		var s: float = float(q["size"]) * (0.4 + 0.6 * t)           # shrink as it dies
 		canvas.draw_rect(Rect2(Vector2(q["pos"]) - Vector2(s, s) * 0.5, Vector2(s, s)), col)
+
+
+## The live particles, as data. Exists so `tests/test_particles.gd` can compare two fields particle for
+## particle rather than only counting them (D0304) — a count is equal between a field that reproduced and
+## one that was regenerated differently, which is exactly the property under test. Returns the array
+## itself rather than a copy: every caller is a test, and a copy would only hide an accidental mutation.
+func snapshot() -> Array[Dictionary]:
+	return _p

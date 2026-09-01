@@ -58,6 +58,8 @@ var _recording: Array[PackedStringArray] = []
 var _camera: Camera2D
 var _finished: bool = false
 var _screenshot_tick: int = -1
+## Set for the duration of the shutter's awaits, so the world holds still while the pixels are read.
+var _shutter_held: bool = false
 var _screenshot_path: String = ""
 var _target_glimmer_col: int = -1
 var _camera_zoom: float = 6.0
@@ -114,6 +116,18 @@ func _ready() -> void:
 		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
 		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
 	_build_view()
+	# THE GLOBAL RNG IS SEEDED FROM THIS RUN'S OWN SEED (D0304), and it is the last thing standing
+	# between a capture and being reproducible. `view/fx/particles.gd` uses `randf_range` and its header
+	# argues correctly that this is safe: a particle never feeds back into the sim, so it cannot make a
+	# replay diverge. That argument names the SIM as its frame and is silent about the other one -- an
+	# unseeded global RNG also means no two screenshots of the same commit at the same tick can ever be
+	# compared, and capture-diffing is the instrument that found the crumble painter never drawing
+	# (D0289) and the glint's population being 93% short (D0300). Measured: 33,572 pixels of the `aim`
+	# moment moved between two runs of one commit, all of it chip debris.
+	#
+	# Seeded here rather than in `particles.gd`, because the file is a verbatim lift and `randf` is where
+	# legacy put it. What was missing was not a different RNG; it was anyone deciding where it starts.
+	seed(hash(_seed_value))
 	_sfx = Sfx.new()
 	add_child(_sfx)
 	_sfx.setup(_seed_value)
@@ -148,7 +162,7 @@ func _parse_args() -> Dictionary:
 
 
 func _physics_process(delta: float) -> void:
-	if _finished:
+	if _finished or _shutter_held:
 		return
 	if _sky_view != null:
 		_sky_view.refresh()
@@ -170,6 +184,9 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 	if _screenshot_tick >= 0 and _tick_count == _screenshot_tick:
+		# Held across the shutter's awaits so the world stops while the pixels are read; the reason,
+		# and the numbers, are in `tests/body/reveal_shutter.gd` (D0304).
+		_shutter_held = true
 		await RevealShutter.capture(self, _screenshot_path, _tick_count, _camera, _camera_zoom, _body)
 		_flush_recording()
 		get_tree().quit(0)
@@ -329,37 +346,12 @@ func _draw() -> void:
 	# The band-tinted backdrop moved to `view/visuals/backdrop_painter.gd` (D0276) -- it is the bottom of
 	# the painter stack now, not a fill in this node's own draw call. It covered the terrain painter the
 	# moment terrain moved, which is D0244's finding one layer down; the painter's header carries it.
-	_draw_body()
+	RevealBodyDraw.draw(self, _body, _last_input, _tick_count,
+		_sky_view.current_frame() if _sky_view != null else null, COLOR_BODY, COLOR_BODY_GROUNDED)
 	# Drawn last so the reach ring and reticle sit over the terrain and the body rather than under them.
 	MiningOverlay.draw(self, _grid, _mining, _body.pos_x, _body.pos_y,
 		_last_input.has_aim, Vector2i(_last_input.aim_col, _last_input.aim_row))
 	_particles.draw(self)  ## D0216: last, so chips and the draught sit over the terrain they came from
-
-
-## The miner: sprite if one resolves, the primitive rectangle if not. See `MinerLook` for why the dig
-## pose reads the INPUT rather than the dig event, and why the rectangle path stays.
-func _draw_body() -> void:
-	var left: float = float(_body._left_x()) / float(Fx.SCALE)
-	var top: float = float(_body._top_y()) / float(Fx.SCALE)
-	# The swing phase comes through the L2 door rather than off `_mining` directly, even though this scene
-	# holds both: D0287's whole claim is that the pick animation is a function of the SIM's swing, and
-	# reading the sim object here would draw the identical picture while proving none of that. A frame the
-	# coordinator has not built yet leaves the sentinel, and the animation falls back to legacy's clock.
-	var swing_phase: int = MinerLook.SWING_PHASE_NONE
-	var frame: Frame = _sky_view.current_frame() if _sky_view != null else null
-	if frame != null and frame.obs != null:
-		swing_phase = frame.obs.mining_swing_phase
-	var key: String = MinerLook.sprite_key(_last_input.dig_pressed, _body.on_floor,
-		_body.vel_x, _body.vel_y, _tick_count, swing_phase)
-	var tex: Texture2D = MinerLook.resolve(key)
-	if tex == null:
-		draw_rect(Rect2(left, top, Body.WIDTH_PX, Body.HEIGHT_PX),
-			COLOR_BODY_GROUNDED if _body.on_floor else COLOR_BODY, true)
-		return
-	# The body's local origin is its CENTRE, which is what `MinerLook.dest_rect` is expressed in.
-	MinerLook.draw_sprite(self, tex,
-		Vector2(left + float(Body.WIDTH_PX) * 0.5, top + float(Body.HEIGHT_PX) * 0.5),
-		Body.HEIGHT_PX, _body.facing)
 
 
 func _finish_and_quit() -> void:

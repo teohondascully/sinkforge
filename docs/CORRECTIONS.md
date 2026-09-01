@@ -390,6 +390,34 @@ never separate them; and `Particles` reports only its own size, so a test writte
 could tell that something was emitted and nothing about where it went, which way it drifted, or how much
 of it there was. `draught_plan` returns the decision as data now, and all four are rows.
 
+## D0304 corrects D0300 — a mechanism guessed and stated as a finding, in the same entry that measured the thing correctly
+
+**The claim.** D0300 recorded that milestone captures are not byte-reproducible when an animated layer is
+active, and gave the cause as *"`WorldView.anim_time()` is deterministic in RENDERED ticks, and the number
+of render ticks before a given SIM tick is not."*
+
+**What is wrong with it.** `tests/body/reveal_scene.gd` calls `WorldView.refresh()` from
+`_physics_process`, once per sim tick, so `_anim_ticks` and `_tick_count` advance together and the clock
+is deterministic in exactly the way that sentence says it is not. The observation D0300 was built on — two
+runs of one commit differing by 35,408 pixels — was real and correctly measured. The explanation attached
+to it was never checked, and it reads with the same confidence as the measurement beside it.
+
+**What was actually going on**, found by subtraction rather than by reasoning (D0304): the shutter's two
+`process_frame` awaits let the sim keep running while the pixels were read (38,900 -> 33,572 in `aim`),
+and `view/fx/particles.gd`'s `randf_range` runs on an unseeded global RNG (33,572 -> **0** once the scene
+seeds it). Two causes, neither of them the one named.
+
+**The shape worth keeping.** The particle header's own argument is the interesting half: it says `randf()`
+is safe here because a particle never feeds back into the sim, so it cannot make a replay diverge. That is
+true, and it names the SIM as its frame. The cost of an unseeded RNG landed on a different instrument
+entirely — capture-diffing, which is what caught D0289 and D0300 — and the header is silent about it
+because nobody was standing in that frame when it was written. A safety argument is scoped to the frame it
+names, and the scope is rarely written down.
+
+**Why nothing caught it.** Nothing had ever compared two captures of the SAME commit. Every diff this
+project has run was across a change, where a difference is expected and its size is not examined. The
+control was one command away and had never been run.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,

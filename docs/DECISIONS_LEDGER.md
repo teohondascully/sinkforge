@@ -12622,3 +12622,58 @@ already correct. The gap was that nothing had ever asserted it.
 
 **Reverse cost:** `voice_for_frame` can be folded back into `note_frame`; the `is_inside_tree` guard
 should not be, and the suite would catch its removal.
+
+## D0304 · 2026-08-31 · harness — a capture is reproducible now, and D0300's mechanism was wrong
+
+**Two runs of the same commit at the same tick now differ by exactly ZERO pixels, in all four moments.**
+Before: 38,900 in `aim` and 1,008 in `delve`. Capture-diffing is the instrument that caught the crumble
+painter never drawing (D0289) and the glint's population being 93% short (D0300) — both of which every
+suite passed — and until tonight it was being trusted without ever having been checked against itself.
+
+**CORRECTION TO D0300.** That entry states the cause as "`WorldView.anim_time()` is deterministic in
+RENDERED ticks, and the number of render ticks before a given SIM tick is not." **That is wrong, and it
+was written without checking.** `reveal_scene` calls `refresh()` from `_physics_process`, once per sim
+tick, so `_anim_ticks` and `_tick_count` advance together and the clock is deterministic. The conclusion
+D0300 drew from it — that a capture carrying an animated layer is not byte-reproducible — was correct;
+the mechanism under it was a plausible guess presented as a finding. Numbers are addresses, so D0300
+stands as written and this is the correction to it.
+
+**The two real causes, both measured by subtraction:**
+
+1. **The shutter kept the world running while it read the pixels.** `RevealShutter.capture` awaits two
+   `process_frame`s (D0189's own fix, for a different reason) and nothing stopped `_physics_process`
+   during them — so the sim, and the cosmetic clock with it, advanced by however many physics ticks fell
+   inside two rendered frames, which is a function of machine load. Holding the scene across the awaits:
+   `aim` 38,900 -> 33,572, `delve` 1,008 -> 424. Real, and not the whole of it.
+2. **`randf_range` on an unseeded global RNG, in the particle path.** `view/fx/particles.gd`'s header
+   argues that `randf()` is safe here because a particle never feeds back into the sim, so it cannot make
+   a replay diverge. **That argument is correct and it names only one frame.** An unseeded global RNG also
+   decides that no two screenshots can ever be compared, and the header does not say so because the cost
+   landed on a different instrument than the one it was reasoning about. Seeding the global RNG from the
+   scene's own run seed: 33,572 -> **0**.
+
+Seeded in the SCENE rather than in `particles.gd`, which is a verbatim lift and where `randf` is exactly
+where legacy put it. What was missing was never a different RNG; it was anyone deciding where it starts.
+
+Mutation-proven end to end: remove the one `seed()` line and `aim` diverges by 34,318 pixels again.
+`tests/test_particles.gd` holds the mechanism in both directions — same seed reproduces the field, a
+different seed does not, so it cannot pass against a generator that quietly stopped varying.
+
+**AND THE CAPTURE TOOL REPORTED A BLANK WORLD AS A SUCCESS.** Separately, `tools/capture_moments.sh`
+emitted `delve` at **45 distinct colours** where a drawn frame gives 592 — a uniform grey field with the
+miner sprite and nothing else — printed the number, and exited 0. The cause was a stale Godot import
+cache after a rebase: every `class_name` global fails to resolve, so no painter runs, while the scene
+still boots, still reaches its tick and still writes a PNG. This is the green-by-absence shape the
+structural gates exist for, one directory over, and it nearly cost a false regression report — the
+degraded capture was on my branch, main was fine, and the difference was a `--import` I had not run.
+
+There is now a floor (`MIN_COLOURS=120`) that fails the run and names the remedy. Set far below any real
+frame rather than close to one: the moments measure 392-632, the sparsest thing this tool has ever
+legitimately produced is a wall of textured clay at 159, and the failure came in at 45. A floor tracking
+the real counts would measure the palette instead of the failure. Branch exercised via
+`MIN_COLOURS=9999`, which reaches the same code in seconds where staging the real cause costs a
+ten-minute import rebuild — the guard's branch is proven, and its CAUSE was observed live rather than
+re-staged. Exit code checked in both directions: 1 when tripped, 0 when healthy.
+
+**Reverse cost:** drop `_shutter_held`, the `seed()` line and the floor. Captures go back to being
+uncomparable, which is fine right up until the next defect only the picture can see.
