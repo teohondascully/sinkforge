@@ -97,7 +97,7 @@ func _test_extend_terrain_dig_extent_first_touch_is_just_that_touch() -> void:
 ## D0125's whole reason to exist: two touches to the same column with a GAP between them must merge
 ## into one contiguous span covering both, regardless of which touch happened first -- a low touch then
 ## a high one, and the reverse. This is the property that makes the D0122/D0123 staircase structurally
-## impossible: the caller (`Body._handle_dig`) excavates the returned range, not just its own touch.
+## impossible: the caller (`BodyDig.handle`) excavates the returned range, not just its own touch.
 func _test_extend_terrain_dig_extent_merges_across_touches_closing_the_gap() -> void:
 	var low_then_high: TileGrid = TileGrid.new(10, 20, 1)
 	low_then_high.extend_terrain_dig_extent(4, 10, 12)

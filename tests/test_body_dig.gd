@@ -32,11 +32,11 @@ func _idle_input() -> InputFrame:
 	return InputFrame.new()
 
 
-## `target`/`left_target`/`right_target` below are computed WITHOUT calling `body._dig_target_cell()` --
+## `target`/`left_target`/`right_target` below are computed WITHOUT calling `BodyDig.terrain_target_cell(body)` --
 ## the function under test -- deliberately: an earlier version of this test derived the expected cell
 ## by calling that same function, which cannot catch a bug IN the function (it would just excavate
 ## whatever wrong cell the buggy formula named, and every assertion below would still read as passing).
-## That's exactly what happened: `_dig_target_cell()` shipped with a real off-by-one (right-facing only,
+## That's exactly what happened: `BodyDig.terrain_target_cell` shipped with a real off-by-one (right-facing only,
 ## `docs/DECISIONS_LEDGER.md` D0112), found only by actually running `tests/body/reveal_scene.gd` and
 ## watching the body get permanently stuck one cell short of the wall it had just dug past. Independent
 ## derivation: a body spawned at `spawn_col * CELL` and never given horizontal input occupies exactly
@@ -69,7 +69,7 @@ func _test_dig_against_air_is_not_an_event() -> void:
 	var body: Body = Body.new(10 * CELL * Fx.SCALE, Fx.from_int(TEST_SPAWN_ROW * CELL))
 	for i: int in range(60):
 		body.tick(_idle_input(), grid)
-	var target: Vector2i = body._dig_target_cell()
+	var target: Vector2i = BodyDig.terrain_target_cell(body)
 	_check(not grid.is_solid(target), "sanity: the target cell starts as air for this test")
 	var dig: InputFrame = InputFrame.new()
 	dig.dig_pressed = true
@@ -98,16 +98,16 @@ func _test_dig_respects_facing_left() -> void:
 	_check(grid.is_solid(right_target), "facing left leaves the right-adjacent cell (the wrong side) untouched")
 
 
-## Calls `_handle_dig` directly rather than through `tick()`, so the out-of-bounds check under test is
+## Calls `BodyDig.handle` directly rather than through `tick()`, so the out-of-bounds check under test is
 ## isolated from `_enforce_grid_bounds`'s own world-edge clamping (which runs earlier in the tick and
 ## would otherwise fight over what "the body's position" even means near an edge).
 func _test_dig_out_of_bounds_is_not_an_event() -> void:
 	var grid: TileGrid = TileGrid.new(5, 20, 1)
 	var body: Body = Body.new(0, Fx.from_int(TEST_SPAWN_ROW * CELL))
 	body.facing = -1
-	var target: Vector2i = body._dig_target_cell()
+	var target: Vector2i = BodyDig.terrain_target_cell(body)
 	_check(not grid.in_bounds(target), "sanity: the dig target is off-grid for this fixture (got %s)" % target)
-	body._handle_dig(grid)
+	BodyDig.handle(body, grid)
 	_check(not body.dig_event_this_tick, "a dig press off the grid edge is not an event")
 
 
@@ -150,7 +150,7 @@ func _test_dig_clears_the_whole_body_height_column() -> void:
 	dig.dig_pressed = true
 	body.tick(dig, grid)
 	# The actual expected range, read AFTER the dig tick -- the same `_top_y()`/`_bottom_y()`/
-	# `_px_to_cell()` primitives `_handle_dig` itself uses, but not the dig logic under test, so this
+	# `_px_to_cell()` primitives `BodyDig.handle` itself uses, but not the dig logic under test, so this
 	# isn't tautological about the actual defect class (how many rows, which column) this test exists to
 	# catch.
 	var headroom: int = Heightfield.DIG_HEADROOM_CELLS
@@ -212,12 +212,12 @@ func _test_dig_gap_between_two_touches_in_the_same_column_is_closed() -> void:
 	for row: int in range(0, 100):
 		grid.set_material(Vector2i(target_col, row), &"hardrock")
 	body.pos_y = Fx.from_int(10 * CELL)
-	body._handle_dig(grid)
+	BodyDig.handle(body, grid)
 	_check(body.dig_event_this_tick, "sanity: first touch fires a dig event")
 	var first_top: int = Body._px_to_cell(body._top_y())
 	var first_bottom: int = Body._px_to_cell(body._bottom_y() - 1)
 	body.pos_y = Fx.from_int(60 * CELL)
-	body._handle_dig(grid)
+	BodyDig.handle(body, grid)
 	_check(body.dig_event_this_tick, "sanity: second touch fires a dig event")
 	var second_top: int = Body._px_to_cell(body._top_y())
 	var second_bottom: int = Body._px_to_cell(body._bottom_y() - 1)

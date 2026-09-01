@@ -273,7 +273,7 @@ func _dig_edge(dig_held: bool) -> bool:
 
 
 ## Agent mode's own verification driver -- NOT a claims/C004 measurement tool (see module docstring).
-## Holds move+dig together every tick: body.tick()'s own order (horizontal resolve, THEN _handle_dig)
+## Holds move+dig together every tick: body.tick()'s own order (horizontal resolve, THEN BodyDig.handle)
 ## means each tick either advances into space dug on the previous tick, or digs the wall now blocking
 ## it, so the two naturally alternate without a separate walk/dig state machine. Simple and knows the
 ## target column because it exists only to prove the scene renders and the dig-into-reveal path works,

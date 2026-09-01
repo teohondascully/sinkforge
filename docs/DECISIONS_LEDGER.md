@@ -13067,3 +13067,85 @@ control had to be about the subject itself.
 **Mutation-tested in both directions, as a new gate must be:** with the tick reverted to 14 the tool
 exits **1** and names the remedy; with the tick at 117 it exits **0**. Reaching the check is not the same
 as the check firing, and here the check had already been written once in a form that could not fire.
+
+## D0310 · 2026-09-01 · The stride and the stagger — and the constants that must NOT be converted
+
+**`docs/LEGACY_GAP.md` T1 #9 and #10, ported together because they are one trade.** T1 #9: *"a fall is
+currently free: ride terminal velocity into rock and sprint off the impact tick, so a forty-row hole is a
+strictly better staircase."* T1 #10: *"one flat top speed today. `RUN_SPEED` is tuned for mining and is
+the wrong speed for crossing a world."* One makes descent cost something; the other makes distance cost
+less. Shipping either alone changes the balance in one direction only.
+
+Ported from `legacy/scenes/player.gd:45-71` (constants and reasoning), `:411-432` (the fall accounting),
+`:625-643` (`_update_stride`).
+
+**THE DECISION THIS ENTRY EXISTS FOR: THESE CONSTANTS PORT IN PIXELS, AND WG-4 DOES NOT APPLY.**
+
+WG-4 (D0305) converted world-generation constants by ×4 / ×16 / ×0.5 because legacy's cell was one metre
+and this build's is a quarter of one. The reflex after that work is to convert everything, and it would
+have been wrong here. The body is the opposite regime, and the check that settles it is comparing the
+constants rather than reasoning about what a cell means:
+
+| | legacy `player.gd` | this build `body.gd` |
+|---|---|---|
+| `RUN_SPEED` | 150.0 | 150 |
+| `GRAVITY` | 900.0 | 900 |
+| `JUMP_VELOCITY` | -365.0 | -365 |
+| `MAX_FALL` | 560.0 | 560 |
+
+**Four for four.** `sim/body/body.gd` is a pixel-for-pixel port of legacy's player, so a 288 px fall takes
+the same time, reaches the same speed, and stands in the same ratio to the same jump height in both
+builds. Converting to metres would have been the correct procedure applied in the wrong regime — a 2×
+change to numbers that were already right, justified by an arithmetic that does not hold. **Knowing which
+regime you are in is the whole trap, and the way to know is to compare the constants, not to reason.**
+
+**WHY THE STAGGER IS PRICED ON DISTANCE AND NOT ON IMPACT SPEED**, which is legacy's argument and is
+now measured rather than quoted: terminal velocity (`MAX_FALL` 560 under `GRAVITY` 900) arrives after
+`560²/(2×900)` = **174 px**. `STAGGER_FALL` is 288 px. **Every fall this rule is about lands at exactly
+the same speed**, so a speed threshold fires on all of them or on none. `tests/test_gait.gd` asserts the
+ordering of those two numbers directly rather than restating the sentence.
+
+And the cost is GRIP, NOT DAMAGE — legacy's reason kept whole: *"a platformer that takes control away
+feels broken however justified the moment."* Steering, jumping and mining all still work. The suite
+asserts both directions: reduced, and never zero.
+
+**THE ACCEPTANCE GOLDEN MOVED 225 → 194 TICKS, AND THE MOVE WAS ATTRIBUTED BEFORE IT WAS ACCEPTED.**
+`GOLDEN_TRAVERSE_TICKS` measures how long a traverse takes, which is precisely the quantity T1 #10
+exists to change — a drift would be a regression, this is the deliverable. But "it is supposed to move"
+is not a reason to accept any particular number. Setting `Gait.STRIDE_GAIN_NUM` to 0, leaving the
+stagger, the fall seed, the gait plumbing and the `BodyDig` split all live, returns the traverse to
+**exactly 225** — not 224, not 226. So all 31 ticks are the stride gain and none of it is anything else
+in this commit. `[[control-inside-the-measurement]]`.
+
+**AND THE THING THE FUZZER CANNOT SEE.** `test_body_fuzz_fast` reports `bounds=922` before this change
+and `bounds=922` after. That is not reassuring and it is not luck: `FuzzDriverCommon.random_input` draws
+`move_dir` uniformly from {-1, 0, 1} **independently every tick**, so the run of 55 consecutive
+same-direction ticks the stride needs has probability `2 × (1/3)^54`. **Measured over the real generator:
+the longest unbroken heading in 50,000 fuzz ticks is 10 ticks.** The per-commit fuzzer cannot build a
+stride, so it cannot fuzz one.
+
+This is `docs/NEEDS_DIRECTOR.md` P004's finding in a third place — that entry already records the same
+fuzzer posing the corner nudge **zero** times and excavating **once** in 50,000 ticks. A sustained run is
+the third mechanic its input distribution excludes by construction. It is asserted in `test_gait.gd`
+rather than written down here, so that if the distribution ever changes the assertion says so instead of
+quietly becoming false.
+
+**TWO SPLITS, BOTH AT THE 400-LINE CAP, BOTH AT REAL SEAMS.** `sim/body/gait.gd` is the pure decision
+layer (every function an integer function of its arguments, assertable with no world); `sim/body/gait_state.gd`
+is the five persistent fields and the ORDER they update in, which is body work. That took `body.gd` to
+410, so the dig half moved to `sim/body/body_dig.gd` — a seam `tests/test_body_dig.gd` had already made
+at D0269 and named in exactly those words, so the file follows the suite rather than the reverse.
+
+**EVERY GAIT FIELD IS IN `state_signature()`.** The signature IS the determinism contract (D0261), and
+`stride` sets top speed while `stagger_ticks` sets acceleration — a replay blind to them diverges
+silently. `hold`, `fall_from_y` and `was_on_floor` are in it too: none is read by the physics directly,
+and each DECIDES a later value that is, so two bodies differing only in one of them diverge a tick later.
+The suite asserts each field moves the signature, and that restoring them all restores it — a signature
+that only ever grew would pass the first half.
+
+**THE SPLIT CAUGHT A MASKED CRASH ON ITS WAY THROUGH, which is worth one line.** Moving `_handle_dig`
+and `_dig_target_cell` out of `Body` left three call sites in `tests/test_body_dig.gd` pointing at
+methods that no longer existed. The suite printed **`ALL PASS`** and exited **0**, with three of its tests
+silently doing nothing; only the D0115/D0116 masked-crash detector in `run_gd_test.sh` failed the run.
+Every call site is updated, including the prose references, so a reader searching for the old name still
+lands somewhere real.

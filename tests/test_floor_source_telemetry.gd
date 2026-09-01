@@ -71,7 +71,7 @@ func _test_auto_step_up_names_try_step() -> void:
 
 func _test_direct_call_to_grid_floor_backstop_names_itself() -> void:
 	# grid_floor_backstop only fires when the body's own box is already blocked (D0059f's pit-lip
-	# case) -- reproduced directly, the same way test_body.gd calls `_handle_dig` directly, rather
+	# case) -- reproduced directly, the same way test_body.gd calls `BodyDig.handle` directly, rather
 	# than fighting the ground-plane resolver into producing this specific edge for us.
 	var grid: TileGrid = TileGrid.new(20, 30, 1)
 	for col: int in range(0, 20):
