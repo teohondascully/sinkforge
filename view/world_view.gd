@@ -37,6 +37,7 @@ var _look: MaterialLook = null
 var _camera: Camera2D = null
 var _layers: Array[PaintLayer] = []
 var _frame: Frame = null
+var _hud: HudLayer = null
 
 
 ## Constructor-by-method rather than `_init` arguments, so this node can also be instantiated from a
@@ -62,6 +63,25 @@ func add_painter(paint: Callable) -> PaintLayer:
 	return layer
 
 
+## The screen-space half. A `HudLayer` is a `CanvasLayer`, so its children are not moved by the camera
+## transform, and its chips use the SAME `(frame, ci)` painter signature as the world painters above.
+##
+## It hangs off the coordinator rather than off the scene so that the HUD and the world are painted from
+## ONE frame per tick and cannot disagree about which tick they are showing -- the same reason
+## `PaintLayer` asks for `current_frame()` at draw time instead of caching one. A HUD that held its own
+## copy of the observation would go stale silently, and only on redraws the coordinator did not
+## initiate: a resize, a focus change. `docs/LEGACY_GAP.md` H-01.
+##
+## One host, created on demand: a second call returns the same layer rather than a second `CanvasLayer`
+## stacked on the first, which would double every chip.
+func add_hud() -> HudLayer:
+	if _hud == null:
+		_hud = HudLayer.new()
+		_hud.setup(self)
+		add_child(_hud)
+	return _hud
+
+
 ## The frame built for the current tick, or `null` before the first `refresh()`. `PaintLayer` reads this
 ## during its own `_draw`; it is not rebuilt per layer, so every painter in one tick sees one world.
 func current_frame() -> Frame:
@@ -76,6 +96,8 @@ func refresh() -> void:
 	_frame = _build_frame()
 	for layer: PaintLayer in _layers:
 		layer.queue_redraw()
+	if _hud != null:
+		_hud.refresh()
 
 
 func _build_frame() -> Frame:

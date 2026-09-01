@@ -109,8 +109,7 @@ func _ready() -> void:
 		# actually looking at the captured image, not assumed correct from the math alone.
 		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
 		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
-	if _sky:
-		_build_sky()
+	_build_view()
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
 
 
@@ -120,11 +119,13 @@ func _ready() -> void:
 ## that observe() -> Frame -> painter -> canvas works end to end.
 ##
 ## `z_index` well behind everything: this scene paints terrain in its own `_draw` at the default 0.
-func _build_sky() -> void:
+func _build_view() -> void:
 	_sky_view = WorldView.new()
 	add_child(_sky_view)
 	_sky_view.setup(Interface.new(_grid, _body, _mining), _look, _camera)
-	_sky_view.add_painter(SkyPainter.paint).z_index = -100
+	if _sky:
+		_sky_view.add_painter(SkyPainter.paint).z_index = -100
+	_sky_view.add_hud().add_chip(DepthChip.paint)
 
 
 ## Applies `RevealArgs.parse()` to this scene's fields, and returns the two the caller needs by name.
@@ -332,8 +333,10 @@ func _draw() -> void:
 	# in the world rather than only as a number. Kept to BAND_TINT (0.10) because legacy's band colours
 	# were authored as ANNOUNCEMENT colours -- type on a dark plate, every one between 0.44 and 0.96 in
 	# its brightest channel -- and are far too bright to use as fills at full strength.
-	var band: Dictionary = _look.band_at(Body._px_to_cell(_body.pos_y))
-	var band_color: Color = Color(band["color"][0], band["color"][1], band["color"][2])
+	# `band_color` rather than unpacking the record's colour array here -- that unpacking existed in two
+	# places as of D0271 and two conversions of one record are how a palette starts disagreeing with
+	# itself about whether the fourth element is alpha.
+	var band_color: Color = _look.band_color(Body._px_to_cell(_body.pos_y))
 	# `--sky` REPLACES this fill rather than layering under it (D0244). This rect is opaque and spans
 	# 12000px, so with the sky layer behind it the backdrop was drawn and then completely covered -- the
 	# first capture showed flat COLOR_BG above the terrain and looked exactly like a painter that had not

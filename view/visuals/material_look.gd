@@ -101,6 +101,14 @@ func band_at(row: int) -> Dictionary:
 	return out
 
 
+## The band's own tint, as a `Color`. The record carries `color` as a three-float ARRAY straight out of
+## `data/bands/*.yaml`, and every consumer would otherwise repeat that unpacking -- which is how a
+## palette ends up with two conversions that disagree about whether the fourth element is alpha.
+## D0271: added for `view/hud/depth_chip.gd`, the band ladder's first renderer.
+func band_color(row: int) -> Color:
+	return _to_color(band_at(row)["color"])
+
+
 ## Metres below the surface datum. Negative above it, deliberately, exactly as legacy: "standing on a
 ## hilltop reads as a negative depth rather than a clamped zero, so the number is never fudged."
 static func depth_m(row: int) -> int:

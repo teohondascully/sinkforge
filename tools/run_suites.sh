@@ -17,6 +17,19 @@
 #
 # `run_gd_test.sh` already exits non-zero on every failure shape it knows about, so the exit code is the
 # verdict and no string matching is needed at all.
+#
+# WHY A FAILING SUITE'S OUTPUT IS DUMPED WHOLE, AND NOT FILTERED TO ITS `FAIL` LINES. It was filtered,
+# for two commits, and that silently disabled a diagnostic built specifically to be read from the CI log.
+# `test_shaft_replay_determinism.gd` prints its full observed hash sequence on a golden mismatch --
+# unconditionally, not behind a verbose flag -- because D0167 cost an extra commit-and-push round trip
+# for want of exactly that. It is a bare `print()`, so it matched neither `^  FAIL` nor `FAILURE(S)`, and
+# the first CI run under the parallel runner reported the mismatch with **the sequence nowhere in the
+# log**.
+#
+# The general rule this is an instance of: a runner must not decide which lines of a FAILING suite's
+# output are interesting. It cannot know -- the interesting line is usually the one the suite author
+# added precisely because the failure was hard to diagnose. Verbosity costs nothing here, because this
+# path only runs when something is already red.
 set -uo pipefail
 
 GODOT="${1:?usage: run_suites.sh <godot-binary> [jobs] [suite ...]}"
@@ -64,8 +77,8 @@ for f in "$OUT"/*.result; do
     PASSED=$((PASSED+1))
   else
     FAILED=$((FAILED+1))
-    echo "FAIL  $suite"
-    grep -E '^  FAIL|FAILURE\(S\)' "$OUT/$(basename "$suite").log" | head -3 | sed 's/^/        /'
+    echo "FAIL  $suite -- its FULL output follows:"
+    sed 's/^/        /' "$OUT/$(basename "$suite").log"
   fi
 done
 

@@ -265,6 +265,13 @@ jobs:
       - name: tools/run_gd_test.sh self-test (D0115/D0116 — must run before every suite below trusts it)
         run: bash tools/test_run_gd_test.sh ./godot
 
+      # D0272, the same principle one level up: run_gd_test.sh is trusted to DETECT a failure, and this
+      # proves run_suites.sh actually SURFACES one. It filtered a failing suite's log to its `FAIL` lines
+      # for two commits, which silently disabled D0167's golden-mismatch print — a bare print() that
+      # matched no filter. CI reported the mismatch with the sequence nowhere in the log.
+      - name: tools/run_suites.sh self-test (D0272 — a failing suite's own diagnostic must reach the log)
+        run: bash tools/test_run_suites.sh ./godot
+
       # THE SUITES, RUN IN PARALLEL (docs/DECISIONS_LEDGER.md D0263, D0264, D0265).
       #
       # These were 42 sequential steps. Measured locally, serial was 794s and `jobs=8` was 350s over the
@@ -307,6 +314,7 @@ jobs:
       #   test_reveal_replay_driver.gd                   test_reveal_replay_driver (claims/C004's own replay driver, D0129)
       #   test_floor_source_telemetry.gd                 test_floor_source_telemetry (grounding-path telemetry, D0132)
       #   test_miner_look.gd                             miner sprite state table (D0268)
+      #   test_hud.gd                                    test_hud (the HUD host + the depth chip — D0271, LEGACY_GAP H-01/T1 #8)
       #   test_material_palette.gd                       test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
       #   test_mining.gd                                 test_mining (cursor-aim, reach, hold-to-charge, the bite, the hollow tell — D0195/D0196/D0200)
       #   test_mining_bite.gd                            test_mining_bite (one blow's volume against legacy's metre, D0200)
@@ -328,7 +336,7 @@ jobs:
       #   test_view_lifts.gd                             test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
       #   test_settings.gd                               test_settings (the split halves share one bindings map; persist=false writes nothing)
       #   test_recorded_sessions.gd                      test_recorded_sessions (every director recording is binding until retired — P002/D0228)
-      - name: all 44 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 45 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           bash tools/run_suites.sh ./godot 4 \
             res://tests/test_fixed_point.gd \
@@ -355,6 +363,7 @@ jobs:
             res://tests/test_floor_source_telemetry.gd \
             res://tests/test_material_palette.gd \
             res://tests/test_miner_look.gd \
+            res://tests/test_hud.gd \
             res://tests/test_mining.gd \
             res://tests/test_mining_bite.gd \
             res://tests/test_reveal_scene_dig_edge.gd \
