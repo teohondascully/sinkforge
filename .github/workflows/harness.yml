@@ -305,6 +305,7 @@ jobs:
       #   test_reveal_metric.gd                          test_reveal_metric (claims/C004's own dig-rate-lift instrument, D0114)
       #   test_reveal_replay_driver.gd                   test_reveal_replay_driver (claims/C004's own replay driver, D0129)
       #   test_floor_source_telemetry.gd                 test_floor_source_telemetry (grounding-path telemetry, D0132)
+      #   test_miner_look.gd                             miner sprite state table (D0268)
       #   test_material_palette.gd                       test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
       #   test_mining.gd                                 test_mining (cursor-aim, reach, hold-to-charge, the bite, the hollow tell — D0195/D0196/D0200)
       #   test_mining_bite.gd                            test_mining_bite (one blow's volume against legacy's metre, D0200)
@@ -351,6 +352,7 @@ jobs:
             res://tests/test_reveal_replay_driver.gd \
             res://tests/test_floor_source_telemetry.gd \
             res://tests/test_material_palette.gd \
+            res://tests/test_miner_look.gd \
             res://tests/test_mining.gd \
             res://tests/test_mining_bite.gd \
             res://tests/test_reveal_scene_dig_edge.gd \

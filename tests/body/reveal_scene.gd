@@ -340,32 +340,31 @@ func _draw() -> void:
 	# run. Found by looking at the image, not by reasoning about z_index, which was correct all along.
 	if not _sky:
 		draw_rect(Rect2(-4000, -4000, 12000, 12000), COLOR_BG.lerp(band_color, BAND_TINT), true)
-	var view_center_col: int = Body._px_to_cell(_body.pos_x)
-	var col_lo: int = maxi(0, view_center_col - 60)
-	var col_hi: int = mini(_grid.width, view_center_col + 60)
-	# 120-row cap only makes sense for the follow-the-body view -- `--wide-view` needs the WHOLE topsoil
-	# band drawn (D0121), since the density contrast it exists to show is spread across it, not just the
-	# top 120 of a band that runs 160 rows on both reveal-test sites. NOT the full grid height (up to
-	# 1024 rows for max_depth_m=256): the reveal layer only ever places below row 0 and above
-	# topsoil_end, so drawing past it would shrink the actually-relevant band to a sliver of a mostly
-	# irrelevant screenshot. WIDE_VIEW_ROW_CAP is topsoil_end(160) + margin, not read from the site
-	# config -- this scene already hardcodes plenty else about the two reveal-test sites specifically.
-	var row_cap: int = mini(_grid.height, WIDE_VIEW_ROW_CAP) if _wide_view else mini(_grid.height, 120)
-	for col: int in range(col_lo, col_hi):
-		for row: int in range(0, row_cap):
-			var material: StringName = _grid.get_material(Vector2i(col, row))
-			if material == &"":
-				continue
-			draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL),
-				_look.cell_color(material, col, row), true)
-	var left: float = float(_body._left_x()) / float(Fx.SCALE)
-	var top: float = float(_body._top_y()) / float(Fx.SCALE)
-	draw_rect(Rect2(left, top, Body.WIDTH_PX, Body.HEIGHT_PX),
-		COLOR_BODY_GROUNDED if _body.on_floor else COLOR_BODY, true)
+	RevealTerrainDraw.draw_cells(self, _grid, _look, _body.pos_x, CELL, _wide_view,
+		WIDE_VIEW_ROW_CAP)
+	_draw_body()
 	# Drawn last so the reach ring and reticle sit over the terrain and the body rather than under them.
 	MiningOverlay.draw(self, _grid, _mining, _body.pos_x, _body.pos_y,
 		_last_input.has_aim, Vector2i(_last_input.aim_col, _last_input.aim_row))
 	_particles.draw(self)  ## D0216: last, so chips and the draught sit over the terrain they came from
+
+
+## The miner: sprite if one resolves, the primitive rectangle if not. See `MinerLook` for why the dig
+## pose reads the INPUT rather than the dig event, and why the rectangle path stays.
+func _draw_body() -> void:
+	var left: float = float(_body._left_x()) / float(Fx.SCALE)
+	var top: float = float(_body._top_y()) / float(Fx.SCALE)
+	var key: String = MinerLook.sprite_key(_last_input.dig_pressed, _body.on_floor,
+		_body.vel_x, _body.vel_y, _tick_count)
+	var tex: Texture2D = MinerLook.resolve(key)
+	if tex == null:
+		draw_rect(Rect2(left, top, Body.WIDTH_PX, Body.HEIGHT_PX),
+			COLOR_BODY_GROUNDED if _body.on_floor else COLOR_BODY, true)
+		return
+	# The body's local origin is its CENTRE, which is what `MinerLook.dest_rect` is expressed in.
+	MinerLook.draw_sprite(self, tex,
+		Vector2(left + float(Body.WIDTH_PX) * 0.5, top + float(Body.HEIGHT_PX) * 0.5),
+		Body.HEIGHT_PX, _body.facing)
 
 
 func _finish_and_quit() -> void:

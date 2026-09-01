@@ -8,16 +8,17 @@ extends RefCounted
 ##
 ## Lifted unchanged from `legacy/scenes/art.gd` (`docs/DECISIONS_LEDGER.md` D0227).
 ##
-## **`res://assets/` DOES NOT EXIST IN THIS TREE, and that is this file's designed state, not a defect.**
-## Every `tex()` returns null and `has_any()` returns false, which is exactly the contract: a renderer
-## keeps its pure-primitive path until real art lands. Said out loud because a loader pointed at a
-## missing directory is indistinguishable from a broken loader unless somebody writes down which one it
-## is -- and because the negative case is the ONLY one this build can currently test, so
-## `tests/test_art.gd` measures the caching and the fallback, and cannot measure a hit.
+## **ART HAS LANDED (D0268).** `assets/sprites/` holds 16 authored 32x48 miner PNGs, copied from
+## `legacy/assets/sprites/`, and `view/visuals/miner_look.gd` is this file's first consumer. Both
+## sentences replace the opposite claim that stood here from D0227 until 2026-08-31 -- that the directory
+## did not exist and nothing called `tex()`. Correct when written, and left here in this form on purpose:
+## a loader pointed at a missing directory is indistinguishable from a broken loader unless somebody
+## writes down which one it is, and the same is true in reverse once the files arrive.
 ##
-## NO CONSUMER TODAY. Nothing in `view/` calls it. It is the seam the director's art pass lands through,
-## ported while it is 26 lines and provably inert.
-
+## The miss path is still the designed contract and is still exercised: any key with no PNG returns null,
+## the miss is cached, and the caller keeps its own code-drawn primitive. `tests/test_view_lifts.gd` now
+## asserts BOTH directions, where before it could only assert the miss.
+##
 const DIR: String = "res://assets/sprites/"
 
 static var _cache: Dictionary = {}                   ## key -> Texture2D or null (miss)

@@ -4,11 +4,12 @@ extends "res://tests/test_base.gd"
 ## CONSUMER, so what a test can honestly assert about them is narrow, and saying which half is covered
 ## matters more than the count of green lines.
 ##
-## `Art`: `res://assets/` does not exist in this tree, so **only the miss path is reachable here.** The
-## hit path -- a real PNG resolving to a Texture2D -- is untestable until art lands, and a suite that
-## pretended otherwise would be asserting the fallback while claiming to check the loader. What IS
-## testable is the part that would break silently: the cache must remember a MISS, or a renderer calling
-## `tex()` per frame re-probes a missing file every frame forever.
+## `Art`: **art has now landed** (D0268 -- 16 miner PNGs under `assets/sprites/`), so BOTH paths are
+## reachable here for the first time. This file's earlier note said the hit path was untestable "until
+## art lands"; it has, and the assertion below moved with it rather than being relaxed.
+##
+## The miss path still matters just as much and is still asserted: the cache must remember a MISS, or a
+## renderer calling `tex()` per frame re-probes a missing file every frame forever.
 ##
 ## `LightLayer`: the callback contract. `_draw` is invoked directly rather than through a viewport --
 ## the painter receives the canvas and this test's painters make no `draw_*` calls, which are the calls
@@ -19,7 +20,7 @@ extends "res://tests/test_base.gd"
 
 func _initialize() -> void:
 	_test_art_returns_null_and_caches_the_miss()
-	_test_art_reports_no_art_at_all_so_callers_keep_their_primitives()
+	_test_art_now_reports_real_art_and_still_misses_cleanly()
 	_test_light_layer_hands_its_own_canvas_to_the_painter()
 	_test_light_layer_only_builds_a_material_when_the_blend_is_not_the_default()
 	_test_light_layer_survives_an_invalid_painter()
@@ -39,10 +40,18 @@ func _test_art_returns_null_and_caches_the_miss() -> void:
 		"CONTROL: clear_cache actually empties it, so the assertion above is reading a real entry")
 
 
-func _test_art_reports_no_art_at_all_so_callers_keep_their_primitives() -> void:
+## RE-PINNED 2026-08-31 (D0268). This asserted `not Art.has_any()` -- correct while `assets/` did not
+## exist, and it went red the moment the miner sprites landed. That is a ratchet doing its job, not a
+## test to loosen: the assertion now states what is true, and the accompanying miss check keeps the
+## fallback contract covered so this is a MOVE rather than a deletion.
+func _test_art_now_reports_real_art_and_still_misses_cleanly() -> void:
 	Art.clear_cache()
-	_check(not Art.has_any(),
-		"has_any() is false in a tree with no assets/ directory -- the state this build is in, and the signal that keeps every renderer on its code-drawn path")
+	_check(Art.has_any(),
+		"has_any() is TRUE now that assets/sprites/ holds real art -- was false, and D0268 is what moved it")
+	_check(Art.tex("miner_idle") != null,
+		"a real key resolves to a Texture2D -- the HIT path, unreachable in this suite until art landed")
+	_check(Art.tex("definitely_not_a_sprite") == null,
+		"and an absent key still returns null, so a renderer without art for a key keeps its primitive")
 
 
 func _test_light_layer_hands_its_own_canvas_to_the_painter() -> void:
