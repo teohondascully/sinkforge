@@ -77,6 +77,7 @@ var _fixed_camera: Vector2 = Vector2.ZERO  ## `--camera=col,row`, for comparable
 var _has_fixed_camera: bool = false  ## a real bool, not a Vector2 compared against null (D0194's note)
 var _sky: bool = false  ## `--sky` (D0244): draw the lifted SkyPainter behind the world
 var _sky_view: WorldView = null  ## the real coordinator, so this proves the whole contract
+var _rig: CameraRig = CameraRig.new()  ## D0273: the ported follow; warped to the spawn in `_ready`
 
 
 func _ready() -> void:
@@ -168,7 +169,7 @@ func _physics_process(delta: float) -> void:
 	_last_input = input
 	_record_tick(input)
 	_tick_count += 1
-	_update_camera()
+	_update_camera(delta)
 	queue_redraw()
 
 	if _screenshot_tick >= 0 and _tick_count == _screenshot_tick:
@@ -319,13 +320,11 @@ func _record_tick(input: InputFrame) -> void:
 		input.mine_held, input.has_aim, input.aim_col, input.aim_row))
 
 
-func _update_camera() -> void:
-	if _has_fixed_camera:
-		_camera.position = _fixed_camera
-		return
+func _update_camera(delta: float) -> void:
 	if _wide_view:
 		return  # camera stays fixed on the grid midpoint, set once in _ready() -- not the body
-	_camera.position = Vector2(float(_body.pos_x) / float(Fx.SCALE), float(_body.pos_y) / float(Fx.SCALE))
+	_camera.position = _fixed_camera if _has_fixed_camera else DebugSceneCommon.follow_camera(
+		_rig, _body, _camera_zoom, get_viewport(), delta)
 
 
 func _draw() -> void:
