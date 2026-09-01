@@ -370,6 +370,26 @@ Adding `test_recorded_sessions` to CI in the same run made it 38 against 39 — 
 `test_body_fuzz.gd`. Corrected in four files. A count is only true against the tree that produced it, and
 writing one into prose while still editing that tree is how it goes stale before anyone reads it.
 
+## D0293 corrects the draught's own port — a lifted mechanism that carried the sentence and not the behaviour
+
+**What was claimed:** `view/fx/particles.gd::draught` was ported from legacy, and
+`tests/body/debug_scene_common.gd` documented it as "the hollow tell's visual half".
+
+**Measured:** read against `legacy/scenes/main.gd:1600-1609`, it was wrong in four independent ways —
+it fired on BREACH rather than during the charge, drifted a hardcoded direction rather than the swing's,
+threw a hardcoded 6 rather than `1 + int(2 * hollow)`, and sat on the broken cell's centre rather than
+the near face.
+
+**The error, precisely.** `sim/mining/mining.gd` already carried legacy's own sentence about why the
+amount rides the reading — *"closing on a cavity is a crescendo you can act on rather than a flag that
+flips"* — while the code five files away was the flag. A quoted rationale is not an implemented one, and
+a port that lifts the comment reads as more finished than one that lifts nothing.
+
+**Why nothing caught it.** Each of the four is a plausible cue on its own, so watching the screen could
+never separate them; and `Particles` reports only its own size, so a test written against the emitter
+could tell that something was emitted and nothing about where it went, which way it drifted, or how much
+of it there was. `draught_plan` returns the decision as data now, and all four are rows.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,
