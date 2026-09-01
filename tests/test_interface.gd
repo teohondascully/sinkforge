@@ -30,6 +30,8 @@ func _initialize() -> void:
 	_test_a_mine_command_inside_reach_actually_breaks_ground()
 	_test_the_wall_plane_is_its_own_plane()
 	_test_the_surface_answers_in_fx_and_only_from_inside_the_window()
+	_test_the_mining_verbs_state_reaches_the_door()
+	_test_the_mining_state_is_copied_not_handed_over()
 	_finish("interface")
 
 
@@ -42,14 +44,19 @@ func _build() -> Array:
 	var body: Body = Body.new(
 		Fx.from_int(GRID_W * Heightfield.TERRAIN_CELL_PX / 2),
 		Fx.from_int(FLOOR_ROW * Heightfield.TERRAIN_CELL_PX) - (Body.HEIGHT_PX * Fx.SCALE) / 2)
-	var iface: Interface = Interface.new(grid, body, Mining.new())
+	var mining: Mining = Mining.new()
+	var iface: Interface = Interface.new(grid, body, mining)
 	for _i: int in 10:
 		iface.apply(Command.move(InputFrame.new()))
-	return [grid, body, iface]
+	return [grid, body, iface, mining]
 
 
-func _sig(grid: TileGrid, body: Body) -> String:
-	return body.state_signature() + "||" + grid.state_signature()
+## `Mining` is in here as of D0274 (PRE-3). It was not, and that mattered: the crack bank IS sim state --
+## two runs that banked different partial charges break different cells on different ticks later, which is
+## why `Mining.state_signature()` exists at all. Without it, a rejected command that nonetheless advanced
+## a crack, or an `observe()` that touched the bank, would have read here as "changed nothing at all".
+func _sig(grid: TileGrid, body: Body, mining: Mining) -> String:
+	return body.state_signature() + "||" + grid.state_signature() + "||" + mining.state_signature()
 
 
 func _test_observe_is_pure() -> void:
@@ -57,10 +64,11 @@ func _test_observe_is_pure() -> void:
 	var grid: TileGrid = parts[0]
 	var body: Body = parts[1]
 	var iface: Interface = parts[2]
-	var before: String = _sig(grid, body)
+	var mining: Mining = parts[3]
+	var before: String = _sig(grid, body, mining)
 	for _i: int in 25:
 		iface.observe(Interface.Envelope.oracle_over(grid))
-	_check(_sig(grid, body) == before, "25 observe() calls leave the sim state byte-identical")
+	_check(_sig(grid, body, mining) == before, "25 observe() calls leave the sim state byte-identical")
 
 
 ## The reach-around test, and the reason `Observation` copies instead of holding a reference. If it held
@@ -131,11 +139,11 @@ func _test_every_rejection_is_named_and_changes_nothing() -> void:
 	_check_over(cases.size(), true,
 		"the rejection cases are actually posed, so the checks inside the loop have something to run on")
 	for c: Dictionary in cases:
-		var before: String = _sig(grid, body)
+		var before: String = _sig(grid, body, parts[3])
 		var r: Interface.Result = iface.apply(Command.mine(c["cell"]))
 		_check(not r.ok and r.reason == c["want"],
 			"mining %s is rejected as `%s` (got ok=%s reason=%s)" % [c["label"], c["want"], r.ok, r.reason])
-		_check(_sig(grid, body) == before, "and the rejected `%s` command changed nothing at all" % c["label"])
+		_check(_sig(grid, body, parts[3]) == before, "and the rejected `%s` command changed nothing at all" % c["label"])
 
 
 ## The positive control for the three rejections above: without it, "rejected" could be the only thing
@@ -224,3 +232,76 @@ func _test_the_surface_answers_in_fx_and_only_from_inside_the_window() -> void:
 		% above.surface_y_at_terrain_col(col))
 	_check(o.surface_y_at_terrain_col(GRID_W + 5) == Heightfield.NO_FLOOR,
 		"and a column outside the window entirely is NO_FLOOR, not an out-of-range index")
+
+
+## PRE-3 (`docs/LEGACY_GAP.md`): `observe()` read `_grid` and `_body` and never touched `_mining`, so
+## every mining-feedback capability in the backlog was blocked behind one unopened door.
+##
+## THE ASSERTIONS ARE PAIRED WITH A BEFORE-STATE, not written against the after-state alone. A field that
+## was always `true`, or a hollow that was always non-zero, would pass a single post-mine check; what
+## makes this measure the door is that each one is read while nothing is being mined FIRST.
+func _test_the_mining_verbs_state_reaches_the_door() -> void:
+	var parts: Array = _build()
+	var iface: Interface = parts[2]
+	var body: Body = parts[1]
+	var target := Vector2i(Body._px_to_cell(body.pos_x), FLOOR_ROW)
+	var env: Interface.Envelope = Interface.Envelope.covering(
+		Rect2(Vector2.ZERO, Vector2(GRID_W, GRID_H) * float(Heightfield.TERRAIN_CELL_PX)), 0)
+	var idle: Interface.Observation = iface.observe(env)
+	_check(not idle.mining_is_charging, "before any mining, nothing is charging")
+	_check(idle.mining_cracks.is_empty(), "and no cell holds a crack (%d)" % idle.mining_cracks.size())
+	_check(idle.mining_hollow == 0, "and the hollow reading is 0 (%d)" % idle.mining_hollow)
+	_check(not idle.mining_broke and not idle.mining_breach, "and nothing broke or breached")
+	iface.apply(Command.mine(target))
+	var mining: Interface.Observation = iface.observe(env)
+	_check(mining.mining_is_charging,
+		"one mine command later the verb reports charging -- this is the field that was unreachable")
+	_check(mining.mining_charging_cell == target,
+		"at the cell that was commanded (%s vs %s)" % [mining.mining_charging_cell, target])
+	_check(mining.mining_cracks.size() == 1,
+		"and exactly the worked cell holds a crack (%d: %s)" % [mining.mining_cracks.size(), mining.mining_cracks.keys()])
+	_check(int(mining.mining_cracks.get(target, 0)) > 0,
+		"with a real banked charge on it (%d)" % int(mining.mining_cracks.get(target, 0)))
+	# Hollow is a magnitude, and here it is legitimately 0 -- a solid floor to the horizon has no cavity
+	# behind it. Asserted as "in range" rather than "> 0", because demanding a non-zero reading from this
+	# fixture would be demanding the wrong answer.
+	_check(mining.mining_hollow >= 0 and mining.mining_hollow <= HollowTell.FULL,
+		"and the hollow reading is a per-mille magnitude in range (%d of %d)"
+		% [mining.mining_hollow, HollowTell.FULL])
+
+
+## The copy contract, applied to the two CONTAINERS the mining fields introduce. Every scalar above is
+## copied by value for free; a `Dictionary` and an `Array` are not. Handing over the live containers would
+## let a view clear the sim's crack bank by tidying up after itself, and that failure surfaces as a
+## determinism divergence hundreds of ticks later with nothing pointing back here.
+##
+## Checked by MUTATING the observation's copies and then re-observing -- the same way
+## `_test_an_observation_does_not_track_the_grid_it_came_from` reaches around the door rather than
+## trusting it.
+func _test_the_mining_state_is_copied_not_handed_over() -> void:
+	var parts: Array = _build()
+	var iface: Interface = parts[2]
+	var body: Body = parts[1]
+	var target := Vector2i(Body._px_to_cell(body.pos_x), FLOOR_ROW)
+	var env: Interface.Envelope = Interface.Envelope.covering(
+		Rect2(Vector2.ZERO, Vector2(GRID_W, GRID_H) * float(Heightfield.TERRAIN_CELL_PX)), 0)
+	iface.apply(Command.mine(target))
+	var mining: Mining = parts[3]
+	var before: String = mining.state_signature()
+	var o: Interface.Observation = iface.observe(env)
+	_check(o.mining_cracks.size() == 1, "sanity: there is a crack to try to destroy (%d)" % o.mining_cracks.size())
+	var sim_broke_before: int = mining.broke_cells.size()
+	o.mining_cracks.clear()
+	o.mining_broke_cells.append(Vector2i(999, 999))
+	_check(mining.state_signature() == before,
+		"mutating the observation's crack copy leaves the sim's own signature byte-identical")
+	# `broke_cells` is per-tick telemetry and is deliberately NOT in `state_signature()`, so the check
+	# above cannot see it. Asserted against the sim's own array directly -- without this, handing the live
+	# list over instead of a duplicate passed every assertion here. The mutation run found exactly that.
+	_check(mining.broke_cells.size() == sim_broke_before,
+		"and appending to the observation's broke_cells copy does not reach the sim's own list (%d vs %d)"
+		% [mining.broke_cells.size(), sim_broke_before])
+	var after: Interface.Observation = iface.observe(env)
+	_check(after.mining_cracks.size() == 1,
+		"and a fresh observation still reports the crack (%d) -- the door handed over a copy, not the bank"
+		% after.mining_cracks.size())

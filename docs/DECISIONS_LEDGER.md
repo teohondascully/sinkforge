@@ -11229,3 +11229,60 @@ cap and shaving a WHY-comment to fit is what `docs/QUALITY.md` §2 exists to sto
 **Reverse cost:** `reveal_scene._update_camera` returns to assigning the body's position.
 `view/camera_rig.gd`, its suite, and `DebugSceneCommon.follow_camera` delete as a unit. The world
 shimmers in motion again.
+
+
+## D0274 · The L2 door never opened onto the mining verb, and six backlog items were behind it · 2026-08-31 · LEGACY_GAP PRE-3
+
+**The finding, restated exactly.** `sim/mining/mining.gd` computes `charging_cell`, `banked(cell)`,
+`cracked_cells()`, `broke_this_tick`, `broke_material`, `broke_cells` and `breach_this_tick` — and
+`Interface.observe()` read `_grid` and `_body` **and never touched `_mining` at all**. Cracks, crumble,
+the hollow ring, the breach payoff, the draught and payout ticks were every one of them blocked behind
+a door nobody had opened. `cracked_cells()`'s own docstring says it exists "for a renderer"; nothing
+called it.
+
+**THE HOLLOW READING IS NOW A MAGNITUDE, and that is the substantive change rather than the plumbing.**
+It was computed inside `_break` and discarded, surviving only as the boolean `breach_this_tick`.
+Legacy's reason for carrying the number is in its own comment: *"volume rides the reading, so closing on
+a cavity is a crescendo you can act on rather than a flag that flips."* Both audio laws and the
+draught's particle count are functions of the magnitude, and a consumer given only the threshold cannot
+reconstruct it — while one given the magnitude derives the threshold for free.
+
+Set on **every charging tick**, not only on a break. Legacy rings per swing while you work the face, and
+that repetition is what makes the tell RISE as you approach; computing it only when rock gives way would
+deliver the whole crescendo as a single note at the end. `_break` now READS the field the tick already
+set rather than calling `hollow_at` a second time — two calls are two chances for the break's threshold
+and the renderer's crescendo to disagree about the same blow.
+
+**The boolean beside the cell is not redundant.** `mining_is_charging` exists because `Mining.NO_CELL` is
+a sentinel, and a view testing against it would have to name a `sim/` symbol to ask an ordinary question
+— which `tools/layer_lint` forbids, and which would make the sentinel part of the public contract. The
+door answers the question instead of handing over the key.
+
+**MUTATION-TESTING CORRECTED TWO OF MY OWN GUARDS BEFORE THEY SHIPPED, which is the reason the rule
+exists.** Six mutants; two were initially MISSED:
+* *`broke_cells` handed over live instead of duplicated* — my test mutated the observation's copy and
+  compared `state_signature()`, but `broke_cells` is per-tick telemetry and deliberately not in the
+  signature, so the check could not see it. Now asserted against the sim's own array directly.
+* *`hollow_this_tick` never set at all* — my interface assertion checked only "in range 0..FULL", **and
+  0 satisfies that**, so it passed on a field that was never written. A guard that cannot be false. The
+  replacement poses a real cavity where the right answer is non-zero, keeps a solid-rock control where
+  it is zero, and asserts the value equals `hollow_at` for that cell and direction.
+
+All six caught after the fix, including "hollow pinned to the BREACH threshold" — a mutant that turns
+the magnitude back into a flag while still setting the field, which is the exact regression this entry
+is about.
+
+**`_sig` in `tests/test_interface.gd` was missing `Mining` entirely.** The crack bank IS sim state —
+two runs that banked different partial charges break different cells on different ticks later, which is
+why `Mining.state_signature()` exists. Without it, a rejected command that nonetheless advanced a crack
+would have read as "changed nothing at all" in the suite whose whole subject is that claim.
+
+**The swing edge PRE-3 also asks for is NOT in this change, and that is a parked decision rather than an
+omission.** Legacy fires the ring per SWING — a discrete blow — and this build has no swing: `mine()` is
+a per-tick hold, and `charging_cell` advances every tick. Defining a swing cadence is a feel decision
+about how mining reads, not a plumbing change, so it goes to `docs/NEEDS_DIRECTOR.md` rather than being
+invented in a loop. Everything else PRE-3 names is here, and the items it unblocks (T1 #5 cracks and
+crumble, T1 #6 the hollow ring) need only the parts that landed.
+
+**Reverse cost:** delete `_fill_mining` and the nine `Observation` fields; drop `hollow_this_tick` and
+restore `_break`'s local. Every mining-feedback item goes back to being blocked on one unopened door.

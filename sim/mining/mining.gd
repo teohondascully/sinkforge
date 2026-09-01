@@ -99,6 +99,18 @@ var charging_cell: Vector2i = NO_CELL  ## the cell this tick's hold advanced, if
 var broke_this_tick: bool = false
 var broke_material: StringName = &""
 var breach_this_tick: bool = false  ## the break opened into a void -- `HollowTell.BREACH` or above
+
+## THE HOLLOW READING AS A MAGNITUDE, not a flag. Per mille: 0 is solid to the horizon, 1000 is a void
+## right behind the face. `docs/LEGACY_GAP.md` PRE-3 asked for exactly this, and the reason is in legacy's
+## own comment at `main.gd:1600-1609`: **"volume rides the reading, so closing on a cavity is a crescendo
+## you can act on rather than a flag that flips."** Both audio laws and the draught's particle count are
+## functions of the magnitude; `breach_this_tick` is one threshold sampled from it and cannot reconstruct
+## it.
+##
+## Set on EVERY charging tick, not only on a break. Legacy rings per swing while you work the face, which
+## is what makes the tell RISE as you approach; computing it only at the moment rock gives way would
+## deliver the whole crescendo as a single note at the end. 0 whenever nothing is being worked.
+var hollow_this_tick: int = 0
 ## Every cell this tick's blow actually cleared, target first, in the deterministic scan order `_clear_bite`
 ## walks. A view wanting to spray debris per cleared cell reads this rather than re-deriving the disc, which
 ## would be a second copy of the shape free to drift from the one that ran.
@@ -202,6 +214,7 @@ func mine(grid: TileGrid, body_x: int, body_y: int, target: Vector2i, held: bool
 	broke_this_tick = false
 	broke_material = &""
 	breach_this_tick = false
+	hollow_this_tick = 0
 	broke_cells.clear()
 
 	_rhythm_idle += 1
@@ -214,12 +227,13 @@ func mine(grid: TileGrid, body_x: int, body_y: int, target: Vector2i, held: bool
 		return NO_CELL
 
 	charging_cell = target
+	hollow_this_tick = hollow_at(grid, target, swing_dir(body_x, body_y, target))
 	var material: StringName = grid.get_material(target)
 	var charge: int = banked(target) + CHARGE_UNIT + (CHARGE_UNIT * _rhythm) / RHYTHM_SPEED_DEN
 	if charge < break_cost(material):
 		_cracks[target] = Vector2i(charge, 0)
 		return NO_CELL
-	return _break(grid, body_x, body_y, target, material)
+	return _break(grid, target, material)
 
 
 ## A cell is workable if it is a real solid cell inside the world and within reach. Legacy also required
@@ -254,14 +268,16 @@ func _heal_cracks(grid: TileGrid, working: Vector2i) -> void:
 ## Overshoot is discarded rather than carried into the next cell, as in legacy -- with a fixed tick that
 ## quantises break time upward by at most one tick, which is the honest cost of not carrying a remainder
 ## that would make two identical holds break at different times depending on where the previous one ended.
-func _break(grid: TileGrid, body_x: int, body_y: int, cell: Vector2i, material: StringName) -> Vector2i:
-	var hollow: int = hollow_at(grid, cell, swing_dir(body_x, body_y, cell))
+func _break(grid: TileGrid, cell: Vector2i, material: StringName) -> Vector2i:
+	# `hollow_this_tick` was already set by `mine()` for this same cell and direction, so this reads it
+	# rather than calling `hollow_at` a second time -- two calls would be two chances for the break's
+	# threshold and the renderer's crescendo to disagree about the same blow.
 	_clear_bite(grid, cell)
 	_rhythm = mini(RHYTHM_FULL, _rhythm + RHYTHM_GAIN)
 	_rhythm_idle = 0
 	broke_this_tick = true
 	broke_material = material
-	breach_this_tick = hollow >= HollowTell.BREACH
+	breach_this_tick = hollow_this_tick >= HollowTell.BREACH
 	return cell
 
 

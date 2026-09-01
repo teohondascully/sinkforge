@@ -114,6 +114,43 @@ class Observation:
 	## bug: an observation must never answer from data it did not hand over.
 	var surface_y: PackedInt32Array
 
+	## --- THE MINING VERB'S OWN STATE -----------------------------------------------------------------
+	##
+	## `docs/LEGACY_GAP.md` PRE-3, and the finding it records: `sim/mining/mining.gd` computed all of this
+	## and `observe()` read `_grid` and `_body` **and never touched `_mining` at all**. Every mining
+	## feedback capability in the backlog -- cracks, crumble, the hollow ring, the breach payoff, the
+	## draught, payout ticks -- was blocked behind one door that had simply never been opened.
+	##
+	## Copied per observation rather than handed over as a reference to the `Mining` object, which is the
+	## same rule the body's fields above follow: an `Observation` is a COPY, so a view cannot reach back
+	## through it and mutate the sim (`docs/ARCHITECTURE.md` L2, `tests/test_interface.gd`).
+
+	## The cell this tick's hold advanced, and whether there was one. **The boolean is not redundant.**
+	## `Mining.NO_CELL` is the sentinel, and a view testing against it would have to name a `sim/` symbol
+	## to ask an ordinary question -- which `tools/layer_lint` forbids and which would make the sentinel
+	## part of the public contract. The door answers the question instead of handing over the key.
+	var mining_charging_cell: Vector2i = Vector2i.ZERO
+	var mining_is_charging: bool = false
+
+	## Cell -> banked charge, for every cell currently holding one. A crack overlay reads this instead of
+	## probing the whole visible grid every frame, which is what `Mining.cracked_cells()` was written for
+	## and what nothing had yet called.
+	var mining_cracks: Dictionary = {}
+
+	## What this tick's blow actually did. `broke_cells` is target-first in the deterministic scan order
+	## `_clear_bite` walks, so a view spraying debris per cleared cell reads it rather than re-deriving
+	## the disc -- a second copy of that shape would be free to drift from the one that ran.
+	var mining_broke: bool = false
+	var mining_broke_material: StringName = &""
+	var mining_broke_cells: Array[Vector2i] = []
+
+	## THE HOLLOW READING AS A MAGNITUDE (per mille), and `mining_breach` is one threshold sampled from
+	## it. Legacy's own reason for carrying the number rather than the flag: "volume rides the reading, so
+	## closing on a cavity is a crescendo you can act on rather than a flag that flips." A consumer given
+	## only the boolean cannot reconstruct the crescendo; one given the magnitude can derive the boolean.
+	var mining_hollow: int = 0
+	var mining_breach: bool = false
+
 	## True iff `c` holds solid material. Outside the window returns false -- NOT "unknown", and the
 	## distinction matters as soon as fog exists: a consumer asking about a cell it was not given should
 	## be reading `in_window` first. Deliberately not an error, because a renderer legitimately probes
@@ -218,7 +255,28 @@ func observe(envelope: Envelope) -> Observation:
 	o.cell = Vector2i(Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y))
 	o.window = envelope.window
 	_fill_window(o)
+	_fill_mining(o)
 	return o
+
+
+## The mining verb's per-tick state, copied onto the observation. Split out of `observe` for the same
+## reason `_fill_window` is: that function stays a flat list of field reads a reader can check against
+## `Observation` by eye.
+##
+## `duplicate()` on the crack map and the broken-cell list, not a reference. Handing over the live
+## containers would let a view clear the sim's crack bank by tidying up after itself, and the failure
+## would surface as a determinism divergence hundreds of ticks later with nothing pointing back here.
+func _fill_mining(o: Observation) -> void:
+	o.mining_charging_cell = _mining.charging_cell
+	o.mining_is_charging = _mining.charging_cell != Mining.NO_CELL
+	o.mining_cracks = {}
+	for cell: Vector2i in _mining.cracked_cells():
+		o.mining_cracks[cell] = _mining.banked(cell)
+	o.mining_broke = _mining.broke_this_tick
+	o.mining_broke_material = _mining.broke_material
+	o.mining_broke_cells = _mining.broke_cells.duplicate()
+	o.mining_hollow = _mining.hollow_this_tick
+	o.mining_breach = _mining.breach_this_tick
 
 
 ## Copies the window into the three derived fields. Split out of `observe` so that function stays a flat

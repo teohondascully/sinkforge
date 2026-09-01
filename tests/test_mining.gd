@@ -33,6 +33,7 @@ func _initialize() -> void:
 	_test_the_tell_rises_monotonically_on_approach()
 	_test_the_world_edge_does_not_read_as_a_cavity()
 	_test_the_tell_normalisation_reproduces_legacys_own_constant()
+	_test_the_hollow_magnitude_survives_the_tick_that_computes_it()
 	_finish("mining")
 
 
@@ -247,3 +248,44 @@ func _test_the_tell_normalisation_reproduces_legacys_own_constant() -> void:
 	print("  [OBSERVED] TOTAL_WEIGHT %d, unscaled %.3f (legacy's own 7.5)" % [HollowTell.TOTAL_WEIGHT, scaled])
 	_check(absf(scaled - 7.5) < 0.0001,
 		"the derived normalisation equals legacy's (REACH+1)(SPREAD+1)/2 == 7.5 (got %.4f)" % scaled)
+
+
+## D0274 (`docs/LEGACY_GAP.md` PRE-3): the hollow reading was computed inside `_break` and thrown away,
+## leaving only the boolean `breach_this_tick`. Legacy carries the MAGNITUDE because "volume rides the
+## reading, so closing on a cavity is a crescendo you can act on rather than a flag that flips", and a
+## consumer given only the threshold cannot reconstruct the ramp.
+##
+## POSED AGAINST A REAL CAVITY, which is the whole point. An earlier version of this assertion checked
+## only that the reading was "in range 0..FULL" -- and 0 satisfies that, so it passed on a `Mining` that
+## never set the field at all. The mutation run caught it. A magnitude test needs a fixture where the
+## right answer is NOT zero, and a control where it is.
+func _test_the_hollow_magnitude_survives_the_tick_that_computes_it() -> void:
+	var body_x: int = Fx.from_int(32 * CELL)
+	var body_y: int = Fx.from_int(30 * CELL)
+	var face := Vector2i(32, 32)   ## directly below the body: `swing_dir` reads this as downward
+
+	# CONTROL: solid to the horizon, so the correct reading here is genuinely 0 and a non-zero one would
+	# mean the fixture, not the field, is wrong.
+	var solid: TileGrid = _solid_grid(&"hardrock")
+	var quiet: Mining = _charge_mechanic_mining()
+	quiet.mine(solid, body_x, body_y, face, true)
+	_check(quiet.hollow_this_tick <= QUIET_CEIL,
+		"charging into solid rock reads quiet (%d <= %d)" % [quiet.hollow_this_tick, QUIET_CEIL])
+
+	# TREATMENT: the same swing with a void opened just past the face.
+	var hollow_grid: TileGrid = _solid_grid(&"hardrock")
+	for col: int in range(28, 37):
+		for row: int in range(34, 42):
+			hollow_grid.excavate(Vector2i(col, row))
+	var loud: Mining = _charge_mechanic_mining()
+	loud.mine(hollow_grid, body_x, body_y, face, true)
+	_check(loud.hollow_this_tick > QUIET_CEIL,
+		"charging at a face with a cavity behind it reads loud (%d > %d)" % [loud.hollow_this_tick, QUIET_CEIL])
+	_check(loud.hollow_this_tick == Mining.hollow_at(hollow_grid, face, Mining.swing_dir(body_x, body_y, face)),
+		"and it is exactly what `hollow_at` reports for that cell and direction (%d)" % loud.hollow_this_tick)
+
+	# And it CLEARS on a tick that works nothing -- a field that only ever accumulated would report a
+	# crescendo the player is no longer causing.
+	loud.mine(hollow_grid, body_x, body_y, face, false)
+	_check(loud.hollow_this_tick == 0,
+		"a tick that works nothing clears the reading (%d)" % loud.hollow_this_tick)
