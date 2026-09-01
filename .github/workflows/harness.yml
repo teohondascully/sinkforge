@@ -312,6 +312,7 @@ jobs:
       #   test_heightfield.gd                            test_heightfield
       #   test_body.gd                                   test_body
       #   test_body_dig.gd                               test_body_dig (the dig half, split out at D0269 -- which cell, which rows, what it reports)
+      #   test_gait.gd                                   test_gait (the stride and the stagger -- pure integer decisions, D0310)
       #   test_hostile_chamber.gd                        test_hostile_chamber
       #   test_shaft_replay_determinism.gd               test_shaft_replay_determinism (QUALITY gate 8 — real ShaftGenerator+TileGrid+Body sim, two-process replay)
       #   test_cave_geometry.gd                          test_cave_geometry
@@ -376,6 +377,7 @@ jobs:
             res://tests/test_heightfield.gd \
             res://tests/test_body.gd \
             res://tests/test_body_dig.gd \
+            res://tests/test_gait.gd \
             res://tests/test_hostile_chamber.gd \
             res://tests/test_shaft_replay_determinism.gd \
             res://tests/test_cave_geometry.gd \

@@ -17,7 +17,7 @@ extends RefCounted
 ## WHAT SUPERSEDES WHAT. `docs/DECISIONS_LEDGER.md` D0110 deferred the aim-direction question ("which key
 ## means down, does it compete with mantle_hold's up-key") and scoped digging to horizontal-only as a
 ## result. Cursor-aim answers it: aim is a point against a radius, so "down" is just a cell below the body
-## and no key has to mean it. `body.gd::_handle_dig`'s horizontal column dig still exists alongside this
+## and no key has to mean it. `sim/body/body_dig.gd`'s horizontal column dig still exists alongside this
 ## through Slice 1 -- the reveal metric and every committed recording run on it -- and is not removed here.
 
 const CELL_PX: int = Heightfield.TERRAIN_CELL_PX  ## 4

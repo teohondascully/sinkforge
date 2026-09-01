@@ -171,7 +171,7 @@ func _visible_cells() -> Rect2i:
 ## Memoized per cell. `MaterialLook.cell_color` does a band lookup, a depth darken and two hashes per
 ## call, which was being paid for every solid cell of every frame once this scene stopped drawing one flat
 ## colour. SAFE HERE AND ONLY HERE: `play_scene` has no mining or digging verb -- `_read_play_input` never
-## sets `dig_pressed`, and `Body._handle_dig` is the only thing that mutates terrain -- so the grid is
+## sets `dig_pressed`, and `BodyDig.handle` is the only thing that mutates terrain -- so the grid is
 ## immutable after `_ready`. `reveal_scene` must NOT copy this; its terrain changes under the player.
 func _cell_color(cell: Vector2i) -> Color:
 	if _color_cache.has(cell):

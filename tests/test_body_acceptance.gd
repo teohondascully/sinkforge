@@ -11,7 +11,18 @@ const MAX_TICKS: int = 3000  ## ~50s -- generous; a controller that needs this l
 ## future regression is checked against THIS number, not against whatever a later run happens to produce.
 ## Measured from the first fully-passing run, once the chamber's own bugs (not body.gd's) stopped
 ## distorting it -- docs/DECISIONS_LEDGER.md D0038 has the full before/after.
-const GOLDEN_TRAVERSE_TICKS: int = 225
+##
+## RE-PINNED 2026-09-01 FROM 225 TO 194 FOR THE STRIDE (D0310), and this is the one kind of change that
+## is entitled to move this number: the golden measures HOW LONG A TRAVERSE TAKES, and `docs/LEGACY_GAP.md`
+## T1 #10 is the feature whose entire purpose is that crossing a world gets faster. A drift would be a
+## regression; this is the deliverable.
+##
+## THE MOVE WAS ATTRIBUTED BEFORE IT WAS ACCEPTED, not reasoned about. Setting `Gait.STRIDE_GAIN_NUM` to
+## 0 -- leaving the stagger, the fall seed, the gait plumbing and the `BodyDig` split all live -- returns
+## this to **exactly 225**, not to 224 or 226. So the whole 31-tick move is the stride gain and none of
+## it is anything else in that commit. A re-pin that could not say which of five changes moved the number
+## would be a re-pin of a number nobody understands.
+const GOLDEN_TRAVERSE_TICKS: int = 194
 
 var _t: Dictionary = {}  ## shared telemetry from the one recorded run, built once in _initialize()
 

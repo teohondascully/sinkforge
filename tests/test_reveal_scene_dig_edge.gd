@@ -12,7 +12,7 @@ extends "res://tests/test_base.gd"
 ## The assertions are on EVENT COUNTS produced by a hold PATTERN, never on the expression itself. A test
 ## that recomputed `held and not was_held` and compared it to `_dig_edge`'s output would pass for any
 ## implementation of that same expression including a wrong one -- the self-referential mutation test
-## D0112 records as having hidden a real off-by-one in `_handle_dig`'s right-facing case for exactly this
+## D0112 records as having hidden a real off-by-one in `BodyDig.handle`'s right-facing case for exactly this
 ## reason. A count over a pattern cannot be satisfied by restating the code under test.
 ##
 ## Run: tools/run_gd_test.sh <godot-binary> res://tests/test_reveal_scene_dig_edge.gd

@@ -89,6 +89,9 @@ var facing: int = 1
 ## run, and one without the field reconstructs at the ratio it was recorded under, never today's default.
 var air_control_num: int = AIR_CONTROL_NUM
 var on_floor: bool = false
+## THE GAIT (D0310): the stride that builds while you run and the stagger a long fall costs.
+## `sim/body/gait.gd` is the pure decision layer; `sim/body/gait_state.gd` is the state and the order.
+var gait: GaitState = GaitState.new()
 var _coyote_ticks_left: int = 0
 var _jump_buffer_ticks_left: int = 0
 var _was_jump_held: bool = false
@@ -137,9 +140,13 @@ func _init(start_x: int, start_y: int) -> void:
 ## check). Excludes `_last_violation_col`/`_last_violation_row`/`_had_bounds_violation`: those gate
 ## `Invariants`' own stderr rate-limiting, not any future simulation output.
 func state_signature() -> String:
-	return "%d,%d,%d,%d,%d,%s,%d,%d,%s,%d" % [
+	# `gait.signature()` is appended rather than left out: `stride` and `stagger_ticks` change top speed
+	# and acceleration, so a replay blind to them diverges silently. The signature IS the determinism
+	# contract (D0261) and every mutation path has to reach it.
+	return "%d,%d,%d,%d,%d,%s,%d,%d,%s,%d,%s" % [
 		pos_x, pos_y, vel_x, vel_y, facing, on_floor,
-		_coyote_ticks_left, _jump_buffer_ticks_left, _was_jump_held, air_control_num]
+		_coyote_ticks_left, _jump_buffer_ticks_left, _was_jump_held, air_control_num,
+		gait.signature()]
 
 
 func _left_x() -> int:
@@ -180,57 +187,6 @@ func _box_blocked(grid: TileGrid, left: int, top: int, right: int, bottom: int) 
 				return true
 	return false
 
-
-## The column of cells horizontally adjacent to the body's leading edge, in `facing`'s direction --
-## `_handle_dig` excavates the WHOLE column spanning the body's own height (D0113), this returns just its
-## x plus the body's centre row for bounds-checking and reporting. Horizontal-only on purpose
-## (docs/DECISIONS_LEDGER.md D0110) -- the reveal-layer test this exists for is scoped to lateral search
-## (docs/GDD.md §8/§12), and a single well-defined direction avoids the aim-direction design question a
-## vertical/diagonal dig would raise (which key means "down," does it compete with mantle_hold's up-key)
-## without a stated answer yet.
-##
-## `_right_x()`/`_left_x()` are the box's edges over a HALF-OPEN [left,right) range, same as
-## `_box_blocked`'s own `right - 1`/`bottom - 1` convention (docs/DECISIONS_LEDGER.md D0112) -- a body
-## resting with its right edge exactly on a cell boundary has `_px_to_cell(_right_x())` already equal to
-## the cell just ahead of it (not one it occupies), so `+ facing` on that value overshoots by one cell.
-## The left edge doesn't need the same `- 1`: floor's rounding already gives the leftmost occupied cell
-## there, correctly, with no adjustment.
-func _dig_target_cell() -> Vector2i:
-	var cx: int = _px_to_cell(_right_x() - 1) + 1 if facing > 0 else _px_to_cell(_left_x()) - 1
-	var cy: int = _px_to_cell(pos_y)
-	return Vector2i(cx, cy)
-
-
-## Excavates the dig target COLUMN across its own FULL HISTORICAL dig extent, not just the body's
-## current height -- a single-row notch cannot be walked through by a body several cells tall
-## (docs/DECISIONS_LEDGER.md D0113), and a column dug at two different body-heights without ever being
-## dug in between leaves a gap the body's own later, differently-positioned footprint can straddle
-## (D0122/D0123's staircase). `TileGrid.extend_terrain_dig_extent` (D0125) is the fix: it folds this touch into
-## the column's own historical [min,max] and returns the merged range, so a column is always one
-## contiguous open span from the lowest row ever dug there to the highest -- never re-computed from the
-## body's own current height alone. A press against a column that's already fully open is not an event;
-## a partially-open column still counts once any new cell clears. `dug_material_this_tick` reports
-## `glimmer` if the excavated range held it anywhere, else the first real material found.
-func _handle_dig(grid: TileGrid) -> void:
-	var target: Vector2i = _dig_target_cell()
-	if not grid.in_bounds(target):
-		return
-	var touch_top: int = maxi(0, _px_to_cell(_top_y()) - Heightfield.DIG_HEADROOM_CELLS)
-	var touch_bottom: int = _px_to_cell(_bottom_y() - 1)
-	var extent: Vector2i = grid.extend_terrain_dig_extent(target.x, touch_top, touch_bottom)
-	var reported_material: StringName = &""
-	for row: int in range(extent.x, extent.y + 1):
-		var cell: Vector2i = Vector2i(target.x, row)
-		if not grid.in_bounds(cell):
-			continue
-		var material: StringName = grid.get_material(cell)
-		if material == &"":
-			continue
-		grid.excavate(cell)
-		if reported_material == &"" or material == &"glimmer":
-			reported_material = material
-	dig_event_this_tick = reported_material != &""
-	dug_material_this_tick = reported_material
 
 
 ## One fixed 60Hz tick. Order: horizontal integrate+move+collide, vertical integrate+move+collide.
@@ -293,12 +249,15 @@ func tick(input: InputFrame, grid: TileGrid) -> void:
 	_enforce_grid_bounds(grid)
 	_enforce_grounding_consistency()
 	if input.dig_pressed:
-		_handle_dig(grid)
+		BodyDig.handle(self, grid)
 	# LAST, and after `_enforce_grid_bounds` in particular: the clamp is one of the two recovery paths
 	# entitled to move `pos_x` without consent, and the flag that exempts it is only set once it fires.
 	translation_consent_violation_this_tick = Invariants.report_translation_consent(
 		input.move_dir, entry_vel_x, entry_pos_x, pos_x,
 		depenetrated_this_tick or bounds_violation_this_tick, grid.seed, pos_y) != null
+
+	# LAST, so the gait reads the SETTLED `on_floor` and `pos_y` rather than the mid-resolve ones.
+	vel_y = gait.step(on_floor, pos_y, vel_y, input.move_dir, vel_x, RUN_SPEED)
 
 	_coyote_ticks_left = COYOTE_TICKS if on_floor else maxi(0, _coyote_ticks_left - 1)
 	_jump_buffer_ticks_left = maxi(0, _jump_buffer_ticks_left - 1)
@@ -310,9 +269,13 @@ func _integrate_horizontal(input: InputFrame) -> void:
 	if not on_floor:
 		accel = (accel * air_control_num) / AIR_CONTROL_DEN
 		decel = (decel * air_control_num) / AIR_CONTROL_DEN
+	# The stagger takes GRIP, not control: steering, jumping and mining all still work, the legs just
+	# have less authority for a beat. The stride raises the ceiling it is steering toward.
+	accel = Gait.grip(accel, gait.stagger_ticks)
+	decel = Gait.grip(decel, gait.stagger_ticks)
 	if input.move_dir != 0:
 		facing = input.move_dir
-		var target: int = input.move_dir * RUN_SPEED
+		var target: int = input.move_dir * Gait.top_speed(RUN_SPEED, gait.stride)
 		if vel_x < target:
 			vel_x = mini(target, vel_x + accel)
 		else:
