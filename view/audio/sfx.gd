@@ -76,6 +76,16 @@ func play(voice: StringName, at: Vector2, pitch: float, volume_db: float) -> boo
 	if not _streams.has(voice) or _pool.is_empty():
 		return false
 	var player: AudioStreamPlayer2D = _pool[_next]
+	# **REPORTING TRUE ON A PLAYBACK THE ENGINE REFUSED IS THE ONE THING THIS MUST NOT DO** (D0303).
+	# `AudioStreamPlayer2D.play()` requires the node to be INSIDE the tree, and outside it emits an
+	# engine-level ERROR and returns nothing -- which never changes an exit code, so the caller's `true`
+	# was the only signal and it was wrong. Found by a suite that does `get_root().add_child(sfx)` in
+	# `_initialize`, where `is_inside_tree()` is FALSE: the SceneTree's root is not itself in the tree
+	# that early, so every `extends SceneTree` suite that parents a node there has one that is not
+	# really parented. The game path is unaffected -- `reveal_scene` adds this in `_ready` -- but a
+	# function that says it played when it did not is how a silent library gets shipped.
+	if not player.is_inside_tree():
+		return false
 	_next = (_next + 1) % _pool.size()
 	player.stream = _streams[voice]
 	player.position = at
@@ -91,18 +101,33 @@ func play(voice: StringName, at: Vector2, pitch: float, volume_db: float) -> boo
 ## ring is the whole of it. Returns whether it played, so a caller can tell "nothing to say" from "the
 ## pool refused".
 func note_frame(frame: Frame) -> bool:
+	var v: Dictionary = voice_for_frame(frame)
+	if v.is_empty():
+		return false
+	return play(v["voice"], v["at"], v["pitch"], v["db"])
+
+
+## WHAT THIS FRAME SHOULD SOUND LIKE, as data: `{}` for silence, else voice/at/pitch/db. Static and pure.
+##
+## Split from `note_frame` for the reason `legacy/tools/check_pump.gd` states as the lesson that
+## generalises past audio -- "every generator, every stream and the whole `set_line` driver shipped and
+## went green in check_voice, which called `set_line` by hand, while the controller never called it once".
+## The decision and the actuation are separate things that fail separately, and only one of them can be
+## asserted without an audio device in the tree. `tests/test_sfx_driver.gd` takes the five branches here
+## and the pooled player over there.
+static func voice_for_frame(frame: Frame) -> Dictionary:
 	if frame == null or frame.obs == null or frame.obs.cell_px <= 0:
-		return false
+		return {}
 	var obs: Interface.Observation = frame.obs
+	var at: Vector2 = _cell_centre(obs.mining_charging_cell, obs.cell_px)
 	if obs.mining_breach:
-		return play(&"breach", _cell_centre(obs.mining_charging_cell, obs.cell_px),
-			BREACH_PITCH, BREACH_DB)
+		return {"voice": &"breach", "at": at, "pitch": BREACH_PITCH, "db": BREACH_DB}
 	if not obs.mining_swing or not obs.mining_is_charging:
-		return false
+		return {}
 	if obs.mining_hollow < Interface.HOLLOW_RING:
-		return false
+		return {}
 	var v: Dictionary = voice_for_hollow(obs.mining_hollow, Interface.HOLLOW_FULL)
-	return play(&"hollow", _cell_centre(obs.mining_charging_cell, obs.cell_px), v["pitch"], v["db"])
+	return {"voice": &"hollow", "at": at, "pitch": v["pitch"], "db": v["db"]}
 
 
 static func _cell_centre(cell: Vector2i, cell_px: int) -> Vector2:
