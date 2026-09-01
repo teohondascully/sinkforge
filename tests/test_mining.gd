@@ -34,7 +34,8 @@ func _initialize() -> void:
 	_test_the_world_edge_does_not_read_as_a_cavity()
 	_test_the_tell_normalisation_reproduces_legacys_own_constant()
 	_test_the_hollow_magnitude_survives_the_tick_that_computes_it()
-	_test_the_pick_lands_on_a_cadence_that_quickens_with_rhythm()
+	_test_the_pick_lands_on_a_cadence()
+	_test_rhythm_quickens_the_swing_cadence()
 	_finish("mining")
 
 
@@ -296,7 +297,7 @@ func _test_the_hollow_magnitude_survives_the_tick_that_computes_it() -> void:
 ## `SWING_PERIOD` / `RHYTHM_SWING` rather than invented. The properties that matter are all about WHEN it
 ## fires, so every one of them is measured by counting edges over a run of ticks rather than by reading
 ## the flag once.
-func _test_the_pick_lands_on_a_cadence_that_quickens_with_rhythm() -> void:
+func _test_the_pick_lands_on_a_cadence() -> void:
 	var grid: TileGrid = _solid_grid(&"deepstone")
 	var body_x: int = Fx.from_int(32 * CELL)
 	var body_y: int = Fx.from_int(30 * CELL)
@@ -331,8 +332,16 @@ func _test_the_pick_lands_on_a_cadence_that_quickens_with_rhythm() -> void:
 	_check(gap == idle_period,
 		"the next blow lands exactly %d ticks later, the period at this rhythm (got %d)" % [idle_period, gap])
 
-	# RHYTHM SHORTENS IT. Posed by driving the rhythm up with real breaks rather than by writing to
-	# `_rhythm`, so this measures the mechanism legacy shipped and not a field poke.
+
+
+## The other half of D0279, split from the cadence test above when it hit QUALITY gate 4's 50-line limit.
+## The seam is real: above is WHEN a blow lands at a fixed rhythm, this is what RHYTHM does to that.
+##
+## Posed by driving the rhythm up with real breaks rather than by writing to `_rhythm`, so it measures
+## the mechanism legacy shipped rather than a field poke.
+func _test_rhythm_quickens_the_swing_cadence() -> void:
+	var body_y: int = Fx.from_int(30 * CELL)
+	var idle_period: int = _charge_mechanic_mining().swing_period_ticks()
 	var fast: Mining = Mining.new()
 	var soft: TileGrid = _solid_grid(&"topsoil")
 	var breaks: int = 0

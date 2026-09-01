@@ -16,6 +16,7 @@ extends RefCounted
 ##   -100  sky        (only under `--sky`)
 ##    -50  terrain    (D0276)
 ##      0  cracks     (D0275) -- over the terrain it cracks, under the body doing the cracking
+##      0  crumble    (D0278) -- debris from a cell that has just gone, so it sits over the hole
 ##      0  the scene's own `_draw`: the body sprite and the mining overlay
 ##     10  the HUD    (a `CanvasLayer`, so the camera does not move it)
 ##
@@ -46,5 +47,9 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 		view.add_painter(BackdropPainter.paint).z_index = BACKDROP_Z
 	view.add_painter(TerrainPainter.paint).z_index = TERRAIN_Z
 	view.add_painter(CrackPainter.paint_frame)
+	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so this is an INSTANCE
+	# and a bound method rather than a static Callable. The instance is owned by the layer it is bound
+	# to; nothing else needs to reach it, because it spawns from the frame rather than being poked.
+	view.add_painter(CrumblePainter.new().paint)
 	view.add_hud().add_chip(DepthChip.paint)
 	return view
