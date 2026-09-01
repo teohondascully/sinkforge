@@ -294,6 +294,7 @@ jobs:
       #   test_shaft_generator.gd                        test_shaft_generator
       #   test_heightfield.gd                            test_heightfield
       #   test_body.gd                                   test_body
+      #   test_body_dig.gd                               test_body_dig (the dig half, split out at D0269 -- which cell, which rows, what it reports)
       #   test_hostile_chamber.gd                        test_hostile_chamber
       #   test_shaft_replay_determinism.gd               test_shaft_replay_determinism (QUALITY gate 8 — real ShaftGenerator+TileGrid+Body sim, two-process replay)
       #   test_cave_geometry.gd                          test_cave_geometry
@@ -327,7 +328,7 @@ jobs:
       #   test_view_lifts.gd                             test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
       #   test_settings.gd                               test_settings (the split halves share one bindings map; persist=false writes nothing)
       #   test_recorded_sessions.gd                      test_recorded_sessions (every director recording is binding until retired — P002/D0228)
-      - name: all 42 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 44 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           bash tools/run_suites.sh ./godot 4 \
             res://tests/test_fixed_point.gd \
@@ -340,6 +341,7 @@ jobs:
             res://tests/test_shaft_generator.gd \
             res://tests/test_heightfield.gd \
             res://tests/test_body.gd \
+            res://tests/test_body_dig.gd \
             res://tests/test_hostile_chamber.gd \
             res://tests/test_shaft_replay_determinism.gd \
             res://tests/test_cave_geometry.gd \

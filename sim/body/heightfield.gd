@@ -11,6 +11,29 @@ extends RefCounted
 
 const TERRAIN_CELL_PX: int = 4  ## docs/ARCHITECTURE.md §9: the terrain/digging grid's pixel size.
 
+## D0269 (`docs/NEEDS_DIRECTOR.md` P022, the director's ruling). How many TERRAIN cells of clearance a
+## dug tunnel leaves above the body's head, instead of stopping flush against it.
+##
+## **Lives here rather than on `Body` because it is a property of the TERRAIN GRID**, denominated in the
+## cells this file owns, and because a body is not the only thing that will ever want to fit through a
+## tunnel. (`sim/body/body.gd` was also at 396 of its 400-line cap, but that is why it is not THERE, not
+## why it is HERE.)
+##
+## DERIVED, not picked. A tunnel carved to exactly the body's height leaves **zero** headroom -- measured
+## directly, `headroom above the body = 0.0 px` -- so anything drawn taller than the collision box is
+## permanently inside rock. That is what P022 was: the ported miner sprite is 48px against a 40px body,
+## so its top 8px, helmet and pickaxe, sat in the ceiling on every frame. 8px / `TERRAIN_CELL_PX` = **2**.
+##
+## Stated as a WORLD property and not as a rendering fix, deliberately. `sim/` may not know what `view/`
+## draws, and a constant justified by "the current sprite is 48 tall" would need changing every time art
+## does. The durable claim is the one legacy shipped: a tunnel a person dug has clearance above their
+## head. Legacy got it for free -- its `CELL` was 32px, so every dug tunnel had a full cell of slack.
+## Ours is 4px and carved flush. This restores legacy's property by the mechanism this build needs.
+##
+## NOT applied to width. The body digs the column it faces, and widening that changes what a dig COSTS,
+## which is an economy question and not this one.
+const DIG_HEADROOM_CELLS: int = 2
+
 ## Definitionally "no floor found within the scanned range" -- i32 max, never a value a real surface
 ## height could produce (`docs/ARCHITECTURE.md` §9's depth budget is 4096px). Distinct from a real fall:
 ## a caller seeing this must treat it as "the ground plane doesn't answer here," not as a valid height

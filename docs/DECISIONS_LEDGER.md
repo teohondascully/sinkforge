@@ -10993,3 +10993,66 @@ is ported verbatim (cool and bright, one ring — legacy's own reasoning, that a
 with the miner's leather-and-amber palette and that a second inner ring turned the legs into black boxes),
 but whether it reads at this build's zoom is a judgment I have not made. The art also overhangs the
 collision box 48px against 40px, which the gap doc records as wanting a 48 -> 56 re-bake.
+
+
+## D0269 · A dug tunnel now leaves headroom above the head — the miner's helmet was inside the ceiling · 2026-08-31 · Lane C, NEEDS_DIRECTOR P022, director-ruled
+
+**The defect, measured.** The director looked at the sprite that landed in D0268 and said the miner
+"literally isn't even in the right spot". The obvious reading — bad placement arithmetic — was wrong, and
+measuring said so: the sprite sits at exactly 0.00px error on both axes against its own contract. The real
+quantity is different. `Body` is 40px tall, the authored art is 48px, so **8px of helmet and pickaxe rise
+above the collision box**; and `_handle_dig` carved exactly `[body top, body bottom]`, which is **0.0px of
+clearance**. Every one of those 8px was inside solid rock on every frame. Two correct-looking numbers,
+wrong as a pair.
+
+**The ruling, and the two options refused.** The director ruled: carve headroom, one-to-two terrain cells.
+Explicitly NOT re-baking the art to 40px (a band-aid — it fixes the symptom by deleting the silhouette
+that makes the miner read as a person rather than a chip), and explicitly NOT taking `docs/LEGACY_GAP.md`'s
+queued 48→56 re-bake, which *deepens* the overhang and so makes this worse.
+
+**Derived, not picked.** 8px of overhang / `TERRAIN_CELL_PX` 4 = **2 cells**. Legacy got this property for
+free: its `CELL` was 32px, so any dug tunnel had a full cell of slack above the head. Ours is 4px and was
+carved flush. So this is a PORT of a legacy property by the mechanism this build needs, not a new idea —
+`docs/MASTER_PLAN_AUG30.md` §0.
+
+**The constant lives on `Heightfield`, not `Body`.** It is denominated in terrain cells, which is the
+concept `heightfield.gd` owns, and a body is not the only thing that will ever need to fit through a
+tunnel. (`body.gd` was also at 396 of the 400-line cap. That is why it is not THERE; it is not why it is
+HERE.) Stated as a world property rather than a rendering fix on purpose: `sim/` may not know what `view/`
+draws, and a constant justified by "the current sprite is 48 tall" would need editing every time art does.
+Not applied to WIDTH — widening the dug column changes what a dig costs, which is an economy question.
+
+**Two guards, because it is two different properties, and the mutation run corrected my own comment.**
+The first draft of `test_body_dig.gd`'s docstring claimed the derived boundary catches a wrong constant.
+It does not, and the mutation run said so before the claim shipped: that test recomputes its expectation
+FROM the constant, so it is green at a headroom of 0, 1, 2 or 4 alike. What it actually catches is
+`body.gd` disagreeing with the constant. Whether the constant is BIG ENOUGH has a different subject and
+needed a different home — `test_miner_look.gd`, the only place that can see the sprite's height too, where
+`DIG_HEADROOM_CELLS * TERRAIN_CELL_PX >= texture height - Body.HEIGHT_PX` **reads the overhang from the
+texture** rather than restating `8`, so a future re-bake fails there instead of silently re-opening this.
+This is the `constant must dominate constant` shape: two literals in layers that may not reference each
+other, individually reasonable, wrong as a pair — and nothing in the shipping code can hold them in one
+expression, so a test has to.
+
+Mutation-tested with a witness (`applied=True`) and a positive control, all four as documented:
+constant lowered 2→1 (4px carved vs 8px needed) → `test_miner_look` RED, `test_body_dig` green;
+`body.gd` dropping the term / applying one cell too few / one too many → `test_body_dig` RED all three,
+`test_miner_look` green. The witness is not decoration: a shell version of this same probe earlier in the
+run reported all paths NOT CAUGHT because its replacements never applied.
+
+**`tests/test_body.gd` was split at 398/400.** The seven `_test_dig_*` tests became
+`tests/test_body_dig.gd`. The seam is real rather than convenient: every dig test poses a `dig_pressed`
+input and reads the GRID afterwards, while the movement half poses motion and reads the BODY. Registered
+in `.github/workflows/harness.yml` — `check_ci_not_shrunk` (D0266) sees an addition and passes. That step's
+name carried a hardcoded "42 suites" against an actual 43; corrected to 44. Nothing verifies that count,
+which is why it drifted — the gate compares SETS, so the name is cosmetic and stayed wrong silently.
+
+**Determinism: re-pinned, not regressed, and the distinction is the whole point.** `GOLDEN_HASHES` in
+`test_shaft_replay_determinism.gd` no longer match — expected, since the golden scenario digs 321 times and
+each dig now clears two more rows. The corrupting failure is a different assertion, and it PASSED: two
+separate OS processes replaying the same seed produced bit-identical hashes (first mismatch at -1), and the
+seed+1 control still diverges at the first checkpoint. Re-captured from **CI's own pinned Linux Godot**
+per D0167 — never locally, whatever a local run happens to agree with.
+
+**Reverse cost:** delete `DIG_HEADROOM_CELLS` and restore `touch_top` to `_px_to_cell(_top_y())`; revert
+`GOLDEN_HASHES`; the two suites merge back. The miner's head returns to the ceiling.

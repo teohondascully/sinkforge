@@ -215,7 +215,7 @@ func _handle_dig(grid: TileGrid) -> void:
 	var target: Vector2i = _dig_target_cell()
 	if not grid.in_bounds(target):
 		return
-	var touch_top: int = _px_to_cell(_top_y())
+	var touch_top: int = maxi(0, _px_to_cell(_top_y()) - Heightfield.DIG_HEADROOM_CELLS)
 	var touch_bottom: int = _px_to_cell(_bottom_y() - 1)
 	var extent: Vector2i = grid.extend_terrain_dig_extent(target.x, touch_top, touch_bottom)
 	var reported_material: StringName = &""
