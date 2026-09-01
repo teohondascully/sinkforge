@@ -11668,3 +11668,47 @@ by `check_ci_not_shrunk.py`.
 **Reverse cost:** delete `compare_enforcement` and its three properties from
 `tools/layer_lint/check_ci_not_shrunk.py`, and the eight enforcement branches from the self-test. The
 name checks stand alone again, and the row-1-to-5 column of the table above goes back to "passes".
+## D0280 · Gate 26 counted a check that cannot register its subject, and now counts five · 2026-08-31 · Codex audit FIX 1
+
+**The defect, measured.** `docs/QUALITY.md` gate 26 listed `translation_consent` among six invariants the
+fast fuzz asserts hard-zero, presented as coverage. It is asserted, and the assertion is sound — but the
+population it runs over cannot contain the subject. The only mechanism in `sim/body` that can produce an
+unconsented translation is the ceiling corner nudge, and `tests/fixture_body_fuzz_probe.gd` fires
+`corner_corrected_this_tick` **0 times in 50,000 ticks** (the fast per-commit window) and **0 times in
+1,500,000 ticks** (the full 1000x1500 nightly sweep). Both numbers read off `FUZZ_SUMMARY` on this
+machine, not inferred from the older prose that asserted the first one.
+
+**Proven by mutation, not by argument, and the pair is the finding.** Restoring the pre-D0213 defect in
+`resolve_ceiling` (nudge direction falling back to the stale `body.facing` when `vel_x == 0`) on one tree:
+`tests/test_corner_consent.gd` goes to **4 FAILURE(S)**, exit 1; `tests/test_body_fuzz_fast.gd` on that
+same tree stays **ALL PASS**, exit 0, with `translation_consent` counted at 0. One defect, two instruments,
+one of which is blind to it. A green from the blind one had been written into a normative document as
+though it were coverage.
+
+**Decided: remove the false claim, and add a counter — not a witness.** Gate 26 now says six asserted,
+five covered, names `translation_consent` as the one that is not, and names `tests/test_corner_consent.gd`
+(platform-independent, builds its own grid from constants) plus `tests/test_shaft_replay_determinism.gd`
+(a world that actually produces corner corrections) as where the class is really carried. The fixture's own
+header says the same thing at the same strength.
+
+**Deliberately NOT done: manufacturing a corner in the fuzz world to give the check a witness.** That would
+convert a documented gap into a hand-placed geometry feature fitted to make an assertion non-vacuous, which
+is `docs/QUALITY.md` §2's fitted-fixture failure exactly — and D0055 already recorded `HostileChamber`'s one
+hand-placed corner tile going unreachable once the bug it had been fitted against was fixed. The check is
+also NOT deleted: it costs nothing, and it is the tripwire that fires if the fuzz world ever changes such
+that the class becomes reachable.
+
+**What the artifact carries instead of the prose.** `corner_corrections=` is now printed on every
+`FUZZ_SUMMARY` line. The vacuity was previously stated in a comment and in this ledger; a reader had to
+trust it. Now any run of the probe reports its own coverage of the class, and a non-zero there is the
+signal that this entry needs revisiting — the limit lives in the instrument rather than in the
+documentation of the instrument.
+
+**Not disturbed, checked deliberately because the same audit called them good:** the empty-population
+guard (`fuzz_total_ticks`, which parses `total_ticks=` by field and is unaffected by an appended field —
+`test_empty_population_guard` still green), both masked-crash detectors in `tools/run_gd_test.sh`, and
+`test_body_fuzz_fast`'s own exit-code and `SCRIPT ERROR:` checks. `violations=922` before and after the
+counter was added, so the instrumentation did not perturb the sweep it measures.
+
+**Reverse cost:** trivial. Drop the `corner_corrections` counter from the probe (one variable, one `if`,
+one format field) and restore gate 26's previous sentence. Nothing depends on the new field.

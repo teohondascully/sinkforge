@@ -17,11 +17,16 @@ extends SceneTree
 ## (20260825) is fixed and unrelated to the fuzzer's input seed, so rebuilding it per run would only
 ## waste time, not add coverage.
 ##
-## D0213: `translation_consent` IS A TRIPWIRE WITHOUT A WITNESS **in this fixture**, and is labelled that
-## way rather than counted as coverage. It reports 0 both with the D0213 defect present and with it fixed,
-## so its own zero here is evidence of nothing. Isolated rather than assumed: wiring that same line to
-## `bounds_violation_this_tick` prints 922 over the fast window, so the print-and-count path works and it
-## is the CONDITION that is never reached.
+## D0213/D0280: `translation_consent` IS A TRIPWIRE WITHOUT A WITNESS **in this fixture**, so THIS FIXTURE
+## DOES NOT COVER THAT CLASS and must never be cited as doing so. It reports 0 both with the D0213 defect
+## present and with it fixed, so its own zero here is evidence of nothing. Isolated rather than assumed:
+## wiring that same line to `bounds_violation_this_tick` prints 922 over the fast window, so the
+## print-and-count path works and it is the CONDITION that is never reached.
+##
+## D0280 moves that from prose into the artifact: `corner_corrections=` on the FUZZ_SUMMARY line below
+## counts the only mechanism in `sim/body` that can produce an unconsented translation, so any run of this
+## fixture states its own coverage of the class instead of a reader having to trust this paragraph. A
+## non-zero there is the signal that the world finally poses the subject and the claim can be revisited.
 ##
 ## **The cause is the WORLD, not the input distribution, and the first answer written here was the wrong
 ## one.** It said uniform random input essentially never leaves the body at horizontal rest. That is false
@@ -172,13 +177,19 @@ func _initialize() -> void:
 	var grid_w: int = grid.width * CELL * Fx.SCALE
 	var grid_h: int = grid.height * CELL * Fx.SCALE
 	var violations: int = 0
+	## D0280: the subject count for `translation_consent`, not a violation count. Every unconsented
+	## translation this fixture could ever report has to come through the corner nudge, so this is the
+	## number that says whether the sweep posed that class at all.
+	var corner_corrections: int = 0
 	for seed: int in range(NUM_SEEDS):
 		var rng: SplitRng = SplitRng.new(seed)
 		var body: Body = FuzzDriverCommon.spawn_body()
 		var state: _RunState = _RunState.new(body)
 		for tick: int in range(TICKS_PER_SEED):
 			body.tick(FuzzDriverCommon.random_input(rng, DIG_DISABLED), grid)
+			if body.corner_corrected_this_tick:
+				corner_corrections += 1
 			violations += _check_tick(body, grid, grid_w, grid_h, state, seed, tick)
-	print("FUZZ_SUMMARY seeds=%d ticks_per_seed=%d total_ticks=%d violations=%d dig_disabled=%s" %
-		[NUM_SEEDS, TICKS_PER_SEED, NUM_SEEDS * TICKS_PER_SEED, violations, DIG_DISABLED])
+	print("FUZZ_SUMMARY seeds=%d ticks_per_seed=%d total_ticks=%d violations=%d dig_disabled=%s corner_corrections=%d" %
+		[NUM_SEEDS, TICKS_PER_SEED, NUM_SEEDS * TICKS_PER_SEED, violations, DIG_DISABLED, corner_corrections])
 	quit(0)
