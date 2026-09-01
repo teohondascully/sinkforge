@@ -25,8 +25,9 @@ harness already produced.
   QUALITY gate 32 (D0318/D0319).
 - `coverage_check.py` — function-name coverage for `core/` and `sim/`. A function is "covered" if its
   name appears as an identifier in at least one `tests/test_*.gd` suite (comments and string literals
-  blanked first). 60% floor, currently 61.8%. Mutation-tested (9/9). Wired into CI as QUALITY gate 33
-  (D0322).
+  blanked first). Ratchet at 61.8% (89/144 names), reported-only — not BLOCKING, because it measures
+  reference not execution and can be gamed to 100% with dead lines. Mutation-tested (10/10). Wired
+  into CI as QUALITY gate 33 (D0322/D0323).
 - `scratch/` — gitignored. Scratch work lives here and only here. If a script here turns out to be
   worth keeping, it becomes a real tool with a claim ID and moves out.
 

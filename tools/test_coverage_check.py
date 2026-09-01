@@ -133,12 +133,33 @@ def branch_string_not_coverage() -> None:
                     "untested" not in test_ids, detail=f"test_ids={test_ids}")
 
 
+def branch_name_collision() -> None:
+    """Two functions sharing a name in different files are ONE unit in the denominator,
+    and one test reference covers both. This is the gate's key modelling choice — coverage
+    is keyed by name, not by (file, name) — and it means the denominator is smaller than
+    the real declaration count. The gate must disclose this wherever it is cited."""
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        init_scratch(root)
+        write_file(root, "core/mod_a.gd", "func shared():\n\tpass\n")
+        write_file(root, "sim/mod_b.gd", "func shared():\n\tpass\n")
+        write_file(root, "tests/test_mod.gd", "func _test():\n\tshared()\n")
+        funcs = C.game_functions(root)
+        LOG.observe("name-collision: two same-named functions are ONE unit in the denominator",
+                    "shared" in funcs and len(funcs["shared"]) == 2,
+                    detail=f"files={funcs.get('shared', set())}")
+        covered = {name for name in funcs if name in C.test_identifiers(root)}
+        LOG.observe("name-collision: one test reference covers BOTH definitions",
+                    "shared" in covered,
+                    detail=f"covered={covered}")
+
+
 def main() -> int:
     for branch in (branch_covered_function, branch_uncovered_function,
                    branch_threshold_fires, branch_threshold_passes,
                    branch_void_no_game_functions, branch_void_no_tests,
                    branch_engine_called_excluded, branch_comment_not_coverage,
-                   branch_string_not_coverage):
+                   branch_string_not_coverage, branch_name_collision):
         branch()
     return LOG.summarise()
 

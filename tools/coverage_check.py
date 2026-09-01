@@ -1,19 +1,36 @@
 #!/usr/bin/env python3
-"""Function coverage for `core/` and `sim/` — which functions are exercised by at least one test suite.
+"""Function-name coverage for `core/` and `sim/` — a ratchet against neglect, not a coverage guarantee.
 
 Not line coverage (GDScript has no coverage instrumentation, and no pure-Python GDScript parser
 exists to build one), but a real, enforceable metric: a function is "covered" if its name appears
 as an identifier in at least one `tests/test_*.gd` suite's code — comments and string literals blanked
 first (`gd_source.blank_comments_and_strings`), so a mention in prose doesn't count.
 
-This overcounts (a name can appear for a different reason) and undercounts (private functions called
-by covered public functions are marked uncovered, and engine-called functions like `_init`/`_ready`
-are never called by tests directly). Both directions are stated, not glossed over. What it answers
-is the most important coverage question: which functions have no test exercising them at all?
+Three properties that must be stated wherever this gate is cited:
+
+1. **It measures reference, not execution.** A bare identifier in a test file — never called —
+   counts as covered. The gate can be taken to 100% by appending one dead line per uncovered name,
+   with zero new testing. That is the tool's declared design (its name says "function-name
+   coverage"), but it means this is a ratchet against neglect, not a coverage guarantee.
+
+2. **The denominator is keyed by name, not by definition.** Two functions sharing a name in
+   different files are one unit in the denominator, and one test reference covers both. The real
+   declaration count is higher (156 in core/+sim/ at the time this was written); the gate's
+   denominator is 144 (156 declarations → 146 distinct names → 144 after engine-called exclusion).
+
+3. **The margin is thin.** 60% of 144 needs 87; the current level is 89. Three new untested
+   functions in core/ or sim/ turns it red — which is the point of a ratchet, but it will fire on
+   the next feature commit rather than eventually.
+
+This overcounts (a name can appear for a different reason, and one match covers every same-named
+function) and undercounts (private functions called by covered public functions are marked
+uncovered, and engine-called functions like `_init`/`_ready` are never called by tests directly).
+Both directions are stated, not glossed over. What it answers is the most important coverage
+question: which functions have no test exercising them at all?
 
 `docs/QUALITY.md` gate 14 declares "≥ 85% line coverage on `core/` and `sim/`" but has no enforcing
 code (gate_status.py reports it NO-CODE). This tool does not satisfy that gate's letter — it is a
-different, weaker metric — but it is the first coverage metric this repository has ever enforced.
+different, weaker metric — and is reported-only, not BLOCKING, for the reasons above.
 
     python3 tools/coverage_check.py
 
@@ -37,10 +54,12 @@ ROOT = Path(__file__).resolve().parents[1]
 GAME_DIRS = ("core", "sim")
 TEST_DIR = "tests"
 
-# The threshold is set below the current measured level (63.0% at the time this was written,
-# D0322) to give headroom for refactoring while catching real drops. A new function added to
-# core/ or sim/ that no test references lowers the percentage; if it drops below 60%, CI fails.
-COVERAGE_FLOOR = 60.0
+# The threshold is set at the current measured level (61.8% at the time this was written,
+# D0322) as a ratchet — it can only go up, never down. A new function added to core/ or sim/
+# that no test references lowers the percentage; if it drops below 61.8%, the gate reports it.
+# This is reported-only (not BLOCKING) because the metric is a ratchet against neglect, not a
+# coverage guarantee (see the docstring's three properties).
+COVERAGE_FLOOR = 61.8
 
 # Engine-called functions that are invoked by Godot itself, not by test code. Excluding them
 # from the denominator is not gaming the metric — they ARE covered (by the engine calling them
@@ -97,7 +116,7 @@ def run(root: Path = ROOT) -> int:
 
     print(f"coverage_check: {len(covered)}/{total} function names in core/+sim/ are referenced "
           f"by tests ({pct:.1f}%)")
-    print(f"coverage_check: threshold is {COVERAGE_FLOOR:.0f}%")
+    print(f"coverage_check: threshold is {COVERAGE_FLOOR:.1f}%")
 
     if uncovered:
         print(f"coverage_check: {len(uncovered)} uncovered function name(s):")
@@ -107,12 +126,12 @@ def run(root: Path = ROOT) -> int:
             print(f"  ... and {len(uncovered) - 20} more")
 
     if pct < COVERAGE_FLOOR:
-        print(f"coverage_check: FAIL -- {pct:.1f}% is below the {COVERAGE_FLOOR:.0f}% floor. "
+        print(f"coverage_check: FAIL -- {pct:.1f}% is below the {COVERAGE_FLOOR:.1f}% floor. "
               f"Add tests for the uncovered functions above, or lower the floor if the metric "
               f"overcounts uncovered (e.g. private functions called by covered public ones).")
         return 1
 
-    print(f"coverage_check: PASS -- {pct:.1f}% meets the {COVERAGE_FLOOR:.0f}% floor.")
+    print(f"coverage_check: PASS -- {pct:.1f}% meets the {COVERAGE_FLOOR:.1f}% floor.")
     return 0
 
 

@@ -13635,3 +13635,35 @@ Wired as QUALITY gate 33 (BLOCKING) in `harness.yml`. Mutation-tested with 9 bra
 (`tools/test_coverage_check.py`): covered/uncovered function detection, threshold fires/passes,
 void populations (no game functions, no test suites), engine-called exclusion, comment-blanking,
 string-blanking.
+
+## D0323 · 2026-09-01 · corrects D0322 — the coverage gate's three properties, the wrong number, and the demotion
+
+**The wrong number.** D0322's threshold comment said "63.0% at the time this was written." The tool,
+run then and now, reports 61.8%. 63.0% was never measured — it was the pre-engine-called-exclusion
+count (92/146), written into the comment before the exclusion was added and never corrected. Fixed
+to 61.8%.
+
+**The undisclosed mechanism.** D0322 disclosed that "a name can appear for a different reason" (the
+overcounting direction). It did not disclose that coverage is keyed by name, not by definition — so
+`state_signature` in `sim/body/body.gd`, `sim/mining/mining.gd`, and `sim/world/tile_grid.gd` is one
+unit in the denominator, and one test reference covers all three. The real declaration count in
+core/+sim/ is 156; the gate's denominator is 144 (156 declarations → 146 distinct names → 144 after
+engine-called exclusion). Zero of the 9 mutation branches tested this. Added a 10th branch
+(`branch_name_collision`) that creates two same-named functions in different files and verifies both
+are covered by a single reference.
+
+**The demotion.** The gate was BLOCKING with 1.8 points of headroom (89/144 = 61.8% against a 60%
+floor). 89/149 definitions = 59.7% — the verdict depends on a modelling choice the gate never stated,
+and three new untested functions in core/ or sim/ would turn CI red on the next feature commit rather
+than eventually. Demoted to reported-only (`continue-on-error: true`). The floor is now 61.8% — a
+ratchet at the measured value, which can only go up. The gate reports; it does not block.
+
+**The three properties.** Stated in the tool's docstring, QUALITY.md gate 33, and here, so a future
+session does not cite 61.8% as evidence that 61.8% of `sim/` is exercised:
+
+1. It measures reference, not execution. A bare identifier, never called, counts as covered. The
+   gate can be taken to 100% by appending one dead line per uncovered name, with zero new testing.
+2. The denominator is keyed by name, not by definition. Two functions sharing a name are one unit;
+   one test reference covers both.
+3. The margin is thin. 60% of 144 needs 87; the ratchet sits at 89. Three new untested functions
+   turns it red.
