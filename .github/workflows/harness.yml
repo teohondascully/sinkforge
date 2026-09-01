@@ -329,6 +329,7 @@ jobs:
       #   test_terrain_painter.gd                        test_terrain_painter (terrain on the coordinator + the painter z-order — D0276, LEGACY_GAP T1 #4)
       #   test_crumble_painter.gd                        test_crumble_painter (rock shatters when it breaks — D0278, LEGACY_GAP T1 #5)
       #   test_wall_painter.gd                           test_wall_painter (the background wall plane + its recess cast — D0286, LEGACY_GAP T1 #3)
+      #   test_wall_lode.gd                              test_wall_lode (the mineral mark in that plane, untoned as legacy draws it — D0299)
       #   test_arrival_plate.gd                          test_arrival_plate (the stratum arrival ceremony — D0288, LEGACY_GAP T1 #8)
       #   test_sfx_bank.gd                               test_sfx_bank (the hollow ring + the breach, synthesised and measured — D0296, LEGACY_GAP T1 #6)
       #   test_material_palette.gd                       test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
@@ -388,6 +389,7 @@ jobs:
             res://tests/test_terrain_painter.gd \
             res://tests/test_crumble_painter.gd \
             res://tests/test_wall_painter.gd \
+            res://tests/test_wall_lode.gd \
             res://tests/test_arrival_plate.gd \
             res://tests/test_mining.gd \
             res://tests/test_mining_bite.gd \

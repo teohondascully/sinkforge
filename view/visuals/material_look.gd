@@ -28,7 +28,7 @@ extends RefCounted
 ## cell subdivided into 8px fine cells; this world is 16px subdivided into 4px. Legacy's nugget quad is
 ## 6.4px tall, so **legacy's smallest sub-cell mark is larger than this world's entire terrain cell.**
 ## Its per-cell interior detail has nowhere to go but into the cell colour itself, which is what
-## `_speck_lift` below does with the nugget: legacy scattered N crystals inside one cell, and here a
+## `speck_color`/`is_speck` below do with the nugget: legacy scattered N crystals inside one cell, and here a
 ## deterministic fraction of CELLS carry the nugget colour instead. Same statistical read, one grid
 ## finer. The measured basis for that claim is in D0189.
 
@@ -79,7 +79,7 @@ const STRATA_AMOUNT: float = 0.17  ## legacy `world_renderer.gd:1611` -- how far
 const DEPTH_DARKEN_FULL_M: float = 128.0
 
 ## Nugget-bearing materials: the fraction of cells that carry the nugget colour rather than the host.
-## Derived, not picked -- see `_speck_lift`. Legacy's `nugget_count` is crystals per 32px cell; one 32px
+## Derived, not picked -- see `is_speck`. Legacy's `nugget_count` is crystals per 32px cell; one 32px
 ## cell is 64 of this world's 4px cells, so `count / 64` is the same areal density one grid finer.
 const LEGACY_CELL_SUBCELLS: float = 64.0
 
@@ -135,7 +135,7 @@ static func depth_m(row: int) -> int:
 ## polygons over the top (`world_renderer.gd:1181 _draw_lode`, `:1223 _draw_grain`) -- so a vein keeps its
 ## own mineral colour however deep it sits. This world's terrain cell is 4px and legacy's smallest nugget
 ## mark is 6.4px, so there is no room to draw a crystal ON a cell; the cell IS the mark, which is the
-## whole basis of `_speck_lift`. That leaves the ore's own body colour going through the tint, and the
+## whole basis of `is_speck`/`speck_color`. That leaves the ore's own body colour going through the tint, and the
 ## measured consequence was severe: at 252 m all four zone bands are clamped at full strength and only
 ## 32% of a material's own colour survives (0.78*0.84*0.74*0.66), which collapsed glimmer-vs-deepstone
 ## separation from 0.25 to **0.061** and would have made a vein unfindable in Stonereach.
@@ -147,15 +147,50 @@ static func depth_m(row: int) -> int:
 ## materials are exempt (coal, glimmer, ore_copper, ore_iron); three are not (clay, deepstone, hardrock).
 ## `tests/test_material_palette.gd`'s distinctness floor is what holds this honest.
 func cell_color(material: StringName, col: int, row: int) -> Color:
+	if is_speck(material, col, row):
+		return speck_color(material, col, row)
+	return matrix_color(material, col, row)
+
+
+## The rock at this cell WITHOUT the mineral mark on it: base, depth-darkened, zone-tinted, toned. This
+## is what legacy calls the matrix, and it is a separate function from the mark for one reason — the wall
+## plane tones the matrix and does NOT tone the mark (`world_renderer.gd:1204` "the matrix is baked into
+## the wall plane; what is left for the live pass is the metal in it"). While `cell_color` was the only
+## way in, `wall_painter.wall_color` had no way to honour that ordering and put both through the recess.
+## Public for `WallPainter`; the split changes nothing about what `cell_color` returns (D0299).
+func matrix_color(material: StringName, col: int, row: int) -> Color:
 	var rec: Dictionary = MaterialsRecords.RECORDS.get(material, {})
 	if rec.is_empty() or not rec.has("base_color"):
 		return Color(0.42, 0.34, 0.24)  # the pre-Slice-0 debug brown: an unmapped material stays visible
 	var base: Color = _to_color(rec["base_color"])
 	base = _depth_darkened(base, rec, row)
 	var country_rock: bool = not rec.has("nugget_color")
-	base = apply_tone(base, cell_tone(col, row, country_rock))
-	base = _speck_lift(base, rec, col, row)
-	return base
+	return apply_tone(base, cell_tone(col, row, country_rock))
+
+
+## True when this cell carries the mineral mark rather than the matrix around it. Public so a test can
+## NAME the population it is measuring: "ore vs rock" pooled over both branches compares an ore's own
+## matrix against country rock and demands they differ, which is asking for the opposite of what the
+## matrix is for — the first version of `test_wall_painter`'s ore assertion did exactly that and its
+## worst case was coal's matrix against deepstone's, two country rocks that are supposed to be alike.
+func is_speck(material: StringName, col: int, row: int) -> bool:
+	var rec: Dictionary = MaterialsRecords.RECORDS.get(material, {})
+	if not rec.has("nugget_color"):
+		return false
+	var density: float = float(int(rec.get("nugget_count", 0))) / LEGACY_CELL_SUBCELLS
+	return _hash01(col, row, 7717) < density
+
+
+## The mark itself, at full strength, independent of whatever it is drawn over — which is what makes it
+## portable to the wall plane. Legacy draws socket / body / facet as three polygons; at one cell there is
+## room for one value, so the cell takes the crystal body and a hash decides whether it is the lit facet
+## or the seated socket.
+func speck_color(material: StringName, col: int, row: int) -> Color:
+	var rec: Dictionary = MaterialsRecords.RECORDS.get(material, {})
+	if not rec.has("nugget_color"):
+		return matrix_color(material, col, row)
+	var nug: Color = _to_color(rec["nugget_color"])
+	return nug.lightened(0.22) if _hash01(col, row, 3391) < 0.34 else nug.darkened(0.18)
 
 
 ## Legacy `world_renderer.gd:1516-1523 _zone_tinted`. Ease `base` toward every zone tint whose band this
@@ -274,18 +309,6 @@ func _depth_darkened(base: Color, rec: Dictionary, row: int) -> Color:
 ## cell; at 4px a crystal is bigger than a cell, so the scatter moves up one level: a deterministic
 ## fraction of cells take the nugget colour outright. `count / 64` preserves areal density exactly,
 ## because one 32px legacy cell covers 64 of these.
-func _speck_lift(base: Color, rec: Dictionary, col: int, row: int) -> Color:
-	if not rec.has("nugget_color"):
-		return base
-	var density: float = float(int(rec.get("nugget_count", 0))) / LEGACY_CELL_SUBCELLS
-	if _hash01(col, row, 7717) >= density:
-		return base
-	# Legacy draws socket / body / facet as three polygons; at one cell there is room for one value, so
-	# the cell takes the crystal body and a hash decides whether it is the lit facet or the seated socket.
-	var nug: Color = _to_color(rec["nugget_color"])
-	return nug.lightened(0.22) if _hash01(col, row, 3391) < 0.34 else nug.darkened(0.18)
-
-
 ## Legacy's `grain` is a BOOLEAN gate, not an amount (material_def.gd:19), enabling a per-cell speckle
 ## pass. Here it gates a small deterministic value jitter -- the cheapest possible stand-in for the
 ## thing that stops rock reading as a flat fill, and at 4px the only one the grid can express. The
