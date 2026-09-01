@@ -125,6 +125,8 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
 
 31. **Every tracked `tests/test_*.gd` suite is actually run by CI.** A suite that exists, passes locally and appears in no workflow step is the ledger's "gate that runs nowhere" class with the subject being the whole suite: four of them — `test_material_palette` (Slice 0), `test_mining`, `test_reveal_scene_dig_edge` and `test_reveal_spawn_bounds` (Slice 1) — were in exactly that state, including two deliberately mutation-tested bounds controls. Reconciles the tracked population against the workflow's own `res://tests/…` references and reports the MEMBERS of both set differences, because the counts on each side looked healthy throughout (`docs/DECISIONS_LEDGER.md`'s "equal counts, different sets"). `tools/layer_lint/check_suite_coverage.py`, `docs/DECISIONS_LEDGER.md` D0201.
 
+32. **Every `.gd`/`.py`/`.sh`/`.yml`/`.yaml` file matches `.editorconfig`'s declared rules.** `.editorconfig` declared five properties for this tree and nothing checked one of them until this gate. Six rules (charset, trailing-whitespace, file-edges, blank-run, indent, comment-space), two rulesets (string-aware for `.gd`/`.py`, byte-level for `.sh`/`.yml`/`.yaml`), mutation-tested 76/76 and self-including. `tools/formatter/formatter.py`, `docs/DECISIONS_LEDGER.md` D0318. The `indent` rule refuses rather than guesses on ambiguous indentation (mixed tabs and spaces, or a space count not a multiple of 4) — a formatter that reshapes an indentation it cannot read unambiguously is changing program structure on a guess, and the refusal is reported with its line number so a human can fix it by hand.
+
 ---
 
 ## 2. Harness truth

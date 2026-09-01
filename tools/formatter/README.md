@@ -104,5 +104,5 @@ the property is asserted on every run, not trusted from a test.
   shared `Observations` class from `tools/layer_lint/gate_test_support.py` (D0232).
 - **The tree has been reformatted.** `--write` fixed 10 files (blank lines at EOF, 3+ blank runs, one
   missing final newline). A second `--check` confirms idempotence: PASS.
-- **Not wired into CI or `.githooks/pre-commit`,** and no `docs/QUALITY.md` gate number. Until it runs
-  somewhere it cannot be bypassed, it is a tool, not a gate.
+- **Wired into CI** as `docs/QUALITY.md` gate 32 (BLOCKING), and into `.githooks/pre-commit` (staged files
+  only). The mutation tests run in CI via the existing `find tools -name 'test_*.py'` sweep.

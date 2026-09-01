@@ -13520,3 +13520,24 @@ run, and the fix was to use the existing shared utility, not to add an exclusion
 **Not a gate yet.** The tool, its tests (76/76), and the 10-file sweep land in this commit. CI wiring
 (`harness.yml`, `.githooks/pre-commit`, `docs/QUALITY.md` gate 32) is a separate commit — tool first,
 gate later, so gate 32 does not go live on assertions the tool's own author calls a smoke check.
+
+
+## D0319 · 2026-09-01 · Gate 32 goes live — the formatter as a BLOCKING CI step and a pre-commit hook
+
+**The gate.** `docs/QUALITY.md` gate 32: every `.gd`/`.py`/`.sh`/`.yml`/`.yaml` file matches
+`.editorconfig`'s declared rules. BLOCKING in `harness.yml`'s `gates` job, and in `.githooks/pre-commit`
+on staged files only (not the whole tree — the CI gate covers the full population on every push/PR).
+
+The mutation tests run in CI via the existing `find tools -name 'test_*.py'` sweep — no new step needed
+for them, they are picked up automatically.
+
+**BLOCKING, not advisory.** The formatter's own mutation tests (76/76) prove every rule fires when
+broken, the tool is self-including, and the tree is already canonical. A formatting regression is a
+fact about the tree a build should refuse — the same reasoning as `duplication.py` (D0099).
+
+**The pre-commit hook restructures the mojibake gate's early return.** The mojibake check's
+`[ -z "$files" ] && exit 0` was an unconditional exit that would have skipped the formatter check. The
+fix: wrap the mojibake block in `if [ -n "$files" ]; then ... fi` so the early return becomes a skip
+of the mojibake block, not an exit from the whole hook. The formatter check follows, with its own
+early return on empty scope (exit 2 from the formatter is VOID, not a failure — none of the staged
+files are in the formatter's scope, e.g. only `.md` staged).

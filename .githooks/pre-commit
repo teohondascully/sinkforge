@@ -82,7 +82,7 @@ fi
 # round of the Latin-1/UTF-8 confusion always produces them. Testing for them catches the fault at the
 # only moment it is cheap to fix.
 files=$(git diff --cached --name-only --diff-filter=ACM -- '*.gd' '*.md' '*.sh' '*.cfg' '*.godot')
-[ -z "$files" ] && exit 0
+if [ -n "$files" ]; then
 bad=""
 for f in $files; do
 	[ -f "$f" ] || continue
@@ -110,5 +110,25 @@ if [ -n "$bad" ]; then
 	printf '\nA byte-oriented editor re-encoded UTF-8 as Latin-1. Repair before committing;\n' >&2
 	printf 'do not "fix" it by deleting the punctuation.\n' >&2
 	exit 1
+fi
+fi
+
+# FORMATTER GATE (D0319). `.editorconfig` made executable. Checks only the staged files that are in
+# the formatter's scope (.gd/.py/.sh/.yml/.yaml), not the whole tree -- fast enough for a pre-commit
+# hook, and the CI gate (harness.yml) checks the full population on every push/PR. Exit 2 (VOID) from
+# the formatter means "none of the staged files are in scope" (e.g. only .md staged), which is not a
+# failure -- the hook passes, same as the mojibake gate's early return above.
+fmt_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.gd' '*.py' '*.sh' '*.yml' '*.yaml')
+if [ -n "$fmt_files" ]; then
+	python3 tools/formatter/formatter.py $fmt_files >/dev/null 2>&1
+	fmt_exit=$?
+	if [ "$fmt_exit" -eq 1 ]; then
+		printf 'COMMIT REFUSED: formatting violations in staged files.\n' >&2
+		printf 'Run: python3 tools/formatter/formatter.py --write\n' >&2
+		exit 1
+	elif [ "$fmt_exit" -gt 2 ]; then
+		printf 'COMMIT REFUSED: formatter exited with an unexpected code (%d).\n' "$fmt_exit" >&2
+		exit 1
+	fi
 fi
 exit 0
