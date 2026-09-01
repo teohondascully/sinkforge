@@ -24,10 +24,34 @@ extends "res://tests/test_base.gd"
 ##    on the movement course it was actually played on. A replayer that trusts the field gets a
 ##    plausible-looking run against the wrong world and reports its own divergence as the body's.
 ##
-## So a pre-D0209 log is replayed against BOTH worlds and attributed to one that comes back clean. That
-## is a genuinely weaker check than a believed header gets, and it is weaker in a specific way worth
-## knowing: for two of the three old logs BOTH worlds replay clean, so those sessions are checked for
-## "some world replays this cleanly" rather than "the world it was played in does".
+## So a pre-D0209 log is replayed against BOTH worlds and attributed to one that comes back clean.
+##
+## **THIS SUITE THEREFORE MAKES TWO DIFFERENT CLAIMS, AND THEY MUST NOT BE QUOTED AS ONE** (D0282). Every
+## row of output names which one it carries; nothing here is a blanket "the recorded sessions replay
+## faithfully".
+##
+## * **FAITHFUL** -- the log carries `air_control=`, so its `chamber=` is believed, and the session is
+##   replayed against THE WORLD IT WAS RECORDED IN. A clean result means what it sounds like it means.
+## * **ATTRIBUTED** -- the log predates that commit, so `chamber=` carries no information and the world is
+##   chosen by replaying candidates until one comes back clean. A clean result proves only **"this input
+##   replays cleanly under at least one supported world"**. It is NOT evidence that the chosen world is
+##   the one that was played, and it is NOT faithful recorded-world replay.
+##
+## How weak ATTRIBUTED is varies per log, and the corpus contains both extremes -- measured, all candidates
+## replayed (D0282), not inferred from the attribution the suite settles on:
+##
+## * `play_2026-08-30T15-46-21.log` DISCRIMINATES: `bad=0` on `movement_course`, `bad=855` on
+##   `hostile_chamber`. Only one world can be right, so the attribution is evidenced even though the header
+##   is not believed.
+## * `play_2026-08-30T01-08-15.log` and `play_2026-08-30T01-43-19.log` DO NOT: `bad=0` under BOTH worlds.
+##   For these two the suite is checking "some supported world replays this cleanly" and nothing more.
+##   Their climb counts differ by world (0 vs 1, and 0 vs 6), which is the sharpest available statement of
+##   the ambiguity: the two logs that get the weaker guarantee contribute 0 to the `climbs` positive
+##   control under the world they are attributed to, so they are not carrying that control either.
+##
+## The fallback itself is deliberate and stays -- it is the right handling for genuinely corrupt historic
+## metadata, and the alternative (trusting a field known to be wrong) is worse. What D0282 changed is only
+## what the suite CLAIMS about the result.
 ##
 ## Run: tools/run_gd_test.sh <godot-binary> res://tests/test_recorded_sessions.gd
 
@@ -44,8 +68,14 @@ func _initialize() -> void:
 	_check(logs.size() > 0,
 		"the corpus is non-empty -- %d play recording(s) found under %s (0 would make every assertion below vacuous)"
 		% [logs.size(), RECORDINGS_DIR])
-	var totals: Dictionary = {"bad": 0, "airborne": 0, "invented": 0, "climbs": 0, "ticks": 0}
+	var totals: Dictionary = {"bad": 0, "airborne": 0, "invented": 0, "climbs": 0, "ticks": 0,
+		"faithful": 0, "attributed": 0}
 	var offenders: Array[String] = []
+	# D0282: counted rather than written down, so the split cannot go stale the next time the director
+	# records a session -- a hand-typed "4 of 7" in a message is a number that decays on the next commit.
+	print("  [OBSERVED] FAITHFUL = replayed against the world it was RECORDED in (header believed). " +
+		"ATTRIBUTED = header carries no world; replays cleanly under at least ONE candidate world, " +
+		"which is a strictly weaker claim.")
 	for path: String in logs:
 		_check_one(path, totals, offenders)
 	_report(logs.size(), totals, offenders)
@@ -127,7 +157,11 @@ func _replay(world: String, rows: Array[InputFrame], air: int) -> Dictionary:
 
 
 ## Replays one recording and folds its numbers into `totals`. A believed header is checked against the
-## world it names; an unbelievable one is attributed to whichever candidate world comes back clean.
+## world it names -- that row is FAITHFUL. An unbelievable one is attributed to whichever candidate world
+## comes back clean, and that row is ATTRIBUTED: it establishes "some supported world replays this
+## cleanly", never "the recorded world does". The two are folded into the SAME totals on purpose (a
+## violation is worth catching whichever row it comes from), which is exactly why each row and every
+## assertion below has to name which claim it is making.
 func _check_one(path: String, totals: Dictionary, offenders: Array[String]) -> void:
 	var parsed: Dictionary = _parse(path)
 	var rows: Array[InputFrame] = parsed["rows"]
@@ -145,8 +179,12 @@ func _check_one(path: String, totals: Dictionary, offenders: Array[String]) -> v
 		if int(best["bad"]) == 0:
 			break  # a clean attribution is an answer; replaying the rest only produces noise
 	var name: String = path.get_file()
-	print("  [OBSERVED] %-34s %5d ticks air=%d/%d world=%-16s bad=%d airborne=%d unconsented=%d climbs=%d"
-		% [name, rows.size(), parsed["air"], Body.AIR_CONTROL_DEN, best_world + ("" if believed else "*"),
+	# D0282: this used to mark an unbelieved header with a bare `*` that nothing in the output explained,
+	# so every row read as the same claim. The guarantee is named on the row that carries it.
+	var guarantee: String = "FAITHFUL" if believed else "ATTRIBUTED"
+	totals["faithful" if believed else "attributed"] = int(totals["faithful" if believed else "attributed"]) + 1
+	print("  [OBSERVED] %-34s %5d ticks air=%d/%d world=%-16s %-10s bad=%d airborne=%d unconsented=%d climbs=%d"
+		% [name, rows.size(), parsed["air"], Body.AIR_CONTROL_DEN, best_world, guarantee,
 		best["bad"], best["airborne"], best["invented"], best["climbs"]])
 	if int(best["bad"]) > 0 or int(best["airborne"]) > 0 or int(best["invented"]) > 0:
 		offenders.append("%s (%s): bad=%d airborne=%d unconsented=%d"
@@ -175,20 +213,28 @@ func _unbelieved_order(named: String) -> Array[String]:
 	return out
 
 
+## D0282: every message here names the population it holds over. `scope` is not decoration -- it is the
+## difference between "the recorded sessions replay faithfully" (which this suite does not prove, and never
+## did) and what it does prove, which is that claim over the FAITHFUL rows and the weaker
+## replays-under-some-candidate-world claim over the ATTRIBUTED ones.
 func _report(session_count: int, totals: Dictionary, offenders: Array[String]) -> void:
-	print("  [OBSERVED] %d session(s), %d ticks replayed, %d climb(s) exercised"
-		% [session_count, totals["ticks"], totals["climbs"]])
+	var faithful: int = int(totals["faithful"])
+	var attributed: int = int(totals["attributed"])
+	var scope: String = ("over %d FAITHFUL session(s) replayed in their own recorded world, and %d " +
+		"ATTRIBUTED session(s) where this establishes only that SOME supported world replays them cleanly") % [faithful, attributed]
+	print("  [OBSERVED] %d session(s) (%d faithful, %d attributed), %d ticks replayed, %d climb(s) exercised"
+		% [session_count, faithful, attributed, totals["ticks"], totals["climbs"]])
 	# The positive control FIRST. Every assertion below is a zero-count, and a replay that did nothing at
 	# all satisfies all of them -- this is the line that fails if the harness stops driving the body.
 	_check(int(totals["climbs"]) > 0,
 		"the corpus actually exercised the climb path -- %d step-up/mantle event(s) across %d ticks; 0 would mean every zero below was measured on a body that never moved"
 		% [totals["climbs"], totals["ticks"]])
 	_check(int(totals["bad"]) == 0,
-		"no recorded session produces a bounds violation or a solid overlap (%d bad tick(s)%s)"
-		% [totals["bad"], "" if offenders.is_empty() else "; first " + offenders[0]])
+		"no replayed session produces a bounds violation or a solid overlap, %s (%d bad tick(s)%s)"
+		% [scope, totals["bad"], "" if offenders.is_empty() else "; first " + offenders[0]])
 	_check(int(totals["airborne"]) == 0,
-		"no recorded session climbs while airborne -- D0212's rule, held across every session the director has recorded (%d airborne climb(s))"
-		% totals["airborne"])
+		"no replayed session climbs while airborne -- D0212's rule, %s (%d airborne climb(s))"
+		% [scope, totals["airborne"]])
 	_check(int(totals["invented"]) == 0,
-		"no recorded session produces an unconsented corner nudge -- D0213's rule, a corner correction never fires at vel_x == 0 (%d unconsented)"
-		% totals["invented"])
+		"no replayed session produces an unconsented corner nudge -- D0213's rule, a corner correction never fires at vel_x == 0, %s (%d unconsented)"
+		% [scope, totals["invented"]])
