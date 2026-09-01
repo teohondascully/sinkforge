@@ -37,7 +37,7 @@ extends Node2D
 const CELL: int = Heightfield.TERRAIN_CELL_PX
 const MAX_TICKS: int = 3000  ## agent-mode-only safety cap, matching test_body_acceptance.gd's own
 
-const COLOR_BG: Color = Color(0.16, 0.16, 0.18)
+const COLOR_BG: Color = BackdropPainter.COLOR_BG  ## D0276: was a third copy of this literal
 const COLOR_TERRAIN: Color = Color(0.42, 0.34, 0.24)
 const COLOR_BODY: Color = Color(0.85, 0.25, 0.25)
 const COLOR_BODY_GROUNDED: Color = Color(0.95, 0.75, 0.15)

@@ -22,8 +22,10 @@ extends Node2D
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
 const MAX_TICKS: int = 3000  ## agent-mode-only safety cap, matching play_scene.gd's own
-const WIDE_VIEW_ROW_CAP: int = 180  ## `--wide-view` (D0121): both reveal-test sites' topsoil_shale_end
-## is 40m = 160 rows (TERRAIN_CELLS_PER_METER=4); a little margin past it, not the whole grid.
+## `--wide-view` (D0121): both reveal-test sites' topsoil_shale_end is 40m = 160 rows
+## (TERRAIN_CELLS_PER_METER=4), plus margin. Since D0276 this FRAMES the camera; it no longer bounds the
+## draw, which the painter does from the observation's own window.
+const WIDE_VIEW_ROW_CAP: int = 180
 
 ## D0189 (Slice 0): terrain and glimmer are no longer flat constants -- `MaterialLook` derives each
 ## cell's fill from `data/materials`' lifted appearance records. The two removed constants were
@@ -35,10 +37,9 @@ const WIDE_VIEW_ROW_CAP: int = 180  ## `--wide-view` (D0121): both reveal-test s
 ## the renderer actually backs, not just an assertion". Replacing it with a data-driven colour would have
 ## retired that claim silently. It is instead re-measured against the new records, over the real
 ## depth range and both nugget branches, by `tests/test_material_palette.gd`.
-const COLOR_BG: Color = Color(0.16, 0.16, 0.18)
+const COLOR_BG: Color = BackdropPainter.COLOR_BG  ## D0276: one definition, in the painter that fills it
 const COLOR_BODY: Color = Color(0.85, 0.25, 0.25)
 const COLOR_BODY_GROUNDED: Color = Color(0.95, 0.75, 0.15)
-const BAND_TINT: float = 0.10  ## how far the background leans toward the current band's own colour
 ## `--mine-down` (D0195). The scan window only has to cover the reach itself -- 51.2px is 12.8 terrain
 ## cells -- so 16 rows is the reach plus margin, not an arbitrary depth.
 const MINE_DOWN_SCAN_ROWS: int = 16
@@ -103,31 +104,21 @@ func _ready() -> void:
 	## without the window mostly showing background. Overridable (`--zoom=`) since a density-contrast
 	## shot needs the opposite trade-off -- see `--wide-view` below.
 	if _wide_view:
-		# Centered on the DRAWN band's own midpoint (WIDE_VIEW_ROW_CAP), not the full grid height -- the
-		# full grid runs to max_depth_m's ~1024 rows, and _draw() only ever paints the first
-		# WIDE_VIEW_ROW_CAP of them in this mode. Centering on the true grid height pointed the camera at
-		# an empty, undrawn region far below the topsoil band, producing a blank screenshot -- found by
-		# actually looking at the captured image, not assumed correct from the math alone.
+		# Centered on the topsoil band's own midpoint, not the full grid height -- the full grid runs to
+		# max_depth_m's ~1024 rows, and centering on that pointed the camera at empty rock far below the
+		# band this mode exists to show, producing a blank screenshot. Found by looking at the image, not
+		# assumed correct from the math. As of D0276 this frames the shot rather than bounding the draw:
+		# `TerrainPainter` culls against the observation's window, so whatever the camera frames is drawn.
 		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
 		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
 	_build_view()
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
 
 
-## `--sky` (D0244). Drives the lifted `SkyPainter` through the REAL coordinator rather than a hand-built
-## `Frame`, which is the whole point: `SkyPainter` reads nothing from `observe()`, so a shortcut frame
-## would have drawn the same picture while proving none of the contract. This way the shot is evidence
-## that observe() -> Frame -> painter -> canvas works end to end.
-##
-## `z_index` well behind everything: this scene paints terrain in its own `_draw` at the default 0.
+## The render stack lives in `tests/body/reveal_view_setup.gd` (D0276), which carries the painter order
+## and why it is the picture. This scene keeps only the call, because WHEN to build it is scene work.
 func _build_view() -> void:
-	_sky_view = WorldView.new()
-	add_child(_sky_view)
-	_sky_view.setup(Interface.new(_grid, _body, _mining), _look, _camera)
-	if _sky:
-		_sky_view.add_painter(SkyPainter.paint).z_index = -100
-	_sky_view.add_painter(CrackPainter.paint_frame)  # D0275, and the first consumer of D0274's L2 door
-	_sky_view.add_hud().add_chip(DepthChip.paint)
+	_sky_view = RevealViewSetup.build(self, Interface.new(_grid, _body, _mining), _look, _camera, _sky)
 
 
 ## Applies `RevealArgs.parse()` to this scene's fields, and returns the two the caller needs by name.
@@ -329,22 +320,9 @@ func _update_camera(delta: float) -> void:
 
 
 func _draw() -> void:
-	# D0189: the ground the body stands in is tinted toward the band it is in, so depth reads as a change
-	# in the world rather than only as a number. Kept to BAND_TINT (0.10) because legacy's band colours
-	# were authored as ANNOUNCEMENT colours -- type on a dark plate, every one between 0.44 and 0.96 in
-	# its brightest channel -- and are far too bright to use as fills at full strength.
-	# `band_color` rather than unpacking the record's colour array here -- that unpacking existed in two
-	# places as of D0271 and two conversions of one record are how a palette starts disagreeing with
-	# itself about whether the fourth element is alpha.
-	var band_color: Color = _look.band_color(Body._px_to_cell(_body.pos_y))
-	# `--sky` REPLACES this fill rather than layering under it (D0244). This rect is opaque and spans
-	# 12000px, so with the sky layer behind it the backdrop was drawn and then completely covered -- the
-	# first capture showed flat COLOR_BG above the terrain and looked exactly like a painter that had not
-	# run. Found by looking at the image, not by reasoning about z_index, which was correct all along.
-	if not _sky:
-		draw_rect(Rect2(-4000, -4000, 12000, 12000), COLOR_BG.lerp(band_color, BAND_TINT), true)
-	RevealTerrainDraw.draw_cells(self, _grid, _look, _body.pos_x, CELL, _wide_view,
-		WIDE_VIEW_ROW_CAP)
+	# The band-tinted backdrop moved to `view/visuals/backdrop_painter.gd` (D0276) -- it is the bottom of
+	# the painter stack now, not a fill in this node's own draw call. It covered the terrain painter the
+	# moment terrain moved, which is D0244's finding one layer down; the painter's header carries it.
 	_draw_body()
 	# Drawn last so the reach ring and reticle sit over the terrain and the body rather than under them.
 	MiningOverlay.draw(self, _grid, _mining, _body.pos_x, _body.pos_y,

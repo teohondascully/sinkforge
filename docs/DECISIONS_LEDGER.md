@@ -11334,3 +11334,57 @@ cell, under the miner in its dig pose.
 
 **Reverse cost:** delete `view/visuals/crack_painter.gd` and its suite, drop the `add_painter` line.
 `cell_px` should stay regardless — it closes a real hole in the door.
+
+
+## D0276 · Terrain moved onto the coordinator — and the picture went empty while all 48 suites passed · 2026-08-31 · Lane B-view, LEGACY_GAP T1 #4
+
+`docs/LEGACY_GAP.md` ranks this "the structural unlock for every painter below it", and it draws nothing
+new: until terrain arrives through `Frame`, the wall plane (T1 #3), the veil (T1 #2) and every later pass
+have nowhere to sit. `WorldView` carried exactly one painter (sky), and only under `--sky`.
+
+**THE CULL BECAME THE WINDOW, and that is a correctness change rather than a tidy-up.** The old loop in
+`tests/body/reveal_terrain_draw.gd` scanned `body_col ± 60` columns and capped rows at 120 — or at a
+`WIDE_VIEW_ROW_CAP` passed in specially, because `--wide-view` needs the whole topsoil band and the 120
+cap would have sliced it. Both numbers existed because the loop had no idea what was on screen. An
+observation does: `obs.window` IS the camera rect plus the coordinator's margin, so the wide view and the
+follow view need no special case between them, and the capture now shows terrain past where the old ±60
+cap cut it off.
+
+**THE FAILURE WORTH RECORDING IS MINE, AND IT IS THE HOUSE CLASS EXACTLY.** With terrain at
+`z_index = -50`, the scene's own `_draw` still filled an **opaque 12,000px backdrop at z 0** — so terrain
+was drawn and then completely covered. The capture showed the HUD, the miner and the cracks over flat
+grey. **All 48 suites passed.** `test_terrain_painter` asserted the visit rect, the window containment,
+and the material agreement, and every one of those was true; none of them could observe that the output
+never reached the screen, because Godot exposes no way to read back a `CanvasItem`'s draw commands.
+
+D0244 had already found this exact shape one layer up, and **its comment was three lines above the bug**:
+"`--sky` REPLACES this fill rather than layering under it... the first capture showed flat COLOR_BG above
+the terrain and looked exactly like a painter that had not run. Found by looking at the image, not by
+reasoning about z_index, which was correct all along." The z_index was correct again. What was wrong
+again was which NODE owned the fill — and a comment warning about a trap does not stop you walking into
+it from a different direction.
+
+**The remedy is structural, not a z-index nudge.** The backdrop became `view/visuals/backdrop_painter.gd`
+at the bottom of one ordered stack. "What is behind what" is now answerable by reading one list
+(`tests/body/reveal_view_setup.gd`) instead of by cross-referencing a painter's `z_index` against another
+node's draw call. And the ordering is now an ASSERTION — `BACKDROP_Z < SKY_Z < TERRAIN_Z < 0` — which
+would have failed on the broken commit. It cannot see a NEW opaque painter added above terrain; it pins
+the exact relationship that broke. That limit is stated in the test rather than left implied.
+
+**`COLOR_BG` existed three times** — `reveal_scene`, `play_scene`, `test_material_palette`, all
+`Color(0.16, 0.16, 0.18)`. The palette suite's copy was the dangerous one: it measures colour-distance
+claims AGAINST the background, and a distance measured against a stale copy of the background measures
+nothing. All three now reference the painter that draws it.
+
+**`reveal_scene.gd` hit exactly 400 and I split rather than trimmed.** `docs/QUALITY.md` §2 records what
+the alternative looks like: `sim/body/body.gd` sat at exactly 400 for three commits running because it was
+shaved to fit. `RevealViewSetup` is the fourth seam out of that file, and it is a real one — the scene
+orchestrates argv, ticks, recording and quitting; this decides which painters exist and in what order.
+389 lines now, with the painter order and its reasoning in the file that owns it.
+
+**Legacy's `terrain_painter.gd` is 438 lines and NONE of its later passes are here** — the autotile
+chamfers, concave fillets, carved-edge AO and the surface cap are T1 #2 and T1 #3. Porting half of one
+would make the gap doc lie about what is done.
+
+**Reverse cost:** the painters delete as a unit and `RevealTerrainDraw` comes back from git. The ±60/120
+caps come back with it, and the wide view needs its special case again.
