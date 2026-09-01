@@ -23,6 +23,11 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
+# The distinct-colour floor, shared with `tools/test_capture_moments.sh` so the test drives the same
+# code this tool runs rather than a restatement of it (D0316).
+# shellcheck source=tools/capture_colour_guard.sh
+. "$ROOT/tools/capture_colour_guard.sh"
+
 SLICE="${1:?usage: capture_moments.sh <slice-label> [output-dir]}"
 OUT_DIR="${2:-docs/milestones}"
 GODOT="${GODOT_BIN:-godot}"
@@ -171,8 +176,8 @@ for entry in "${MOMENTS[@]}"; do
 		fail=1
 		continue
 	fi
-	colours="$(printf '%s\n' "$out" | grep -o "capture has [0-9]* distinct colours" | grep -o "[0-9]*" | head -1)"
-	echo "capture_moments: $name -> $png (${colours:-?} distinct colours, tick $tick, bite ${BITE:-default})"
+	colours="$(capture_colour_count "$out")"
+	echo "capture_moments: $name -> $png (${colours:-ABSENT} distinct colours, tick $tick, bite ${BITE:-default})"
 	# THE `grain` MOMENT CARRIES ITS OWN POSITIVE CONTROL (D0311), because a colour floor cannot see its
 	# subject: `SeamPainter` draws a handful of thin strokes, so a frame with the grain and a frame
 	# without it have effectively the same colour count, and both clear MIN_COLOURS comfortably. What
@@ -205,13 +210,12 @@ for entry in "${MOMENTS[@]}"; do
 	# produced is a wall of textured clay at 159, and the failure it must catch came in at 45. A floor
 	# that tracked the real counts would have to move every time the palette does, and would then be
 	# measuring the palette instead of the failure.
-	if [ -n "$colours" ] && [ "$colours" -lt "$MIN_COLOURS" ]; then
-		echo "capture_moments: FAIL -- $name has only $colours distinct colours (floor $MIN_COLOURS)." >&2
-		echo "capture_moments:        A frame this flat is not a picture. The usual cause is a STALE" >&2
-		echo "capture_moments:        IMPORT CACHE after a branch switch or rebase, which makes every" >&2
-		echo "capture_moments:        class_name global fail to resolve so no painter draws:" >&2
-		echo "capture_moments:            godot --headless --path . --import" >&2
-		echo "capture_moments:        and re-run. The PNG has been left in place so it can be looked at." >&2
+	# D0316: THIS USED TO FAIL OPEN. The condition was `[ -n "$colours" ] && [ "$colours" -lt ... ]`, so
+	# a run that reported no count at all skipped the floor and passed -- no measurement read as a good
+	# measurement, which is this run's dominant failure class arriving inside a gate. The guard now lives
+	# in `tools/capture_colour_guard.sh`, shared with the test that drives it with output no real run
+	# would produce, and an absent count is a hard failure.
+	if ! capture_colour_guard "$out" "$MIN_COLOURS" "$name"; then
 		fail=1
 	fi
 	i=$((i + 1))

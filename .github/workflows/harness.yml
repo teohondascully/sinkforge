@@ -191,6 +191,14 @@ jobs:
           done < <(find tools -name 'test_*.py' | sort)
           echo "Ran $count gate mutation test file(s)."
 
+      # D0316. Runs in `gates` rather than in `tests` because it needs no engine and no display: it
+      # drives tools/capture_colour_guard.sh with synthetic producer text, which is the point -- the
+      # failure it exists to catch is output no real run emits, so no real run can be the fixture.
+      # Named separately rather than swept up with the .py tests above because the other tools/test_*.sh
+      # files DO need Godot and belong in the `tests` job; a find-based sweep here would drag them in.
+      - name: Capture colour floor fails CLOSED on an absent count (D0316) — BLOCKING
+        run: bash tools/test_capture_moments.sh
+
       # tools/quality_check/ (docs/DECISIONS_LEDGER.md D0096-D0099). Duplication is the one instrument
       # that gates -- BLOCKING per D0099, since 0 clusters is this project's verified-clean state and a
       # regression is a fact about the tree a build should refuse. The other three are `continue-on-
