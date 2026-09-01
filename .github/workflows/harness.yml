@@ -168,6 +168,13 @@ jobs:
       - name: No untracked file exists outside the shipped .gitignore (QUALITY gate 27, D0063)
         run: python3 tools/layer_lint/check_untracked_files.py
 
+      # The other half of `.gitattributes`' `merge=union` on the ledger (D0298). Union merge resolves the
+      # append-only file's conflicts without a human and CORRUPTS IT SILENTLY if the append-only rule is
+      # ever broken, so the automatic resolver may only ship with the check that catches what it would
+      # hide: a number declared twice, a back-reference to an entry a merge dropped, a marker left behind.
+      - name: Ledger numbers are addresses -- each declared once, every back-reference resolves (D0298)
+        run: python3 tools/layer_lint/check_ledger_integrity.py
+
       # Phase 0a enforcement (D0149): the gate scripts above are themselves untested code the moment CI
       # stops running their own mutation-test files by hand. This runs every one of them -- whichever
       # scripts happen to exist under tools/test_*.py and tools/*/test_*.py, globbed fresh each run, never
