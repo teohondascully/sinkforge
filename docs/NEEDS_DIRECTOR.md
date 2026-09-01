@@ -533,7 +533,7 @@ I would take (1): the 15% gap and the impermeable shelf are the same defect wear
 fixes the face rather than the cause. But it re-rolls every fixture pinned to a generated world — this run
 has already re-pinned two of them (D0255, D0256) — so it is worth your explicit yes.
 
-## P021 · The 15% carve target survives the octave port, and closing it is a threshold move
+## P021 · CLOSED 2026-08-31 by D0280 · Measured: the thresholds are right and "15%" was never a measurement
 
 **P020 is DONE and this is what it did not fix.** Porting legacy's 5 octaves and re-deriving the
 calibration by measurement (D0258) made the shelf permeable — 0 → 15 cells of 97,920 — and moved overall

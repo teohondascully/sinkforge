@@ -11501,3 +11501,59 @@ it was blocked on, and it now also unblocks the draught's re-wiring (T1 #6).
 
 **Reverse cost:** drop `swing_this_tick`, `_swing_ticks` and `swing_period_ticks()`. T1 #6 goes back to
 having no per-blow edge to fire on.
+
+
+## D0280 · P021 measured and closed: the thresholds are right, legacy's "15%" was never a measurement · 2026-08-31 · P021 ruled
+
+The director ruled P021 the way P020 was ruled: **close it by measuring the correct carve rate, not by
+nudging a threshold.** Measuring closed it without changing a constant.
+
+**Measurement 1 — total void, by source.** `tools/measure_void_fraction.gd`, 16 seeds, 786,432 cells:
+**total 0.0421**, of which caves 0.0411 and ruins 0.0010. Median per-seed 0.0402, range 0.0293-0.0583.
+That is **28% of the stated 15%**, so candidate (2) — "15% counted ruins too" — is refuted: adding every
+other carving source this build has moves 0.0411 to 0.0421.
+
+**Measurement 2 — the controlled comparison, and it is the one that settles it.** D0258 showed our field
+matches FastNoiseLite's crossing rates at three isolated thresholds. That is a weaker claim than "the
+same fraction of the world opens", because the real pipeline lerps the threshold with depth and adds
+`shelf_resist` on a third of the rows. So the same carve pipeline was run twice, changing **exactly one
+thing**: the noise source. Ours is `ValueNoise.sample_fbm` × the D0258 calibration; the reference is
+Godot's own `FastNoiseLite` with legacy's literal settings — `TYPE_SIMPLEX_SMOOTH` (which legacy sets
+explicitly and is NOT the default) at `frequency = 0.11`. Everything else held identical.
+
+**ours 0.0400, legacy's own field 0.0428, ratio 0.935.** The thresholds are correct. Whatever the 15%
+gap is, it is not calibration and it is not the threshold.
+
+**Measurement 3 — the null result, and it is the answer.** Found while a parallel read-only pass was
+inventorying WG-4: **legacy's "near 15%" appears exactly once in all of `legacy/`** — a comment at
+`layered_world_gen.gd:23`. The only carve assertion legacy actually ships
+(`legacy/tests/test_worldgen.gd:421-427`) is an **upper bound**: `< 0.25` and `< 0.32`. Our 0.0421 passes
+legacy's own test. This is candidate (3), and it is exactly the `range-read-as-observations` rule: a
+number in a comment with no measurement behind it is an aspiration, and I spent three measurements
+chasing it because it was quoted as though it were data.
+
+**The threshold sweep is committed anyway, and deliberately as a CURVE rather than a fitted constant.**
+Reaching 0.15 needs both thresholds down by ~0.19 (0.47→0.28, 0.31→0.12) — a 40% and 61% move.
+Recording the relationship means a future revision of the target, or a WG-4 ruling that changes what a
+cell means, re-reads the curve instead of re-deriving from scratch.
+
+**What the gap actually is, stated for the record rather than fixed here.** Legacy runs THREE carving
+passes — `_carve_caves`, `_carve_big_caverns`, `_carve_tunnels` (`layered_world_gen.gd:236-238`). This
+build runs one, plus ruins. It also has no `CAVE_SHELF_BIAS` (legacy's ±0.10 undercut/roof asymmetry).
+Those are ports that have not happened, not constants that are wrong, and they belong in `LEGACY_GAP`
+rather than in a threshold nudge.
+
+**The instrument's own control fired, and it was right.** With caves and ruins both removed the world
+must be solid; it reported exactly 1 void cell on every seed. That was not a third carving source — it
+was my removal being wrong: `radius_cells = 0` still carves a disc's centre. Removing ruins by `count`
+instead cleared it. A 1-cell leak is invisible in a fraction printed to four places, which is the whole
+reason a difference-based measurement needs a control that runs every seed rather than once.
+
+**And a second tell was checked rather than assumed.** All three sites first reported byte-identical void
+fractions to four decimal places, which is what an instrument that cannot register its subject looks
+like. Checked against the configs: `reveal_test_dense`, `reveal_test_sparse` and `shallow_clay` carry
+**identical** `cave`, `ruin`, `strata_shelf` and `layer_thresholds_m` blocks and differ only in ore
+placement, which places material rather than carving. The identical triple was the correct answer.
+
+**Reverse cost:** none — nothing in `sim/` changed. Deleting the tool loses the measurement and the
+curve.
