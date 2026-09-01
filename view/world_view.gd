@@ -51,7 +51,15 @@ var _anim_ticks: int = 0
 ## How far past the camera rect to observe, in terrain cells. A painter deciding a cell's edges legitimately
 ## probes the ring just outside its own view, and `interface/interface.gd` says so: reading past the window
 ## is "deliberately not an error, because a renderer legitimately probes the ring just past its own window".
-const WINDOW_MARGIN_CELLS: int = 2
+##
+## THREE, because the deepest probe on the stack now reaches three cells: `TerrainPainter.visit_rect` draws
+## one cell past the view so a straddling cell is drawn whole, and `WallPainter.ao_alpha` probes
+## `AO_RAMP_CELLS` further out from every cell it draws. At a margin of 2 that probe left the window on the
+## outermost ring, `solid_at` answered false for a cell it had simply never been given, and the straddling
+## column at each screen edge lost its cast shadow — a defect that only appears at the very edge of the
+## frame and only in one direction, which is the kind a screenshot does not settle.
+## `tests/test_wall_painter.gd` derives this from those two constants rather than restating it.
+const WINDOW_MARGIN_CELLS: int = 3
 
 var _iface: Interface = null
 var _look: MaterialLook = null
