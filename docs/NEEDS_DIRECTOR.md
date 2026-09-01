@@ -561,3 +561,47 @@ move at all. I will run that measurement in the decision-free lane and report it
 one is needed, is yours.
 
 **Nothing is blocked on this.** WG-2 and WG-3 are closed, PR #10 is unblocked on its merits.
+
+## P022 · The miner's head is 8px inside the ceiling, always — and legacy's fix was a bigger tunnel, not smaller art
+
+**You spotted this in the D0268 capture. It is real, it is measured, and the placement code is not the
+cause.** Probed directly: the sprite's bottom edge and horizontal centre land on the body's AABB to
+**0.00 px on both axes**. The sprite is exactly where the red rectangle was.
+
+The defect is vertical clearance:
+
+```
+body top = 8.0   bottom = 48.0     ceiling (first solid above) = 8.0
+HEADROOM above the body            = 0.0 px
+sprite is 48 px tall vs a 40 px body, feet on the AABB bottom
+=> the top 8 px of helmet and pickaxe sits INSIDE solid rock, on every frame
+```
+
+At `--zoom=6.5` that is ~52 screen pixels of miner buried in the ceiling, which is why it reads as
+"not even in the right spot".
+
+**Legacy had the same overhang and it did not show.** Legacy's body was 14x34 with 32x48 art — a **14 px**
+overhang, worse than our 8. What differed is the world: legacy's `CELL` was **32 px**, so any dug tunnel
+had a full cell of headroom. Our terrain cell is 4 px and the dig carves exactly body height, leaving
+**zero**. The art was sized to legacy's tunnel, not to legacy's body.
+
+**This also means `docs/LEGACY_GAP.md`'s own recommendation makes it worse.** That doc proposes re-baking
+`H: 48 -> 56` to keep the art proportional to our taller 40 px body. Proportionally right, and it takes
+the overhang from 8 px to 16 px.
+
+**Three ways out, and all three are yours:**
+
+1. **Carve headroom.** Give the dig one terrain cell (4 px) or two of clearance above the body. Fixes it
+   for every future sprite too, and is closest to what legacy actually did. It is a `sim/` change to dig
+   extents and re-pins the world, so it is a threshold move by another name.
+2. **Re-bake the miner at 40 px tall** via `legacy/tools/bake_miner.gd`, which composes all 15 frames from
+   ASCII tables against a 19-entry palette — a two-constant edit and a re-run, not a repaint. Changes the
+   character's proportions, which is a look call.
+3. **Accept it.** A miner whose hat brushes the ceiling in a hand-dug tunnel is arguably correct, and
+   nobody would question it in a wider chamber.
+
+**I recommend (1).** It is the difference that actually exists between the two builds, it fixes every
+sprite rather than this one, and (2) spends art work compensating for a world that is too tight.
+
+**Meanwhile the port is landed and green** — `MinerLook` is tested, the state table is exhaustive over the
+keys it emits, and the rectangle fallback survives. This is a placement question, not a port defect.
