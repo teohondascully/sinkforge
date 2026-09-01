@@ -32,6 +32,9 @@ func _initialize() -> void:
 	_test_the_voice_mapping_moves_the_whole_way_and_stays_in_its_stops()
 	await _test_the_pool_is_built_and_the_actuator_moves()
 	await _test_play_refuses_rather_than_lying_when_it_cannot_play()
+	_test_every_mapped_material_has_a_voice_the_bank_can_build()
+	_test_the_fallback_is_the_stone_voice_and_not_a_fifth_one()
+	_test_the_four_strikes_are_measurably_different_sounds()
 	_finish("sfx_driver")
 
 
@@ -189,3 +192,64 @@ func _test_play_refuses_rather_than_lying_when_it_cannot_play() -> void:
 	_check(detached.play(&"hollow", Vector2.ZERO, 1.0, -12.0),
 		"...and the SAME driver plays once it is in the tree, so the guard is not simply always-false")
 	detached.queue_free()
+
+
+## THE MATERIAL STRIKES (D0313), `legacy/scenes/sfx.gd:26-35 STRIKE`.
+##
+## THIS SESSION CANNOT HEAR ANYTHING IT MAKES, so what is asserted here is deliberately not "it sounds
+## right". Three things that are checkable without ears, and each one is a way the port could be wrong
+## while every existing assertion stayed green:
+##
+##   THE TWO TABLES AGREE.     `Sfx.STRIKE` names voices; `SfxBank.STRIKES` builds them. A material
+##                             mapped to a voice the bank does not carry is a silent miss at runtime.
+##   THE VOICES ARE DISTINCT.  Four names that all render the same samples is the whole feature failing
+##                             while the map, the pool and the driver all look correct.
+##   THE FALLBACK IS `hollow`. Legacy is explicit that an absent material falls to "the plain crunch,
+##                             which is itself the stone voice", so `hardrock` must keep exactly the
+##                             behaviour it shipped with rather than acquiring a fifth timbre.
+func _test_every_mapped_material_has_a_voice_the_bank_can_build() -> void:
+	_check(not Sfx.STRIKE.is_empty(), "positive control: the strike map is not empty (%d entries)"
+		% Sfx.STRIKE.size())
+	for material: StringName in Sfx.STRIKE:
+		var voice: StringName = Sfx.STRIKE[material]
+		_check(SfxBank.STRIKES.has(voice),
+			"`%s` maps to `%s`, and the bank can build it -- a name in one table and not the other is a "
+			% [material, voice] + "blow that plays nothing, on a code path where every other check passes")
+
+
+func _test_the_fallback_is_the_stone_voice_and_not_a_fifth_one() -> void:
+	_check(Sfx.strike_voice(&"hardrock") == &"hollow",
+		"hardrock falls back to `hollow` -- legacy calls the default 'the plain crunch, which is itself "
+		+ "the stone voice', so the material with no entry keeps the voice that already shipped")
+	_check(Sfx.strike_voice(&"no_such_material") == &"hollow",
+		"...and so does a material that does not exist at all")
+	_check(Sfx.strike_voice(&"coal") == &"hit_coal",
+		"...while a MAPPED material does not (coal -> hit_coal), so the fallback is a fallback and not "
+		+ "an unconditional answer")
+
+
+## Distinct SAMPLES, not distinct names. Rendered from the same seed so the comparison is the timbre and
+## not the noise draw, and compared on two axes that move independently: how bright the fracture is
+## (mean absolute sample value early on, which the one-pole cutoff sets) and how long it lasts.
+func _test_the_four_strikes_are_measurably_different_sounds() -> void:
+	var seen: Dictionary = {}
+	for voice: StringName in SfxBank.STRIKES:
+		var s: PackedFloat32Array = SfxBank.strike(SplitRng.new(7).split("sfx"), voice)
+		_check(s.size() > 0, "`%s` renders samples at all (%d)" % [voice, s.size()])
+		if s.is_empty():
+			continue
+		var early: float = SfxBank.rms(s, 0, s.size() / 8)
+		var late: float = SfxBank.rms(s, s.size() / 2, s.size())
+		var tail: float = late / maxf(early, 0.000001)
+		print("  [OBSERVED] %-10s early rms %.4f  tail ratio %.4f" % [voice, early, tail])
+		_check(early > 0.0, "...and `%s` is not silence (early rms %.4f)" % [voice, early])
+		for other: StringName in seen:
+			var o: Array = seen[other]
+			_check(absf(early - float(o[0])) > 0.002 or absf(tail - float(o[1])) > 0.01,
+				"`%s` and `%s` are different sounds (early rms %.4f vs %.4f, tail %.4f vs %.4f). Four "
+				% [voice, other, early, float(o[0]), tail, float(o[1])]
+				+ "names rendering the same samples is the whole feature failing with every other "
+				+ "assertion in this file still green.")
+		seen[voice] = [early, tail]
+	_check(seen.size() == SfxBank.STRIKES.size(),
+		"all %d strikes were reachable to compare (%d)" % [SfxBank.STRIKES.size(), seen.size()])

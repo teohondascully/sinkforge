@@ -97,6 +97,63 @@ static func breach(rng: SplitRng) -> PackedFloat32Array:
 	return out
 
 
+## THE MATERIAL STRIKES, from `legacy/scenes/sfx.gd:26-35 STRIKE` (D0313). Legacy's reason is one
+## sentence and it is about a whole session rather than a single sound: *"Terrain material -> the strike
+## that material makes, so an hour of digging soil, coal, ore and the deep band is not one noise several
+## hundred times over."*
+##
+## **ONE SYNTH, PARAMETERISED, RATHER THAN FOUR BESPOKE ONES.** Legacy renders each strike separately and
+## can audition them; this session cannot hear anything it makes, so writing four hand-tuned voices would
+## be four unverifiable claims. What ports faithfully without ears is the DISTINCTION legacy draws — how
+## bright the fracture is, how fast it dies, and whether anything rings after it — expressed as three
+## parameters over the strike shape `hollow()` already establishes. A director with speakers can then
+## move a row of a table rather than re-derive a synth.
+##
+## The columns, and what each one is doing physically:
+##
+##   `lp`     one-pole cutoff on the noise. HIGH is a bright, gritty fracture; LOW is a dull thud. This
+##            is the axis that separates earth from slate more than any other.
+##   `decay`  how fast the strike envelope falls. Crumbly materials are over instantly; dense ones hang.
+##   `ring`   gain on the tonal tail. Metal rings, earth does not, and this is the only column that is
+##            zero for anything.
+##   `hz`     the tail's fundamental, when there is one.
+const STRIKE_SECONDS: float = 0.22
+const STRIKES: Dictionary = {
+	# Soil: dull, damped, no tail at all. Legacy maps `earth` and `gravel` here.
+	&"hit_earth": {"lp": 0.12, "decay": 9.0, "ring": 0.00, "hz": 0.0},
+	# Coal: dry and crumbly -- brighter than soil, dies faster than anything else, still no ring.
+	&"hit_coal": {"lp": 0.34, "decay": 13.0, "ring": 0.00, "hz": 0.0},
+	# Metal in rock: the one voice with a real tail. Legacy maps every ore here, which is the point --
+	# a vein announces itself through the pick before the eye finds it.
+	&"hit_metal": {"lp": 0.46, "decay": 6.0, "ring": 0.30, "hz": 470.0},
+	# Deep slate: sharp and clacky, a short high tail rather than a hum.
+	&"hit_slate": {"lp": 0.55, "decay": 11.0, "ring": 0.12, "hz": 320.0},
+}
+
+
+## One material's strike. Same shape as `hollow()`'s impact half, with the tail made optional.
+static func strike(rng: SplitRng, voice: StringName) -> PackedFloat32Array:
+	var p: Dictionary = STRIKES.get(voice, STRIKES[&"hit_earth"])
+	var n: int = int(float(RATE) * STRIKE_SECONDS)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var lp: float = 0.0
+	var cutoff: float = float(p["lp"])
+	var decay: float = float(p["decay"])
+	var ring_gain: float = float(p["ring"])
+	var hz: float = float(p["hz"])
+	for i: int in n:
+		var t: float = float(i) / float(n)
+		var env: float = pow(maxf(0.0, 1.0 - t * decay), HOLLOW_STRIKE_POW)
+		lp += cutoff * (_noise(rng) - lp)
+		var s: float = float(i) / float(RATE)
+		var tail: float = 0.0
+		if ring_gain > 0.0:
+			tail = sin(TAU * hz * s) * pow(1.0 - t, HOLLOW_RING_DECAY) * ring_gain
+		out[i] = lp * env * HOLLOW_NOISE_GAIN + tail
+	return out
+
+
 ## THE LIMITER, `legacy/scenes/sfx.gd:1073-1074` and `_to_pcm`. A SOFT KNEE, not a clamp, and the
 ## difference is the whole reason this is ported rather than written: **the breach deliberately
 ## overdrives** — it peaks near 1.15 by construction, because `lp * 1.5` with a low-passed noise source
