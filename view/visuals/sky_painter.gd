@@ -11,7 +11,7 @@ extends RefCounted
 ## what makes it the proof-of-contract rather than merely the prettiest file.
 ##
 ## TWO ADAPTATIONS, BOTH DERIVED RATHER THAN PICKED. Legacy authored this in a world with 32px cells and
-## its surface 22 rows down; this world has 4px cells and its surface datum at row 0. Neither number was
+## its surface 22 rows down; this world has 4px cells and its surface datum 80 rows down. Neither number was
 ## tuned by eye -- see `SCALE` and `HORIZON_Y` below, each of which carries its derivation.
 ##
 ## THE CLOCK IS PINNED AND THE SKY DOES NOT MOVE (Q5, ruled). There is no time system: `Frame.anim_time`
@@ -32,10 +32,13 @@ const SCALE: float = float(Interface.TERRAIN_CELL_PX) / LEGACY_CELL_PX
 const INV_SCALE: float = LEGACY_CELL_PX / float(Interface.TERRAIN_CELL_PX)
 
 ## The world-y of the surface. Legacy's was `SURFACE_LINE(22) * CELL(32)` = 704, because its world had
-## sky rows above the datum. This world's grid STARTS at the surface: `data/bands/topsoil.yaml` is
-## `from_m: 0` and `MaterialLook.depth_m(0)` is 0, so the datum is row 0 and the horizon is y = 0.
-## (`open_sky` runs to `from_m: -119`, which is the air above -- not rows in the grid.)
-const HORIZON_Y: float = 0.0
+## sky rows above the datum. **THIS WORLD HAS THEM NOW TOO** (P017/D0292): the grid opens with
+## `MaterialLook.SURFACE_ROW` rows of air, `depth_m` subtracts it, and `data/bands/topsoil.yaml`'s
+## `from_m: 0` lands on that row rather than on row 0. So the horizon is where the rock starts, which
+## is derived from the datum rather than written down — and this file was the only thing in the build
+## drawing into a region the player could not enter, which is what P017 was raised about.
+## (`open_sky` runs to `from_m: -119`, which is the air above the band the grid actually holds.)
+const HORIZON_Y: float = float(MaterialLook.SURFACE_ROW * Interface.TERRAIN_CELL_PX)
 
 ## THE PINNED CLOCK, AND THIS IS THE ONE KNOB THE DIRECTOR MAY WANT TO TURN.
 ##

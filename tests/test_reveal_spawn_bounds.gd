@@ -108,6 +108,16 @@ func _session_at_column(site: StringName, seed_value: int, spawn_col: int) -> Di
 func _prefix_ceiling_session(site: StringName, seed_value: int) -> Dictionary:
 	var grid: TileGrid = ShaftGenerator.generate(StrataData.get_site(site), seed_value)
 	var spawn_col: int = RevealSessionSetup.find_spawn(grid)["spawn_col"]
+	# THE SKY BAND IS FILLED BACK IN, and that is what makes this a control again. This fixture poses the
+	# world as it was BEFORE the two fixes it exists to measure — D0199's rock ceiling and P017's sky
+	# (D0292) — and P017 removed the second one from underneath it: with twenty metres of air above the
+	# rock the body simply falls, never jumps, and the control read 0 violations, which is exactly the
+	# reading it is written to treat as "the test above measures nothing". Removing the SUBJECT means
+	# putting the rock back, not looking somewhere else.
+	for col: int in grid.width:
+		for row: int in ShaftGenerator.SKY_ROWS:
+			grid.set_material(Vector2i(col, row), &"clay")
+			grid.set_wall(Vector2i(col, row), &"clay")
 	var rows: int = Body.HEIGHT_PX / CELL + 2
 	for dc: int in SHAFT_COLS:
 		for row: int in rows:  # from row 0 -- the pre-fix carve, which opened the world's own ceiling

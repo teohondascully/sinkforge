@@ -21,6 +21,8 @@ func _initialize() -> void:
 	_test_different_seeds_diverge()
 	_test_glimmer_appears_in_reveal_test_dense()
 	_test_glimmer_never_appears_at_or_below_topsoil_end()
+	_test_there_is_sky_above_the_surface_and_nothing_is_generated_into_it()
+	_test_the_view_and_the_generator_agree_where_the_surface_is()
 	_test_shallow_clay_has_no_glimmer_at_all()
 	_test_dense_reveal_site_places_more_glimmer_than_sparse()
 	_finish("shaft_generator")
@@ -38,7 +40,7 @@ func _test_band_hash_matches_reference() -> void:
 
 func _test_base_fill_bands_by_depth() -> void:
 	var grid: TileGrid = TileGrid.new(4, 20, 1)
-	ShaftGenerator._fill_base(grid, 8, 14)
+	ShaftGenerator._fill_base(grid, 0, 8, 14)
 	_check(grid.get_material(Vector2i(0, 0)) == &"clay", "row 0 (< topsoil_end) is clay")
 	_check(grid.get_material(Vector2i(0, 7)) == &"clay", "row 7 (< topsoil_end) is clay")
 	_check(grid.get_material(Vector2i(0, 8)) == &"hardrock", "row 8 (== topsoil_end) is hardrock")
@@ -50,10 +52,10 @@ func _test_base_fill_bands_by_depth() -> void:
 
 func _test_caves_never_carve_above_min_depth() -> void:
 	var grid: TileGrid = TileGrid.new(12, 60, 1)
-	ShaftGenerator._fill_base(grid, 20, 50)
+	ShaftGenerator._fill_base(grid, 0, 20, 50)
 	var cave_cfg: Dictionary = StrataData.SHALLOW_CLAY["cave"]
 	var shelf_cfg: Dictionary = StrataData.SHALLOW_CLAY["strata_shelf"]
-	ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, 1)
+	ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, 1, 0)
 	var min_depth: int = int(cave_cfg["min_depth_cells"])
 	var violations: int = 0
 	for col: int in grid.width:
@@ -65,10 +67,10 @@ func _test_caves_never_carve_above_min_depth() -> void:
 
 func _test_caves_carve_something() -> void:
 	var grid: TileGrid = TileGrid.new(48, 400, 1)
-	ShaftGenerator._fill_base(grid, 40, 140)
+	ShaftGenerator._fill_base(grid, 0, 40, 140)
 	var cave_cfg: Dictionary = StrataData.SHALLOW_CLAY["cave"]
 	var shelf_cfg: Dictionary = StrataData.SHALLOW_CLAY["strata_shelf"]
-	ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, 1)
+	ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, 1, 0)
 	var open_count: int = 0
 	for col: int in grid.width:
 		for row: int in grid.height:
@@ -107,14 +109,14 @@ static func _measure_carve(seeds: Array, cave_cfg: Dictionary, shelf_cfg: Dictio
 	var out: Dictionary = {"shelf_eligible": 0, "shelf_carved": 0, "open_eligible": 0, "open_carved": 0}
 	for seed: int in seeds:
 		var grid: TileGrid = TileGrid.new(48, 1024, 1)
-		ShaftGenerator._fill_base(grid, 40, 140)
+		ShaftGenerator._fill_base(grid, 0, 40, 140)
 		var solid_before: Array[Vector2i] = []
 		for col: int in grid.width:
 			for row: int in range(min_depth, grid.height):
 				var cell: Vector2i = Vector2i(col, row)
 				if grid.is_solid(cell):
 					solid_before.append(cell)
-		ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, seed)
+		ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, seed, 0)
 		for cell: Vector2i in solid_before:
 			var shelf: bool = ShaftGenerator._is_shelf_band(cell.y, band_height, shelf_every)
 			var key: String = "shelf" if shelf else "open"
@@ -247,7 +249,7 @@ func _test_ruin_carves_a_chamber() -> void:
 			grid.set_material(Vector2i(col, row), &"hardrock")
 	var rng: SplitRng = SplitRng.new(5).split("terrain_gen")
 	var ruin_cfg: Dictionary = {"count": 1, "min_depth_m": 100, "radius_cells": 4}
-	ShaftGenerator._place_ruins(grid, rng, ruin_cfg)
+	ShaftGenerator._place_ruins(grid, rng, ruin_cfg, 0)
 	var min_row: int = 100 * ShaftGenerator.TERRAIN_CELLS_PER_METER
 	var open_below_min: int = 0
 	var open_above_min: int = 0
@@ -289,7 +291,12 @@ func _test_glimmer_appears_in_reveal_test_dense() -> void:
 
 func _test_glimmer_never_appears_at_or_below_topsoil_end() -> void:
 	var grid: TileGrid = ShaftGenerator.generate(StrataData.REVEAL_TEST_DENSE, 20260826)
-	var topsoil_end: int = int(StrataData.REVEAL_TEST_DENSE["layer_thresholds_m"]["topsoil_shale_end"]) * ShaftGenerator.TERRAIN_CELLS_PER_METER
+	# The threshold is metres BELOW THE SURFACE, and the surface is row `SKY_ROWS` (P017/D0292) -- read
+	# through the same offset the generator uses rather than restated, or this measures a row the world
+	# no longer keys anything to.
+	var topsoil_end: int = ShaftGenerator.SKY_ROWS \
+		+ int(StrataData.REVEAL_TEST_DENSE["layer_thresholds_m"]["topsoil_shale_end"]) \
+		* ShaftGenerator.TERRAIN_CELLS_PER_METER
 	var violations: int = 0
 	for cell: Vector2i in grid.occupied_terrain_cells():
 		if grid.get_material(cell) == &"glimmer" and cell.y >= topsoil_end:
@@ -313,3 +320,66 @@ func _test_dense_reveal_site_places_more_glimmer_than_sparse() -> void:
 	_check(dense_count > sparse_count,
 		"the dense reveal site places more glimmer than the sparse one at the same seed (dense=%d, sparse=%d)" %
 		[dense_count, sparse_count])
+
+
+## P017 (D0292), and the assertion is about ABSENCE, which is the hard kind: the sky band must hold no
+## block AND no wall. A band with walls but no blocks looks identical from the sim's side -- `is_solid`
+## is false either way -- and reads as a tunnel rather than as open air, because `WallPainter` draws
+## exactly the cells that have a wall behind them (D0286).
+func _test_there_is_sky_above_the_surface_and_nothing_is_generated_into_it() -> void:
+	var grid: TileGrid = ShaftGenerator.generate(StrataData.REVEAL_TEST_DENSE, 4242)
+	var surface: int = ShaftGenerator.SKY_ROWS
+	_check(surface > 0, "sanity: there is a sky band at all (%d rows)" % surface)
+	var blocks: int = 0
+	var walls: int = 0
+	for col: int in grid.width:
+		for row: int in surface:
+			var cell := Vector2i(col, row)
+			if grid.is_solid(cell):
+				blocks += 1
+			if grid.get_wall(cell) != &"":
+				walls += 1
+	_check_over(grid.width * surface, blocks == 0,
+		"no block is generated above the surface (%d of %d)" % [blocks, grid.width * surface])
+	_check_over(grid.width * surface, walls == 0,
+		"and no WALL either (%d) -- a wall with no block is a tunnel, not sky, and it is the wall plane "
+		% walls + "that decides which of the two the player sees")
+	# CONTROL: the row immediately below is rock. Without it every row above passes on a generator that
+	# produced an empty world.
+	var solid_below: int = 0
+	for col: int in grid.width:
+		if grid.is_solid(Vector2i(col, surface)):
+			solid_below += 1
+	_check(solid_below == grid.width,
+		"CONTROL: the very next row is solid across the whole width (%d of %d) -- the sky ENDS"
+		% [solid_below, grid.width])
+	# The band has to clear the jump, or it is decoration. 74px apex at a 4px cell is ~18 rows; this is
+	# derived from the two of them rather than restated, so a jump tuning change fails here.
+	var apex_rows: int = 74 / Heightfield.TERRAIN_CELL_PX
+	_check(surface > apex_rows,
+		"and the band is taller than a full jump (%d rows vs a %d-row apex), so the ceiling is never the "
+		% [surface, apex_rows] + "thing the player notices")
+
+
+## CONSTANT MUST DOMINATE CONSTANT. `view/` may not name a `sim/` symbol, so `MaterialLook.SURFACE_ROW`
+## is a COPY of `ShaftGenerator.SKY_ROWS` and the two can silently disagree — at which point every depth
+## on the HUD is wrong by the difference and the horizon is drawn in the middle of the rock. Asserted
+## here rather than trusted to the comment that says so.
+func _test_the_view_and_the_generator_agree_where_the_surface_is() -> void:
+	_check(MaterialLook.SURFACE_ROW == ShaftGenerator.SKY_ROWS,
+		"the palette's surface row (%d) is the generator's sky band (%d)"
+		% [MaterialLook.SURFACE_ROW, ShaftGenerator.SKY_ROWS])
+	_check(MaterialLook.CELLS_PER_METRE == ShaftGenerator.TERRAIN_CELLS_PER_METER,
+		"and its metre is the generator's metre (%d vs %d)"
+		% [MaterialLook.CELLS_PER_METRE, ShaftGenerator.TERRAIN_CELLS_PER_METER])
+	# And the conversion built on them lands where it should: zero AT the datum, negative above it,
+	# positive below. The negative half is what `DepthChip` renders as `+N m` and has never until now
+	# been reachable in a generated world.
+	_check(MaterialLook.depth_m(ShaftGenerator.SKY_ROWS) == 0,
+		"the surface row is 0 m (%d)" % MaterialLook.depth_m(ShaftGenerator.SKY_ROWS))
+	_check(MaterialLook.depth_m(0) < 0,
+		"the top of the sky is a NEGATIVE depth (%d m) -- the readout's `+N m` case, reachable at last"
+		% MaterialLook.depth_m(0))
+	_check(MaterialLook.depth_m(ShaftGenerator.SKY_ROWS + 10 * MaterialLook.CELLS_PER_METRE) == 10,
+		"and ten metres of rock below it reads as 10 m (%d)"
+		% MaterialLook.depth_m(ShaftGenerator.SKY_ROWS + 10 * MaterialLook.CELLS_PER_METRE))

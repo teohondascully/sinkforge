@@ -10,7 +10,12 @@ extends RefCounted
 ## defines "what a reveal session's own starting state is."
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
-const SHALLOW_ROW_LIMIT: int = 30  ## how far down the scan looks for a "near-surface" glimmer pocket
+## How far BELOW THE SURFACE the scan looks for a "near-surface" glimmer pocket. Was an absolute row
+## until P017 (D0292) put twenty metres of air above the rock, at which point the whole scan band sat
+## in the sky: no glimmer was ever found, `target_glimmer_col` came back -1, and agent mode's stopping
+## condition ("no target") was satisfied on tick ONE. Every capture moment came back blank or missing,
+## which is how it was noticed — not by a suite, all of which still passed.
+const SHALLOW_ROWS_BELOW_SURFACE: int = 30
 const APPROACH_OFFSET_COLS: int = 6  ## spawn this many columns left of the found pocket
 
 ## D0192. The spawn may never sit flush against the world's own left edge. DERIVED, not picked: the body
@@ -29,7 +34,7 @@ const APPROACH_OFFSET_COLS: int = 6  ## spawn this many columns left of the foun
 const MIN_SPAWN_COL: int = 1
 
 
-## First shallow (row < SHALLOW_ROW_LIMIT) glimmer cell, scanning columns left to right -- deterministic
+## First shallow (within SHALLOW_ROWS_BELOW_SURFACE of the surface) glimmer cell, scanning columns left to right -- deterministic
 ## given a deterministic grid, so the same (site, seed) always finds the same spawn column and the same
 ## target glimmer column. Returns `{"spawn_col": int, "target_glimmer_col": int}` -- the latter is -1 if
 ## this seed/site placed no shallow glimmer at all (parks the spawn in the middle instead of crashing).
@@ -41,7 +46,7 @@ static func find_spawn(grid: TileGrid) -> Dictionary:
 	for col: int in grid.width:
 		if col < APPROACH_OFFSET_COLS:
 			continue
-		for row: int in SHALLOW_ROW_LIMIT:
+		for row: int in range(SURFACE_ROW, SURFACE_ROW + SHALLOW_ROWS_BELOW_SURFACE):
 			if grid.get_material(Vector2i(col, row)) == &"glimmer":
 				return {"spawn_col": maxi(MIN_SPAWN_COL, col - APPROACH_OFFSET_COLS), "target_glimmer_col": col}
 	return {"spawn_col": grid.width / 2, "target_glimmer_col": -1}
@@ -62,6 +67,12 @@ static func find_spawn(grid: TileGrid) -> Dictionary:
 ## open onto the sky at row 0.
 const CEILING_ROWS: int = 1
 
+## The row the rock starts at. P017 (D0292) put twenty metres of air above it, so the entry pocket and
+## the spawn are both keyed to the SURFACE and not to row 0 — which is now sky, and carving a pocket
+## there would put the body in it, in mid-air, with the ceiling it is meant to stand under 80 rows
+## below. Read off the generator rather than restated.
+const SURFACE_ROW: int = ShaftGenerator.SKY_ROWS
+
 
 ## `ShaftGenerator` output is solid rock/clay from row 0 down -- pure geology, no pre-existing opening.
 ## Carves a small, explicit entry pocket the width of the body, standing height only, matching
@@ -69,7 +80,7 @@ const CEILING_ROWS: int = 1
 static func carve_entry_shaft(grid: TileGrid, col: int) -> void:
 	var rows: int = Body.HEIGHT_PX / CELL + 2
 	for dc: int in range(0, 4):  # Body.WIDTH_PX/CELL cells wide
-		for row: int in range(CEILING_ROWS, CEILING_ROWS + rows):
+		for row: int in range(SURFACE_ROW + CEILING_ROWS, SURFACE_ROW + CEILING_ROWS + rows):
 			grid.excavate(Vector2i(col + dc, row))
 
 
@@ -79,7 +90,7 @@ static func carve_entry_shaft(grid: TileGrid, col: int) -> void:
 ## one whose top lands on the first CARVED row. Public because `tests/test_reveal_spawn_bounds.gd` builds
 ## the pre-fix setup as a live control and has to be able to state both rows against the same derivation.
 static func spawn_row_for_ceiling() -> int:
-	return Body.HEIGHT_PX / CELL / 2 + CEILING_ROWS
+	return SURFACE_ROW + Body.HEIGHT_PX / CELL / 2 + CEILING_ROWS
 
 
 ## The full session start: generates the grid, finds the spawn/target columns, carves the entry shaft, and

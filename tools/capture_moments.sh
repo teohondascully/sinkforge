@@ -73,6 +73,23 @@ mkdir -p "$OUT_DIR" || exit 1
 RECORDINGS="tests/body/recordings"
 BEFORE_LOGS="$(ls "$RECORDINGS"/reveal_agent_*.log 2>/dev/null | sort)"
 
+# EVERY CAMERA ROW BELOW IS RELATIVE TO THE SURFACE, and the surface is no longer row 0. P017 (D0292)
+# put twenty metres of air above the rock, so the four moments' absolute rows all pointed into the sky and
+# every one of them captured a blank frame or no frame at all. Derived from `ShaftGenerator` rather than
+# restated here, because a capture tool whose camera silently drifts off the world is a tool that reports
+# "blank frame" for a reason that has nothing to do with what changed.
+#
+# It FAILS CLOSED if either constant cannot be read: a bare `$(( ))` on an empty string is zero, which is
+# a perfectly plausible surface row and would put every camera back in the sky without saying so.
+SKY_M="$(grep -oE '^const SKY_ROWS: int = [0-9]+' sim/terrain_gen/shaft_generator.gd | grep -oE '[0-9]+$')"
+CPM="$(grep -oE '^const TERRAIN_CELLS_PER_METER: int = [0-9]+' sim/terrain_gen/shaft_generator.gd | grep -oE '[0-9]+$')"
+if [ -z "$SKY_M" ] || [ -z "$CPM" ]; then
+	echo "capture_moments: FAIL - could not read SKY_ROWS/TERRAIN_CELLS_PER_METER from ShaftGenerator;" >&2
+	echo "capture_moments:        every camera row below is relative to the surface and would be wrong." >&2
+	exit 1
+fi
+SURFACE_ROW=$(( SKY_M * CPM ))
+
 # moment | extra scene args | capture tick
 # `surface` is the world as a player first meets it. `delve` is the same seed after the scripted shaft has
 # been sunk, framed so the whole descent is in one frame. `aim` is Slice 1's own subject: the reach ring,
@@ -91,14 +108,14 @@ BEFORE_LOGS="$(ls "$RECORDINGS"/reveal_agent_*.log 2>/dev/null | sort)"
 # accepts off-world background on one side: the body spawns one cell from the left wall and cannot be
 # centred without it, and a 4px cell has to reach ~78 output px to read as a reticle at all.
 MOMENTS=(
-	"surface|--zoom=6.5 --camera=24,13|2"
-	"delve|--mine-down --zoom=6.5 --camera=24,17|216"
-	"aim|--mine-down --zoom=13.0 --camera=12,12|40"
+	"surface|--zoom=6.5 --camera=24,$((SURFACE_ROW + 13))|2"
+	"delve|--mine-down --zoom=6.5 --camera=24,$((SURFACE_ROW + 17))|216"
+	"aim|--mine-down --zoom=13.0 --camera=12,$((SURFACE_ROW + 12))|40"
 	# D0244. `horizon` frames the surface datum (row 0) about a third of the way down the frame, which is
 	# the only moment where the backdrop is visible at all -- `surface` at row 13 puts the horizon off the
 	# top edge. Captured in BOTH modes so `SKY=1` and the plain run are a true pair: same seed, same
 	# camera, same tick, and the backdrop the only difference.
-	"horizon|--zoom=6.5 --camera=24,4|2"
+	"horizon|--zoom=6.5 --camera=24,$((SURFACE_ROW + 4))|2"
 )
 
 fail=0

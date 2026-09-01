@@ -168,8 +168,15 @@ func _test_the_band_ladder_is_ordered_and_total() -> void:
 			ordered = false
 		last_from = int(band["from_m"])
 	_check(ordered, "band_at() returns a monotonically deepening band as the row increases")
-	_check(String(look.band_at(0)["display_name"]) == "TOPSOIL",
-		"row 0 reads as TOPSOIL (got %s)" % look.band_at(0)["display_name"])
+	# The SURFACE row, not row 0. P017 (D0292) put twenty metres of air above the rock, so row 0 is now
+	# `OPEN SKY` -- a band that has existed in `data/bands/` from the start (`from_m: -119`) and that no
+	# generated world could reach until this. Reading it back is the ladder finally being whole.
+	_check(String(look.band_at(MaterialLook.SURFACE_ROW)["display_name"]) == "TOPSOIL",
+		"the surface row reads as TOPSOIL (got %s)"
+		% look.band_at(MaterialLook.SURFACE_ROW)["display_name"])
+	_check(String(look.band_at(0)["display_name"]) == "OPEN SKY",
+		"and row 0, twenty metres above it, reads as OPEN SKY (got %s) -- the band above the datum was unreachable before P017"
+		% look.band_at(0)["display_name"])
 	_check(String(look.band_at(MAX_ROW)["display_name"]) == "STONEREACH",
 		"the deepest row in the world still has a band, the last one (got %s)"
 		% look.band_at(MAX_ROW)["display_name"])
