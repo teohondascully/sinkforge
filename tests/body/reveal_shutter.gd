@@ -44,3 +44,29 @@ static func capture(scene: Node2D, path: String, tick: int, camera: Camera2D, zo
 		[camera.position, zoom, Body._px_to_cell(body.pos_x), Body._px_to_cell(body.pos_y),
 		float(body.pos_x) / float(Fx.SCALE), float(body.pos_y) / float(Fx.SCALE)])
 	DebugSceneCommon.warn_if_blank(img, path)
+
+
+## A POSITIVE CONTROL FOR THE SHUTTER FRAME (D0311). `tools/capture_moments.sh`'s `grain` moment exists
+## to photograph `SeamPainter`, and whether it does is a property of the TICK and the CAMERA, not of the
+## code: the painter draws only where the worked cell carries a seam, about two thirds of rock carries
+## none, and the camera is fixed while the agent digs away from it. A moment that drifts off its subject
+## produces a perfectly good picture of nothing — which is indistinguishable from a painter that stopped
+## drawing (D0309), and which no colour floor can see, because a handful of thin strokes barely moves a
+## colour count (314 vs 371 across exactly this failure).
+##
+## **`visible` IS THE QUANTITY, NOT `run`.** The first version of this control reported only whether the
+## painter had work to do. It passed at `run=3` on a frame that diffed at ZERO pixels, because the work
+## was eleven rows below the bottom of the camera. "The subject is posed" and "the subject is in the
+## picture" are different claims and only the second one is what a capture depends on.
+static func report_subject(frame: Frame, tick: int) -> void:
+	if frame == null or frame.obs == null:
+		print("reveal_scene: seam_run=0 visible=0 on the shutter frame at tick %d (no frame)" % tick)
+		return
+	var run: Array[Vector2i] = SeamPainter.aim_run(frame.obs)
+	var px: int = maxi(1, frame.obs.cell_px)
+	var visible: int = 0
+	for c: Vector2i in run:
+		if frame.view_world_rect.intersects(Rect2(Vector2(c * px), Vector2(px, px))):
+			visible += 1
+	print("reveal_scene: seam_run=%d visible=%d on the shutter frame at tick %d"
+		% [run.size(), visible, tick])

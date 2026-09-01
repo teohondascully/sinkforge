@@ -117,10 +117,13 @@ MOMENTS=(
 	# was printing the painter's own gate: `charging=true cell=(24, 95) seam=0`. At tick 14 the agent is
 	# working (23, 93), which carries a DIAGONAL seam, and the same diff moves 2,962 pixels.
 	#
-	# So the moment is pinned at 14, and the reason is written down rather than left as a number: a future
-	# change to the agent's path or to `Seams`' rates can silently return this moment to an ungrained cell,
-	# and the failure would look exactly like a painter that stopped drawing.
-	"grain|--mine-down --zoom=13.0 --camera=12,$((SURFACE_ROW + 12))|14"
+	# THAT PREDICTION CAME TRUE WITHIN THE HOUR (D0311). Tick 14 was verified at 2,962 changed pixels and
+	# then D0307 changed `cave.frequency`, the world moved under it, and the same diff read ZERO again --
+	# the agent no longer works a grained cell anywhere in its first sixty ticks. The tick is now 117,
+	# which is inside a ten-tick window (113-122) rather than on its edge, and MORE IMPORTANTLY the tool
+	# no longer trusts it: `reveal_scene` prints `seam_run=` for the shutter frame and the check below
+	# fails this moment when it is zero. A pinned tick is a claim about a world, and the world changes.
+	"grain|--mine-down --zoom=13.0 --camera=26,$((SURFACE_ROW + 23))|117"
 	# D0244. `horizon` frames the surface datum (row 0) about a third of the way down the frame, which is
 	# the only moment where the backdrop is visible at all -- `surface` at row 13 puts the horizon off the
 	# top edge. Captured in BOTH modes so `SKY=1` and the plain run are a true pair: same seed, same
@@ -170,6 +173,27 @@ for entry in "${MOMENTS[@]}"; do
 	fi
 	colours="$(printf '%s\n' "$out" | grep -o "capture has [0-9]* distinct colours" | grep -o "[0-9]*" | head -1)"
 	echo "capture_moments: $name -> $png (${colours:-?} distinct colours, tick $tick, bite ${BITE:-default})"
+	# THE `grain` MOMENT CARRIES ITS OWN POSITIVE CONTROL (D0311), because a colour floor cannot see its
+	# subject: `SeamPainter` draws a handful of thin strokes, so a frame with the grain and a frame
+	# without it have effectively the same colour count, and both clear MIN_COLOURS comfortably. What
+	# separates them is whether the shutter frame had a run to draw at all -- which `reveal_scene` now
+	# prints, because the tick that poses it is a fact about the WORLD and the world changes underneath a
+	# pinned number. It already did once, inside an hour (D0307 moved it; D0309 is how it was found).
+	if [ "$name" = "grain" ]; then
+		seam_run="$(printf '%s\n' "$out" | grep -o "visible=[0-9]*" | grep -o "[0-9]*" | head -1)"
+		if [ -z "$seam_run" ] || [ "$seam_run" -eq 0 ]; then
+			echo "capture_moments: FAIL - grain captured a frame with NO grain on it (visible=${seam_run:-absent})." >&2
+			echo "capture_moments:        This moment exists to photograph SeamPainter and it photographed" >&2
+			echo "capture_moments:        rock instead. The picture is fine; it is a picture of nothing," >&2
+			echo "capture_moments:        which is indistinguishable from a painter that stopped drawing." >&2
+			echo "capture_moments:        The worked cell at tick $tick carries no seam any more -- about two" >&2
+			echo "capture_moments:        thirds of rock carries none, so this is the COMMON case, not bad" >&2
+			echo "capture_moments:        luck. Re-derive a tick that poses it rather than lowering a floor." >&2
+			fail=1
+			continue
+		fi
+		echo "capture_moments:        ...and the shutter frame actually carried the grain (visible=$seam_run strokes)"
+	fi
 	# A FLOOR, because this tool's failure mode is a PLAUSIBLE-LOOKING SUCCESS (D0304). A stale Godot
 	# import cache makes every `class_name` global fail to resolve, so the painters never run -- and the
 	# scene still boots, still reaches the tick, still writes a PNG, and still reports a number. It

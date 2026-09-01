@@ -13026,3 +13026,44 @@ with SIGPIPE the moment grep exits, **before the shutter fires**, and the run wr
 reporting nothing wrong. `[[pipefail-reports-failure-on-match]]` has been recorded twice before in this
 project and both times as `grep -q`; `-m<N>` is the same defect with a different flag. Redirect to a file
 and grep the file.
+
+## D0311 · 2026-09-01 · The capture moment D0309 pinned went stale inside the hour, and "posed" is not "in frame"
+
+**D0309 pinned `tools/capture_moments.sh`'s `grain` moment to tick 14, verified it at 2,962 changed
+pixels, and wrote this beside it:** *"a future change to the agent's path or to `Seams`' rates can
+silently return this moment to an ungrained cell, and the failure would look exactly like a painter that
+stopped drawing."*
+
+**That happened in the next hour.** D0307 changed `cave.frequency` 0.11 → 0.0656, the world moved under
+the pinned tick, and the same with/without diff read **0 pixels** again. In the new world the scripted
+agent works no grained cell anywhere in its first sixty ticks — measured, not inferred: 239 paint calls
+over 400 ticks, 10 of them with a run, all at cell (27, 103), first at render tick **113**.
+
+**A pinned tick is a claim about a world, and the world is under active change.** So the tick is no
+longer trusted on its own. `tests/body/reveal_scene.gd` now reports what the shutter frame actually
+contained and `capture_moments.sh` fails the moment when it contained nothing. The tick moved to **117**,
+chosen as the middle of the 113–122 window rather than its edge, so a small drift still lands inside.
+
+**AND THE SECOND MISTAKE, WHICH IS THE ONE WORTH THE ENTRY.** The first version of that control asked
+`seam_run > 0` — did the painter have work to do. It passed at tick 117 with `seam_run=3`, **and the
+diff still read exactly 0 pixels.** By tick 117 the agent has dug eleven rows below the fixed camera, so
+the grain it was lighting was off the bottom of the frame. The painter had work, did it, and none of it
+was in the picture.
+
+**"The subject is posed" and "the subject is in the picture" are different claims, and a control that
+answers the first will report success for a photograph of nothing.** The check now intersects each run
+cell against `frame.view_world_rect` and reports `visible=`, which is the quantity the moment actually
+depends on. The camera moved with it, to `26,SURFACE_ROW+23`, where the work is.
+
+**Verified after both fixes: 8,130 changed pixels, bbox `x 1037..1272, y 512..561`** — centre frame,
+where the camera now points.
+
+**WHY A COLOUR FLOOR COULD NEVER HAVE CAUGHT EITHER OF THESE.** `MIN_COLOURS` is 120 and exists for a
+different failure (D0304's stale import cache, which read 45). The stale grain frame reported **314
+distinct colours** and the good one **371**: a handful of thin strokes barely moves a colour count, and
+both clear the floor by a wide margin. **A floor on a global statistic cannot see a local subject.** The
+control had to be about the subject itself.
+
+**Mutation-tested in both directions, as a new gate must be:** with the tick reverted to 14 the tool
+exits **1** and names the remedy; with the tick at 117 it exits **0**. Reaching the check is not the same
+as the check firing, and here the check had already been written once in a form that could not fire.
