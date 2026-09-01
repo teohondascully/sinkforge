@@ -18,15 +18,32 @@ which is `docs/MASTER_PLAN_AUG30.md` §3's own output.
 
 ### The rule that governs this queue
 
-**A parked decision pauses a LANE, never the RUN.** When an item needs a director ruling — a threshold or
-calibration move, a collision-resolver touch, a design/taste call, a gate bypass — write it to
-`docs/NEEDS_DIRECTOR.md`, mark the item BLOCKED-ON-DIRECTOR, and **immediately pull the next
-DECISION-FREE item from any lane**. "I hit a decision, so I stopped" is the failure mode this queue
-exists to prevent.
+**A parked decision pauses a LANE, never the RUN.** `.claude/commands/loop.md` carries the full
+procedure; the short form is: write the ruling to `docs/NEEDS_DIRECTOR.md` with its measurement, decide
+whether it gates only this item or the whole lane, and **take the next item either way**. Rulings
+accumulate into a batch and are surfaced together, never one at a time.
 
-**The run stops only on:** (a) a determinism two-process replay divergence, (b) genuine exhaustion of
-decision-free work, (c) 10h. A parked ruling, a gate-7 block, a resolver touch and a taste call are
-**not** stop conditions.
+**Reporting is not stopping.** Two runs stalled here — the first halted on one ruling (P020) at 8
+commits; the second finished a unit, reported, and treated the report as a terminus. After you report,
+take the next item.
+
+**The run stops on exactly three things:** a determinism two-process replay divergence, decision-free
+work exhausted across ALL lanes, or the time budget. Not a parked ruling. Not a gate block. Not a taste
+call. Not finishing something.
+
+### LANE STATUS
+
+| lane | state | gated by |
+|---|---|---|
+| C · sprites/visuals | **UNBLOCKED** (P022 ruled: carve headroom) | — |
+| F · HUD/UI | OPEN, decision-free | — |
+| G · audio | OPEN, decision-free | — |
+| A · camera/framing | OPEN, decision-free (body collision width parks) | — |
+| D · harness | OPEN — O(1) hash DONE (D0261), suite selection DONE (D0260) | — |
+| B · world-gen, view side | OPEN, decision-free | — |
+| B · world-gen, sim side | BLOCKED-ON-DIRECTOR | P021 (15% carve), WG-4 |
+| E · verbs/systems | OPEN except rope-sim | resolver park |
+| economy | OUT OF SCOPE this run | redesign, sequenced separately |
 
 ### DECISION-FREE — work to exhaustion, low-decision lanes first
 
