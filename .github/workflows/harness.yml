@@ -229,6 +229,13 @@ jobs:
         continue-on-error: true
         run: python3 tools/quality_check/coupling.py
 
+      # D0318/D0319. `.editorconfig` made executable. Six rules, two rulesets, string-aware for .gd/.py.
+      # BLOCKING: the formatter's own mutation tests (76/76, run by the mutation-test sweep above via
+      # `find tools -name 'test_*.py'`) prove every rule fires when broken, and the tool is self-including
+      # (it formats its own source). A formatting regression is a fact about the tree a build should refuse.
+      - name: Every .gd/.py/.sh/.yml/.yaml file matches .editorconfig (QUALITY gate 32, D0318) — BLOCKING
+        run: python3 tools/formatter/formatter.py
+
   # Runs every tests/test_*.gd suite under the real, pinned engine (QUALITY gates 8, 9, 11 —
   # determinism, conservation, movement acceptance — all depend on this actually happening).
   # Godot is downloaded and checksum-verified rather than pulled from a marketplace action,
