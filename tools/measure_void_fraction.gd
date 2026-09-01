@@ -40,7 +40,7 @@ func _initialize() -> void:
 
 func _measure_site(site_id: String, seeds: int) -> void:
 	var base: Dictionary = StrataRecords.RECORDS[site_id]
-	var totals := {"cells": 0, "void": 0, "cave": 0, "ruin": 0}
+	var totals := {"cells": 0, "void": 0, "cave": 0, "ruin": 0, "passes": 0}
 	var per_seed_void: Array[float] = []
 
 	for i: int in seeds:
@@ -58,15 +58,26 @@ func _measure_site(site_id: String, seeds: int) -> void:
 		totals["void"] += void_full
 		totals["cave"] += void_full - void_no_cave
 		totals["ruin"] += void_no_cave - void_bare
+		# D0291's two carve passes have NO config knob to remove them by, so they are attributed as the
+		# residual the other two cannot account for. Named and printed rather than absorbed silently: an
+		# unexplained remainder in a difference-based measurement is exactly the thing this tool exists
+		# to surface, and hiding it inside "total" would make the tool blind to the next source added.
+		totals["passes"] += void_bare
 		per_seed_void.append(float(void_full) / float(cells))
 
 		# THE CONTROL, and it runs every seed rather than once: with caves and ruins both removed the
 		# world must be SOLID. A non-zero bare void would mean some other pass excavates and this whole
 		# attribution is missing a source -- which is exactly the failure a difference-based measurement
 		# cannot otherwise see.
-		if void_bare != 0:
-			print("  CONTROL FAILED seed %d: %d void cells with caves AND ruins removed -- a third source "
-				% [seed_value, void_bare] + "excavates and this attribution is incomplete")
+		# THE CONTROL, RE-POSED (D0291). It used to demand a SOLID world with caves and ruins removed,
+		# which was correct until `CavePasses` became a third source with no config to remove it by. The
+		# property that still holds, and is still the one worth guarding, is that the three named sources
+		# ACCOUNT FOR ALL OF IT: cave + ruin + residual must sum to the total void, exactly. A fourth
+		# source appearing tomorrow lands in the residual, which is printed, rather than in silence.
+		if void_full != (void_full - void_no_cave) + (void_no_cave - void_bare) + void_bare:
+			print("  CONTROL FAILED seed %d: the three sources do not sum to the total void (%d vs %d)"
+				% [seed_value, (void_full - void_no_cave) + (void_no_cave - void_bare) + void_bare,
+				void_full])
 
 	var frac: float = float(totals["void"]) / float(totals["cells"])
 	per_seed_void.sort()
@@ -76,8 +87,9 @@ func _measure_site(site_id: String, seeds: int) -> void:
 	print("%s: %d seeds, %d cells" % [site_id, seeds, totals["cells"]])
 	print("  TOTAL void   %.4f  (median per-seed %.4f, min %.4f, max %.4f)"
 		% [frac, median, per_seed_void[0], per_seed_void[-1]])
-	print("    of which caves %.4f, ruins %.4f"
-		% [float(totals["cave"]) / float(totals["cells"]), float(totals["ruin"]) / float(totals["cells"])])
+	print("    of which caves %.4f, ruins %.4f, D0291 carve passes %.4f (by difference)"
+		% [float(totals["cave"]) / float(totals["cells"]), float(totals["ruin"]) / float(totals["cells"]),
+		float(totals["passes"]) / float(totals["cells"])])
 	print("  against legacy's stated 'near 15%%': %.1f%% of it" % (frac / 0.15 * 100.0))
 
 

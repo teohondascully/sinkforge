@@ -298,6 +298,7 @@ jobs:
       #   test_tile_grid.gd                              test_tile_grid
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
+      #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
       #   test_shaft_generator.gd                        test_shaft_generator
       #   test_heightfield.gd                            test_heightfield
       #   test_body.gd                                   test_body
@@ -353,6 +354,7 @@ jobs:
             res://tests/test_tile_grid.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
+            res://tests/test_cave_passes.gd \
             res://tests/test_shaft_generator.gd \
             res://tests/test_heightfield.gd \
             res://tests/test_body.gd \

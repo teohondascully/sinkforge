@@ -12102,3 +12102,64 @@ the save, the camera diagnostic and the blank check. Extract-only, per the direc
 
 **Reverse cost:** delete `view/audio/sfx.gd`, `view/audio/sfx_bank.gd` and the suite; drop the two lines
 in `_step_mining_feedback`. `RevealShutter` should stay regardless.
+## D0291 · P021's two unported carve passes — the void goes 0.042 to 0.104, and no threshold moved · 2026-08-31 · Lane B, NEEDS_DIRECTOR P021, director-ruled
+
+Ported from `legacy/src/core/layered_world_gen.gd:372-403` (`_carve_big_caverns`), `405-437`
+(`_carve_tunnels`, `_carve_disc`) and `:31/360-364` (`CAVE_SHELF_BIAS`). Director's ruling: *"P021 is a
+PORTING item, not a threshold move — the real gap is unported work."*
+
+**MEASURED, AND THAT IS THE WHOLE POINT OF THE ITEM.** Total void across 24 seeds of `shallow_clay`,
+1,179,648 cells: **0.0421 -> 0.1042**, from 28% of legacy's stated "near 15%" to **69.5%** of it — and
+the cave thresholds were not touched. `tools/measure_void_fraction.gd` attributes it: caves 0.0385,
+ruins 0.0010, these two passes 0.0647. P021's earlier measurement stands: our carve rate against
+Godot's own `FastNoiseLite` is 0.907, so the thresholds were always right and the thinness was missing
+passes.
+
+**A CORRECTION TO THE RULING'S WORDING, applied rather than silently absorbed.** The ruling says "caves +
+ruins + shelf undercut bias". Ruins were already ported and P021 measured them at 0.0010 of total void;
+the two passes actually missing are big caverns and tunnels. The shelf undercut bias is real and is the
+third piece, and it lands in `ShaftGenerator._carve_caves` where it belongs.
+
+**D0017 DELIBERATELY DROPPED THESE, and the reason it gave does not survive the measurement.** It called
+big caverns and tunnels "artifacts of the pre-pivot progression-gated structure". That reading holds for
+rifts, sinkhole mouths and the seal. It does not hold for the worms: legacy's own comment says they
+"thread the isolated noise pockets into ONE CONNECTED SYSTEM", and a pocket you cannot walk into is
+scenery. `tests/test_cave_passes.gd` measures that directly — largest connected region, and the SHARE it
+holds of all open space, because a worm that carved a long private corridor would raise the void and the
+largest region together while connecting nothing.
+
+**NO `cos`, NO `sin`, ANYWHERE IN WORLD GENERATION.** Legacy's worm carries a float `angle` and steps by
+`cos`/`sin`. Godot's are the platform's libm, which is not required to agree in the last bit — and D0167
+pins this generator's output as goldens captured on CI **Linux** while development happens on macOS. One
+flipped rounding in one worm is a different world, and it would present as a determinism regression
+rather than as a port. The heading is an index into a table of sixteen fixed-point directions instead,
+written out as literals rather than computed at startup. The suite asserts the table IS a circle (every
+heading has an exact opposite) and carries legacy's 0.55 vertical squash as a ratio.
+
+**COUNTS ARE DENOMINATED IN METRES, NOT IN CELLS, and this is the WG-4 trap avoided at the point of
+writing rather than added to the backlog.** Legacy calibrated its `*_PER_COL` rates against an 80-row
+world of one-metre cells. This world's cell is a quarter of a metre, so the same physical volume holds
+**sixteen times** the cells: driving legacy's rate off our cell counts would have put sixteen halls where
+legacy put one, and both worlds look equally plausible. `count_for` takes `cells_per_m` and the suite
+asserts the invariance that matters — the same PHYSICAL world at 1 and at 4 cells per metre gets the
+same count. These passes touch neither `DENSITY_ROWS` nor a `*_per_col` value, so WG-4 moves neither.
+
+**A SPLIT OF THE TERRAIN STREAM, not the stream itself.** `rng.split("carve_passes")` means adding two
+passes cannot shift a single vein or ruin draw. Without it every ore body in every world would re-roll,
+and the golden re-pin below would be hiding that inside a change that was going to re-pin anyway.
+
+**Two fixtures that posed nothing, both found by their own controls reading zero.** The connectivity test
+first ran the worms against the CHAMBERS alone: the largest region did not move by one cell, correctly,
+because four worms in a world with four halls mostly miss them — the pass needs pockets to thread, so the
+fixture now poses a field of them. And the surface-guard control read zero twice: a worm starts two
+metres below the boundary and can only breach it by wandering upward over many steps, so one seed asserts
+nothing. It is a population of twenty seeds now, and the subject-removed control (the same seeds with the
+guard at zero) opens 113 cells in that band against the guarded run's 0.
+
+**The goldens re-pin.** Two separate processes agree bit-identically (first mismatch at -1) and the
+seed+1 control still diverges at checkpoint 0, so this is a world-generation change and not a determinism
+regression — the two have different remedies and D0167 is explicit about telling them apart. Harvested
+from CI's own Linux build, never locally.
+
+**Reverse cost:** delete `sim/terrain_gen/cave_passes.gd` and its suite, drop the two calls and the
+`SHELF_BIAS` branch, and re-pin the goldens back.
