@@ -260,8 +260,12 @@ func _test_the_mining_verbs_state_reaches_the_door() -> void:
 		"at the cell that was commanded (%s vs %s)" % [mining.mining_charging_cell, target])
 	_check(mining.mining_cracks.size() == 1,
 		"and exactly the worked cell holds a crack (%d: %s)" % [mining.mining_cracks.size(), mining.mining_cracks.keys()])
-	_check(int(mining.mining_cracks.get(target, 0)) > 0,
-		"with a real banked charge on it (%d)" % int(mining.mining_cracks.get(target, 0)))
+	# Per mille of the way to breaking, not the raw charge: strictly between 0 and 1000 after ONE tick of
+	# a hold. Both bounds asserted -- 0 would mean the field is never written, and 1000 would mean the
+	# division is by something other than the break cost.
+	var progress: int = int(mining.mining_cracks.get(target, 0))
+	_check(progress > 0 and progress < 1000,
+		"carrying real progress toward the break, in per mille (%d)" % progress)
 	# Hollow is a magnitude, and here it is legitimately 0 -- a solid floor to the horizon has no cavity
 	# behind it. Asserted as "in range" rather than "> 0", because demanding a non-zero reading from this
 	# fixture would be demanding the wrong answer.

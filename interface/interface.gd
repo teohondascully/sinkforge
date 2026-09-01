@@ -132,9 +132,16 @@ class Observation:
 	var mining_charging_cell: Vector2i = Vector2i.ZERO
 	var mining_is_charging: bool = false
 
-	## Cell -> banked charge, for every cell currently holding one. A crack overlay reads this instead of
-	## probing the whole visible grid every frame, which is what `Mining.cracked_cells()` was written for
-	## and what nothing had yet called.
+	## Cell -> **progress toward breaking it, per mille**, for every cell currently holding a crack. A
+	## crack overlay reads this instead of probing the whole visible grid every frame, which is what
+	## `Mining.cracked_cells()` was written for and what nothing had yet called.
+	##
+	## THE FRACTION, NOT THE RAW BANKED CHARGE, and the difference is a layer boundary rather than a
+	## convenience. What a renderer draws is how far gone the rock looks, which is `banked / break_cost`
+	## — and `break_cost` is a function of the MATERIAL, so a view holding the raw charge would have to
+	## call `Mining.break_cost()` to mean anything by it. That is a `sim/` symbol, and `view/` may not
+	## name one. Per mille to match `mining_hollow`, and integer for the same reason everything else here
+	## is: a float in the observation is a float in a replay.
 	var mining_cracks: Dictionary = {}
 
 	## What this tick's blow actually did. `broke_cells` is target-first in the deterministic scan order
@@ -150,6 +157,20 @@ class Observation:
 	## only the boolean cannot reconstruct the crescendo; one given the magnitude can derive the boolean.
 	var mining_hollow: int = 0
 	var mining_breach: bool = false
+
+	## The terrain cell's size in world pixels. **Not a mining field** — it belongs to whatever a painter
+	## does with `window`, `materials` and `walls`, all of which are cell-denominated while every draw
+	## call is in pixels. `view/` may not name `Heightfield.TERRAIN_CELL_PX`, and until now every painter
+	## that needed it either lived outside `view/` or worked in fractions. The layer lint caught the first
+	## one that did not (`view/visuals/crack_painter.gd`), which is the gate doing exactly its job.
+	var cell_px: int = 0
+
+	## The diameter, in world pixels, of what ONE blow destroys — `(2 * bite_radius + 1) * cell`. Carried
+	## because a crack overlay has to size itself against the blow rather than against the cell (see
+	## `view/visuals/crack_painter.gd`'s header on WG-4), and `Mining.bite_radius` is a `sim/` field a view
+	## may not read. Derived here rather than in the painter for the same reason `mining_cracks` is a
+	## fraction: the door converts, so no consumer has to name a sim symbol to interpret what it was given.
+	var mining_blow_px: int = 0
 
 	## True iff `c` holds solid material. Outside the window returns false -- NOT "unknown", and the
 	## distinction matters as soon as fog exists: a consumer asking about a cell it was not given should
@@ -254,6 +275,7 @@ func observe(envelope: Envelope) -> Observation:
 	o.facing = _body.facing
 	o.cell = Vector2i(Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y))
 	o.window = envelope.window
+	o.cell_px = Heightfield.TERRAIN_CELL_PX
 	_fill_window(o)
 	_fill_mining(o)
 	return o
@@ -271,12 +293,16 @@ func _fill_mining(o: Observation) -> void:
 	o.mining_is_charging = _mining.charging_cell != Mining.NO_CELL
 	o.mining_cracks = {}
 	for cell: Vector2i in _mining.cracked_cells():
-		o.mining_cracks[cell] = _mining.banked(cell)
+		var cost: int = Mining.break_cost(_grid.get_material(cell))
+		# A cell whose material has somehow no cost cannot be "part way broken", and dividing by it would
+		# be a crash in the door rather than in whatever wrote the bad material.
+		o.mining_cracks[cell] = (_mining.banked(cell) * 1000) / cost if cost > 0 else 0
 	o.mining_broke = _mining.broke_this_tick
 	o.mining_broke_material = _mining.broke_material
 	o.mining_broke_cells = _mining.broke_cells.duplicate()
 	o.mining_hollow = _mining.hollow_this_tick
 	o.mining_breach = _mining.breach_this_tick
+	o.mining_blow_px = (2 * _mining.bite_radius + 1) * Mining.CELL_PX
 
 
 ## Copies the window into the three derived fields. Split out of `observe` so that function stays a flat

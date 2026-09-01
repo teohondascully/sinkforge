@@ -126,6 +126,7 @@ func _build_view() -> void:
 	_sky_view.setup(Interface.new(_grid, _body, _mining), _look, _camera)
 	if _sky:
 		_sky_view.add_painter(SkyPainter.paint).z_index = -100
+	_sky_view.add_painter(CrackPainter.paint_frame)  # D0275, and the first consumer of D0274's L2 door
 	_sky_view.add_hud().add_chip(DepthChip.paint)
 
 

@@ -35,14 +35,14 @@ call. Not finishing something.
 
 | lane | state | gated by |
 |---|---|---|
-| C · sprites/visuals | **UNBLOCKED** (P022 ruled: carve headroom) | — |
-| F · HUD/UI | OPEN, decision-free | — |
-| G · audio | OPEN, decision-free | — |
-| A · camera/framing | OPEN, decision-free (body collision width parks) | — |
-| D · harness | OPEN — O(1) hash DONE (D0261), suite selection DONE (D0260) | — |
+| C · sprites/visuals | **UNBLOCKED and moving** — miner sprite (D0268), headroom (D0269) | — |
+| F · HUD/UI | **UNBLOCKED** — the host exists (D0271), depth chip shipped | — |
+| A · camera/framing | **UNBLOCKED** — follow/lead/pixel-snap shipped (D0273) | — |
+| E · mining feedback | **UNBLOCKED for cracks/crumble** (D0274 opened the L2 door) | ring cadence: P024 |
+| G · audio | OPEN — the score is wired; SFX want P024's swing edge for the RING only | partly P024 |
+| D · harness | OPEN — O(1) hash (D0261), suite selection (D0260), runner diagnostic (D0272) | — |
 | B · world-gen, view side | OPEN, decision-free | — |
 | B · world-gen, sim side | BLOCKED-ON-DIRECTOR | P021 (15% carve), WG-4 |
-| E · verbs/systems | OPEN except rope-sim | resolver park |
 | economy | OUT OF SCOPE this run | redesign, sequenced separately |
 
 ### DECISION-FREE — work to exhaustion, low-decision lanes first
@@ -54,15 +54,19 @@ call. Not finishing something.
       Python goldens survive.
 - [x] **WG-2 · shelf bands impermeable** (D0258). Closed by WG-3, not by a threshold move: 0 → 15 of
       97,920. The wall was a field with no tail, not a line set too high.
-- [ ] **LANE C · sprites/visuals** — miner, pickaxe + swing, tool/item/machine sprites, particles,
+- [x] **LANE C · sprites/visuals** — FIRST PASS LANDED (D0268/D0269).
+      Remaining: pickaxe swing, tool/item/machine sprites, post-fx, glimmer.
+- [ ] **LANE C tail** — miner, pickaxe + swing, tool/item/machine sprites, particles,
       post-fx, glimmer. Pure view, self-tested by capture. Highest item count in the backlog.
-- [ ] **LANE F · HUD/UI** — depth readout, strata bands, hotbar, objective card, key hints, map, theme
+- [x] **LANE F · HUD host + depth readout** (D0271). H-01 unblocked all 65 of Lane H's rows.
+- [ ] **LANE F tail** — depth readout, strata bands, hotbar, objective card, key hints, map, theme
       grammar. Port-and-refactor, trim dead content.
 - [ ] **LANE G · audio** — synthesized SFX (hollow tell, breach, blow-against-material), depth-mixed
       score. Synthesized at boot, no assets.
-- [ ] **LANE A · camera/framing/zoom/sprite-scale.** View only — body collision width is a resolver
+- [x] **LANE A · camera follow, lead, pixel-snap** (D0273). Shake parks with its trigger (T1 #9).
+- [ ] **LANE A tail — zoom/sprite-scale.** View only — body collision width is a resolver
       touch and parks.
-- [ ] **LANE D · determinism fast-track** (§6) — `state_signature()` to an O(1) running hash, ~74s → ~5s.
+- [x] **LANE D · determinism fast-track** (§6) — DONE (D0261) — `state_signature()` to an O(1) running hash, ~74s → ~5s.
       **Guard:** the hash IS the determinism contract; it must update on every mutation path, and a
       forgotten update must be mutation-proven to break a test, or it does not ship.
 - [ ] **LANE B, view-side only** — depth shading, light pool, shadow veil, parallax, back-wall. No

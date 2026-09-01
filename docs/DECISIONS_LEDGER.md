@@ -11286,3 +11286,51 @@ crumble, T1 #6 the hollow ring) need only the parts that landed.
 
 **Reverse cost:** delete `_fill_mining` and the nine `Observation` fields; drop `hollow_this_tick` and
 restore `_break`'s local. Every mining-feedback item goes back to being blocked on one unopened door.
+
+
+## D0275 · Mining has feedback: spider cracks on rock being worked · 2026-08-31 · Lane E, LEGACY_GAP T1 #5
+
+Ported from `legacy/scenes/world_renderer.gd:944-968` (`_draw_mine_cracks`). Legacy's own reason: "so
+hand-mining reads as effortful work on a specific block rather than an instant pop." **This build had no
+mining feedback at all** — rock was solid, then it was gone. The first consumer of the L2 door D0274
+opened, and it is driven through that door rather than around it: `paint_frame` reads everything from
+`Interface.Observation`, so a picture on screen is evidence the contract works end to end. Reading the
+`Mining` object directly would have drawn the same picture while proving none of it.
+
+**Deterministic, no RNG, exactly as legacy.** Crack angles come from the cell's own coordinates. That is
+not a style preference: `docs/QUALITY.md`'s screenshot-comparison discipline requires the renderer to be
+a function of state, and a random crack field would make every capture incomparable with the last.
+
+**THE ONE NUMBER THAT IS NOT LEGACY'S.** Legacy sizes every crack as a fraction of `CELL` — 32px there,
+4px here. Ported literally a crack would be **0.7 to 2 pixels long**: invisible. That is `LEGACY_GAP`
+WG-4, parked for the director. So the RATIO is ported and the unit it multiplies is stated rather than
+assumed: legacy's crack spans a fraction of what ONE BLOW destroys, and one legacy blow destroys one
+32px cell. One blow here destroys a disc of `bite_radius` cells, so the painter takes the blow's
+footprint in pixels — 20px at the default radius, giving 3.6–10.4px cracks, legacy's proportions at this
+build's scale. **If WG-4 is ruled on and the grid re-denominated, this file needs no change**, because it
+is already expressed against the blow rather than against the cell.
+
+**Two things moved onto `Observation` that are not mining fields, and the layer lint is why.**
+`crack_painter.gd` reached for `Heightfield.TERRAIN_CELL_PX` and the gate refused it: `view/` may not
+name a `sim/` symbol. That is the gate doing exactly its job, and the right fix was not an exemption but
+noticing the door was incomplete. `cell_px` now rides on every observation — the window, the material
+plane and the wall plane are all cell-denominated while every draw call is in pixels, so this was always
+missing; nothing had hit it because every earlier painter either lived outside `view/` or worked in
+fractions. `mining_blow_px` rides for the same reason: `Mining.bite_radius` is a `sim/` field.
+
+**`mining_cracks` carries the FRACTION, not the raw banked charge**, changed one commit after D0274 added
+it. What a renderer draws is how far gone the rock looks — `banked / break_cost` — and `break_cost` is a
+function of the material, so a view holding the raw charge would have to call `Mining.break_cost()` to
+mean anything by it. Per mille and integer, matching `mining_hollow`: a float in an observation is a
+float in a replay.
+
+**Shadow pass then bright pass, not shadow-then-bright per fracture.** With the per-segment order a later
+fracture's dark underlay prints over an earlier one's bright line and the star reads as broken spokes.
+Legacy's loop has the same bug latent and never hit it because its `n` is small; ours is the same `n`,
+and the ordering is written down here so a future edit does not "simplify" it back.
+
+**Verified by capture**: at zoom 6 mid-dig, a bright fracture star with its impact pip sits on the worked
+cell, under the miner in its dig pose.
+
+**Reverse cost:** delete `view/visuals/crack_painter.gd` and its suite, drop the `add_painter` line.
+`cell_px` should stay regardless — it closes a real hole in the door.
