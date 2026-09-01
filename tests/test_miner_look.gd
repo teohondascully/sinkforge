@@ -10,6 +10,7 @@ func _initialize() -> void:
 	_test_every_key_the_table_can_emit_resolves_to_a_texture()
 	_test_the_fallback_chain_terminates_and_reaches_a_real_file()
 	_test_feet_sit_on_the_aabb_bottom()
+	_test_dug_headroom_covers_the_sprites_overhang()
 	_finish("miner_look")
 
 
@@ -109,3 +110,32 @@ func _test_feet_sit_on_the_aabb_bottom() -> void:
 	_check(r.size.y > float(Body.HEIGHT_PX),
 		"the art deliberately OVERHANGS the collision box (%.0fpx art against a %dpx body) -- legacy's own "
 		% [r.size.y, Body.HEIGHT_PX] + "arrangement, not a scaling bug; a box is not a silhouette")
+
+
+## THE ONE ASSERTION THAT TIES THE TWO HALVES OF P022 TOGETHER, and the reason it lives in this suite
+## rather than in `tests/test_body_dig.gd`: it is the only place that can see both numbers at once.
+##
+## Two constants in different layers must be ORDERED against each other. `Heightfield.DIG_HEADROOM_CELLS`
+## decides how much rock a dig clears above the head; the authored PNG's height decides how far the art
+## rises above the collision box. Neither file may reference the other -- `sim/` must not know what
+## `view/` draws -- so nothing in the shipping code can hold them in the same expression, and each looks
+## individually reasonable while the pair is wrong. That is exactly how P022 shipped: `0` headroom
+## against `8px` of overhang, and the miner's helmet spent every frame inside the ceiling.
+##
+## Derived, not restated. The overhang is READ from the texture rather than written as `8`, so re-baking
+## the art to a different height fails here instead of silently re-opening the bug. `>=`, not `==`: extra
+## clearance is a look decision, too little is a defect.
+func _test_dug_headroom_covers_the_sprites_overhang() -> void:
+	var tex: Texture2D = MinerLook.resolve("miner_idle")
+	_check(tex != null, "sanity: a texture exists to measure -- without this the comparison below is vacuous")
+	if tex == null:
+		return
+	var overhang_px: int = tex.get_height() - Body.HEIGHT_PX
+	var carved_px: int = Heightfield.DIG_HEADROOM_CELLS * Heightfield.TERRAIN_CELL_PX
+	_check(overhang_px > 0,
+		"sanity: the art really does overhang the box (%dpx art, %dpx body) -- if it did not, the check "
+		% [tex.get_height(), Body.HEIGHT_PX] + "below would pass on any headroom at all, including none")
+	_check(carved_px >= overhang_px,
+		"a dug tunnel clears the sprite's overhang: %d cells x %dpx = %dpx carved, against %dpx of art "
+		% [Heightfield.DIG_HEADROOM_CELLS, Heightfield.TERRAIN_CELL_PX, carved_px, overhang_px]
+		+ "above the collision box")
