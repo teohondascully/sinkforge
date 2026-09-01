@@ -13590,3 +13590,23 @@ not have. Unhandled, the hook exits 1 on every case, the five violation rows go 
 reason, and the three pass-rows fail with a message about identity — a uniformly-refusing hook stops
 discriminating exactly like a uniformly-passing one. The precondition is therefore **established and
 restored** rather than assumed, and verified by running the suite with the local email unset.
+
+
+## D0321 · 2026-09-01 · Test-suite duration is now tracked, not just printed — timing reports uploaded as CI artifacts
+
+**The gap.** `tools/run_suites.sh` already measured per-suite timing, reported the six slowest suites,
+and printed total elapsed time — but only to the CI log, visible for the latest run and gone after.
+`docs/WORKING.md` carried one ad-hoc measurement (81.1s→61.3s, D0229) with no tooling to track the
+trend. The evaluation: "Evidence that org monitors test performance, not just pass/fail."
+
+**The fix.** Two `actions/upload-artifact@v4` steps, one per job that runs tests:
+
+- **`tests` job:** `run_suites.sh` output is piped through `tee suite_timing.txt` (with
+  `set -o pipefail` so the exit code still propagates) and uploaded as `suite-timing`. The report
+  already contains per-suite PASS/FAIL with durations, the six slowest suites, and total elapsed.
+- **`gates` job:** the mutation-test `find` loop now writes `gate_timing.txt` with per-file durations
+  and prints the five slowest, then uploads as `gate-timing`.
+
+Both artifacts are retained for 90 days, so timing is comparable across runs rather than vanishing
+with the log. `run_suites.sh` itself was not modified — it already produced the right output; the
+gap was preservation, not measurement.

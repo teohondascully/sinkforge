@@ -191,18 +191,31 @@ jobs:
         run: |
           set -e
           count=0
+          echo "gate mutation test timing report" > gate_timing.txt
           while IFS= read -r f; do
             echo "=== $f ==="
+            t0=$(date +%s)
             python3 "$f"
+            echo "$(( $(date +%s) - t0 )) $f" >> gate_timing.txt
             count=$((count + 1))
           done < <(find tools -name 'test_*.py' | sort)
           echo "Ran $count gate mutation test file(s)."
+          echo "slowest gate tests:"
+          sort -rn -k1 gate_timing.txt | head -5
 
       # D0316. Runs in `gates` rather than in `tests` because it needs no engine and no display: it
       # drives tools/capture_colour_guard.sh with synthetic producer text, which is the point -- the
       # failure it exists to catch is output no real run emits, so no real run can be the fixture.
       # Named separately rather than swept up with the .py tests above because the other tools/test_*.sh
       # files DO need Godot and belong in the `tests` job; a find-based sweep here would drag them in.
+      # D0320. Same timing report for the gate mutation tests as the suite timing report above.
+      - name: Upload gate timing report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-timing
+          path: gate_timing.txt
+          retention-days: 90
+
       - name: Capture colour floor fails CLOSED on an absent count (D0316) — BLOCKING
         run: bash tools/test_capture_moments.sh
 
@@ -397,6 +410,7 @@ jobs:
       # to have one at all -- this is how it is made safe to have.
       - name: all 62 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
+          set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
             res://tests/test_fixed_point.gd \
             res://tests/test_split_rng.gd \
@@ -459,7 +473,17 @@ jobs:
             res://tests/test_empty_population_guard.gd \
             res://tests/test_view_lifts.gd \
             res://tests/test_settings.gd \
-            res://tests/test_recorded_sessions.gd
+            res://tests/test_recorded_sessions.gd 2>&1 | tee suite_timing.txt
+
+      # D0320. `run_suites.sh` already prints per-suite timing, the six slowest suites, and total
+      # elapsed time. This step preserves that report as a downloadable artifact so timing is
+      # tracked across runs, not just visible in the Actions UI for the latest run only.
+      - name: Upload suite timing report
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-timing
+          path: suite_timing.txt
+          retention-days: 90
 
   # D0060: the deep companion to test_body_fuzz_fast above -- the full 1000-seed x 1500-tick sweep
   # (~114s measured), which is why it runs nightly rather than on every push/PR. Only fires on the
