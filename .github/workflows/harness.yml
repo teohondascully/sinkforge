@@ -129,6 +129,13 @@ jobs:
       - name: Every tracked test suite is actually run by CI (QUALITY gate 31)
         run: python3 tools/layer_lint/check_suite_coverage.py
 
+      # D0317. The sibling of the gate above, one level down: gate 31 reconciles WHICH suites run, this
+      # reconciles the COUNT the parallel step's own name advertises against its own argument list. The
+      # name said 49 while 62 ran -- nothing broken, but the verification UI is what a reviewer reads to
+      # decide a PR is safe, and it was thirteen short.
+      - name: CI's suite-count label matches the suites it runs (D0317)
+        run: python3 tools/layer_lint/check_ci_suite_count.py
+
       - name: Layer dependency lint (ARCHITECTURE §3)
         run: python3 tools/layer_lint/layer_lint.py
 
@@ -368,7 +375,11 @@ jobs:
       #   test_view_lifts.gd                             test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
       #   test_settings.gd                               test_settings (the split halves share one bindings map; persist=false writes nothing)
       #   test_recorded_sessions.gd                      test_recorded_sessions (every director recording is binding until retired — P002/D0228)
-      - name: all 49 suites, in parallel (determinism, conservation, movement acceptance)
+      # The count in this name is CHECKED, not maintained by hand: `check_ci_suite_count.py` (D0317)
+      # derives it from this step's own argument list and fails when the two disagree. It said 49 while
+      # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
+      # to have one at all -- this is how it is made safe to have.
+      - name: all 62 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           bash tools/run_suites.sh ./godot 4 \
             res://tests/test_fixed_point.gd \
@@ -441,13 +452,14 @@ jobs:
   # filesystem state, and a `needs:` dependency here would make every push/PR wait on a job it never
   # actually runs.
   # The only job in this file that opens a WINDOW. Every other suite runs --headless, which is why the
-  # class D0248 found could exist: the reveal scene booted, rendered, and passed 42 headless suites while
+  # class D0248 found could exist: the reveal scene booted, rendered, and passed every one of the 42
+  # headless suites that existed at that time (a HISTORICAL count, not a live one -- see D0317) while
   # the command its own header tells a human to type ran in the wrong mode and quit without a window.
   # Headless cannot see that, by construction -- there is no window for the flag to have failed to open.
   #
   # It gets its own job rather than a step in `tests` because it needs a display (xvfb) and a GL driver
   # that the headless job deliberately does not install, and because a display-related failure here
-  # should be legible as such rather than mixed into 42 suite results.
+  # should be legible as such rather than mixed into the parallel job's suite results.
   headed_boot:
     name: headed boot (the documented --play invocation actually opens a window)
     runs-on: ubuntu-latest

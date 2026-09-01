@@ -13421,3 +13421,53 @@ pins `head -1`, because a guard that took the LAST match would judge one moment 
 **Verified end to end, not only in the unit.** The real tool captured all five moments (673, 675, 299,
 381, 613 distinct colours) at exit 0 through the new sourced guard, with the `grain` positive control
 firing at `visible=3` strokes.
+## D0317 · 2026-09-01 · CI's step name said 49 suites while 62 ran — and a `name:` cannot derive itself
+
+**Found by a Codex audit.** `.github/workflows/harness.yml`'s parallel step was named `all 49 suites, in
+parallel` and passed **62** to `tools/run_suites.sh`. Nothing was broken — every suite ran — but the
+verification UI, which is the surface a reviewer actually reads to decide a PR is safe, understated the
+work by thirteen.
+
+**Two instruments disagreed about the count, and reconciling them was the first move.**
+`tools/list_ci_suites.py` reports **62**; `check_suite_coverage.py` reports **63**. Both are right and
+they answer different questions: `list_ci_suites` reads the per-commit `tests` job only, by explicit
+design ("the job name is not a parameter on purpose"), while `check_suite_coverage` counts every suite
+referenced anywhere in CI. The difference is exactly one file — `test_body_fuzz.gd`, which belongs to the
+schedule-only `fuzz_nightly` job. `[[two-instruments-are-not-a-cover]]`: the populations reconcile, and
+the number the label needs is neither of them by luck but **62 because that is what that step passes**.
+
+**THE PREFERRED FIX IS IMPOSSIBLE, AND THAT IS WORTH WRITING DOWN.** The right instinct — and the audit's
+own recommendation — is to delete the hand-written count and derive it. GitHub Actions cannot: a step
+`name:` is evaluated before any shell runs, so it can interpolate neither `list_ci_suites.py` nor
+anything else. The real choice is a hand-written number or no number, and no number costs something
+genuinely useful — at a glance in the run list you can see whether a commit ran sixty-two suites or six.
+
+So the number stays and becomes **checkable**, which is the same trade `check_suite_coverage.py` already
+makes one gate over: a hand-written list is fine when something reconciles it.
+`tools/layer_lint/check_ci_suite_count.py` derives the count from the step's own `run:` block and fails
+when the label disagrees. A label cannot update itself; it can refuse to be wrong, which turns "remember
+to edit the name" from a silent drift into a red build.
+
+**THE POPULATION IS THE STEP, NOT THE JOB — deliberately, and the gate says why.** Checking the label
+against `list_ci_suites.py` would agree today and rot quietly: that tool reads the whole `tests` job, so a
+future step running one extra suite would make its total correct and this label wrong, with the gate
+green. `[[mechanism-vs-population]]`.
+
+**Two populations inside the gate, and the narrower one is the subject.** `run_suites.sh` is also invoked
+by its own D0272 self-test, which drives a deliberately-failing fixture and passes no `res://` suite at
+all. The first draft judged that step too and demanded a count on something that runs no suites. The
+subject is the steps that actually pass suites — and the empty-population guard moves UP a level rather
+than being dropped, so a parallel step emptied of every suite fails rather than being skipped.
+`[[empty-population-guard]]`.
+
+**Mutation-tested, nine rows, and rows 5-7 are the ones that matter.** Rows 1-4 (control, drift low,
+drift high, count deleted) are all satisfied by a gate reading the WRONG step or NO step — which is this
+project's dominant failure class, and it does not stop being possible inside the check written to catch
+an instance of it. So: the self-test step must NOT be judged, an emptied step must fail, and an absent
+`tests` job must exit 2 rather than pass. Rows 8-9 come at it from the other side, moving the suite list
+against a fixed label, because that is what actually happens when someone adds a test.
+
+**Two more counts in the same file, left as history and reworded to say so.** `42 headless suites` and
+`42 suite results` date from D0248 and are true of that moment. They now name themselves as historical
+rather than reading as live claims; changing them to 62 would have falsified a record to satisfy a
+pattern. `[[name-the-frame]]`.
