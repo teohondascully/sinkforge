@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_test_the_fixture_poses_a_depth_that_can_glint_at_all()
 	_test_only_an_exposed_face_can_glint()
 	_test_coal_never_glints_however_exposed_it_is()
+	_test_the_mark_gate_is_not_in_the_predicate()
 	_test_the_surface_does_not_twinkle_and_the_deep_does()
 	_test_every_cell_flares_within_one_period_and_is_dark_for_most_of_it()
 	_test_the_clock_is_what_moves_it()
@@ -66,14 +67,15 @@ func _world(material: StringName, dug: Array[Vector2i]) -> Array:
 	return [obs, MaterialLook.new()]
 
 
-## The first marked cell of `material` in the solid body, and the first marked cell exposed by `dug`.
-## Returns Vector2i(-1, -1) for either if the fixture posed none — the callers check, because a loop over
-## an empty population is a green that measured nothing.
-func _find_marked(look: MaterialLook, obs: Interface.Observation, exposed: bool) -> Vector2i:
+## The first solid ore cell that is (or is not) an exposed face. Returns Vector2i(-1, -1) if the fixture
+## posed none — the callers check, because a loop over an empty population is a green that measured
+## nothing. Deliberately NOT filtered by `is_speck`: that gate belongs to how ore is coloured, not to
+## whether it flares, and intersecting the two is the defect this suite's population now excludes.
+func _find_ore(_look: MaterialLook, obs: Interface.Observation, exposed: bool) -> Vector2i:
 	for row: int in range(ROCK_TOP, GRID_H):
 		for col: int in range(GRID_W):
 			var c := Vector2i(col, row)
-			if obs.material_at(c) == &"" or not look.is_speck(obs.material_at(c), col, row):
+			if obs.material_at(c) == &"":
 				continue
 			if GlintPainter.is_exposed_face(obs, c) == exposed:
 				return c
@@ -93,18 +95,50 @@ func _test_only_an_exposed_face_can_glint() -> void:
 	var obs: Interface.Observation = w[0]
 	var look: MaterialLook = w[1]
 
-	var face: Vector2i = _find_marked(look, obs, true)
-	var buried: Vector2i = _find_marked(look, obs, false)
-	_check(face.x >= 0, "the fixture posed a marked EXPOSED cell (got %s)" % face)
-	_check(buried.x >= 0, "the fixture posed a marked BURIED cell (got %s)" % buried)
+	var face: Vector2i = _find_ore(look, obs, true)
+	var buried: Vector2i = _find_ore(look, obs, false)
+	_check(face.x >= 0, "the fixture posed an EXPOSED ore cell (got %s)" % face)
+	_check(buried.x >= 0, "the fixture posed a BURIED ore cell (got %s)" % buried)
 	if face.x < 0 or buried.x < 0:
 		return
-	_check(GlintPainter.can_glint(look, obs, face), "a marked cell at a dug face can glint (%s)" % face)
+	_check(GlintPainter.can_glint(look, obs, face), "an ore cell at a dug face can glint (%s)" % face)
 	_check(not GlintPainter.can_glint(look, obs, buried),
-		"a marked cell sealed inside stone cannot, however deep (%s)" % buried)
+		"an ore cell sealed inside stone cannot, however deep (%s)" % buried)
 	# The open cell itself is not solid, so it is not a face either -- the pocket does not glint, its wall does.
 	_check(not GlintPainter.can_glint(look, obs, dug[0]),
 		"an OPEN cell is not a face: it is the hole, not the rock around it (%s)" % dug[0])
+
+
+## THE ASSERTION THAT WOULD HAVE CAUGHT THE OVER-PORT. `is_speck` decides how ore is COLOURED — ~10% of a
+## vein's cells take the mineral hue (D0299) — and it has nothing to say about whether a face catches the
+## light. The first version of `can_glint` intersected the two because it looked like it followed from
+## D0299, and on the real `reveal_test_dense` world that took 1,183 exposed ore faces down to 81. Every
+## test still passed; three of four milestone captures diffed at exactly ZERO pixels.
+##
+## Stated as the population it excludes rather than as a count, so it stays true when the density changes:
+## an exposed ore face that is NOT marked must still be able to glint.
+func _test_the_mark_gate_is_not_in_the_predicate() -> void:
+	var dug: Array[Vector2i] = []
+	for col: int in range(GRID_W):
+		dug.append(Vector2i(col, ROCK_TOP))
+	var w: Array = _world(&"glimmer", dug)
+	var obs: Interface.Observation = w[0]
+	var look: MaterialLook = w[1]
+	var unmarked_faces: int = 0
+	var unmarked_glinting: int = 0
+	for col: int in range(GRID_W):
+		var c := Vector2i(col, ROCK_TOP + 1)
+		if look.is_speck(&"glimmer", c.x, c.y):
+			continue
+		unmarked_faces += 1
+		if GlintPainter.can_glint(look, obs, c):
+			unmarked_glinting += 1
+	_check(unmarked_faces > 0,
+		"the fixture posed exposed glimmer that is NOT marked (%d of %d) -- with every cell marked this "
+		% [unmarked_faces, GRID_W] + "assertion could not tell the two predicates apart")
+	_check(unmarked_glinting == unmarked_faces,
+		"every UNMARKED exposed ore face can still glint (%d of %d) -- the colouring gate is not the "
+		% [unmarked_glinting, unmarked_faces] + "flaring gate, and intersecting them cost 93%% of the population")
 
 
 ## `data/materials/coal.yaml` sets `glitters: false` and carries legacy's reason: glittering coal was
@@ -117,20 +151,20 @@ func _test_coal_never_glints_however_exposed_it_is() -> void:
 	var w: Array = _world(&"coal", dug)
 	var obs: Interface.Observation = w[0]
 	var look: MaterialLook = w[1]
-	var marked: int = 0
+	var faces: int = 0
 	var glinting: int = 0
 	for col: int in range(GRID_W):
 		var c := Vector2i(col, ROCK_TOP + 1)
-		if look.is_speck(&"coal", c.x, c.y):
-			marked += 1
+		if GlintPainter.is_exposed_face(obs, c):
+			faces += 1
 		if GlintPainter.can_glint(look, obs, c):
 			glinting += 1
-	_check(marked > 0,
-		"the fixture posed marked coal at all (%d of %d columns) -- zero would make the next line pass "
-		% [marked, GRID_W] + "by having nothing to reject")
+	_check(faces == GRID_W,
+		"the fixture posed exposed coal in every column (%d of %d) -- zero would make the next line pass "
+		% [faces, GRID_W] + "by having nothing to reject")
 	_check(GlintPainter.is_exposed_face(obs, Vector2i(0, ROCK_TOP + 1)),
 		"...and that row IS an exposed face, so the rejection below is about `glitters` and not about depth")
-	_check(glinting == 0, "coal never glints: %d of %d marked exposed coal cells glinted" % [glinting, marked])
+	_check(glinting == 0, "coal never glints: %d of %d exposed coal faces glinted" % [glinting, faces])
 
 
 ## Legacy fades the flare out as skylight rises — "a lit surface vein reads as rock, not a sparkle". There
@@ -197,8 +231,8 @@ func _test_the_clock_is_what_moves_it() -> void:
 	var w: Array = _world(&"glimmer", dug)
 	var obs: Interface.Observation = w[0]
 	var look: MaterialLook = w[1]
-	var c: Vector2i = _find_marked(look, obs, true)
-	_check(c.x >= 0, "the fixture posed a marked exposed cell to move (got %s)" % c)
+	var c: Vector2i = _find_ore(look, obs, true)
+	_check(c.x >= 0, "the fixture posed an exposed ore cell to move (got %s)" % c)
 	if c.x < 0:
 		return
 	var seen: Dictionary = {}

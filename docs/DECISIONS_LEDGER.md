@@ -12446,3 +12446,67 @@ places that should have used it and didn't. The same session's `capture_moments`
 Four instances, one cause, and each was found by a different accident.
 
 **Reverse cost:** none worth taking — the old body is the bug.
+
+## D0300 · 2026-08-31 · Lane A/T, the discovery twinkle
+
+**The glint, ported — and the port was wrong twice in ways only the picture could show.**
+
+`legacy/scenes/world_renderer.gd:1295-1330 _draw_glint_flares`. Legacy is careful that this is NOT the
+lode (D0299): "The lode in the wall... has to hold up to being looked at for a long time. This is not the
+glint, which is a rare twinkle that says something is over there and still fires on top of this." One is
+a face you work; the other is a moment that catches your eye. Both now exist.
+
+Legacy's constants transfer unchanged where they are not pixels — `PERIOD 3.4`, `FLARE_LEN 0.5`, the
+`(x * 73856093) ^ (y * 19349663)` hash and its `% 997` phase offset. The star geometry is legacy's own
+absolute pixels and is held in METRES at the director's WG-4 factor, so WG-4's re-denomination cannot
+silently rescale it.
+
+**`glint_dark` had no quantity to read, and was re-denominated rather than dropped.** Legacy scales the
+flare by how dark the veil has made the cell — "a lit surface vein reads as rock, not a sparkle". There
+is no veil (T1 #2). Depth is what skylight was a proxy for, so the gate reads depth in metres and ramps
+rather than switching, because a hard edge draws a horizontal line across the world at one row. Dropping
+it would make the surface twinkle, which is the single outcome legacy names as wrong.
+
+**THE OVER-PORT.** The first version intersected the predicate with `is_speck`, and it felt like it
+followed from D0299 — if the cell IS the mark, surely only a marked cell glints. It is a misreading of
+what the two mechanisms do. `is_speck` decides how ore is COLOURED: ~10% of a vein's cells take the
+mineral hue so a patch reads as flecked rock. Legacy's glint asks a different question and its predicate
+is exactly `has_nuggets() and glitters` plus exposure — the speckle field only picks a POSITION inside
+the cell, never whether the cell may flare. Measured on the real `reveal_test_dense` world: **1,183
+exposed ore faces became 81**, and at a 14.7% duty that is roughly twelve flaring cells in a
+thousand-row world.
+
+**Every test passed. The suite could not see it, and there was no version of that suite which could** —
+it asserts that the right cells glint, and 81 correct cells satisfy that exactly as well as 869 do. What
+showed it was the CAPTURE: three of four moments diffed at **exactly zero pixels** against the commit
+before the painter existed. Not "few" — zero, on an instrument whose noise floor here is genuinely 0.
+After the fix, delve moves 1,096 pixels at a max channel delta of 127, while surface and horizon stay at
+zero, which is the depth gate visible as a control rather than asserted as a claim.
+
+The suite now carries the assertion that would have caught it, stated as the population it excludes
+rather than as a count so it survives a density change: **an exposed ore face that is not marked must
+still be able to glint.**
+
+**The other rejection is coal, and it needs both fields.** `data/materials/coal.yaml` sets
+`glitters: false` carrying legacy's reason — glittering coal was mistaken for a gem. Coal HAS nuggets, so
+a predicate keyed on `nugget_color` alone passes it, which the very first version did.
+
+**A fixture that posed its subject seventeen metres in the air.** `ROCK_TOP` was a bare 12, which is
+altitude once P017 put the surface at row 80, so `depth_gate` was zero everywhere and the clock assertion
+failed against a correct painter. Surface-relative now, with `_test_the_fixture_poses_a_depth_that_can_
+glint_at_all` as its witness. This is the same cause as D0301 and the third instance of it in this file.
+
+**BUILT-PARKED for the director's eye, not self-certified.** How loud and what colour a discovery cue
+should be is legacy's OWN open question — its header says the glint arrives at rgb 255,255,~237, "the
+brightest mineral mark in the game therefore says bright rather than ore", and that every repair for it
+"is a look decision rather than a tuning one". The `lightened(0.65)` came over unchanged and the question
+travels with it. Screenshot: `d0300b_glint_delve`, two flares on the shaft edge at 6 m where the ramp is
+at 0.4.
+
+**One thing worth knowing about captures**, found here: `WorldView.anim_time()` is deterministic in
+RENDERED ticks, and the number of render ticks before a given SIM tick is not. So a capture containing an
+active animated layer is not byte-reproducible — the `aim` moment's crumble debris moved 35,408 pixels
+between two runs of the same commit while the three static moments moved zero. Diffing captures is a
+sound instrument for a still layer and needs a duty-period argument for a moving one.
+
+**Reverse cost:** drop the `GlintPainter.paint` line from `reveal_view_setup` and the file with it.
