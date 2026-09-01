@@ -187,7 +187,6 @@ def branch_too_few_population_commits_is_unmeasurable_not_a_pass() -> None:
         shutil.rmtree(root, ignore_errors=True)
 
 
-
 # --- 6. D0259: instrument-heavy but game IS growing -- WARNS without BLOCKING ----------------------
 # The case that stalled a real run. PR #10 grew instrument +1148 against game +542 -- more than the 2x
 # velocity limit, so the old rule blocked it -- while every one of those instrument lines was building

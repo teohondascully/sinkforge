@@ -41,7 +41,6 @@ func _initialize() -> void:
 ## existing — the alternative is a hand list that goes stale exactly when a material is added.
 
 
-
 func _ore_and_rock() -> Array:
 	var ore: Array[StringName] = []
 	var rock: Array[StringName] = []

@@ -188,7 +188,6 @@ func _box_blocked(grid: TileGrid, left: int, top: int, right: int, bottom: int) 
 	return false
 
 
-
 ## One fixed 60Hz tick. Order: horizontal integrate+move+collide, vertical integrate+move+collide.
 ## Matches `docs/ARCHITECTURE.md` §4's phase order at body's own scope (input already read into
 ## `input`; body never polls a device).

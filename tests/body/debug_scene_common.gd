@@ -185,4 +185,3 @@ static func follow_camera(rig: CameraRig, body: Body, zoom: float, vp: Viewport,
 		Vector2(float(body.pos_x) / float(Fx.SCALE), float(body.pos_y) / float(Fx.SCALE)),
 		Vector2(float(body.vel_x) / float(Fx.SCALE), float(body.vel_y) / float(Fx.SCALE)),
 		zoom, screen_width, delta)
-

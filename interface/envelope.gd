@@ -47,5 +47,3 @@ static func covering(world_rect: Rect2, margin_cells: int) -> Envelope:
 	var hi := Vector2i(int(ceil(world_rect.end.x / cell)),
 		int(ceil(world_rect.end.y / cell))) + margin
 	return Envelope.new(Rect2i(lo, hi - lo))
-
-

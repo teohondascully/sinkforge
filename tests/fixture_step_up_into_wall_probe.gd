@@ -101,5 +101,3 @@ func _initialize() -> void:
 		print("NOT REPRODUCED: the body never overlapped solid rock. If this is a fix, retire the fixture;")
 		print("if it is a change of geometry or spawn, the transcription above no longer poses the defect.")
 	quit(0)
-
-

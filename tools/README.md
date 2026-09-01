@@ -19,6 +19,10 @@ harness already produced.
   became a blocking step.
 - `report/` — turns run artifacts (`telemetry.jsonl`, `result.json`) into human-readable output.
   Empty until `harness/driver` produces something to report on.
+- `formatter/` — `.editorconfig` made executable. Six rules (charset, trailing-whitespace, file-edges,
+  blank-run, indent, comment-space), two rulesets (string-aware for `.gd`/`.py`, byte-level for
+  `.sh`/`.yml`/`.yaml`). Mutation-tested (76/76), self-including, idempotent. Not wired into CI yet —
+  tool first, gate later (D0318).
 - `scratch/` — gitignored. Scratch work lives here and only here. If a script here turns out to be
   worth keeping, it becomes a real tool with a claim ID and moves out.
 

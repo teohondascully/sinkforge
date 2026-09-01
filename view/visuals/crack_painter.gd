@@ -128,4 +128,3 @@ static func paint_frame(frame: Frame, ci: CanvasItem) -> void:
 	if blow <= 0.0 or frame.obs.cell_px <= 0:
 		return   ## a zero-radius bite, or an observation that carries no scale: nothing to size against
 	paint(frame.obs.mining_cracks, ci, frame.obs.cell_px, blow)
-
