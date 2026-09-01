@@ -4,7 +4,7 @@ Not a log. Current stage, what's actually happening, and what would be lost if t
 right now. Updated as work happens. Resets when a stage closes — durable content moves to an ADR,
 a MODULE.md, or a claim first.
 
-**Last updated: 2026-08-31.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-09-01.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
@@ -99,38 +99,55 @@ Moving any `data/strata/*.yaml` threshold or cell-denominated constant; changing
 means the instrument genuinely outgrew the game, and the remedy is game work — which is why the WG-3 port
 belongs in the same arc as the instruments that found it.
 
-## STOPPED AT ◆ — PR #10 is parked on gate 7, and the queue's next item is on the EXPENSIVE line
+## CURRENT — the overnight run of 2026-08-31/09-01
 
-**PR #10 (`run/generator-defects`, 7 commits) is green on authorship, all 43 test suites, and headed
-boot. It is red on gate 7 only** — instrument +1148 against game +542 over the last 10 population-touching
-commits. Per `docs/MASTER_PLAN_AUG30.md` §10 that is **park, never bypass**, so it is held open with the
-reason recorded on the PR. The gate's own message names the remedy: "the next unit of work is game, not
-another check." That is WG-3. This is the same shape that unblocked #6 (P012/D0250) — let the gate judge
-the whole arc, no override, protection untouched.
+**Nine PRs merged green, #16-#24, plus #25 in flight.** Every one rebase-merged, authorship clean. The
+ledger runs D0286-D0306. What is worth knowing, rather than what happened:
 
-**Why the loop stopped rather than starting WG-3.** The octave port requires re-deriving
-`FASTNOISELITE_SD_CALIBRATION`, and that constant governs how *every* threshold ported from legacy
-behaves. Re-deriving it is a threshold move in effect if not in spelling, which the queue's own EXPENSIVE
-list reserves for you. **This is the ◆ and it is one ruling.**
+**Three defects shipped and were caught here, all of which every suite passed.**
 
-**What landed on the branch this run:**
+- **D0301** — `depth_m_exact` never subtracted the surface datum, so every terrain zone tint was applied
+  20 m too shallow. Introduced by this same session's P017 (D0292), which moved the datum and updated
+  `depth_m` and not its float twin. Found by accident three commits later.
+- **D0300** — the glint's population was 93% short: 1,183 exposed ore faces became 81, because the
+  predicate was intersected with `is_speck`, which legacy never does. No version of that suite could
+  have caught it. Three of four milestone captures diffing at EXACTLY zero pixels did.
+- **D0303** — `Sfx.play()` returned `true` on playbacks the engine refused. Underneath it: in a suite's
+  `_initialize`, `get_root().add_child(x)` leaves `is_inside_tree()` FALSE.
 
-- **D0255** — gate 8's determinism golden re-captured from CI's pinned Linux build. Cross-checked against
-  the local macOS run **elementwise, 200 of 200 identical**. Divergence at checkpoint 0 (not partway) is
-  the corroborating shape for a seed that reaches the field before the first cell is written.
-- **D0256** — `test_reveal_replay_driver`'s seed was pinned to a coincidence of the truncated noise field.
-  It still reached its target column and still fired 6 digs, but hit glimmer **0 times**. Re-picked by
-  scanning 59 seeds. **The finding is that only 37 of 59 (63%) qualify at all** — `find_spawn` picks a
-  glimmer COLUMN, the approach digs at the body's ROW, and nothing makes them meet. The durable fix is
-  parked because `find_spawn` is shared with `reveal_scene.gd`'s live spawn.
-- **D0257** — carve fraction measured for the first time in this repository. **Shelf bands carve 0 of
-  97,920 cells** over six seeds; non-shelf 5.37%; overall 3.58% against legacy's stated ~15%. WG-2 is now
-  confirmed empirically, not only analytically. Both ratchets mutation-tested.
+**The capture is a real instrument now (D0304).** Two runs of one commit differed by 38,900 pixels; they
+now differ by **0**, in all four moments. Two causes: the shutter kept the world running while reading
+pixels, and `randf_range` on an unseeded global RNG. `capture_moments` was also reporting a blank grey
+world (45 colours against 592) as a success — a stale import cache — and now has a floor. This entry
+also corrects D0300's stated mechanism, which was a guess presented as a finding.
 
-**The instrument that was not there.** Cave coverage was `open_count > 0` — "opened at least one cell".
-That floor cannot separate 15% from 3%, and cannot see a band that carves exactly zero at every seed.
-Four defects sat green behind it. The new measurement partitions rather than pools, because 3.58% is
-equally consistent with "uniformly thin" and "normal except impossible inside shelves".
+**The veil landed (D0302) and the lamp with it (D0306).** T1 #2, "the single largest visual gap in the
+project", whose "window-vs-world scope decision" turned out to be a measurement with the answer 9. The
+lamp cuts the veil rather than glowing over it, which is legacy's own architecture and its own recorded
+regression.
+
+**WG-4 Batch A (D0305) is in flight as PR #25**, and it re-pins `GOLDEN_HASHES`, so its first CI run is
+expected to fail on the goldens. Twelve constants converted with per-site factors; ore bodies 477 -> 42,
+median size 32 -> 550 cells, volume near-neutral. **Nothing in the repository could see any of it** — the
+existing carve ratchet moved by at most 0.0048 against a ±0.0060 band across all eleven constants, and
+eight moved it by 0.0000. `tests/test_ore_bodies.gd` is the instrument that can.
+
+### In flight
+
+- **PR #25 `run/wg4`** — WG-4 Batch A. Goldens to be harvested from ITS OWN CI Linux log, per D0167.
+- **`run/lamp`** — D0306, committed, PR not yet opened.
+
+### Open, and parked for the director
+
+- **`cave.frequency`** — the WG-4 tail, ruled a FEEL target. Metre-correct is 0.0275, at which the whole
+  12 m shaft sits inside 0.63 of one noise period and lateral cave structure disappears entirely. Ships
+  tuned and BUILT-PARKED, not converted.
+- **The veil's remaining halves** — the amber TINT needs a multiply-blend light layer; `_skylight_alpha`'s
+  three legacy call sites all scale light SOURCES, so where the veil's own depth term belongs is a
+  question no port here has answered, and none has asserted an answer to.
+- **`test_reveal_replay_driver`'s fixture** — the seed re-picked 8 -> 1, and the qualification rate FELL
+  from 63% to 37% (D0305). The target and the approach are still uncoupled; the fix is still parked
+  behind `find_spawn` being shared with the live spawn.
 
 ## Earlier — sky_painter draws, and the world has no sky to jump into (D0243–D0250)
 
