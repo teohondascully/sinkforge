@@ -897,3 +897,52 @@ criterion for a Tier-0 gap and changing what counts as "closed" is your call, no
 size seventeen-fold. The *only* thing blocking it is this assertion going to zero. If (1) shows the true
 shelf rate was never meaningfully above zero at `0.11` either, then `0.0275` does not re-open WG-2 — it
 just stops a knife-edge from landing on the lucky side, and the better world is one line away.
+
+---
+
+## P029 · Legacy's bedding boost and this build's glimmer floor cannot both be satisfied
+
+**Status:** open · **Cost to apply:** one constant, or one floor · **Raised by:** D0312, 2026-09-01
+
+The veil landed (D0302/D0306), which un-blocked legacy's depth tone boost — `1 + depth * 2.2`, whose
+stated reason is quantitative: *"the shadow veil takes roughly half a cell's tonal range, so the
+compensation must exceed 2x by the deep band or bedding does not read down there at all."* The veil's
+actual cut is `MASS_SHADE` **0.55**, so legacy's description was accurate.
+
+**Porting it faithfully breaks a shipped legibility guarantee.** At legacy's 2.2 the deep tone swing
+brings **deepstone within 0.239 of glimmer**, under `test_material_palette`'s **0.25** distinctness
+floor. Glimmer is the reveal material — the one thing that must never be mistaken for the rock around it.
+
+**Measured across the range, `hardrock` luma spread over a 64×64 patch at 140 m:**
+
+| `TONE_BOOST_AT_FLOOR` | boost at 140 m | glimmer's worst separation | deep spread after the veil |
+|---|---|---|---|
+| 0.0 (no boost) | 1.000 | comfortable | **0.0706** ← the residual |
+| **1.0 (shipped)** | **1.547** | **0.253** | **0.1083** |
+| 1.1 | 1.602 | 0.250 ← on the line | 0.1119 |
+| 1.2 | 1.656 | 0.249 ✗ | 0.1156 |
+| 1.5 | 1.820 | 0.248 ✗ | 0.1264 |
+| 1.8 | 1.984 | 0.243 ✗ | 0.1370 |
+| 2.2 (legacy) | 2.203 | 0.239 ✗ | 0.1508 |
+
+**The two requirements do not overlap.** Reaching legacy's 2× at the deep band needs a constant of at
+least **1.83**; the glimmer floor allows at most about **1.0**. There is no value satisfying both.
+
+**What shipped, and why it is not the decision.** 1.0 — the largest value that breaks no shipped
+guarantee. It still does most of the work: post-veil deep bedding spread goes **0.0706 → 0.1083, a 53%
+recovery**, and it reverses a comparison that runs the wrong way without it (unaided, deep rock is
+*flatter* than surface rock, 0.1569 against 0.1838, because `_depth_darkened` compresses luma as it
+darkens). That is a real improvement and it is not the full port.
+
+**Three ways out, and I do not have a preference between the first two.**
+
+1. **Keep 1.0 and accept that deep bedding is quieter than legacy's.** Costs nothing, guarantees nothing
+   is lost, and leaves 30% of the available range on the table.
+2. **Re-hue glimmer away from deepstone**, then raise the boost. The collision is between two specific
+   colours, not between the two mechanisms — `glimmer 1f646a` against `deepstone 4e4b4e` at row 880.
+   Moving one hue buys the whole range back. This is an art call and it is yours.
+3. **Lower the 0.25 distinctness floor.** Rejected unless you say otherwise: that floor is what stops the
+   reveal material reading as rock, and trading it for bedding richness trades a mechanic for a texture.
+
+**This is a taste trade with a measured frontier, not a bug.** The table is the frontier; which side of
+it you want is the part I should not pick.

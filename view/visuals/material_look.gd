@@ -78,6 +78,12 @@ const STRATA_AMOUNT: float = 0.17  ## legacy `world_renderer.gd:1611` -- how far
 ## a cell at 128 m darkens exactly as legacy's bottom row did, and everything below sits at the clamp.
 const DEPTH_DARKEN_FULL_M: float = 128.0
 
+## The depth over which the tone boost runs from none to full: the site's own `max_depth_m`, matching
+## legacy's normalisation by `GRID_ROWS`. And the extra it reaches there -- legacy's `2.2`, so the boost
+## spans 1.0 at the surface to 3.2 at the floor.
+const TONE_BOOST_FULL_M: float = 256.0
+const TONE_BOOST_AT_FLOOR: float = 1.0
+
 ## Nugget-bearing materials: the fraction of cells that carry the nugget colour rather than the host.
 ## Derived, not picked -- see `is_speck`. Legacy's `nugget_count` is crystals per 32px cell; one 32px
 ## cell is 64 of this world's 4px cells, so `count / 64` is the same areal density one grid finer.
@@ -214,23 +220,51 @@ func zone_tinted(base: Color, row: int) -> Color:
 
 ## Legacy `world_renderer.gd:1596 _cell_tone`, as `(jitter, bedding)`.
 ##
-## THE DEPTH BOOST IS NOT PORTED YET, AND ITS STATED PRECONDITION HAS NOW ARRIVED. Legacy multiplies both
-## terms by `1 + depth * 2.2` for one reason: the shadow veil takes roughly half a cell's tonal range, so
-## the compensation must exceed 2x by the deep band or bedding does not read down there at all.
+## THE DEPTH BOOST, PORTED NOW THAT ITS PRECONDITION EXISTS (D0312). Legacy `world_renderer.gd:1591-1594
+## _cell_tone` multiplies BOTH terms by `1 + depth * 2.2`, for one stated reason: the shadow veil takes
+## roughly half a cell's tonal range, so the compensation must exceed 2x by the deep band or bedding does
+## not read down there at all.
 ##
 ## This paragraph used to say "this build has no veil, so the boost would not be compensating for
-## anything -- it comes back WITH the veil, not before it." **The veil landed 2026-09-01 (D0302, lamp
-## D0306), so the condition this deferral named is met and the boost is DUE.** It is deliberately not
-## folded into D0308's seam work: it changes the colour of every rock pixel in the game and belongs in a
-## commit whose captures are about exactly that, measured against the veil that now exists rather than
-## against the flat fill this note was written under.
+## anything -- it comes back WITH the veil, not before it." **The veil landed at D0302 and its lamp at
+## D0306**, so the deferral's own condition is met and the number it was waiting for now exists:
+## `VeilPainter.MASS_SHADE` is 0.55, which is the "roughly half" legacy was describing, measured rather
+## than assumed.
+##
+## Legacy normalises depth by `GRID_ROWS`, the world's whole row extent. The equivalent here is the
+## site's own `max_depth_m` (256, `data/strata/shallow_clay.yaml:13`, per `docs/ARCHITECTURE.md` §9), so
+## the boost runs from 1.0 at the surface to `1 + TONE_BOOST_AT_FLOOR` at the floor, on legacy's own
+## curve. It is a metre constant for the same reason `DEPTH_DARKEN_FULL_M` is one.
+##
+## **AND THE CONSTANT IS 1.0 HERE, NOT LEGACY'S 2.2, BECAUSE THE TWO GUARANTEES CANNOT BOTH HOLD**
+## (`docs/NEEDS_DIRECTOR.md` P029). At legacy's 2.2 the deep tone swing brings deepstone within **0.239**
+## of glimmer, under `test_material_palette`'s shipped **0.25** distinctness floor — and glimmer is the
+## reveal material, the one thing that must never be mistaken for the rock around it. Measured across the
+## whole range: 2.2 → 0.239, 1.8 → 0.243, 1.5 → 0.248, 1.2 → 0.249, 1.1 → 0.250, **1.0 → 0.253**.
+##
+## Legacy's own requirement is that the boost EXCEED 2x at the deep band, which needs a constant of at
+## least 1.83. The glimmer floor allows at most about 1.0. There is no value satisfying both, so this
+## ships the largest one that breaks no shipped guarantee and the trade is parked rather than decided in
+## a loop. It still does most of the work: post-veil deep spread goes 0.0706 → 0.1083, a 53% recovery.
 ## `bedded` is false for ore-bearing rock, which takes the JITTER but not the BEDDING -- see the note on
 ## `cell_color`. The jitter is a small achromatic value drift and breaks a flat fill either way; the
 ## bedding is a hue move toward `STRATA_WARM`/`STRATA_COOL` and is a statement about sedimentary
 ## structure. A vein is not bedded, it CUTS bedding, which is exactly why legacy drew it as separate
 ## polygons over the top rather than as a modulation of the fill.
 func cell_tone(col: int, row: int, bedded: bool = true) -> Vector2:
-	return Vector2(_cell_jitter(col, row), _strata(col, row) if bedded else 0.0)
+	var boost: float = tone_depth_boost(row)
+	return Vector2(_cell_jitter(col, row) * boost,
+		(_strata(col, row) if bedded else 0.0) * boost)
+
+
+## `1 + depth * 2.2`, legacy's own form, with depth normalised over the world's stated depth budget.
+##
+## Public because the claim it encodes is testable and should be tested rather than believed: legacy says
+## the compensation "must exceed 2x by the deep band", and `tests/test_material_palette.gd` asserts that
+## against `MaterialLook.band_at`'s own ladder instead of restating the sentence.
+static func tone_depth_boost(row: int) -> float:
+	var frac: float = clampf(depth_m_exact(row) / TONE_BOOST_FULL_M, 0.0, 1.0)
+	return 1.0 + frac * TONE_BOOST_AT_FLOOR
 
 
 ## Legacy `fine_terrain.gd:411-415 apply_tone` -- THE single authority for what a tone means to a pixel.

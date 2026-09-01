@@ -13199,3 +13199,62 @@ check; pointing `coal` at a voice the bank does not build fails the table-agreem
 
 **BUILT-PARKED, NOT DONE.** Whether these four are the right four sounds is a judgement no assertion in
 this repository can make. The table is arranged so that judgement is cheap to act on.
+## D0312 · 2026-09-01 · The bedding boost, its precondition, and the guarantee it collides with
+
+**A deferral whose stated condition came true.** `view/visuals/material_look.gd` carried, for a session:
+*"THE DEPTH BOOST IS DELIBERATELY NOT PORTED... this build has no veil, so the boost would not be
+compensating for anything. It comes back WITH the veil, not before it."* The veil landed at D0302 and its
+lamp at D0306. Found by reading the file for something else — which is the general lesson: **a deferral
+is a claim with a precondition, and nothing in this repository was watching for the precondition to be
+met.** The comment was correct on the day it was written and silently wrong afterwards.
+
+Ported from `legacy/scenes/world_renderer.gd:1591-1594 _cell_tone`, normalised by the site's own
+`max_depth_m` (256) as legacy normalises by `GRID_ROWS`.
+
+**THE CLAIM WAS MEASURED, NOT QUOTED.** Legacy's reason is quantitative — *"the shadow veil takes roughly
+half a cell's tonal range, so the compensation must exceed 2x by the deep band"* — and `VeilPainter.MASS_SHADE`
+is **0.55**, so legacy's description of its own veil describes ours. The quantity that matters is
+**tonal SPREAD, not mean**: a veil that darkens everything equally leaves bedding perfectly legible, and
+what kills a band is the range collapsing.
+
+`hardrock` luma spread over a 64×64 patch, **with the subject removed as the control**:
+
+| | surface | deep, raw | deep, after the veil |
+|---|---|---|---|
+| boost removed (`0.0`) | 0.1838 | **0.1569** | **0.0706** |
+| shipped (`1.0`) | 0.1877 | 0.2406 | **0.1083** |
+
+**Without the boost, deep rock is FLATTER than surface rock** (0.1569 < 0.1838) — `_depth_darkened`
+compresses luma as it darkens. So the boost does not amplify an existing trend, **it reverses one**. And
+the floor in the test is that 0.0706 residual rather than a number chosen to be cleared:
+`[[floor-below-the-residual]]`.
+
+**AND THE COLLISION, WHICH IS THE REAL FINDING** (`docs/NEEDS_DIRECTOR.md` P029). At legacy's 2.2 the
+deep tone swing brings **deepstone within 0.239 of glimmer**, under the shipped **0.25** distinctness
+floor — and glimmer is the reveal material. Swept: 2.2 → 0.239, 1.8 → 0.243, 1.5 → 0.248, 1.2 → 0.249,
+1.1 → 0.250, 1.0 → 0.253.
+
+Legacy's 2× requirement needs a constant of at least **1.83**; the glimmer floor allows about **1.0**.
+**No value satisfies both.** So this ships 1.0 — the largest that breaks no shipped guarantee, still a
+53% recovery of post-veil deep spread — and parks the frontier. **Neither guarantee was weakened to fit
+the other**, which was the available shortcut: raising the boost and re-pinning the distinctness floor
+would have traded a mechanic for a texture and both numbers would have looked green.
+
+**The assertion states what is true rather than what was hoped for.** It was first written as
+`deep >= 2.0`, legacy's requirement, and that is the version that would have justified quietly moving the
+glimmer floor. It now asserts `1.4 < boost < 2.0` and names P029, so clearing 2.0 in future is a signal
+that the ruling happened rather than a silent widening.
+
+**TWO INSTRUMENT FAULTS OF MY OWN, both caught in the same hour, both already in my notes.**
+
+**A material that does not exist.** The first version measured `&"stone"`, which `data/materials/` does
+not carry. `matrix_color` answers an unmapped material with a flat debug brown, so every patch measured a
+CONSTANT and the spread read **0.0000 at both depths** — and the surviving comparison, `veiled_deep >=
+raw_surface`, was `0 >= 0` and **passed**. It failed only because a second assertion happened to run the
+other way. The positive control is now in the file: the material must actually vary at both depths before
+any comparison is read. `[[error-path-returns-passing-value]]`.
+
+**`grep -c "ALL PASS"` as a pass detector.** The sweep above first reported every boost value as passing,
+because `run_gd_test.sh`'s failure line is *"never printed its own ALL PASS line"* — which contains the
+string being searched for. This is recorded in my own notes from an earlier run of exactly this mistake,
+and I made it again. **Use the exit code.** The corrected sweep is the table above.

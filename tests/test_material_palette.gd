@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_the_palette_is_deterministic_in_cell_coordinates()
 	_test_the_band_ladder_is_ordered_and_total()
 	_test_the_two_depth_conversions_agree_at_every_row()
+	_test_the_depth_boost_keeps_bedding_legible_under_the_veil()
 	_finish("material_palette")
 
 
@@ -220,3 +221,104 @@ func _test_the_two_depth_conversions_agree_at_every_row() -> void:
 	_check(MaterialLook.depth_m(0) < 0 and MaterialLook.depth_m_exact(0) < 0.0,
 		"both read negative above the datum (%d, %.1f)"
 		% [MaterialLook.depth_m(0), MaterialLook.depth_m_exact(0)])
+
+
+## THE DEPTH BOOST, AND THE CLAIM IT ENCODES (D0312).
+##
+## Legacy's reason for `1 + depth * 2.2` is a quantitative one: *"the shadow veil takes roughly half a
+## cell's tonal range, so the compensation must exceed 2x by the deep band or bedding does not read down
+## there at all."* That sentence sat in this repository for a session as a deferral, because the veil it
+## names did not exist. It does now (`VeilPainter.MASS_SHADE` 0.55, D0302), so the claim is checkable and
+## is checked here rather than quoted.
+##
+## THE `surface` PATCH IS NOT PURELY AT THE SURFACE, and saying so matters for reading the numbers: it
+## is `BOOST_PATCH` rows tall starting at `SURFACE_ROW`, so it spans the first 16 metres and the boost is
+## already slightly above 1.0 across most of it. That is why the two runs below differ at the surface
+## (0.1838 vs 0.1923) when the boost is exactly 1.0 at row `SURFACE_ROW` itself.
+##
+## THE QUANTITY IS TONAL SPREAD, NOT MEAN. A veil that darkens everything equally moves the mean and
+## leaves bedding perfectly legible; what kills bedding is the RANGE collapsing. So this measures
+## max-minus-min luma over a patch, which is the thing a reader's eye is actually using to see a band.
+const BOOST_PATCH: int = 64
+const DEEP_ROW: int = MaterialLook.SURFACE_ROW + int(140.0 * float(MaterialLook.CELLS_PER_METRE))
+
+## A REAL material id, and the first version of this test did not use one. It asked for `&"stone"`, which
+## is not in `data/materials/` -- `matrix_color` answers an unmapped material with a flat debug brown, so
+## every patch measured a CONSTANT and the spread was 0.0000 at both depths. The assertion failed rather
+## than passed only by luck of its direction; `veiled_deep >= raw_surface` was 0 >= 0 and passed. Hence
+## the positive control below, which is the part that generalises.
+const BOOST_MATERIAL: StringName = &"hardrock"
+
+## MEASURED 2026-09-01 WITH `TONE_BOOST_AT_FLOOR` SET TO 0.0 — the subject removed, the rest of the
+## pipeline untouched. That run reads `surface 0.1838 | deep raw 0.1569 | deep after the veil 0.0706`,
+## against `0.1923 | 0.3352 | 0.1508` with the boost in place. Two things it establishes that the
+## with-boost run alone cannot:
+##
+##   * **Deep rock is FLATTER than surface rock without the boost** (0.1569 < 0.1838). The boost does not
+##     amplify an existing trend, it reverses one. `_depth_darkened` compresses luma as it darkens.
+##   * **The floor below is a RESIDUAL, not a chosen number.** 0.0706 is what deep bedding looks like
+##     under the veil when nothing compensates. Anything above it is the boost doing work; a floor picked
+##     to be comfortably cleared would have told us nothing.
+const VEILED_DEEP_WITHOUT_BOOST: float = 0.0706
+
+
+## Luma spread over a `BOOST_PATCH`-square patch of one material at `row`.
+##
+## `_luma` here is the repo's own convention and is taken from the palette module rather than re-typed:
+## this project defines luma two ways across 27 sites and a second spelling here would be a 28th.
+func _tone_spread(look: MaterialLook, material: StringName, row: int) -> float:
+	var lo: float = 2.0
+	var hi: float = -1.0
+	for dc: int in BOOST_PATCH:
+		for dr: int in BOOST_PATCH:
+			var c: Color = look.matrix_color(material, dc, row + dr)
+			var l: float = c.get_luminance()
+			lo = minf(lo, l)
+			hi = maxf(hi, l)
+	return hi - lo
+
+
+func _test_the_depth_boost_keeps_bedding_legible_under_the_veil() -> void:
+	var look: MaterialLook = MaterialLook.new()
+	var surface: float = MaterialLook.tone_depth_boost(MaterialLook.SURFACE_ROW)
+	var deep: float = MaterialLook.tone_depth_boost(DEEP_ROW)
+	print("  [OBSERVED] tone boost %.3f at the surface, %.3f at stonereach_end (140 m)" % [surface, deep])
+	_check(is_equal_approx(surface, 1.0),
+		"the boost is EXACTLY 1.0 at the surface row (%.4f) -- nothing is veiled up here, so nothing may "
+		% surface + "be compensated; a boost that started above 1 would make surface rock louder for no reason")
+	# LEGACY'S OWN REQUIREMENT IS `>= 2.0` HERE AND THIS BUILD CANNOT MEET IT, so the assertion states
+	# what is true rather than what was hoped for (`docs/NEEDS_DIRECTOR.md` P029). Reaching 2x at 140 m
+	# needs `TONE_BOOST_AT_FLOOR >= 1.83`, and anything above ~1.0 pushes deepstone inside the 0.25
+	# glimmer distinctness floor that the reveal material depends on. Two shipped guarantees, no value
+	# satisfying both. What IS asserted is that the boost is real and bounded, and the trade is parked.
+	_check(deep > 1.4 and deep < 2.0,
+		"the boost at the deep band is %.3f: materially above 1 and BELOW legacy's own 2x requirement, "
+		% deep + "which this build cannot reach without breaking glimmer's distinctness floor (2.2 gives "
+		+ "0.239 against a 0.25 floor). If this ever clears 2.0, P029 has been ruled on and this "
+		+ "assertion should be replaced rather than widened.")
+
+	# THE MEASUREMENT THE ASSERTION ABOVE IS ABOUT. Raw palette spread, then the same spread after the
+	# veil's mass shade has taken its cut, against the surface spread that needs no compensation at all.
+	var raw_surface: float = _tone_spread(look, BOOST_MATERIAL, MaterialLook.SURFACE_ROW)
+	var raw_deep: float = _tone_spread(look, BOOST_MATERIAL, DEEP_ROW)
+	var veiled_deep: float = raw_deep * (1.0 - VeilPainter.MASS_SHADE)
+	print("  [OBSERVED] %s luma spread: surface %.4f | deep raw %.4f | deep after the veil %.4f"
+		% [BOOST_MATERIAL, raw_surface, raw_deep, veiled_deep])
+	# THE CONTROL, and it is here because its absence already cost this test once: a spread of zero is not
+	# a small spread, it is NO MEASUREMENT, and every comparison below reads as a pass on it.
+	_check(raw_surface > 0.0 and raw_deep > 0.0,
+		"positive control: `%s` actually varies across a patch at both depths (surface %.4f, deep %.4f). "
+		% [BOOST_MATERIAL, raw_surface, raw_deep] + "A material this palette does not carry answers a flat "
+		+ "debug colour, and a flat colour makes every assertion below true by having nothing in it.")
+	if raw_surface <= 0.0 or raw_deep <= 0.0:
+		return
+	_check(raw_deep > raw_surface,
+		"deep rock carries MORE raw tonal spread than surface rock (%.4f vs %.4f). This comparison RUNS "
+		% [raw_deep, raw_surface] + "THE OTHER WAY without the boost -- 0.1569 deep against 0.1838 near "
+		+ "the surface -- so the boost is not amplifying an existing trend, it is reversing one.")
+	_check(veiled_deep > VEILED_DEEP_WITHOUT_BOOST,
+		"...and after the veil takes its %.0f%%, the deep band holds %.4f -- against the %.4f the same "
+		% [VeilPainter.MASS_SHADE * 100.0, veiled_deep, VEILED_DEEP_WITHOUT_BOOST]
+		+ "measurement gives with the boost REMOVED. The floor is that residual, measured, not a number "
+		+ "chosen to be cleared: it is what deep bedding looks like under the veil when nothing "
+		+ "compensates for it.")
