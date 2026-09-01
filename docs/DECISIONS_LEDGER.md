@@ -11179,3 +11179,53 @@ Mutation-tested, all three caught: the exact pre-fix filter restored → RED; no
 
 **Reverse cost:** restore the grep filter. Every future golden re-pin costs a round trip again, and any
 diagnostic a suite prints outside `FAIL`-prefixed lines becomes invisible in CI.
+
+
+## D0273 · The camera follows softly, leads the direction of travel, and snaps to whole pixels · 2026-08-31 · Lane A, LEGACY_GAP T1 #11
+
+`docs/LEGACY_GAP.md` calls this "the single largest concentrated feel gap outside the resolver", and the
+build it was describing is exactly what was here: `reveal_scene._update_camera` assigned the body's
+position to the camera every tick. No smoothing, no lead, no snap, no limits. Ported from
+`legacy/scenes/main.gd:310-333`, `683-706` and `2355-2358`, constants unchanged.
+
+**SMOOTH THE FOLLOW, SNAP THE RENDER — and they are not one step.** Godot's built-in
+`position_smoothing` renders the camera at a FRACTIONAL position, so every terrain texel samples between
+screen pixels each frame and the world shimmers whenever anything moves. Legacy's fix, ported: ease
+toward the body in continuous world space, then round the RESULT to a whole screen pixel. The eased
+position is kept internally at full precision — rounding it in place would compound the rounding into
+the easing and the follow would ratchet. **The suite asserts both halves**, because a rig that rounded
+its own state passes the "lands on whole pixels" check and fails silently at the thing that check exists
+to protect.
+
+**The look-ahead is the half that is about feel.** The camera leads along the body's velocity, capped at
+170px, eased at 5/s, and 0.55x vertically because vertical space is scarcer on a 16:9 frame. Legacy's
+own reason: without it "a swing or a long fall spends its most interesting half off-screen and the
+player brakes to see."
+
+**Three things deliberately NOT ported, and the reasons differ.**
+* **The stride multiplier.** Legacy leads further at speed. This build has one flat top speed
+  (`LEGACY_GAP` T1 #10), so `stride` would be a constant 0 and the whole term identically 1.0. Omitted
+  rather than written as a factor that can never move — same rule `MinerLook` applied to the grapple
+  poses.
+* **Screen shake.** It comes back with its TRIGGER, T1 #9's landing telemetry. A shake with nothing to
+  set it is `view/visuals/art.gd` again: lifted, correct, and referenced by nothing for four sessions.
+  It also needs a deterministic source rather than `randf_range`, since a renderer whose output moves
+  between runs cannot be screenshot-compared — which this project's whole capture discipline rests on.
+* **The camera limits.** Legacy clamps to the world rect. `--wide-view` and `--camera=col,row`
+  deliberately frame outside the body's world, and clamping would silently break the milestone captures
+  those flags exist to produce.
+
+**Two controls in the suite carry it.** "A jump past the threshold cuts" passes on a rig that cuts
+EVERY frame — which is the assignment this replaces — so it is paired with a jump just inside the
+threshold that must still pan. And "converges eventually" passes on a hard assign, so it is paired with
+"after ONE step the camera is still behind the body".
+
+**Where the code lives.** `view/camera_rig.gd` is a plain `RefCounted` with no node and no `_process`, so
+the whole rig is driven by calling `step()` in a loop — a camera whose smoothing sat in a `_process`
+could only be tested by running a scene and looking at it. The `Fx` → world-px conversion is in
+`tests/body/debug_scene_common.gd` rather than inline, because `reveal_scene.gd` was at 397 of a 400-line
+cap and shaving a WHY-comment to fit is what `docs/QUALITY.md` §2 exists to stop.
+
+**Reverse cost:** `reveal_scene._update_camera` returns to assigning the body's position.
+`view/camera_rig.gd`, its suite, and `DebugSceneCommon.follow_camera` delete as a unit. The world
+shimmers in motion again.

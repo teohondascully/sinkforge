@@ -109,3 +109,23 @@ static func step_mining_feedback(particles: Particles, mining: Mining, look: Mat
 		var lead: Vector2i = mining.broke_cells[0]
 		var at: Vector2 = Vector2(float(lead.x) + 0.5, float(lead.y) + 0.5) * float(cell_px)
 		particles.draught(at, look.cell_color(mining.broke_material, lead.x, lead.y), Vector2(0.0, 1.0), 6)
+
+
+## The camera follow, for the debug scenes: D0273's soft follow + look-ahead + pixel-snap, replacing the
+## per-tick `camera.position = body.position` that made `docs/LEGACY_GAP.md` T1 #11 "the single largest
+## concentrated feel gap outside the resolver".
+##
+## `CameraRig` is pure `view/` and so cannot see a `Body`; this is the conversion at the boundary --
+## position and velocity out of `Fx` into world px and px/s. It lives here rather than inline in
+## `tests/body/reveal_scene.gd`, which sat at 397 of a 400-line cap: shaving a WHY-comment to fit is
+## exactly what `docs/QUALITY.md` §2 exists to stop, so the code moved to where the reasoning has room.
+##
+## `screen_width` comes from the live viewport rather than a constant: the cut threshold is half a screen,
+## and a hardcoded width would silently stop matching the window the moment anything resized it.
+static func follow_camera(rig: CameraRig, body: Body, zoom: float, vp: Viewport, delta: float) -> Vector2:
+	var screen_width: float = float(vp.get_visible_rect().size.x) if vp != null else 1920.0
+	return rig.step(
+		Vector2(float(body.pos_x) / float(Fx.SCALE), float(body.pos_y) / float(Fx.SCALE)),
+		Vector2(float(body.vel_x) / float(Fx.SCALE), float(body.vel_y) / float(Fx.SCALE)),
+		zoom, screen_width, delta)
+
