@@ -12223,3 +12223,37 @@ open air over the surface line with the miner in the entry pocket at 1 m.
 
 **Reverse cost:** set `SKY_ROWS` to 0. Every offset above is written as `surface + n`, so they all
 collapse correctly, and the goldens re-pin back.
+
+
+## D0295 · The local gate loop and CI's gate job were two different populations · 2026-08-31 · harness
+
+`tools/run_local_battery.sh` exists because "run what CI runs" written by hand is wrong in a direction
+nobody notices — its own header says so, about suites. **It only ever covered the suites.** Every session
+that wanted the gates wrote `for g in tools/layer_lint/*.py` by hand, which is a different and quietly
+SMALLER population than the gate job's step list: it misses `tools/quality_check/duplication.py`,
+`function_length.py`, `complexity.py`, `coupling.py`, `tools/check_base_namespace.sh`, the schema
+validator, the data-codegen check, `check_corrections_freshness.py` and `check_project_settings.py`.
+**Nine steps, four of which had never run locally in this session at all.**
+
+It cost a round trip to find out. A commit passed the hand-rolled loop, was pushed, and CI's duplication
+gate failed on `tests/test_cave_passes.gd` — two helpers that were byte-identical under identifier
+normalization, which is a fair catch and a five-minute fix that took a CI cycle to learn about.
+
+`tools/list_ci_gates.py` parses the same workflow the suite list comes from: **one source, read twice**,
+which is the battery's own stated principle applied to the half it was missing. Twenty steps run locally
+now, in CI's order.
+
+**NUL-separated, not newline-separated.** One gate step is a multi-line shell script, and splitting on
+newlines hands the caller half a script as a whole command — it would have "passed" by running `set -e`
+and nothing else. That is the same green-by-absence shape `check_ci_not_shrunk.py` exists for, so the
+parser also refuses to print an empty list.
+
+**The two things this found immediately**, neither of which any local check would have caught:
+`tools/check_headed_boot.sh` typed `--camera=24,4`, an absolute row that P017 put in the sky, so the
+frame came back blank and CI failed with "could not read a distinct-colour count" — a message about the
+instrument, in a run where the instrument was fine. And `reveal_scene`'s own printed hint — the line the
+director copy-pastes, which exists because of D0248 — handed out the same dead camera. The row is
+computed there now, and `tools/surface_row.sh` is the one derivation both shell tools read, failing
+closed because `$(( ))` on an empty string is zero, which is a plausible surface row.
+
+**Reverse cost:** delete `list_ci_gates.py` and the gate block in the battery; the gates still run in CI.

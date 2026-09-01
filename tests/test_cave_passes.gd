@@ -40,13 +40,21 @@ func _deep_row() -> int:
 	return H / 2
 
 
-func _void_count(grid: TileGrid) -> int:
+## Open cells over a row range. ONE function with two bindings rather than two functions: the
+## duplication gate (D0099) caught the first version, where "how much of the world is open" and "did
+## anything breach the protected band" were byte-identical under identifier normalization. It was right
+## -- they differ only in which rows they look at.
+func _open_cells(grid: TileGrid, from_row: int, to_row: int) -> int:
 	var n: int = 0
 	for col: int in W:
-		for row: int in H:
+		for row: int in range(from_row, to_row):
 			if not grid.is_solid(Vector2i(col, row)):
 				n += 1
 	return n
+
+
+func _void_count(grid: TileGrid) -> int:
+	return _open_cells(grid, 0, H)
 
 
 ## THE ASSERTION THE WHOLE FILE EXISTS FOR. A pass that ran and opened nothing is indistinguishable from
@@ -98,12 +106,7 @@ func _test_nothing_is_carved_into_the_protected_surface_band() -> void:
 
 ## Open cells strictly above `MIN_DEPTH` -- the band the guard protects.
 func _band_openings(grid: TileGrid) -> int:
-	var n: int = 0
-	for col: int in W:
-		for row: int in MIN_DEPTH:
-			if not grid.is_solid(Vector2i(col, row)):
-				n += 1
-	return n
+	return _open_cells(grid, 0, MIN_DEPTH)
 
 
 ## Both passes at one seed and one guard depth.

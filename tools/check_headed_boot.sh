@@ -97,7 +97,11 @@ fi
 
 # --- B. --play, headed: the exact line the director typed, plus a shutter so it terminates. -----------
 shot="$WORK/headed.png"
-out_b="$("$GODOT_BIN" --path . "$SCENE" -- --play --sky --zoom=6.5 --camera=24,4 \
+# The camera row is RELATIVE TO THE SURFACE (P017/D0292). At an absolute 4 it pointed into the sky, the
+# frame came back blank, and this check failed with "could not read a distinct-colour count" -- a message
+# about the instrument, in a run where nothing was wrong with the instrument.
+SURFACE_ROW="$("$ROOT/tools/surface_row.sh")" || exit 1
+out_b="$("$GODOT_BIN" --path . "$SCENE" -- --play --sky --zoom=6.5 --camera=24,$((SURFACE_ROW + 4)) \
 	--screenshot-tick=10 --screenshot-out="$shot" 2>&1)"
 rc_b=$?
 [ "$rc_b" -ne 0 ] && { bad "--play headed boot exited $rc_b"; printf '%s\n' "$out_b" | tail -15 >&2; }
