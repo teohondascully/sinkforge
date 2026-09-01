@@ -18,7 +18,7 @@ layer_thresholds_m:
 
 cave:
   # legacy CAVE_FREQ / CAVE_THRESHOLD_TOP / CAVE_THRESHOLD_DEEP / CAVE_MIN_DEPTH / CAVE_XSTRETCH
-  frequency: 0.11
+  frequency: 0.0656
   threshold_top: 0.47
   threshold_deep: 0.31
   min_depth_cells: 24

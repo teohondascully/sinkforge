@@ -112,7 +112,7 @@ reveal, the calve verb, and the Wedge mechanic.
 
 ## TIER 0 — the generator defects
 
-**WG-1 … WG-4 below outrank everything in Tier 1.** WG-1/2/3 are CLOSED (D0254, D0258). **WG-4 Batch A is converted** (D0305): twelve constants with per-site factors, ore bodies 477 → 42 and median size 32 → 550 cells. `cave.frequency` is held out as a feel target (`docs/NEEDS_DIRECTOR.md` P026); items 10/15/16/17-21 are held with the plan's own arguments. They are not ports; they are the current build being
+**WG-1 … WG-4 below outrank everything in Tier 1.** WG-1/3 are CLOSED (D0254, D0258). **WG-2's closure is now in question** — its assertion is `shelf_frac > 0.0` against a quantity measured at 0/1/6/15/17 cells in 46,080, which is a noise floor, and the sentence declaring it closed rested on ONE carved cell (D0307, `docs/NEEDS_DIRECTOR.md` P028). **WG-4 is fully converted** (D0305, D0307): thirteen constants with per-site factors, ore bodies 477 → 42 and median size 32 → 550 cells, and `cave.frequency 0.11 → 0.0656` taking median cave pocket 7 → 15. The metre-correct `0.0275` would take it to **121** and is blocked only by that same WG-2 assertion; items 10/15/16/17-21 are held with the plan's own arguments. **Frequency is NOT the missing void** — void fraction is flat (0.0822–0.0871) across a 4× frequency sweep, excluding `docs/MASTER_PLAN_AUG30.md`'s stated most-likely explanation for P021. They are not ports; they are the current build being
 measurably wrong. Three of the four are single-digit line counts, and until they are fixed every world
 this build generates is one of 65,536, a third of it is an impermeable wall, and its caves are a quarter
 of their authored size. Fix them **before** any visual port, because every visual judgement made against
