@@ -4,9 +4,9 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-01. This round: the overnight run — seventeen PRs merged green (#16–#33), ledger
-D0286–D0314, every one rebase-merged with authorship clean.** WG-4 fully converted, three legacy ports
-landed with their sources named, and **five separate greens found to be measuring nothing.**
+**Last updated: 2026-09-01. This round: the overnight run — eighteen PRs merged green (#16–#34), ledger
+D0286–D0314, every one rebase-merged with authorship clean.** WG-4 fully converted, five legacy ports
+landed with their sources named, and **six separate greens found to be measuring nothing.**
 
 **Headline: a capture diff of ZERO pixels has two causes — the painter drew nothing, or the moment did
 not pose it — and nothing in the output separates them.** `SeamPainter` shipped correct, mounted on the
@@ -34,10 +34,11 @@ The metre-correct value does **not** make lateral caves vanish — it **consolid
 And **void fraction is flat across the whole 4× range**, which excludes `MASTER_PLAN_AUG30`'s stated
 most-likely explanation for P021's missing 15%.
 
-**Three ports, sources named.** The grain reveal (**D0308**, `world_renderer.gd:2262-2344`) — which
+**Five ports, sources named.** The grain reveal (**D0308**, `world_renderer.gd:2262-2344`) — which
 closed PRE-4 and gave `core/seams.gd` its first caller after four sessions unwired behind one `int`. The
 stride and the stagger (**D0310**, `player.gd:45-71, 411-432, 625-643`), T1 #9 and #10. Per-material
-strike voices (**D0313**, `sfx.gd:26-35`).
+strike voices (**D0313**, `sfx.gd:26-35`). The bedding depth boost (**D0312**,
+`world_renderer.gd:1591-1594`) and `cave.frequency` (**D0307**) are the other two, both below.
 
 **PRE-1, PRE-3 and PRE-4 are all closed** and `LEGACY_GAP` had recorded none of it. **PRE-2, the `Fx`
 vector layer, is the only prerequisite genuinely open** — verified in the tree, not inferred. It gates
@@ -47,7 +48,7 @@ the grapple.
 
 ## What was learned
 
-**The house failure class ran five times this session and four were my own instruments.** Listed
+**The house failure class ran six times this session and five were my own instruments.** Listed
 together because the shape is the lesson:
 
 1. **A capture that could not pose its subject** (D0309/D0311) — above. Twice, with the second failure
@@ -60,7 +61,10 @@ together because the shape is the lesson:
 4. **A mutation escaping because the population could not pose the gate** (D0308). The assertion "every
    cell shares the worked cell's seam" was posed on a HORIZONTAL run — which walks `(1,0)`, and
    `Seams.at` keys HORIZONTAL to the row. Every cell in it is horizontal *by construction*.
-5. **A shipped Tier-0 closure resting on one cell** (D0307) — see below.
+5. **A probe wrong by a factor of fifteen** (D0314). It carved an already-carved grid and reported 66
+   shelf cells where the truth is 990. Only routing the *suite* through the same function exposed it —
+   **a shared implementation is a parity check that runs itself.**
+6. **A shipped Tier-0 closure resting on one cell** (D0307) — see below. The only one that is not mine.
 
 **And two harness traps I had already recorded and hit again:** `grep -c "ALL PASS"` as a pass detector
 matches `run_gd_test`'s own *"never printed its own ALL PASS line"* failure; and `godot ... | grep -m2`
