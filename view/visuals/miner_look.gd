@@ -155,13 +155,58 @@ const RIM_OFFSETS: Array[Vector2] = [
 ## The facing flip negates the rect's WIDTH rather than setting a canvas transform. Legacy used a
 ## transform and had to restore it; an un-restored transform inside a `_draw` leaks onto everything drawn
 ## afterwards, and the restore is one early return away from being skipped.
+##
+## **NEGATE THE SIZE AND LEAVE THE POSITION ALONE.** `Rect2` and Godot's rasterizer disagree about what a
+## negative width means, and the disagreement is silent. To `Rect2`, `Rect2(x, -w)` and `Rect2(x - w, w)`
+## describe the same interval, so the natural-looking "move the corner, then negate" is arithmetic that
+## reads as correct. `RenderingServer.canvas_item_add_texture_rect` does neither: it sets a `FLIP_H` flag,
+## takes the absolute value of the size, and **keeps `position` exactly where it was**. So pre-shifting
+## the corner is never undone, and the sprite draws one full width to the right of where it belongs.
+##
+## MEASURED, NOT REASONED (D0315, `tools/probe_facing_flip.tscn`): drawing the same texture at the same
+## centre under both facings put facing-1 at canvas x 305..337 and facing+1 at 335..366 -- both 31px wide,
+## so nothing was clipped, and the turn translated the miner **+29.3px**. The director found it by playing:
+## the miner "reflects around an offset center" every time it turns around.
+##
+## A unit test on this rect cannot see any of that ON ITS OWN. `Rect2(336, -32)` covers the same interval
+## as `Rect2(304, 32)` by any assertion written against `position`/`size`/`abs()`, and the two draw 32px
+## apart. That is why the evidence is a headed pixel capture -- and why the convention it measured is
+## written down below as `drawn_span`, so the suite has something it CAN assert against.
 static func draw_sprite(canvas: CanvasItem, tex: Texture2D, centre: Vector2,
 		body_height_px: int, facing: int) -> void:
-	var dst: Rect2 = dest_rect(tex, body_height_px)
-	dst.position += centre
-	if facing > 0:
-		dst.position.x += dst.size.x
-		dst.size.x = -dst.size.x
+	var dst: Rect2 = placed_rect(tex, centre, body_height_px, facing)
 	for d: Vector2 in RIM_OFFSETS:
 		canvas.draw_texture_rect(tex, Rect2(dst.position + d, dst.size), false, RIM_COLOR)
 	canvas.draw_texture_rect(tex, dst, false)
+
+
+## The exact rect `draw_sprite` hands the rasterizer, as a value. Split out so the placement can be
+## asserted without a canvas, a window or a GPU -- `draw_sprite` itself is untestable headless, which is
+## how the flip defect survived to reach the director.
+static func placed_rect(tex: Texture2D, centre: Vector2, body_height_px: int, facing: int) -> Rect2:
+	var dst: Rect2 = dest_rect(tex, body_height_px)
+	dst.position += centre
+	if facing > 0:
+		dst.size.x = -dst.size.x
+	return dst
+
+
+## **THE RASTERIZER'S CONVENTION FOR A NEGATIVE-WIDTH RECT, WRITTEN DOWN SO IT CAN BE ASSERTED.** Given a
+## rect as passed to `draw_texture_rect`, the `[left, right]` the pixels actually land in.
+##
+## `RenderingServer.canvas_item_add_texture_rect` responds to a negative width by raising a horizontal-flip
+## flag and taking the absolute value of the size. It does **not** move `position`. So the covered interval
+## is `[position.x, position.x + |size.x|]` -- the position is the LEFT edge either way, and a negative
+## width mirrors the content inside that same interval rather than reflecting the interval itself.
+##
+## This differs from the convention `Rect2` itself implies, where a negative size means the position is the
+## far corner (`Rect2.abs()` moves the position; this does not). Two reasonable conventions, one of them
+## silent, and the gap between them is the whole of D0315.
+##
+## NOT DERIVED FROM THE DOCS -- MEASURED. `tools/probe_facing_flip.tscn` draws one texture at one centre
+## under both facings and reports the shift that best aligns the mirrored bands: the pre-fix code aligns at
+## **+32px** (a full sprite width) with a cost of 1173.1 at zero, and the fix aligns at **+0px** with a
+## cost of 30.7. Identical residual at each one's own best shift, so the mirror is intact in both and only
+## the translation differs. Re-run that probe if this function is ever doubted; do not reason about it.
+static func drawn_span(rect: Rect2) -> Vector2:
+	return Vector2(rect.position.x, rect.position.x + absf(rect.size.x))

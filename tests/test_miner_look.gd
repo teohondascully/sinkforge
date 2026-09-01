@@ -14,7 +14,50 @@ func _initialize() -> void:
 	_test_the_struck_frame_shows_on_the_tick_the_rock_takes_damage()
 	_test_the_free_running_fallback_is_the_at_rest_swing_by_construction()
 	_test_a_shorter_swing_makes_the_pick_swing_faster()
+	_test_turning_around_mirrors_the_miner_without_moving_it()
 	_finish("miner_look")
+
+
+## D0315 -- THE DEFECT THE DIRECTOR FOUND BY PLAYING: "when I turn it literally reflects around an offset
+## center". Turning right translated the miner a full sprite width to the right, every time.
+##
+## The cause was `draw_sprite` moving the rect's corner before negating its width -- correct under the
+## convention `Rect2.abs()` implies, wrong under the one the rasterizer uses, which keeps `position` and
+## takes `|size|`. See `MinerLook.drawn_span`, which is that convention written down.
+##
+## **WHY THIS TEST CANNOT BE WRITTEN AGAINST `Rect2` DIRECTLY.** The broken rect and the correct rect
+## describe the SAME INTERVAL to every `Rect2` accessor: `Rect2(336, -32)` and `Rect2(304, 32)` both have
+## `abs()` spanning 304..336, so an assertion on position, size, or `abs()` passes on both and draws 32px
+## apart. Every honest headless assertion here has to go through `drawn_span`, and `drawn_span` earns its
+## right to be believed from a headed pixel measurement (`tools/probe_facing_flip.tscn`), not from
+## reasoning. That probe is the evidence; this is the ratchet.
+func _test_turning_around_mirrors_the_miner_without_moving_it() -> void:
+	var tex: Texture2D = MinerLook.resolve("miner_idle")
+	_check(tex != null, "sanity: a texture exists to place -- every comparison below is vacuous without one")
+	if tex == null:
+		return
+	var centre: Vector2 = Vector2(320.0, 120.0)
+	var left: Rect2 = MinerLook.placed_rect(tex, centre, Body.HEIGHT_PX, -1)
+	var right: Rect2 = MinerLook.placed_rect(tex, centre, Body.HEIGHT_PX, 1)
+	var span_l: Vector2 = MinerLook.drawn_span(left)
+	var span_r: Vector2 = MinerLook.drawn_span(right)
+	_check(is_equal_approx(span_l.x, span_r.x) and is_equal_approx(span_l.y, span_r.y),
+		"turning covers the same pixels: facing -1 draws %.1f..%.1f, facing +1 draws %.1f..%.1f"
+		% [span_l.x, span_l.y, span_r.x, span_r.y])
+	# ...AND THE MIRROR IS STILL REQUESTED. Without this, deleting the flip outright passes the line
+	# above perfectly, and trades a miner that jumps for a miner that never turns around -- which the
+	# headed probe would catch and this suite would not.
+	_check(right.size.x < 0.0,
+		"and facing +1 still asks for a mirror (width %.1f must be negative)" % right.size.x)
+	_check(left.size.x > 0.0,
+		"CONTROL: facing -1 does not (width %.1f must be positive) -- otherwise the line above would "
+		% left.size.x + "pass on code that mirrored unconditionally, which never turns around either")
+	# The interval is the body's, centred. Stated against the CENTRE rather than against literals so a
+	# re-baked sprite of a different width still has to be centred rather than merely consistent.
+	var w: float = float(tex.get_width())
+	_check(is_equal_approx(span_l.x, centre.x - w * 0.5) and is_equal_approx(span_l.y, centre.x + w * 0.5),
+		"and that interval is centred on the body: %.1f..%.1f against a %.0f-wide sprite at x %.1f"
+		% [span_l.x, span_l.y, w, centre.x])
 
 
 ## D0287. The pick's two frames are `dig_up` and `dig_down` (`legacy/tools/bake_miner.gd:448-449`), and
