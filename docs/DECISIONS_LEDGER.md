@@ -11797,3 +11797,71 @@ fix.
 
 **Reverse cost:** trivial. Revert one file's prose, two counters and four message strings. No behavior
 depends on any of it.
+
+
+## D0286 · The wall plane, drawn — carved space stops being the same picture as the sky · 2026-08-31 · Lane B-view, LEGACY_GAP T1 #3
+
+Ported from `legacy/scenes/world_renderer.gd:2194-2260` (`_draw_background`, `_wall_fill_color`),
+`2685-2766` (`_wall_base_color`), `legacy/scenes/fine_terrain.gd:350-381` (`apply_wall_tone`) and
+`legacy/scenes/terrain_painter.gd:353-377` (`paint_wall_face`).
+
+`Interface.observe()` has shipped `walls`/`wall_legend` since D0238 and `tests/test_interface.gd` has
+asserted them ever since. **Zero renderers read either.** Every dug room in every capture was a flat
+fill — the same flat fill as the sky, so a tunnel and open air were literally the same picture. Legacy
+puts it better than a paraphrase can: "a tunnel rendered as a flat rectangle at roughly four percent grey
+does not read as dark, it reads as EMPTY, and no amount of work on the foreground plane fixes it."
+
+**Darkness belongs to the veil, not to this.** Legacy records a measured regression at this exact spot:
+the wall was darkened once in its own paint and again by the shadow veil, so the veil compounded an
+already-crushed value and a lit chamber came out as a black rectangle. So this file paints what the wall
+IS — the same rock a plane back, recessed in value and drifted cool — and takes no view on how lit it is.
+T1 #2 owns that, and this has to still be correct when it lands.
+
+**THE ONE THING THAT IS NOT LEGACY'S SHAPE.** Legacy ramps the cast shadow in six 2px bands INSIDE one
+cell, across 12 of its 32 pixels. Its cell is one metre; ours is a quarter of one, so each of those bands
+would be **a quarter of a pixel** here. Sub-pixel bands do not draw. The ramp is therefore kept in METRES
+(`AO_DEPTH_M = 12/32`) and the quantum moved from the sub-cell band to the cell — which is what the cell
+became when it shrank. A wall cell is shaded by its distance to the nearest solid, and the gradient
+legacy drew inside one cell is drawn across two of ours. Same falloff over the same distance in world
+terms. Denominated in metres for the same reason `crack_painter.gd` is denominated in the blow: WG-4 may
+re-denominate the grid and a depth in metres is already correct on the other side of it.
+
+**A measured difference, recorded rather than hidden.** `1.5` cells rounds up to 2, so our ramp is 0.5 m
+against legacy's 0.375 m, and the cell is shaded whole where legacy shaded a band. Integrating both: per
+unit area ours carries **~1.7x** legacy's total shadow (0.233 vs 0.136 mean alpha over the equivalent
+span), while the alpha AT THE CONTACT LINE is legacy's constant exactly. It reads well in capture today
+and it is the tail, not the contact, that differs — but the veil lands on top of this, and 1.7x is the
+number to revisit then rather than rediscover.
+
+**The observation window went 2 -> 3 cells, and that is a correctness fix, not a tuning knob.** The
+deepest probe on the stack is now `OVERDRAW_CELLS + AO_RAMP_CELLS = 3`: the terrain painter draws one
+cell past the view, and the wall painter probes two further from every cell it draws. At a margin of 2
+that probe left the window, `solid_at` answered *false* for a cell it had simply never been given, and
+the straddling column at each screen edge silently lost its cast — visible only at the frame's extreme
+edge and only on one side, which is the kind of defect a screenshot does not settle.
+`tests/test_wall_painter.gd` derives the margin from those two constants rather than restating it.
+
+**A guard that could not fail, found by mutating it.** "The wall is cooler, not merely dimmer" was
+written as `back.b/back.r > front.b/front.r`, and it PASSED with the cool drift deleted: `Color.darkened`
+scales all three channels, so the two ratios agree to three decimals and differ in the last float bit,
+and a strict `>` read pure rounding as a result. It now measures against the subject-removed colour (the
+same rock darkened and *not* drifted) as a control that travels inside the measurement, with a 20% floor
+against the 45% the drift actually moves. Four mutants are caught now where three were: inverted fade,
+oversaturated composite, solid cells no longer skipped, and the drift removed.
+
+**A fixture that posed nothing, found the same way.** The first cast-ordering test dug its "beside a
+wall" slot at rows ABOVE the fixture's solid floor, where there is no rock to cast at all. It read 0.0.
+The neighbouring row — "the ceiling cell is darkest" — PASSED against that same 0.0 and would have gone
+on passing against a painter whose side cast did not exist. The fixture is now one 7x7 chamber whose top,
+bottom and left cells each touch solid on exactly ONE side, so each alpha must equal its own constant
+undiminished, with the chamber's corner as the control proving the isolation is by construction.
+
+**Four directions composite, they do not sum.** `1 - Π(1 - a)`, because that is what legacy's four stacked
+`draw_rect` calls actually do. The constants sum to 1.46, so summing would clip an enclosed pocket to
+opaque black.
+
+**Already correct for P017.** A cell with no wall entry is left transparent, which is legacy's own rule
+and is what will let the air band above the surface read as sky rather than as more tunnel.
+
+**Reverse cost:** delete `view/visuals/wall_painter.gd` and its suite, drop the `add_painter` line, and
+put `WINDOW_MARGIN_CELLS` back to 2.

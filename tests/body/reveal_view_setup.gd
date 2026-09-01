@@ -14,6 +14,7 @@ extends RefCounted
 ##
 ##   -200  backdrop   (the band-tinted fill; `--sky` REPLACES it, see below)
 ##   -100  sky        (only under `--sky`)
+##    -60  wall       (D0286) -- the plane BEHIND the play space, so it is behind everything solid
 ##    -50  terrain    (D0276)
 ##      0  cracks     (D0275) -- over the terrain it cracks, under the body doing the cracking
 ##      0  crumble    (D0278) -- debris from a cell that has just gone, so it sits over the hole
@@ -27,6 +28,7 @@ extends RefCounted
 
 const BACKDROP_Z: int = -200
 const SKY_Z: int = -100
+const WALL_Z: int = -60
 const TERRAIN_Z: int = -50
 
 
@@ -45,6 +47,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 		view.add_painter(SkyPainter.paint).z_index = SKY_Z
 	else:
 		view.add_painter(BackdropPainter.paint).z_index = BACKDROP_Z
+	view.add_painter(WallPainter.paint).z_index = WALL_Z
 	view.add_painter(TerrainPainter.paint).z_index = TERRAIN_Z
 	view.add_painter(CrackPainter.paint_frame)
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so this is an INSTANCE
