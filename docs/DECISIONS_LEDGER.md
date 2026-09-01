@@ -13372,3 +13372,52 @@ printing the image size and the viewport rect side by side instead of assuming t
 probe exits 0. `grep` for the shape across `view/ sim/ tests/ tools/` finds exactly one instance and two
 textured draw calls in the codebase, both in this file, so the repair reaches the whole population —
 `[[repair-reaches-one-instance]]`.
+## D0316 · 2026-09-01 · The capture colour floor failed OPEN — the sixth vacuous green, and the first in a gate
+
+**Found by a Codex audit, not by this session.** `tools/capture_moments.sh` gated every milestone shot on
+a distinct-colour floor, and the gate read:
+
+    if [ -n "$colours" ] && [ "$colours" -lt "$MIN_COLOURS" ]; then ... fail
+
+A capture whose producer emitted **no colour line at all** made `-n` false, skipped the comparison
+entirely, and **passed**. The floor was never applied, and the run reported success. *No measurement was
+read as a good measurement.* `[[instrument-cannot-register-subject]]`.
+
+**Why this one is worse than the five before it.** The other five instances this run found were in tests
+and probes — instruments measuring a subject. This was in a **gate**: the thing whose entire job is to
+refuse. A test that measures nothing wastes a suite; a gate that measures nothing hands out a pass. And
+its failure mode is exactly the one the floor was written to catch (D0304: a stale import cache makes
+every `class_name` global fail to resolve, no painter draws, and the scene still boots and still writes a
+PNG) — one step further along the same path, where the shutter also stops reporting, and the guard that
+existed for it says nothing.
+
+**The rule was already written down correctly, one directory over.** `tools/check_headed_boot.sh` handles
+the identical parse and says so in prose: *"Refusing to call the frame non-blank on the strength of the
+file merely existing."* Two copies of one rule, one of them right. `[[repair-reaches-one-instance]]` —
+so the fix is a de-duplication, not a patch: the guard moved to `tools/capture_colour_guard.sh`, sourced
+by the tool and by its test, and an absent count is now a hard failure with its own message naming the
+producer and the exact line it expects.
+
+**MUTATION-TESTED, AND THE MUTANT FLIPS EXACTLY ONE ROW.** `tools/test_capture_moments.sh` drives the
+guard with producer text no real run emits — which is the only honest fixture, since the defect IS the
+absence of real output:
+
+| | before D0316 | after |
+|---|---|---|
+| count below the floor (45) | FAIL | FAIL |
+| **no count at all** | **PASS** | **FAIL** |
+| count above the floor (592) | PASS | PASS |
+
+With the fail-open condition reinstated, row 2 and only row 2 goes red; the other seven assertions stay
+green. Row 3 is the control that matters most — without it, a guard that failed on everything would
+satisfy rows 1 and 2 while making the tool useless, which is the other way to "fix" this.
+
+**Three assertions exist because the first two could both be failing for the wrong reason.** Rows 6-7
+read the parsed number back out and assert the empty string on absent input: a `grep` that matched
+nothing would turn every row into row 2, and rows 1 and 5 would still be green while measuring nothing at
+all. `[[existence-probe-has-no-witness]]` — the guard needed a positive control on its own parser. Row 8
+pins `head -1`, because a guard that took the LAST match would judge one moment by another's frame.
+
+**Verified end to end, not only in the unit.** The real tool captured all five moments (673, 675, 299,
+381, 613 distinct colours) at exit 0 through the new sourced guard, with the `grain` positive control
+firing at `visible=3` strokes.
