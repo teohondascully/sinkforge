@@ -61,8 +61,8 @@ call. Not finishing something.
 - [x] **LANE F · HUD host + depth readout** (D0271). H-01 unblocked all 65 of Lane H's rows.
 - [ ] **LANE F tail** — depth readout, strata bands, hotbar, objective card, key hints, map, theme
       grammar. Port-and-refactor, trim dead content.
-- [ ] **LANE G · audio** — synthesized SFX (hollow tell, breach, blow-against-material), depth-mixed
-      score. Synthesized at boot, no assets.
+- [x] **LANE G · audio** — hollow tell and breach (D0293/D0303), **blow-against-material (D0313)**:
+      four parameterised strike voices, synthesized at boot, no assets. Remaining: the depth-mixed score.
 - [x] **LANE A · camera follow, lead, pixel-snap** (D0273). Shake parks with its trigger (T1 #9).
 - [ ] **LANE A tail — zoom/sprite-scale.** View only — body collision width is a resolver
       touch and parks.
@@ -101,53 +101,68 @@ belongs in the same arc as the instruments that found it.
 
 ## CURRENT — the overnight run of 2026-08-31/09-01
 
-**Nine PRs merged green, #16-#24, plus #25 in flight.** Every one rebase-merged, authorship clean. The
-ledger runs D0286-D0306. What is worth knowing, rather than what happened:
+**Fifteen PRs merged green, #16–#31.** Every one rebase-merged, authorship clean. The ledger runs
+**D0286–D0313**. What is worth knowing, rather than what happened:
 
-**Three defects shipped and were caught here, all of which every suite passed.**
+**THE RUN'S DOMINANT FINDING: five separate greens this session were measuring nothing, and four of them
+were my own instruments.** They are listed together because the shape repeats and the shape is the
+lesson, not any one of them.
 
-- **D0301** — `depth_m_exact` never subtracted the surface datum, so every terrain zone tint was applied
-  20 m too shallow. Introduced by this same session's P017 (D0292), which moved the datum and updated
-  `depth_m` and not its float twin. Found by accident three commits later.
-- **D0300** — the glint's population was 93% short: 1,183 exposed ore faces became 81, because the
-  predicate was intersected with `is_speck`, which legacy never does. No version of that suite could
-  have caught it. Three of four milestone captures diffing at EXACTLY zero pixels did.
-- **D0303** — `Sfx.play()` returned `true` on playbacks the engine refused. Underneath it: in a suite's
-  `_initialize`, `get_root().add_child(x)` leaves `is_inside_tree()` FALSE.
+- **D0309/D0311 — a capture diff of ZERO has two causes and the output cannot tell them apart.**
+  `SeamPainter` shipped correct, mounted, mutation-tested, and its verification capture read **0 of
+  2,073,600 pixels changed**. The painter was fine; the moment did not pose it. The move that separates
+  "the layer is dead" from "the gate is closed" is an **ungated full-viewport fill from the same layer**
+  — it read 99.8%, in one run. Then the fix went stale **within the hour** when D0307 moved the world,
+  and the replacement control (`seam_run > 0`) passed on a frame that still diffed at zero, because the
+  subject was **posed and off-camera**. "Posed" and "in frame" are different claims.
+- **D0310 — a suite printed `ALL PASS` and exited 0 with three of its tests calling methods that no
+  longer existed.** Only the D0115 masked-crash detector failed the run.
+- **D0312 — a palette test measured `&"stone"`, which `data/materials/` does not carry.** `matrix_color`
+  answers an unmapped material with a flat debug brown, so every patch measured a **constant**, spread
+  read 0.0000 at both depths, and the surviving comparison was `0 >= 0` and **passed**.
+- **D0308 — a mutation escaped because the population could not pose the gate.** The seam-run test
+  asserted "every cell shares the worked cell's seam" on a HORIZONTAL run — which walks `(1,0)`, and
+  `Seams.at` keys HORIZONTAL to the row, so **every cell in it is horizontal by construction**.
+- **D0307 — WG-2's closure assertion is `shelf_frac > 0.0` against a quantity measured at 0, 1, 6, 15
+  and 17 cells out of 46,080.** No trend, 17× between adjacent rows, one landing on zero. **That is a
+  noise floor**, and the sentence declaring WG-2 closed rested on **one carved cell**. Not touched:
+  re-stating a Tier-0 closure criterion is the director's call (**P028**).
 
-**The capture is a real instrument now (D0304).** Two runs of one commit differed by 38,900 pixels; they
-now differ by **0**, in all four moments. Two causes: the shutter kept the world running while reading
-pixels, and `randf_range` on an unseeded global RNG. `capture_moments` was also reporting a blank grey
-world (45 colours against 592) as a success — a stale import cache — and now has a floor. This entry
-also corrects D0300's stated mechanism, which was a guess presented as a finding.
+**WG-4 is fully converted (D0305 + D0307).** `cave.frequency` 0.11 → 0.0656 ships tuned and
+BUILT-PARKED. The sweep behind it **falsified two predictions**: the metre-correct 0.0275 does not make
+caves vanish, it **consolidates** them (271 pockets of median 7 → 47 of median 121), and **void fraction
+is flat across a 4× frequency change** (0.0822–0.0871), which excludes `MASTER_PLAN_AUG30`'s stated
+most-likely explanation for P021's missing 15%.
 
-**The veil landed (D0302) and the lamp with it (D0306).** T1 #2, "the single largest visual gap in the
-project", whose "window-vs-world scope decision" turned out to be a measurement with the answer 9. The
-lamp cuts the veil rather than glowing over it, which is legacy's own architecture and its own recorded
-regression.
+**Three ports landed with their legacy sources named.** The grain reveal (**D0308**, PRE-4 closed —
+`core/seams.gd` had been unwired for four sessions behind one `int`); the stride and the stagger
+(**D0310**, T1 #9/#10 — and these port in **pixels**, not metres, because `body.gd` matches legacy's
+`RUN_SPEED`/`GRAVITY`/`JUMP`/`MAX_FALL` four for four); per-material strike voices (**D0313**).
 
-**WG-4 Batch A (D0305) is in flight as PR #25**, and it re-pins `GOLDEN_HASHES`, so its first CI run is
-expected to fail on the goldens. Twelve constants converted with per-site factors; ore bodies 477 -> 42,
-median size 32 -> 550 cells, volume near-neutral. **Nothing in the repository could see any of it** — the
-existing carve ratchet moved by at most 0.0048 against a ±0.0060 band across all eleven constants, and
-eight moved it by 0.0000. `tests/test_ore_bodies.gd` is the instrument that can.
+**Two shipped guarantees were found to be in genuine conflict and neither was weakened** (**P029**):
+legacy's bedding depth boost needs ≥1.83 to clear its own 2× requirement, and anything above ~1.0 pushes
+deepstone inside glimmer's 0.25 distinctness floor. Shipped 1.0 — a 53% recovery of post-veil deep
+spread — with the frontier parked as a table.
+
+**Determinism held at every world and body change.** Two processes bit-identical (first mismatch −1),
+seed+1 control diverging at checkpoint 0, at each of three re-pins. Goldens harvested from CI's own Linux
+build per D0167 and cross-checked elementwise against local macOS: **0 of 200 differ, all three times.**
 
 ### In flight
 
-- **PR #25 `run/wg4`** — WG-4 Batch A. Goldens to be harvested from ITS OWN CI Linux log, per D0167.
-- **`run/lamp`** — D0306, committed, PR not yet opened.
+Nothing. Every branch this run opened is merged and deleted.
 
 ### Open, and parked for the director
 
-- **`cave.frequency`** — the WG-4 tail, ruled a FEEL target. Metre-correct is 0.0275, at which the whole
-  12 m shaft sits inside 0.63 of one noise period and lateral cave structure disappears entirely. Ships
-  tuned and BUILT-PARKED, not converted.
-- **The veil's remaining halves** — the amber TINT needs a multiply-blend light layer; `_skylight_alpha`'s
-  three legacy call sites all scale light SOURCES, so where the veil's own depth term belongs is a
-  question no port here has answered, and none has asserted an answer to.
-- **`test_reveal_replay_driver`'s fixture** — the seed re-picked 8 -> 1, and the qualification rate FELL
-  from 63% to 37% (D0305). The target and the approach are still uncoupled; the fix is still parked
-  behind `find_spawn` being shared with the live spawn.
+- **P028 · WG-2's closure rests on six cells in ninety-two thousand.** The cheap resolution is 200 seeds.
+  It gates **P026**: if the true shelf rate was never above zero at `0.11` either, then the metre-correct
+  `cave.frequency 0.0275` never re-opened WG-2 and a **seventeen-fold** larger cave is one line away.
+- **P029 · the bedding boost and the glimmer floor cannot both be satisfied.** Measured frontier in the
+  entry; option (2), re-hueing glimmer away from deepstone, buys the whole range back and is an art call.
+- **P026 · `cave.frequency`** — BUILT at 0.0656, with the full sweep table.
+- **P027 · the veil's remaining halves** — the amber tint and where `_skylight_alpha` belongs.
+- **P004 · the per-commit fuzzer poses neither the corner nudge, nor dig, nor now the stride.** Measured
+  this run: its longest unbroken heading in 50,000 ticks is **10** against the **55** a stride needs.
 
 ## Earlier — sky_painter draws, and the world has no sky to jump into (D0243–D0250)
 
