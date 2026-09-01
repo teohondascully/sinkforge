@@ -31,11 +31,23 @@ extends RefCounted
 ##     flares a different one each cycle. At 4px a whole CELL is one mark (D0189, D0299), so there is
 ##     exactly one fleck to choose from and the cycle index has nothing to select between. The variety
 ##     legacy got within a cell is carried here by the per-cell hash phase across cells instead.
+##
 ##   * **The colour.** Legacy's own header says the glint arrives at rgb 255,255,~237 — "the brightest
 ##     mineral mark in the game therefore says bright rather than ore" — and that every repair for it
 ##     "changes how loud and what colour a deliberate discovery cue is, so it is a look decision rather
 ##     than a tuning one." That is LEGACY'S open question and it is not this port's to answer. The
 ##     `lightened(0.65)` is carried over unchanged and the question travels with it.
+##
+## **`is_speck` IS NOT PART OF THIS PREDICATE, AND ADDING IT WAS THE FIRST VERSION'S BUG.** It seemed to
+## follow from D0299 — if a cell is the mark, surely only a marked cell glints — and it is a
+## misreading of what the two mechanisms are for. `is_speck` decides how ore is COLOURED: ~10% of a vein's
+## cells take the mineral hue so a patch reads as flecked rock rather than as painted metal. Legacy's
+## glint asks a different question, and its predicate is exactly `has_nuggets() and glitters` plus
+## exposure — the speckle field is used only to pick a POSITION inside the cell, never to decide whether
+## the cell may flare at all. Intersecting the two multiplied the population by the mark density: measured
+## on the real `reveal_test_dense` world, **1,183 exposed ore faces became 81**, and at a 14.7% duty that
+## is ~12 flaring cells in a thousand-row world. The tests all passed. The capture is what showed it —
+## three of four moments diffed at exactly ZERO pixels against the commit before the painter existed.
 
 ## Legacy's own two time constants, in seconds. Neither is a pixel count, so both transfer unchanged.
 const PERIOD: float = 3.4       ## how long between one cell's flares
@@ -85,9 +97,10 @@ static func is_exposed_face(obs: Interface.Observation, c: Vector2i) -> bool:
 	return false
 
 
-## Whether this cell can EVER glint, ignoring time: an exposed face of a marked, glittering material.
-## Split from the time term so a test can pose the population without posing the clock — and so the two
-## can fail separately, which they did: the first version returned true for coal.
+## Whether this cell can EVER glint, ignoring time: an exposed face of a glittering, nugget-bearing
+## material. Split from the time term so a test can pose the population without posing the clock — and so
+## the two can fail separately, which they did twice: the first version returned true for coal, and the
+## second was intersected with `is_speck` and returned true for 81 cells in a world with 1,183 faces.
 static func can_glint(look: MaterialLook, obs: Interface.Observation, c: Vector2i) -> bool:
 	if look == null or obs == null:
 		return false
@@ -96,8 +109,6 @@ static func can_glint(look: MaterialLook, obs: Interface.Observation, c: Vector2
 		return false
 	var rec: Dictionary = MaterialsRecords.RECORDS.get(material, {})
 	if not rec.has("nugget_color") or not bool(rec.get("glitters", false)):
-		return false
-	if not look.is_speck(material, c.x, c.y):
 		return false
 	return is_exposed_face(obs, c)
 
