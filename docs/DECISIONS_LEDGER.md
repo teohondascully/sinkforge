@@ -10940,3 +10940,56 @@ gate's own then-untracked file, and `git branch -D` on that branch took it with 
 same path then truncated it to zero bytes, destroying the recovery target. Rewritten from scratch and
 re-verified. `untracking-is-deferred-deletion` has a sibling: an untracked file committed to a throwaway
 branch is a file that only exists on the branch you are about to delete.
+
+## D0268 · The miner is a sprite, not a red rectangle · 2026-08-31 · Lane C, LEGACY_GAP T1 #1
+
+`docs/LEGACY_GAP.md` ranks this the single most player-visible gap in the project. Ported from
+`legacy/scenes/player.gd:664-793` — `_sprite_key`, `SPRITE_FALLBACKS`, `_resolve_tex` and the draw block
+— re-expressed against this build's `Body`, and landed through `Art`, which was lifted from
+`legacy/scenes/art.gd` in D0227 and **had no consumer until now**. The 16 authored 32x48 PNGs came from
+`legacy/assets/sprites/`; there was no art backlog behind this, only a seam nobody had walked through.
+
+**What was NOT ported is as load-bearing as what was.** Legacy's key table also carries `miner_swing`,
+`miner_haul`, `miner_climb_0/1` and `miner_hang`, selected on `grapple.taut`, `grapple.state` and
+`climbing`. This build has no grapple and no rope, so those branches are **omitted rather than stubbed**:
+a branch that can never be true is a branch nobody can test, and it would read as supported. `miner_land`
+goes too — legacy selects it on a `_land_hold` landing timer this `Body` does not have, and inventing one
+to fill a sprite slot would be building a feel mechanic to satisfy a table.
+
+**Thresholds converted, not re-tuned.** Legacy compared a float `velocity.x` in px/s against 10.0;
+`Body.vel_x` is `Fx` fixed-point px/s, so the same physical speed is `10 * Fx.SCALE`. Re-picking the
+number by feel would have silently discarded legacy's judgment while looking like a port.
+
+**The dig pose reads the INPUT, not `Body.dig_event_this_tick`.** The event is true only on the tick a
+cell is actually excavated, so animating from it would flash one dig frame at the instant rock breaks and
+show idle for the entire swing before it. The input is what the player is doing; the event is what the
+world did about it.
+
+**`view/` may not reach `sim/`**, so `MinerLook` takes loose primitives — `sprite_key(digging, on_floor,
+vel_x, vel_y, anim_ticks)` — and never sees a `Body`. That constraint made the whole state table a pure
+function, which is why `tests/test_miner_look.gd` can assert it without building a world.
+
+**The population check is the one that matters.** Rather than listing keys by hand — which only asserts
+the ones somebody remembered — the suite drives `sprite_key` across the real state space, collects the
+**9 distinct keys it actually emits**, and resolves every one. A key added to the selector but missing
+from `assets/sprites/` fails there instead of appearing as an invisible miner in a capture nobody opens.
+The cycles are asserted as SETS over a clock (2 dig frames, 4 walk frames), because a frame index that
+never advanced passes every single-tick assertion.
+
+**Two ratchets moved, neither loosened.** `test_view_lifts` asserted `not Art.has_any()` — correct while
+`assets/` did not exist, red the moment sprites landed. Re-pinned to assert `has_any()` is true AND that
+the hit path resolves AND that an absent key still returns null, so the fallback contract stays covered:
+a move, not a deletion. `art.gd`'s own docstring said the directory did not exist and nothing called
+`tex()`; both were corrected in place rather than left to ship beside the code refuting them.
+
+**`tests/body/reveal_scene.gd` was at 397/400** and had no room. The terrain cell loop moved to
+`tests/body/reveal_terrain_draw.gd` — the third seam out of that file after `RevealArgs` and
+`RevealRecording` (D0244), taken for the same reason: the scene orchestrates, this draws. Deliberately
+NOT named `terrain_painter.gd`, which is `docs/LEGACY_GAP.md` T1 #4, a real port onto the `WorldView`
+coordinator; calling it that would claim work this is not.
+
+**BUILT-PARKED, not done.** The look is the director's eye: `docs/milestones/miner_*.png`. The rim halo
+is ported verbatim (cool and bright, one ring — legacy's own reasoning, that a warm outline would collide
+with the miner's leather-and-amber palette and that a second inner ring turned the legs into black boxes),
+but whether it reads at this build's zoom is a judgment I have not made. The art also overhangs the
+collision box 48px against 40px, which the gap doc records as wanting a 48 -> 56 re-bake.
