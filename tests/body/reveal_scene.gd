@@ -71,6 +71,7 @@ var _mining: Mining = Mining.new()  ## D0195: the cursor-aim mining verb (Slice 
 ## `tools/run_gd_test.sh` reads as a bare ERROR.
 var _score: Score = null
 var _particles: Particles = Particles.new()  ## D0216: chips on a break, a draught on a breach
+var _sfx: Sfx = null  ## D0296: the hollow ring and the breach -- the draught's audible half
 var _mine_down: bool = false  ## `--mine-down`: agent mode sinks a shaft instead of walking to glimmer
 var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the reticle from
 var _spawn_row: int = 0  ## the row the body started on -- `--mine-down`'s descent is measured against it
@@ -112,6 +113,9 @@ func _ready() -> void:
 		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
 		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
 	_build_view()
+	_sfx = Sfx.new()
+	add_child(_sfx)
+	_sfx.setup(_seed_value)
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
 
 
@@ -157,10 +161,7 @@ func _physics_process(delta: float) -> void:
 	# own live session and `test_reveal_replay_driver.gd` says so.
 	_mining.mine(_grid, _body.pos_x, _body.pos_y, Vector2i(input.aim_col, input.aim_row),
 		input.mine_held and input.has_aim)
-	# The observation, not the sim object, for the draught's half of it -- see `draught_for` (D0293).
-	var mining_frame: Frame = _sky_view.current_frame() if _sky_view != null else null
-	DebugSceneCommon.step_mining_feedback(_particles, _mining,
-		mining_frame.obs if mining_frame != null else null, _look, CELL, delta)
+	_step_mining_feedback(delta)
 	_last_input = input
 	_record_tick(input)
 	_tick_count += 1
@@ -168,29 +169,30 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 	if _screenshot_tick >= 0 and _tick_count == _screenshot_tick:
-		# D0189: was a single `await process_frame`, which silently captured a BLACK image on every
-		# early tick -- the agent-mode run is only ~15 ticks long, so every capture point is early, and
-		# the tool reported "screenshot saved" over a frame the renderer had not drawn yet. A capture
-		# tool that cannot register its own subject and calls that success is the house failure class;
-		# two frames is what actually clears it here, and the blankness check below is what makes a
-		# future recurrence loud instead of a black PNG nobody opens.
-		await get_tree().process_frame
-		await get_tree().process_frame
-		var img: Image = get_viewport().get_texture().get_image()
-		img.save_png(_screenshot_path)
-		print("reveal_scene: screenshot saved to %s at tick %d" % [_screenshot_path, _tick_count])
-		# What was actually in frame. A capture tool that reports only "saved" cannot tell a badly-aimed
-		# camera from a correct one, which is the same class of blindness D0190 found in this very block.
-		print("reveal_scene: camera=%s zoom=%.1f body_cell=(%d,%d) body_px=(%.1f,%.1f)" %
-			[_camera.position, _camera_zoom, Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y),
-			float(_body.pos_x) / float(Fx.SCALE), float(_body.pos_y) / float(Fx.SCALE)])
-		DebugSceneCommon.warn_if_blank(img, _screenshot_path)
+		await RevealShutter.capture(self, _screenshot_path, _tick_count, _camera, _camera_zoom, _body)
 		_flush_recording()
 		get_tree().quit(0)
 		return
 
 	if not _play_mode and (_tick_count >= MAX_TICKS or _agent_run_is_done()):
 		_finish_and_quit()
+
+
+## Both halves of the mining tell, from ONE frame. Split out of `_physics_process` at QUALITY gate 4's
+## 50-line limit, and the seam is the right one: everything else in that function advances the world,
+## and this only reads what it did.
+##
+## Legacy fires the ring and the draught from a single site and calls the draught "the same tell for a
+## player with the sound off" (D0293, D0296). They read one observation here for the same reason: two
+## paths to one cue can disagree about which tick they are describing, and this one cannot.
+##
+## The OBSERVATION, not the `_mining` object, even though this scene holds both -- see `draught_for`.
+func _step_mining_feedback(delta: float) -> void:
+	var frame: Frame = _sky_view.current_frame() if _sky_view != null else null
+	DebugSceneCommon.step_mining_feedback(_particles, _mining,
+		frame.obs if frame != null else null, _look, CELL, delta)
+	if _sfx != null:
+		_sfx.note_frame(frame)
 
 
 ## Agent mode's own stopping condition. `--mine-down` runs until the body has actually DESCENDED the target

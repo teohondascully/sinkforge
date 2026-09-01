@@ -12051,3 +12051,54 @@ silently threw away the type checking that is most of what those factories are f
 name to use instead of relying on there being only one.
 
 **Reverse cost:** paste the class back and delete the const. Nothing else refers to the file.
+
+
+## D0296 · The hollow tell finally makes a sound — and the limiter that was the missing half of the port · 2026-08-31 · Lane G, LEGACY_GAP T1 #6
+
+Ported from `legacy/scenes/sfx.gd:732-748` (`_gen_hollow`), `751-764` (`_gen_breach`), `1073-1074` +
+`_to_pcm` (the limiter), and the call site at `legacy/scenes/main.gd:1601-1603`.
+
+`sim/mining/hollow_tell.gd` has been "written, tested, correct" since it landed and **`HollowTell.RING`
+was referenced by nothing** — `docs/LEGACY_GAP.md` T1 #6's own words. D0293 gave the reading its visual
+half back; this is the audible one it was written for. Legacy treats them as one cue and says so: the
+draught is "the same tell for a player with the sound off". They fire from one site here, off one frame,
+because two paths to one cue can disagree about which tick they are describing.
+
+**LEGACY'S FILE IS 1,125 LINES AND THIS IS NOT A PORT OF IT.** Eleven of its players are ambience beds
+for systems this build does not have — factory hum in three layers, winch, creak, rush, wind, cave-air,
+pour, pump. Porting the file would be porting eleven dead players and the crossfade logic that drives
+them from state nothing produces. What comes over is the pool, the one `play()` this build has a caller
+for, and the two voices.
+
+**THE HARD PART IS THAT ALMOST EVERY ASSERTION ABOUT A SYNTHESISED SOUND IS TRUE OF ANY NOISE.** "It
+produced samples", "it is not silent", "it does not clip" — a `randf()` loop passes all three. So the
+suite measures the property that actually distinguishes these two: `tone_magnitude` does a single-bin DFT
+and the ring's energy concentrates on its three partials at **18.75x** an unstated frequency between
+them, against the breach's **1.55x**. Legacy calls the breach "the answer to the hollow ring" and builds
+it broadband; each voice is the other's control. Legacy's design note is asserted too — "96, 154 and 233
+Hz sit on a stretched series, so this reads as an empty space and not as a note" — as both claims: the
+partials are there, AND the two ratios differ (1.604 vs 1.513), which is what stops it being a bell.
+
+**THE LIMITER WAS THE MISSING HALF, AND ONLY THE SUITE FOUND IT.** The first version of this file ended
+in a hard clamp. The breach then failed a "does not exceed full scale" row at a peak of **1.148** — and
+the row was wrong, not the sound: `lp * 1.5` with a low-passed noise source reaching ±1 overdrives **by
+construction**, and legacy's `_to_pcm` catches it with a soft `tanh` knee (`KNEE 0.72`, `CEIL 0.985`),
+not a clamp. A clamp flat-tops every loud sample into audible distortion, and **no measurement in the
+suite could have told the two apart: the peak is identical under both.** The test found the overdrive and
+legacy's source explained that the overdrive was the point. `limited()` is now asserted at stated inputs
+for the property a peak cannot see — it keeps ORDER above the knee, where a clamp returns one value for
+every input above it.
+
+**One over-strong assertion, corrected in place.** "Nothing ever reaches the ceiling" is false in floating
+point: `tanh` saturates to exactly 1.0, so a loud enough input lands ON the asymptote. It is `<= CEIL`
+now, plus the claim legacy actually makes — that the ceiling is below full scale.
+
+**Deterministic in a `SplitRng`**, not because audio is replayed (it is not) but because a spectral
+assertion against a buffer that changes per run is measuring the noise floor.
+
+**`reveal_scene.gd` passed 400 again and gave up its fifth seam**, `RevealShutter` — the two-frame await,
+the save, the camera diagnostic and the blank check. Extract-only, per the director's standing note and
+`docs/QUALITY.md` §2.
+
+**Reverse cost:** delete `view/audio/sfx.gd`, `view/audio/sfx_bank.gd` and the suite; drop the two lines
+in `_step_mining_feedback`. `RevealShutter` should stay regardless.
