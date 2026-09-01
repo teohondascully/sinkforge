@@ -13307,3 +13307,68 @@ ratio that stable will not tell you your population is wrong.
 
 **Nothing was changed about WG-2.** Replacing `shelf_frac > 0.0` with a rate criterion changes what
 "closed" means for a Tier-0 gap, which stays with the director. The knife-edge is merely visible now.
+
+---
+
+## D0315 · 2026-09-01 · Turning the miner moved it a full sprite width — two rect conventions, one silent
+
+**Found by playing, not by a suite.** The director, in a 1558-tick session
+(`tests/body/recordings/reveal_play_2026-09-01T15-22-28.log`): *"when I turn it literally reflects around
+an offset center."* Every turn to the right translated the miner 32px to the right and every turn back
+translated it home.
+
+**Two conventions for a negative-width `Rect2`, and nothing anywhere says which one you are in.**
+`MinerLook.draw_sprite` flipped the sprite by moving the rect's corner and then negating its width:
+
+    dst.position.x += dst.size.x    # <- the defect
+    dst.size.x = -dst.size.x
+
+That is correct under the convention `Rect2.abs()` implies, where a negative size means `position` is the
+FAR corner. `RenderingServer.canvas_item_add_texture_rect` uses the other one: it raises a `FLIP_H` flag,
+takes `|size|`, and **leaves `position` exactly where it was**. So the corner shift is never undone. The
+fix is to delete that line — negate the size and leave the position alone.
+
+**WHY NO TEST COULD HAVE CAUGHT THIS, AND WHAT WAS BUILT SO ONE CAN.** `Rect2(336, -32)` and
+`Rect2(304, 32)` are the same interval to every `Rect2` accessor — `position`, `size`, `abs()`, `end` —
+and they draw 32px apart. An assertion written against the rect passes on both. This is
+`[[instrument-cannot-register-subject]]` in its purest form: the subject is a *convention*, and the type
+system models the interval, which both rects agree about. The remedy is `MinerLook.drawn_span`, which
+writes the rasterizer's convention down as a function the suite can assert through — and which earns the
+right to be believed from pixels, not from reading engine source.
+
+**THE MEASUREMENT** (`tools/probe_facing_flip.tscn`, headed — `tools/capture_moments.sh` records that the
+headless renderer returns a null image here, so a headless "control" would measure a known-broken path).
+It draws one texture at one centre under both facings, mirrors the first band about the placement centre,
+and slides it across the second, reporting the best-aligning shift:
+
+| | best shift | cost aligned | cost at shift 0 |
+|---|---|---|---|
+| pre-fix | **+32 px** | 30.7 | 1173.1 |
+| fixed | **+0 px** | 30.7 | 30.7 |
+
+**The identical aligned cost is the control.** It says the mirror itself is intact in both builds and only
+the translation differs — so the fix cannot have "passed" by quietly deleting the flip, which is the one
+wrong answer that satisfies a naive same-position assertion. The headless suite carries the same control
+as an explicit assertion that facing +1 still requests a negative width and facing −1 does not.
+
+**THREE SUMMARY STATISTICS THAT COULD NOT HAVE SETTLED IT, kept in the probe and labelled as such.** The
+drawn bounding box and the brightness centroid BOTH move when an asymmetric sprite is mirrored — correctly
+— so after the fix the bbox centre still shifts −2.5px, and reading the fix off that number means
+deciding how much residual is "just the art". That is a judgment call standing in for a measurement.
+The mirror-and-slide comparison has no such freedom: the same art appears on both sides, so its asymmetry
+cancels. `[[print-the-discriminating-quantity]]`.
+
+**THE PROBE FAILED TWICE BEFORE IT MEASURED ANYTHING, both times reading as plausible.** First it filled a
+hand-sized 640×400 rect and scanned the whole render target, so the untouched remainder came back as
+clear-colour and every "sprite" spanned the full width. Then — the one worth keeping — it scanned bands at
+**canvas** rows against a **1920×1080** image of a 1280×720 canvas, so the facing+1 band covered image rows
+200..320 while its sprite sat at 348..420: **the number reported for facing +1 was the bottom edge of the
+facing −1 sprite.** Both bands returned confident, plausible, wrong numbers, and the run printed a −6.0px
+offset that meant nothing. `[[correct-instrument-wrong-scale]]`, and the remedy that caught it was
+printing the image size and the viewport rect side by side instead of assuming they matched.
+
+**Mutation-tested in both directions, both instruments.** With the corner shift reinstated: the suite fails
+(`facing +1 draws 336.0..368.0`) and the probe exits 1 with `best shift +32`. With it removed: suite green,
+probe exits 0. `grep` for the shape across `view/ sim/ tests/ tools/` finds exactly one instance and two
+textured draw calls in the codebase, both in this file, so the repair reaches the whole population —
+`[[repair-reaches-one-instance]]`.

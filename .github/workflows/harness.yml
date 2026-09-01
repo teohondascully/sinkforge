@@ -472,6 +472,13 @@ jobs:
       - name: The documented headed invocations behave as documented (D0248)
         run: xvfb-run -a bash tools/check_headed_boot.sh ./godot
 
+      # D0315. Lives in the HEADED job because that is the only place it can run: the defect is a
+      # disagreement between rect arithmetic and the rasterizer, and only pixels can see it. The
+      # headless suite carries the same claim through `MinerLook.drawn_span`, but `drawn_span` is a
+      # written-down convention -- this step is what keeps it honest against the engine itself.
+      - name: Turning the miner mirrors it in place (D0315)
+        run: xvfb-run -a ./godot --path . tools/probe_facing_flip.tscn
+
   fuzz_nightly:
     name: fuzz nightly (full 1000x1500 sweep, allowlisted residual per D0060)
     if: github.event_name == 'schedule'
