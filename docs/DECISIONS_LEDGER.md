@@ -12405,3 +12405,44 @@ the seam is real — that suite is about the CAST (does a hole read as a room), 
 
 **Reverse cost:** `wall_color` back to one `cell_color` call; the `MaterialLook` split can stay, it is
 inert on its own.
+
+## D0301 · 2026-08-31 · view, palette — a defect this session introduced and this session found
+
+**`depth_m_exact` never subtracted the surface datum, so every terrain tint sat twenty metres too shallow.**
+
+`MaterialLook` has two depth conversions. `depth_m(row)` floors to an int for the readout and subtracts
+`SURFACE_ROW`. `depth_m_exact(row)` keeps the fraction for the tint and returned `row / CELLS_PER_METRE` —
+no datum at all. Its own docstring introduced it as the float version of the other one, and it was not.
+
+**It was correct when written and stopped being correct hours later, in this same session.** D0252 added
+it when the surface datum was row 0, where `row - 0 == row`. D0292 (P017, mine, today) put twenty metres
+of sky above the world and moved the datum to row 80, updating `depth_m` and not this. Nothing failed.
+Every suite stayed green, the depth chip kept reading correctly, and `zone_tinted` — the only caller —
+quietly applied all four zone tints twenty metres early: rock at the surface was already 62% of the way
+through a Clayband warmth that does not begin until 10 m down, and the terrain's colour bands no longer
+lined up with the ladder the HUD announces above them.
+
+This is the house shape at its purest: **two halves of one quantity, drifting apart, each defensible on
+its own.** Neither function is wrong-looking in isolation. The defect exists only in the relationship,
+and nothing was measuring the relationship.
+
+**Found by accident, which is the part worth recording.** It surfaced because D0300's new depth gate
+returned 1.0 at the surface row, where it must return 0. The glint test failed on the palette's bug, not
+its own — an unrelated instrument tripping over it, three commits after it landed. Had D0300 not needed a
+depth this session, this would have shipped and been discovered as "the tints look wrong" with no thread
+back to P017.
+
+`test_material_palette` now asserts `floor(depth_m_exact(row)) == depth_m(row)` at all 1024 rows, that
+both read exactly zero at the datum, and that both read negative above it — legacy's own rule, "standing
+on a hilltop reads as a negative depth rather than a clamped zero, so the number is never fudged". Over
+the whole world rather than at a probe row, because a constant offset is invisible at any single row you
+happen to pick. Mutation-proven: restoring the old body fails three of the four assertions, naming the
+20 m disagreement and the row it is worst at.
+
+**The general form, for the next constant that moves:** D0292 changed what a row MEANS. Everything
+downstream that converts a row is a caller of that meaning, and `grep SURFACE_ROW` does not find the
+places that should have used it and didn't. The same session's `capture_moments` cameras, the headed-boot
+`--camera=24,4`, and `test_wall_painter`'s `FLOOR_ROW = 20` sweep were the same defect three more times.
+Four instances, one cause, and each was found by a different accident.
+
+**Reverse cost:** none worth taking — the old body is the bug.

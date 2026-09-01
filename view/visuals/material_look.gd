@@ -288,8 +288,17 @@ func _cell_jitter(col: int, row: int) -> float:
 ## Depth in metres as a FLOAT. `depth_m` floors to an int because a depth READOUT is a whole number; a
 ## tint that stepped on integer metres would band at four-cell intervals, which is the stripe artefact
 ## `_strata`'s comment above is about.
+##
+## **IT MUST SUBTRACT `SURFACE_ROW`, AND FOR TWENTY METRES IT DID NOT** (D0301). Written under D0252 as
+## `row / CELLS_PER_METRE`, which was correct while the surface datum sat at row 0 — and P017/D0292 moved
+## it to row 80 the same day, updating `depth_m` and not this. The two then disagreed by exactly the sky
+## band, 20 m, while presenting themselves as the same measurement at two precisions. `zone_tinted` reads
+## this one, so every terrain tint was applied twenty metres too shallow: rock at the surface was already
+## 62% of the way through a Clayband warmth that should not begin until 10 m down, and the colour bands
+## no longer lined up with the ladder the depth chip announces. `test_material_palette` now asserts the
+## two agree at every row rather than trusting this comment (memory: a caveat in prose does not protect).
 static func depth_m_exact(row: int) -> float:
-	return float(row) / float(CELLS_PER_METRE)
+	return float(row - SURFACE_ROW) / float(CELLS_PER_METRE)
 
 
 ## Legacy `_cell_base_color`: `base.darkened(depth_frac * depth_darken)`, linear, clamped at 1.0.

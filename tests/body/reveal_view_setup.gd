@@ -31,6 +31,11 @@ const BACKDROP_Z: int = -200
 const SKY_Z: int = -100
 const WALL_Z: int = -60
 const TERRAIN_Z: int = -50
+## Legacy draws the glint from `_paint_lights`, ABOVE the veil, and its own header records why: drawn at
+## the terrain's own z, "every flare was scaled by `_dark`, the LightLayer with BLEND_MODE_MUL that makes
+## rock dark", so the compensation and the attenuation cancelled exactly. There is no veil here yet (T1
+## #2), but the ordering is what has to be right when it lands -- the glint sits above the rock it marks.
+const GLINT_Z: int = -40
 
 
 ## Builds the coordinator, attaches it to `scene`, and hangs every painter and the HUD off it.
@@ -50,6 +55,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 		view.add_painter(BackdropPainter.paint).z_index = BACKDROP_Z
 	view.add_painter(WallPainter.paint).z_index = WALL_Z
 	view.add_painter(TerrainPainter.paint).z_index = TERRAIN_Z
+	view.add_painter(GlintPainter.paint).z_index = GLINT_Z
 	view.add_painter(CrackPainter.paint_frame)
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
 	# rather than as a bound Callable. D0289: `add_painter(CrumblePainter.new().paint)` freed the painter
