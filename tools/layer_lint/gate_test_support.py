@@ -1,4 +1,4 @@
-"""Shared reporting for the gate mutation tests -- extracted 2026-08-30 (D0232).
+"""Shared reporting and fixtures for the gate mutation tests -- extracted 2026-08-30 (D0232).
 
 `tools/quality_check/duplication.py` flagged two byte-identical `check()` helpers across
 `test_gd_scan.py` and `test_check_size_limits.py`, written minutes apart. Unlike D0221's cluster, this
@@ -10,6 +10,24 @@ right, it asks **whether a branch was ever seen to fire** -- so a case that does
 is that a check which has never been observed failing is not a check, and these files exist to observe
 exactly that.
 """
+
+import subprocess
+from pathlib import Path
+
+
+def init_scratch(root: Path) -> None:
+    """Initialise a git repo in a temp directory so gd_files_excluding's .git scan works."""
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.email", "scratch@test"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.name", "scratch"], cwd=root, check=True)
+    (root / ".gitignore").write_text("scratch/\n", encoding="utf-8")
+
+
+def write_file(root: Path, rel: str, content: str) -> None:
+    """Write a file under root, creating parent directories as needed."""
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
 class Observations:

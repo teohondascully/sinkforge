@@ -27,6 +27,7 @@ import duplication  # noqa: E402
 import function_length  # noqa: E402
 import scan  # noqa: E402
 from scan import Func, run_cli  # noqa: E402
+from gate_test_support import write_file  # noqa: E402
 
 import check_size_limits  # noqa: E402 -- scan.py's own import already inserts tools/layer_lint/ onto sys.path
 
@@ -328,18 +329,12 @@ def branch_duplication_gate_exit() -> None:
 
 # --- coupling ---------------------------------------------------------------------------------------
 
-def _write(root: Path, rel: str, content: str) -> None:
-    path = root / rel
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-
-
 def branch_coupling_sim_path_and_class_name() -> None:
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _write(root, "sim/mod_a/mod_a.gd", "class_name TypeA\nfunc foo():\n\tpass\n")
-        _write(root, "sim/mod_b/mod_b.gd", "func bar():\n\tvar x = TypeA.new()\n")
-        _write(root, "sim/mod_c/mod_c.gd", 'func baz():\n\tpreload("res://sim/mod_a/mod_a.gd")\n')
+        write_file(root, "sim/mod_a/mod_a.gd", "class_name TypeA\nfunc foo():\n\tpass\n")
+        write_file(root, "sim/mod_b/mod_b.gd", "func bar():\n\tvar x = TypeA.new()\n")
+        write_file(root, "sim/mod_c/mod_c.gd", 'func baz():\n\tpreload("res://sim/mod_a/mod_a.gd")\n')
         result = coupling.analyze(root)
         fan_in_a = result["sim"]["fan_in"]["mod_a"]
         check("coupling (sim): class_name-only usage (no preload) is still a real edge",
@@ -352,8 +347,8 @@ def branch_coupling_sim_path_and_class_name() -> None:
 def branch_coupling_stub_exclusion() -> None:
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _write(root, "sim/mod_a/mod_a.gd", "class_name TypeA\nfunc foo():\n\tpass\n")
-        _write(root, "sim/mod_b/mod_b.gd", "func bar():\n\tvar x = TypeA.new()\n")
+        write_file(root, "sim/mod_a/mod_a.gd", "class_name TypeA\nfunc foo():\n\tpass\n")
+        write_file(root, "sim/mod_b/mod_b.gd", "func bar():\n\tvar x = TypeA.new()\n")
         (root / "sim" / "empty_stub_one").mkdir(parents=True)
         (root / "sim" / "empty_stub_two").mkdir(parents=True)
         result = coupling.analyze(root)
@@ -373,14 +368,14 @@ def branch_coupling_stub_exclusion() -> None:
 def branch_coupling_tools_import_resolution() -> None:
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _write(root, "tools/sub1/helper.py", "X = 1\n")
-        _write(root, "tools/sub2/consumer.py", "from helper import X\n")
-        _write(root, "tools/sub1/schema.py", "Y = 1\n")
-        _write(root, "tools/sub2/schema.py", "Y = 2\n")
-        _write(root, "tools/sub2/user.py", "from schema import Y\n")
-        _write(root, "tools/sub1/ambig.py", "Z = 1\n")
-        _write(root, "tools/sub3/ambig.py", "Z = 2\n")
-        _write(root, "tools/sub2/user2.py", "import ambig\n")
+        write_file(root, "tools/sub1/helper.py", "X = 1\n")
+        write_file(root, "tools/sub2/consumer.py", "from helper import X\n")
+        write_file(root, "tools/sub1/schema.py", "Y = 1\n")
+        write_file(root, "tools/sub2/schema.py", "Y = 2\n")
+        write_file(root, "tools/sub2/user.py", "from schema import Y\n")
+        write_file(root, "tools/sub1/ambig.py", "Z = 1\n")
+        write_file(root, "tools/sub3/ambig.py", "Z = 2\n")
+        write_file(root, "tools/sub2/user2.py", "import ambig\n")
 
         edges = coupling._tools_edges(root)
         check("coupling (tools): an import resolving to exactly one OTHER module is a real edge",

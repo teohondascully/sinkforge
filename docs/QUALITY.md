@@ -127,6 +127,8 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
 
 32. **Every `.gd`/`.py`/`.sh`/`.yml`/`.yaml` file matches `.editorconfig`'s declared rules.** `.editorconfig` declared five properties for this tree and nothing checked one of them until this gate. Six rules (charset, trailing-whitespace, file-edges, blank-run, indent, comment-space), two rulesets (string-aware for `.gd`/`.py`, byte-level for `.sh`/`.yml`/`.yaml`), mutation-tested 76/76 and self-including. `tools/formatter/formatter.py`, `docs/DECISIONS_LEDGER.md` D0318. The `indent` rule refuses rather than guesses on ambiguous indentation (mixed tabs and spaces, or a space count not a multiple of 4) — a formatter that reshapes an indentation it cannot read unambiguously is changing program structure on a guess, and the refusal is reported with its line number so a human can fix it by hand.
 
+33. **Function-name coverage for `core/` and `sim/` meets a 60% floor.** Gate 14 declares ≥ 85% line coverage but has no enforcing code — GDScript has no coverage instrumentation, and no pure-Python GDScript parser exists to build one. This gate enforces a different, weaker metric: a function is "covered" if its name appears as an identifier in at least one `tests/test_*.gd` suite's code (comments and string literals blanked first, so a mention in prose doesn't count). Engine-called functions (`_init`, `_ready`, `_to_string`, etc.) are excluded from the denominator. This overcounts (a name can appear for a different reason) and undercounts (private functions called by covered public functions are marked uncovered) — both directions stated, not glossed over. Currently 89/144 = 61.8%. `tools/coverage_check.py`, `docs/DECISIONS_LEDGER.md` D0322.
+
 ---
 
 ## 2. Harness truth

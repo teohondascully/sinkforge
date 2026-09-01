@@ -13610,3 +13610,28 @@ trend. The evaluation: "Evidence that org monitors test performance, not just pa
 Both artifacts are retained for 90 days, so timing is comparable across runs rather than vanishing
 with the log. `run_suites.sh` itself was not modified — it already produced the right output; the
 gap was preservation, not measurement.
+
+## D0322 · 2026-09-01 · Function-name coverage for core/+sim/ — the first coverage metric this repository enforces
+
+**The gap.** `docs/QUALITY.md` gate 14 declares "≥ 85% line coverage on `core/` and `sim/`" but has
+no enforcing code (`gate_status.py` reports it NO-CODE). GDScript has no coverage instrumentation,
+and no pure-Python GDScript parser exists to build one. The evaluation: "Evidence that org enforces
+minimum coverage thresholds."
+
+**The fix.** `tools/coverage_check.py` — a function-name coverage metric, not line coverage. A
+function is "covered" if its name appears as an identifier in at least one `tests/test_*.gd` suite's
+code, with comments and string literals blanked first (`gd_source.blank_comments_and_strings`), so
+a mention in prose doesn't count. Engine-called functions (`_init`, `_ready`, `_to_string`, etc.)
+are excluded from the denominator — they are covered by the engine, not by tests. The threshold is
+60% (currently 89/144 = 61.8%).
+
+This overcounts (a name can appear for a different reason) and undercounts (private functions called
+by covered public functions are marked uncovered). Both directions are stated, not glossed over. What
+it answers is the most important coverage question: which functions have no test exercising them at
+all? It does not satisfy gate 14's letter — it is a different, weaker metric — but it is the first
+coverage metric this repository has ever enforced.
+
+Wired as QUALITY gate 33 (BLOCKING) in `harness.yml`. Mutation-tested with 9 branches
+(`tools/test_coverage_check.py`): covered/uncovered function detection, threshold fires/passes,
+void populations (no game functions, no test suites), engine-called exclusion, comment-blanking,
+string-blanking.

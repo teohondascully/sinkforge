@@ -14,7 +14,6 @@ Synthetic fixtures throughout for the pure-function tests (no git, no real tree)
 and exit-code branches use the real repository, the same way `test_quality_check.py`'s
 `branch_find_gd_files_reaches_whole_tree` and `branch_dashboard_runs_end_to_end` do.
 """
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -23,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import formatter as F  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "layer_lint"))
-from gate_test_support import Observations  # noqa: E402
+from gate_test_support import Observations, init_scratch  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -404,18 +403,11 @@ def branch_self_inclusion() -> None:
 
 # --- run / exit codes --------------------------------------------------------------------------------
 
-def _init_scratch(root: Path) -> None:
-    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-    subprocess.run(["git", "config", "user.email", "scratch@test"], cwd=root, check=True)
-    subprocess.run(["git", "config", "user.name", "scratch"], cwd=root, check=True)
-    (root / ".gitignore").write_text("scratch/\n", encoding="utf-8")
-
-
 def branch_run_clean() -> None:
     """A scratch repo with only clean files exits 0."""
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _init_scratch(root)
+        init_scratch(root)
         (root / "core").mkdir()
         (root / "core" / "clean.gd").write_text("func a():\n\tpass\n", encoding="utf-8")
         (root / "tools").mkdir()
@@ -428,7 +420,7 @@ def branch_run_violations_check() -> None:
     """A scratch repo with violations, in --check mode, exits 1 and changes nothing."""
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _init_scratch(root)
+        init_scratch(root)
         (root / "core").mkdir()
         dirty_gd = "func a():\n\tpass\n\n\n\n\n"
         (root / "core" / "dirty.gd").write_text(dirty_gd, encoding="utf-8")
@@ -443,7 +435,7 @@ def branch_run_violations_write() -> None:
     """A scratch repo with violations, in --write mode, exits 0 and fixes the file."""
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _init_scratch(root)
+        init_scratch(root)
         (root / "core").mkdir()
         dirty_gd = "func a():\n\tpass\n\n\n\n\n"
         (root / "core" / "dirty.gd").write_text(dirty_gd, encoding="utf-8")
@@ -463,7 +455,7 @@ def branch_run_void_empty() -> None:
     must not look alike. Per docs/QUALITY.md §2."""
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _init_scratch(root)
+        init_scratch(root)
         exit_code = F.run(root, write=False, only=[])
         LOG.observe("run: empty population exits 2 (VOID)", exit_code == 2, detail=f"exit={exit_code}")
 
@@ -473,7 +465,7 @@ def branch_run_refused_indent() -> None:
     is NOT modified even in --write mode."""
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _init_scratch(root)
+        init_scratch(root)
         (root / "core").mkdir()
         mixed = "func a():\n\t   return 1\n"
         (root / "core" / "mixed.gd").write_text(mixed, encoding="utf-8")
@@ -492,7 +484,7 @@ def branch_run_path_filter() -> None:
     """The `paths` argument limits the population to the named files."""
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
-        _init_scratch(root)
+        init_scratch(root)
         (root / "core").mkdir()
         (root / "core" / "clean.gd").write_text("func a():\n\tpass\n", encoding="utf-8")
         (root / "core" / "dirty.gd").write_text("func a():\n\tpass\n\n\n\n\n", encoding="utf-8")

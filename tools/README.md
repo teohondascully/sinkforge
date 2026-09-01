@@ -21,8 +21,12 @@ harness already produced.
   Empty until `harness/driver` produces something to report on.
 - `formatter/` — `.editorconfig` made executable. Six rules (charset, trailing-whitespace, file-edges,
   blank-run, indent, comment-space), two rulesets (string-aware for `.gd`/`.py`, byte-level for
-  `.sh`/`.yml`/`.yaml`). Mutation-tested (76/76), self-including, idempotent. Not wired into CI yet —
-  tool first, gate later (D0318).
+  `.sh`/`.yml`/`.yaml`). Mutation-tested (76/76), self-including, idempotent. Wired into CI as
+  QUALITY gate 32 (D0318/D0319).
+- `coverage_check.py` — function-name coverage for `core/` and `sim/`. A function is "covered" if its
+  name appears as an identifier in at least one `tests/test_*.gd` suite (comments and string literals
+  blanked first). 60% floor, currently 61.8%. Mutation-tested (9/9). Wired into CI as QUALITY gate 33
+  (D0322).
 - `scratch/` — gitignored. Scratch work lives here and only here. If a script here turns out to be
   worth keeping, it becomes a real tool with a claim ID and moves out.
 
