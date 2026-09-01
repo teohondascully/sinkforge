@@ -11759,3 +11759,41 @@ which is why this commit cannot move the gate it documents.
 
 **Reverse cost:** trivial and purely textual. Restore gate 8's one-line form, revert the docstring banner
 and the rename. No behavior to unwind.
+
+## D0282 · The recorded-session suite proved two different things and said one · 2026-08-31 · Codex audit FIX 5
+
+**The defect.** `tests/test_recorded_sessions.gd` replays a log whose `chamber=` header cannot be trusted
+against each candidate world and keeps the first that comes back clean. For those logs a green establishes
+**"some supported world replays this input cleanly"**, which is not **"faithful replay of the recorded
+world"** — and every assertion message said "no recorded session produces ...", with no distinction. The
+only marker of the difference in the output was a bare `*` appended to the world name, which nothing in the
+output explained.
+
+**Measured, all candidates replayed rather than inferred from the attribution the suite settles on** (the
+suite `break`s on the first clean world, so the ambiguity is invisible in a normal run). Corpus of 7: **4
+believed headers**, **3 unbelieved**. Of the 3, one DISCRIMINATES — `play_2026-08-30T15-46-21.log` is
+`bad=0` on `movement_course` and `bad=855` on `hostile_chamber`, so its attribution is evidenced despite
+the header. The other two do NOT: `play_2026-08-30T01-08-15.log` and `play_2026-08-30T01-43-19.log` are
+`bad=0` under BOTH worlds. Their climb counts differ by world (0 vs 1, and 0 vs 6), which is the sharpest
+statement of the ambiguity available: **the two logs on the weaker guarantee contribute 0 to the `climbs`
+positive control under the world they are attributed to**, so they are not carrying that control either.
+
+**Decided: fix the claim, not the logic.** The fallback is correct handling for genuinely corrupt historic
+metadata and the alternative — trusting a field known to be wrong — is worse; `_replay`, `_spawn`,
+`_parse`, `_unbelieved_order` and the selection loop including its `break` are byte-identical to before.
+What changed is that the suite now names two guarantees, FAITHFUL and ATTRIBUTED, prints a legend, tags
+every per-log row with the one it carries, and appends the population to all three zero-count assertion
+messages.
+
+**The split is COUNTED, not written down.** "4 of 7" in a comment is a number that decays the next time the
+director records a session — and every log recorded from now on carries a believed header, so this split
+moves on its own. The suite counts the two populations as it goes and puts them in its own output.
+
+**Deliberately NOT done.** No recording retired, no header rewritten, no candidate-order change, and the
+`break` stays — replaying the wrong world emits hundreds of `push_error` lines into CI, and the existing
+docstring already records why teaching readers to skip ERROR lines is its own cost. Making every log
+FAITHFUL would mean re-recording sessions the director owns, which is a director call and not a wording
+fix.
+
+**Reverse cost:** trivial. Revert one file's prose, two counters and four message strings. No behavior
+depends on any of it.
