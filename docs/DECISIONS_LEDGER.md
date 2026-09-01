@@ -11084,3 +11084,98 @@ table so the answer survives a compaction.
 accumulate; the director clears them in a single pass. `docs/NEEDS_DIRECTOR.md` currently holds 11 open.
 
 **Reverse cost:** restore `loop.md`'s six-hard-stop list. The run halts on the first parked decision again.
+
+
+## D0271 · The HUD exists — a `CanvasLayer` host and the depth readout · 2026-08-31 · Lane F, LEGACY_GAP H-01 + T1 #8
+
+**What was absent.** The build drew **zero text**, had no `CanvasLayer`, and no font handle. All
+sixty-five rows of `docs/LEGACY_GAP.md`'s Lane H were blocked on that one missing host, so this is the
+prerequisite rather than a feature — H-01.
+
+**The host is a `CanvasLayer` whose children are ordinary `PaintLayer`s, and that is the whole design.**
+A `CanvasLayer`'s children are not moved by the camera transform, so a painter parented there draws in
+SCREEN pixels while using **exactly** the `(frame: Frame, ci: CanvasItem)` signature the world painters
+already use. The alternative considered — a second painter contract for screen space, with its own frame
+type carrying viewport size — would have doubled what a painter author must learn to buy nothing: a HUD
+painter that needs the viewport can ask its own canvas.
+
+**It hangs off `WorldView`, not off the scene.** The HUD and the world are then painted from ONE frame
+per tick and cannot disagree about which tick they are showing. A HUD holding its own copy of the
+observation would go stale silently and only on redraws the coordinator did not initiate — a resize, a
+focus change — which is the defect that reproduces on someone else's machine and not on mine.
+`view/paint_layer.gd` already refuses to cache a frame for this exact reason; this is that rule applied
+one level up.
+
+**Nothing is ported from `legacy/scenes/hud.gd`'s STRUCTURE.** That file is 2,189 lines against a 400-line
+gate, one `_draw` with thirty-odd `_draw_*` methods reaching into fields on the page. The chips come over
+one at a time as static functions. Legacy's own numbers say this is affordable: only 15 of its call sites
+read the sim at all, across five surfaces, so most of the HUD needs no new sim accessor.
+
+**The depth chip first, of sixty-five, because the whole game is descent and nothing on screen said how
+deep you are.** Ported from `hud.gd:842-863`. The data was already all present — `MaterialLook.depth_m()`,
+`band_at()`, `data/bands/*.yaml`'s eight records, `Observation.cell.y`. Only the chip was missing.
+
+**The negative depth is ported, not cleaned up.** `depth_m` is negative above the surface datum and legacy
+prints `+3 m` rather than clamping: "so the number is never fudged." A clamp would make the readout lie for
+exactly the part of the world the player starts in — and a clamp agrees with the correct code everywhere
+except there, which is why the suite asserts both sides of the datum and zero.
+
+**`layout()` IS SPLIT OUT OF `paint()` SO THE CHIP IS ASSERTABLE, and this is the finding.** Godot exposes
+no way to read back what a `CanvasItem` was told to draw. A suite written against `paint` alone can assert
+only "it did not crash" — **and not crashing is exactly what a broken early return does.** A painter that
+returned immediately every frame would pass that suite while the HUD stayed invisible: the instrument
+could not register its subject. Splitting the decisions out means the rect, the strings, the tint and the
+two baselines are asserted as data, the four incomplete-frame cases are asserted as EMPTY rather than as
+"returned without error", and there is a control proving the same call is non-empty when nothing is
+missing — without which a `layout` that returned `{}` unconditionally would pass all four.
+
+**`UiTheme` is lifted WHOLE, which is a deliberate departure from how `MinerLook` was ported.** There,
+unreachable branches were omitted. A colour token is not a branch: it has no execution path, cannot be
+silently wrong, and the thing that makes it valuable — a measured WCAG ratio against a named plate — is
+exactly what a later session loses if it re-derives the colour by eye. Tokens with no consumer yet are
+marked as such. Legacy's bazaar/settings LAYOUT constants are NOT lifted: geometry, unlike a contrast
+ratio, is re-derivable once the page exists.
+
+**`MaterialLook.band_color()` added, and it removed a real duplicate.** `band_at()` returns the record with
+`color` as a three-float array; `tests/body/reveal_scene.gd` was already unpacking it by hand, and the chip
+would have been the second site. Two conversions of one record is how a palette starts disagreeing with
+itself about whether the fourth element is alpha.
+
+**Verified by capture, not by a green suite.** `--screenshot-tick` at zoom 4.0 shows the chip reading
+`1 m  TOPSOIL` on its raised panel, band name in the band's own tint — and, in the same frame, D0269's
+headroom: the miner's helmet sits in open air rather than inside the ceiling.
+
+**Reverse cost:** `WorldView.add_hud()` and the `_hud` refresh go; `reveal_scene._build_view` returns to
+`_build_sky` behind `if _sky`. The three `view/hud/` files and `tests/test_hud.gd` are deletable as a unit.
+
+
+## D0272 · The parallel runner filtered a failing suite's log and silently disabled a diagnostic built for CI · 2026-08-31 · harness
+
+**Found by needing it.** D0269 re-pinned the determinism goldens, so I pushed expecting to harvest the new
+sequence from the CI log the way D0167 designed: `test_shaft_replay_determinism.gd` prints its full
+observed hash sequence on a mismatch, **unconditionally, not behind a verbose flag**, precisely because
+diagnosing D0167 had cost an extra commit-and-push round trip for want of it. The CI run failed as
+expected — and the sequence was **nowhere in the log**.
+
+**Cause.** `tools/run_suites.sh` (D0262, mine, two commits old) printed a failing suite's log filtered to
+`grep -E '^  FAIL|FAILURE\(S\)' | head -3`. The golden print is a bare `print()`. It matched neither
+pattern. The information had not failed — it had stopped existing, which is the same shape as D0265's
+deleted CI jobs and this project's house failure class wearing the harness's clothes.
+
+**The general rule, which is the part worth keeping:** a runner must not decide which lines of a FAILING
+suite's output are interesting. It cannot know — the interesting line is usually the one a suite author
+added *because* that failure was hard to diagnose. Verbosity is free here: the path only runs when
+something is already red. Failing suites now dump their log whole.
+
+**Guarded, because an unguarded fix here is worth little.** `tools/test_run_suites.sh` runs a POSITIVE
+CONTROL PAIR against two generated fixtures that print the same marker and differ only in whether they
+fail: the marker MUST appear for the failing one and MUST NOT for the passing one. One assertion without
+the other proves nothing — a runner that dumps everything always passes the first alone, and one that
+dumps nothing passes the second alone. Registered in CI beside `test_run_gd_test.sh`, for the same stated
+reason: the thing that reports failures is checked before anything trusts it.
+
+Mutation-tested, all three caught: the exact pre-fix filter restored → RED; no log printed at all → RED;
+**every** suite's log echoed pass-or-fail (the over-correction) → RED.
+
+**Reverse cost:** restore the grep filter. Every future golden re-pin costs a round trip again, and any
+diagnostic a suite prints outside `FAIL`-prefixed lines becomes invisible in CI.
