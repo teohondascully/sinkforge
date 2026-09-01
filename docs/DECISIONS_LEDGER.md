@@ -12257,3 +12257,42 @@ computed there now, and `tools/surface_row.sh` is the one derivation both shell 
 closed because `$(( ))` on an empty string is zero, which is a plausible surface row.
 
 **Reverse cost:** delete `list_ci_gates.py` and the gate block in the battery; the gates still run in CI.
+## D0297 · A key legend that teaches itself out of existence · 2026-08-31 · Lane F/H, LEGACY_GAP Lane H
+
+Ported from `legacy/scenes/hud.gd:2021-2043` (`HINT_KEYS`, `note_hint_used`, `_draw_hint`). Legacy's own
+note on the line it replaced — "the tiny bottom-left key legend, which replaces the giant footer" — and
+on why each row goes away: *"everything here has been used, so the line has finished its job."*
+
+A permanent control footer is furniture the player stops seeing in the first minute and which then costs
+a strip of screen forever. One that retires row by row costs nothing after that minute and is present for
+exactly as long as it is needed. That is the idea, and it is the whole port.
+
+**THE TABLE IS NOT LEGACY'S, AND THAT IS NOT A LIBERTY.** Its five rows are grapple, drop, craft, map and
+help — **not one of those verbs exists in this build**. Porting the table would put five hints on screen
+for keys that do nothing, which is worse than no legend. What ports is the mechanism; the rows are this
+build's own three verbs, and their ids are `Controls`' own action names so a row cannot name a binding
+that does not exist. `tests/test_key_legend.gd` checks every id against `Controls.defaults()`, because a
+re-authored table is exactly where a label for an unbound key survives forever.
+
+**RETIRED ON THE EFFECT, NOT ON THE KEYPRESS.** Legacy calls `note_hint_used` from its input handler, so
+a row goes the instant the key is pressed. This reads the observation: you have learned to walk when you
+have MOVED, not when you have held a key against a wall. It is also the only source a HUD chip has — the
+alternative is a second contract carrying raw input into `view/hud/`, a parallel path to the same tick
+that `hud_layer.gd` exists specifically to avoid.
+
+**A guard the suite could not have found, and the masked-crash detector did.** `layout` did not check
+`frame.obs`, because the legend's CONTENT does not depend on it — every row of the suite is about the
+content and the content was correct. But `paint` then reached `draw_string` on a startup frame, and Godot
+refuses drawing outside `_draw()`. It passed standalone and failed under the sweep, which is the D0149
+sibling: an engine-level error that neither stops execution nor changes the exit code.
+
+**And an ad-hoc gate loop reported a false green in the same run.** Running the D0295 gate list from a
+branch that does not have `list_ci_gates.py` yet, the parser failed, the `while read` loop iterated zero
+times, and the script printed `gates failed: 0`. That is precisely the shape `list_ci_gates.py`'s own
+zero-step guard exists to prevent, reproduced by calling it wrongly. The loop prints a RUN COUNT beside
+the failure count now — a witness, per this ledger's own `existence-probe-has-no-witness` rule.
+
+**Verified by capture**: the legend draws bottom-left showing only "LMB mine", because the agent-mode run
+has already walked and jumped. The mechanism, visible in one frame.
+
+**Reverse cost:** delete `view/hud/key_legend.gd` and its suite, drop the `add_stateful_chip` line.

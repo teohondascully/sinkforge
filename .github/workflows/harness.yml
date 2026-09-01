@@ -315,6 +315,7 @@ jobs:
       #   test_reveal_replay_driver.gd                   test_reveal_replay_driver (claims/C004's own replay driver, D0129)
       #   test_floor_source_telemetry.gd                 test_floor_source_telemetry (grounding-path telemetry, D0132)
       #   test_miner_look.gd                             miner sprite state table (D0268)
+      #   test_key_legend.gd                             test_key_legend (the legend that teaches itself out of existence — D0297)
       #   test_hud.gd                                    test_hud (the HUD host + the depth chip — D0271, LEGACY_GAP H-01/T1 #8)
       #   test_camera_rig.gd                             test_camera_rig (soft follow, look-ahead, pixel-snap — D0273, LEGACY_GAP T1 #11)
       #   test_crack_painter.gd                          test_crack_painter (spider cracks on worked rock — D0275, LEGACY_GAP T1 #5)
@@ -373,6 +374,7 @@ jobs:
             res://tests/test_sfx_bank.gd \
             res://tests/test_material_palette.gd \
             res://tests/test_miner_look.gd \
+            res://tests/test_key_legend.gd \
             res://tests/test_hud.gd \
             res://tests/test_camera_rig.gd \
             res://tests/test_crack_painter.gd \
