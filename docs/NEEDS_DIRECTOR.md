@@ -844,7 +844,47 @@ so the gap is visible rather than implied by a screenshot that is darker than yo
 
 ---
 
-## P028 · WG-2 is "CLOSED" on six cells in ninety-two thousand, and I cannot tell you it is really closed
+## P028 · ANSWERED 2026-09-01 by D0314 · WG-2 is "CLOSED" on six cells in ninety-two thousand
+
+**THE 200-SEED RUN IS DONE AND IT SETTLES THE FACTUAL HALF.** This entry recommended it as the cheap
+resolution; `tools/probe_shelf_rate.gd` is that run, using the suite's own carve walk so the numbers are
+comparable rather than merely similar.
+
+| | value |
+|---|---|
+| shelf cells carved, 200 seeds | **990** of 3,072,000 → rate **0.000322** |
+| non-shelf cells carved | 406,142 of 6,528,000 → rate **0.0622** |
+| **shelf : open ratio** | **0.00518** — the shelf is **193× less permeable** than open rock |
+| **seeds carving ANY shelf cell** | **75 of 200** |
+
+**So the mechanism is REAL and the assertion is still a coin flip, and those are not in tension.** 990
+cells is not noise: WG-3's octave port genuinely gave the field a tail that clears the shelf threshold,
+and the sentence D0258 wrote is true. But **62.5% of individual seeds carve no shelf cell at all**, so a
+`> 0.0` test over six of them is a lottery — P(all six carve zero) ≈ **6%**. The shipped suite is
+currently passing on **1 of its 6 seeds**, which is now printed on every run.
+
+**What this does NOT support is my own earlier recommendation.** This entry proposed a replacement
+criterion of *"the shelf carves at ≥1% of the non-shelf rate"*. **Measured, it is 0.52%** — that
+threshold would fail on a correct build. A criterion derived from the measurement rather than guessed is
+about **≥0.3%**, which clears the observed 0.518% with margin and would still fail hard if the octave
+port were undone (which returns the rate to zero, not to 0.4%).
+
+**AND THE CONSEQUENCE FOR P026, WHICH IS WHY THIS MATTERED.** At the metre-correct `cave.frequency`
+0.0275 the three-seed sample carved 0 of 46,080. Against a base rate where **62.5% of seeds carve
+nothing**, three seeds of zero is **not evidence that WG-2 re-opened** — it is the expected outcome about
+24% of the time even at the shipped frequency. **The blocker on the seventeen-fold larger cave was a
+sample size, not a defect.** Re-running P026's candidate at 200 seeds would settle it the same way this
+settled P028, and that is now a mechanical job rather than a judgement.
+
+**WHAT IS STILL YOURS.** Whether to replace `shelf_frac > 0.0` with a rate criterion at ~0.3% of the
+non-shelf rate is a change to what "WG-2 closed" MEANS, and re-stating a Tier-0 acceptance criterion is
+not a loop's call. Nothing was changed; the knife-edge is merely visible now.
+
+---
+
+### The original entry, kept because it is the reasoning the measurement was built to test
+
+#### Found while sweeping P026, not while looking for it
 
 Found while sweeping P026, not while looking for it. `tests/test_shaft_generator.gd` carries the
 assertion that closed WG-2 (D0258):
