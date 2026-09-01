@@ -418,6 +418,46 @@ names, and the scope is rarely written down.
 project has run was across a change, where a difference is expected and its size is not examined. The
 control was one command away and had never been run.
 
+## D0323 corrects D0322 — a gate built on an unmeasured number, an undisclosed modelling choice, and a floor it could not afford
+
+**What D0322 claimed** (2026-09-01): it built `tools/coverage_check.py` — the first coverage metric this
+repository has ever enforced — and wired it as QUALITY gate 33 (BLOCKING). Its threshold comment said
+"63.0% at the time this was written," and it disclosed that the metric overcounts ("a name can appear
+for a different reason").
+
+**What is wrong with it.** Three things, each a different class.
+
+1. **The number was never measured.** The tool, run then and now, reports **89/144 = 61.8%**. The 63.0%
+   was the pre-engine-called-exclusion count (92/146), written into the comment before the exclusion was
+   added and never re-checked — a direct violation of the standing rule that a numeric claim is verified
+   against actual tool output before being written down.
+2. **The load-bearing modelling choice was undisclosed.** Coverage is keyed by function NAME, not by
+   definition. The real declaration count in core/+sim/ is 156; the gate's denominator is 144 (156
+   declarations → 146 distinct names → 144 after engine-called exclusion). So `state_signature` in
+   `sim/body/body.gd`, `sim/mining/mining.gd`, and `sim/world/tile_grid.gd` is one unit in the
+   denominator, and one test reference covers all three. D0322 disclosed the overcounting direction and
+   not this one — and zero of its 9 mutation branches tested it. D0323 added a 10th
+   (`branch_name_collision`): two same-named functions in different files, both covered by a single
+   reference.
+3. **The verdict depended on that undisclosed choice, with almost no margin.** The gate was BLOCKING at
+   a 60% floor with 1.8 points of headroom (89/144 = 61.8%). Keyed by definition instead of name,
+   89/149 = **59.7%** — the gate flips from PASS to FAIL on a modelling decision the gate never stated,
+   and three new untested functions in core/ or sim/ would have turned CI red on the next feature commit.
+
+**The correction.** Gate 33 demoted to reported-only (`continue-on-error: true`), the floor set to
+61.8% as a ratchet at the measured value — it can only go up. The gate reports; it does not block.
+D0323 also states the tool's three properties (measures reference, not execution; keyed by name, not
+definition; margin is thin) in the tool's docstring, `docs/QUALITY.md`, and the ledger, so a future
+session does not cite 61.8% as evidence that 61.8% of `sim/` is exercised — a dead identifier never
+called counts as covered, and the metric could be taken to 100% with zero new testing.
+
+**The chain here is shallow, and worth saying so.** D0322 was written and corrected the same day; there
+is no deeper origin for the wrong number than D0322 itself. What D0322 was answering — gate 14's
+long-standing NO-CODE status ("≥ 85% line coverage" with no enforcing code) — is context, not a
+corrected claim: gate 14's declaration is still open, and D0322 said plainly that its own weaker metric
+does not satisfy it. Nothing further back needed correcting, so per this page's own rule, nothing
+further back is traced.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,
