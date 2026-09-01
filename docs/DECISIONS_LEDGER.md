@@ -13541,3 +13541,52 @@ fix: wrap the mojibake block in `if [ -n "$files" ]; then ... fi` so the early r
 of the mojibake block, not an exit from the whole hook. The formatter check follows, with its own
 early return on empty scope (exit 2 from the formatter is VOID, not a failure — none of the staged
 files are in the formatter's scope, e.g. only `.md` staged).
+
+---
+
+## D0320 · 2026-09-01 · `.githooks/pre-commit` had no test, and it is the file with the worst record of dead gates
+
+**D0319 added a formatter gate to the bottom of `.githooks/pre-commit` and restructured the early return
+above it so the new gate could be reached.** That restructure is correct — verified — but its correctness
+is a property of **statement order** and of **which extensions each block globs**, and nothing in this
+repository looked at either. `tools/test_commit_msg_hook.sh` does exactly this job for `commit-msg`;
+`pre-commit` had no equivalent.
+
+**This specific file has gone silently dead twice, by its own comments.** The base-class namespace gate
+no-op'd for **119 commits** (D0117/D0119) after the pivot moved its script and nothing recreated it at
+the expected path. The identity gate was "dead twice over": once below the final `exit 0`, and then still
+dead because the mojibake block opened with `[ -z "$files" ] && exit 0`. `[[gate-that-runs-nowhere]]`,
+twice, in one file — which makes a third instance a prediction rather than a worry.
+
+**THE ROW THAT CARRIES THE TEST, and why the extension matters.** The mojibake gate globs
+`.gd .md .sh .cfg .godot`; the formatter globs `.gd .py .sh .yml .yaml`. **`.py` is in the second set and
+not the first**, so a commit staging only Python is precisely the commit the old early return swallowed.
+Mutation-tested by reinstating `[ -z "$files" ] && exit 0`: **the two `.py`-alone rows flip and nothing
+else does.** The `.gd` rows stay green under the mutant — because `.gd` is in the mojibake glob, so
+`$files` is non-empty and the early return never fires. **A `.gd`-staged commit could never have observed
+this defect**, which is why it survived review; a test built only from `.gd` fixtures would have been
+green on the broken hook. `[[mechanism-vs-population]]`.
+
+**Eight rows, and three of them are controls rather than assertions.** A hook that refused everything
+satisfies every violation row, so canonical files staged together must PASS. A restructure that reached
+the formatter by disabling the block above it satisfies rows 1-4, so mojibake in a `.md` must still be
+refused. And "nothing in scope" must not be a refusal, or every docs-only commit is blocked.
+
+**MY OWN FIXTURE WAS OUT OF THE POPULATION, TWICE, AND BOTH TIMES IT READ AS THE SUBJECT FAILING.**
+First the scratch directory was `.hook_probe_tmp/` and four formatter rows came back exit 0 — the
+formatter excludes hidden directories, answered VOID, and the hook correctly passed. Then the `.yaml`
+fixture sat under `tools/`, and `.yml`/`.yaml` are in scope **only** under `.github/workflows/` and
+`data/` (`formatter.py` `YAML_DIRS`), so it was VOID too. Both times the failing row named the hook and
+the fault was mine. `[[instrument-cannot-register-subject]]` — the fixture has to live where the tool
+under test can see it, and "my test failed" is not evidence about the subject until the population is
+checked. The yaml case is now an assertion in its own right: a file the formatter cannot judge must not
+be refused.
+
+**Two portability properties, because a hook test is unusually invasive.** It runs every case against a
+throwaway `GIT_INDEX_FILE`, so an interrupted run cannot leave a caller's staging area modified — this is
+routinely run with work staged. And the **identity gate runs first and would refuse every row**: it
+compares the effective identity against `git config --local user.email`, which a fresh CI checkout does
+not have. Unhandled, the hook exits 1 on every case, the five violation rows go green for the wrong
+reason, and the three pass-rows fail with a message about identity — a uniformly-refusing hook stops
+discriminating exactly like a uniformly-passing one. The precondition is therefore **established and
+restored** rather than assumed, and verified by running the suite with the local email unset.
