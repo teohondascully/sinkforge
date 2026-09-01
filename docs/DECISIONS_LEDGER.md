@@ -13667,3 +13667,32 @@ session does not cite 61.8% as evidence that 61.8% of `sim/` is exercised:
    one test reference covers both.
 3. The margin is thin. 60% of 144 needs 87; the ratchet sits at 89. Three new untested functions
    turns it red.
+
+## D0324 · 2026-09-01 · Test naming, test isolation, and flaky test detection — the last real testing signals
+
+**The gap.** Three testing signals from the readiness model were failing and applicable to this
+project: test naming conventions (nothing enforced the `test_*.gd` / `_test_*()` convention),
+test isolation (process-level isolation existed via `run_gd_test.sh` but nothing checked it held),
+and flaky test detection (no tool ran suites multiple times to catch intermittent failures).
+
+**The fixes.**
+
+`tools/test_naming_check.py` — two static rules: (1) every `tests/test_*.gd` file must define at
+least one `func _test_*()` (a test file with no tests is dead weight that CI runs green over);
+(2) every `func _test_*()` in the repository must be inside `tests/`. Fixture files
+(`fixture_*.gd`), diagnostic files (`diag_*.gd`), `test_base.gd`, `property_checks.gd`, and
+`test_recorded_sessions.gd` (which replays recordings in `_initialize()`, D0282) are exempt from
+rule 1. Found one real exception: `test_recorded_sessions.gd` has no `_test_*()` functions —
+legitimate, added to the exemption set. Mutation-tested 6/6. Wired as QUALITY gate 34 (BLOCKING).
+
+`tools/test_isolation_check.py` — static check on `harness.yml` that no `godot` command
+references a `res://tests/` path without going through `run_gd_test.sh` or `run_suites.sh`. The
+first version was too naive (flagged `res://tests/` arguments to `run_suites.sh` as violations);
+rewritten to check only lines that invoke `godot` directly. Mutation-tested 4/4. Wired as
+QUALITY gate 35 (BLOCKING).
+
+`tools/flaky_test_detector.py` — wraps `tools/run_suites.sh`, runs it N times (default 3), parses
+per-suite PASS/FAIL, and reports any suite whose verdict is not consistent across runs. Not run
+in CI (too slow for a per-commit gate) — it is a local tool, run on demand or nightly, that
+produces evidence the repository can detect flakiness. The readiness signal asks for "evidence
+that org detects flaky tests" — this tool is that evidence.

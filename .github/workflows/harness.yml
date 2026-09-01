@@ -262,6 +262,12 @@ jobs:
         run: python3 tools/coverage_check.py
         continue-on-error: true
 
+      - name: Test naming conventions (QUALITY gate 34, D0324) — BLOCKING
+        run: python3 tools/test_naming_check.py
+
+      - name: Test isolation — every godot suite goes through run_gd_test.sh (QUALITY gate 35, D0324) — BLOCKING
+        run: python3 tools/test_isolation_check.py
+
   # Runs every tests/test_*.gd suite under the real, pinned engine (QUALITY gates 8, 9, 11 —
   # determinism, conservation, movement acceptance — all depend on this actually happening).
   # Godot is downloaded and checksum-verified rather than pulled from a marketplace action,

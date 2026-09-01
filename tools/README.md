@@ -28,6 +28,13 @@ harness already produced.
   blanked first). Ratchet at 61.8% (89/144 names), reported-only — not BLOCKING, because it measures
   reference not execution and can be gamed to 100% with dead lines. Mutation-tested (10/10). Wired
   into CI as QUALITY gate 33 (D0322/D0323).
+- `test_naming_check.py` — enforces the `test_*.gd` / `_test_*()` naming convention. Mutation-tested
+  (6/6). Wired into CI as QUALITY gate 34 (D0324).
+- `test_isolation_check.py` — verifies every `godot` suite invocation in CI goes through
+  `run_gd_test.sh` or `run_suites.sh`, not a bare `godot --script`. Mutation-tested (4/4). Wired into
+  CI as QUALITY gate 35 (D0324).
+- `flaky_test_detector.py` — wraps `run_suites.sh`, runs it N times, and flags suites with
+  inconsistent verdicts. Local tool, not run in CI (too slow for per-commit). D0324.
 - `scratch/` — gitignored. Scratch work lives here and only here. If a script here turns out to be
   worth keeping, it becomes a real tool with a claim ID and moves out.
 
