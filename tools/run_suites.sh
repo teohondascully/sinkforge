@@ -2,7 +2,7 @@
 # Run test suites, optionally in parallel, and report by EXIT CODE.
 #
 # Usage: tools/run_suites.sh <godot-binary> [jobs] [suite ...]
-#   jobs defaults to 1. With no suites listed, runs every tests/test_*.gd that CI runs.
+#   jobs defaults to 1. With no suites listed, runs exactly the suites CI's `tests` job runs.
 #
 # WHY EXIT CODE AND NOT OUTPUT MATCHING. The obvious check is `grep -q 'ALL PASS'`, and it is wrong in
 # the one direction that matters: `tools/run_gd_test.sh`'s own failure message is
@@ -30,6 +30,28 @@
 # output are interesting. It cannot know -- the interesting line is usually the one the suite author
 # added precisely because the failure was hard to diagnose. Verbosity costs nothing here, because this
 # path only runs when something is already red.
+#
+# WHY THE NO-ARGUMENT DEFAULT PARSES ONE JOB INSTEAD OF GREPPING EVERY WORKFLOW (D0283). The header
+# above claims this runner's default is what CI runs. It was not. The default used to be
+#
+#     grep -ohE 'res://tests/test_[a-z0-9_]+\.gd' .github/workflows/*.yml | sort -u
+#
+# -- every `res://tests/...` string in every file under .github/workflows/, regardless of which job it
+# belongs to or whether that job fires on a push at all. Measured on this tree: that grep selected 48
+# suites where CI's `tests` job runs 47, and the extra one was `test_body_fuzz.gd`, which lives in
+# `fuzz_nightly` -- a `schedule`-only job that sweeps 1000x1500 and takes ~114s (D0060). So the LOCAL
+# default silently ran a nightly-sized sweep as though it were the per-commit set, and a local green
+# meant something different from a CI green while claiming to mean the same thing. CI itself was never
+# affected: it passes an explicit list. Only the header's claim was false.
+#
+# It now reads `tools/list_ci_suites.py`, the same parser `tools/run_local_battery.sh` uses -- one
+# source, read twice -- which loads the YAML and walks the `tests` job's own steps. The job name is not
+# a parameter there, on purpose (its own docstring): making the caller name a job is exactly how someone
+# eventually passes the wrong one, which is the defect above.
+#
+# If that parser fails, this aborts with exit 2 rather than falling back to the grep. A fallback here
+# would reintroduce the whole problem class: the fallback's answer and the real answer are both a list
+# of suites, both plausible, and nothing downstream can tell which one it got.
 set -uo pipefail
 
 GODOT="${1:?usage: run_suites.sh <godot-binary> [jobs] [suite ...]}"
@@ -43,9 +65,21 @@ SUITES=()
 if [ "$#" -gt 0 ]; then
   SUITES=("$@")
 else
+  # Assigned first and checked second: `X="$(cmd)"` carries `cmd`'s status into `$?`, whereas the
+  # process substitution this replaced (`done < <(...)`) discards it entirely -- a parser that exited 2
+  # and printed nothing would have read as "no suites" rather than as "the parser broke".
+  CI_SUITES="$(python3 "$ROOT/tools/list_ci_suites.py" "$ROOT/.github/workflows/harness.yml")"
+  LIST_RC=$?
+  if [ "$LIST_RC" -ne 0 ]; then
+    echo "run_suites: tools/list_ci_suites.py exited $LIST_RC -- refusing to guess a suite list." >&2
+    exit 2
+  fi
+  # Herestring, not a pipe: a pipe runs the loop in a subshell and SUITES would be empty on the far
+  # side of it. Blank lines are skipped so a trailing newline cannot become an empty suite path.
   while IFS= read -r line; do
+    [ -n "$line" ] || continue
     SUITES+=("$line")
-  done < <(grep -ohE 'res://tests/test_[a-z0-9_]+\.gd' .github/workflows/*.yml | sort -u)
+  done <<< "$CI_SUITES"
 fi
 [ "${#SUITES[@]}" -gt 0 ] || { echo "run_suites: no suites found -- refusing to report a green over an empty population" >&2; exit 2; }
 

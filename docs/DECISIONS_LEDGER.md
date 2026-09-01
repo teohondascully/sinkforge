@@ -11557,3 +11557,43 @@ placement, which places material rather than carving. The identical triple was t
 
 **Reverse cost:** none — nothing in `sim/` changed. Deleting the tool loses the measurement and the
 curve.
+## D0283 · `run_suites.sh`'s no-argument default was not the CI set it said it was · 2026-08-31 · harness
+
+**The defect, as measured.** The file's own header says "runs every tests/test_*.gd that CI runs". Its
+no-argument default was `grep -ohE 'res://tests/test_[a-z0-9_]+\.gd' .github/workflows/*.yml | sort -u`
+— every `res://tests/…` string in every workflow file, with no notion of which job owns it or whether
+that job fires on a push. Measured on this tree: that grep selects **48** suites; CI's `tests` job runs
+**47**; the symmetric difference is exactly one element, `res://tests/test_body_fuzz.gd`, which belongs
+to `fuzz_nightly` — a `schedule`-only job running the full 1000×1500 sweep at ~114s (D0060). Both
+directions of the difference were read, not just the counts: nothing CI runs was missing from the local
+default, so the error ran in one direction only.
+
+**Why it matters even though CI was never wrong.** CI passes an explicit list, so the job itself was
+always correct; what was false was the *equivalence claim*. A local `run_suites.sh ./godot 8` and a CI
+run reported over different populations while a human read them as the same verdict — and the extra
+member was the one suite deliberately kept out of the per-commit set, so the local default was quietly
+the slowest possible reading of "what CI runs".
+
+**Decided.** The default now calls `tools/list_ci_suites.py .github/workflows/harness.yml` — the same
+parser `tools/run_local_battery.sh` already uses, which loads the YAML and walks the `tests` job's own
+steps. One source, read twice, and the job name is not a parameter there on purpose.
+
+**Deliberately not done.** No fallback to the old grep when the parser fails. A fallback would hand back
+a list that is the same *shape* as the right answer with nothing downstream able to tell which one it
+got — the exact class this repository keeps being bitten by. Both non-answers exit 2 instead, verified:
+a parser that exits non-zero prints `refusing to guess a suite list` (rc=2), and a parser that exits 0
+having printed nothing falls into the pre-existing empty-population guard (rc=2). Also not done:
+teaching `list_ci_suites.py` to take a job name. Its own docstring argues against it, and this defect is
+what a job-name parameter eventually produces.
+
+**Also not done:** nothing in `.github/workflows/harness.yml` changed. The CI job's explicit list stays
+explicit — a job that names its suites is legible in review in a way `bash tools/run_suites.sh ./godot 4`
+would not be, and the gate 30 fingerprint below now reads that list.
+
+**Proof.** New default run against a stub binary, so every suite reports and names itself: 47 selected,
+and `comm` in both directions against `list_ci_suites.py`'s output is empty. `res://tests/test_body_fuzz.gd`
+present in the old default, absent from the new one. `tools/test_run_suites.sh` still passes all five of
+its checks, so neither the exit-code reading (D0262) nor the whole-log dump (D0272) regressed.
+
+**Reverse cost:** one line — restore the grep. The local default goes back to running a nightly-sized
+sweep and claiming it is the per-commit set.
