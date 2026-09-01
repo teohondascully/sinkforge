@@ -11056,3 +11056,31 @@ per D0167 — never locally, whatever a local run happens to agree with.
 
 **Reverse cost:** delete `DIG_HEADROOM_CELLS` and restore `touch_top` to `_px_to_cell(_top_y())`; revert
 `GOLDEN_HASHES`; the two suites merge back. The miner's head returns to the ceiling.
+
+
+## D0270 · The loop stopped twice for reasons that were never stop conditions; the rule is now written where the loop reads it · 2026-08-31 · process
+
+**The observed failure, twice.** Run one hit a single parked ruling (P020) and halted with eight commits
+still queued. Run two finished a unit, reported to the director, and treated the report as a terminus.
+The director's diagnosis was exact: "the run KEEPS STOPPING". Both times the queue still held work that
+needed no ruling at all — HUD, audio, camera — and both times it sat untouched while one blocked item
+held the whole run.
+
+**The rule, and it belongs in `.claude/commands/loop.md` rather than in a session's head:** a parked
+decision pauses a LANE, never the RUN. `loop.md` previously listed six HARD STOPS, several of which
+("any EXPENSIVE decision", "any gate red not clearable in one attempt") describe things that should park
+an item and continue. A command file that names six ways to stop and none to continue gets what it asked
+for. Rewritten to exactly three stop conditions — a two-process replay divergence, decision-free work
+exhausted across ALL lanes, the time budget — with everything else explicitly named as not-a-stop,
+including the one that actually caught me: **"Reporting is not stopping."**
+
+**Root blocker vs item blocker is the load-bearing distinction.** P022 gated *every* sprite, because each
+one hit the same clearance wall — so it blocked the lane, and the right move was a different lane, not a
+halt. A ruling that gates only its own item blocks only that item. `loop.md` now asks that question
+explicitly rather than leaving it to judgment in the moment, and `docs/WORKING.md` carries a LANE STATUS
+table so the answer survives a compaction.
+
+**Rulings batch.** Surfacing them one at a time is what makes each one feel like a stopping point. They
+accumulate; the director clears them in a single pass. `docs/NEEDS_DIRECTOR.md` currently holds 11 open.
+
+**Reverse cost:** restore `loop.md`'s six-hard-stop list. The run halts on the first parked decision again.

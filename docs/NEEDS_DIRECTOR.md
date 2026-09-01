@@ -129,7 +129,12 @@ replacing it and an argument for repairing it in equal measure.
 
 ---
 
-## P007 · The determinism suite is 93% string-building, and the fix touches the determinism contract
+## P007 · CLOSED 2026-08-31 by D0261 · The determinism suite is 93% string-building, and the fix touches the determinism contract
+
+**CLOSED.** Measured at 91% (65.7s of 72s), fixed by an O(1) running hash, 72s -> 8.8s. The contract
+concern this entry raised is answered by `recomputed_signature()` plus a mutation test on all four paths.
+The separate aliasing question about sharing a carved grid is still open and is NOT this entry -- it is
+referenced by D0267, which sidesteps it by cloning.
 
 **Status:** open · **Cost to apply:** ~2 hours + a golden re-capture · **Raised by:** a measurement pass, 2026-08-30
 
@@ -485,7 +490,7 @@ legacy's smallest nugget mark is 6.4px, larger than this world's entire 4px terr
 claim about whether a player can find ore, not a convenience. Landing the tint by relaxing it would have
 been the shipped-claim-retired-silently failure this project keeps finding.
 
-## P020 · The cave field is single-octave where legacy's is five, and porting it re-derives a constant that governs every ported threshold
+## P020 · RULED AND DONE 2026-08-31 by D0258 · The cave field is single-octave where legacy's is five
 
 **One ruling. It unblocks WG-2, WG-3 and PR #10 together.**
 
@@ -562,7 +567,7 @@ one is needed, is yours.
 
 **Nothing is blocked on this.** WG-2 and WG-3 are closed, PR #10 is unblocked on its merits.
 
-## P022 · The miner's head is 8px inside the ceiling, always — and legacy's fix was a bigger tunnel, not smaller art
+## P022 · RULED 2026-08-31: carve headroom · The miner's head is 8px inside the ceiling
 
 **You spotted this in the D0268 capture. It is real, it is measured, and the placement code is not the
 cause.** Probed directly: the sprite's bottom edge and horizontal centre land on the body's AABB to
