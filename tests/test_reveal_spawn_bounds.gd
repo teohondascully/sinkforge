@@ -31,7 +31,6 @@ const SHAFT_COLS: int = 4  ## `carve_entry_shaft`'s own `range(0, 4)`
 const JUMP_TICKS: int = 90
 
 
-
 ## D0267. THE SAME 128 (site, seed) WORLDS WERE GENERATED THREE TIMES -- once per assertion pass -- and
 ## `ShaftGenerator.generate` is ~858 ms for a 48x1024 shaft (~414 ms of it five-octave noise). 384
 ## generations is ~329 s, which measured as 347 s of a 351 s full sweep: this one suite WAS the sweep.

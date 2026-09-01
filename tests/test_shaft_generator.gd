@@ -78,7 +78,6 @@ func _test_caves_carve_something() -> void:
 	_check(open_count > 0, "cave carving opened at least one cell (%d opened)" % open_count)
 
 
-
 func _test_ore_appears_somewhere() -> void:
 	var grid: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, 20260826)
 	var found: bool = false

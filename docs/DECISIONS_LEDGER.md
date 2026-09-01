@@ -13471,3 +13471,52 @@ against a fixed label, because that is what actually happens when someone adds a
 `42 suite results` date from D0248 and are true of that moment. They now name themselves as historical
 rather than reading as live claims; changing them to 62 would have falsified a record to satisfy a
 pattern. `[[name-the-frame]]`.
+
+
+## D0318 · 2026-09-01 · `.editorconfig` made executable — a formatter that canonicalizes what has one answer, and refuses what does not
+
+**The gap.** `.editorconfig` declares five properties for this tree and nothing checked one of them. It
+had already drifted: 4 `.gd` files with blank lines at EOF, 5 `.gd` and 1 `.py` with 3+ blank runs, 1
+`.gd` with no final newline. Ten files, the kind of difference a human eye does not register and a diff
+shows as noise — the case for a formatter rather than another lint.
+
+**gdformat rejected, twice over.** `gdformat` (gdtoolkit) is the standard GDScript formatter. It reflows
+code to its own line-length model, which over this tree's comment-dense, hand-aligned source would
+produce a diff too large to review on lines whose current shape was a decision. And it is a third-party
+dependency for a project that has exactly one (`pyyaml`, for the schema validator). The trade taken
+instead: canonicalize only what has a single defensible answer, and state what is therefore left alone.
+
+**Six rules, two rulesets.** `.gd`/`.py` get all six (charset, trailing-whitespace, file-edges,
+blank-run, indent, comment-space) and are read STRING-aware — a `#` inside `"#....####"` is not a
+comment, and trailing whitespace inside a literal is data. `.sh`/`.yml`/`.yaml` get the four byte-level
+rules only, because a YAML block scalar and a shell heredoc carry indentation this tool has no grammar
+for. No operator spacing, no comma spacing, no line wrapping, no argument alignment — each needs a real
+GDScript grammar, and no GDScript parser exists in pure Python. Measured, not assumed unnecessary: the
+tree has zero missing-space-after-comma, zero space-before-comma, zero space-before-close-bracket, zero
+`#foo` comments across 153 `.gd` files.
+
+**`indent` refuses rather than guesses.** A `.gd` line indented with a whole number of 4-space groups
+becomes tabs. Tabs and spaces mixed, or a space count not a multiple of 4, is reported with its line
+number and left untouched. A formatter that reshapes an indentation it cannot read unambiguously is
+changing program structure on a guess.
+
+**The wrapped-trailing-comment exemption, and the bug that found it.** Eight lines in this tree are
+comment-only continuations aligned to a trailing comment in the code line above (`sim/body/
+input_frame.gd:15-16`, `sim/body/vertical_resolve.gd:21-23`, and three more). Their leading spaces are
+column alignment, which no tab count reproduces. The first implementation exempted them by checking the
+immediately previous line — but a wrapped chain can span several comment-only lines, and the previous
+line to line 16 is line 15, which is also comment-only (no code before the `#`). The fix: track the last
+CODE line (not the immediately previous line), resetting on blank lines, so the chain traces back to
+the code line that started it. Found by running `--check` on the real tree and seeing 3 REFUSED lines
+that should have been exempt — the mutation tests passed because they only tested the two-line case, not
+the chain. `[[test-passes-but-bug-lives]]`.
+
+**Self-inclusion, per `docs/QUALITY.md` §2.** The formatter discovers its own source in its own
+population and passes its own formatting check. The mutation tests use the shared `Observations` class
+from `tools/layer_lint/gate_test_support.py` (D0232) rather than a standalone `check()` — the
+duplication gate caught a byte-identical `check()` helper against `test_quality_check.py` on the first
+run, and the fix was to use the existing shared utility, not to add an exclusion.
+
+**Not a gate yet.** The tool, its tests (76/76), and the 10-file sweep land in this commit. CI wiring
+(`harness.yml`, `.githooks/pre-commit`, `docs/QUALITY.md` gate 32) is a separate commit — tool first,
+gate later, so gate 32 does not go live on assertions the tool's own author calls a smoke check.

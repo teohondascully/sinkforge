@@ -333,7 +333,6 @@ func _test_the_pick_lands_on_a_cadence() -> void:
 		"the next blow lands exactly %d ticks later, the period at this rhythm (got %d)" % [idle_period, gap])
 
 
-
 ## The other half of D0279, split from the cadence test above when it hit QUALITY gate 4's 50-line limit.
 ## The seam is real: above is WHEN a blow lands at a fixed rhythm, this is what RHYTHM does to that.
 ##
