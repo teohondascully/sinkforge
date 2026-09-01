@@ -11503,7 +11503,7 @@ it was blocked on, and it now also unblocks the draught's re-wiring (T1 #6).
 having no per-blow edge to fire on.
 
 
-## D0280 · P021 measured and closed: the thresholds are right, legacy's "15%" was never a measurement · 2026-08-31 · P021 ruled
+## D0285 · P021 measured and closed: the thresholds are right, legacy's "15%" was never a measurement · 2026-08-31 · P021 ruled
 
 The director ruled P021 the way P020 was ruled: **close it by measuring the correct carve rate, not by
 nudging a threshold.** Measuring closed it without changing a constant.
