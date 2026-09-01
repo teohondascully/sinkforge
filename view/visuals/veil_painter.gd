@@ -132,6 +132,97 @@ static func shade_at(obs: Interface.Observation, rect: Rect2i, field: PackedFloa
 	return mass * (1.0 + KEY_STRENGTH * key)
 
 
+## --- THE LAMP -------------------------------------------------------------------------------------
+##
+## **"LIGHT REVEALS, IT DOES NOT PAINT"** — `world_renderer.gd:3221 _veil_cut`, and legacy states the
+## consequence as a measured regression: the lamp's job is to CUT A HOLE IN THE VEIL, "which is what
+## actually makes rock visible", and the amber bloom on top is halo. "An additive term strong enough to
+## swamp the reveal repaints the rock the veil just uncovered: three overlapping pools summed past 1.0,
+## tripped the glow threshold and blew the centre of the frame to a white smear."
+##
+## So the lamp lands here, in the veil, and not as a glow painter over it. D0302 shipped the veil and made
+## the deep correctly and unusably dark, because legacy's veil never worked without this.
+##
+## THREE CUTS, legacy's own radii and strengths — `world_renderer.gd:3163-3165`. Radii are legacy CELLS,
+## and a legacy cell is one metre, so they are held in METRES here like every other length in this file.
+const LAMP_BEAM_M: float = 9.0        ## the aimed beam: wide reveal, open core
+const LAMP_BEAM_STRENGTH: float = 0.99
+const LAMP_THROAT_M: float = 5.0      ## the beam throat, between the head and the cast pool
+const LAMP_THROAT_STRENGTH: float = 0.8
+const LAMP_BODY_M: float = 3.4        ## the close body glow
+const LAMP_BODY_STRENGTH: float = 0.5
+const LAMP_LEAD_M: float = 1.9        ## how far the pool leads toward what the miner is working
+
+## Legacy's textured falloff, unchanged: two crossed sines under a window that peaks mid-falloff and
+## vanishes at both ends, "so the bright centre is unbroken" and "light dissolves into the rock grain as
+## it fades" rather than ending in a clean gaussian blob.
+const LAMP_GRAIN: float = 0.13
+const LAMP_WINDOW_GAIN: float = 2.2
+
+## **THE LAMP IS SCALED BY HOW DARK THE MINER'S OWN SPOT IS**, and legacy records the regression it fixes:
+## "at spawn the full-strength lamp washed out both the avatar and the starter ore it sits on, so every
+## warm thing read as a lamp." A full blaze in the deep where it IS the light; a dim glow in daylight.
+##
+## Legacy scales by `_skylight_alpha(...) / AMBIENT_DARK`, and this build has no skylight term — the same
+## missing quantity `GlintPainter.depth_gate` substitutes for, resolved the same way and for the same
+## reason, so the two do not disagree about what "deep" means. Legacy's own floor is 0.30.
+const LAMP_SURFACE_SCALE: float = 0.30   ## legacy's `lerpf(0.30, 1.0, ...)`
+const LAMP_FULL_M: float = 12.0          ## at and below this depth the lamp is the light (SKY_REACH)
+const LAMP_NONE_M: float = 0.0           ## at the surface datum it is at its floor, never off
+
+
+## How much light one cut lifts at `cell`, 0..1. `centre` and `radius` are in CELLS.
+static func cut_lift(centre: Vector2, radius: float, strength: float, cell: Vector2i) -> float:
+	var d: Vector2 = Vector2(float(cell.x) + 0.5, float(cell.y) + 0.5) - centre
+	var dist: float = d.length()
+	if dist >= radius or radius <= 0.0:
+		return 0.0
+	var f: float = 1.0 - dist / radius
+	var window: float = (1.0 - f) * clampf(f * LAMP_WINDOW_GAIN, 0.0, 1.0)
+	var g: float = (sin(float(cell.x) * 1.7 + float(cell.y) * 2.3) * 0.62
+		+ sin(float(cell.x) * 4.1 - float(cell.y) * 3.7) * 0.38) * LAMP_GRAIN * window
+	return clampf(strength * f * f + g * strength, 0.0, 1.0)
+
+
+## Where the lamp's beam points, in CELLS. Legacy leads toward the cursor's aim; nothing puts an aim on
+## the observation (the cursor is the human's, and `docs/DECISIONS_LEDGER.md` records why that stays out
+## of the sim), so the beam leads toward THE CELL BEING WORKED when there is one, and along `facing`
+## otherwise. Same intent — the pool goes where the attention is — expressed in what crosses the L2 door.
+static func lamp_head(obs: Interface.Observation) -> Vector2:
+	var head: Vector2 = Vector2(obs.cell) + Vector2(0.5, 0.5)
+	var lead_cells: float = LAMP_LEAD_M * float(MaterialLook.CELLS_PER_METRE)
+	var toward: Vector2 = Vector2(float(obs.facing), 0.0)
+	if obs.mining_is_charging:
+		var to_cell: Vector2 = Vector2(obs.mining_charging_cell) + Vector2(0.5, 0.5) - head
+		if to_cell.length() > 0.001:
+			toward = to_cell.normalized()
+	return head + toward * lead_cells
+
+
+## The three cuts composited the way legacy composites them: each source lifts whatever the previous one
+## left, `l -> l + (1 - l) * lift`, so overlapping pools brighten toward full light and can never
+## overshoot it. Returns 0..1.
+static func lamp_scale(row: int) -> float:
+	var depth: float = MaterialLook.depth_m_exact(row)
+	var t: float = clampf((depth - LAMP_NONE_M) / (LAMP_FULL_M - LAMP_NONE_M), 0.0, 1.0)
+	return lerpf(LAMP_SURFACE_SCALE, 1.0, t)
+
+
+static func lamp_lift(obs: Interface.Observation, cell: Vector2i) -> float:
+	if obs == null:
+		return 0.0
+	var m: float = float(MaterialLook.CELLS_PER_METRE)
+	var scale: float = lamp_scale(obs.cell.y)
+	var head: Vector2 = lamp_head(obs)
+	var body: Vector2 = Vector2(obs.cell) + Vector2(0.5, 0.5)
+	var lit: float = 0.0
+	for cut: Array in [[head, LAMP_BEAM_M, LAMP_BEAM_STRENGTH],
+			[body.lerp(head, 0.45), LAMP_THROAT_M, LAMP_THROAT_STRENGTH],
+			[body, LAMP_BODY_M, LAMP_BODY_STRENGTH]]:
+		lit += (1.0 - lit) * cut_lift(cut[0], float(cut[1]) * m, float(cut[2]) * scale, cell)
+	return clampf(lit, 0.0, 1.0)
+
+
 ## --- THE CACHE ------------------------------------------------------------------------------------
 ##
 ## **RE-BAKING EVERY FRAME IS NOT AFFORDABLE, AND LEGACY SAYS SO IN ITS SIGNATURE.** `_bake_openness`
@@ -200,6 +291,11 @@ static func _paint_with(frame: Frame, ci: CanvasItem, field: PackedFloat32Array)
 			if li < 0 or lj < 0 or li >= baked.size.x or lj >= baked.size.y:
 				continue
 			var s: float = shade_at(obs, baked, field, li, lj)
+			# THE LAMP LIFTS WHAT THE VEIL LEFT, which is legacy's own composition rule: a light raises
+			# the light level rather than lowering an opacity, so a lit cell trends toward full light and
+			# can never overshoot it. Applied here rather than baked into the field because the field is
+			# cached on the world's solidity and the lamp moves every tick.
+			s += (1.0 - s) * lamp_lift(obs, Vector2i(col, row))
 			if is_equal_approx(s, 1.0):
 				continue
 			var box := Rect2(col * cell_px, row * cell_px, cell_px, cell_px)
