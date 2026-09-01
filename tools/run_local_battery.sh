@@ -25,6 +25,7 @@ GODOT="${1:-$(command -v godot || echo ./godot)}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKFLOW="$ROOT/.github/workflows/harness.yml"
 PARSER="$ROOT/tools/list_ci_suites.py"
+GATE_PARSER="$ROOT/tools/list_ci_gates.py"
 
 if ! command -v "$GODOT" >/dev/null 2>&1 && [ ! -x "$GODOT" ]; then
 	echo "run_local_battery: FAIL - no godot binary at '$GODOT'" >&2
@@ -36,6 +37,47 @@ fi
 # executed ZERO suites -- and still looked like it had worked. That is the exact failure this file's own
 # header is about, reproduced inside the fix for it. The zero-suite guard below is what makes that shape
 # loud instead of quiet, and it is the reason the guard is not optional politeness.
+# THE GATES FIRST, and from the SAME workflow for the same reason the suites are (D0295). Every session
+# that wanted "run what CI's gate job runs" wrote `for g in tools/layer_lint/*.py` by hand, which is a
+# DIFFERENT and quietly smaller population: it misses the duplication gate, the base-namespace check, the
+# schema validator and the codegen check. A commit passed that loop, was pushed, and CI's duplication
+# gate failed on it -- a whole round trip spent discovering that two lists disagreed.
+#
+# NUL-separated, because one gate step is a multi-line script and splitting on newlines would run half
+# of it as a command. `read -d ''` is in bash 3.2, which is what macOS ships (see the note below on
+# `mapfile`, which is not).
+GATES=()
+while IFS= read -r -d '' gate; do
+	[ -n "$gate" ] && GATES+=("$gate")
+done < <(python3 "$GATE_PARSER" "$WORKFLOW"; printf '\0')
+
+if [ "${#GATES[@]}" -eq 0 ]; then
+	echo "run_local_battery: FAIL - parsed the workflow and found ZERO gate steps in the 'gates' job" >&2
+	exit 2
+fi
+
+echo "run_local_battery: ${#GATES[@]} gate step(s) from harness.yml's 'gates' job"
+GATE_FAILED=0
+for gate in "${GATES[@]}"; do
+	# The label skips shell preamble (`set -e`, blank lines) so a multi-line gate step is named by what it
+	# actually runs rather than by its first housekeeping line.
+	label="$(printf '%s' "$gate" | grep -vE '^[[:space:]]*(set |#|$)' | head -1)"
+	[ -n "$label" ] || label="$(printf '%s' "$gate" | head -1)"
+	if ( cd "$ROOT" && eval "$gate" ) >"${TMPDIR:-/tmp}/gate.log" 2>&1; then
+		echo "PASS  gate: $label"
+	else
+		echo "FAIL  gate: $label"
+		tail -20 "${TMPDIR:-/tmp}/gate.log"
+		GATE_FAILED=$((GATE_FAILED + 1))
+	fi
+done
+if [ "$GATE_FAILED" -gt 0 ]; then
+	echo "run_local_battery: $GATE_FAILED gate step(s) FAILED -- CI will fail the same way" >&2
+fi
+if [ "${GATES_ONLY:-}" = "1" ]; then
+	exit $(( GATE_FAILED > 0 ? 1 : 0 ))
+fi
+
 SUITES=()
 while IFS= read -r line; do
 	[ -n "$line" ] && SUITES+=("$line")

@@ -74,21 +74,11 @@ RECORDINGS="tests/body/recordings"
 BEFORE_LOGS="$(ls "$RECORDINGS"/reveal_agent_*.log 2>/dev/null | sort)"
 
 # EVERY CAMERA ROW BELOW IS RELATIVE TO THE SURFACE, and the surface is no longer row 0. P017 (D0292)
-# put twenty metres of air above the rock, so the four moments' absolute rows all pointed into the sky and
-# every one of them captured a blank frame or no frame at all. Derived from `ShaftGenerator` rather than
-# restated here, because a capture tool whose camera silently drifts off the world is a tool that reports
-# "blank frame" for a reason that has nothing to do with what changed.
-#
-# It FAILS CLOSED if either constant cannot be read: a bare `$(( ))` on an empty string is zero, which is
-# a perfectly plausible surface row and would put every camera back in the sky without saying so.
-SKY_M="$(grep -oE '^const SKY_ROWS: int = [0-9]+' sim/terrain_gen/shaft_generator.gd | grep -oE '[0-9]+$')"
-CPM="$(grep -oE '^const TERRAIN_CELLS_PER_METER: int = [0-9]+' sim/terrain_gen/shaft_generator.gd | grep -oE '[0-9]+$')"
-if [ -z "$SKY_M" ] || [ -z "$CPM" ]; then
-	echo "capture_moments: FAIL - could not read SKY_ROWS/TERRAIN_CELLS_PER_METER from ShaftGenerator;" >&2
-	echo "capture_moments:        every camera row below is relative to the surface and would be wrong." >&2
-	exit 1
-fi
-SURFACE_ROW=$(( SKY_M * CPM ))
+# put twenty metres of air above the rock, so the four moments' absolute rows all pointed into the sky
+# and every one of them captured a blank frame or no frame at all. `tools/surface_row.sh` derives it from
+# `ShaftGenerator` and fails closed if it cannot — see that file for why an empty value is the dangerous
+# one.
+SURFACE_ROW="$("$ROOT/tools/surface_row.sh")" || exit 1
 
 # moment | extra scene args | capture tick
 # `surface` is the world as a player first meets it. `delve` is the same seed after the scripted shaft has

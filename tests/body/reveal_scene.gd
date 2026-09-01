@@ -12,7 +12,8 @@ extends Node2D
 ## and exits, which looks like a broken launch if you were expecting to play (D0248 -- the director hit
 ## exactly this following a line in `docs/NEEDS_DIRECTOR.md` that omitted the flag). To look at the sky:
 ##
-##   godot --path . tests/body/reveal_scene.tscn -- --play --sky --zoom=6.5 --camera=24,4
+##   godot --path . tests/body/reveal_scene.tscn -- --play --sky --zoom=6.5 --camera=24,84
+##   (the camera row is relative to the surface, which is `ShaftGenerator.SKY_ROWS` -- P017/D0292)
 ##
 ## Agent mode (default) drives a short, deterministic walk-and-dig sequence toward the nearest shallow
 ## glimmer pocket the generated seed actually placed -- built for this scene's own verification and for
@@ -372,7 +373,12 @@ func _finish_and_quit() -> void:
 	# announced itself only in a vocabulary ("agent-mode run") that already assumes you knew.
 	print("reveal_scene: this was AGENT mode (the default) -- it drives itself and exits. "
 		+ "For a window you can play in, add --play:")
-	print("  godot --path . tests/body/reveal_scene.tscn -- --play --sky --zoom=6.5 --camera=24,4")
+	# The camera row is COMPUTED, not typed. D0248 made this line exist because the director hit
+	# agent mode twice from a documented command; a hint that hands them a camera pointing into the sky
+	# (P017/D0292 moved the surface to row `SKY_ROWS`) would be the same class of defect one layer on --
+	# a documented invocation that does not do what it says.
+	print("  godot --path . tests/body/reveal_scene.tscn -- --play --sky --zoom=6.5 --camera=24,%d"
+		% (ShaftGenerator.SKY_ROWS + 4))
 	get_tree().quit(0)
 
 
