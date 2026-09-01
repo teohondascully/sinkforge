@@ -11,6 +11,17 @@ extends RefCounted
 
 ## Saves one frame, says what was IN it, and refuses to call a blank capture a success.
 ##
+## **THE CALLER MUST HOLD THE WORLD ACROSS THESE AWAITS** (D0304). Nothing here stops the scene ticking,
+## and for as long as nothing did, the sim and `WorldView`'s cosmetic clock advanced by however many
+## physics ticks happened to fall inside two rendered frames — a function of machine load, which made two
+## captures of the SAME COMMIT at the SAME TICK differ by 38,900 pixels in the `aim` moment and 1,008 in
+## `delve`. `reveal_scene` sets `_shutter_held` before calling this. Holding the tick does NOT hold the
+## picture, which is the trap worth naming: the redraw these awaits exist to wait for was already queued
+## before the hold, so freezing the process does not freeze the draw it is waiting on.
+##
+## That was one of two causes; the other was an unseeded global RNG in the particle path, and only both
+## together take the difference to zero.
+##
 ## **TWO `process_frame` AWAITS, NOT ONE** (D0189). It was a single await, which silently captured a
 ## BLACK image on every early tick — the agent-mode run is only ~15 ticks long, so every capture point IS
 ## early, and the tool reported "screenshot saved" over a frame the renderer had not drawn yet. A capture

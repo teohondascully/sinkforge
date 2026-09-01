@@ -21,6 +21,7 @@ const TICKS: int = 400
 
 func _initialize() -> void:
 	_test_the_cap_actually_caps()
+	_test_one_seed_gives_one_particle_field()
 	_test_particles_retire_and_the_layer_empties()
 	_test_a_busy_particle_layer_cannot_move_the_sim()
 	_test_a_real_break_actually_reaches_the_particle_layer()
@@ -207,3 +208,39 @@ func _hollow_obs(cell: Vector2i, dir: Vector2i, reading: int, swinging: bool) ->
 	o.mining_hollow = reading
 	o.mining_swing = swinging
 	return o
+
+
+## THE PARTICLE FIELD IS A FUNCTION OF THE SEED, WHICH IS WHAT MAKES A CAPTURE COMPARABLE (D0304).
+##
+## `view/fx/particles.gd`'s header argues, correctly, that `randf()` is safe here: a particle never feeds
+## back into the sim, so it cannot make a replay diverge. That argument names the SIM as its frame and is
+## silent about the other one. An unseeded global RNG also means no two screenshots of the same commit at
+## the same tick can be compared — and capture-diffing is the instrument that caught the crumble painter
+## never drawing (D0289) and the glint's population being 93% short (D0300). Measured before the fix:
+## 33,572 pixels of the `aim` moment moved between two runs of one commit, all of it chip debris.
+##
+## `tests/body/reveal_scene.gd` seeds the global RNG from its own run seed. This asserts the property that
+## makes that work, in both directions — the same seed reproduces the field, a different one does not, so
+## the test cannot pass against a generator that has quietly stopped varying at all.
+func _test_one_seed_gives_one_particle_field() -> void:
+	var first: Array = _burst_positions(4242)
+	var again: Array = _burst_positions(4242)
+	var other: Array = _burst_positions(9137)
+	_check(first.size() > 8,
+		"the fixture actually spawned a field to compare (%d particles) -- an empty one would make both "
+		% first.size() + "directions below trivially true")
+	_check(first == again, "the SAME seed reproduces the particle field exactly")
+	_check(first != other,
+		"...and a DIFFERENT seed does not, so this is not passing against a generator that stopped varying")
+
+
+## The positions of one deterministic burst, as comparable data.
+func _burst_positions(seed_value: int) -> Array:
+	seed(seed_value)
+	var p: Particles = Particles.new()
+	p.burst(Vector2(40.0, 60.0), 12, Color(0.5, 0.4, 0.3), 30.0, 0.6, 2.0, 90.0)
+	p.chip(Vector2(50.0, 70.0), Color(0.6, 0.5, 0.4), 0.4)
+	var out: Array = []
+	for particle: Dictionary in p.snapshot():
+		out.append("%.5f,%.5f,%.5f" % [particle["pos"].x, particle["pos"].y, particle["size"]])
+	return out

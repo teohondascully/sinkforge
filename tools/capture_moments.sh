@@ -97,6 +97,11 @@ SURFACE_ROW="$("$ROOT/tools/surface_row.sh")" || exit 1
 # with the whole world plus a small margin, with the camera on the middle column. `aim` goes tighter and
 # accepts off-world background on one side: the body spawns one cell from the left wall and cannot be
 # centred without it, and a 4px cell has to reach ~78 output px to read as a reticle at all.
+## The floor below which a capture is not a picture; see the check at the bottom of the loop.
+## Overridable so the guard's own branch can be exercised without staging its cause: a full import-cache
+## rebuild takes minutes, and `MIN_COLOURS=9999` reaches the same code path in seconds.
+MIN_COLOURS=${MIN_COLOURS:-120}
+
 MOMENTS=(
 	"surface|--zoom=6.5 --camera=24,$((SURFACE_ROW + 13))|2"
 	"delve|--mine-down --zoom=6.5 --camera=24,$((SURFACE_ROW + 17))|216"
@@ -150,6 +155,26 @@ for entry in "${MOMENTS[@]}"; do
 	fi
 	colours="$(printf '%s\n' "$out" | grep -o "capture has [0-9]* distinct colours" | grep -o "[0-9]*" | head -1)"
 	echo "capture_moments: $name -> $png (${colours:-?} distinct colours, tick $tick, bite ${BITE:-default})"
+	# A FLOOR, because this tool's failure mode is a PLAUSIBLE-LOOKING SUCCESS (D0304). A stale Godot
+	# import cache makes every `class_name` global fail to resolve, so the painters never run -- and the
+	# scene still boots, still reaches the tick, still writes a PNG, and still reports a number. It
+	# reported 45 for `delve` where a drawn frame gives 592, and the run said nothing was wrong. That is
+	# the same green-by-absence shape the structural gates exist for, one directory over.
+	#
+	# The number is deliberately far below any real frame rather than tuned close to one: the moments
+	# measured 392-631 on the day this was written, the sparsest thing this tool has ever legitimately
+	# produced is a wall of textured clay at 159, and the failure it must catch came in at 45. A floor
+	# that tracked the real counts would have to move every time the palette does, and would then be
+	# measuring the palette instead of the failure.
+	if [ -n "$colours" ] && [ "$colours" -lt "$MIN_COLOURS" ]; then
+		echo "capture_moments: FAIL -- $name has only $colours distinct colours (floor $MIN_COLOURS)." >&2
+		echo "capture_moments:        A frame this flat is not a picture. The usual cause is a STALE" >&2
+		echo "capture_moments:        IMPORT CACHE after a branch switch or rebase, which makes every" >&2
+		echo "capture_moments:        class_name global fail to resolve so no painter draws:" >&2
+		echo "capture_moments:            godot --headless --path . --import" >&2
+		echo "capture_moments:        and re-run. The PNG has been left in place so it can be looked at." >&2
+		fail=1
+	fi
 	i=$((i + 1))
 done
 
