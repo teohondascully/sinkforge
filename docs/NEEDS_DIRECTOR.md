@@ -567,7 +567,7 @@ one is needed, is yours.
 
 **Nothing is blocked on this.** WG-2 and WG-3 are closed, PR #10 is unblocked on its merits.
 
-## P022 · RULED 2026-08-31: carve headroom · The miner's head is 8px inside the ceiling
+## P022 · RULED AND LANDED 2026-08-31 by D0269 · The miner's head is 8px inside the ceiling
 
 **You spotted this in the D0268 capture. It is real, it is measured, and the placement code is not the
 cause.** Probed directly: the sprite's bottom edge and horizontal centre land on the body's AABB to
@@ -610,3 +610,32 @@ sprite rather than this one, and (2) spends art work compensating for a world th
 
 **Meanwhile the port is landed and green** — `MinerLook` is tested, the state table is exhaustive over the
 keys it emits, and the rectangle fallback survives. This is a placement question, not a port defect.
+
+
+---
+
+## P023 · Every milestone capture mints a binding session recording
+
+**Status:** open · **Cost to apply:** one sentence, or a two-line change · **Raised by:** this session,
+2026-08-31, while capturing D0271's HUD.
+
+`tests/body/reveal_scene.gd`'s screenshot path calls `_flush_recording()` before it quits. So a
+`--screenshot-out` run — whose entire purpose is a PNG — also writes a session log into
+`tests/body/recordings/`. Eight capture attempts while tuning the HUD shot produced **eight** of them in
+two minutes.
+
+**Why that is your call and not mine.** `docs/NEEDS_DIRECTOR.md` P002 / D0228 says **every director
+recording is binding until retired**, and `tests/test_recorded_sessions.gd` enforces it. Whether an
+agent-mode capture's incidental log counts as one of those is a question about what the recording
+corpus is FOR, which is the thing that rule protects. I deleted the eight from this session — verified
+by mtime as my own, all within two minutes of my capture loop, none older than the newest tracked
+recording — but I am not changing the behaviour or touching anything already committed.
+
+**What I would do:** make the flush conditional on the run having been a real session — `--play`, or
+agent-drive without `--screenshot-out`. A capture is not a play session, and a corpus that fills with
+throwaway 13-tick agent runs makes "binding until retired" mean less every time someone takes a
+screenshot.
+
+**What it would cost to leave:** nothing today. The count grows by one per capture, and the corpus's
+signal-to-noise falls slowly enough that nobody notices until a `test_recorded_sessions` failure points
+at a log nobody meant to keep.
