@@ -106,6 +106,21 @@ MOMENTS=(
 	"surface|--zoom=6.5 --camera=24,$((SURFACE_ROW + 13))|2"
 	"delve|--mine-down --zoom=6.5 --camera=24,$((SURFACE_ROW + 17))|216"
 	"aim|--mine-down --zoom=13.0 --camera=12,$((SURFACE_ROW + 12))|40"
+	# `grain` IS `aim` AT A DIFFERENT TICK, and the tick is the whole point (D0309). `SeamPainter` lights
+	# the worked cell's bedding plane and the run it would shear — and at tick 40 the scripted agent is
+	# working cell (24, 95), which `Seams.at` answers NONE for. Roughly two thirds of cells carry no grain,
+	# so an ungrained cell is the COMMON case, not bad luck: `aim` was never going to show this painter.
+	#
+	# That was found the hard way. The painter shipped, every suite passed, it was mounted on the real
+	# coordinator, and a full four-moment capture diffed against the parent commit at EXACTLY ZERO pixels
+	# — which is D0289's signature and sent this session hunting a bug that did not exist. What settled it
+	# was printing the painter's own gate: `charging=true cell=(24, 95) seam=0`. At tick 14 the agent is
+	# working (23, 93), which carries a DIAGONAL seam, and the same diff moves 2,962 pixels.
+	#
+	# So the moment is pinned at 14, and the reason is written down rather than left as a number: a future
+	# change to the agent's path or to `Seams`' rates can silently return this moment to an ungrained cell,
+	# and the failure would look exactly like a painter that stopped drawing.
+	"grain|--mine-down --zoom=13.0 --camera=12,$((SURFACE_ROW + 12))|14"
 	# D0244. `horizon` frames the surface datum (row 0) about a third of the way down the frame, which is
 	# the only moment where the backdrop is visible at all -- `surface` at row 13 puts the horizon off the
 	# top edge. Captured in BOTH modes so `SKY=1` and the plain run are a true pair: same seed, same

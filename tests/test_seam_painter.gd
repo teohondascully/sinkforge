@@ -29,6 +29,12 @@ const ROCK: StringName = &"stone"
 ## expression rather than as 5 so it follows `Seams.RUN_CAP` if the Wedge bit ever raises it.
 const MAX_RUN: int = 1 + 2 * (Seams.RUN_CAP - 1)
 
+## Measured 2026-09-01 over seeds [1, 20260826, 424242] of SHALLOW_CLAY, every solid terrain cell:
+## 0.3011 of the rock carries a seam. Pinned as a MEASUREMENT with a band, in the same shape as the carve
+## ratchets, rather than as the 0.3289 the three rates predict under a per-cell independence model that
+## does not hold -- see the cross-check in the test itself.
+const MEASURED_GRAINED: float = 0.3011
+
 
 func _initialize() -> void:
 	_test_the_population_this_suite_needs_actually_exists()
@@ -39,6 +45,7 @@ func _initialize() -> void:
 	_test_the_polyline_is_continuous_along_every_seam_kind()
 	_test_the_wander_bends_rather_than_jumps()
 	_test_the_parting_does_not_lie_on_the_grid()
+	_test_the_grain_is_reachable_in_a_world_the_generator_actually_makes()
 	_finish("seam_painter")
 
 
@@ -317,3 +324,60 @@ func _test_the_parting_does_not_lie_on_the_grid() -> void:
 		_check(worst > 0.0,
 			"seam kind %d strays off its own cell edge (%.3f px). With `WANDER` at 0.0 this is exactly "
 			% [seam, worst] + "0.000 -- a ruled line on a grid boundary, which is the graph-paper defect.")
+
+
+## THE ASSERTION THE CAPTURE NEEDED AND DID NOT HAVE (D0309).
+##
+## Everything above poses a fixture: a slab of one material at a seed searched for until it carried the
+## seam the test wanted. That proves the painter's LOGIC and says nothing about whether a player will
+## ever see it — and the difference is not academic. `SeamPainter` shipped correct, mounted on the real
+## coordinator, with every suite green, and a four-moment capture diffed against the parent commit at
+## **exactly zero pixels**. Nothing here could have caught that, because a searched-for seed is by
+## construction a world with the grain in it.
+##
+## What the capture was actually showing is that at its own tick the agent works cell (24, 95), and
+## `Seams.at` answers NONE there. So this measures the RATE in a real generated world: not "can the
+## grain exist" but "how much of the rock a player digs through carries one".
+##
+## THE BAND IS WIDE ON PURPOSE. `Seams` combines three planes at 0.18 / 0.12 / 0.07, and the union of
+## three independent events at those rates is `1 - 0.82*0.88*0.93 = 0.329`. The assertion is that the
+## measured rate lands near the rate the CONSTANTS predict — which is a check on the wiring, not a pin on
+## taste, and it moves correctly if the director retunes the rates.
+func _test_the_grain_is_reachable_in_a_world_the_generator_actually_makes() -> void:
+	var predicted: float = 1.0 - (
+		(1.0 - float(Seams.RATE_HORIZONTAL) / float(Seams.RATE_DENOMINATOR))
+		* (1.0 - float(Seams.RATE_VERTICAL) / float(Seams.RATE_DENOMINATOR))
+		* (1.0 - float(Seams.RATE_DIAGONAL) / float(Seams.RATE_DENOMINATOR)))
+	var grained: int = 0
+	var solid: int = 0
+	for world_seed: int in [1, 20260826, 424242]:
+		var grid: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, world_seed)
+		for cell: Vector2i in grid.occupied_terrain_cells():
+			solid += 1
+			if Seams.at(cell, world_seed) != Seams.NONE:
+				grained += 1
+	_check(solid > 0, "positive control: the generated worlds contain solid rock at all (%d cells)" % solid)
+	if solid == 0:
+		return
+	var rate: float = float(grained) / float(solid)
+	print("  [OBSERVED] %d of %d solid cells carry a seam (%.4f), constants predict %.4f"
+		% [grained, solid, rate, predicted])
+	_check(absf(rate - MEASURED_GRAINED) < 0.05,
+		"a real generated world grains %.4f of its solid rock, near its measured %.4f (+/-0.05). If this "
+		% [rate, MEASURED_GRAINED] + "falls to zero the mechanic is invisible in play and no fixture in "
+		+ "this file would notice, because every fixture here SEARCHES for a seed that has the grain.")
+	# THE CONSTANTS AS A LOOSE CROSS-CHECK, and the gap between the two numbers is not an error.
+	# `1 - 0.82*0.88*0.93 = 0.3289` treats the three planes as independent PER-CELL events. They are not:
+	# `Seams.at` keys bedding to the ROW and joints to the COLUMN, so a whole row or column is in or out
+	# together, and over 48 columns the vertical term alone carries real sampling error. The measured
+	# 0.3011 is the truth and 0.3289 is a model of it; this bound is wide enough to say "the rates are
+	# wired to the outcome" without pretending the model is exact.
+	_check(absf(rate - predicted) < 0.10,
+		"...and it tracks the %.4f its own three rates predict, within a bound wide enough for the fact "
+		% predicted + "that the planes are row- and column-quantised rather than per-cell (measured "
+		+ "%.4f). A rate change that moved nothing here would mean the constants are decorative." % rate)
+	# ...and the other direction, which is the one the capture actually tripped over: most rock is BARE.
+	_check(rate < 0.5,
+		"...and most solid rock carries NO grain (%.4f grained) -- which is why a capture aimed at an "
+		% rate + "arbitrary tick shows nothing, and why `tools/capture_moments.sh` pins the `grain` "
+		+ "moment to a tick whose worked cell is known to be grained rather than trusting the odds")
