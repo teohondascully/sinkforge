@@ -26,7 +26,15 @@ const TERRAIN_CELLS_PER_METER: int = 4  # docs/ARCHITECTURE.md §9: 16px/m world
 ## Legacy's DENSITY_ROWS: the world height ore/coal/iron's *_per_col rates were calibrated to. Ported as
 ## a literal so a much taller shaft still gets a comparable density per unit volume, not a comparable
 ## density per column (`legacy/src/core/layered_world_gen.gd` _density_count's whole reason to exist).
-const DENSITY_ROWS: int = 80
+##
+## **320, NOT 80** (WG-4 item 11, D0305). It is a ROW COUNT, and legacy's 80 rows are 80 METRES because a
+## legacy cell is one metre square. Eighty of THIS build's rows are twenty metres, so the literal came
+## over meaning a quarter of what it says. Seeds per cell is `per_col / DENSITY_ROWS` and is independent
+## of world size, so this constant and the three `*_attempts_per_col` fields multiply: 320 together with
+## the /4 on the rates is exactly /16, which is what takes ore from 0.20000 seeds/m^2 back to legacy's
+## own 0.01250. Neither half is correct alone, and correcting one without the other moves the world by
+## 16x in whichever direction was touched.
+const DENSITY_ROWS: int = 320
 
 ## `legacy/src/core/layered_world_gen.gd:31` `CAVE_SHELF_BIAS`. See `_carve_caves` for what it does and
 ## why it is the one constant of the three P021 passes that is dimensionless.

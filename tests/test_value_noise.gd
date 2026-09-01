@@ -102,7 +102,11 @@ func _test_high_seed_bits_reach_the_field() -> void:
 ## here rather than discovered later as an unexplained change in cave density.
 func _test_calibrated_distribution_matches_fastnoiselite() -> void:
 	var x_stretch: float = 2.1
-	var frequency: float = 0.11
+	# READ FROM THE DATA, not typed (D0305). This suite exists to prove our value noise matches
+	# FastNoiseLite at the frequency THE GAME ACTUALLY USES, and a literal here is a second copy of that
+	# number which has to be kept in step by hand -- exactly the drift `tools/list_ci_gates.py` was
+	# written to end one directory over. One source, read twice.
+	var frequency: float = float(StrataData.SHALLOW_CLAY["cave"]["frequency"])
 	var vn_sum: float = 0.0
 	var vn_sq_sum: float = 0.0
 	var fnl_sum: float = 0.0
@@ -153,7 +157,11 @@ func _test_calibrated_distribution_matches_fastnoiselite() -> void:
 ## hole. Asserting only "shelf carves sometimes" would pass on a field that carved everything.
 func _test_calibrated_tail_matches_fastnoiselite() -> void:
 	var x_stretch: float = 2.1
-	var frequency: float = 0.11
+	# READ FROM THE DATA, not typed (D0305). This suite exists to prove our value noise matches
+	# FastNoiseLite at the frequency THE GAME ACTUALLY USES, and a literal here is a second copy of that
+	# number which has to be kept in step by hand -- exactly the drift `tools/list_ci_gates.py` was
+	# written to end one directory over. One source, read twice.
+	var frequency: float = float(StrataData.SHALLOW_CLAY["cave"]["frequency"])
 	var thresholds: Array[float] = [0.31, 0.47, 0.65]
 	# Tolerance widens with rarity, and that is a statement about what each row can support rather than a
 	# band loosened until it passed. At 0.31 the rate is ~0.12 over 30,720 samples -- thousands of events,

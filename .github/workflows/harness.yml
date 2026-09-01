@@ -307,6 +307,7 @@ jobs:
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
       #   test_shaft_generator.gd                        test_shaft_generator
+      #   test_ore_bodies.gd                             test_ore_bodies (vein size distribution — the only thing that can see WG-4, D0305)
       #   test_heightfield.gd                            test_heightfield
       #   test_body.gd                                   test_body
       #   test_body_dig.gd                               test_body_dig (the dig half, split out at D0269 -- which cell, which rows, what it reports)
@@ -368,6 +369,7 @@ jobs:
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \
             res://tests/test_shaft_generator.gd \
+            res://tests/test_ore_bodies.gd \
             res://tests/test_heightfield.gd \
             res://tests/test_body.gd \
             res://tests/test_body_dig.gd \
