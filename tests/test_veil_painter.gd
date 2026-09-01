@@ -26,6 +26,8 @@ func _initialize() -> void:
 	_test_burial_darkens_and_a_face_barely_does()
 	_test_the_key_separates_a_floor_from_a_ceiling_at_equal_burial()
 	_test_the_cache_returns_the_same_field_and_misses_when_a_cell_changes()
+	_test_the_lamp_opens_the_veil_around_the_miner_and_not_far_from_it()
+	_test_the_lamp_is_dimmer_in_daylight_than_in_the_deep()
 	_test_an_incomplete_frame_paints_nothing()
 	_finish("veil_painter")
 
@@ -243,3 +245,51 @@ func _test_an_incomplete_frame_paints_nothing() -> void:
 	VeilPainter.paint(Frame.new(), node)
 	node.free()
 	_check(true, "no frame, and a frame with no observation, each paint nothing rather than erroring")
+
+
+## THE LAMP CUTS THE VEIL, which is the half that makes rock visible (D0306). Legacy is explicit that
+## this is not a glow over the top: "Light reveals, it does not paint... it cuts a wide hole in the
+## darkness veil, which is what actually makes rock visible", and that an additive term strong enough to
+## swamp the reveal "repaints the rock the veil just uncovered".
+func _test_the_lamp_opens_the_veil_around_the_miner_and_not_far_from_it() -> void:
+	var obs: Interface.Observation = _world(_chamber(30, 40, 46, 52))
+	var here: Vector2i = obs.cell
+	var near_lift: float = VeilPainter.lamp_lift(obs, here)
+	var far_lift: float = VeilPainter.lamp_lift(obs,
+		here + Vector2i(VeilPainter.LAMP_BEAM_M * MaterialLook.CELLS_PER_METRE * 3, 0))
+	print("  [OBSERVED] lamp lift at the miner %.4f, three beam-radii away %.4f" % [near_lift, far_lift])
+	_check(near_lift > 0.3, "the miner's own cell is well lit (%.4f)" % near_lift)
+	_check(is_zero_approx(far_lift),
+		"and a cell three beam radii away gets nothing (%.4f) -- a lamp that lit the whole window would "
+		% far_lift + "undo the veil rather than cut it")
+	_check(VeilPainter.lamp_lift(null, here) == 0.0, "a null observation lights nothing")
+	# FALLOFF, MEASURED AT THE RIGHT SCALE. A step-by-step monotonicity check was tried first and failed
+	# at 24 of 36 steps -- correctly, because legacy's grain texture deliberately breaks the pool's outer
+	# half so "light dissolves into the rock grain as it fades". A per-step check measures the grain, not
+	# the falloff. The mean of the near half against the far half is the quantity the grain cannot flip.
+	var near_sum: float = 0.0
+	var far_sum: float = 0.0
+	var half: int = int(VeilPainter.LAMP_BEAM_M) * MaterialLook.CELLS_PER_METRE / 2
+	for k: int in range(0, half):
+		near_sum += VeilPainter.lamp_lift(obs, here + Vector2i(0, k))
+		far_sum += VeilPainter.lamp_lift(obs, here + Vector2i(0, k + half))
+	print("  [OBSERVED] pool mean over the near half %.4f, over the far half %.4f"
+		% [near_sum / float(half), far_sum / float(half)])
+	_check(near_sum > far_sum * 1.5,
+		"the pool is brighter near the lamp than far from it (%.4f vs %.4f over %d cells each)"
+		% [near_sum / float(half), far_sum / float(half), half])
+
+
+## Legacy's own regression, ported with it: "at spawn the full-strength lamp washed out both the avatar
+## and the starter ore it sits on, so every warm thing read as a lamp." A full blaze in the deep, a dim
+## glow in daylight — and a FLOOR, never off, or the surface has no lamp at all.
+func _test_the_lamp_is_dimmer_in_daylight_than_in_the_deep() -> void:
+	var surface: float = VeilPainter.lamp_scale(MaterialLook.SURFACE_ROW)
+	var deep: float = VeilPainter.lamp_scale(MaterialLook.SURFACE_ROW
+		+ int(VeilPainter.LAMP_FULL_M) * MaterialLook.CELLS_PER_METRE)
+	print("  [OBSERVED] lamp scale at the surface %.2f, at %.0f m %.2f"
+		% [surface, VeilPainter.LAMP_FULL_M, deep])
+	_check(is_equal_approx(surface, VeilPainter.LAMP_SURFACE_SCALE),
+		"at the surface the lamp sits at legacy's %.2f floor (%.2f)" % [VeilPainter.LAMP_SURFACE_SCALE, surface])
+	_check(is_equal_approx(deep, 1.0), "in the deep it is at full strength (%.2f)" % deep)
+	_check(surface > 0.0, "...and it is never switched OFF -- a floor, not a gate")

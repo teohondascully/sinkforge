@@ -12754,3 +12754,50 @@ one noise period and lateral cave structure disappears. It ships next, tuned and
 
 **Reverse cost:** the twelve constants back to their old values, the ratchet centres back, the seed back
 to 8, and `test_ore_bodies.gd` deleted. The goldens re-pin either way.
+## D0306 · 2026-09-01 · Lane B view-side — the lamp cuts the veil
+
+**"Light reveals, it does not paint."** `legacy/scenes/world_renderer.gd:3221 _veil_cut`, and the sentence
+is the architecture rather than a flourish. The lamp does two jobs and only one of them is a glow: it cuts
+a hole in the darkness veil — "which is what actually makes rock visible" — and adds an amber bloom on
+top. Legacy records what happens when the second is asked to do the first's job: "an additive term strong
+enough to swamp the reveal repaints the rock the veil just uncovered: three overlapping pools summed past
+1.0, tripped the glow threshold and blew the centre of the frame to a white smear."
+
+So the lamp lands INSIDE `VeilPainter`, not as a painter over it. D0302 shipped the veil and made the deep
+correctly and unusably dark, and named the missing counterpart; this is that counterpart.
+
+Three cuts at legacy's own radii and strengths — beam 9 m at 0.99, throat 5 m at 0.8, body 3.4 m at 0.5 —
+held in METRES, since a legacy cell is one metre. Composited legacy's way: each source lifts whatever the
+previous one left, `l -> l + (1 - l) * lift`, "so overlapping pools brighten toward full light and can
+never overshoot it". The textured falloff comes over unchanged: two crossed sines under a window that
+vanishes at both the hot core and the dead fringe, "so light dissolves into the rock grain as it fades".
+
+**The beam leads toward the cell being WORKED, and that is a substitution.** Legacy leads toward the
+cursor's aim; nothing puts an aim on the `Observation`, so the lead follows `mining_charging_cell` when
+there is one and `facing` otherwise. Same intent — the pool goes where the attention is — expressed in
+what actually crosses the L2 door.
+
+**Legacy's own regression came over with it.** `lamp_scale` dims the lamp in daylight, because "at spawn
+the full-strength lamp washed out both the avatar and the starter ore it sits on, so every warm thing read
+as a lamp". Legacy scales by `_skylight_alpha / AMBIENT_DARK`; there is no skylight term here, so it reads
+depth — the SAME substitution `GlintPainter.depth_gate` makes, resolved the same way on purpose so the two
+cannot disagree about what "deep" means. A floor at legacy's 0.30, never off.
+
+**A test that measured the wrong thing, caught by its own failure.** The falloff was first asserted as
+per-step monotonicity and failed at 24 of 36 steps — correctly, because the grain texture deliberately
+breaks the pool's outer half. A per-step check measures the GRAIN, not the falloff. Replaced by the mean
+of the near half against the far half, which the grain cannot flip: **0.2299 against 0.0227**, a 10×
+falloff. Same lesson as the veil's own absolute-RGB floor: the instrument has to be at the scale of the
+thing it is asked about.
+
+**What is still not ported, stated rather than implied.** The amber TINT. Legacy's cut lifts each channel
+toward `255 * tint` so lamp-lit rock comes out amber, which needs a multiply-blend light layer; this
+build's veil is a black-alpha overlay, so the cut here is a pure luminance reveal. The reveal is the
+load-bearing half and the tint is not guessed at — it comes with the blend-mode change, on its own commit.
+`_skylight_alpha` also remains unported: its three legacy call sites all scale light SOURCES rather than
+the veil base, so where the veil's own depth term lives is a question this port has NOT answered and is
+not going to assert an answer to.
+
+**BUILT-PARKED with a capture.** Distinct colours: delve 592 -> 673, surface 631 -> 779.
+
+**Reverse cost:** delete the lamp block and the one `s += (1.0 - s) * lamp_lift(...)` line.
