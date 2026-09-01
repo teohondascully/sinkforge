@@ -680,3 +680,44 @@ the edge in the same place.
 The magnitude and the breach flag are both available now, so a build that rings only on the BREAK is
 possible today without this ruling — it would just be a flag that flips, which is the thing legacy's own
 comment says not to do.
+
+
+---
+
+## P025 · `Frame.anim_time` is pinned to 0.0, and 28+ backlog rows are inert until it moves
+
+**Status:** open · **Cost to apply:** ~3 lines and one ruling · **Raised by:** this session, 2026-08-31
+(hit while porting D0275's cracks; it is `docs/LEGACY_GAP.md` PRE-1, the highest-leverage prerequisite
+in the whole document).
+
+`view/world_view.gd:28` — `const ANIM_TIME: float = 0.0`. **You ruled this correctly** (Q5, "pin it"),
+and the reasoning was right at the time: this build starts underground, no time system was authored, and
+a wall clock in the frame would have been a field nothing could use. It is a `const` rather than a `var`
+specifically so "the clock does not advance" is a property of the type.
+
+**What has changed since is that the animated backlog arrived.** Every one of these ports and then sits
+frozen: crumble chunks (T1 #5's other half, the part I did NOT land in D0275), the status pulse, working
+machine glyphs, the construction overlay, the need bubble, rope sway, payout rise, godrays, glint flares,
+the lamp flicker, surface life. `LEGACY_GAP` counts 28+ rows. Each would be lifted, be correct, and show
+nothing — which is `view/visuals/art.gd` again: shipped, tested, referenced by nothing for four sessions.
+
+**The three candidates.**
+
+1. **A cosmetic tick counter.** `anim_time` becomes the render tick count / 60.0. Monotonic, deterministic
+   given a tick count, and it cannot desync from the sim because it IS the sim's clock. Captures stay
+   comparable if the capture pins the tick, which `--screenshot-tick` already does.
+2. **A wall clock** (`Time.get_ticks_msec()`). What legacy used. Simplest, and **it breaks screenshot
+   comparison**: two captures of the same tick would differ. Against this project's whole capture
+   discipline, so I would not take it.
+3. **Depth-driven rather than time-driven.** Your own earlier note on the sky says variation should be
+   "depth-driven, not wall-clock-driven". That works for ambience and not for a crumble that must play
+   out over 0.24s after a specific event.
+
+**My recommendation: (1), the cosmetic tick counter, and keep the `const`-becomes-`var` narrow** — one
+value on `WorldView`, advanced by whoever already calls `refresh()`, with the existing `ANIM_TIME`
+retained as the value a test poses. It preserves determinism, preserves capture comparability, and is
+the only one of the three that can carry a timed one-shot like crumble.
+
+**What it blocks right now:** the crumble half of T1 #5, which is otherwise ready — the sim already
+reports `broke_cells` through the door as of D0274, so the four quadrant chunks over `CRUMBLE_DUR 0.24`
+are a straight port the moment there is a clock to run them against.

@@ -38,7 +38,7 @@ call. Not finishing something.
 | C · sprites/visuals | **UNBLOCKED and moving** — miner sprite (D0268), headroom (D0269) | — |
 | F · HUD/UI | **UNBLOCKED** — the host exists (D0271), depth chip shipped | — |
 | A · camera/framing | **UNBLOCKED** — follow/lead/pixel-snap shipped (D0273) | — |
-| E · mining feedback | **UNBLOCKED for cracks/crumble** (D0274 opened the L2 door) | ring cadence: P024 |
+| E · mining feedback | **UNBLOCKED and moving** — cracks shipped (D0275); crumble wants PRE-1 | crumble: PRE-1 (P025) · ring: P024 |
 | G · audio | OPEN — the score is wired; SFX want P024's swing edge for the RING only | partly P024 |
 | D · harness | OPEN — O(1) hash (D0261), suite selection (D0260), runner diagnostic (D0272) | — |
 | B · world-gen, view side | OPEN, decision-free | — |
@@ -69,6 +69,8 @@ call. Not finishing something.
 - [x] **LANE D · determinism fast-track** (§6) — DONE (D0261) — `state_signature()` to an O(1) running hash, ~74s → ~5s.
       **Guard:** the hash IS the determinism contract; it must update on every mutation path, and a
       forgotten update must be mutation-proven to break a test, or it does not ship.
+- [x] **PRE-3 · the L2 door onto the mining verb** (D0274) — unblocked six backlog items.
+- [x] **T1 #5 · mine cracks** (D0275). Crumble needs PRE-1's clock and parks.
 - [ ] **LANE B, view-side only** — depth shading, light pool, shadow veil, parallax, back-wall. No
       constant, no threshold; runs while B's sim-side sits parked.
 - [ ] **P021 measurement (decision-free half)** — instrument TOTAL void fraction (caves + ruins +
