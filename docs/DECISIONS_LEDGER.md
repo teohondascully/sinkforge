@@ -12878,3 +12878,88 @@ never locally.
 `reveal.*` and `pending_sim_economy.*` untouched. `tools/probe_cave_freq.gd` was a throwaway sweep
 harness and is deleted rather than shipped — its output is the table above, which is the part worth
 keeping.
+## D0308 · 2026-09-01 · PRE-4 closed, and the grain gets its first caller after four sessions unwired
+
+**One `int` was the whole prerequisite.** `core/seams.gd` has been in this repository since D0227: fully
+ported from `legacy/src/data/seams.gd`, converted from floats to integers, proven exact as a unit over
+all 196,608 inputs, with its own suite — and **called by nothing** except `sky_painter`'s starfield hash.
+Its own header says so out loud: *"NOT WIRED TO ANYTHING YET, stated so nobody reads its presence as a
+shipped mechanic."* What kept it unwired was not difficulty. `Seams.at(cell, world_seed)` needs the seed;
+the seed lives on `TileGrid`; `TileGrid` is `sim/`; and `view/` may reach only `{interface, core}`. So
+`Observation.world_seed` is added here — a COPY, like every other field, never a handle back into the sim
+— and `docs/LEGACY_GAP.md` PRE-4 closes.
+
+**`view/visuals/seam_painter.gd`**, ported from `legacy/scenes/world_renderer.gd:2262-2344`
+(`_draw_seams`, `_seam_wander`, `_stroke_seam`, `_aim_run`). It is the first thing in this build ever to
+call `Seams.at`.
+
+**THE LOAD-BEARING DECISION IS LEGACY'S AND IT IS A REFUSAL.** There is no ambient pass. `Seams.at` keys
+bedding to the ROW and joints to the COLUMN, so one plane spans the entire world; each cell laying its
+stroke on its own edge makes a run of them a ruled line lying exactly on a cell boundary. At the shipped
+rates that is 18% of rows and 12% of columns ruled on the grid in ink — legacy's words: *"which reads as
+graph paper: a renderer drawing its own storage layout."* **Drawing the grain everywhere is the obvious
+implementation, it is wrong, and it is wrong in a way a screenshot of a small window would not reveal.**
+So the cursor answers instead: the worked cell lights its own plane and the run it would shear.
+
+**ONE NARROWING, STATED RATHER THAN SILENT.** Legacy triggers on HOVER (`_aim`, gated by `_aim_in_reach
+and _aim_bites`). This build has no hover at L2; what it has is `mining_charging_cell`, set only on a
+tick where a hold actually advanced a cell. So the grain lights while you are WORKING a cell rather than
+while pointing at one. Legacy's purpose survives — the grain must be readable *before* the blow or the
+calve is a slot machine — and when a hover target reaches L2 this reads it instead.
+
+**THE SCALE CONVERSION.** Legacy's stroke widths are absolute pixels in a world where a 32px cell was one
+metre. This build is 16px/metre, so every legacy pixel is 0.5 here: 2.2 → 1.1, 2.4 → 1.2, 1.7 → 0.85.
+`SEAM_WANDER 0.30` is in CELLS, is dimensionless, and crosses untouched. Same factor as WG-4's absolute
+lengths (D0305).
+
+**MUTATION-TESTED, AND TWO OF THE SEVEN MUTANTS ESCAPED THE FIRST SUITE.** Both escapes were real holes
+and both are now closed; the third is a deliberate non-gate.
+
+| mutant | first suite | now |
+|---|---|---|
+| ignore `mining_is_charging` (an ambient pass) | CAUGHT | CAUGHT |
+| wander becomes a hash (steps, not bends) | CAUGHT | CAUGHT |
+| run cap raised past the calve | CAUGHT | CAUGHT |
+| a dug-out worked cell still draws | CAUGHT | CAUGHT |
+| **seam gate dropped from the walk** | **NOT CAUGHT** | CAUGHT |
+| **`NONE` cells light up too** | **NOT CAUGHT** | CAUGHT |
+| `WANDER` halved 0.30 → 0.15 | NOT CAUGHT | **deliberately not gated** |
+
+**THE FIRST ESCAPE IS THE ONE WORTH THE ENTRY, AND IT IS `[[mechanism-vs-population]]` EXACTLY.** The
+suite asserted "every cell in the run shares the worked cell's seam" and posed it on a HORIZONTAL run.
+A horizontal run walks `(1, 0)`, so every cell in it shares the worked cell's ROW — and `Seams.at` keys
+HORIZONTAL to the row. **Every cell along a horizontal run is horizontal by construction.** The gate was
+vacuous over the only population the suite ever drew, and deleting it changed nothing. The gate is
+reachable only where a HIGHER-PRECEDENCE plane crosses the run: `at()` answers bedding, then joint, then
+diagonal, so a cell partway down a VERTICAL run whose row is a bedding plane answers HORIZONTAL and
+breaks it. That case is now SEARCHED for, with a control that fails if the search comes up empty.
+
+**The second escape had a mechanism nobody would guess from the guard's text.** `Seams.terrain_axis(NONE)`
+is `Vector2i.ZERO`, so a walk without the `NONE` check steps by nothing and appends the SAME cell
+`RUN_CAP - 1` times in each direction. The mutant's own failure message reports it: *"a worked cell with
+NO grain draws nothing (5 cells)"*. No fixture had ever worked an ungrained cell, which is roughly two
+thirds of the world.
+
+**AND ONE MUTANT IS DELIBERATELY NOT CAUGHT.** Halving `WANDER` goes green and should. How far a parting
+strays from its cell line is a LOOK call, and a suite that fails when the director nudges it has
+appointed itself the art director. What IS gated is the floor, and the floor is DERIVED, not chosen: at
+`WANDER 0.0` the deviation is exactly 0.000 px, so `> 0.0` separates "the wander is there" from "the
+wander was deleted" and nothing else. `[[floor-below-the-residual]]`.
+
+**Z-ORDER.** `SEAM_Z -35`, above the veil, for the same reason the glint is and one more: this is an AIM
+READOUT, not scenery, and a readout the veil can dim is a readout that stops working in the exact place
+the game is played.
+
+**THREE STALE COMMENTS CORRECTED WHILE HERE, all of the same kind — prose shipped beside code that
+refutes it** (`[[superseded-draft-above-its-amendment]]`). `reveal_view_setup.gd` said *"There is no veil
+here yet (T1 #2)"* in a block that adds the veil, and said it twice in one paragraph, which is the tell.
+Its layer map omitted the veil, the glint and the seam. `material_look.gd` said *"This build has no veil,
+so the boost would not be compensating for anything — it comes back WITH the veil, not before it"* — the
+veil landed at D0302, **so that deferral's own stated precondition is now met and the depth boost is
+DUE.** Not folded in here: it changes the colour of every rock pixel and belongs in a commit whose
+captures are about exactly that.
+
+**`docs/LEGACY_GAP.md` had recorded none of the prerequisite closures.** Three of the four are now closed
+(PRE-1 D0277, PRE-3 D0279/D0293, PRE-4 here) and the section still ranked all four as gating. PRE-2, the
+`Fx` vector layer, is the only one genuinely open — verified in the tree, not inferred: `core/fixed_point.gd`
+has no `normalize`, `dot` or `limit_length`. T1 #4 was likewise landed at D0276 and its row never said so.

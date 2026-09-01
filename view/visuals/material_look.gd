@@ -214,12 +214,16 @@ func zone_tinted(base: Color, row: int) -> Color:
 
 ## Legacy `world_renderer.gd:1596 _cell_tone`, as `(jitter, bedding)`.
 ##
-## THE DEPTH BOOST IS DELIBERATELY NOT PORTED. Legacy multiplies both terms by `1 + depth * 2.2` for one
-## stated reason: the shadow veil takes roughly half a cell's tonal range, so the compensation must
-## exceed 2x by the deep band or bedding does not read down there at all. This build has no veil (see
-## `_depth_darkened` below, which reports the same finding from the other direction), so the boost would
-## not be compensating for anything -- it would just make deep rock louder than shallow rock for no
-## reason a player could name. It comes back WITH the veil, not before it.
+## THE DEPTH BOOST IS NOT PORTED YET, AND ITS STATED PRECONDITION HAS NOW ARRIVED. Legacy multiplies both
+## terms by `1 + depth * 2.2` for one reason: the shadow veil takes roughly half a cell's tonal range, so
+## the compensation must exceed 2x by the deep band or bedding does not read down there at all.
+##
+## This paragraph used to say "this build has no veil, so the boost would not be compensating for
+## anything -- it comes back WITH the veil, not before it." **The veil landed 2026-09-01 (D0302, lamp
+## D0306), so the condition this deferral named is met and the boost is DUE.** It is deliberately not
+## folded into D0308's seam work: it changes the colour of every rock pixel in the game and belongs in a
+## commit whose captures are about exactly that, measured against the veil that now exists rather than
+## against the flat fill this note was written under.
 ## `bedded` is false for ore-bearing rock, which takes the JITTER but not the BEDDING -- see the note on
 ## `cell_color`. The jitter is a small achromatic value drift and breaks a flat fill either way; the
 ## bedding is a hue move toward `STRATA_WARM`/`STRATA_COOL` and is a statement about sedimentary

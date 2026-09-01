@@ -61,6 +61,14 @@ class Observation:
 	##
 	## A copy like every other field here, never a reference to the grid (ARCHITECTURE §3).
 	var world_cells: Vector2i
+	## THE WORLD SEED, and the whole of `docs/LEGACY_GAP.md` PRE-4 (D0308). `core/seams.gd` is fully
+	## ported, integer-exact over all 196,608 inputs, and `Seams.at(cell, world_seed)` could not be called
+	## by anything in `view/` because the seed was on `TileGrid` and `TileGrid` is `sim/`. One `int`.
+	##
+	## It is a SEED, not a handle: a painter may hash it and must never treat it as a key back into the
+	## sim. `Seams` is a pure function of `(coordinate, world_seed)` and never saved, which is exactly why
+	## this field is enough to draw the grain without the renderer reaching across the L2 boundary.
+	var world_seed: int = 0
 	## Row-major over `window`, one byte per cell: an index into `legend`. 0 is always the empty
 	## material, so `solid_at` is a byte comparison and not a string one.
 	var materials: PackedByteArray
@@ -275,6 +283,7 @@ func observe(envelope: Envelope) -> Observation:
 	o.cell = Vector2i(Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y))
 	o.window = envelope.window
 	o.world_cells = Vector2i(_grid.width, _grid.height)
+	o.world_seed = _grid.seed
 	o.cell_px = Heightfield.TERRAIN_CELL_PX
 	_fill_window(o)
 	_fill_mining(o)
