@@ -28,6 +28,10 @@ const TERRAIN_CELLS_PER_METER: int = 4  # docs/ARCHITECTURE.md §9: 16px/m world
 ## density per column (`legacy/src/core/layered_world_gen.gd` _density_count's whole reason to exist).
 const DENSITY_ROWS: int = 80
 
+## `legacy/src/core/layered_world_gen.gd:31` `CAVE_SHELF_BIAS`. See `_carve_caves` for what it does and
+## why it is the one constant of the three P021 passes that is dimensionless.
+const SHELF_BIAS: float = 0.10
+
 const _HOST_ROCK: Array[StringName] = [&"clay", &"hardrock", &"deepstone"]
 
 
@@ -45,6 +49,15 @@ static func generate(site: Dictionary, seed: int) -> TileGrid:
 	# Cave noise is a pure function of the world seed, not the vein RNG stream -- order-independent of
 	# how many vein draws happen before or after it, matching legacy's own separation of the two.
 	_carve_caves(grid, site["cave"], site["strata_shelf"], seed)
+	# P021's two unported passes, in legacy's own order: halls first, then the worms that thread them and
+	# the noise pockets into one system. Both draw from a SPLIT of the terrain stream rather than from it
+	# directly, so adding them cannot shift a single vein or ruin draw -- the whole point of `SplitRng`,
+	# and what keeps this from re-rolling every ore body in every world (`CavePasses`, D0291).
+	var carve_rng: SplitRng = rng.split("carve_passes")
+	CavePasses.carve_big_caverns(grid, carve_rng, int(thresholds["stonereach_end"]) * TERRAIN_CELLS_PER_METER,
+		int(site["cave"]["min_depth_cells"]), TERRAIN_CELLS_PER_METER)
+	CavePasses.carve_tunnels(grid, carve_rng, int(site["cave"]["min_depth_cells"]),
+		TERRAIN_CELLS_PER_METER)
 	# Caves carved first: vein growth only ever replaces solid host rock, so an already-open cave cell
 	# is naturally skipped, same as legacy.
 	_scatter_vein_material(grid, rng, site["ore"], &"ore_copper")
@@ -112,6 +125,17 @@ static func _carve_caves(grid: TileGrid, cave_cfg: Dictionary, shelf_cfg: Dictio
 			var threshold: float = lerpf(threshold_top, threshold_deep, depth_frac)
 			if _is_shelf_band(row, band_height, shelf_every):
 				threshold += shelf_resist
+			# THE OVERHANG BIAS (P021, `layered_world_gen.gd:360-364`), the third of the three passes
+			# D0017 left behind and the only one that lands here rather than in `CavePasses`. Asymmetric
+			# on purpose, and legacy says why in one line: "easier just under a shelf (undercut), harder
+			# just above one (roof pools)". It is what turns a hard band from a stripe of resistant rock
+			# into a LEDGE with space under it -- the shelf survives, and the cave hangs beneath it.
+			#
+			# Dimensionless, so it needs no conversion: it moves a noise threshold, not a distance.
+			elif _is_shelf_band(row - 1, band_height, shelf_every):
+				threshold -= SHELF_BIAS
+			elif _is_shelf_band(row + 1, band_height, shelf_every):
+				threshold += SHELF_BIAS
 			var noise_x: float = float(col) / x_stretch * frequency
 			var noise_y: float = float(row) * frequency
 			# threshold_top/threshold_deep are ported directly from legacy's FastNoiseLite-tuned
