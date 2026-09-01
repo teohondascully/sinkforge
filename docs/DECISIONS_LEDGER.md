@@ -12296,3 +12296,53 @@ the failure count now — a witness, per this ledger's own `existence-probe-has-
 has already walked and jumped. The mechanism, visible in one frame.
 
 **Reverse cost:** delete `view/hud/key_legend.gd` and its suite, drop the `add_stateful_chip` line.
+
+## D0298 · 2026-08-31 · harness, throughput
+
+**The ledger conflicted on every single rebase, and the resolution was always the same one.**
+
+This run batches 3-4 units per branch and cuts each new branch from `main`, so branches are rebased
+constantly. Every one of those rebases stopped on `docs/DECISIONS_LEDGER.md` — three times in the last
+hour — because both sides had appended an entry, which is precisely what the file is *for*. The
+resolution is identical every time: keep both. That is not a judgment call being made repeatedly; it is
+one judgment call being re-typed, and re-typing it by hand is where a real entry eventually gets dropped.
+
+`.gitattributes` now carries `docs/DECISIONS_LEDGER.md merge=union`. Git's union driver concatenates both
+sides' hunks in order with no markers. **Verified, not assumed** — the same three-commit rebase run three
+ways in scratch repositories: with the attribute, `rebase_rc=0`, no conflict, and the file holds both
+entries; with no `.gitattributes`, and with the attribute pointed at a different filename, `rebase_rc=1`
+and a conflict both times. A `.gitattributes` line that silently did nothing would look exactly like
+success from here, which is why the two controls exist.
+
+**Union merge is the right resolver for this file and a corrupting one for any file that is edited in
+place**, so the attribute names one path and not a glob. `WORKING.md` and `BRIEF.md` are deliberately
+excluded: they are rewritten each session, and a union merge there would duplicate prose rather than
+preserve appends.
+
+**The gate is the other half of the trade, not an accessory.** Union merge fails *silently* when the
+append-only rule is broken — it will happily emit a file containing one entry twice and report success —
+and a quiet, rare corruption of the project's own address space is a worse trade than a loud, frequent
+conflict. So `tools/layer_lint/check_ledger_integrity.py` ships in the same commit and in the same CI job:
+a number declared twice, a back-reference to an entry that is no longer present (what a merge that
+*dropped* a block looks like from the inside), a conflict marker committed into the file, and a ledger
+that parses to almost nothing. 9/9 mutation branches observed.
+
+**What the first version of this got wrong, and the finding underneath it.** A scan for `^## D0\d{3}`
+reported D0004 and D0019 as duplicated, and an earlier session had already written that down as "two
+pre-existing duplicates" and moved on. They are not duplicates. The ledger has **three** heading forms:
+
+    ## D0004 · 2026-08-26 · core/ — NOT DECIDED, stopped per instruction   <- a DECLARATION
+    ## D0004 — RESOLVED, 2026-08-26                                        <- a continuation
+    ## D0019/D0020 · 2026-08-26 · addendum — the wrapper-type cost         <- a joint addendum
+
+Only the first opens an address; the other two revisit addresses that already exist, which is something
+this ledger does on purpose and must keep being allowed to do. Enumerating the forms before writing the
+rule turned a two-entry grandfather list into **no grandfather list at all**: there are 293 declarations,
+all distinct, and there never were any duplicates. A gate built on the crude scan would have shipped with
+two permanent exemptions covering a defect that does not exist — and, worse, would have been *unable to
+fault a genuine duplicate at those two numbers*. Memory: *declaration forms a scan omits*.
+
+The sed/`uniq -c` version of that same count disagreed with the Python one (294 vs 293) because `.` in a
+multibyte locale matched a byte, not the `·`. Two instruments, two numbers, and the shell one was wrong.
+
+**Reverse cost:** delete `.gitattributes` and the gate, drop the workflow step. Rebases conflict again.

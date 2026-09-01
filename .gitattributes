@@ -1,0 +1,19 @@
+# Merge behaviour. See `docs/DECISIONS_LEDGER.md` D0298.
+#
+# The ledger is APPEND-ONLY by rule: `CLAUDE.md` forbids editing or reusing an entry number, because the
+# numbers are addresses cited from commit messages, docs and code comments. Two branches that each append
+# an entry therefore conflict on every rebase, always in the same way, always resolved the same way --
+# keep both. `merge=union` is git's own resolver for exactly that file shape: it concatenates both sides'
+# hunks in order, leaves no markers, and needs no human.
+#
+# Union merge is only safe because the append-only rule holds, and it fails SILENTLY if that rule is ever
+# broken -- it will produce a file with one entry in it twice and report success. So it ships together
+# with `tools/layer_lint/check_ledger_integrity.py`, which faults a number declared twice, a back-
+# reference to an entry no longer present, and a conflict marker committed into the file. Enabling the
+# resolver without that gate would be trading a loud, frequent conflict for a quiet, rare corruption,
+# which is the wrong direction for this project specifically.
+#
+# Deliberately NOT applied to `docs/WORKING.md`, `docs/BRIEF.md` or the other normative docs: those are
+# edited in place, so a union merge would duplicate prose rather than preserve appends. This line covers
+# the one file whose append-only discipline is actually enforced.
+docs/DECISIONS_LEDGER.md merge=union
