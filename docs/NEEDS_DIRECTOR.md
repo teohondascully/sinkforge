@@ -21,6 +21,24 @@ are deleted per the rule above; the ledger carries the rulings.
 
 **Closed 2026-08-30 by the coordinator rebuild, ruled and applied:** P011 (the painter contract — all five questions answered; `Seams` to `core/` is D0237, the two L2 doors are D0238, the skeleton is D0240, Phase 2 is confirmed as `sky_painter` + `terrain_painter`, and the day/night clock is pinned). **P013** (view/ may read appearance data; `data` is a modelled layer now and the edge is enforced with a laundering guard rather than merely permitted — D0243).
 
+
+**Audited 2026-09-01 against the tree, and four entries were lying about their own state.** P017, P024
+and P025 said **"Status: open"** while their rulings had shipped (D0292, D0279, D0277); P007 carried a
+`CLOSED` banner and a `Status: open` line five rows below it. That is the exact failure this file's own
+rule names — *"an entry that stays here after a ruling is worse than no entry, because the next session
+cannot tell a live question from a settled one."*
+
+Every closure was **verified in the code, not merely found in the ledger**, before its heading changed:
+`ShaftGenerator.SKY_ROWS` for P017, `Observation.mining_swing*` plus `test_sfx_driver`'s edge assertion
+for P024, `WorldView.anim_time()` for P025. The bodies are kept rather than deleted — the reasoning
+behind a ruling is worth more than the tidiness of removing it — and P019/P020/P021/P022 got the four
+`---` separators they had been missing since they were written.
+
+**Why five of these got missed is worth more than the tidy-up:** each was closed by the session working
+*that lane*, and closing a parked item is the one step of the loop that belongs to no lane at all. This
+audit is cheap, it is mechanical, and it belongs in `/wrap` rather than in whichever lane happens to
+notice.
+
 ---
 
 ## P001 · The fast fuzz suite gates 5 of its 7 violation types
@@ -136,7 +154,7 @@ concern this entry raised is answered by `recomputed_signature()` plus a mutatio
 The separate aliasing question about sharing a carved grid is still open and is NOT this entry -- it is
 referenced by D0267, which sidesteps it by cloning.
 
-**Status:** open · **Cost to apply:** ~2 hours + a golden re-capture · **Raised by:** a measurement pass, 2026-08-30
+**Status:** CLOSED by D0261 · **Superseded field kept for the record:** originally open · **Cost to apply:** ~2 hours + a golden re-capture · **Raised by:** a measurement pass, 2026-08-30
 
 The per-commit suite takes ~307s locally. Where it goes, timed per suite:
 
@@ -406,9 +424,12 @@ fixes the cause rather than the symptom. (c) is a real design cycle, not a Bin A
 
 ---
 
-## P017 · The world has no sky to jump into — row 0 is the surface, the ceiling, and the horizon at once
+## P017 · RULED AND LANDED 2026-08-31 by D0292 · The world has no sky to jump into — row 0 is the surface, the ceiling, and the horizon at once
 
-**Status:** open · **Cost to apply:** a band-ladder decision, then a regeneration · **Raised by:** the
+**CLOSED. Verified in the tree 2026-09-01, not merely found in the ledger:** `ShaftGenerator.SKY_ROWS = 20 * TERRAIN_CELLS_PER_METER`, and `test_shaft_generator` asserts the band holds no block **and** no wall — the absence that a walls-only band would have faked. The analysis below is kept as the reasoning behind the ruling; it is no longer a live question.
+
+
+**Status:** CLOSED by D0292 · **Cost to apply:** a band-ladder decision, then a regeneration · **Raised by:** the
 director in play, 2026-08-30 (D0249)
 
 **Reported from the chair, not from a test:** *"it wont let me jump up beyond the surface. like my head
@@ -446,6 +467,9 @@ jump rather than as a bump.
 
 I did not pick. (a) is cheap mechanically and changes what every existing capture, recording and spawn-row
 derivation means, which is exactly the kind of change that is yours.
+
+
+---
 
 ## P019 · The depth tint is ported and unapplied, because Stonereach slate-blue and glimmer teal are the same hue
 
@@ -490,6 +514,9 @@ legacy's smallest nugget mark is 6.4px, larger than this world's entire 4px terr
 claim about whether a player can find ore, not a convenience. Landing the tint by relaxing it would have
 been the shipped-claim-retired-silently failure this project keeps finding.
 
+
+---
+
 ## P020 · RULED AND DONE 2026-08-31 by D0258 · The cave field is single-octave where legacy's is five
 
 **One ruling. It unblocks WG-2, WG-3 and PR #10 together.**
@@ -533,6 +560,9 @@ I would take (1): the 15% gap and the impermeable shelf are the same defect wear
 fixes the face rather than the cause. But it re-rolls every fixture pinned to a generated world — this run
 has already re-pinned two of them (D0255, D0256) — so it is worth your explicit yes.
 
+
+---
+
 ## P021 · CLOSED 2026-08-31 by D0285 · Measured: the thresholds are right and "15%" was never a measurement
 
 **P020 is DONE and this is what it did not fix.** Porting legacy's 5 octaves and re-deriving the
@@ -566,6 +596,9 @@ move at all. I will run that measurement in the decision-free lane and report it
 one is needed, is yours.
 
 **Nothing is blocked on this.** WG-2 and WG-3 are closed, PR #10 is unblocked on its merits.
+
+
+---
 
 ## P022 · RULED AND LANDED 2026-08-31 by D0269 · The miner's head is 8px inside the ceiling
 
@@ -643,9 +676,12 @@ at a log nobody meant to keep.
 
 ---
 
-## P024 · The hollow ring needs a SWING, and this build only has a hold
+## P024 · RULED AND LANDED 2026-08-31 by D0279 · The hollow ring needs a SWING, and this build only has a hold
 
-**Status:** open · **Cost to apply:** one ruling, then ~1 hour · **Raised by:** this session, 2026-08-31
+**CLOSED. Verified in the tree 2026-09-01:** `Observation` carries `mining_swing`, `mining_swing_dir` and `mining_swing_phase`, and `tests/test_sfx_driver.gd` asserts the ring is an EDGE — a held charge with one blow in it rings exactly once (D0303). The analysis below is kept as the reasoning behind the ruling; it is no longer a live question.
+
+
+**Status:** CLOSED by D0279 · **Cost to apply:** one ruling, then ~1 hour · **Raised by:** this session, 2026-08-31
 (D0274, closing the rest of `docs/LEGACY_GAP.md` PRE-3).
 
 PRE-3 asked for two things beyond the plumbing: the hollow reading as an **int** rather than a boolean,
@@ -684,9 +720,12 @@ comment says not to do.
 
 ---
 
-## P025 · `Frame.anim_time` is pinned to 0.0, and 28+ backlog rows are inert until it moves
+## P025 · RULED AND LANDED 2026-08-31 by D0277 · `Frame.anim_time` is pinned to 0.0, and 28+ backlog rows are inert until it moves
 
-**Status:** open · **Cost to apply:** ~3 lines and one ruling · **Raised by:** this session, 2026-08-31
+**CLOSED. Verified in the tree 2026-09-01:** `WorldView.anim_time()` returns `_anim_ticks * SECONDS_PER_TICK` and `reset_anim_clock()` preserves Q5's original guarantee for captures. Option (1), the cosmetic tick counter, exactly as recommended below. The analysis below is kept as the reasoning behind the ruling; it is no longer a live question.
+
+
+**Status:** CLOSED by D0277 · **Cost to apply:** ~3 lines and one ruling · **Raised by:** this session, 2026-08-31
 (hit while porting D0275's cracks; it is `docs/LEGACY_GAP.md` PRE-1, the highest-leverage prerequisite
 in the whole document).
 
