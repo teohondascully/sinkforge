@@ -189,6 +189,20 @@ func swing_period_ticks() -> int:
 	return (SWING_TICKS_X100 * RHYTHM_FULL) / (100 * (RHYTHM_FULL + scaled_rhythm))
 
 
+## HOW FAR THROUGH THE CURRENT SWING THE PICK IS, in per mille. 0 on the tick a blow lands and climbing
+## back to 1000 as the next one winds up, so a two-frame pick animation driven from this has its STRUCK
+## frame on the exact tick the rock takes damage (D0287).
+##
+## Per mille and integer for the reason every other number crossing L2 is: a float in an observation is a
+## float in a replay. Between blows -- and while the pick is held against nothing workable -- `mine()`
+## primes the counter to a full period, so this reads 1000, which is "raised", which is right.
+func swing_phase_per_mille() -> int:
+	var period: int = swing_period_ticks()
+	if period <= 0:
+		return 0   ## unreachable at any rhythm the constants allow, but a division that cannot be zero
+	return clampi((_swing_ticks * 1000) / period, 0, 1000)
+
+
 ## How much charge a cell has banked, 0 if none. The renderer's crack overlay reads this.
 func banked(cell: Vector2i) -> int:
 	return (_cracks[cell] as Vector2i).x if _cracks.has(cell) else 0

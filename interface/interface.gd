@@ -164,6 +164,12 @@ class Observation:
 	## first outward sign.
 	var mining_swing: bool = false
 
+	## ...and how far through the CURRENT swing the pick is, per mille — 0 on the tick it lands, climbing
+	## to 1000 as the next blow winds up. The edge above says a blow happened; this says where in the
+	## stroke the arms are, which is what a two-frame pick animation needs to put its struck frame on the
+	## tick the rock takes damage rather than on a free-running clock of its own (D0287).
+	var mining_swing_phase: int = 0
+
 	## The terrain cell's size in world pixels. **Not a mining field** — it belongs to whatever a painter
 	## does with `window`, `materials` and `walls`, all of which are cell-denominated while every draw
 	## call is in pixels. `view/` may not name `Heightfield.TERRAIN_CELL_PX`, and until now every painter
@@ -309,6 +315,7 @@ func _fill_mining(o: Observation) -> void:
 	o.mining_hollow = _mining.hollow_this_tick
 	o.mining_breach = _mining.breach_this_tick
 	o.mining_swing = _mining.swing_this_tick
+	o.mining_swing_phase = _mining.swing_phase_per_mille()
 	o.mining_blow_px = (2 * _mining.bite_radius + 1) * Mining.CELL_PX
 
 

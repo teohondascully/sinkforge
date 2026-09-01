@@ -11865,3 +11865,42 @@ and is what will let the air band above the surface read as sky rather than as m
 
 **Reverse cost:** delete `view/visuals/wall_painter.gd` and its suite, drop the `add_painter` line, and
 put `WINDOW_MARGIN_CELLS` back to 2.
+
+
+## D0287 · The pick's animation is a function of the swing, not of a clock that resembles one · 2026-08-31 · Lane C, LEGACY_GAP T1 #1/#5
+
+D0279 gave `Mining` a real swing cadence — 16 ticks at rest, 10 at full rhythm — and **nothing on screen
+read it.** The miner's dig frames alternated on `anim_ticks / 8`, a free-running counter with no idea
+when the pick lands.
+
+**This is a port, and legacy's own version is the thing being corrected.** Legacy alternates on
+`int(_anim_time * 8.0) % 2` (`player.gd:664-793`). That is not arbitrary: 8 Hz is a half-cycle of 0.125 s
+against its own `SWING_PERIOD` of 0.28 s, so **at rest the two very nearly agree.** They come apart
+exactly as `RHYTHM_SWING` speeds the swing up and the animation, driven by a clock, does not follow.
+Legacy could not do better because it never computed the period as a value; this build does
+(`swing_period_ticks()`), so the frame is a function of the swing rather than of something shaped like
+it. The two paths agreeing at rest is now an assertion, not a coincidence: `DIG_TICKS_PER_FRAME * 2`
+must equal the at-rest period read off a real `Mining`, and the frames are compared tick for tick over
+four periods.
+
+**`miner_dig_1` is the STRUCK pose** (`legacy/tools/bake_miner.gd:449`, arms `dig_down`), and it shows
+from phase 0 — which is the tick `Mining` zeroes its counter, which is the tick the rock takes damage.
+`miner_dig_0` (`dig_up`) covers the wind-up and ends at the next impact. Half and half, as legacy's
+alternation is, so it reads as a steady chop rather than a twitch.
+
+**`swing_phase_per_mille()`, not the raw counter.** Per mille and integer for the reason everything
+crossing L2 is: a float in an observation is a float in a replay. It also means the view never has to
+know the period to interpret the number — which is the point, since the period is the thing that moves.
+
+**`SWING_PHASE_NONE` is `-1`, not `0`.** Zero is a REAL phase (the tick a blow lands); a caller with no
+swing to read and a caller reporting an impact must not be the same value. The sentinel path is legacy's
+clock verbatim, so a fixture or a preview still animates.
+
+**Read through the door even though the scene holds the sim object.** `tests/body/reveal_scene.gd` has
+`_mining` in hand and could have called it directly for one less indirection. It reads
+`_sky_view.current_frame().obs.mining_swing_phase` instead: the claim being made is that the animation is
+a function of the SIM's swing, and reaching past L2 would draw the identical picture while proving none
+of it. Same argument D0275 made for the cracks and D0244 made for `--sky`.
+
+**Reverse cost:** drop the sixth argument (it defaults to the sentinel, so every existing call site is
+already the old behaviour), and remove the field from `Observation`.
