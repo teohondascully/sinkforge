@@ -12963,3 +12963,66 @@ captures are about exactly that.
 (PRE-1 D0277, PRE-3 D0279/D0293, PRE-4 here) and the section still ranked all four as gating. PRE-2, the
 `Fx` vector layer, is the only one genuinely open — verified in the tree, not inferred: `core/fixed_point.gd`
 has no `normalize`, `dot` or `limit_length`. T1 #4 was likewise landed at D0276 and its row never said so.
+
+## D0309 · 2026-09-01 · The capture diffed at EXACTLY ZERO and the painter was fine — the instrument could not pose its subject
+
+**This is D0289's signature arriving from the other side, and it cost real time, so it is written down.**
+
+`SeamPainter` shipped (D0308): correct, mutation-tested, mounted on the real coordinator. Then the
+verification that D0289 taught this project to run — capture four moments, diff against the parent commit
+— came back **0 changed pixels of 2,073,600, on all four moments.** That is the exact reading a painter
+that never draws produces, and D0289 is the entry that says so.
+
+**It was not the painter.** The sequence that settled it, in the order it should have been run:
+
+1. **A positive control on the diff tool first.** `aim` against `delve`: 98.4862% changed. The instrument
+   works. (Skipping this would have been `[[existence-probe-has-no-witness]]`.)
+2. **Print the painter's own gate.** It runs 40 times, `charging=true`, `run=1`. So it IS called.
+3. **Draw something unmissable** — magenta, 8px. Still 0 pixels. So the draw is not reaching the frame.
+4. **Remove the geometry question entirely:** `ci.draw_rect(frame.view_world_rect, magenta)` — **99.8186%
+   changed.** The layer composites. So the plumbing is fine and the gate is fine and the geometry is off.
+5. **Print the gate on the shutter's own frame.** `PAINT run=0 charging=true cell=(24, 95) seam=0`.
+
+**At the captured tick the agent is working an UNGRAINED cell.** Roughly two thirds of rock carries no
+seam, so this is the common case rather than bad luck — `aim` at tick 40 was never going to show this
+painter, and neither was any other moment. `_draw` replaces a layer's contents, so the sixteen earlier
+frames that DID draw the grain are irrelevant: only the shutter's frame is in the PNG.
+
+**THE GENERAL FORM, and it is the house failure class with the roles swapped.** The usual shape is an
+instrument that cannot register its subject and reports a quiet green. Here the instrument was sound and
+the SUBJECT WAS ABSENT FROM THE POSE — and the two are indistinguishable from the reading alone. A
+capture diff of zero has two causes: the painter drew nothing, or the moment did not pose it. **Nothing
+in the capture output separates them**, which is why step 4 above — an ungated full-viewport fill from
+the same layer — is the move that should come second, not fifth. It splits "the layer is dead" from "the
+gate is closed" in one run.
+
+**TWO REMEDIES, BOTH SHIPPED.**
+
+**A `grain` moment, pinned at tick 14 with the reason written down.** At tick 14 the agent works
+`(23, 93)`, which carries a DIAGONAL seam, and the same diff moves **2,962 pixels** in a bbox of
+`x 1817..1919, y 625..722` — exactly where the geometry predicts. The tick is a fact about the agent's
+path and the seam field, and either can move; the comment says so, because a future change returning this
+moment to an ungrained cell would look precisely like a painter that stopped drawing.
+
+**An assertion that the mechanic is reachable in a world the generator actually makes.** Every other
+fixture in `tests/test_seam_painter.gd` SEARCHES for a seed carrying the seam it wants, so by
+construction none of them can notice that most rock has no grain. The new one measures the rate over
+every solid cell of three real `SHALLOW_CLAY` worlds: **0.3011 grained**, pinned with a ±0.05 band.
+
+**The band is around the MEASUREMENT, not around the model, and the gap between them is the point.**
+`1 - 0.82 × 0.88 × 0.93 = 0.3289` treats the three planes as independent per-cell events. They are not:
+`Seams.at` keys bedding to the ROW and joints to the COLUMN, so a whole row or column is in or out
+together, and across 48 columns the vertical term alone carries real sampling error. 0.3011 is the truth;
+0.3289 is a model of it. The constants are kept as a **separate, looser (±0.10) cross-check** — enough to
+catch "someone changed the rates and nothing moved", not so tight that it asserts a model that is false.
+`[[name-the-frame]]`.
+
+**AND THE ASSERTION IN THE OTHER DIRECTION, which is the one this entry exists for:** `rate < 0.5` —
+*most solid rock carries no grain*. That is not a redundant bound. It is the fact that made the capture
+read zero, stated where the next person will find it.
+
+**One incidental harness fact, which wasted a run.** `godot ... 2>&1 | grep -m2 PATTERN` kills the engine
+with SIGPIPE the moment grep exits, **before the shutter fires**, and the run writes no PNG while
+reporting nothing wrong. `[[pipefail-reports-failure-on-match]]` has been recorded twice before in this
+project and both times as `grep -q`; `-m<N>` is the same defect with a different flag. Redirect to a file
+and grep the file.
