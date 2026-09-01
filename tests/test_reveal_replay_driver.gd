@@ -23,7 +23,25 @@ const SITE_ID: StringName = &"reveal_test_dense"
 ## shallow glimmer COLUMN and the scripted approach digs at the body's own ROW -- nothing makes the two
 ## meet. The seed is the workaround; selecting a target the approach can actually reach is the fix, and it
 ## is parked rather than done here because `find_spawn` is shared with `reveal_scene.gd`'s live spawn.
-const SEED_VALUE: int = 8
+
+## **RE-PINNED AGAIN 2026-09-01 for WG-4 Batch A (D0305): 8 -> 1.** The conversion took ore from many
+## small specks to few large bodies (median 32 -> 550 cells, 477 bodies -> 42), and a scripted approach
+## that digs at a fixed column is *less* likely to cross a body when the bodies are fewer, however much
+## larger each one is. Seed 8 stopped qualifying; re-picked by scanning, exactly as D0256 did.
+##
+## **The rate is the number that matters, and it FELL: 9 of 24 seeds qualify, 37%, against D0256's 63%.**
+## Reported rather than buried, because a rate this low says the same thing D0256 said and says it louder
+## -- the seed is a workaround for a fixture whose target and whose approach are not coupled. `find_spawn`
+## picks a glimmer COLUMN, the scripted approach digs at the body's ROW, and nothing makes them meet.
+## Selecting a target the approach can actually reach is still the fix, and it is still parked because
+## `find_spawn` is shared with `reveal_scene.gd`'s live spawn.
+##
+## The scan that produced 37% is the SECOND one run. The first reported 100% of 20 seeds, including seeds
+## that fail on a direct run, because it decided pass/fail with `grep -q "ALL PASS"` -- and this harness's
+## own failure line reads "never printed its own ALL PASS line". The probe matched the failure text as a
+## success. It reads pass/fail off the exit code now.
+
+const SEED_VALUE: int = 1
 const IDLE_BEFORE: int = 350  ## padding so a reveal mid-approach sits inside a full WINDOW_TICKS(300) span
 const IDLE_AFTER: int = 350
 const APPROACH_CAP: int = 200  ## generous; the real approach only needs ~6 columns' worth of movement

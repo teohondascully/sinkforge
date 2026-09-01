@@ -12677,3 +12677,80 @@ re-staged. Exit code checked in both directions: 1 when tripped, 0 when healthy.
 
 **Reverse cost:** drop `_shutter_held`, the `seed()` line and the floor. Captures go back to being
 uncomparable, which is fine right up until the next defect only the picture can see.
+
+## D0305 · 2026-09-01 · Lane B, WG-4 Batch A — director-ruled, and the instrument it needed
+
+**Twelve constants converted surgically, with per-site factors. The 40 correct ones untouched.**
+
+`docs/WG4_CONVERSION_PLAN.md` §7's Batch A, on the director's ruling. Legacy's cell is 32 px = **1 m**;
+this build's terrain cell is 4 px = **0.25 m**. That gives three transfer rules running in different
+directions, which is why one blanket multiplier would have been wrong three ways:
+
+| axis | items | factor |
+|---|---|---|
+| LENGTH (`cave.min_depth_cells`, `strata_shelf.band_height_cells`) | 2 | ×4 |
+| AREA (`{ore,coal,iron}.size_min`, `.size_depth_bonus`) | 6 | ×16 |
+| SEED DENSITY (`DENSITY_ROWS`, `{ore,coal,iron}.attempts_per_col`) | 4 | ×4 and ÷4 |
+
+Verified surgical rather than asserted: 33 changed lines across three site files, all of them one of the
+eleven named keys. `reveal.*` and every `pending_sim_economy.*` field appear in the diff **as context
+only**. Held per the plan's own argument, and it is this project's own rule: items 10 and 15 are
+`claims/C004`'s swept variables and moving them conflates a conversion with a design change on the one
+axis a claim is watching; item 16 `Seams.RUN_CAP` and items 17-21 `pending_sim_economy` are inert, and
+"correcting an inert constant produces a number nobody can check and a green nobody can trust."
+
+**THE MEASUREMENT, AND WHY IT IS NOT A VOLUME.** Sizes go up 16× and densities down 16×, and they cancel
+**by construction** — total ore volume is `attempts × accept × mean_size`. The deliverable is *many tiny
+scattered specks* becoming *fewer, room-scale bodies*, so **volume is exactly the quantity that cannot
+see it**. What can is the connected-component size distribution:
+
+| | bodies | median body | total cells |
+|---|---|---|---|
+| ore_copper | 477 → **42** | 32 → **550** | 24,924 → 26,556 |
+| coal | 531 → **37** | 20 → **402** | 13,789 → 17,368 |
+| ore_iron | 263 → **18** | 24 → **429** | 8,746 → 8,447 |
+
+Body count down ~92%, median size up 16-20×, volume within +26%/−3%. Three numbers moving three different
+ways, none of which one of them can fake.
+
+**AND NOTHING IN THE REPOSITORY COULD SEE ANY OF IT.** Checked rather than assumed, before shipping: each
+of the eleven constants was reverted in memory and the existing carve ratchet re-run. The largest movement
+any produced in `carve_open` was **0.0048** against a ±0.0060 band; **eight of eleven moved it by
+0.0000**. The carve ratchet measures `_carve_caves` and these are ore constants — it was never going to
+see them. WG-4 was one commit from shipping a world-shaping change with no assertion anywhere that could
+register it, which is this project's dominant failure class arriving as a quiet green on a *deliberate*
+change rather than an accidental one. `tests/test_ore_bodies.gd` is that instrument. **All nine material
+constants mutation-caught**, each with a witness that the mutation actually landed.
+
+**Two probes were void before they were right, both the same shape.** The first mutation sweep reported
+every constant NOT CAUGHT: `set -- $spec` in zsh, which does not word-split, so the block and key were
+empty and no mutation was ever applied. The seed scan reported 100% of 20 seeds qualifying, including
+seeds that fail on a direct run, because it decided pass/fail with `grep -q "ALL PASS"` — and this
+harness's failure line reads *"never printed its own ALL PASS line"*. **A probe matching its own failure
+text as a success.** Both now carry a positive witness; the second reads the exit code.
+
+**The carve ratchet was re-derived, not widened** — band unchanged at ±0.0060, centre moved 0.0493 →
+0.0561 and 0.0329 → 0.0381, because `min_depth_cells` and `band_height_cells` change which cells are
+eligible and which rows count as shelf. Total void across all sources is **0.1025**, against 0.1058
+before: the conversion did not disturb P021's carve budget.
+
+**`test_value_noise` reads the frequency from the data now** instead of typing `0.11` twice. It exists to
+prove our value noise matches FastNoiseLite *at the frequency the game uses*, and a literal is a second
+copy to keep in step by hand — the same drift `list_ci_gates.py` (D0295) ended one directory over.
+
+**The replay driver's seed re-picked, 8 → 1, and the RATE is the finding.** Fewer, larger bodies are
+*harder* for a fixed-column scripted approach to cross: **9 of 24 seeds qualify, 37%, against D0256's
+63%.** Reported rather than buried — it says what D0256 said, louder. The fixture's target and its
+approach are still not coupled, and that fix is still parked behind `find_spawn` being shared with the
+live spawn.
+
+**Determinism: a world change, not a regression.** Two separate processes replaying the same seed are
+bit-identical (first mismatch at −1); the seed+1 control still diverges at checkpoint 0; the goldens
+moved. Harvesting from CI's own Linux build per D0167 — never locally.
+
+**`cave.frequency` (item 3) is NOT in this batch.** It is the director's separate feel ruling and carries
+its own arithmetic problem: metre-correct is 0.0275, at which the entire 12 m shaft sits inside 0.63 of
+one noise period and lateral cave structure disappears. It ships next, tuned and BUILT-PARKED.
+
+**Reverse cost:** the twelve constants back to their old values, the ratchet centres back, the seed back
+to 8, and `test_ore_bodies.gd` deleted. The goldens re-pin either way.

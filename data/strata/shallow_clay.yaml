@@ -21,25 +21,25 @@ cave:
   frequency: 0.11
   threshold_top: 0.47
   threshold_deep: 0.31
-  min_depth_cells: 6
+  min_depth_cells: 24
   x_stretch: 2.1
 
 strata_shelf:
   # legacy STRATA_BAND_H / STRATA_SHELF_EVERY / STRATA_SHELF_RESIST -- see that file's comment for why
   # SHELF_EVERY must not drop to 2 (a real regression, held by a legacy test this port does not carry
   # forward yet; tracked as a gap, not silently dropped -- docs/DECISIONS_LEDGER.md D0017)
-  band_height_cells: 4
+  band_height_cells: 16
   shelf_every: 3
   shelf_resist: 0.34
 
 ore:
   # legacy ORE_ATTEMPTS_PER_COL / ORE_CHANCE_DEEP / ORE_SHALLOW_FLOOR / ORE_SIZE_MIN / ORE_SIZE_DEPTH_BONUS
   material: ore_copper
-  attempts_per_col: 1.0
+  attempts_per_col: 0.25
   chance_deep: 0.85
   shallow_floor: 0.34
-  size_min: 8
-  size_depth_bonus: 44
+  size_min: 128
+  size_depth_bonus: 704
   pending_sim_economy:
     # legacy ORE_AMOUNT_BASE / ORE_AMOUNT_DEPTH_BONUS / RICH_CHANCE / RICH_AMOUNT_MULT. NOT read by
     # sim/terrain_gen/shaft_generator.gd -- richness/deposit accounting is sim/economy or sim/items
@@ -55,11 +55,11 @@ ore:
 coal:
   # legacy COAL_ATTEMPTS_PER_COL / COAL_CHANCE_DEEP / COAL_SHALLOW_FLOOR / COAL_SIZE_MIN / COAL_SIZE_DEPTH_BONUS
   material: coal
-  attempts_per_col: 0.8
+  attempts_per_col: 0.2
   chance_deep: 0.95
   shallow_floor: 0.42
-  size_min: 6
-  size_depth_bonus: 30
+  size_min: 96
+  size_depth_bonus: 480
   pending_sim_economy:
     # legacy COAL_AMOUNT_BASE / COAL_AMOUNT_DEPTH_BONUS. Same gap and same reasoning as ore's above.
     amount_base: 30
@@ -70,9 +70,9 @@ iron:
   # research-progression "seal" (SEAL_TOP); that gate is dead pre-pivot design, so this port gates iron
   # by depth threshold (stonereach_end) alone.
   material: ore_iron
-  attempts_per_col: 0.5
-  size_min: 10
-  size_depth_bonus: 30
+  attempts_per_col: 0.125
+  size_min: 160
+  size_depth_bonus: 480
   pending_sim_economy:
     # legacy IRON_AMOUNT. Same gap and same reasoning as ore's above.
     amount: 220

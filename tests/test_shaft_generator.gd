@@ -150,6 +150,13 @@ func _test_carve_fraction_by_region() -> void:
 	print("carve_fraction: overall %.4f | shelf-band %.4f (%d/%d) | non-shelf %.4f (%d/%d)" %
 		[total_frac, shelf_frac, shelf_carved, shelf_eligible, open_frac, open_carved, open_eligible])
 
+	_check_carve_ratchets(shelf_frac, open_frac, total_frac, shelf_carved, shelf_eligible)
+
+
+## The ratchets themselves, split from the measurement at the 50-line function gate. The split is also
+## the right shape: above is what the world DID, here is what it is held to.
+func _check_carve_ratchets(shelf_frac: float, open_frac: float, total_frac: float,
+		shelf_carved: int, shelf_eligible: int) -> void:
 	# THE RATCHET, re-pinned 2026-08-31 after the WG-3 octave port (D0258). The previous version asserted
 	# `shelf_frac == 0.0` as a pinned DEFECT and said "if this line FAILS, WG-2 is fixed". It failed. The
 	# shelf carves 15 cells where it carved 0, so this now asserts the SHAPE legacy actually had rather
@@ -164,12 +171,20 @@ func _test_carve_fraction_by_region() -> void:
 		+ "clears 0.31 at 0.1164 and 0.65 at 0.0009, a 130x difference, and clears the 0.81 top-shelf "
 		+ "threshold 0.0000 of the time. A shelf carving at the open-rock rate is not a fixed shelf, it is "
 		+ "a deleted one -- do NOT 'fix' this by raising the calibration until the two numbers meet.")
-	_check(absf(open_frac - 0.0493) < 0.0060,
-		"non-shelf carve fraction %.4f stays near its measured 0.0493 (+/-0.0060)" % open_frac)
-	_check(absf(total_frac - 0.0329) < 0.0060,
-		"overall carve fraction %.4f stays near its measured 0.0329 (+/-0.0060). NOTE: legacy's own " % total_frac
-		+ "stated target is ~15%%, and the octave port did NOT close that -- it moved 0.0358 -> 0.0329. "
-		+ "That gap is a THRESHOLD question, not a noise-field one, and is parked as P021.")
+	# RE-PINNED 2026-09-01 for WG-4 Batch A (D0305), from the new measurement rather than by widening the
+	# old band -- the band width is unchanged at +/-0.0060 and only its centre moved. The conversion
+	# raised `cave.min_depth_cells` 6 -> 24 and `strata_shelf.band_height_cells` 4 -> 16, which changes
+	# both what carves and which rows count as shelf, so the populations behind these two fractions are
+	# not the ones the previous numbers were measured over. A band widened to swallow both would be
+	# measuring nothing.
+	_check(absf(open_frac - 0.0561) < 0.0060,
+		"non-shelf carve fraction %.4f stays near its measured 0.0561 (+/-0.0060)" % open_frac)
+	_check(absf(total_frac - 0.0381) < 0.0060,
+		"overall carve fraction %.4f stays near its measured 0.0381 (+/-0.0060). NOTE: legacy's own " % total_frac
+		+ "stated target is ~15%%, and neither the octave port nor WG-4 closed it on THIS measure -- "
+		+ "0.0358 -> 0.0329 -> 0.0381. What P021 closed was the missing carve PASSES (D0291), which this "
+		+ "fraction does not see: it measures `_carve_caves` alone. `tools/measure_void_fraction.gd` is "
+		+ "the one that counts every source, and it reads 0.1058.")
 
 
 func _test_ore_appears_somewhere() -> void:
