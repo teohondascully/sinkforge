@@ -317,6 +317,7 @@ jobs:
       #   test_hud.gd                                    test_hud (the HUD host + the depth chip — D0271, LEGACY_GAP H-01/T1 #8)
       #   test_camera_rig.gd                             test_camera_rig (soft follow, look-ahead, pixel-snap — D0273, LEGACY_GAP T1 #11)
       #   test_crack_painter.gd                          test_crack_painter (spider cracks on worked rock — D0275, LEGACY_GAP T1 #5)
+      #   test_terrain_painter.gd                        test_terrain_painter (terrain on the coordinator + the painter z-order — D0276, LEGACY_GAP T1 #4)
       #   test_material_palette.gd                       test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
       #   test_mining.gd                                 test_mining (cursor-aim, reach, hold-to-charge, the bite, the hollow tell — D0195/D0196/D0200)
       #   test_mining_bite.gd                            test_mining_bite (one blow's volume against legacy's metre, D0200)
@@ -338,7 +339,7 @@ jobs:
       #   test_view_lifts.gd                             test_view_lifts (the sprite loader caches its misses; a light pass owns only its canvas)
       #   test_settings.gd                               test_settings (the split halves share one bindings map; persist=false writes nothing)
       #   test_recorded_sessions.gd                      test_recorded_sessions (every director recording is binding until retired — P002/D0228)
-      - name: all 47 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 48 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           bash tools/run_suites.sh ./godot 4 \
             res://tests/test_fixed_point.gd \
@@ -368,6 +369,7 @@ jobs:
             res://tests/test_hud.gd \
             res://tests/test_camera_rig.gd \
             res://tests/test_crack_painter.gd \
+            res://tests/test_terrain_painter.gd \
             res://tests/test_mining.gd \
             res://tests/test_mining_bite.gd \
             res://tests/test_reveal_scene_dig_edge.gd \

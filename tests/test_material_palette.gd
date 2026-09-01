@@ -15,7 +15,10 @@ extends "res://tests/test_base.gd"
 ##
 ## Run: tools/run_gd_test.sh <godot-binary> res://tests/test_material_palette.gd
 
-const COLOR_BG: Color = Color(0.16, 0.16, 0.18)  ## reveal_scene.gd's own, unchanged by Slice 0
+## The backdrop this palette's colours must stay distinct FROM. Taken from the painter that draws it
+## rather than restated (D0276): a colour-distance claim measured against a stale copy of the
+## background measures nothing, and it would go stale silently.
+const COLOR_BG: Color = BackdropPainter.COLOR_BG
 const HOSTS: Array[StringName] = [&"clay", &"hardrock", &"deepstone"]
 ## The claim's own floor. Legacy authored against WCAG-style ratios; this is a plain RGB euclidean
 ## distance in 0..1 space, which is what the original comment's "color-distance" meant and what the
