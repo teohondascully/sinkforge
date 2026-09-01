@@ -32,6 +32,9 @@ const HUD_CANVAS_LAYER: int = 10
 
 var _view: WorldView = null
 var _layers: Array[PaintLayer] = []
+## Chips that keep state, held so they outlive the expression that created them (D0289). Nothing reads
+## this array; it exists to be a reference.
+var _owned: Array[RefCounted] = []
 
 
 ## Constructor-by-method, matching `WorldView.setup` — so this node can also come from a scene file
@@ -51,6 +54,15 @@ func add_chip(paint: Callable) -> PaintLayer:
 	add_child(canvas)
 	_layers.append(canvas)
 	return canvas
+
+
+## A chip that KEEPS STATE — an arrival ceremony outlives the tick that fired it — handed over as an
+## object rather than as a bound `Callable`. See `WorldView.add_stateful_painter`: a `Callable` does not
+## keep a `RefCounted` alive, so the bound form frees the chip before this method is even entered
+## (D0289).
+func add_stateful_chip(chip: RefCounted, method: StringName) -> PaintLayer:
+	_owned.append(chip)
+	return add_chip(Callable(chip, method))
 
 
 ## Marks every chip dirty. Called once per rendered tick by whoever owns the coordinator, AFTER

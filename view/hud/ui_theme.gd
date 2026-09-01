@@ -75,10 +75,38 @@ const STATE_INK := Color(0.48, 0.70, 0.52)
 
 ## --- Layout ----------------------------------------------------------------------------------------
 
-## The authoring canvas. Everything the page lays out is in these coordinates and is scaled to the
-## window, which is why a layout number in a HUD painter is a number you can reason about rather than a
-## fraction of an unknown viewport.
-const CANVAS := Vector2(640, 360)
+## **LEGACY'S** authoring canvas. Every layout number in `legacy/scenes/hud.gd` — every margin, type
+## size, inset and plate width — is in these coordinates, so a ported chip is written in them too and
+## converted once, here, rather than re-tuned per site.
+const AUTHORED := Vector2(640, 360)
+
+## OUR canvas: the project's base viewport. `window/stretch/mode = "canvas_items"` scales the whole
+## canvas to the window, so a `CanvasLayer` child draws into exactly this many pixels whatever the
+## window is — which is what makes a HUD layout number reasonable-about rather than a fraction of an
+## unknown viewport.
+##
+## **THIS WAS 640x360 AND THE PROJECT'S VIEWPORT WAS NOT** (D0290). `project.godot` records the bump to
+## 1280x720 for render-target density; this constant was written against the old value and never
+## followed. Nothing caught it, because the only chip that existed anchors to the TOP-LEFT corner, where
+## the two canvases agree exactly. The stratum plate is the first thing to CENTRE itself, and it landed a
+## quarter of the way across the screen. `tests/test_hud.gd` now reads the project setting rather than
+## trusting this line.
+const CANVAS := Vector2(1280, 720)
+
+## What carries a legacy number onto our canvas. One factor, not two: the two canvases are the same
+## 16:9, asserted rather than assumed.
+const UI_SCALE: float = 2.0
+
+
+## A legacy LENGTH — a margin, a width, an inset — in our canvas pixels.
+static func px(authored: float) -> float:
+	return authored * UI_SCALE
+
+
+## A legacy TYPE SIZE in our canvas pixels. Separate from `px` because it returns an `int`: a font size
+## is rasterised, so 30 is a crisp glyph and a chip scaled by a node transform would be a blurred 15.
+static func pt(authored: int) -> int:
+	return int(round(float(authored) * UI_SCALE))
 
 
 ## Legacy's `Hud._panel`, the one drawing primitive every chip and plate is built on. Fill, then a

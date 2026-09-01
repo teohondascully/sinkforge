@@ -319,6 +319,8 @@ jobs:
       #   test_crack_painter.gd                          test_crack_painter (spider cracks on worked rock — D0275, LEGACY_GAP T1 #5)
       #   test_terrain_painter.gd                        test_terrain_painter (terrain on the coordinator + the painter z-order — D0276, LEGACY_GAP T1 #4)
       #   test_crumble_painter.gd                        test_crumble_painter (rock shatters when it breaks — D0278, LEGACY_GAP T1 #5)
+      #   test_wall_painter.gd                           test_wall_painter (the background wall plane + its recess cast — D0286, LEGACY_GAP T1 #3)
+      #   test_arrival_plate.gd                          test_arrival_plate (the stratum arrival ceremony — D0288, LEGACY_GAP T1 #8)
       #   test_material_palette.gd                       test_material_palette (Slice 0's lifted palette and its colour-distance claim, D0189)
       #   test_mining.gd                                 test_mining (cursor-aim, reach, hold-to-charge, the bite, the hollow tell — D0195/D0196/D0200)
       #   test_mining_bite.gd                            test_mining_bite (one blow's volume against legacy's metre, D0200)
@@ -372,6 +374,8 @@ jobs:
             res://tests/test_crack_painter.gd \
             res://tests/test_terrain_painter.gd \
             res://tests/test_crumble_painter.gd \
+            res://tests/test_wall_painter.gd \
+            res://tests/test_arrival_plate.gd \
             res://tests/test_mining.gd \
             res://tests/test_mining_bite.gd \
             res://tests/test_reveal_scene_dig_edge.gd \

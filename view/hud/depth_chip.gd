@@ -26,6 +26,11 @@ extends RefCounted
 ## rather than a clamped zero, so the number is never fudged." A clamp would make the readout lie for
 ## exactly the part of the world the player starts in.
 
+## EVERY NUMBER BELOW IS IN LEGACY'S AUTHORING CANVAS (`UiTheme.AUTHORED`, 640x360), exactly as
+## `legacy/scenes/hud.gd` wrote it, and is carried onto ours through `UiTheme.px`/`UiTheme.pt` at the
+## point of use. Baking the factor into the constants instead would delete the provenance: the value here
+## would no longer be the value in the file it was ported from, and the next port would have to guess
+## which convention this one used (D0290).
 const LABEL_SIZE: int = 15   ## the metres numeral
 const BAND_SIZE: int = 10    ## the band name beside it, deliberately smaller: it is context, not the value
 const MARGIN := Vector2(10.0, 8.0)
@@ -52,9 +57,9 @@ static func label_for(row: int) -> String:
 ## `maxf(lw + 10 + bw, 96) + 24`: the floor stops the chip from resizing on every metre boundary, which
 ## would make the corner of the screen twitch continuously during a descent.
 static func width_for(font: Font, row: int, band_name: String) -> float:
-	var lw: float = font.get_string_size(label_for(row), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_SIZE).x
-	var bw: float = font.get_string_size(band_name, HORIZONTAL_ALIGNMENT_LEFT, -1, BAND_SIZE).x
-	return maxf(lw + GAP + bw, MIN_WIDTH) + PAD * 2.0
+	var lw: float = font.get_string_size(label_for(row), HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LABEL_SIZE)).x
+	var bw: float = font.get_string_size(band_name, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(BAND_SIZE)).x
+	return maxf(lw + UiTheme.px(GAP) + bw, UiTheme.px(MIN_WIDTH)) + UiTheme.px(PAD) * 2.0
 
 
 ## Everything the chip decides, as data. Returns an EMPTY dictionary when it has nothing to draw, which
@@ -73,15 +78,17 @@ static func layout(frame: Frame, font: Font) -> Dictionary:
 	var band: Dictionary = frame.look.band_at(row)
 	var band_name: String = String(band.get("display_name", ""))
 	var label: String = label_for(row)
-	var chip := Rect2(MARGIN, Vector2(width_for(font, row, band_name), CHIP_HEIGHT))
+	var chip := Rect2(MARGIN * UiTheme.UI_SCALE,
+		Vector2(width_for(font, row, band_name), UiTheme.px(CHIP_HEIGHT)))
 	var cy: float = chip.position.y + chip.size.y * 0.5
-	var lw: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_SIZE).x
+	var lw: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LABEL_SIZE)).x
 	return {
 		"chip": chip,
 		"label": label,
-		"label_at": Vector2(chip.position.x + PAD, cy + LABEL_BASELINE),
+		"label_at": Vector2(chip.position.x + UiTheme.px(PAD), cy + UiTheme.px(LABEL_BASELINE)),
 		"band": band_name,
-		"band_at": Vector2(chip.position.x + PAD + lw + GAP, cy + BAND_BASELINE),
+		"band_at": Vector2(chip.position.x + UiTheme.px(PAD) + lw + UiTheme.px(GAP),
+			cy + UiTheme.px(BAND_BASELINE)),
 		"tint": frame.look.band_color(row),
 	}
 
@@ -95,6 +102,6 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 	var font: Font = ThemeDB.fallback_font
 	UiTheme.panel(ci, l["chip"])
 	ci.draw_string(font, l["label_at"], l["label"],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_SIZE, UiTheme.UI_TEXT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LABEL_SIZE), UiTheme.UI_TEXT)
 	ci.draw_string(font, l["band_at"], l["band"],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, BAND_SIZE, l["tint"])
+		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(BAND_SIZE), l["tint"])
