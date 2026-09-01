@@ -34,6 +34,12 @@ extends RefCounted
 
 const CELLS_PER_METRE: int = 4  ## ShaftGenerator.TERRAIN_CELLS_PER_METER -- 4px cells, 16px/m.
 
+## THE SURFACE DATUM, in rows. Mirrors `ShaftGenerator.SKY_ROWS` (P017/D0292), which is the authority:
+## `view/` may not name a `sim/` symbol, so this is a copy, and `tests/test_material_palette.gd`
+## asserts the two are equal rather than trusting the comment. Same arrangement, and the same reason,
+## as `CELLS_PER_METRE` above.
+const SURFACE_ROW: int = 80
+
 ## Legacy `world_renderer.gd:1506-1512 ZONE_TINTS` and `:1573-1629 _cell_tone/_strata/_cell_jitter`,
 ## ported in METRES (D0252). Everything below this line arrived together because legacy computes them
 ## together: `_cell_fill_color = apply_tone(_cell_base_color(...), _cell_tone(...))`.
@@ -112,7 +118,7 @@ func band_color(row: int) -> Color:
 ## Metres below the surface datum. Negative above it, deliberately, exactly as legacy: "standing on a
 ## hilltop reads as a negative depth rather than a clamped zero, so the number is never fudged."
 static func depth_m(row: int) -> int:
-	return int(floor(float(row) / float(CELLS_PER_METRE)))
+	return int(floor(float(row - SURFACE_ROW) / float(CELLS_PER_METRE)))
 
 
 ## The fill colour for one solid terrain cell. Deterministic in (material, col, row) and free of any

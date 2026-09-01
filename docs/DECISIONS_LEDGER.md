@@ -12163,3 +12163,63 @@ from CI's own Linux build, never locally.
 
 **Reverse cost:** delete `sim/terrain_gen/cave_passes.gd` and its suite, drop the two calls and the
 `SHELF_BIAS` branch, and re-pin the goldens back.
+
+
+## D0292 · Twenty metres of sky — the world had nowhere to jump into · 2026-08-31 · Lane B, NEEDS_DIRECTOR P017, director-ruled
+
+Reported from the chair, not from a test: *"it wont let me jump up beyond the surface. like my head bumps
+at the surfaceline and i cant jump higher."* Correct, and measured: jump is 365 px/s against 900 px/s²,
+a **74 px apex — about 18 rows** — and the world ended one row above the body's head. Row 0 was the
+surface datum, the top of the `TileGrid` and `SkyPainter.HORIZON_Y` simultaneously.
+
+**Legacy's number at this build's scale.** `SURFACE_ROW = 20` over a one-metre cell is twenty metres;
+here that is 80 rows. Four times the jump apex, so the ceiling is never the thing the player notices, and
+enough room for the ridges, stars and moon `SkyPainter` already draws — into a region nobody could enter,
+which is what P017 was raised about.
+
+**The band costs nothing.** `TileGrid` holds blocks in a dictionary, so a row with no material is not a
+row of empty entries, it is no entries. And `WallPainter` (D0286) already leaves a cell with no wall
+behind it transparent, deliberately — written three commits before this landed, and correct for it
+without a change.
+
+**NO BLOCK *AND* NO WALL, and the suite asserts both.** A band with walls and no blocks is identical from
+the sim's side — `is_solid` is false either way — and reads as a TUNNEL rather than as sky, because the
+wall plane draws exactly the cells that have something behind them. Absence is the hard thing to assert
+and it needed the pair.
+
+**The datum moved, so everything keyed to it moved.** `depth_m` subtracts `SURFACE_ROW`; the layer
+thresholds, the cave floor, the ruin depth and every scatter's seed range add it; densities are counted
+against the ROCK (`height - surface`) rather than the grid, or the sky band would have raised every ore
+rate by its own share of the world. `MaterialLook.SURFACE_ROW` is a copy of `ShaftGenerator.SKY_ROWS`
+because `view/` may not name a `sim/` symbol — and the two are now asserted equal rather than trusted to
+the comment saying so, since a silent disagreement puts every depth on the HUD out by the difference and
+draws the horizon in the middle of the rock.
+
+**A side effect worth naming: `DepthChip`'s negative-depth case is reachable at last.** D0271 ported
+legacy's `+3 m` formatting for standing above the datum and wrote down why a clamp would be wrong. Until
+this commit no generated world had a row above the datum, so the branch had never run outside a test.
+
+**THE FAILURE THAT FOUND THE REST OF IT, and no suite saw it.** `reveal_session_setup.find_spawn` scanned
+`row < 30` for a near-surface glimmer pocket. That band is now entirely sky, so it found nothing,
+`target_glimmer_col` came back −1, and agent mode's stopping condition — "no target" — was satisfied on
+**tick one**. Every capture came back blank or missing. Every suite still passed. The constant is
+`SHALLOW_ROWS_BELOW_SURFACE` now and the scan starts at the surface, which is what it always meant.
+
+**`tools/capture_moments.sh`'s four cameras were absolute rows** and all four pointed into the sky. They
+are `$((SURFACE_ROW + n))` now, with `SURFACE_ROW` **derived from `ShaftGenerator` by reading the file**
+rather than restated — and failing closed if either constant cannot be read, because `$(( ))` on an empty
+string is zero, which is a perfectly plausible surface row that would put every camera back in the sky
+without saying so.
+
+**And `tools/measure_void_fraction.gd`'s population silently grew.** Its "void fraction" counted the
+whole grid, so the eighty rows of sky — void by construction, carved by nothing — went straight into the
+numerator: the reading jumped **0.1042 -> 0.1706 on a commit that carved nothing new.** That is the exact
+failure the tool exists to catch, arriving in the tool. The population is the ROCK now
+(`_rock_cells`), and the attribution is stable across the change — carve passes 0.0647 before and after
+— which is the invariance that says the fix is right. Total is **0.1058, 70.5% of legacy's stated 15%.**
+
+**Verified by capture, which is the only thing that could have verified it**: the horizon moment shows
+open air over the surface line with the miner in the entry pocket at 1 m.
+
+**Reverse cost:** set `SKY_ROWS` to 0. Every offset above is written as `surface + n`, so they all
+collapse correctly, and the goldens re-pin back.

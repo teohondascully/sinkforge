@@ -49,7 +49,7 @@ func _measure_site(site_id: String, seeds: int) -> void:
 		var no_cave: TileGrid = ShaftGenerator.generate(_without_caves(base), seed_value)
 		var bare: TileGrid = ShaftGenerator.generate(_without_ruins(_without_caves(base)), seed_value)
 
-		var cells: int = full.width * full.height
+		var cells: int = _rock_cells(full)
 		var void_full: int = cells - _solid(full)
 		var void_no_cave: int = cells - _solid(no_cave)
 		var void_bare: int = cells - _solid(bare)
@@ -79,6 +79,13 @@ func _measure_site(site_id: String, seeds: int) -> void:
 				% [seed_value, (void_full - void_no_cave) + (void_no_cave - void_bare) + void_bare,
 				void_full])
 
+	_report(site_id, seeds, totals, per_seed_void)
+
+
+## The printing half, split out when `_measure_site` hit QUALITY gate 4's 50-line limit. The seam is real
+## rather than convenient: everything above GENERATES worlds and differences them, everything here only
+## divides and formats, and the two have never needed to know about each other.
+func _report(site_id: String, seeds: int, totals: Dictionary, per_seed_void: Array[float]) -> void:
 	var frac: float = float(totals["void"]) / float(totals["cells"])
 	per_seed_void.sort()
 	var median: float = per_seed_void[per_seed_void.size() / 2]
@@ -93,10 +100,19 @@ func _measure_site(site_id: String, seeds: int) -> void:
 	print("  against legacy's stated 'near 15%%': %.1f%% of it" % (frac / 0.15 * 100.0))
 
 
+## THE POPULATION IS THE ROCK, NOT THE GRID (P017/D0292). The world now opens with `SKY_ROWS` rows of
+## air, which are void by construction and were never carved by anything. Counting them put 0.072 of
+## pure sky into the "void fraction" -- the number went 0.1042 to 0.1706 on a commit that carved nothing
+## new, and the whole reading is about carve rate. A metric whose population silently grew is the exact
+## shape this tool was written to catch, so it is spelled out here rather than left to the caller.
+func _rock_cells(grid: TileGrid) -> int:
+	return grid.width * (grid.height - ShaftGenerator.SKY_ROWS)
+
+
 func _solid(grid: TileGrid) -> int:
 	var n: int = 0
 	for col: int in grid.width:
-		for row: int in grid.height:
+		for row: int in range(ShaftGenerator.SKY_ROWS, grid.height):
 			if grid.is_solid(Vector2i(col, row)):
 				n += 1
 	return n
@@ -145,8 +161,8 @@ func _sweep_thresholds(site_id: String, seeds: int) -> void:
 		var empty: int = 0
 		for i: int in seeds:
 			var grid: TileGrid = ShaftGenerator.generate(cfg, 1000 + i * 7919)
-			cells += grid.width * grid.height
-			empty += grid.width * grid.height - _solid(grid)
+			cells += _rock_cells(grid)
+			empty += _rock_cells(grid) - _solid(grid)
 		var frac: float = float(empty) / float(cells)
 		print("  %+.2f   %.3f  %.3f  %.4f    %.2f"
 			% [offset, cfg["cave"]["threshold_top"], cfg["cave"]["threshold_deep"], frac, frac / 0.15])

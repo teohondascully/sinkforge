@@ -59,11 +59,18 @@ func _test_the_authoring_canvas_is_the_canvas_that_is_actually_drawn_into() -> v
 ## datum AND at zero, because a clamp and the correct code agree everywhere except above it.
 func _test_depth_label_signs_the_number_rather_than_clamping_it() -> void:
 	var per_m: int = MaterialLook.CELLS_PER_METRE
+	# Rows are keyed to the SURFACE, which is `MaterialLook.SURFACE_ROW` and not row 0 since P017 (D0292).
+	# Written as offsets from the datum rather than as absolute rows, so this asserts the FORMATTING and
+	# the sign, which is what it is about, instead of where the world happens to put its surface.
+	var datum: int = MaterialLook.SURFACE_ROW
 	var cases: Array = [
-		{"row": 0, "want": "0 m"},
-		{"row": per_m * 5, "want": "5 m"},
-		{"row": per_m * 137, "want": "137 m"},
-		{"row": -per_m * 3, "want": "+3 m"},
+		{"row": datum, "want": "0 m"},
+		{"row": datum + per_m * 5, "want": "5 m"},
+		{"row": datum + per_m * 137, "want": "137 m"},
+		{"row": datum - per_m * 3, "want": "+3 m"},
+		# And row 0 itself, which is now real sky rather than a hypothetical: the `+N m` branch D0271
+		# ported "on purpose" had never once run against a generated world before P017.
+		{"row": 0, "want": "+%d m" % (datum / per_m)},
 	]
 	for c: Dictionary in cases:
 		var got: String = DepthChip.label_for(c["row"])
@@ -129,7 +136,7 @@ func _test_the_chip_lays_itself_out_where_legacy_put_it() -> void:
 	var frame := Frame.new()
 	frame.look = MaterialLook.new()
 	frame.obs = Interface.Observation.new()
-	frame.obs.cell = Vector2i(4, 12 * MaterialLook.CELLS_PER_METRE)
+	frame.obs.cell = Vector2i(4, MaterialLook.SURFACE_ROW + 12 * MaterialLook.CELLS_PER_METRE)
 	var l: Dictionary = DepthChip.layout(frame, font)
 	_check(not l.is_empty(), "a complete frame produces a layout (got %s)" % l)
 	if l.is_empty():

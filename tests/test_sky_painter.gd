@@ -45,15 +45,22 @@ func _test_the_scale_is_derived_and_self_consistent() -> void:
 
 
 ## The horizon is where the world's surface is, and the world says where that is. Legacy's was
-## `SURFACE_LINE(22) * CELL(32)`; asserting 0.0 as a bare literal would restate the constant rather than
-## check it, so this checks the DATUM the constant was derived from.
+## `SURFACE_LINE(22) * CELL(32)`; asserting a bare literal would restate the constant rather than check
+## it, so this checks the DATUM the constant is derived from -- which, since P017 (D0292), is
+## `MaterialLook.SURFACE_ROW` rather than row 0.
 func _test_the_horizon_sits_on_the_surface_datum() -> void:
-	_check(MaterialLook.depth_m(0) == 0,
-		"the band ladder puts row 0 at depth 0 m (got %d)" % MaterialLook.depth_m(0))
-	_check(SkyPainter.HORIZON_Y == float(0 * Interface.TERRAIN_CELL_PX),
-		"so the horizon is the world-y of row 0 (%f)" % SkyPainter.HORIZON_Y)
-	_check(MaterialLook.depth_m(-4) < 0,
-		"control: rows above the datum read as NEGATIVE depth, so 'above the horizon' is a real region")
+	_check(MaterialLook.depth_m(MaterialLook.SURFACE_ROW) == 0,
+		"the band ladder puts the surface row at depth 0 m (got %d)"
+		% MaterialLook.depth_m(MaterialLook.SURFACE_ROW))
+	_check(is_equal_approx(SkyPainter.HORIZON_Y,
+			float(MaterialLook.SURFACE_ROW * Interface.TERRAIN_CELL_PX)),
+		"so the horizon is the world-y of that row (%f vs %f)"
+		% [SkyPainter.HORIZON_Y, float(MaterialLook.SURFACE_ROW * Interface.TERRAIN_CELL_PX)])
+	# The whole point of P017: there is sky ABOVE the horizon now, and it is a negative depth. Before it,
+	# this line could only have been written about a region the grid did not contain.
+	_check(SkyPainter.HORIZON_Y > 0.0 and MaterialLook.depth_m(0) < 0,
+		"and there is world ABOVE it -- row 0 is %d m, which is air the player can rise into rather than "
+		% MaterialLook.depth_m(0) + "a backdrop drawn outside the world")
 
 
 ## The two properties that separate a starfield from nothing, and from a comb.
