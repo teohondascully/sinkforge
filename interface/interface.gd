@@ -32,46 +32,6 @@ extends RefCounted
 ## to drive `sim/` directly; migrating them is separate work, deliberately not bundled here.
 
 
-## What a consumer is allowed to see. Today: a rectangle of cells, in cell coordinates.
-##
-## `window` is REQUIRED and has no default, on purpose. An envelope that means "everything" is the one
-## an agent measuring discoverability must never be handed by accident, and a defaulted whole-world
-## window is exactly how that happens. `oracle_over()` exists to make the unfiltered case say its own
-## name at the call site.
-class Envelope:
-	var window: Rect2i
-
-	func _init(cell_window: Rect2i) -> void:
-		window = cell_window
-
-	## Perfect spatial information over a whole grid -- §5's Oracle envelope, as far as this build has a
-	## mechanism for it. Named rather than written as a literal `Rect2i(0, 0, w, h)` at each call site so
-	## a reader can see which runs are unfiltered.
-	static func oracle_over(grid: TileGrid) -> Envelope:
-		return Envelope.new(Rect2i(0, 0, grid.width, grid.height))
-
-	## The window covering a world-PIXEL rectangle, grown by `margin_cells` on every side.
-	##
-	## THIS LIVES HERE BECAUSE THE CONVERSION NEEDS A `sim/` CONSTANT and its caller is `view/`, which may
-	## depend on `{interface, core}` and not on `sim`. The alternative -- re-declaring the terrain cell
-	## size in `view/` -- would put a second definition of a world-scale number in the tree, and the near
-	## miss is worth recording: `view/visuals/material_look.gd` already carries `CELLS_PER_METRE = 4`,
-	## which is a DIFFERENT quantity (cells per metre, not pixels per cell) that happens to share the
-	## value at 16px/m. Reaching for it would have been right by coincidence and wrong by construction.
-	##
-	## `floor` on the near edge and `ceil` on the far one, never `int()`: truncation toward zero drops
-	## the partially-visible row at the top and left of the screen, a one-cell strip of undrawn world
-	## that appears only at some camera positions and reads as flicker rather than as a missing feature.
-	static func covering(world_rect: Rect2, margin_cells: int) -> Envelope:
-		var cell: float = float(Heightfield.TERRAIN_CELL_PX)
-		var margin := Vector2i(margin_cells, margin_cells)
-		var lo := Vector2i(int(floor(world_rect.position.x / cell)),
-			int(floor(world_rect.position.y / cell))) - margin
-		var hi := Vector2i(int(ceil(world_rect.end.x / cell)),
-			int(ceil(world_rect.end.y / cell))) + margin
-		return Envelope.new(Rect2i(lo, hi - lo))
-
-
 ## One tick's readable state, as a value. Holds no reference into `sim/`.
 ##
 ## The body's box edges travel as their own fields rather than being recomputed by the consumer from
@@ -164,6 +124,13 @@ class Observation:
 	## first outward sign.
 	var mining_swing: bool = false
 
+	## THE SWING DIRECTION, as a unit cell step from the body toward what it is working. `Mining.swing_dir`
+	## has been public "specifically for this" since it was written and **nothing has ever called it** —
+	## `docs/LEGACY_GAP.md` T1 #6 names that directly. A draught puff has to be placed on the NEAR face and
+	## drift along the swing, and deriving the direction a second time in the view would be a second copy
+	## of a thing the sim already decided (D0293).
+	var mining_swing_dir: Vector2i = Vector2i.ZERO
+
 	## ...and how far through the CURRENT swing the pick is, per mille — 0 on the tick it lands, climbing
 	## to 1000 as the next blow winds up. The edge above says a blow happened; this says where in the
 	## stroke the arms are, which is what a two-frame pick animation needs to put its struck frame on the
@@ -254,6 +221,17 @@ class Result:
 ## definition: it reads `Heightfield`'s, so there is still exactly one number. `view/` reaching for its
 ## own copy is the near miss D0240 already recorded -- `material_look.gd` carries `CELLS_PER_METRE = 4`,
 ## a different quantity that happens to share the value, and copying it would be right by coincidence.
+## THE HOLLOW READING'S OWN SCALE, republished at the door. `mining_hollow`'s note says a consumer given
+## the magnitude "can derive the boolean" — which is only true if it also has the thresholds, and those
+## live on `HollowTell`, which is `sim/`. So they come through here with everything else the reading needs
+## (D0293). `RING` is the level at which a blow starts to answer hollow; `FULL` is the per-mille scale.
+const HOLLOW_RING: int = HollowTell.RING
+const HOLLOW_FULL: int = HollowTell.FULL
+
+## `Interface.Envelope`, split into its own file at D0294. A `const` rather than a `class_name` keeps
+## the one name it is reached by (see that file's header).
+const Envelope = preload("res://interface/envelope.gd")
+
 const TERRAIN_CELL_PX: int = Heightfield.TERRAIN_CELL_PX
 
 const REJECT_UNKNOWN_KIND: StringName = &"unknown_command_kind"
@@ -316,6 +294,8 @@ func _fill_mining(o: Observation) -> void:
 	o.mining_breach = _mining.breach_this_tick
 	o.mining_swing = _mining.swing_this_tick
 	o.mining_swing_phase = _mining.swing_phase_per_mille()
+	o.mining_swing_dir = _mining.swing_dir(_body.pos_x, _body.pos_y, _mining.charging_cell) \
+		if _mining.charging_cell != Mining.NO_CELL else Vector2i.ZERO
 	o.mining_blow_px = (2 * _mining.bite_radius + 1) * Mining.CELL_PX
 
 

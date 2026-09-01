@@ -157,7 +157,10 @@ func _physics_process(delta: float) -> void:
 	# own live session and `test_reveal_replay_driver.gd` says so.
 	_mining.mine(_grid, _body.pos_x, _body.pos_y, Vector2i(input.aim_col, input.aim_row),
 		input.mine_held and input.has_aim)
-	DebugSceneCommon.step_mining_feedback(_particles, _mining, _look, CELL, delta)
+	# The observation, not the sim object, for the draught's half of it -- see `draught_for` (D0293).
+	var mining_frame: Frame = _sky_view.current_frame() if _sky_view != null else null
+	DebugSceneCommon.step_mining_feedback(_particles, _mining,
+		mining_frame.obs if mining_frame != null else null, _look, CELL, delta)
 	_last_input = input
 	_record_tick(input)
 	_tick_count += 1

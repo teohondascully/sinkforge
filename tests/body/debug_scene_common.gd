@@ -19,6 +19,14 @@ static func record_row(tick: int, move_dir: int, jump_pressed: bool, jump_held: 
 ## a sentinel a real cell could equal is the guard-that-cannot-be-false trap this ledger keeps recording.
 const NO_AIM_ROW: int = -2147483648
 
+## The draught's four numbers, all legacy's (`legacy/scenes/main.gd:1607-1609`). Fractions and counts, not
+## pixels, so none of them needs a scale conversion: the offset is a fraction OF THE CELL and the amount
+## is a particle count.
+const NEAR_FACE_FRAC: float = 0.4      ## back along the swing from the cell's centre -- the face you are hitting
+const DRAUGHT_LIGHTEN: float = 0.25    ## dust reads lighter than the rock it came off
+const DRAUGHT_BASE: int = 1            ## legacy's `1 + int(2.0 * hollow)`: always one puff...
+const DRAUGHT_PER_HOLLOW: float = 2.0  ## ...and up to two more as the void behind the face gets closer
+
 
 ## `reveal_scene.gd`'s V2 dialect (Slice 1, D0195): the five V1 fields plus the mining hold and the aimed
 ## cell. Aim is state-affecting input under cursor-aim -- which cell a hold charges depends on it -- so a
@@ -96,8 +104,8 @@ static func depth_fraction(body_row: int, spawn_row: int, grid_rows: int) -> flo
 ##   * a BREACH is the hollow tell's visual half (`sim/mining/hollow_tell.gd` is the audible half's
 ##     source). A slow, nearly weightless DRAUGHT drifting into the opened void, not more chips --
 ##     the point of the cue is that it reads as air moving, so it cannot look like debris.
-static func step_mining_feedback(particles: Particles, mining: Mining, look: MaterialLook,
-		cell_px: int, delta: float) -> void:
+static func step_mining_feedback(particles: Particles, mining: Mining, obs: Interface.Observation,
+		look: MaterialLook, cell_px: int, delta: float) -> void:
 	particles.advance(delta)
 	if not mining.broke_this_tick:
 		return
@@ -105,10 +113,59 @@ static func step_mining_feedback(particles: Particles, mining: Mining, look: Mat
 		var at: Vector2 = Vector2(float(cell.x) + 0.5, float(cell.y) + 0.5) * float(cell_px)
 		var tint: Color = look.cell_color(mining.broke_material, cell.x, cell.y)
 		particles.chip(at, tint, randf_range(-PI, PI))
-	if mining.breach_this_tick and mining.broke_cells.size() > 0:
-		var lead: Vector2i = mining.broke_cells[0]
-		var at: Vector2 = Vector2(float(lead.x) + 0.5, float(lead.y) + 0.5) * float(cell_px)
-		particles.draught(at, look.cell_color(mining.broke_material, lead.x, lead.y), Vector2(0.0, 1.0), 6)
+	draught_for(particles, obs, look, cell_px)
+
+
+## THE DRAUGHT, RE-WIRED (D0293). `docs/LEGACY_GAP.md` T1 #6 called the old version "lifted and
+## MIS-WIRED", and it was wrong in four separate ways at once, each of which reads as a plausible cue on
+## its own:
+##
+##   * it fired on BREACH, **after** the rock broke — legacy fires it during the CHARGE, while you are
+##     still hitting a face that has a void behind it. That is the whole cue: it is a warning, not a
+##     result. Firing it afterwards tells you something you have already found out;
+##   * direction hardcoded DOWN, where legacy uses the true swing direction;
+##   * amount hardcoded 6, where legacy's is `1 + int(2 * hollow)` — **volume rides the reading**, which
+##     `sim/mining/mining.gd` quotes legacy on directly: "closing on a cavity is a crescendo you can act
+##     on rather than a flag that flips". A fixed 6 is the flag;
+##   * placed on the broken cell's centre, where legacy places it on the NEAR FACE, offset back along the
+##     swing by `CELL * 0.4`, so the air reads as being drawn INTO the wall rather than puffing out of it.
+##
+## Gated on the SWING rather than on the tick, for the reason D0279 records: the ring, the draught and
+## the pick animation all fire per blow in legacy, and per charging tick would be sixty a second.
+##
+## Reads the OBSERVATION, not the `Mining` object, even though this file may see both: `mining_swing_dir`
+## exists precisely so the view does not re-derive a direction the sim already decided.
+## Where the puff goes, which way it drifts and how much of it there is — as DATA, so all four of the
+## things the old wiring got wrong are assertable. `Particles` reports only its own size, so a test
+## written against the emitter could check that something was emitted and nothing about what.
+## Returns an empty dictionary when no draught is owed, which is the difference between "no cue" and
+## "a cue at the origin, pointing down".
+static func draught_plan(obs: Interface.Observation, cell_px: int) -> Dictionary:
+	if obs == null or cell_px <= 0 or not obs.mining_swing or not obs.mining_is_charging:
+		return {}
+	if obs.mining_hollow < Interface.HOLLOW_RING:
+		return {}
+	var cell: Vector2i = obs.mining_charging_cell
+	var dir: Vector2i = obs.mining_swing_dir
+	var centre: Vector2 = Vector2(float(cell.x) + 0.5, float(cell.y) + 0.5) * float(cell_px)
+	var hollow: float = float(obs.mining_hollow) / float(Interface.HOLLOW_FULL)
+	return {
+		"at": centre - Vector2(dir) * (float(cell_px) * NEAR_FACE_FRAC),
+		"dir": Vector2(dir),
+		"amount": DRAUGHT_BASE + int(DRAUGHT_PER_HOLLOW * hollow),
+		"cell": cell,
+	}
+
+
+static func draught_for(particles: Particles, obs: Interface.Observation, look: MaterialLook,
+		cell_px: int) -> void:
+	var plan: Dictionary = draught_plan(obs, cell_px)
+	if plan.is_empty():
+		return
+	var cell: Vector2i = plan["cell"]
+	particles.draught(plan["at"],
+		look.cell_color(obs.material_at(cell), cell.x, cell.y).lightened(DRAUGHT_LIGHTEN),
+		plan["dir"], plan["amount"])
 
 
 ## The camera follow, for the debug scenes: D0273's soft follow + look-ahead + pixel-snap, replacing the
