@@ -639,3 +639,44 @@ screenshot.
 **What it would cost to leave:** nothing today. The count grows by one per capture, and the corpus's
 signal-to-noise falls slowly enough that nobody notices until a `test_recorded_sessions` failure points
 at a log nobody meant to keep.
+
+
+---
+
+## P024 · The hollow ring needs a SWING, and this build only has a hold
+
+**Status:** open · **Cost to apply:** one ruling, then ~1 hour · **Raised by:** this session, 2026-08-31
+(D0274, closing the rest of `docs/LEGACY_GAP.md` PRE-3).
+
+PRE-3 asked for two things beyond the plumbing: the hollow reading as an **int** rather than a boolean,
+and a **swing edge**. The first landed. The second cannot, without a decision from you.
+
+**Why.** Legacy fires the ring once per BLOW — a discrete swing of the pick — and the repetition is what
+makes the tell rise rather than flip. This build has no blow. `Mining.mine()` is a per-tick hold:
+`charging_cell` advances every one of the 60 ticks a second you hold the button, and the only discrete
+event in the whole verb is the break at the end. Firing the ring on every charging tick would be 60
+rings a second; firing it only on the break gives one note where legacy gives a crescendo.
+
+**The three candidates, with what each costs.**
+
+1. **A fixed swing period** — the pick lands every N ticks while held; the ring, the dust and (later) the
+   swing pose all fire on that edge. Simplest, and it gives mining an audible tempo it currently lacks.
+   Cost: N is a feel number nobody has played against yet.
+2. **Rhythm-driven period** — `Mining._rhythm` already exists and already makes consecutive breaks
+   faster. Deriving the swing period from it means the pick visibly speeds up as you get into a groove,
+   which is the mechanic the rhythm system was ported for and which currently has **no outward sign at
+   all**. Cost: more moving parts, and the period becomes a function rather than a constant.
+3. **Charge-fraction edges** — fire at each 1/N of the way to a break. The number of swings per cell is
+   then constant regardless of hardness, so hard rock swings slower, which is arguably the most physical.
+   Cost: the edge count is fixed by the fraction, not by time, so a very fast break fires them all at once.
+
+**My recommendation: (2), rhythm-driven.** The rhythm system is already ported, already tested, and
+currently affects nothing the player can see or hear — this would be its first outward expression, and
+"the pick speeds up as you find a groove" is a feel the other two cannot produce. If that reads as too
+much for a first pass, (1) with the period later replaced by (2) is a clean sequence, because both put
+the edge in the same place.
+
+**What it blocks:** `docs/LEGACY_GAP.md` T1 #6 (the hollow ring + breach + draught) in its ported form.
+The magnitude and the breach flag are both available now, so a build that rings only on the BREAK is
+possible today without this ruling — it would just be a flag that flips, which is the thing legacy's own
+comment says not to do.
