@@ -187,6 +187,7 @@ func _physics_process(delta: float) -> void:
 		# Held across the shutter's awaits so the world stops while the pixels are read; the reason,
 		# and the numbers, are in `tests/body/reveal_shutter.gd` (D0304).
 		_shutter_held = true
+		RevealShutter.report_subject(_sky_view.current_frame() if _sky_view != null else null, _tick_count)
 		await RevealShutter.capture(self, _screenshot_path, _tick_count, _camera, _camera_zoom, _body)
 		_flush_recording()
 		get_tree().quit(0)
