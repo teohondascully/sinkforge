@@ -390,6 +390,7 @@ jobs:
       #   test_glint_painter.gd                          test_glint_painter (the discovery twinkle on an exposed vein — D0300)
       #   test_seam_painter.gd                           test_seam_painter (the grain reveal at the worked cell -- PRE-4's first caller, D0308)
       #   test_veil_painter.gd                           test_veil_painter (mass occlusion + the key light — D0302, T1 #2)
+      #   test_terrain_bake.gd                           test_terrain_bake (the static terrain baked once, not per frame — D0326, PORT_ORDER V1)
       #   test_arrival_plate.gd                          test_arrival_plate (the stratum arrival ceremony — D0288, LEGACY_GAP T1 #8)
       #   test_sfx_bank.gd                               test_sfx_bank (the hollow ring + the breach, synthesised and measured — D0296, LEGACY_GAP T1 #6)
       #   test_sfx_driver.gd                             test_sfx_driver (note_frame's five branches + the actuator — D0303)
@@ -418,7 +419,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 62 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 63 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -463,6 +464,7 @@ jobs:
             res://tests/test_glint_painter.gd \
             res://tests/test_seam_painter.gd \
             res://tests/test_veil_painter.gd \
+            res://tests/test_terrain_bake.gd \
             res://tests/test_arrival_plate.gd \
             res://tests/test_mining.gd \
             res://tests/test_mining_bite.gd \

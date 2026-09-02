@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_the_lead_is_capped_and_eases_instead_of_lurching()
 	_test_a_big_reposition_cuts_instead_of_panning_across_the_world()
 	_test_the_rendered_position_lands_on_whole_screen_pixels()
+	_test_the_framing_shows_legacys_own_field_of_view()
 	_finish("camera_rig")
 
 
@@ -174,3 +175,38 @@ func _test_the_rendered_position_lands_on_whole_screen_pixels() -> void:
 	_check(CameraRig.snap_to_pixel(p, 0.0) == p, "zoom 0 returns the position unchanged (%s)" % CameraRig.snap_to_pixel(p, 0.0))
 	_check(CameraRig.snap_to_pixel(p, -1.0) == p, "a negative zoom does too (%s)" % CameraRig.snap_to_pixel(p, -1.0))
 	_check(CameraRig.cut_distance(0.0, SCREEN_W) == INF, "and a degenerate zoom never cuts")
+
+
+## D0325 -- THE NUMBER NOBODY PORTED. The build shipped at zoom 6.0, showing 13.3 metres of world, while
+## legacy's most zoomed-IN rung showed 40. Three times tighter than legacy ever got.
+##
+## ASSERTED IN METRES, because metres is the unit legacy's design comment is written in: "a 40x22-cell
+## field", and legacy's cell WAS one metre. Asserting the zoom NUMBER instead would be asserting a value
+## in a regime it does not belong to -- the same class of error as D0310's constants, and the reason
+## `metres_across` exists at all. If either the terrain cell size or `TERRAIN_CELLS_PER_METER` moves, the
+## right zoom moves with it and this test says so rather than passing on a stale literal.
+func _test_the_framing_shows_legacys_own_field_of_view() -> void:
+	# Legacy `main.gd:31`: index 0 "shows a 40x22-cell field". Its cell is one metre.
+	var wide: float = CameraRig.metres_across(CameraRig.ZOOM_LEVELS[CameraRig.DEFAULT_ZOOM_IDX])
+	_check(absf(wide - 40.0) < 0.5,
+		"the play default frames legacy's own 40-cell field: %.1f metres across (legacy 40.0)" % wide)
+	# ...and legacy's SECOND rung is its 57-cell field. Two rungs, so the ladder is a conversion of
+	# legacy's and not one value that happens to land right.
+	var next_out: float = CameraRig.metres_across(CameraRig.ZOOM_LEVELS[1])
+	_check(absf(next_out - 57.0) < 1.0,
+		"and the next rung out is legacy's 57-cell field: %.1f metres (legacy 57.0)" % next_out)
+	# The ladder only goes OUTWARD. Smaller zoom is further out, so the metres must increase.
+	var previous: float = 0.0
+	for z: float in CameraRig.ZOOM_LEVELS:
+		var m: float = CameraRig.metres_across(z)
+		_check(m > previous, "rung at zoom %.2f shows %.1f m, wider than the %.1f m before it"
+			% [z, m, previous])
+		previous = m
+	# CONTROL: the old value must FAIL the claim above. Without this the assertion could be satisfied by
+	# a `metres_across` that returned 40.0 for anything, and the whole point is that 6.0 did not.
+	_check(absf(CameraRig.metres_across(6.0) - 40.0) > 10.0,
+		"CONTROL: the shipped-until-now zoom 6.0 shows %.1f metres, nothing like legacy's 40 -- so the "
+		% CameraRig.metres_across(6.0) + "row above is a real comparison and not true of every input")
+	# And the pixels-per-metre it all rests on is DERIVED, not written down.
+	_check(CameraRig.PIXELS_PER_METRE == Heightfield.TERRAIN_CELL_PX * ShaftGenerator.TERRAIN_CELLS_PER_METER,
+		"pixels-per-metre (%d) is the terrain grid's own product, not a literal" % CameraRig.PIXELS_PER_METRE)

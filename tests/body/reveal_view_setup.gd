@@ -65,8 +65,17 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 		view.add_painter(SkyPainter.paint).z_index = SKY_Z
 	else:
 		view.add_painter(BackdropPainter.paint).z_index = BACKDROP_Z
-	view.add_painter(WallPainter.paint).z_index = WALL_Z
-	view.add_painter(TerrainPainter.paint).z_index = TERRAIN_Z
+	# THE TWO STATIC PAINTERS GO INTO THE BAKE, not onto a per-frame layer (D0326, `docs/PORT_ORDER.md` V1).
+	# They are the only two on this stack whose picture cannot change unless the terrain does, and they are
+	# the expensive ones: legacy measured the terrain pass at ~72% of all frame draw calls. Registered in
+	# draw order — wall behind terrain — and baked into ONE quad at `WALL_Z`, which preserves that order
+	# inside the target while collapsing both layers to a single draw call per frame.
+	#
+	# `bake_static` falls back to mounting both as ordinary layers when no render target is available
+	# (headless), so this call site is correct on both paths and the picture is the same either way.
+	view.add_baked_painter(WallPainter.paint)
+	view.add_baked_painter(TerrainPainter.paint)
+	view.bake_static(WALL_Z)
 	view.add_stateful_painter(VeilPainter.new(), &"paint_frame").z_index = VEIL_Z
 	view.add_painter(GlintPainter.paint).z_index = GLINT_Z
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
