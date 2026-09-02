@@ -74,7 +74,12 @@ shutter on every capture. **Build this before optimising anything** — legacy's
 
 ## Next, in payoff order
 
-### 1. `TileGrid` planes as a flat array — the remaining 6.36 ms
+### 1. `TileGrid` planes as a flat array — LARGELY SUPERSEDED by D0340's cache
+
+**D0340 took `observe` from 6.36 ms to 0.03 by caching the planes on `TileGrid.terrain_version` and
+snapping the window so the cache hits 96.5% of ticks — so this is no longer urgent.** It remains the
+right structural answer for the REBUILD itself, which still costs a full window walk on the 21 ticks in
+600 that miss, and which would matter again under heavy sustained digging.
 
 `Interface.observe` walks the window doing a `Vector2i`-keyed `Dictionary` lookup per cell (~18,900 cells
 at this framing). **Legacy has no equivalent to port because legacy never paid this**: its renderer reads
