@@ -174,6 +174,23 @@ func matrix_color(material: StringName, col: int, row: int) -> Color:
 	return apply_tone(base, cell_tone(col, row, country_rock))
 
 
+## THE MATERIAL'S TEXTURE GRAMMAR, as a `RockTone.GRAM_*` index. Reads the `grammar:` field that
+## `data/materials/*.yaml` has carried since Slice 0 and that **nothing has read until now** — the same
+## shape as the depth chip before D0271, where the data was entirely present and only the consumer was
+## missing. D0327.
+##
+## Defaults to CLASTIC for a material with no `grammar:` key, which is what legacy does when its own
+## `grammar_at` callable is unset — and legacy warns that this default is silent, so an unmapped material
+## reads as soil rather than erroring. `tests/test_rock_tone.gd` asserts every shipped material resolves
+## to a grammar its own YAML names, so the default cannot quietly absorb a typo.
+func grammar_of(material: StringName) -> int:
+	var rec: Dictionary = MaterialsRecords.RECORDS.get(material, {})
+	match String(rec.get("grammar", "clastic")):
+		"bedded": return RockTone.GRAM_BEDDED
+		"massive": return RockTone.GRAM_MASSIVE
+		_: return RockTone.GRAM_CLASTIC
+
+
 ## True when this cell carries the mineral mark rather than the matrix around it. Public so a test can
 ## NAME the population it is measuring: "ore vs rock" pooled over both branches compares an ore's own
 ## matrix against country rock and demands they differ, which is asking for the opposite of what the

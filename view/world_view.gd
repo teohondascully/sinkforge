@@ -86,6 +86,10 @@ var _bake: TerrainBake = null
 var _owned: Array[RefCounted] = []
 var _frame: Frame = null
 var _hud: HudLayer = null
+## Built lazily on the first frame, because it is seeded from `Observation.world_seed` and there is no
+## observation until `refresh()` runs. Held rather than rebuilt: its eight noise fields are constructed
+## once and a per-frame rebuild would be both wasteful and, worse, a different world every frame.
+var _tone: RockTone = null
 
 
 ## Constructor-by-method rather than `_init` arguments, so this node can also be instantiated from a
@@ -143,10 +147,15 @@ func bake_static(z: int) -> bool:
 		return false
 	var probe: Interface.Observation = _iface.observe(
 		Interface.Envelope.covering(Rect2(), WINDOW_MARGIN_CELLS))
+	# Built here rather than waiting for `_build_frame`, because the bake paints BEFORE the first
+	# `refresh()` and a bake that ran with a null tone would burn the flat fill into a retained target --
+	# permanently, since nothing re-bakes a chunk that has not been dug.
+	if _tone == null:
+		_tone = RockTone.new(probe.world_seed)
 	_bake = TerrainBake.new()
 	add_child(_bake)
 	var ok: bool = _bake.setup(probe.world_cells, probe.cell_px,
-		observe_rect, _look, _baked_painters)
+		observe_rect, _look, _tone, _baked_painters)
 	if not ok:
 		# `free()`, not `remove_child` alone: removing a node from the tree does NOT free it, and the
 		# declined bake would sit in memory holding its CanvasItem RID for the life of the process. On the
@@ -269,6 +278,9 @@ func _build_frame() -> Frame:
 	f.view_world_rect = rect
 	f.zoom = _camera.zoom.x if _camera != null else 1.0
 	f.look = _look
+	if _tone == null:
+		_tone = RockTone.new(f.obs.world_seed)
+	f.tone = _tone
 	f.marks = PackedVector2Array()  ## empty in this build -- see Frame.marks
 	return f
 

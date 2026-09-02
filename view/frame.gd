@@ -48,6 +48,17 @@ var zoom: float = 1.0
 ## The palette: `data/` material records -> one `Color` per terrain cell.
 var look: MaterialLook = null
 
+## THE MOLDED-ROCK SHADING, or `null` before the first frame / in a fixture that did not build one.
+##
+## Separate from `look` rather than folded into it, and the reason is a dependency rather than taste:
+## `MaterialLook` is a pure palette that needs nothing but `data/`, while `RockTone` must be seeded from
+## `Observation.world_seed` and therefore cannot exist until an observation does. Folding it in would make
+## every `MaterialLook.new()` in the test suite need a seed it has no opinion about.
+##
+## A painter must treat `null` as "draw the flat fill" rather than as an error — that is the picture this
+## build drew before D0327 and it is always correct, only flatter.
+var tone: RockTone = null
+
 ## World-pixel positions where a UI marker needs the background to get out of its way.
 ##
 ## THIS ONE FIELD REPLACES FIVE. `sky_painter` reached for `_guide_targets`, `_aim`, `_aim_in_reach`,

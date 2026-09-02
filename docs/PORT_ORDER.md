@@ -103,10 +103,25 @@ the default while the frame costs what it currently costs (`D0325`).
 
 | | |
 |---|---|
-| **Legacy** | `scenes/fine_terrain.gd` (1402, view) + `src/core/fine_terrain.gd` (114, sim) |
+| **Legacy** | `scenes/fine_terrain.gd` — the SHADING only, `:380-505` and `:993-1085` |
 | **Depends on** | **V1** — it bakes into the same target and is unaffordable per-frame |
-| **Lines** | ~1,516 |
-| **Done when** | rock reads as molded rather than as a cell grid, and the determinism suite is green across the noise swap |
+| **Lines** | ~560 of shading, **not** the 1,402-line file |
+| **Status** | **LANDED 2026-09-01 as `view/visuals/rock_tone.gd` (D0327)** |
+
+**RE-SCOPED BY A MEASUREMENT, and the original estimate here was wrong.** This row was written to port
+that file whole. It should not be: legacy renders on a fine grid of 8px cells against a 32px/1-metre
+coarse cell, so its fine cell is 1/4 metre — and **this build's 4px terrain cell against 16px/metre is
+also 1/4 metre**. The two grids are the same physical granularity. Porting the subdivision would have
+produced 1/16-metre cells, four times finer than legacy ever rendered at sixteen times the cost, which is
+D0305's regime trap in its sharpest form.
+
+So the ~435 lines of subdivision bookkeeping do not come over, and every frequency constant ports
+UNCHANGED because both grids sample at the same scale. Three of the file's five over-limit functions were
+in the half that was dropped. The `grammar:` field in `data/materials/*.yaml`, carried since Slice 0 and
+read by nothing, got its first consumer here.
+
+Still open, and deliberately: every term needing a NEIGHBOUR — carved-edge AO, rim light, sky-form
+gradient, moss, hanging tufts, the soil profile. All reachable through `Observation.material_at`.
 
 Two halves and both are required for the vertical to be complete. The view half (1402) takes its shape
 from the sim as injected `Callable`s and its 11 noise fields are purely cosmetic, so `FastNoiseLite` is
