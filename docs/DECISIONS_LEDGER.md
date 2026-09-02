@@ -14092,3 +14092,33 @@ surface (this term may not darken the daylit band, which the sky painter and sur
 floor at `1 - AMBIENT_DARK` rather than at black, and — the control that matters — that the ceiling is
 already down to 0.56 by ten metres. A gradient that reached its floor only at 200 m would pass every other
 assertion while leaving the entire early game exactly as evenly lit as before.
+
+## D0333 · 2026-09-01 · The camera showed past the world — limits ported, and D0273's reason for deferring did not survive checking
+
+**A CAPTURE AT THE PORTED WIDE FRAMING HAD A THIRD OF THE FRAME AS FLAT GREY.** The body spawns near the
+world's left edge and the camera followed it straight past that edge. At the 12-metre framing this build
+shipped with, the camera never got far enough from the middle for it to show — which is exactly why the
+omission survived until D0325 fixed the framing.
+
+**D0273 DEFERRED THE LIMITS FOR A REASON THAT IS NOT TRUE.** `view/camera_rig.gd`'s header said clamping
+"would silently break the milestone captures" that `--wide-view` and `--camera=col,row` exist to produce.
+It would not: **both debug paths bypass the rig entirely.** `reveal_scene._update_camera` returns before
+calling it under `--wide-view`, and assigns `_fixed_camera` directly under `--camera=`. Nothing that
+frames outside the world goes through `step()`, so a clamp inside it cannot reach them. The deferral was
+a plausible-sounding claim about code neither the author nor any later reader checked, and it survived
+four sessions because the defect it protected was invisible at the framing then in use.
+
+**THE CLAMP APPLIES TO THE RENDERED POSITION, NOT THE EASED ONE**, the same ordering as `snap_to_pixel`
+and for the same reason: the rig's internal `_pos` keeps converging on the body at full precision, so
+walking along a wall does not push the eased position into the limit and then make it crawl back out when
+the body turns around. It is a view constraint, not a follow constraint.
+
+**A WORLD NARROWER THAN THE VIEW IS CENTRED, NOT PINNED.** `min > max` on an axis means the world does not
+fill the frame there, and clamping between crossed bounds pins the camera to whichever edge the
+expression evaluated last — the world would sit against the left of the screen rather than in the middle
+of it. Both branches are asserted.
+
+The limits are set by the scene, not by the rig's constructor: `CameraRig` is `view/` and cannot see a
+`TileGrid`, so the world's pixel bounds are the caller's to supply. An unset limit is unlimited, which is
+what every existing caller and every rig posed in isolation still gets — and the test's control drives an
+unlimited rig past the same edge to prove the clamp is what does the work.

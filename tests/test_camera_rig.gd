@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_test_a_big_reposition_cuts_instead_of_panning_across_the_world()
 	_test_the_rendered_position_lands_on_whole_screen_pixels()
 	_test_the_framing_shows_legacys_own_field_of_view()
+	_test_the_camera_never_shows_past_the_world()
 	_finish("camera_rig")
 
 
@@ -210,3 +211,51 @@ func _test_the_framing_shows_legacys_own_field_of_view() -> void:
 	# And the pixels-per-metre it all rests on is DERIVED, not written down.
 	_check(CameraRig.PIXELS_PER_METRE == Heightfield.TERRAIN_CELL_PX * ShaftGenerator.TERRAIN_CELLS_PER_METER,
 		"pixels-per-metre (%d) is the terrain grid's own product, not a literal" % CameraRig.PIXELS_PER_METRE)
+
+
+## THE VOID AT THE EDGE OF THE WORLD (D0333). A capture at the ported wide framing showed a third of the
+## frame as flat grey: the body spawns near the world's left edge, and the camera followed it straight
+## past that edge. At the 12-metre framing this build shipped with, the camera never got far enough from
+## the middle for it to show — which is why the omission survived until the framing was fixed.
+func _test_the_camera_never_shows_past_the_world() -> void:
+	var world := Rect2(0.0, 0.0, 2048.0, 4096.0)
+	var rig := CameraRig.new()
+	rig.set_world_limits(world)
+	var half: float = SCREEN_W / ZOOM * 0.5
+	# Drive the body hard into each edge and check the VIEW stays inside, not the camera position.
+	var corners: Array[Vector2] = [
+		Vector2(-500.0, 2000.0), Vector2(4000.0, 2000.0),
+		Vector2(1000.0, -500.0), Vector2(1000.0, 9000.0),
+	]
+	var checked: int = 0
+	var inside: int = 0
+	for target: Vector2 in corners:
+		var r := CameraRig.new()
+		r.set_world_limits(world)
+		r.warp_to(target)
+		var got: Vector2 = r.step(target, Vector2.ZERO, ZOOM, SCREEN_W, DT)
+		checked += 1
+		if got.x - half >= world.position.x - 0.5 and got.x + half <= world.end.x + 0.5:
+			inside += 1
+		else:
+			_check(false, "camera at %s shows x [%.1f, %.1f], outside the world's [0, %.1f]"
+				% [target, got.x - half, got.x + half, world.end.x])
+	_check_over(checked, inside == checked,
+		"the view stays inside the world at all %d edges -- %d did" % [checked, inside])
+	# CONTROL: with NO limits set the same drive DOES leave the world, so the rows above report the clamp
+	# and not a rig that never travels far. Without this they pass on a `step` that ignores its argument.
+	var free_rig := CameraRig.new()
+	free_rig.warp_to(Vector2(-500.0, 2000.0))
+	var loose: Vector2 = free_rig.step(Vector2(-500.0, 2000.0), Vector2.ZERO, ZOOM, SCREEN_W, DT)
+	_check(loose.x - half < world.position.x,
+		"CONTROL: an unlimited rig shows x from %.1f, outside the world -- so the clamp is doing the work"
+			% (loose.x - half))
+	# A WORLD NARROWER THAN THE VIEW IS CENTRED, not pinned to an edge: clamping between crossed bounds
+	# would put the world against one side of the screen rather than in the middle of it.
+	var narrow := Rect2(0.0, 0.0, 100.0, 4096.0)
+	var n := CameraRig.new()
+	n.set_world_limits(narrow)
+	n.warp_to(Vector2(5000.0, 2000.0))
+	var centred: Vector2 = n.step(Vector2(5000.0, 2000.0), Vector2.ZERO, ZOOM, SCREEN_W, DT)
+	_check(absf(centred.x - 50.0) < 1.0,
+		"a world narrower than the view is CENTRED at %.1f, not pinned to an edge" % centred.x)
