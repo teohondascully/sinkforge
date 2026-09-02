@@ -1,0 +1,11 @@
+=== Running check_claim_references.py at the pin ===
+check_claim_references: 4 known claim id(s) in claims/, 0 proven (first_failed_at populated)
+check_claim_references: population = 0 scenarios/*.yaml + 0 harness/**/*.gd check-registering file(s) = 0
+check_claim_references: VOID -- zero scenarios and zero harness check-layers exist to carry a claim reference right now; a PASS would assert a corpus was checked and found clean, when nothing was checked at all. The active-claim cap is still enforced above, unconditionally.
+exit code: 0
+---
+=== Population derivation ===
+scenarios/*.yaml:
+(none)
+harness/**/*.gd with 'func run(':
+(none)

@@ -1,0 +1,44 @@
+=== CI step: probe_facing_flip.tscn (harness.yml) ===
+550:        run: xvfb-run -a ./godot --path . tools/probe_facing_flip.tscn
+
+--- Step context (lines around the probe invocation) ---
+      # D0315. Lives in the HEADED job because that is the only place it can run: the defect is a
+      # disagreement between rect arithmetic and the rasterizer, and only pixels can see it. The
+      # headless suite carries the same claim through `MinerLook.drawn_span`, but `drawn_span` is a
+      # written-down convention -- this step is what keeps it honest against the engine itself.
+      - name: Turning the miner mirrors it in place (D0315)
+        run: xvfb-run -a ./godot --path . tools/probe_facing_flip.tscn
+
+  fuzz_nightly:
+
+=== Probe source: exit-code path ===
+--- get_tree().quit() calls in probe_facing_flip.gd ---
+40:		get_tree().quit(1)
+48:	get_tree().quit(1 if _failed else 0)
+
+--- _failed flag and quit logic ---
+27:var _failed: bool = false
+48:	get_tree().quit(1 if _failed else 0)
+97:		_failed = true
+121:		_failed = true
+172:		_failed = true
+182:		_failed = true
+
+=== Comparison: run_gd_test.sh wrapping ===
+Other suites run via: bash tools/run_gd_test.sh ./godot res://tests/test_x.gd
+The probe runs via: xvfb-run -a ./godot --path . tools/probe_facing_flip.tscn
+(no run_gd_test.sh wrapper, no SCRIPT ERROR detection)
+
+=== check_headed_boot.sh: uses run_gd_test.sh? ===
+(no: check_headed_boot.sh invokes godot directly)
+
+=== Assessment ===
+The probe_facing_flip.tscn step runs outside run_gd_test.sh. The verdict
+comes from the scene's own get_tree().quit(1 if _failed else 0). A hang
+(unguarded runtime error in _ready()) is caught only by the job's
+10-min timeout-minutes, not by the wrapper's SCRIPT ERROR detection.
+However: the probe has explicit blank-frame and empty-band checks
+(_failed = true on empty bands), and check_headed_boot.sh has its
+own controls (agent-mode discriminator, MIN_COLOURS floor). The probe
+is fail-closed on the paths it knows about; the gap is the hang path
+only. Not the seventh; a disclosed architectural choice.

@@ -1,0 +1,40 @@
+=== Running check_loc_ratio.py in a shallow clone (depth 1) ===
+git log depth:     1380 commit(s)
+
+check_loc_ratio: instrument (harness+experiment+tools+tests), current:
+    harness           0
+    experiment        0
+    tools         11131
+    tests         14953
+    total         26084
+check_loc_ratio: game (core+sim+interface+view+shell), current:
+    core            422
+    sim            2928
+    interface       446
+    view           4178
+    shell           497
+    total          8471
+check_loc_ratio: absolute ratio = 3.079 (instrument / game) -- informational, does not gate
+check_loc_ratio: why it's >1 -- tools/ and tests/ were built ahead of game content by design (docs/ONBOARDING.md Task 0 requires the structural gates before there is game code for them to check); it falls only when game LOC (8471 now) grows, not when instrument LOC shrinks -- concretely, data/economy/ producing machines and content, per docs/QUALITY.md gate 7's own 'the next unit of work is game.'
+check_loc_ratio: over the last 10 commits that touched either population (72d7ab00..HEAD): instrument 23267 -> 26084 (+2817), game 8396 -> 8471 (+75)
+check_loc_ratio: WARNING (not blocking) -- instrument grew 2817 lines against game's 75 over the last 10 commits that touched either population, more than 2x. This is the polish-the-machine-neglect-the-game signal and it is worth reading, but game LOC IS growing, so it does not block. It blocks only when game growth reaches zero.
+check_loc_ratio: PASS (with velocity warning)
+exit code: 0
+---
+=== ADVISORY path in source (resolve_window_start returns None) ===
+33:`docs/QUALITY.md` gate 7) and had never once been able to fail** -- the `GAME_LOC_ADVISORY_FLOOR` below
+34:used to force ADVISORY (exit 0 unconditionally) whenever game LOC was under 2000, and game LOC has never
+35-exceeded 1665 at any point this project has measured it, so the floor was not a calibration, it was a
+36-permanent off switch with a number attached. Removed rather than raised or justified, per the audit's own
+37-explicit instruction not to narrow scope to make a failing check pass.
+--
+197:              "ADVISORY: not gating on velocity this run.")
+198-        return 0
+199-
+200-    instrument_then = sum(loc_at_commit(window_start, d) for d in INSTRUMENT_DIRS)
+
+=== Assessment ===
+The ADVISORY path fires on a shallow clone (depth 1). The CI workflow
+uses fetch-depth: 0 to prevent this, and the fetch-depth comment in
+harness.yml explains why. The gate is disclosed in-step and demotes
+to advisory rather than silently passing. Not the seventh.

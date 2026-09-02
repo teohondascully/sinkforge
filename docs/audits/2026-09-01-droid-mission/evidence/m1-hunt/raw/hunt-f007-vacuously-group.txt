@@ -1,0 +1,37 @@
+=== Vacuously-PASS paths at the pin (70f8a785) ===
+
+--- layer_lint.py ---
+191:        print("layer_lint: no .gd files under the layer tree -- nothing to check.")
+192:        print("layer_lint: PASS (vacuously)")
+
+--- no_engine_imports.py ---
+185:        print("no_engine_imports: core/ and sim/ have no .gd files yet -- nothing to check.")
+186:        print("no_engine_imports: PASS (vacuously)")
+
+--- check_size_limits.py ---
+119:        print("check_size_limits: no .gd files outside legacy/ yet -- nothing to check.")
+120:        print("check_size_limits: PASS (vacuously)")
+
+--- check_coordinate_naming.py ---
+128:        print("check_coordinate_naming: sim/world and sim/terrain_gen have no .gd files yet -- nothing to check.")
+129:        print("check_coordinate_naming: PASS (vacuously)")
+
+--- schema_validator.py ---
+24:rather than converting "no schema" into "nothing to check."
+68:        print("schema_validator: data/ does not exist yet -- nothing to check.")
+69:        print("schema_validator: PASS (vacuously)")
+74:        print("schema_validator: data/ has no subdirectories yet -- nothing to check.")
+75:        print("schema_validator: PASS (vacuously)")
+
+=== layer_lint.py zero-edge control (check_edges_were_resolved, exit 2) ===
+17:edge. That is why `check_edges_were_resolved` below exists and why this file has a mutation test.
+158:def check_edges_were_resolved(class_map: dict, class_edges: int, path_edges: int) -> str | None:
+210:    broken = check_edges_were_resolved(class_map, class_edges, path_edges)
+
+=== Assessment ===
+All five tools have 'PASS (vacuously)' paths that fire when their policed
+tree is empty. These require the ENTIRE policed tree to vanish (all .gd
+files under core/+sim/ deleted, or data/ removed, etc). layer_lint.py
+additionally has check_edges_were_resolved which exits 2 on zero edges
+(the D0224 guard). These are loud (print 'vacuously'), disclosed, and
+low-risk. Not the seventh; not a new finding.
