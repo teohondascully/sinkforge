@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_test_the_cache_returns_the_same_field_and_misses_when_a_cell_changes()
 	_test_the_lamp_opens_the_veil_around_the_miner_and_not_far_from_it()
 	_test_the_lamp_is_dimmer_in_daylight_than_in_the_deep()
+	_test_the_sky_runs_out_with_depth_and_the_deep_is_genuinely_dark()
 	_test_an_incomplete_frame_paints_nothing()
 	_finish("veil_painter")
 
@@ -237,6 +238,47 @@ func _test_the_cache_returns_the_same_field_and_misses_when_a_cell_changes() -> 
 	var fresh_after: PackedFloat32Array = VeilPainter.openness(moved, moved.window)
 	_check(after == fresh_after, "after one cell is dug the cache MISSES and re-bakes correctly")
 	_check(after != fresh, "...and the field genuinely differs, so the previous line is not vacuous")
+
+
+## THE SKYLIGHT CEILING (D0332), and the gap it closes. `MASS_SHADE` is a purely LOCAL quantity — how
+## buried a cell is relative to an opening — so before this a buried cell two metres down and one two
+## hundred metres down came out at exactly the same brightness, and the underground read as evenly lit at
+## every depth. A capture at 7 m showed it: legible everywhere, dark nowhere.
+##
+## Asserted as a MONOTONE FALL to a floor, not at picked depths, because the shape is the claim: a ceiling
+## that dropped and then recovered, or that dropped in one step, would satisfy a two-point check.
+func _test_the_sky_runs_out_with_depth_and_the_deep_is_genuinely_dark() -> void:
+	var surface_row: int = MaterialLook.SURFACE_ROW
+	var previous: float = 2.0
+	var checked: int = 0
+	var monotone: int = 0
+	for m: int in range(0, 40):
+		var row: int = surface_row + m * MaterialLook.CELLS_PER_METRE
+		var c: float = VeilPainter.skylight_ceiling(row)
+		checked += 1
+		if c <= previous + 0.0001:
+			monotone += 1
+		previous = c
+	_check_over(checked, monotone == checked,
+		"the ceiling never rises as depth grows -- %d of %d samples" % [monotone, checked])
+	# At the surface the sky is unobstructed, so the ceiling must be a true no-op: this term may not
+	# darken the daylit band, which the sky painter and the surface cap already own.
+	_check(is_equal_approx(VeilPainter.skylight_ceiling(surface_row), 1.0),
+		"at the surface the ceiling is exactly 1.0 (%.4f) -- an unobstructed sky darkens nothing"
+			% VeilPainter.skylight_ceiling(surface_row))
+	# ...and in the deep it bottoms out at legacy's own AMBIENT_DARK, rather than at black. Rock in shadow
+	# is dark rock, never a hole -- the same rule `RockTone.VALUE_FLOOR` carries.
+	var deep: float = VeilPainter.skylight_ceiling(surface_row + 200 * MaterialLook.CELLS_PER_METRE)
+	_check(is_equal_approx(deep, 1.0 - VeilPainter.AMBIENT_DARK),
+		"the deep floors at 1 - AMBIENT_DARK = %.2f (got %.4f), not at black"
+			% [1.0 - VeilPainter.AMBIENT_DARK, deep])
+	# CONTROL, and it is the one that matters: the fall must actually HAPPEN over playable depths. A
+	# ceiling that reached its floor only at 200 m would be monotone, would floor correctly, and would
+	# leave the first thirty metres -- the whole early game -- exactly as evenly lit as before.
+	var at_ten: float = VeilPainter.skylight_ceiling(surface_row + 10 * MaterialLook.CELLS_PER_METRE)
+	_check(at_ten < 0.75,
+		"CONTROL: by 10 m the ceiling is already down to %.2f, so the gradient is present where the game "
+			% at_ten + "is actually played and not only in the abyss")
 
 
 func _test_an_incomplete_frame_paints_nothing() -> void:

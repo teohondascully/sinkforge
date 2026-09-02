@@ -14049,3 +14049,46 @@ has no world limits, so at a wide world it follows the body past the world edge 
 is flat void (D0273 deliberately deferred the limits for `--wide-view`; a real play view needs them); the
 guide ring reads as a debug overlay; and there is no darkness gradient with depth, so at 7 m everything
 is equally lit — legacy's identity is light pools in blackness and that is the largest remaining gap.
+
+## D0332 · 2026-09-01 · The veil darkened by burial and not by depth — the skylight ceiling
+
+**A CAPTURE AT 7 METRES WAS LEGIBLE EVERYWHERE AND DARK NOWHERE**, which is the opposite of what this game
+is supposed to look like. `VeilPainter` was already correct about what it did — mass occlusion, the key
+light, the lamp — and `MASS_SHADE` is a purely LOCAL quantity: how buried a cell is relative to a nearby
+opening. So a buried cell two metres down and one two hundred metres down came out at **exactly the same
+brightness**, and the whole underground read as evenly lit at every depth.
+
+The missing term is legacy's `_skylight_alpha` (`world_renderer.gd:3263-3270`): how much sky reaches this
+row at all, attenuating with depth past the surface line. It is independent of burial, which is why
+neither term can substitute for the other and why the absence was invisible to every existing veil test —
+all of them pose one depth.
+
+**COMPOSED AS A CEILING, NOT AS A SECOND DARK RECT.** The skylight caps how bright a cell can be before
+mass, key and lamp are considered; the lamp then lifts what is left. That ordering is legacy's own rule,
+already quoted in this file's `_paint_with`: *"a light raises the light level rather than lowering an
+opacity, so a lit cell trends toward full light and can never overshoot it."* Drawing a second black rect
+would be the regression `view/visuals/wall_painter.gd` records — the wall darkened in its own paint AND
+again by the veil, so a lit chamber came out as a black rectangle. **There is one darkness in this
+renderer**, and this joins it rather than stacking on it.
+
+**IN METRES, and that is the whole conversion.** Legacy's tiles are one metre and this build's cells are a
+quarter of one, so `SKY_REACH 12` and `SKY_FADE 16` copied as ROWS would have been four times too shallow
+— the gradient would have finished inside the first three metres and nothing below would ever change.
+Ported as `SKY_REACH_M`/`SKY_FADE_M` and read through `MaterialLook.depth_m_exact`, the same route
+`lamp_scale` already uses.
+
+**LEGACY'S `daylight()` IS DELIBERATELY ABSENT.** It blends a `NIGHT_DARK` floor from a day cycle; this
+build has none and D0277 ruled sky variation depth-driven rather than clock-driven, so the term would be a
+constant 1.0. Omitted rather than written as a factor that can never move — the same treatment
+`view/camera_rig.gd` gives legacy's stride multiplier.
+
+**ONE APPROXIMATION, STATED.** Legacy also scatters light `SKY_FADE` tiles *under the first solid rock*,
+which needs a per-column surface row at paint time. `Observation` carries `surface_y` and wiring it is a
+follow-up; for now the scatter is folded into the reach. Recorded so the difference is not later mistaken
+for a porting slip.
+
+**The test asserts the SHAPE, not two points.** A monotone fall over 40 sampled metres, exactly 1.0 at the
+surface (this term may not darken the daylit band, which the sky painter and surface cap already own), a
+floor at `1 - AMBIENT_DARK` rather than at black, and — the control that matters — that the ceiling is
+already down to 0.56 by ten metres. A gradient that reached its floor only at 200 m would pass every other
+assertion while leaving the entire early game exactly as evenly lit as before.
