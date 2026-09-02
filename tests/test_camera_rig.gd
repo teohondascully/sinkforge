@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_test_a_big_reposition_cuts_instead_of_panning_across_the_world()
 	_test_the_rendered_position_lands_on_whole_screen_pixels()
 	_test_the_framing_shows_legacys_own_field_of_view()
+	_test_the_default_zoom_never_frames_void()
 	_test_the_camera_never_shows_past_the_world()
 	_finish("camera_rig")
 
@@ -211,6 +212,42 @@ func _test_the_framing_shows_legacys_own_field_of_view() -> void:
 	# And the pixels-per-metre it all rests on is DERIVED, not written down.
 	_check(CameraRig.PIXELS_PER_METRE == Heightfield.TERRAIN_CELL_PX * ShaftGenerator.TERRAIN_CELLS_PER_METER,
 		"pixels-per-metre (%d) is the terrain grid's own product, not a literal" % CameraRig.PIXELS_PER_METRE)
+
+
+## D0335 -- THE FRAMING COULD NOT BE FIXED BY A FRAMING CHANGE. D0325 ported legacy's zoom ladder, whose
+## play rung frames 40 metres; the world was 48 terrain cells, which is 12. So the shipped default of 6.0
+## ALREADY framed wider than the world existed, and the capture showed void bands at both screen edges.
+## Widening the world (`docs/NEEDS_DIRECTOR.md` P031) is what made the ported rung reachable.
+##
+## `default_zoom_for` therefore DERIVES the default rather than writing it down: legacy's rung unless the
+## world is too narrow for it, in which case zoom in far enough to fill the frame. **A larger zoom shows
+## FEWER metres, so it is a `max`** -- and reading it as a `min` frames void, which is the whole defect.
+## That inversion is what the control below poses, because the two differ on exactly one input class.
+func _test_the_default_zoom_never_frames_void() -> void:
+	# The invariant, over every width from a sliver to far wider than the ladder: the visible world px may
+	# never exceed the world px that EXIST. Stated as the defect's own negation, not as a value.
+	for world_px: float in [64.0, 192.0, 512.0, 1024.0, 4096.0, 16384.0]:
+		var z: float = CameraRig.default_zoom_for(world_px, SCREEN_W)
+		_check(SCREEN_W / z <= world_px + 0.5,
+			"a %.0f-px world frames %.0f px at the derived zoom %.2f -- no void" % [world_px, SCREEN_W / z, z])
+	# The ruled play width (256 terrain cells) is wide enough for legacy's own rung, so it must get it
+	# EXACTLY -- a derivation that quietly zoomed past the ported ladder would defeat D0325.
+	var play_px: float = 256.0 * float(Heightfield.TERRAIN_CELL_PX)
+	_check(is_equal_approx(CameraRig.default_zoom_for(play_px, SCREEN_W),
+		CameraRig.ZOOM_LEVELS[CameraRig.DEFAULT_ZOOM_IDX]),
+		"the ruled 256-cell world gets legacy's rung unchanged (%.2f)"
+		% CameraRig.default_zoom_for(play_px, SCREEN_W))
+	# CONTROL, and it is the mutation that matters: for the 48-cell TEST sites the ported rung alone is
+	# WRONG. Without this row the assertion above would be satisfied by a function that returned
+	# ZOOM_LEVELS[0] for every input -- which is precisely the build that shipped void bands.
+	var narrow_px: float = 48.0 * float(Heightfield.TERRAIN_CELL_PX)
+	_check(SCREEN_W / CameraRig.ZOOM_LEVELS[CameraRig.DEFAULT_ZOOM_IDX] > narrow_px,
+		"CONTROL: legacy's rung alone would frame %.0f px of a %.0f-px world -- void, so the max above "
+		% [SCREEN_W / CameraRig.ZOOM_LEVELS[CameraRig.DEFAULT_ZOOM_IDX], narrow_px]
+		+ "is load-bearing and not true of every input")
+	# A degenerate width must not divide by zero into an infinite zoom; it falls back to the ladder.
+	_check(CameraRig.default_zoom_for(0.0, SCREEN_W) == CameraRig.ZOOM_LEVELS[CameraRig.DEFAULT_ZOOM_IDX],
+		"a zero-width world falls back to the ladder rather than dividing by it")
 
 
 ## THE VOID AT THE EDGE OF THE WORLD (D0333). A capture at the ported wide framing showed a third of the

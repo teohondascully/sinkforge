@@ -106,6 +106,25 @@ const DEFAULT_ZOOM_IDX: int = 0
 ## exactly that.
 const PIXELS_PER_METRE: int = Interface.TERRAIN_CELL_PX * MaterialLook.CELLS_PER_METRE
 
+## THE ZOOM A WORLD OF `world_px_wide` SHOULD ACTUALLY BE FRAMED AT (D0335).
+##
+## `ZOOM_LEVELS[DEFAULT_ZOOM_IDX]` is legacy's argued default and frames 40 metres — but a world narrower
+## than that would be framed with VOID at both edges, which is exactly the defect `docs/NEEDS_DIRECTOR.md`
+## P031 records: the shipped default of 6.0 already framed wider than a 48-cell world existed.
+##
+## So the default is DERIVED rather than written down: take legacy's rung, unless the world is too narrow
+## for it, in which case zoom in far enough to fill the frame. A larger zoom shows FEWER metres, so this
+## is a `max` — and reading it as a `min` frames void, which is the mistake this function exists to make
+## unmakeable.
+##
+## Deriving it also means the 48-cell TEST sites keep a sensible framing without a special case, and a
+## site that later changes width moves its own framing with it instead of desynchronising from a constant.
+static func default_zoom_for(world_px_wide: float, viewport_width: float = 1280.0) -> float:
+	if world_px_wide <= 0.0:
+		return ZOOM_LEVELS[DEFAULT_ZOOM_IDX]
+	return maxf(ZOOM_LEVELS[DEFAULT_ZOOM_IDX], viewport_width / world_px_wide)
+
+
 ## Metres of world visible across a viewport of `viewport_width` at `zoom`. The quantity legacy's design
 ## comment is actually written in, so it is the quantity the test asserts.
 static func metres_across(zoom: float, viewport_width: float = 1280.0) -> float:

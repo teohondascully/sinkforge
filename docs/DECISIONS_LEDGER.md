@@ -14170,3 +14170,34 @@ single pass is one `_cell_term` per occupied cell against the four-plus per cell
 cost. It is not built here because a suspended-and-never-resumed signature is a silently wrong value,
 which is exactly the quiet-green class this project spends its effort on; it needs a guard that cannot be
 forgotten, not just an API.
+
+## D0335 · 2026-09-01 · The framing could not be fixed by a framing change — the world was narrower than the view
+
+D0325 ported legacy's zoom ladder and D0333 stopped the camera showing past the world. Both were correct
+and neither was enough: at the ported play rung the frame is **40 metres** wide, and `shallow_clay` was
+**48 terrain cells — 12 metres**. The shipped default of 6.0 already framed wider than the world existed,
+so every capture had void bands at the screen edges and D0333's clamp spent its time centring a world
+that could not fill the frame. **The view was not mis-aimed; there was not enough world to aim it at.**
+
+Ruled by the director as `docs/NEEDS_DIRECTOR.md` P031: **256 cells, 64 metres.** Not legacy's own 512 —
+two screens at the ported framing is enough for the framing to be right and for `docs/GDD.md` §13's
+factory rungs to have a floor, while still reading as a shaft rather than an open world. It costs ~4 s of
+generation against 7.9 for 512, a one-time boot cost, and D0326's bake already makes play cost independent
+of world width.
+
+**THE DEFAULT ZOOM IS NOW DERIVED, NOT WRITTEN DOWN.** `CameraRig.default_zoom_for(world_px_wide)` returns
+legacy's rung unless the world is too narrow for it, in which case it zooms in far enough to fill the
+frame. A larger zoom shows FEWER metres, so it is a `max` — **reading it as a `min` frames void, which is
+the exact defect the function exists to make unmakeable**, and the mutation was run: `minf` fails four
+rows including `a 192-px world frames 960 px at the derived zoom 2.00`. Deriving it also means the 48-cell
+TEST sites keep a sensible framing with no special case, and `tests/test_reveal_args.gd`'s pinned default
+site and `tools/capture_moments.sh`'s `--zoom=6.5` milestone pins stay valid — which is why the test sites
+were deliberately left at 48 and only the play site widened.
+
+**THIS MOVES THE DETERMINISM GOLDEN, AND THAT IS THE EXPECTED SHAPE, NOT A REGRESSION.** The golden
+scenario generates `shallow_clay`, so a width change is a world-GENERATION change and
+`tests/test_shaft_replay_determinism.gd`'s array moves from checkpoint 0. Both discriminators that
+separate a re-pin from a regression were checked and both hold: the two separate OS processes still agree
+bit-identically (first mismatch at −1) and the seed+1 control still diverges at checkpoint 0. Coverage
+stayed live at `jumps=858 digs=360`. Per D0167's protocol the replacement array is harvested from CI's own
+pinned Linux build, never captured locally.

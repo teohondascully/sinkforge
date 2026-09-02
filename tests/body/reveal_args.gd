@@ -19,6 +19,10 @@ extends RefCounted
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
 
+## `camera_zoom` when no `--zoom=` was given, so the scene knows to derive one. Negative because a real
+## zoom is always positive and `CameraRig` already treats `<= 0` as degenerate everywhere else.
+const UNSET_ZOOM: float = -1.0
+
 
 ## What the scene uses when a flag is absent. Its own function so a test can assert a default without
 ## restating it, and so `parse()` stays under the 50-line function gate.
@@ -28,12 +32,17 @@ static func defaults() -> Dictionary:
 		"seed": 20260826,
 		"screenshot_tick": -1,
 		"screenshot_path": "",
-		# STILL 6.0, AND THE LADDER BESIDE IT SAYS WHY. `CameraRig.ZOOM_LEVELS` ports legacy's framing
-		# (index 0 = 40 metres, legacy's own "40x22-cell field"), but two measured facts block using it:
-		# the play site is 48 cells = 12 METRES wide, so 40 metres frames 28 metres of void; and at that
-		# framing the per-frame painter loops measure 22.5 ticks/s against a 120Hz bar. Both are fixed by
-		# `TerrainBake` + a wider world, not by this constant. D0325.
-		"camera_zoom": 6.0,
+		# A SENTINEL, NOT A FRAMING (D0335). Both blockers this used to name are gone: `TerrainBake`
+		# (D0326) made the render cost independent of world width, and P031's ruling widened the play site
+		# to 64 metres. The framing is now DERIVED from the world the scene actually loaded, via
+		# `CameraRig.default_zoom_for`, because a hardcoded default cannot be right for both a 64-metre
+		# play site and the 12-metre test sites -- and the old 6.0 was right for neither, framing wider
+		# than a 48-cell world existed.
+		#
+		# Negative means "nobody passed --zoom", which the scene replaces once it knows the world's size.
+		# A sentinel rather than a `has_zoom` bool because every other override here is read the same way
+		# and one extra key would be a second thing to keep in step.
+		"camera_zoom": UNSET_ZOOM,
 		"fixed_camera": Vector2.ZERO,
 		"has_fixed_camera": false,
 		"bite_radius": -1,   ## -1 means "leave whatever the mining verb defaults to"
