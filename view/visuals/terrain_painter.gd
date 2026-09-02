@@ -66,6 +66,16 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 		return
 	var cell_px: int = frame.obs.cell_px
 	var r: Rect2i = visit_rect(frame.obs, frame.view_world_rect, cell_px)
+	# THE NEIGHBOUR PROBE for the carved-edge terms (D0329): AO, the rim lip and the sky-form gradient all
+	# need to know whether the cell next door is rock. Bound once here rather than per cell, because a
+	# Callable built inside the loop is one allocation per cell per frame.
+	#
+	# `material_at` ANSWERS `&""` OUTSIDE THE WINDOW as well as for air -- the trap `view/frame.gd` names
+	# in its own header -- so a cell at the window's edge would read its unseen neighbours as open sky and
+	# grow a false lit rim along every screen edge. `WorldView.WINDOW_MARGIN_CELLS` is 9 and the deepest
+	# probe here reaches FORM_REACH + 1 = 7, so the ring these terms read is inside the observation.
+	var solid: Callable = func(c: int, rw: int) -> bool:
+		return frame.obs.material_at(Vector2i(c, rw)) != &""
 	for col: int in range(r.position.x, r.end.x):
 		for row: int in range(r.position.y, r.end.y):
 			var material: StringName = frame.obs.material_at(Vector2i(col, row))
@@ -77,5 +87,5 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 			# tone into a crash. The mineral mark is toned along with the matrix here, unlike in the wall
 			# plane where legacy tones only the matrix (`world_renderer.gd:1204`, and D0299 carries why).
 			if frame.tone != null:
-				fill = frame.tone.shade(fill, col, row, frame.look.grammar_of(material))
+				fill = frame.tone.shade(fill, col, row, frame.look.grammar_of(material), solid)
 			ci.draw_rect(Rect2(col * cell_px, row * cell_px, cell_px, cell_px), fill, true)

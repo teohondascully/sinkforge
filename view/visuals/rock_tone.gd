@@ -105,6 +105,27 @@ const GRAM_SEAM_W: Array[float] = [1.00, 1.35, 1.70]  ## a plane's fracture is a
 ## is dark rock, never a hole.
 const VALUE_FLOOR: float = 0.22
 
+## THE CARVED-EDGE TERMS, legacy `:1016-1078`. All four need to look at a NEIGHBOUR, which is why they
+## arrive behind an optional probe rather than in the pure path.
+##
+## `SHADOW_TEAL` (`:385`): carved and AO-shadowed rock is pulled toward a cold teal-blue, so shadows read
+## as the reference's blue-grey cold rock rather than as a warm brown murk.
+const SHADOW_TEAL := Color(0.13, 0.20, 0.27)
+const AO_PER_NEIGHBOUR: float = 0.125   ## each open neighbour darkens the fill toward that edge
+const AO_TEAL_GATE: float = 0.5         ## above this much open air the cell also tints cold
+const AO_TEAL_AMOUNT: float = 0.20
+## Legacy `:220`. The lit lip fades over two rows rather than lighting exactly one: the molding makes a
+## boundary ragged, so a BINARY rim lights alternating cells along a flat floor and a lip that should read
+## as a lit edge prints as a DOTTED LINE.
+const RIM_DEPTH: int = 2
+const RIM_LIGHT: float = 0.10
+const RIM_WARM: float = 0.03
+## Legacy `:324-326`. The sky-ward gradient: a cell with open air above catches the light, one hanging
+## under an overhang sinks into shadow. This is what gives a face volume rather than an even tone.
+const FORM_REACH: int = 6
+const FORM_LIFT: float = 0.22
+const FORM_SINK: float = 0.13
+
 var _drift: FastNoiseLite
 var _grain: FastNoiseLite
 var _grain2: FastNoiseLite
@@ -161,7 +182,7 @@ static func _field(world_seed: int, salt: int, type: FastNoiseLite.NoiseType, fr
 ## with the material's own value and cannot bleach dark rock, while the drift and patch are ADDITIVE so a
 ## broad face still separates from its neighbour where the multiplicative term has almost nothing left to
 ## scale. Getting that backwards makes deep rock either uniformly black or uniformly grey.
-func shade(base: Color, col: int, row: int, gram: int) -> Color:
+func shade(base: Color, col: int, row: int, gram: int, solid_at: Callable = Callable()) -> Color:
 	var g: int = clampi(gram, 0, GRAM_MASSIVE)
 	var x: float = float(col)
 	var y: float = float(row)
@@ -172,7 +193,51 @@ func shade(base: Color, col: int, row: int, gram: int) -> Color:
 	var drift: float = _drift.get_noise_2d(x * 0.35 + 500.0, y * 0.35) * 0.07
 	drift += _patch.get_noise_2d(x, y) * PATCH_AMP * GRAM_PATCH[g]
 
-	# Grain: two octaves, stretched along x by the grammar so bedding runs flat.
+	var grain: float = _micro_texture(x, y, g)
+
+	# Region hue: pull the body a hair toward a region-picked pole so a broad face carries its own tint.
+	var col_out: Color = base
+	var hx: float = _huex.get_noise_2d(x, y)
+	var hy: float = _huey.get_noise_2d(x, y)
+	var pole: Color = HUE_TEAL if hx < -0.15 else (HUE_BROWN if hx > 0.20 else HUE_VIOLET)
+	col_out = col_out.lerp(pole, HUE_AMP * clampf(0.5 + 0.5 * hy, 0.15, 1.0))
+
+	# THE CARVED-EDGE TERMS. Absent when no probe is supplied, which is the pure-material path and is what
+	# a fixture without a world gets; every one of them is legacy's, at the addresses in their constants.
+	var ao: float = 0.0
+	var form: float = 0.0
+	var rim: float = 0.0
+	var rim_warm: float = 0.0
+	if solid_at.is_valid():
+		ao = _air_weight(solid_at, col, row)
+		form = _sky_form(solid_at, col, row)
+		if ao > AO_TEAL_GATE:
+			col_out = col_out.lerp(SHADOW_TEAL, clampf(ao / 6.0, 0.0, 1.0) * AO_TEAL_AMOUNT)
+		# The rim lights the topmost solid cell of an UP-facing face -- open air above, solid below. The
+		# second half of that test is what stops a one-cell-thick shelf being lit from both sides.
+		var top: int = _top_air_distance(solid_at, col, row)
+		if top >= 0 and top < RIM_DEPTH and bool(solid_at.call(col, row + 1)):
+			var lip: float = 1.0 - float(top) / float(RIM_DEPTH)
+			rim = RIM_LIGHT * lip
+			rim_warm = RIM_WARM * lip
+	var vmul: float = maxf(VALUE_FLOOR, 1.0 - AO_PER_NEIGHBOUR * ao + grain + form)
+	# CLAMPED, exactly where legacy clamps. Legacy's `_paint_fine` writes bytes -- `clampf(out.r, 0, 1)`
+	# at `:1105` -- so the clamp is structural there rather than a choice, and leaving it out here let the
+	# additive drift carry a channel NEGATIVE on dark rock: 3,013 of 36,000 sampled cells, worst luma
+	# -0.14, found by this file's own test rather than by looking at it.
+	return Color(
+		clampf(col_out.r * vmul + drift + rim + rim_warm, 0.0, 1.0),
+		clampf(col_out.g * vmul + drift + rim, 0.0, 1.0),
+		clampf(col_out.b * vmul + drift + rim, 0.0, 1.0),
+		base.a)
+
+
+## The multiplicative half of the surface: grain, embedded stones and crack seams, as one value swing.
+## Split out of `shade` at QUALITY gate 4's 50-line limit, and the seam is the right one -- everything
+## here is microtexture that rides the material's own value, while everything left behind is either
+## additive or reads the shape around the cell.
+func _micro_texture(x: float, y: float, g: int) -> float:
+	# Two octaves, stretched along x by the grammar so bedding runs flat.
 	var gx: float = x * GRAIN_XSTRETCH * GRAM_XSTR[g]
 	var gamp: float = GRAIN_AMP * GRAM_GRAIN[g]
 	var grain: float = _grain.get_noise_2d(gx, y) * gamp + _grain2.get_noise_2d(gx, y) * (gamp * 0.35)
@@ -188,26 +253,45 @@ func shade(base: Color, col: int, row: int, gram: int) -> Color:
 	var band: float = CRACK_BAND * GRAM_SEAM_W[g]
 	if crackv < band:
 		grain -= CRACK_DARKEN * GRAM_SEAM[g] * smoothstep(0.0, 1.0, 1.0 - crackv / band)
+	return grain
 
-	# Region hue: pull the body a hair toward a region-picked pole so a broad face carries its own tint.
-	var col_out: Color = base
-	var hx: float = _huex.get_noise_2d(x, y)
-	var hy: float = _huey.get_noise_2d(x, y)
-	var pole: Color = HUE_TEAL if hx < -0.15 else (HUE_BROWN if hx > 0.20 else HUE_VIOLET)
-	col_out = col_out.lerp(pole, HUE_AMP * clampf(0.5 + 0.5 * hy, 0.15, 1.0))
+## Legacy `_air_weight` `:1235`. Open air among the four orthogonal and four diagonal neighbours,
+## orthogonals weighted 1.0 and diagonals 0.5, so a lone nub reads round and an exposed face reads deeply
+## carved. Out of the probe's reach counts as AIR, exactly as legacy counts out-of-grid as air.
+func _air_weight(solid_at: Callable, col: int, row: int) -> float:
+	var w: float = 0.0
+	for d: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+		if not bool(solid_at.call(col + d.x, row + d.y)):
+			w += 1.0
+	for d: Vector2i in [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]:
+		if not bool(solid_at.call(col + d.x, row + d.y)):
+			w += 0.5
+	return w
 
-	# `1.0` is where the neighbour terms will land: legacy's `shade` (carved-edge AO) and `_sky_form`.
-	# Written as the sum rather than folded away so adding them is one edit and the floor still covers it.
-	var vmul: float = maxf(VALUE_FLOOR, 1.0 + grain)
-	# CLAMPED, exactly where legacy clamps. Legacy's `_paint_fine` writes bytes -- `clampf(out.r, 0, 1)`
-	# at `:1105` -- so the clamp is structural there rather than a choice, and leaving it out here let the
-	# additive drift carry a channel NEGATIVE on dark rock: 3,013 of 36,000 sampled cells, worst luma
-	# -0.14, found by this file's own test rather than by looking at it.
-	return Color(
-		clampf(col_out.r * vmul + drift, 0.0, 1.0),
-		clampf(col_out.g * vmul + drift, 0.0, 1.0),
-		clampf(col_out.b * vmul + drift, 0.0, 1.0),
-		base.a)
+
+## Legacy `_sky_form` `:1291`. Brightens toward open air above and darkens under an overhang, each falling
+## off over `FORM_REACH` rows. The `break` is legacy's: only the NEAREST opening counts, so a cell deep in
+## rock is untouched and one just under a ceiling takes the full sink.
+func _sky_form(solid_at: Callable, col: int, row: int) -> float:
+	var f: float = 0.0
+	for d: int in range(FORM_REACH):
+		if not bool(solid_at.call(col, row - d - 1)):
+			f += FORM_LIFT * (1.0 - float(d) / float(FORM_REACH))
+			break
+	for d: int in range(FORM_REACH):
+		if not bool(solid_at.call(col, row + d + 1)):
+			f -= FORM_SINK * (1.0 - float(d) / float(FORM_REACH))
+			break
+	return f
+
+
+## Legacy `_top_air_distance` `:1382`. Rows between this cell and the nearest open air directly above it,
+## or -1 when there is none within `RIM_DEPTH`. 0 means open air immediately above: an exposed top edge.
+func _top_air_distance(solid_at: Callable, col: int, row: int) -> int:
+	for d: int in range(RIM_DEPTH):
+		if not bool(solid_at.call(col, row - d - 1)):
+			return d
+	return -1
 
 
 ## The seam feature size this grammar produces, in CELLS, on each axis — `1 / (freq * multiplier)`.

@@ -13921,3 +13921,36 @@ nothing about the panel being in front of anything", and that applies to any mod
 **What this does NOT claim.** Nothing here renders. No assertion says the vignette darkens a corner or
 the grade warms a highlight; a fragment shader's output is only observable by drawing it and CI runs
 headless. Those are capture comparisons on a headed run, and the suite's own header says so.
+
+## D0329 · 2026-09-01 · The carved-edge terms — AO, the rim lip and the sky-form gradient
+
+Completes D0327. Legacy's `_paint_fine` has three terms that read a NEIGHBOUR rather than the cell, and
+they are the only ones that can make rock read as **carved** rather than as a textured fill. D0327 held
+them out deliberately so every term there stayed a pure function of `(col, row, grammar)`; this adds them
+behind an optional probe, so the material-only path is untouched.
+
+* **`_air_weight` `:1235`** — open air among the four orthogonal (weight 1.0) and four diagonal (0.5)
+  neighbours, darkening the fill toward each open edge, so "a lone fine nub reads round and an exposed
+  face reads deeply carved". Past `AO_TEAL_GATE` the cell also drifts toward `SHADOW_TEAL`, because
+  legacy's shadows are cold blue-grey rock and not a warm brown murk.
+* **`_top_air_distance` `:1382` + the rim** — the topmost solid cell of an up-facing face catches a lit
+  lip. **It fades over two rows rather than lighting exactly one**, and legacy states why: the molding
+  makes that boundary ragged, so a binary rim lights alternating cells along a flat floor and "a lip that
+  should read as a lit edge prints as a dotted line."
+* **`_sky_form` `:1291`** — brightens toward open air above, darkens under an overhang, each falling off
+  over `FORM_REACH` rows, with legacy's `break` so only the NEAREST opening counts.
+
+**THE WINDOW TRAP, AND IT IS THE REASON `WINDOW_MARGIN_CELLS` IS 9.** `Observation.material_at` answers
+`&""` for a cell OUTSIDE THE WINDOW exactly as it does for air — the trap `view/frame.gd` names in its
+own header, and D0238's original instance. A probe at the window's edge therefore reads its unseen
+neighbours as open sky, and every screen edge would grow a **false lit rim**, brightest precisely where
+the frame is cropped. The deepest probe here reaches `FORM_REACH + 1 = 7` cells, inside the margin the
+veil already forced to 9 (D0302). This is why the terms could be added without widening the observation.
+
+**THE OPTIONALITY IS ASSERTED IN BOTH DIRECTIONS**, because "the probe is optional" is a claim that
+passes on a `shade` which ignores the probe entirely. An invalid probe must paint byte-identically to no
+probe over 4,000 cells (so no fixture without a world is silently retuned), and a valid probe must change
+every one of 100 cells on an exposed edge.
+
+The probe is bound ONCE per paint call rather than per cell: a `Callable` built inside the loop is one
+allocation per cell per frame, which on the per-frame fallback path is tens of thousands a second.
