@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_the_seam_directions_run_the_way_their_comments_say()
 	_test_a_grammar_actually_changes_how_loud_the_rock_is()
 	_test_no_grammar_table_is_silently_uniform()
+	_test_the_carved_edge_terms_read_the_shape_around_a_cell()
 	_test_no_stack_of_darkeners_punches_a_hole_in_the_rock()
 	_test_the_shading_is_deterministic_in_the_seed_and_moves_with_it()
 	_test_every_shipped_material_resolves_to_the_grammar_its_own_yaml_names()
@@ -177,6 +178,85 @@ func _test_no_grammar_table_is_silently_uniform() -> void:
 				+ "reports the grammar working")
 	_check_over(checked, uniform == 0,
 		"all %d grammar tables differentiate CLASTIC from MASSIVE -- %d were uniform" % [checked, uniform])
+
+
+## THE CARVED-EDGE TERMS (D0329): AO, the rim lip and the sky-form gradient. These are the only terms
+## that look at a NEIGHBOUR, so they are the only ones that can make rock read as CARVED rather than as a
+## textured fill — and they arrive behind an optional probe, which means the no-probe path must stay
+## exactly what it was. Both halves are asserted.
+##
+## Posed against a hand-built world rather than a generated one: the shapes needed here are a cell buried
+## in rock, a cell on an exposed top edge, and a cell hanging under a ceiling, and a generated world
+## offers no guarantee of containing all three at known coordinates.
+func _test_the_carved_edge_terms_read_the_shape_around_a_cell() -> void:
+	var tone := RockTone.new(SEED)
+	var base := Color(0.4, 0.38, 0.35)
+	# A solid half-space with its surface at row 100, so row 100 is an exposed top edge and row 140 is
+	# deeply buried. `solid` is the probe the painter binds.
+	var solid: Callable = func(_c: int, r: int) -> bool: return r >= 100
+	var lum: Callable = func(c: Color) -> float:
+		return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+
+	# THE RIM: an exposed top edge catches a lit lip. Compared against a cell far enough down that neither
+	# the rim nor the form lift reaches it (FORM_REACH is 6).
+	var checked: int = 0
+	var lit: int = 0
+	for col: int in range(40, 140):
+		var edge: float = lum.call(tone.shade(base, col, 100, RockTone.GRAM_MASSIVE, solid))
+		var deep: float = lum.call(tone.shade(base, col, 140, RockTone.GRAM_MASSIVE, solid))
+		checked += 1
+		if edge > deep:
+			lit += 1
+	_check_over(checked, lit == checked,
+		"an exposed top edge is lit brighter than buried rock at every one of %d columns -- %d were"
+			% [checked, lit])
+
+	# THE FORM SINK: a cell hanging directly under a ceiling darkens. Posed as a ceiling at rows <= 60
+	# with open air below it, so row 60 hangs under nothing and row 59 is interior.
+	var ceiling: Callable = func(_c: int, r: int) -> bool: return r <= 60
+	var under: int = 0
+	var n: int = 0
+	for col: int in range(40, 140):
+		var lip: float = lum.call(tone.shade(base, col, 60, RockTone.GRAM_MASSIVE, ceiling))
+		var inside: float = lum.call(tone.shade(base, col, 20, RockTone.GRAM_MASSIVE, ceiling))
+		n += 1
+		if lip < inside:
+			under += 1
+	_check_over(n, under == n,
+		"a cell hanging under an overhang is darker than interior rock at every one of %d columns -- %d"
+			% [n, under])
+
+	_check_the_probe_is_optional_and_additive(tone, base, solid)
+
+
+## THE PROBE IS OPTIONAL AND ADDITIVE, asserted in both directions. Split from the test above at the
+## 50-line limit. "The probe is optional" passes on a `shade` that ignores the probe entirely, so the
+## control is not decoration here -- it is the half that makes the claim mean anything.
+func _check_the_probe_is_optional_and_additive(tone: RockTone, base: Color, solid: Callable) -> void:
+	# Without a probe every cell must paint EXACTLY what it painted before these terms existed, or this
+	# change silently retuned the material-only path every fixture without a world still uses.
+	var same: int = 0
+	var total: int = 0
+	for col: int in range(0, 100):
+		for row: int in range(200, 240):
+			var a: Color = tone.shade(base, col, row, RockTone.GRAM_BEDDED)
+			var b: Color = tone.shade(base, col, row, RockTone.GRAM_BEDDED, Callable())
+			total += 1
+			if a == b:
+				same += 1
+	_check_over(total, same == total,
+		"an invalid probe paints identically to no probe at all -- %d of %d cells" % [same, total])
+	var moved: int = 0
+	var m: int = 0
+	for col: int in range(0, 100):
+		var a: Color = tone.shade(base, col, 100, RockTone.GRAM_BEDDED)
+		var b: Color = tone.shade(base, col, 100, RockTone.GRAM_BEDDED, solid)
+		m += 1
+		if a != b:
+			moved += 1
+	_check_over(m, moved == m,
+		"CONTROL: supplying a real probe changes every one of %d cells on an exposed edge -- %d moved"
+			% [m, moved])
 
 
 ## ROCK IN SHADOW IS DARK ROCK, NEVER A HOLE. Several independent darkeners stack — grain, an embedded
