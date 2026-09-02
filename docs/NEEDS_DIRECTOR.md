@@ -1039,3 +1039,66 @@ between, and twice without, and see which pairing reproduces. If it reproduces, 
 per-painter draw count, not a colour total) alongside each PNG, so a frame carries evidence of the build
 that made it. **Not decided in-loop:** adding a fingerprint changes what a milestone image IS, and every
 committed pair predates it.
+
+---
+
+## P031 · The world is 12 metres wide, and the ported framing needs 40 — the shaft width is now a blocker
+
+**RULING WANTED: does the play world stay a 12-metre shaft, or widen?** This is a design question, not a
+port, which is why it is parked rather than decided. Everything below is measured.
+
+### What forced it
+
+D0325 ported legacy's zoom ladder: index 0 frames **40 metres**, and legacy argues that number rather
+than picking it — its next rung out already puts the avatar "well under one percent of the frame's
+width, which is below the size at which any amount of rim light, head-lamp or guide ring can make him
+findable". This build ships at **13.3 metres**, three times tighter than legacy's most zoomed-*in* rung.
+
+The ladder was ported, tested and deliberately **not** made the default, because the play site is
+`width_cells: 48` — **12 metres** — and a 40-metre frame on it is mostly void.
+
+### The measurement that closes off the cheap option
+
+There is no better framing available on the current world. 48 cells is 192 world px; filling a 1280-px
+frame needs zoom 6.67. **The shipped default of 6.0 already frames wider than the world exists**, and
+the capture shows dark void bands at both screen edges. Anything wider shows more void; anything tighter
+makes the miner larger still. At the shipped default the miner occupies about a quarter of the frame
+height and the terrain reads as a wall of large flat squares.
+
+So the framing cannot be fixed by a framing change. The width is the variable.
+
+### The cost, measured today
+
+| width | cells | generation |
+|---|---|---|
+| 48 (12 m, shipped) | 52,992 | 718 ms |
+| 128 (32 m) | 141,312 | ~2.0 s |
+| 256 (64 m) | 282,624 | ~4.0 s |
+| 512 (128 m, legacy's own width) | 565,248 | 7.9 s |
+
+Linear at ~14 µs/cell after D0334's optimisation (it was ~16.7). Generation is a one-time boot cost and
+does not affect frame rate; D0326's bake means play cost is independent of world width.
+
+**Why the numbers are large at all:** this world is 256 m deep at quarter-metre cells — 1,104 rows.
+Legacy's was 128 rows at one-metre cells. **This build has ~35x more cells than legacy did**, which is
+the price of the Noita-esque granularity Q1 ruled for. Legacy's own 128 m width costs 7.9 s here.
+
+### The argument each way, and it is genuinely two-sided
+
+**Stay narrow.** `data/strata/shallow_clay.yaml` says it in its own comment — *"a shaft, not an open
+world"* — and the recorded direction is a vertical descent game: the world went vertical, the grapple is
+the traversal identity, and caves are opt-in pockets in solid earth.
+
+**Widen.** GDD §13's factory rungs need horizontal room; 12 metres is perhaps three machine widths, and
+the Freight Winch links two arbitrary cells across a distance that has to exist. The progression thesis
+is a four-axis web of Depth/Tools/**Factory**/Home, and one of those four axes has almost no room.
+
+### Recommendation
+
+**Widen the play site to 256 cells (64 m) rather than to legacy's 512.** It is two screens wide at the
+ported 40-metre framing, which is enough for the framing to be correct and for a factory to have a floor,
+while still reading as a shaft rather than as an open world — and it costs 4 s of generation rather than
+7.9. If that proves too tight for the factory once machines exist, widening again is one data field.
+
+**Blocked behind this ruling:** making `CameraRig.ZOOM_LEVELS[0]` the default zoom, which is the single
+largest visible improvement still on the table.
