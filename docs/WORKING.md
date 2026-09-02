@@ -8,7 +8,37 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
-## CURRENT STAGE — the sequential port (2026-09-01)
+## CURRENT STAGE — the 120 Hz programme (2026-09-01)
+
+**The director set a hard bar: 120 Hz, 8.33 ms a frame — "I refuse to ship a flaky and bad performing
+game."** That interrupted the sequential port, which resumes after. `docs/PERF_PLAN.md` is the ranked,
+sourced plan and the recovered record of how legacy already hit this bar at this same framing.
+
+**Measured, as the slope between a 200-tick and a 600-tick headed run so world-gen cost cancels:**
+
+| | ms/tick | fps |
+|---|---|---|
+| start | 64.6 | 15.5 |
+| now (D0336–D0338) | **15.9** | **63** |
+| target | 8.33 | 120 |
+
+Landed: the veil became a metre-resolution lightmap drawn in ONE call instead of 14,080 (D0336, 41.47 →
+3.58 ms); the glint iterates a cached sparse list instead of every visible cell (D0337, 11.83 → 0.01 ms);
+the per-frame observation stopped building a wall plane whose only reader D0326 had already moved into
+the bake (D0338, observe 10.60 → 6.36 ms). Also `view/draw_cost.gd`, the per-painter attribution
+instrument — built BEFORE any fix, because legacy's own note says optimising against a total "is how you
+end up tuning the wrong thing confidently".
+
+**Next and largest: `TileGrid`'s planes as a flat `PackedByteArray` instead of a `Vector2i`-keyed
+`Dictionary`** — `observe` is still 6.36 ms of the 15.9. Legacy has nothing to port here because it never
+built a per-frame observation at all; the fix is legacy-SHAPED (`factory_sim.gd:795`, "handing the array
+over turns that loop into a memcpy") but the component is ours. It touches `state_signature`'s storage,
+so it needs its own determinism pass and golden re-pin.
+
+**In flight: PR #47** (D0335–D0339). Its `test_shaft_replay_determinism` golden must be re-pinned from
+that PR's own CI Linux run — D0335 widens the world, which is a world-GENERATION change.
+
+## The sequential port (2026-09-01)
 
 **The director replaced the fleet/lane model with a sequential one:** establish the dependency order,
 then port ONE complete vertical at a time — running and verified — before the next. `docs/PORT_ORDER.md`
