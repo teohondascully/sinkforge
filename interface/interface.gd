@@ -79,6 +79,10 @@ class Observation:
 	## instead of a hole in a sheet; without it there is no depth behind the player at all.
 	var walls: PackedByteArray
 	var wall_legend: PackedStringArray
+	## Whether the wall plane above was actually built (D0338). False means the envelope declined it and
+	## `wall_at` will refuse rather than answer air. Defaults TRUE so an Observation built by hand in a
+	## test behaves exactly as it did before this flag existed.
+	var has_walls: bool = true
 	## One entry per COLUMN of `window`, left to right: the walkable surface height as an `Fx` world-y,
 	## or `Heightfield.NO_FLOOR`. Derived here rather than by the consumer because `Heightfield` takes a
 	## `TileGrid` and `view/` may not hold one.
@@ -181,7 +185,15 @@ class Observation:
 	## The BACKGROUND material at `c`, or `&""` -- both for "no wall here" and for "outside the window",
 	## exactly as `material_at` conflates them. Same reasoning, and the same warning applies: a consumer
 	## that needs to tell those apart asks `in_window` FIRST.
+	## FAILS LOUDLY WHEN THE PLANE WAS NOT REQUESTED (D0338), rather than answering `&""`. An absent plane
+	## and a world of air are the same answer, which is D0238's trap exactly -- and the consumer that would
+	## meet it, `WallPainter`, draws nothing for air, so the failure would arrive as a silently missing
+	## background rather than as an error. `has_walls` is the envelope's own `walls` flag carried through.
 	func wall_at(c: Vector2i) -> StringName:
+		if not has_walls:
+			push_error("Observation.wall_at: this observation was taken without the wall plane "
+				+ "(Envelope.walls == false). Ask for it in the envelope rather than reading air.")
+			return &""
 		return _plane_at(wall_legend, walls, c)
 
 	## Shared body of the two plane readers. They are one function with two bindings, not two functions:
@@ -285,7 +297,7 @@ func observe(envelope: Envelope) -> Observation:
 	o.world_cells = Vector2i(_grid.width, _grid.height)
 	o.world_seed = _grid.seed
 	o.cell_px = Heightfield.TERRAIN_CELL_PX
-	_fill_window(o)
+	_fill_window(o, envelope)
 	_fill_mining(o)
 	return o
 
@@ -320,38 +332,20 @@ func _fill_mining(o: Observation) -> void:
 
 ## Copies the window into the three derived fields. Split out of `observe` so that function stays a flat
 ## list of field reads a reader can check against `Observation` by eye.
-func _fill_window(o: Observation) -> void:
-	var blocks: Array = _plane_over_window(o.window, _grid.get_material)
+func _fill_window(o: Observation, envelope: Envelope) -> void:
+	var blocks: Array = WindowPlanes.of(o.window, _grid.get_material)
 	o.materials = blocks[0]
 	o.legend = blocks[1]
-	var background: Array = _plane_over_window(o.window, _grid.get_wall)
-	o.walls = background[0]
-	o.wall_legend = background[1]
+	# THE WALL PLANE IS BUILT ONLY WHEN ASKED FOR (D0338). Its one reader, `WallPainter`, went into the
+	# bake at D0326 and now runs on terrain change rather than per frame -- so the per-frame observation
+	# was paying a dictionary lookup per cell for a plane nothing read. `Observation.wall_at` fails loudly
+	# rather than answering `&""` when it is absent, which is what makes the omission safe.
+	o.has_walls = envelope.walls
+	if envelope.walls:
+		var background: Array = WindowPlanes.of(o.window, _grid.get_wall)
+		o.walls = background[0]
+		o.wall_legend = background[1]
 	_fill_surface(o)
-
-
-## One plane of the window as `[PackedByteArray, PackedStringArray]`, where `read` maps a terrain cell
-## to its material id.
-##
-## Shared by the block plane and the wall plane rather than written twice. The two loops would differ
-## only in which `TileGrid` getter they call, and `tools/quality_check/duplication.py` is a BLOCKING
-## gate that would reject the copy -- correctly, since the byte encoding, the legend-interning and the
-## row-major order are one contract that `Observation._offset_of` decodes for both.
-func _plane_over_window(window: Rect2i, read: Callable) -> Array:
-	var index_of: Dictionary = {&"": 0}
-	var legend: PackedStringArray = PackedStringArray([&""])
-	var bytes: PackedByteArray = PackedByteArray()
-	bytes.resize(window.size.x * window.size.y)
-	var i: int = 0
-	for row: int in range(window.position.y, window.end.y):
-		for col: int in range(window.position.x, window.end.x):
-			var m: StringName = read.call(Vector2i(col, row))
-			if not index_of.has(m):
-				index_of[m] = legend.size()
-				legend.append(m)
-			bytes[i] = index_of[m]
-			i += 1
-	return [bytes, legend]
 
 
 ## One `Fx` surface height per window column, scanned WITHIN the window only.

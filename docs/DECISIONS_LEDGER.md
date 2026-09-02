@@ -14295,3 +14295,45 @@ flattened, the readable version stays as the specification.
 17.85 ms frame. The prime suspect is the per-tick `Observation` build plus the two `hash(obs.materials)`
 calls the caches now make over a ~18,000-entry dictionary every frame — which would be this same lesson
 one layer down, and must be MEASURED before it is believed.
+
+
+## D0338 · 2026-09-01 · Half of `observe()` built a plane nothing read
+
+D0337 ended with the painters at 4.69 ms and **~13 ms of the frame outside them, unattributed** — stated
+that way rather than guessed at. Instrumenting `WorldView.refresh` answered it in one run:
+**`refresh=10.61ms (observe=10.60ms)`**. The whole remainder is the per-tick `Observation` build.
+
+**`observe()` walks the window TWICE**, once for materials and once for background walls, each a
+`Vector2i`-keyed `Dictionary` lookup per cell. At the 40-metre framing the window is ~18,900 cells, so
+that is ~37,800 hashed lookups a frame.
+
+**AND ONE OF THE TWO PLANES HAD NO READER.** `obs.walls` has exactly one consumer in the tree —
+`WallPainter` — and **D0326 moved that painter into the bake**, where it draws from the bake's own
+`observe_rect()`. The per-frame observation had been building a plane for a consumer that stopped looking
+at it two commits earlier. This is the cost of an optimisation's own side effect going unnoticed: D0326
+made the wall plane per-frame-dead and nothing pointed at the now-useless work.
+
+`Envelope` gains `walls: bool = true`; the per-frame path declines it. **Measured: observe 10.60 -> 6.36
+ms**, and end to end the tick went 17.85 -> 15.9 ms.
+
+**DECLINING IS SAFE ONLY BECAUSE `wall_at` FAILS LOUD.** A missing plane and a world of air are the same
+answer — D0238's trap exactly — and the consumer that would meet it draws nothing for air, so a silent
+`&""` would arrive as a quietly missing background rather than as an error. `Observation.has_walls`
+carries the envelope's flag and `wall_at` pushes an error rather than answering.
+
+**THE DANGEROUS DIRECTION IS THE FALLBACK PATH, AND IT WAS NEARLY SHIPPED WRONG.** `bake_static` DECLINES
+when there is no render target — which is every headless CI run — and then `WallPainter` mounts as an
+ordinary per-frame layer reading exactly this observation. Declining unconditionally would have made it
+`push_error` every frame and dropped the background plane in the one configuration the suites run under.
+`_bake == null` is the honest discriminator. `tests/test_world_view.gd` asserts it THROUGH `WorldView`
+rather than by posing its own `Envelope`, because a test that poses its own subject cannot register a
+wiring error at the call site it bypassed; the unconditional-decline mutant fails it on two rows.
+
+**WHAT REMAINS, AND WHY LEGACY HAS NO ANSWER TO PORT FOR IT.** `observe` is still 6.36 ms of a 15.9 ms
+tick. `Interface.Observation` is a rewrite-only construct: legacy's renderer reads `sim.solid`,
+`sim.deposits` and `sim.water` DIRECTLY and never builds a per-frame copy of anything, so it never paid
+this bill. The cost is one our own layer separation created. The fix is legacy-SHAPED even though the
+component is not — `factory_sim.gd:795`: *"handing the array over turns that loop into a memcpy"* —
+i.e. back `TileGrid`'s planes with a flat `PackedByteArray` indexed `row * width + col` instead of a
+`Vector2i`-keyed `Dictionary`, so a window read becomes row slices rather than 18,900 hashed lookups.
+That touches `state_signature`'s own storage and so needs its own pass, not a rider on this one.
