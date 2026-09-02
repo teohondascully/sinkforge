@@ -13879,3 +13879,45 @@ world. The combination and the floor are written so they slot in unchanged.
 **The verbatim 1,402-line copy is deleted rather than kept.** `legacy/scenes/fine_terrain.gd` is
 untouched and remains the source; a second copy in `view/` would be a file nothing references, which is
 the `art.gd` trap the migration map names.
+
+## D0328 · 2026-09-01 · The lens and the palette grade — legacy's post-FX, on a deterministic grain clock
+
+**Ported whole**, `legacy/scenes/post_fx.gdshader` (85 lines) as `view/visuals/post_fx.gdshader` plus a
+`CanvasLayer` host. Legacy's own account of what it buys: it "makes the framebuffer read as a shot
+through real glass rather than flat pixels", and over that lens sits a grade — a filmic S-curve and a
+split-tone pulling shadows toward the underworld's cool blue-black and highlights toward the lamp's warm
+gold — "so every material, light and UI colour passes through one shared grade."
+
+**BETWEEN THE WORLD AND THE HUD, and that is the design rather than a detail.** Canvas layer 5 against
+`HudLayer`'s 10: the world gets the lens, the readouts stay crisp. `tests/test_post_fx.gd` asserts the
+two constants against each other rather than restating either, because they live in different files and
+the failure — a graded, grain-covered HUD — presents as "the UI looks a bit soft" rather than as a bug.
+
+**ONE ADAPTATION, AND IT IS NOT COSMETIC.** Legacy seeds its film grain from `TIME`, a wall clock. This
+project's screenshot-comparison discipline (`docs/QUALITY.md`) rests on the renderer being a function of
+STATE — two captures of the same tick must be byte-comparable — so a wall-clock grain would make every
+capture differ, **and the difference would be read as whatever change was being measured**. That is a
+silent voiding of every capture-based verdict this repository takes, which is a large fraction of them.
+D0277 already ruled this exact question for `Frame.anim_time`: a cosmetic TICK COUNTER, never a wall
+clock. The shader takes an `anim_time` uniform and `WorldView.refresh` feeds it the same clock every
+other animated painter reads, so the grain still moves for a player and still reproduces for a capture.
+
+The test asserts that against the SHADER SOURCE, since no runtime read of a uniform can see a `TIME`
+reference in a fragment body — and carries the control that matters: zero `TIME` references survive in
+shader CODE with comments excluded. Without that control the assertions pass on a shader that declares
+`anim_time`, uses it, and still mixes `TIME` into the same hash.
+
+**TWO FAILURE MODES GUARDED THAT ARE NOT ABOUT THE LOOK.** `setup()` returns false rather than mounting a
+`ColorRect` with no material, because an unmaterialised full-screen rect is an OPAQUE BOX over the entire
+world — far worse than no lens. And the rect is `MOUSE_FILTER_IGNORE`: a full-screen Control that accepts
+events swallows the cursor-aim verb, which would present as "mining stopped working" with nothing
+pointing at a renderer.
+
+**`defocus` IS KEPT WITH NOTHING DRIVING IT, deliberately.** Legacy drove it from the Bazaar counter,
+which GDD §9 kills by name, so it rests at the shader's own no-op branch. Kept because the mechanism is
+not the Bazaar — legacy's finding is that dimming the world "38% and leaving it perfectly sharp said
+nothing about the panel being in front of anything", and that applies to any modal this game grows.
+
+**What this does NOT claim.** Nothing here renders. No assertion says the vignette darkens a corner or
+the grade warms a highlight; a fragment shader's output is only observable by drawing it and CI runs
+headless. Those are capture comparisons on a headed run, and the suite's own header says so.

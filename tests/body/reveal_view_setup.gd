@@ -87,6 +87,10 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_stateful_painter(CrumblePainter.new(), &"paint")
 	# The plate keeps state too: an arrival is one event and the ceremony is two hundred frames. Added
 	# after the depth chip so the ceremony draws over the readout it is announcing, not under it.
+	# THE LENS, between the world and the HUD (D0328). Added after every world painter and before the HUD
+	# so the world is graded and the readouts stay crisp -- ordering enforced by the CanvasLayer indices,
+	# which `tests/test_post_fx.gd` asserts against each other rather than trusting this call order.
+	view.add_post_fx()
 	view.add_hud().add_chip(DepthChip.paint)
 	view.add_hud().add_stateful_chip(ArrivalPlate.new(), &"paint")
 	# The legend keeps state too -- which verbs the player has demonstrated -- and it is added LAST so a
