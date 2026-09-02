@@ -13,6 +13,7 @@ func _initialize() -> void:
 	_test_extend_terrain_dig_extent_is_per_column()
 	_test_state_signature_sensitive_to_dig_extent()
 	_test_running_signature_agrees_with_a_from_scratch_rebuild()
+	_test_the_cell_hash_does_not_collide_where_the_string_form_could()
 	_finish("tile_grid")
 
 
@@ -216,3 +217,75 @@ func _test_running_signature_agrees_with_a_from_scratch_rebuild() -> void:
 	_check(grid.state_signature() != "0:0",
 		"positive control: the sequence actually left a non-empty signature (%s) -- two ZEROS would " % grid.state_signature()
 		+ "agree with each other while proving nothing at all")
+
+
+## THE COLLISIONS THE STRING FORM WAS EXPOSED TO (D0334). `_cell_term` used to fold the text
+## `"%d,%d:%s/%s"`, where `(1, 23)` and `(12, 3)` differ only in where the comma falls and a material/wall
+## pair differs only in where the slash falls. Folding is order-sensitive so the old form did in fact
+## separate them, but nothing asserted it — and the replacement mixes x, y, material and wall as four
+## terms at four fold positions, which is the property that has to hold whichever form is in use.
+##
+## Written as a POSITIVE-CONTROL sweep rather than one hand-picked pair: a hash that returned a constant
+## would pass any single inequality that happened to be written the other way round.
+func _test_the_cell_hash_does_not_collide_where_the_string_form_could() -> void:
+	# Pairs whose text forms are anagram-adjacent: the digits are the same and only the separator moves.
+	var swaps: Array = [
+		[Vector2i(1, 23), Vector2i(12, 3)],
+		[Vector2i(1, 23), Vector2i(23, 1)],
+		[Vector2i(11, 2), Vector2i(1, 12)],
+		[Vector2i(4, 56), Vector2i(45, 6)],
+	]
+	var distinct: int = 0
+	for pair: Array in swaps:
+		var a: TileGrid = TileGrid.new(64, 64, 7)
+		a.set_material(pair[0] as Vector2i, &"clay")
+		a.set_wall(pair[0] as Vector2i, &"clay")
+		var b: TileGrid = TileGrid.new(64, 64, 7)
+		b.set_material(pair[1] as Vector2i, &"clay")
+		b.set_wall(pair[1] as Vector2i, &"clay")
+		if a.state_signature() != b.state_signature():
+			distinct += 1
+		else:
+			_check(false, "cells %s and %s hash the same" % [pair[0], pair[1]])
+	_check_over(swaps.size(), distinct == swaps.size(),
+		"coordinate pairs that share their digits still hash apart -- %d of %d" % [distinct, swaps.size()])
+
+	# MATERIAL AND WALL ARE DIFFERENT TERMS, not one concatenation: swapping them must change the answer.
+	var m: TileGrid = TileGrid.new(64, 64, 7)
+	m.set_material(Vector2i(5, 5), &"clay")
+	m.set_wall(Vector2i(5, 5), &"hardrock")
+	var w: TileGrid = TileGrid.new(64, 64, 7)
+	w.set_material(Vector2i(5, 5), &"hardrock")
+	w.set_wall(Vector2i(5, 5), &"clay")
+	_check(m.state_signature() != w.state_signature(),
+		"swapping a cell's material and wall changes the signature")
+
+	# CONTROL: two grids built the SAME way agree. Without this every row above passes on a hash that
+	# returned a fresh value each call, which would break determinism entirely while looking rigorous.
+	var c1: TileGrid = TileGrid.new(64, 64, 7)
+	c1.set_material(Vector2i(5, 5), &"clay")
+	c1.set_wall(Vector2i(5, 5), &"hardrock")
+	_check(c1.state_signature() == m.state_signature(),
+		"CONTROL: an identically-built grid matches, so the inequalities above are the hash separating "
+			+ "inputs and not a hash that never repeats")
+
+	_check_the_memo_is_populated_by_use()
+
+
+## THE MEMO, ASSERTED STRUCTURALLY RATHER THAN BY TIMING. Split from the test above at the 50-line limit.
+func _check_the_memo_is_populated_by_use() -> void:
+	# A mutant that disables the cache LOOKUP A mutant that disables the cache lookup makes the
+	# code slower and still correct, so no correctness assertion can catch it and a timing one would be
+	# flaky (and would have to run alone -- a duration assertion under parallel jobs measures contention).
+	# What CAN be checked without a clock is that the cache is actually populated by use: if it never
+	# filled, the lookup could never hit however the code was written. The measured saving itself is in
+	# D0334, taken by removing the subject.
+	var before: int = TileGrid._id_folds.size()
+	var probe: TileGrid = TileGrid.new(8, 8, 1)
+	probe.set_material(Vector2i(1, 1), &"a_material_no_other_test_uses")
+	probe.set_wall(Vector2i(1, 1), &"another_unused_material")
+	_check(TileGrid._id_folds.size() > before,
+		"folding two unseen ids populated the memo (%d -> %d entries), so the lookup has something to hit"
+			% [before, TileGrid._id_folds.size()])
+	_check(TileGrid._id_folds.has(&"a_material_no_other_test_uses"),
+		"and it is keyed by the id itself")

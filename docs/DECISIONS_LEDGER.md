@@ -14122,3 +14122,51 @@ The limits are set by the scene, not by the rig's constructor: `CameraRig` is `v
 `TileGrid`, so the world's pixel bounds are the caller's to supply. An unset limit is unlimited, which is
 what every existing caller and every rig posed in isolation still gets — and the test's control drives an
 unlimited rig past the same edge to prove the clamp is what does the work.
+
+## D0334 · 2026-09-01 · A third of world generation was formatting strings — the cell hash, memoised
+
+**MEASURED BY REMOVING THE SUBJECT, not by reasoning about it**, which is this repository's own rule for
+explaining a cost. Generation was 16.69 microseconds per cell and perfectly linear in cell count. With
+`_cell_term` stubbed to return zero it was **11.11** — so the state-signature hashing was **33% of world
+generation**, and 3.15 seconds of a 512-cell-wide world's 9.4.
+
+**WHAT IT WAS DOING.** `_cell_term` built the text `"%d,%d:%s/%s"` and ran `_fold` — a per-character loop
+— over the whole string, twice, once per hash constant. `_write_layer` calls `_cell_term` twice per write
+(out with the old, in with the new) and generation writes both a block and a wall for every cell, so a
+565,248-cell world paid roughly four string allocations and 160 character iterations **per cell**.
+
+**THE FIX IS THAT A WORLD HAS ABOUT EIGHT MATERIALS AND HUNDREDS OF THOUSANDS OF CELLS.** The id fold is
+the same handful of answers recomputed endlessly. It is now memoised, keyed by the id, in a `static`
+Dictionary — safe to share because it memoises a pure function and holds no per-world state. The
+coordinate half became integer arithmetic: the same 31-multiply fold and the same mask, so it stays a
+hand-rolled hash over integers and keeps the cross-platform stability that is the whole reason `_fold`
+exists instead of `String.hash()` — a signature compared between two PROCESSES cannot rest on an engine
+hash whose stability is not guaranteed.
+
+**Result: 16.69 -> 14.05 microseconds per cell; the wide world's generation 9,433 -> 7,943 ms.** About
+half the recoverable overhead; the remainder is GDScript call overhead across `_write_layer` ->
+`_cell_term` -> `_mix`, which only a bulk path could remove and which is recorded below rather than built.
+
+**THE SIGNATURE'S VALUES CHANGE, AND NOTHING PINS THEM.** Every use in the tree is a RELATIVE comparison —
+`a == b` for two-process determinism and for the same-seed check, `a != b` for sensitivity — verified
+across `tests/`, `interface/` and the workflow before touching it. A pinned literal anywhere would have
+made this a golden re-pin under D0167 instead.
+
+**IT IS ALSO STRICTLY BETTER AT ITS JOB.** The string form distinguished `(1, 23)` from `(12, 3)` only by
+where the comma fell, and a material/wall pair only by where the slash fell. Folding is order-sensitive so
+it did separate them — but nothing asserted it. The replacement mixes x, y, material and wall as four
+terms at four fold positions, and `tests/test_tile_grid.gd` now sweeps digit-sharing coordinate pairs and
+a material/wall swap, with a control that an identically-built grid still matches.
+
+**MUTATION-TESTED 3/4, AND THE FOURTH MISS IS THE CORRECT OUTCOME.** Symmetric x/y mixing, a single
+material+wall term, and a memo returning a constant are all caught. Disabling the cache LOOKUP is not —
+it makes the code slower and leaves it correct, so no correctness assertion can see it and a timing one
+would be flaky and would have to run alone. What is assertable without a clock is that the memo is
+populated by use, which a fifth mutant (never writing to it) now fails.
+
+**NOT DONE, and recorded with its numbers.** A bulk path — suspending incremental hashing during
+generation and computing the signature once at the end — would reach the 11.11 floor, because a final
+single pass is one `_cell_term` per occupied cell against the four-plus per cell that incremental writes
+cost. It is not built here because a suspended-and-never-resumed signature is a silently wrong value,
+which is exactly the quiet-green class this project spends its effort on; it needs a guard that cannot be
+forgotten, not just an API.
