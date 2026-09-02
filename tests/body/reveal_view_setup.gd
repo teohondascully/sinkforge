@@ -76,7 +76,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_baked_painter(WallPainter.paint)
 	view.add_baked_painter(TerrainPainter.paint)
 	view.bake_static(WALL_Z)
-	view.add_stateful_painter(VeilPainter.new(), &"paint_frame").z_index = VEIL_Z
+	_mount_veil(view)
 	view.add_painter(GlintPainter.paint).z_index = GLINT_Z
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
 	view.add_painter(CrackPainter.paint_frame)
@@ -97,3 +97,28 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	# ceremony never draws under it. It removes itself from the picture entirely once it is done.
 	view.add_hud().add_stateful_chip(KeyLegend.new(), &"paint")
 	return view
+
+
+## THE VEIL IS A MULTIPLY PASS OVER A STRETCHED LIGHTMAP (D0336), which is two properties on its layer and
+## neither is optional. Split out of `build()` because that function reached 57 lines against
+## `docs/QUALITY.md` §2's 50 cap, and split rather than trimmed for the reason that section records.
+##
+## Legacy keeps a whole class for this — `legacy/scenes/light_layer.gd`, whose header states the reason:
+##
+##   > "each pass can carry its own blend mode, which a single CanvasItem cannot switch mid-`_draw`:
+##   > terrain passes are MIX, the darkness pass multiplies, so shadow scales the light already there,
+##   > and the light pass is ADD."
+##
+## Set here rather than inside the painter because the blend belongs to the CANVAS: a painter that reached
+## out to configure its own layer would be the coordinator contract (`docs/COORDINATOR_CONTRACT.md` §2a)
+## inverted, and the painter would stop being a pure function of `(Frame, CanvasItem)`.
+static func _mount_veil(view: WorldView) -> void:
+	var veil: PaintLayer = view.add_stateful_painter(VeilPainter.new(), &"paint_frame")
+	veil.z_index = VEIL_Z
+	var veil_mat := CanvasItemMaterial.new()
+	veil_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_MUL
+	veil.material = veil_mat
+	# LINEAR is the half that makes one texel per metre read as a gradient rather than as a grid of
+	# squares: the hardware sampler does the interpolation the old per-cell loop was paying for.
+	# `project.godot` sets NEAREST project-wide for pixel art, so this must be stated per layer.
+	veil.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR

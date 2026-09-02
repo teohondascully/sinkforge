@@ -118,6 +118,10 @@ func setup(iface: Interface, look: MaterialLook, camera: Camera2D) -> void:
 func add_painter(paint: Callable) -> PaintLayer:
 	var layer: PaintLayer = PaintLayer.new()
 	layer.bind_to(self, paint)
+	# Labelled from the callable itself, never from a caller-supplied string: a cost report that can be
+	# mislabelled at the call site would attribute one painter's milliseconds to another, and the report
+	# exists precisely to decide which painter to fix first.
+	layer.label = DrawCost.label_for(paint)
 	_layers.append(layer)
 	add_child(layer)
 	return layer
@@ -308,6 +312,12 @@ func refresh() -> void:
 	# of one tick differ.
 	if _post != null:
 		_post.set_anim_time(_frame.anim_time)
+
+
+## Per-painter draw cost for the last rendered frame, slowest first. `view/draw_cost.gd` owns the ranking
+## and the naming; this owns only the layer list it reads. See that file for why a total is not enough.
+func draw_cost_report() -> String:
+	return DrawCost.report(_layers)
 
 
 ## The cosmetic clock's current value, in seconds. Monotonic, deterministic in the number of rendered

@@ -14201,3 +14201,59 @@ separate a re-pin from a regression were checked and both hold: the two separate
 bit-identically (first mismatch at −1) and the seed+1 control still diverges at checkpoint 0. Coverage
 stayed live at `jumps=858 digs=360`. Per D0167's protocol the replacement array is harvested from CI's own
 pinned Linux build, never captured locally.
+
+
+## D0336 · 2026-09-01 · The veil was a draw call per visible cell — the lightmap, and the instrument that found it
+
+**THE DIRECTOR SET A 120 Hz BAR.** Measured against it before anything was changed: at the 40-metre
+framing D0335 had just shipped, 600 ticks cost **64.6 ms each — 15.4 fps, 7.8x over the 8.33 ms budget**.
+Taken as the SLOPE between a 200-tick and a 600-tick run so the constant world-gen cost cancels, rather
+than by estimating generation and subtracting a guess.
+
+**THE SHAPE CAME FIRST, AND IT NAMED THE CULPRIT CLASS.** Same world, same ticks, only the framing
+changed: 12.3 m cost 15.0 ms and 40.0 m cost 64.8 ms — **4.3x the cost for 10.6x the visible area**. So
+the cost was per-VISIBLE-CELL work, not the terrain (D0326's bake had already made that free).
+
+**THEN THE ATTRIBUTION, BECAUSE A TOTAL CANNOT BE OPTIMISED AGAINST.** `view/draw_cost.gd` and
+`PaintLayer.last_draw_usec` were built before a single fix, and legacy explains why in
+`legacy/tools/profile_frame.gd:3`: *"every optimisation decision so far has been taken against a total,
+which is how you end up tuning the wrong thing confidently."* The first report:
+
+    painters total=54.23ms -- veil_painter.paint_frame=41.47ms glint_painter.paint=11.86ms
+    sky_painter.paint=0.89ms terrain_bake.draw_quad=0.00ms seam=0.00 crumble=0.00 crack=0.00
+
+The veil alone was **five times the entire frame budget**, and the bake was confirmed free at 0.00 ms.
+
+**THE FIX IS LEGACY'S, VERBATIM** (`world_renderer.gd:330`): *"The darkness is a small texture, one texel
+per cell, stretched over the whole world with LINEAR filtering so light grades smoothly in every
+direction instead of stepping cell to cell."* `VeilPainter` issued one `ci.draw_rect` per visible cell —
+**14,080 of them at this framing**; legacy issues one `draw_texture_rect`. The composition is provably
+unchanged rather than hoped: the old path drew black at alpha `1 - s`, compositing to `dest * s`, and a
+MULTIPLY blend against a texel of `s` is `dest * s`.
+
+**ONE TEXEL PER METRE, NOT PER TERRAIN CELL — the regime question again** (D0305/D0310). Legacy's "per
+cell" is per METRE, because legacy's cell was 32 px and one metre; ours is a quarter metre, so the
+literal reading costs 16x the texels for the same picture. At one texel per metre the on-screen texel
+density matches legacy's exactly (32 screen px per texel in both). `tests/test_veil_map.gd` asserts the
+ratio against `CELLS_PER_METRE` and carries the literal reading as its control.
+
+**MEASURED AFTER: veil 41.47 ms -> 3.58 ms, frame 54.23 -> 16.34 ms.** The picture did not regress; it
+improved, because the hardware sampler now grades the light instead of stepping it per cell.
+
+**THE TEST WAS WRONG FIRST, AND ONLY THE MUTATION FOUND IT.** `_test_every_texel_equals_the_per_cell_
+reference` computed its `got` FROM its `want` — a value compared to a quantised copy of itself, true
+whatever the map did. It passed a corner-sample mutant cleanly. `VeilMap.texel()` exists so the test
+reads the map's own output; with it the same mutant fails at 0.556. This is the house failure class
+(`docs/CLAIMS.md`) in a test I wrote while explicitly hunting for it, which is worth recording plainly.
+
+**WHAT IS DELIBERATELY NOT PORTED YET.** Legacy splits the field into a cached `_veil_base` and a
+per-frame `duplicate()` into which the lamp cuts holes bounded by its own radius. That matters at
+legacy's whole-world 16,384 texels; here the map covers the WINDOW at ~1,200 texels, so a full
+evaluation is already cheaper than legacy's memcpy-plus-cut and the extra state would buy nothing
+measurable. If the map ever covers the world, port the split with it.
+
+**A MULTIPLY CANNOT BRIGHTEN.** The light model can exceed 1.0 where `KEY_STRENGTH` lifts up-facing
+mass, which the old path drew as an additive white rect. Legacy answers this with a SECOND canvas —
+`_dark` MUL at z 50, `_lights` ADD at z 51 — rather than one pass doing both. Until that additive layer
+is ported the lift is clamped: every darkening cue stays exact and only the above-ambient half of the
+key is lost. Recorded rather than left silent.
