@@ -8,6 +8,60 @@ a MODULE.md, or a claim first.
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
 
+## CURRENT STAGE — the sequential port (2026-09-01)
+
+**The director replaced the fleet/lane model with a sequential one:** establish the dependency order,
+then port ONE complete vertical at a time — running and verified — before the next. `docs/PORT_ORDER.md`
+is that order, 13 components, written and agreed this session. The lane table below is the previous
+model and is retained only for its blocked/unblocked facts.
+
+### Landed this stage, all merged to main
+
+| # | Component | Ledger | What it is |
+|---|---|---|---|
+| V1 | Terrain bake | D0326 | Static terrain drawn ONCE into a world-sized SubViewport and replayed as one quad, instead of re-issuing every per-cell painter loop every frame. Legacy measured that pass at ~72% of frame draw calls. |
+| — | Zoom ladder | D0325 | Legacy's four framing rungs, converted ×2 for the cell regime. Ported and tested; **not yet the default** — see below. |
+| V2 | Molded-rock shading | D0327 | `RockTone`: tonal drift, patches, two-octave grain, stone blobs, crack seams, hue poles, and the eight-table texture grammar. |
+| V2b | Carved-edge terms | D0329 | AO, the rim lip, the sky-form gradient — the three terms that read a neighbour. |
+| V3 | Lens + palette grade | D0328 | `post_fx.gdshader`, on the deterministic tick clock rather than `TIME`. |
+| — | Sub-cell tooth | D0331 | `rock_grit.gdshader` — the world-space roughness that gives rock detail *inside* a cell. |
+| — | Skylight ceiling | D0332 | Depth darkness. The veil darkened by burial and not by depth, so 2 m and 200 m looked identical. |
+| — | Camera limits | D0333 | The camera showed past the world; a third of the frame was grey void at the wide framing. |
+
+### Four defects found, and how — this is the useful part
+
+Three came from **looking at a capture**, one from **sweeping the ported legacy file for its
+optimizations**. None was reachable by any gate:
+
+* **D0330** — a partial re-bake seams along every chunk edge, because painters read up to 7 cells out
+  and only the dug cell's own chunk was marked dirty. Appears **only after mining, only near a
+  boundary, never in a fresh bake**. A mutant escaped first: setting the *call site's* margin to 0 left
+  the suite green, because the test posed its own subject and bypassed the wiring.
+* **D0331** — the baked quad was sampled LINEAR (`NEAREST` was set inside the viewport, which governs
+  drawing *into* it, not sampling *out*), and country rock had no variation inside a cell at all.
+* **D0332** — no depth darkness.
+* **D0333** — no camera limits, and D0273's stated reason for deferring them **was not true**: both
+  debug framings bypass the rig entirely.
+
+### Open, and named
+
+* **The zoom ladder is still not the default.** It needs a world wider than 12 m; `width_cells: 48` is
+  the play site's, and a 40-metre frame on it is mostly void. Generation at 512 cells measured ~10 s.
+* **The progressive bake is not ported** (legacy `fine_terrain.gd:768-812`, a TIME-budgeted slice per
+  frame). Ours paints every chunk in one `UPDATE_ONCE`: fine at 27k cells, will hitch at 289k.
+* **The wall is toothed along with the rock**, because our painters blend alpha where legacy stamps
+  bytes. Separating them changes a painter shared with the non-baked path.
+* **The skylight's under-rock scatter is folded into the reach** — it needs `Observation.surface_y`
+  wired at paint time.
+* The mining reach ring reads as a debug overlay, but it lives in `tests/body/`, not in shipped code.
+
+### The honest visual verdict
+
+Measured: the delve capture went from **178 distinct colours (2026-08-30 baseline) to 1,268**. Caves
+read as voids with lit lips, the sky is genuinely good, the depth gradient works, the lamp pool works.
+**It is still not shippable.** Country rock reads as soft brown cloud, the glimmer marks read as
+floating glyphs, and the frame has no composition beyond "world fills screen".
+
 ## Overnight queue
 
 **Authored 2026-08-31 on the director's explicit instruction** ("author the missing ## section properly
