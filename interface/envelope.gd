@@ -57,11 +57,43 @@ static func oracle_over(grid: TileGrid) -> Envelope:
 ## the partially-visible row at the top and left of the screen, a one-cell strip of undrawn world
 ## that appears only at some camera positions and reads as flicker rather than as a missing feature.
 static func covering(world_rect: Rect2, margin_cells: int,
-		include_walls: bool = true) -> Envelope:
+		include_walls: bool = true, snap: bool = false) -> Envelope:
 	var cell: float = float(Heightfield.TERRAIN_CELL_PX)
 	var margin := Vector2i(margin_cells, margin_cells)
 	var lo := Vector2i(int(floor(world_rect.position.x / cell)),
 		int(floor(world_rect.position.y / cell))) - margin
 	var hi := Vector2i(int(ceil(world_rect.end.x / cell)),
 		int(ceil(world_rect.end.y / cell))) + margin
+	# SNAPPED OUTWARD TO A BLOCK SO THE WINDOW HOLDS STILL WHILE THE CAMERA MOVES (D0340).
+	#
+	# The window is in terrain cells and a cell is a quarter metre, so an unsnapped window shifts several
+	# times a SECOND as the body walks -- and `Interface.observe`'s plane cache is keyed on the window, so
+	# an unsnapped window is a cache that misses almost every frame and pays for the key on top. Snapping
+	# to `SNAP_CELLS` makes the window change once per block of travel instead of once per cell.
+	#
+	# It is a pure enlargement: `floor` on the near edge and `ceil` on the far one, so the snapped window
+	# always CONTAINS the one asked for. Nothing can be culled by this that would have been drawn, which
+	# is what makes it safe to do underneath every consumer without any of them knowing.
+	# **OPT-IN, AND THE DEFAULT IS OFF FOR A MEASURED REASON.** Snapping helps a caller that asks for
+	# nearly the same big rect every tick -- the per-frame observation, whose cache then hits 96.5% of
+	# ticks. It HURTS a caller that asks for many small rects: `TerrainBake` observes one chunk at a time,
+	# and snapping each 128-cell chunk out to a 32-cell block inflates every per-dig re-bake. Applied
+	# unconditionally it took the tick from 15.9 ms to 21.5 while the per-frame path got faster, which is
+	# why this is a parameter and not a policy.
+	if snap:
+		lo = Vector2i(_snap_down(lo.x), _snap_down(lo.y))
+		hi = Vector2i(_snap_up(hi.x), _snap_up(hi.y))
 	return Envelope.new(Rect2i(lo, hi - lo), include_walls)
+
+
+## The block the window snaps to, in terrain cells. 32 cells is 8 metres — a fifth of the 40-metre play
+## framing, so the window grows by at most ~40% in area and is rebuilt after 8 metres of travel rather
+## than after 25 centimetres. Larger blocks trade a bigger plane for fewer rebuilds; this one was chosen
+## so the plane stays comfortably inside the observation the painters already cull against.
+const SNAP_CELLS: int = 32
+
+static func _snap_down(v: int) -> int:
+	return int(floor(float(v) / float(SNAP_CELLS))) * SNAP_CELLS
+
+static func _snap_up(v: int) -> int:
+	return int(ceil(float(v) / float(SNAP_CELLS))) * SNAP_CELLS
