@@ -28,6 +28,11 @@ static func defaults() -> Dictionary:
 		"seed": 20260826,
 		"screenshot_tick": -1,
 		"screenshot_path": "",
+		# STILL 6.0, AND THE LADDER BESIDE IT SAYS WHY. `CameraRig.ZOOM_LEVELS` ports legacy's framing
+		# (index 0 = 40 metres, legacy's own "40x22-cell field"), but two measured facts block using it:
+		# the play site is 48 cells = 12 METRES wide, so 40 metres frames 28 metres of void; and at that
+		# framing the per-frame painter loops measure 22.5 ticks/s against a 120Hz bar. Both are fixed by
+		# `TerrainBake` + a wider world, not by this constant. D0325.
 		"camera_zoom": 6.0,
 		"fixed_camera": Vector2.ZERO,
 		"has_fixed_camera": false,

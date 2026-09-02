@@ -13696,3 +13696,114 @@ per-suite PASS/FAIL, and reports any suite whose verdict is not consistent acros
 in CI (too slow for a per-commit gate) — it is a local tool, run on demand or nightly, that
 produces evidence the repository can detect flakiness. The readiness signal asks for "evidence
 that org detects flaky tests" — this tool is that evidence.
+
+## D0325 · 2026-09-01 · The framing was three times tighter than legacy ever got — the zoom ladder, converted
+
+**The finding.** This build was playing at **13.3 metres across**. Legacy's most zoomed-*in* level was
+**40**, and its widest was 121. Three times tighter than legacy ever got and nine times tighter than its
+widest: the miner filled the frame and the world barely appeared. The director's read of a live
+screenshot was "it kind of looks terrible", and the cause was one constant nobody had ported.
+
+**Legacy's own rationale, which is why these four values and not a taste call** (`main.gd:28-37`):
+
+> "Index 0 is 1.00x, which shows a 40x22-cell field: still a wide side-view field, comfortably wider than
+> Terraria's in tile terms, while keeping the miner large enough to read as a character and a 32px cell
+> large enough to show its rock texture rather than blooming into a smear. At 0.70x the field is 57x32
+> cells and the avatar is well under one percent of the frame's width, which is below the size at which
+> any amount of rim light, head-lamp or guide ring can make him findable."
+
+Legacy states that its own *second* rung already loses the avatar, which settles what the default should
+be without anyone making a taste call: index 0 is the play default and the wider rungs are for surveying.
+
+**The conversion, and why it is not ×1 or ×4.** A WG-4 regime question (D0305), and getting it wrong is
+D0310's trap in the other direction. What is conserved is **metres on screen, not pixels**:
+
+```
+metres_across = VIEWPORT_WIDTH / zoom / pixels_per_metre
+legacy:  1280 / z / 32  =  40 / z        (CELL 32px, and legacy's cell WAS one metre)
+here:    1280 / z / 16  =  80 / z        (4px terrain cell x TERRAIN_CELLS_PER_METER 4)
+```
+
+Equal metres therefore needs `z_here = 2 * z_legacy`, so legacy's `[1.00, 0.70, 0.50, 0.33]` becomes
+`[2.00, 1.40, 1.00, 0.66]` — 40.0 / 57.1 / 80.0 / 121.2 metres. `tests/test_camera_rig.gd` asserts the
+first two against legacy's own stated cell fields **in metres**, because metres is the unit legacy's
+design comment is written in; asserting the zoom number would be asserting a value in a regime it does
+not belong to. The control is that the shipped-until-now 6.0 gives 13.3 m and must FAIL the claim, so
+the row is a comparison rather than something true of every input.
+
+**NOT MADE THE DEFAULT YET, and the reason is a measurement rather than a preference.** At the 40-metre
+framing this build renders 22.5 ticks/s against a 120 Hz bar. Shipping the correct framing onto the
+per-frame renderer would have made the game correct-looking and unplayable in the same commit. The
+ladder lands here; D0326 is what makes it affordable, and the default moves when a measurement says it
+can. Recorded so a later session does not read the held default as an oversight.
+
+**One layer violation, made and caught.** The first draft derived `PIXELS_PER_METRE` from
+`Heightfield.TERRAIN_CELL_PX * ShaftGenerator.TERRAIN_CELLS_PER_METER` — both `sim/` classes, which a
+`view/` file may not name. It now goes through `Interface.TERRAIN_CELL_PX` (L2's own re-export) and
+`MaterialLook.CELLS_PER_METRE` (the copy `tests/test_material_palette.gd` already asserts equal to its
+`sim/` original). The test keeps the `sim/`-side comparison, which is where that assertion belongs.
+
+## D0326 · 2026-09-01 · The static terrain is baked once, not redrawn every frame — the architecture that was never ported
+
+**The diagnosis, and it is not a slow painter.** Every painter ported so far is correct. What did not
+come across is legacy's rule about **when** they run. This build re-issued every per-cell painter loop on
+every rendered frame; legacy bakes the static terrain into a world-sized `SubViewport` once and replays a
+single textured quad. Legacy names the cause itself at `world_renderer.gd:698`:
+
+> "The bottleneck was GDScript re-issuing the whole world's draw commands every frame; the sim itself
+> costs almost nothing."
+
+and the rule at `:756`: *"Terrain, background walls and the smoothed surface are static... repainted only
+on the dug chunk... with no full-world cell loop."* Legacy measured the coarse terrain at **~72% of the
+frame's draw calls, ~11,882 of them** — issued once, not per frame. Measured here before this landed:
+600 ticks at the 40-metre framing took 21.6 s, **22.5 ticks/s against a 120 Hz bar**, 5.3x out of budget
+on a world legacy ran at speed.
+
+**What is baked, and the test is not "is it slow".** The test is *can its picture change while the
+terrain does not*. Of the nine painters on the stack exactly two qualify — `WallPainter` and
+`TerrainPainter` — which is precisely the set legacy's own sentence names. The veil does not (its lamp
+follows the body), nor the glint (animated), the seam (follows the worked cell), the cracks, the crumble,
+or the sky. **A painter registered as static wrongly does not fail; it FREEZES**, silently, at whatever
+value it held when the bake ran. That is written into `WorldView.add_baked_painter`'s own header.
+
+**Three things that are legacy's and one that is not.** The viewport flags, the eraser and the chunked
+partial re-bake are legacy's shape verbatim. `CHUNK_PX` is the exception: legacy's `CHUNK` is 16 cells of
+32px, and porting the **cell count** would give 16 cells of 4px here — a chunk 8x smaller on a side, 64x
+as many of them, and 64x the per-dig bookkeeping for the same world. What must be conserved is the AREA,
+so the constant is held as 512 world px. `tests/test_terrain_bake.gd` asserts that against legacy's own
+product and carries the naive reading as a control.
+
+**The eraser is not optional.** A partial re-render can only ADD coverage — alpha blending cannot take
+rock away — so a cell dug open to the sky would keep its old pixels forever. `erase.gdshader`
+(`blend_disabled`, copied byte-for-byte from legacy) writes straight to the target, so drawing a
+transparent rect with it is a true clear.
+
+**The one structural departure from legacy, and it would have been a quiet green.** Legacy's painters read
+the whole world off the sim directly. Here a painter may read only `frame.obs`, a VALUE covering one
+window, and `Observation.material_at` answers `&""` for any cell outside that window — not "unknown". So
+handing a chunk the CAMERA's frame would have painted every off-screen chunk as empty and baked a mostly
+blank world, silently, with every gate green. The bake therefore takes an `observe(rect)` callable and
+builds its own `Frame` per chunk. This is the house failure class (an instrument that cannot register its
+subject) caught in design rather than in a capture.
+
+**It declines rather than half-works.** `setup()` returns false under `--headless` (SubViewport tools HANG
+there rather than erroring, D0186) and for a world past the smallest maximum texture size. `bake_static`
+then mounts every registered painter as an ordinary per-frame layer — which is the code that runs today
+and is known correct, only slower. A renderer that produced no picture because a render target was
+unavailable would be a far worse failure than a slow one.
+
+**Testability was designed in, because the bake's arithmetic is unreachable on the path CI runs.** Since
+`setup` declines headless, the tiling, the bounds rule and the full-rebake threshold would have shipped
+covered by nothing. They are split out into `plan()` and `would_rebake_all()` — pure integer functions
+needing no render target — and `tests/test_terrain_bake.gd` drives them directly. **Mutation-tested 6/6**:
+a chunk-grid off-by-one, `chunk_index` always -1, `would_rebake_all` always true, `CHUNK_PX` ported as the
+cell count, `plan` accepting a degenerate world, and the fallback mounting nothing were each caught.
+
+**One real defect found by the runner, not by me.** The fallback path called `remove_child` on the
+declined bake and never freed it — removing a node from the tree does not free it — so every headless run
+leaked a `CanvasItem` RID. `tools/run_gd_test.sh` failed the suite on the engine-level warning even though
+all 18 assertions passed, which is exactly what that check exists for (D0149's masked-crash sibling).
+
+**What this does NOT claim.** That the baked picture matches the per-frame picture (a capture comparison,
+which needs a headed run) and that the bake is measurably faster (a timing layer, which must run alone).
+Both are stated in the suite's own header so a later reader cannot over-read its green.

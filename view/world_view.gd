@@ -77,6 +77,10 @@ var _iface: Interface = null
 var _look: MaterialLook = null
 var _camera: Camera2D = null
 var _layers: Array[PaintLayer] = []
+## The static painters, held until `bake_static()` decides whether they run once or every frame. See
+## `add_baked_painter`.
+var _baked_painters: Array[Callable] = []
+var _bake: TerrainBake = null
 ## Painters that keep state, held so they outlive the expression that created them. See
 ## `add_stateful_painter` — nothing reads this array, it exists to be a reference.
 var _owned: Array[RefCounted] = []
@@ -105,6 +109,82 @@ func add_painter(paint: Callable) -> PaintLayer:
 	_layers.append(layer)
 	add_child(layer)
 	return layer
+
+
+## A STATIC painter — one whose picture changes only when the terrain does. Registered here and mounted by
+## `bake_static()`, which decides whether it runs once into a retained target or every frame like the rest.
+##
+## **THIS IS THE SINGLE LARGEST PERFORMANCE DECISION IN THE RENDERER** and legacy states it at
+## `world_renderer.gd:698`: *"The bottleneck was GDScript re-issuing the whole world's draw commands every
+## frame; the sim itself costs almost nothing."* A static painter on the per-frame path re-issues its whole
+## per-cell loop 60 times a second to produce identical pixels. Legacy measured the terrain pass at ~72% of
+## all frame draw calls and issued it ONCE.
+##
+## WHAT QUALIFIES, and the test is not "is it slow" but "can its picture change while the terrain does not":
+## the terrain fill and the wall plane qualify. The veil does NOT (its lamp follows the body), nor the glint
+## (animated), the seam (follows the worked cell), the cracks, the crumble, or the sky (animated). A painter
+## registered here wrongly does not fail — it FREEZES, silently, at the value it held when the bake ran.
+func add_baked_painter(paint: Callable) -> void:
+	_baked_painters.append(paint)
+
+
+## Mounts everything `add_baked_painter` collected, and returns whether it went into a bake.
+##
+## FALLS BACK TO THE PER-FRAME PATH RATHER THAN FAILING. `TerrainBake.setup` declines under `--headless`
+## (SubViewport tools HANG there rather than erroring, D0186) and on a world too large for a render target.
+## In both cases every registered painter mounts as an ordinary layer at `z`, which is exactly the code that
+## runs today and is known correct — only slower. A renderer that produced no picture because a render
+## target was unavailable would be a far worse failure than a slow one.
+##
+## Must be called AFTER `setup()` and after the last `add_baked_painter`, and before the first `refresh()`.
+## Needs one observation to learn the world's size, which is why it cannot happen in `setup`.
+func bake_static(z: int) -> bool:
+	if _iface == null or _baked_painters.is_empty():
+		return false
+	var probe: Interface.Observation = _iface.observe(
+		Interface.Envelope.covering(Rect2(), WINDOW_MARGIN_CELLS))
+	_bake = TerrainBake.new()
+	add_child(_bake)
+	var ok: bool = _bake.setup(probe.world_cells, probe.cell_px,
+		observe_rect, _look, _baked_painters)
+	if not ok:
+		# `free()`, not `remove_child` alone: removing a node from the tree does NOT free it, and the
+		# declined bake would sit in memory holding its CanvasItem RID for the life of the process. On the
+		# fallback path this happens on every headless run, which is every CI run.
+		remove_child(_bake)
+		_bake.free()
+		_bake = null
+		for paint: Callable in _baked_painters:
+			add_painter(paint).z_index = z
+		return false
+	add_painter(Callable(_bake, &"draw_quad")).z_index = z
+	_bake.bake_full()
+	return true
+
+
+## One observation covering `rect`, margined exactly as the per-frame path margins its own. The bake's only
+## route to world state — see `TerrainBake`'s header for why a chunk cannot reuse the camera's observation.
+func observe_rect(rect: Rect2) -> Interface.Observation:
+	if _iface == null:
+		return null
+	return _iface.observe(Interface.Envelope.covering(rect, WINDOW_MARGIN_CELLS))
+
+
+## Tell the bake that these cells changed, so their chunks repaint. A no-op when the bake declined, because
+## the fallback painters redraw every frame anyway and have nothing to invalidate.
+##
+## THE CALLER MUST DO THIS ON EVERY DIG. A retained target is retained: nothing else will notice that the
+## world changed, and the mined cell would keep its rock pixels until something else forced a full bake.
+func invalidate_cells(cells: Array) -> void:
+	if _bake != null:
+		_bake.bake_cells(cells)
+
+
+## The bake, or `null` when it declined. For a test asserting which path was taken — the two produce the
+## same picture by design, so nothing in a capture can tell them apart, which is the point and also means a
+## test cannot infer it.
+func terrain_bake() -> TerrainBake:
+	return _bake
 
 
 ## A painter that KEEPS STATE, handed over as an object rather than as a bound `Callable` — and the
@@ -152,6 +232,13 @@ func refresh() -> void:
 		return
 	_anim_ticks += 1
 	_frame = _build_frame()
+	# THE BAKE IS TOLD WHAT CHANGED HERE, not at the dig site, and deliberately: a retained target is
+	# retained, so a mined cell keeps its rock pixels until something invalidates its chunk. Doing it from
+	# the frame the coordinator already built means no caller can forget it, and there is exactly one place
+	# to look when a dig leaves a ghost. `mining_broke_cells` is empty on the overwhelming majority of ticks,
+	# so this costs an `is_empty()` per tick on the common path.
+	if _bake != null and not _frame.obs.mining_broke_cells.is_empty():
+		_bake.bake_cells(_frame.obs.mining_broke_cells)
 	for layer: PaintLayer in _layers:
 		layer.queue_redraw()
 	if _hud != null:

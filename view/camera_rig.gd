@@ -51,6 +51,61 @@ const FOLLOW_SPEED: float = 8.0      ## soft follow, matching legacy's old posit
 ## body, which is what makes a cut read as a cut rather than as a bug.
 const SNAP_SCREENS: float = 0.5
 
+## HOW MUCH WORLD IS ON SCREEN — ported from `legacy/scenes/main.gd:28-37`, and the one legacy constant
+## that could NOT be copied across unchanged. `docs/DECISIONS_LEDGER.md` D0325.
+##
+## **THE BUILD WAS PLAYING AT 13.3 METRES ACROSS. LEGACY'S MOST ZOOMED-*IN* LEVEL WAS 40.** Three times
+## tighter than legacy ever got, nine times tighter than its widest — the miner filled the frame and the
+## world barely appeared. The director's read of a live screenshot was "it kind of looks terrible", and
+## the cause was one number nobody had ported.
+##
+## LEGACY'S OWN RATIONALE, which is why these four values and not a taste call:
+##
+##   > "Index 0 is 1.00x, which shows a 40x22-cell field: still a wide side-view field, comfortably wider
+##   > than Terraria's in tile terms, while keeping the miner large enough to read as a character and a
+##   > 32px cell large enough to show its rock texture rather than blooming into a smear. At 0.70x the
+##   > field is 57x32 cells and the avatar is well under one percent of the frame's width, which is below
+##   > the size at which any amount of rim light, head-lamp or guide ring can make him findable."
+##
+## So index 0 is the PLAY default and the wider steps are for surveying — legacy states that its own
+## second rung already loses the avatar, which settles what the default should be without a taste call.
+##
+## **THE CONVERSION, AND WHY IT IS NOT ×1 OR ×4.** This is a WG-4 regime question (D0305) and getting it
+## wrong is D0310's trap in the other direction. What is conserved is METRES ON SCREEN, not pixels:
+##
+##     metres_across = VIEWPORT_WIDTH / zoom / pixels_per_metre
+##     legacy:  1280 / z / 32  =  40 / z          (CELL 32px, and legacy's cell WAS one metre)
+##     here:    1280 / z / 16  =  80 / z          (4px terrain cell x TERRAIN_CELLS_PER_METER 4)
+##
+## Equal metres therefore needs `z_here = 2 * z_legacy`, and legacy's own "40x22-cell field" at index 0
+## is the check: `metres_across(2.0)` must come back 40. Both viewports are 1280 wide, so the viewport
+## cancels — but it is written out rather than cancelled by hand, because the two builds agreeing on
+## 1280 is a coincidence of this moment and not a property either file guarantees.
+const ZOOM_LEVELS: Array[float] = [2.00, 1.40, 1.00, 0.66]   ## legacy's [1.00, 0.70, 0.50, 0.33] x 2
+
+## Index 0, by legacy's own argument above: its NEXT rung out already puts the avatar under one percent
+## of the frame width, which legacy calls below findable. Wider rungs are for surveying, not for playing.
+const DEFAULT_ZOOM_IDX: int = 0
+
+## World pixels per metre in THIS build. Derived from the terrain grid rather than written as 16, so a
+## change to either factor moves the framing with it instead of silently desynchronising from it.
+##
+## BOTH FACTORS ARRIVE THROUGH A VIEW-LEGAL ROUTE, and neither may be read from `sim/` directly.
+## `Interface.TERRAIN_CELL_PX` is L2's own re-export of `Heightfield.TERRAIN_CELL_PX`, and
+## `MaterialLook.CELLS_PER_METRE` is the copy of `ShaftGenerator.TERRAIN_CELLS_PER_METER` that
+## `tests/test_material_palette.gd` already asserts equal to its `sim/` original. Naming either `sim/`
+## class here is a `tools/layer_lint/layer_lint.py` failure, and the first draft of this file did
+## exactly that.
+const PIXELS_PER_METRE: int = Interface.TERRAIN_CELL_PX * MaterialLook.CELLS_PER_METRE
+
+## Metres of world visible across a viewport of `viewport_width` at `zoom`. The quantity legacy's design
+## comment is actually written in, so it is the quantity the test asserts.
+static func metres_across(zoom: float, viewport_width: float = 1280.0) -> float:
+	if zoom <= 0.0:
+		return INF   ## same degenerate-zoom contract as `cut_distance` and `snap_to_pixel` above
+	return viewport_width / zoom / float(PIXELS_PER_METRE)
+
+
 var _pos: Vector2 = Vector2.ZERO      ## the eased position, kept at FULL precision -- see the header
 var _lead: Vector2 = Vector2.ZERO
 var _started: bool = false
