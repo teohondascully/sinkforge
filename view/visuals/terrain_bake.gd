@@ -51,6 +51,28 @@ const CHUNK_PX: int = 512
 ## Past roughly a third of the world the partial path is doing more work than the full one for no benefit.
 const FULL_REBAKE_CHUNK_FRACTION: float = 0.34
 
+## HOW FAR A DIG'S INFLUENCE SPREADS, in cells, and this is not a tuning knob.
+##
+## **A PATCHED REGION MUST BE BYTE-IDENTICAL TO A FULL BAKE, and without this it is not.** The baked
+## painters all read NEIGHBOURS: `WallPainter.ao_alpha` probes `AO_RAMP_CELLS` (2) out, `TerrainPainter`
+## draws one cell past its rect so a straddling cell is whole, and `RockTone`'s carved-edge terms reach
+## `FORM_REACH + 1` (7). So digging one cell changes the painted colour of cells up to seven away — and if
+## that cell sits near a chunk boundary, the affected cells live in a chunk this bake never marked dirty.
+##
+## The result is a permanent seam along chunk edges that appears only after mining, only near a boundary,
+## and never in a fresh bake — so a screenshot of a newly generated world looks perfect and the defect
+## accumulates as the player digs. Legacy carries the same constant for the same reason and states it
+## exactly (`fine_terrain.gd:481`): *"It must cover the widest neighbour reach any paint term reads, or a
+## patched region stops being byte-identical to a full bake."*
+##
+## SET FROM THE OBSERVATION MARGIN rather than from the painters' own constants, and deliberately. The
+## bake does not know which painters it was handed — that is the caller's business — so deriving from a
+## specific painter would silently under-dilate the moment a different set is baked. The observation
+## margin is the widest ring any painter could POSSIBLY read, because a painter reading past it is already
+## reading `&""` for cells it was never given. Over-dilating costs at most a few extra chunks per dig;
+## under-dilating is a permanent visual defect.
+var _rebake_margin: int = 0
+
 ## Refuse to build a render target larger than this on either axis. Godot's own limit is driver-dependent
 ## and a target past it fails at RENDER time, not at construction — which would surface as a blank world
 ## rather than as an error. Declining here instead keeps the caller on its per-frame path, which is always
@@ -107,9 +129,10 @@ var _live: bool = false
 ## render target. A bake that silently produced blank pixels would be far worse than one that declines,
 ## because the fallback path is the code that is running today and is known correct.
 func setup(world_cells: Vector2i, cell_px: int, observe: Callable, look: MaterialLook,
-		tone: RockTone, painters: Array[Callable]) -> bool:
+		tone: RockTone, painters: Array[Callable], rebake_margin: int) -> bool:
 	if not plan(world_cells, cell_px):
 		return false
+	_rebake_margin = maxi(rebake_margin, 0)
 	_painters = painters
 	_observe = observe
 	_look = look
@@ -271,8 +294,7 @@ func bake_cells(cells: Array) -> void:
 		return
 	var dirty: Dictionary = {}
 	for cell: Vector2i in cells:
-		var i: int = chunk_index(cell)
-		if i >= 0:
+		for i: int in influenced_chunks(cell):
 			dirty[i] = true
 	if dirty.is_empty():
 		return
@@ -290,6 +312,28 @@ func bake_cells(cells: Array) -> void:
 	_eraser.queue_redraw()
 	_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_NEVER
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+## Every chunk a change at `cell` can alter, which is its own chunk plus any chunk the dilation reaches.
+##
+## Returned as a list rather than folded into `bake_cells` so it is assertable directly: the failure this
+## guards is a seam that appears only after digging near a boundary, which no fresh-world capture can
+## show and no test that only inspects a picture would catch.
+func influenced_chunks(cell: Vector2i) -> Array[int]:
+	var out: Array[int] = []
+	var seen: Dictionary = {}
+	for dx: int in [-_rebake_margin, 0, _rebake_margin]:
+		for dy: int in [-_rebake_margin, 0, _rebake_margin]:
+			var i: int = chunk_index(Vector2i(cell.x + dx, cell.y + dy))
+			if i >= 0 and not seen.has(i):
+				seen[i] = true
+				out.append(i)
+	return out
+
+
+## The dilation actually in force, for a test that wants to assert it rather than infer it.
+func rebake_margin() -> int:
+	return _rebake_margin
 
 
 ## Legacy `:745-748`. The row-major index of the chunk owning `cell`, or -1 outside the world.

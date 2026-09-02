@@ -91,6 +91,13 @@ var _hud: HudLayer = null
 ## once and a per-frame rebuild would be both wasteful and, worse, a different world every frame.
 var _tone: RockTone = null
 var _post: PostFxLayer = null
+## The dilation `bake_static` handed the bake, recorded even when the bake declined.
+##
+## OBSERVABILITY ADDED BECAUSE A MUTANT ESCAPED (D0330). `tests/test_terrain_bake.gd` asserted the
+## dilation by constructing its own `TerrainBake` and passing the margin itself, so setting THIS call site
+## to 0 -- the actual defect, a permanent seam along chunk edges after mining -- left the suite green. A
+## test that poses its own subject cannot register a wiring error at the call site it bypassed.
+var _bake_margin: int = -1
 
 
 ## Constructor-by-method rather than `_init` arguments, so this node can also be instantiated from a
@@ -153,10 +160,11 @@ func bake_static(z: int) -> bool:
 	# permanently, since nothing re-bakes a chunk that has not been dug.
 	if _tone == null:
 		_tone = RockTone.new(probe.world_seed)
+	_bake_margin = WINDOW_MARGIN_CELLS
 	_bake = TerrainBake.new()
 	add_child(_bake)
 	var ok: bool = _bake.setup(probe.world_cells, probe.cell_px,
-		observe_rect, _look, _tone, _baked_painters)
+		observe_rect, _look, _tone, _baked_painters, WINDOW_MARGIN_CELLS)
 	if not ok:
 		# `free()`, not `remove_child` alone: removing a node from the tree does NOT free it, and the
 		# declined bake would sit in memory holding its CanvasItem RID for the life of the process. On the
@@ -188,6 +196,11 @@ func observe_rect(rect: Rect2) -> Interface.Observation:
 func invalidate_cells(cells: Array) -> void:
 	if _bake != null:
 		_bake.bake_cells(cells)
+
+
+## The dilation the coordinator handed the bake, or -1 before `bake_static` ran. See `_bake_margin`.
+func bake_margin() -> int:
+	return _bake_margin
 
 
 ## The bake, or `null` when it declined. For a test asserting which path was taken — the two produce the
