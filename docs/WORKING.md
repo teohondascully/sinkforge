@@ -14,13 +14,14 @@ caught mechanically rather than relying on someone noticing later.
 game."** That interrupted the sequential port, which resumes after. `docs/PERF_PLAN.md` is the ranked,
 sourced plan and the recovered record of how legacy already hit this bar at this same framing.
 
-**Measured, as the slope between a 200-tick and a 600-tick headed run so world-gen cost cancels:**
+**Measured by `view/draw_cost.gd`, inside the frame — painters 4.01 ms against the 8.33 ms budget**
+(`veil=2.99 sky=0.97 glint=0.03 bake=0.01`), plus a 1.58 ms sim tick, so the frame is ~5.6 ms. Legacy
+budgets its own fine-fill at "4ms of the project's 8.33ms budget", so this is parity.
 
-| | ms/tick | fps |
-|---|---|---|
-| start | 64.6 | 15.5 |
-| now (D0336–D0338) | **15.9** | **63** |
-| target | 8.33 | 120 |
+**A correction that matters for anyone reading older numbers in this file's history:** the wall-clock
+"ms/tick" slope is only valid ABOVE the tick interval. `reveal_scene` ticks in `_physics_process`, pinned
+at 60/sec, so three consecutive optimisations all measured "15.9 ms/tick" — 1/60 s — while the work inside
+the frame kept falling. The 64.6 -> 17.9 ms improvement was real; below ~16.7 ms the slope was the clock.
 
 Landed: the veil became a metre-resolution lightmap drawn in ONE call instead of 14,080 (D0336, 41.47 →
 3.58 ms); the glint iterates a cached sparse list instead of every visible cell (D0337, 11.83 → 0.01 ms);
