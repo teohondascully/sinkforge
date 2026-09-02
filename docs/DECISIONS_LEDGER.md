@@ -14257,3 +14257,41 @@ mass, which the old path drew as an additive white rect. Legacy answers this wit
 `_dark` MUL at z 50, `_lights` ADD at z 51 — rather than one pass doing both. Until that additive layer
 is ported the lift is clamped: every darkening cue stays exact and only the above-ambient half of the
 key is lost. Recorded rather than left silent.
+
+
+## D0337 · 2026-09-01 · The glint asked every visible cell whether it could glint — the sparse cache
+
+Once D0336 made the veil a lightmap, `GlintPainter` was the largest painter left at **11.83 ms against a
+120 Hz budget of 8.33**. Its `paint` asks `can_glint` of every cell in the visible rect, every frame, and
+`can_glint` is a `MaterialsRecords` lookup plus four `solid_at` neighbour probes — roughly **70,000
+dictionary lookups a frame** over a 160x88 rect at the 40-metre framing.
+
+**LEGACY NEVER HAD THIS PROBLEM, AND ITS RULE IS ONE SENTENCE** (`world_renderer.gd:756`): *"This
+per-frame pass draws only the live and sparse content (machines, items, conduits, cursor), with no
+full-world cell loop."* Every legacy per-frame painter iterates a sparse sim Dictionary and culls each
+entry; none iterate cells. That is the whole reason legacy's cost scales with world CONTENT and this
+build's scaled with visible AREA.
+
+**THIS BUILD CANNOT COPY THAT DIRECTLY**, and the reason is a layer boundary rather than an oversight:
+`Interface.Observation` exposes a window, not the world's deposits, so `view/` has no sparse ore list to
+iterate. So the list is DERIVED once and cached — which is legacy's own second pattern for exactly this
+case, `_leaf_cells`/`_leaf_cache_dirty`, rebuilt only on terrain change rather than scanning all of
+`sim.solid` per frame for canopy cells.
+
+Keyed on `hash(obs.materials)` and the window rect, the same key `VeilPainter.field_for` uses and for the
+same reasons: which cells CAN glint is a pure function of (window, solidity). **The time term is
+deliberately not cached** — the flare cycle moves every frame and is three arithmetic ops, so caching it
+would freeze the animation rather than speed it up.
+
+**Measured: 11.83 ms -> 0.01 ms.** Painter total 16.34 -> 4.69 ms, now inside the budget. End to end the
+whole programme took the frame from **64.6 ms to 17.85 ms — 15.5 fps to 56 fps, 3.6x** — measured the
+same way both times, as the slope between a 200-tick and a 600-tick run so world-gen cost cancels.
+
+`paint` is KEPT as the per-cell reference rather than deleted, the same call `VeilPainter._paint_with`
+gets and for legacy's own stated reason (`legacy/tools/check_paint_terms.gd:5`): when a hot function is
+flattened, the readable version stays as the specification.
+
+**THE REMAINING ~13 ms IS NOT IN THE PAINTERS** and is not yet attributed. Painters are 4.69 ms of a
+17.85 ms frame. The prime suspect is the per-tick `Observation` build plus the two `hash(obs.materials)`
+calls the caches now make over a ~18,000-entry dictionary every frame — which would be this same lesson
+one layer down, and must be MEASURED before it is believed.

@@ -77,7 +77,8 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_baked_painter(TerrainPainter.paint)
 	view.bake_static(WALL_Z)
 	_mount_veil(view)
-	view.add_painter(GlintPainter.paint).z_index = GLINT_Z
+	# STATEFUL for its sparse cache (D0337): the per-frame scan of every visible cell was 11.83 ms.
+	view.add_stateful_painter(GlintPainter.new(), &"paint_frame").z_index = GLINT_Z
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
 	view.add_painter(CrackPainter.paint_frame)
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
