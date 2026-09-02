@@ -49,6 +49,20 @@ static func capture(scene: Node2D, path: String, tick: int, camera: Camera2D, zo
 		float(body.pos_x) / float(Fx.SCALE), float(body.pos_y) / float(Fx.SCALE)])
 	if view != null:
 		print("reveal_scene: %s" % view.draw_cost_report())
+	# ONE INSTANTANEOUS SAMPLE, AND IT SAYS SO IN ITS OWN OUTPUT (D0341). `get_frames_per_second` is a
+	# one-second reading, so it reports whatever that second contained -- including the shutter's own
+	# forced frames. Measured across one run it read 210 / 120 / 601 / 457 at ticks 200/600/900/1400,
+	# which is a five-fold spread on an unchanged build: enough to show the frame is not obviously over
+	# budget, nowhere near enough to claim the bar is HELD.
+	#
+	# The number that would settle it is legacy's, and it is not ported: `legacy/tools/check_frametime.gd`
+	# measures the MISSED-DEADLINE RATE (frames past 1.5x the interval) together with WORST-FRAME
+	# SEVERITY, over hundreds of frames, because legacy found rate alone scored a real 30.5 -> 17.1 ms fix
+	# as nothing. Until that exists, this line is a smoke test and is labelled as one.
+	var fps: int = Engine.get_frames_per_second()
+	print("reveal_scene: SAMPLE fps=%d (~%.2fms) -- ONE 1s sample, not a distribution; "
+		% [fps, 1000.0 / maxf(1.0, float(fps))]
+		+ "cannot show whether the 120Hz bar is HELD (see docs/PERF_PLAN.md, check_frametime)")
 	DebugSceneCommon.warn_if_blank(img, path)
 
 
