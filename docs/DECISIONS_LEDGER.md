@@ -13996,3 +13996,56 @@ is time, not cells, because the point is to fit inside a frame" — so a boot ba
 build's full bake paints every chunk in one `UPDATE_ONCE`. At the current 48x565-cell world that is ~27k
 cells and acceptable; at the 512-wide world it is ~289k and will hitch. Recorded here with its address so
 the next session does not have to rediscover it.
+
+## D0331 · 2026-09-01 · Two defects a capture found that no gate could — the blurred quad and the missing sub-cell tooth
+
+The director's instruction was to take screenshots and judge them as a player would. The first capture at
+the ported framing showed terrain reading as **soft brown mush**, and the diagnosis took two steps
+because the obvious answer was wrong.
+
+**FIRST: THE BAKED QUAD WAS BEING BLURRED.** `TerrainBake` sets the SubViewport's
+`canvas_item_default_texture_filter` to NEAREST — which governs how the chunk painters draw **into** the
+target and says nothing about how the finished target is sampled when it is drawn **out**. The quad
+inherited the canvas default, linear, so every baked texel was bilinearly interpolated across the screen
+pixels it covered once the camera magnified it. Pixel art through a blur filter.
+
+**No gate could see this.** `test_terrain_bake.gd` checks that the bake draws the same CONTENT as the
+per-frame path, and it does; the filtering is applied afterwards, at draw time, on a property of the
+layer rather than of the picture. Fixed by setting `texture_filter` on the quad's own `PaintLayer`.
+
+**SECOND, AND IT WAS THE LARGER HALF: THERE IS NO DETAIL INSIDE A CELL.** The filter fix changed almost
+nothing, which was the useful result — a native-resolution capture showed **ore bodies crisp and country
+rock smooth**. Ore cells carry per-cell speck colours; country rock's every `RockTone` term has a feature
+size of **9 to 22 cells**, so nothing varies inside one cell at all.
+
+Legacy names this build's exact symptom in `rock_grit.gdshader`'s own header: *"The molded terrain texture
+holds one texel per 8-pixel world cell and is drawn NEAREST, so rock carries no detail below one cell...
+This pass textures the inside of a cell and leaves cell boundaries alone."* Ported as
+`view/visuals/rock_grit.gdshader`, as a material on the quad — it must run per SCREEN pixel, and a tooth
+painted into the bake would be one value per cell, which is the flatness it exists to fix.
+
+**THE TWO GRAINS ARE DIFFERENT JOBS, and shipping only one is why the frame read filmic while the rock
+read flat.** Legacy: *"The screen post-pass already carries a film grain and cannot do this job: a grain
+that sits still while the rock slides underneath it reads as dirt on the lens, while tooth that travels
+with the surface reads as roughness."* D0328 ported the screen-space one; this is its world-space
+complement.
+
+**THE SCALE CONVERSION, again WG-4 (D0305).** Legacy tooths per ITS world pixel at 32 px/metre; ours is
+16, so a tooth per our world pixel would be twice the authored physical size — coarse speckle rather than
+roughness. Sampled at 2x our world pixel, restoring legacy's 1/32-metre tooth cell.
+
+**ONE DEVIATION, NAMED RATHER THAN HIDDEN.** Legacy stamps its back wall with `VOID_ALPHA` (254), one
+level below solid, so `step(0.998, COLOR.a)` tooths the rock and not the wall. This build's painters
+BLEND rather than stamp bytes — `WallPainter` draws its plane and then its cast-shadow overlay as
+separate `draw_rect` calls, so a wall cell's alpha is a blend result landing anywhere across that very
+threshold. The mask here is therefore "did the bake draw anything opaque", which tooths the wall too.
+Separating them needs the painters to stamp alpha as legacy does, which changes a painter shared with the
+non-baked path; recorded as a follow-up rather than faked.
+
+**MEASURED**: distinct colours in the delve capture 178 (the 2026-08-30 baseline) → 1,351.
+
+**WHAT THE SAME CAPTURE SHOWED THAT IS NOT FIXED HERE**, recorded so it is not rediscovered: the camera
+has no world limits, so at a wide world it follows the body past the world edge and a third of the frame
+is flat void (D0273 deliberately deferred the limits for `--wide-view`; a real play view needs them); the
+guide ring reads as a debug overlay; and there is no darkness gradient with depth, so at 7 m everything
+is equally lit — legacy's identity is light pools in blackness and that is the largest remaining gap.
