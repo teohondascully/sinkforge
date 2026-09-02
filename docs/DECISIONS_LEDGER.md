@@ -14426,3 +14426,29 @@ This build has no coarse tier, so every per-cell painter and the observation its
 resolution: **14,080 cells for the same 40 metres, a 16x multiplier on everything that loops.** That is
 why the same algorithm cost 41 ms here and was cheap there, and why the fixes that worked were the ones
 that moved work off the quarter-metre grid entirely.
+
+
+## D0341 · 2026-09-01 · A frame-rate sample that states it is only a sample
+
+The 120 Hz programme reached the point where the painters measure **3.7–4.6 ms against the 8.33 ms
+budget** and the obvious next question is the one the instrument could not answer: is the bar actually
+HELD? `Engine.get_frames_per_second()` is the cheapest thing that looks like an answer, and across a
+single run it read **210 / 120 / 601 / 457** at ticks 200 / 600 / 900 / 1400 — a five-fold spread on an
+unchanged build, because it is a one-second instantaneous reading that includes the shutter's own forced
+frames.
+
+**A crude instrument that reads like a verdict is worse than no instrument**, so the line prints its own
+limit: `SAMPLE fps=… -- ONE 1s sample, not a distribution; cannot show whether the 120Hz bar is HELD`. It
+is kept rather than deleted because it does carry real signal — no sample fell below the bar — and
+because a smoke test that says it is a smoke test cannot be mistaken for the gate.
+
+**WHAT THE REAL GATE IS, recorded so it is not re-derived.** `legacy/tools/check_frametime.gd` measures
+the MISSED-DEADLINE RATE — frames past 1.5x the interval, because "a paced frame lands on 1.0x or on
+2.0x, so anything past the midpoint waited for another refresh" — TOGETHER WITH worst-frame severity.
+Both, because legacy found that fixing the bazaar rescan took DIG p99 from 30.5 ms to 17.1 and **the miss
+rate did not move at all**: "A contract written on rate alone would have scored that fix as nothing."
+
+Two conditions this session's numbers do NOT cover and which that gate would: the widest zoom rung, a
+**9.2x area multiplier** legacy had no LOD to soften; and the DIG phase, legacy's worst by a wide margin
+at 62–68% missed frames against 0–6% idle. Both are named in `docs/PERF_PLAN.md` rather than left as an
+implied "it is fast now".
