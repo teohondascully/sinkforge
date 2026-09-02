@@ -145,6 +145,49 @@ static func shade_at(obs: Interface.Observation, rect: Rect2i, field: PackedFloa
 ##
 ## THREE CUTS, legacy's own radii and strengths — `world_renderer.gd:3163-3165`. Radii are legacy CELLS,
 ## and a legacy cell is one metre, so they are held in METRES here like every other length in this file.
+## THE SKYLIGHT CEILING — legacy `world_renderer.gd:3263-3270 _skylight_alpha` (D0332).
+##
+## **THE VEIL DARKENS BY BURIAL AND, UNTIL NOW, NOT BY DEPTH.** `MASS_SHADE` decides how much light a
+## fully-buried cell loses relative to one at an opening, and that is a purely local quantity — so a
+## buried cell two metres down and one two hundred metres down came out at exactly the same brightness,
+## and the whole underground read as evenly lit at every depth. A capture at 7 m showed it plainly: the
+## frame is legible everywhere and nothing is dark, where legacy's entire identity is light pools in
+## blackness.
+##
+## Legacy's answer is a second, independent term: how much SKY reaches this row at all. It attenuates with
+## depth past the surface line, is blocked by the first solid rock, and scatters a little way under it.
+##
+## **COMPOSED AS A CEILING, NOT AS ANOTHER DARK RECT**, and that ordering is legacy's own rule (quoted in
+## `_paint_with` below): a light raises the light LEVEL rather than lowering an opacity, so a lit cell
+## trends toward full light and can never overshoot. The skylight caps how bright a cell can be before the
+## lamp is considered; the lamp then lifts what is left. Drawing a second black rect on top would be the
+## regression `view/visuals/wall_painter.gd` records — the wall darkened in its own paint AND again by the
+## veil, so a lit chamber came out as a black rectangle. **There is one darkness in this renderer.**
+##
+## IN METRES, like `lamp_scale` above and for the same reason: legacy's tiles are one metre and this
+## build's are a quarter of one, so a constant copied as ROWS would be four times too shallow.
+const AMBIENT_DARK: float = 0.66      ## legacy `:79` — light a fully sky-cut cell has lost
+const SKY_REACH_M: float = 12.0       ## legacy `SKY_REACH 12` tiles of open air sunlight reaches
+const SKY_FADE_M: float = 16.0        ## legacy `SKY_FADE 16` — how far light scatters under solid rock
+const SURFACE_LINE_M: float = 2.0     ## legacy `SURFACE_LINE 22` against its `SURFACE_ROW 20`
+
+## The most light a cell at this row can receive, before mass, key or lamp. 1.0 at the surface, falling to
+## `1 - AMBIENT_DARK` in the deep.
+##
+## **LEGACY'S `daylight()` TERM IS DELIBERATELY ABSENT.** Legacy blends a `NIGHT_DARK` floor from a day
+## cycle; this build has none and D0277 ruled sky variation depth-driven rather than clock-driven, so that
+## term would be a constant 1.0 and is omitted rather than written as a factor that can never move — the
+## same treatment `view/camera_rig.gd` gives legacy's stride multiplier.
+static func skylight_ceiling(row: int) -> float:
+	var depth_m: float = MaterialLook.depth_m_exact(row)
+	var sky: float = AMBIENT_DARK * clampf((depth_m - SURFACE_LINE_M) / SKY_REACH_M, 0.0, 1.0)
+	# Legacy also scatters light a further `SKY_FADE` under the first solid rock. Without a per-column
+	# surface row on the observation this build cannot ask "is this cell under rock", so the scatter is
+	# folded into the reach above rather than approximated — stated so the difference is not mistaken for
+	# a porting slip. `Observation` carries `surface_y` per column and wiring it is the follow-up.
+	return 1.0 - sky
+
+
 const LAMP_BEAM_M: float = 9.0        ## the aimed beam: wide reveal, open core
 const LAMP_BEAM_STRENGTH: float = 0.99
 const LAMP_THROAT_M: float = 5.0      ## the beam throat, between the head and the cast pool
@@ -290,7 +333,10 @@ static func _paint_with(frame: Frame, ci: CanvasItem, field: PackedFloat32Array)
 			var lj: int = row - baked.position.y
 			if li < 0 or lj < 0 or li >= baked.size.x or lj >= baked.size.y:
 				continue
-			var s: float = shade_at(obs, baked, field, li, lj)
+			# THE CEILING FIRST, then mass and key, then the lamp. Multiplying rather than subtracting
+			# keeps the composition monotone: a cell can lose light to depth and to burial independently
+			# and never go below zero, which is what a subtractive stack would do in deep buried rock.
+			var s: float = shade_at(obs, baked, field, li, lj) * skylight_ceiling(row)
 			# THE LAMP LIFTS WHAT THE VEIL LEFT, which is legacy's own composition rule: a light raises
 			# the light level rather than lowering an opacity, so a lit cell trends toward full light and
 			# can never overshoot it. Applied here rather than baked into the field because the field is
