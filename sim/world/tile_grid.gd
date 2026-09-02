@@ -162,9 +162,57 @@ static func _fold(text: String, h0: int) -> int:
 func _cell_term(terrain_cell: Vector2i) -> Vector2i:
 	if not _blocks.has(terrain_cell):
 		return Vector2i.ZERO
-	var body: String = "%d,%d:%s/%s" % [terrain_cell.x, terrain_cell.y,
-		_blocks[terrain_cell], get_wall(terrain_cell)]
-	return Vector2i(_fold(body, 2166136261), _fold(body, 486187739))
+	var m: Vector2i = _id_fold(_blocks[terrain_cell])
+	var w: Vector2i = _id_fold(get_wall(terrain_cell))
+	return Vector2i(
+		_mix(terrain_cell.x, terrain_cell.y, m.x, w.x, 2166136261),
+		_mix(terrain_cell.x, terrain_cell.y, m.y, w.y, 486187739))
+
+
+## THE MEMOISED HALF, AND IT IS A THIRD OF WORLD GENERATION (D0334).
+##
+## This used to build `"%d,%d:%s/%s"` and run `_fold` -- a per-character loop -- over the whole string,
+## TWICE, on every write. `_write_layer` calls `_cell_term` twice per write and generation writes both a
+## block and a wall per cell, so a 512-cell-wide world paid four string allocations and roughly 160
+## character iterations for each of its 565,248 cells.
+##
+## **Measured by removing the subject rather than by reasoning about it**: generation went 16.69 -> 11.11
+## microseconds per cell with the hashing stubbed out, so it was 33% of the total and 3.15 seconds of the
+## wide world's 9.4.
+##
+## A world holds about eight distinct material ids against hundreds of thousands of cells, so the id fold
+## is the same handful of answers computed over and over. Cached here, keyed by the id itself. The cache
+## is `static` because it memoises a PURE function -- same id, same pair, forever -- so it carries no
+## per-world state and cannot leak between grids.
+static var _id_folds: Dictionary = {}
+
+
+static func _id_fold(id: StringName) -> Vector2i:
+	var hit: Variant = _id_folds.get(id)
+	if hit != null:
+		return hit
+	var text: String = String(id)
+	var pair := Vector2i(_fold(text, 2166136261), _fold(text, 486187739))
+	_id_folds[id] = pair
+	return pair
+
+
+## The coordinate half, as integer arithmetic rather than as formatted text.
+##
+## SAME 31-MULTIPLY FOLD, SAME MASK, so it stays a hand-rolled hash over integers and inherits the
+## cross-platform stability that is why `_fold` exists instead of `String.hash()` -- a signature compared
+## between two PROCESSES cannot rest on an engine hash whose stability is not guaranteed.
+##
+## Mixing x and y as separate terms is also strictly better than the string form it replaces: `"1,23"`
+## and `"12,3"` were distinguished only by where the comma fell, and here they are different inputs at
+## different fold positions.
+static func _mix(x: int, y: int, m: int, w: int, h0: int) -> int:
+	var h: int = h0
+	h = ((h * 31) + x) & 0x7FFFFFFF
+	h = ((h * 31) + y) & 0x7FFFFFFF
+	h = ((h * 31) + m) & 0x7FFFFFFF
+	h = ((h * 31) + w) & 0x7FFFFFFF
+	return h
 
 
 func _dig_term(col: int) -> Vector2i:
