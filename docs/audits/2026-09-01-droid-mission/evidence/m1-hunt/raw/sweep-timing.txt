@@ -1,0 +1,39 @@
+=== Suite-timing cross-check ===
+
+Data source: CI suite-timing artifact from the most recent successful run on main
+Provenance: gh run list --branch main --status success --limit 5
+
+Recent successful runs:
+  33545020795 harness 2026-09-01T18:40:27Z
+  33535391405 harness 2026-09-01T17:02:16Z
+  33532949055 harness 2026-09-01T16:38:02Z
+  33530055624 harness 2026-09-01T16:08:55Z
+  33528790045 harness 2026-09-01T15:56:10Z
+
+Downloading suite-timing artifact from run 33545020795...
+Downloaded suite_timing.txt from run 33545020795
+
+=== Suite timings ===
+run_suites: slowest suites:
+    245 res://tests/test_reveal_spawn_bounds.gd
+    243 res://tests/test_body_fuzz_regression_d0122.gd
+    66 res://tests/test_cave_passes.gd
+    57 res://tests/test_ore_bodies.gd
+    45 res://tests/test_shaft_generator.gd
+    33 res://tests/test_replay_determinism.gd
+run_suites: 62 passed, 0 failed, of 62 in 330s (jobs=4)
+
+Timings examined: 6
+Re-derive: grep -c 'res://tests/' suite_timing.txt
+
+=== Outlier criterion: suites with timing < 1 second ===
+Criterion: a suite timing of 0 seconds or under 1 second is a lead
+(a suite that asserts nothing runs suspiciously fast).
+
+Outliers (timing < 1s):
+
+=== Assessment ===
+The suite-timing cross-check looks for suspiciously fast suites as
+vacuous-green leads. The outlier criterion is: suite timing of 0 seconds
+or under 1 second (a suite that asserts nothing runs suspiciously fast).
+The full Godot suite is never run locally; timing data comes from CI.

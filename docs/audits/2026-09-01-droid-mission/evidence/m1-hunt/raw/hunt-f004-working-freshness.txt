@@ -1,0 +1,8 @@
+=== Running check_working_freshness.py with docs/WORKING.md absent ===
+check_working_freshness: docs/WORKING.md does not exist -- nothing to check.
+exit code: 0
+---
+=== Running check_working_freshness.py with docs/WORKING.md present ===
+check_working_freshness: docs/WORKING.md states 2026-09-01, HEAD's commit is dated 2026-09-01
+check_working_freshness: PASS
+exit code: 0

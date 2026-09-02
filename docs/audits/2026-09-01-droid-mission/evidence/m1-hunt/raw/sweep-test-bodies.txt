@@ -1,0 +1,53 @@
+Population: 64 test_*.gd files at the pin
+Re-derive: git -C /Users/thondascully/Projects/sinkforge ls-tree -r --name-only 70f8a785 -- tests | grep -cE 'test_.*\.gd$'
+
+No vacuous-pass shape hits found in test bodies.
+
+=== TestBase.over() guard verification ===
+
+tests/test_base.gd:80-84 (static func over):
+  80: static func over(count: int, condition: bool, label: String) -> Array:
+  81: 	if count <= 0:
+  82: 		return [false, "VACUOUS -- \"%s\" was asserted over %d item(s), which is true by construction "
+  83: 			% [label, count] + "whatever the code does. The population is the bug, not the assertion."]
+  84: 	return [condition, "%s (over %d item(s))" % [label, count]]
+
+Guard semantics: over(count, condition, label)
+  if count <= 0: return [false, 'VACUOUS -- ...']
+  The guard FIRES on empty population (returns false, refusing the assertion).
+  This is a static PURE function (no call state, no tail-call skip).
+
+Call sites of over(): 14
+  tests/test_base.gd:69  var verdict: Array = over(count, condition, label)
+  tests/test_base.gd:78  ## matters is `over(0, true, ...)` -- a condition that WOULD have passed, refused because it had nothing
+  tests/test_empty_population_guard.gd:3  ## Mutation tests for `test_base.gd`'s `over()` / `_check_over()`, D0245.
+  tests/test_empty_population_guard.gd:10  ## THE BRANCH THAT MATTERS is `over(0, true, ...)`: a condition that WOULD have passed, refused because
+  tests/test_empty_population_guard.gd:30  var verdict: Array = over(0, true, "every star is above the horizon")
+  tests/test_empty_population_guard.gd:33  var negative: Array = over(-3, true, "a negative count is not a population either")
+  tests/test_empty_population_guard.gd:41  _check(bool(over(42, true, "x")[0]),
+  tests/test_empty_population_guard.gd:43  _check(not bool(over(42, false, "x")[0]),
+  tests/test_empty_population_guard.gd:45  _check(bool(over(1, true, "x")[0]),
+  tests/test_empty_population_guard.gd:52  var vacuous: String = String(over(0, true, "the field scatters")[1])
+  ... and 4 more
+
+=== Guard-fires evidence: test_empty_population_guard.gd ===
+  tests/test_empty_population_guard.gd:3  ## Mutation tests for `test_base.gd`'s `over()` / `_check_over()`, D0245.
+  tests/test_empty_population_guard.gd:10  ## THE BRANCH THAT MATTERS is `over(0, true, ...)`: a condition that WOULD have passed, refused because
+  tests/test_empty_population_guard.gd:26  ## THE POINT OF THE WHOLE FILE. `true` is the value a vacuous assertion actually produces -- `all()` over
+  tests/test_empty_population_guard.gd:30  var verdict: Array = over(0, true, "every star is above the horizon")
+  tests/test_empty_population_guard.gd:33  var negative: Array = over(-3, true, "a negative count is not a population either")
+  tests/test_empty_population_guard.gd:41  _check(bool(over(42, true, "x")[0]),
+  tests/test_empty_population_guard.gd:43  _check(not bool(over(42, false, "x")[0]),
+  tests/test_empty_population_guard.gd:45  _check(bool(over(1, true, "x")[0]),
+  tests/test_empty_population_guard.gd:49  ## A vacuous pass and a real failure are different bugs and must not read alike in a log. Someone
+  tests/test_empty_population_guard.gd:52  var vacuous: String = String(over(0, true, "the field scatters")[1])
+  tests/test_empty_population_guard.gd:53  var real: String = String(over(9, false, "the field scatters")[1])
+  tests/test_empty_population_guard.gd:54  _check(vacuous.contains("VACUOUS") and vacuous.contains("0 item"),
+  tests/test_empty_population_guard.gd:55  "the empty verdict names itself and its count: %s" % vacuous.substr(0, 60))
+  tests/test_empty_population_guard.gd:56  _check(not real.contains("VACUOUS") and real.contains("over 9 item"),
+  tests/test_empty_population_guard.gd:57  "a genuine failure does NOT say VACUOUS, and reports the population it ranged over: %s" % real)
+  tests/test_empty_population_guard.gd:58  _check(vacuous.contains("the field scatters"),
+  tests/test_empty_population_guard.gd:66  _check_over(3, true, "_check_over defers to over() and passes a real population")
+  tests/test_empty_population_guard.gd:68  _check_over(0, true, "this line is EXPECTED to fail -- it is the guard firing on purpose")
+  tests/test_empty_population_guard.gd:92  _check(not bool(over(fuzz_total_ticks(empty_sweep), true, "zero 'deadlock' violations")[0]),
+exit code: 0

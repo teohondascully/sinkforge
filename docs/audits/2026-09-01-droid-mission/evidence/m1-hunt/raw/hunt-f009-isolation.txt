@@ -1,0 +1,30 @@
+=== test_isolation_check.py: raw-text approach (no YAML parse) ===
+
+--- Source: how the workflow is read ---
+40:    lines = workflow.read_text(encoding="utf-8").splitlines()
+
+--- Source: the regex approach ---
+29:GODOT_SUITE_RE = re.compile(r"godot")
+30:SUITE_RE = re.compile(r"res://tests/\S+\.gd")
+31:WRAPPER_RE = re.compile(r"run_gd_test\.sh|run_suites\.sh")
+45:        if not GODOT_SUITE_RE.search(line):
+47:        if not SUITE_RE.search(line):
+49:        if WRAPPER_RE.search(line):
+
+=== Running test_isolation_check.py at the pin ===
+test_isolation: VOID -- no harness.yml found.
+
+=== Mitigation: check_suite_coverage.py uses YAML parse ===
+19:colon ("test_interface (L2 is a door: observe() is pure...)") made `harness.yml` invalid YAML; GitHub
+32:import yaml
+83:        yaml.safe_load(text)
+84:    except yaml.YAMLError as exc:
+87:        print(f"check_suite_coverage: FAIL - {workflow.name} is not valid YAML{at}: "
+
+=== Assessment ===
+test_isolation_check.py reads harness.yml as raw text (read_text +
+splitlines, no YAML parser). An unparseable harness.yml would still
+scan clean because the regex would still match lines. Mitigated by
+check_suite_coverage.py's YAML parse in the same CI job (D0217):
+if harness.yml is invalid YAML, check_suite_coverage.py fails first.
+Not the seventh; a disclosed and mitigated weakness.

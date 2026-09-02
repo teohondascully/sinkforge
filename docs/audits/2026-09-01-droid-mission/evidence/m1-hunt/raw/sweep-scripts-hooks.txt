@@ -1,0 +1,244 @@
+=== Capture/wait/probe + hooks sweep ===
+Population:
+  tools/ .sh/.gd files: 19 total
+  Non-test tools/ .sh/.gd: 13
+  .githooks/ files: 2 (commit-msg, pre-commit)
+  NO pre-push: 0 (confirmed absent)
+
+Minimum scanned set (per VAL-HUNT-010):
+  tools/capture_moments.sh
+  tools/capture_colour_guard.sh
+  tools/check_headed_boot.sh
+  tools/surface_row.sh
+  tools/probe_facing_flip.gd
+  .githooks/commit-msg
+  .githooks/pre-commit
+
+=== Per-file scan ===
+
+--- tools/capture_moments.sh ---
+  [ -n ... ] guards (skip on absence):
+43:if [ -n "$BITE" ]; then
+57:if [ -n "$SKY" ]; then
+157:	if [ -n "$TICKS" ]; then
+213:	# D0316: THIS USED TO FAIL OPEN. The condition was `[ -n "$colours" ] && [ "$colours" -lt ... ]`, so
+231:		[ -n "$log" ] && rm -f "$log"
+  || true swallows:
+228:NEW_COUNT="$(printf '%s\n' "$NEW_LOGS" | grep -c . || true)"
+  grep-on-output verdicts (grep -q):
+165:	if printf '%s\n' "$out" | grep -q "is blank or"; then
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+
+--- tools/capture_colour_guard.sh ---
+  [ -n ... ] guards (skip on absence):
+12:#     if [ -n "$colours" ] && [ "$colours" -lt "$MIN_COLOURS" ]; then ... fail
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+    (none)
+  exit 0 on absent/empty:
+58:	return 0
+  wait/timeout patterns:
+
+--- tools/check_headed_boot.sh ---
+  [ -n ... ] guards (skip on absence):
+64:			[ -n "$log" ] && rm -f "$log"
+  || true swallows:
+61:	count="$(printf '%s\n' "$new" | grep -c . || true)"
+  grep-on-output verdicts (grep -q):
+90:if printf '%s\n' "$out_a" | grep -qF "$AGENT_DONE"; then
+109:if printf '%s\n' "$out_b" | grep -qF "$AGENT_DONE"; then
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+
+--- tools/surface_row.sh ---
+  [ -n ... ] guards (skip on absence):
+    (none)
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+    (none)
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+
+--- tools/probe_facing_flip.gd ---
+  [ -n ... ] guards (skip on absence):
+    (none)
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+    (none)
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+45:	await RenderingServer.frame_post_draw
+46:	await RenderingServer.frame_post_draw
+
+--- tools/run_gd_test.sh ---
+  [ -n ... ] guards (skip on absence):
+    (none)
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+52:if ! printf '%s\n' "SCRIPT ERROR: Out of bounds get index" | grep -q "SCRIPT ERROR:"; then
+57:if printf '%s\n' "ERROR: a deliberate push_error call" | grep -q "SCRIPT ERROR:"; then
+66:if ! printf '%s\n' "$ENGINE_CRASH_SAMPLE" | grep -A1 "^ERROR: " | grep -E "^[[:space:]]*at: " | grep -qv "^[[:space:]]*at: push_error "; then
+71:if printf '%s\n' "$PUSH_ERROR_SAMPLE" | grep -A1 "^ERROR: " | grep -E "^[[:space:]]*at: " | grep -qv "^[[:space:]]*at: push_error "; then
+87:if printf '%s\n' "$OUT" | grep -q "SCRIPT ERROR:"; then
+91:if printf '%s\n' "$OUT" | grep -A1 "^ERROR: " | grep -E "^[[:space:]]*at: " | grep -qv "^[[:space:]]*at: push_error "; then
+95:if ! printf '%s\n' "$OUT" | grep -q "^ALL PASS"; then
+  exit 0 on absent/empty:
+6:# and exit 0 even after a real runtime crash mid-suite. GDScript has no try/catch -- an uncaught runtime
+  wait/timeout patterns:
+13:# instead of continuing -- already mitigated by this project's own CI `timeout-minutes`, and a real, loud
+
+--- tools/run_suites.sh ---
+  [ -n ... ] guards (skip on absence):
+80:    [ -n "$line" ] || continue
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+7:# WHY EXIT CODE AND NOT OUTPUT MATCHING. The obvious check is `grep -q 'ALL PASS'`, and it is wrong in
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+
+--- tools/run_local_battery.sh ---
+  [ -n ... ] guards (skip on absence):
+51:	[ -n "$gate" ] && GATES+=("$gate")
+65:	[ -n "$label" ] || label="$(printf '%s' "$gate" | head -1)"
+83:	[ -n "$line" ] && SUITES+=("$line")
+  || true swallows:
+97:		grep -E "^[[:space:]]+>" "$LOG" || true
+  grep-on-output verdicts (grep -q):
+    (none)
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+
+--- tools/check_trailers.sh ---
+  [ -n ... ] guards (skip on absence):
+104:if [ -n "${CI:-}" ]; then
+114:	if [ -n "$hooks_path" ]; then
+  || true swallows:
+111:	hooks_path="$(git config --get core.hooksPath || true)"
+151:hits="$(printf '%s' "$dirty" | grep -c . || true)"
+  grep-on-output verdicts (grep -q):
+53:if printf '%s\n' "$probe" | grep -qiE "$PATTERN"; then
+61:printf '%s\n' "a message with no trailer at all" | grep -qiE "$PATTERN"
+70:	printf '%s\n' "$form" | grep -qiE "$PATTERN"
+  exit 0 on absent/empty:
+181:	exit 0
+  wait/timeout patterns:
+
+--- tools/check_base_namespace.sh ---
+  [ -n ... ] guards (skip on absence):
+111:if [ -n "$(collisions_in "$_ctl_dir/bad.gd")" ]; then
+135:	[ -n "$_hits" ] && bad="$bad
+155:if [ -n "$bad" ]; then
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+91:		printf '%s\n%s\n' "$base_vars" "$base_funcs" | grep -qx "$_ci_n" \
+95:		printf '%s\n' "$base_vars" | grep -qx "$_ci_n" \
+132:	head -1 "$f" | grep -q 'test_base\.gd' || continue
+150:		head -1 "$f" | grep -q 'test_base\.gd' || printf '    %s\n' "$f" >&2
+  exit 0 on absent/empty:
+166:exit 0
+  wait/timeout patterns:
+
+--- tools/check_fork_completion.sh ---
+  [ -n ... ] guards (skip on absence):
+    (none)
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+    (none)
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+
+--- tools/gate_status.py ---
+  [ -n ... ] guards (skip on absence):
+    (none)
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+    (none)
+  exit 0 on absent/empty:
+10:that has been advisory (exit 0 unconditionally) since it was written. Both are the same failure: declared
+395:    return 0
+  wait/timeout patterns:
+
+--- tools/gate_status_ci.py ---
+  [ -n ... ] guards (skip on absence):
+    (none)
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+    (none)
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+35:            cwd=ROOT, capture_output=True, text=True, timeout=30,
+53:            cwd=ROOT, capture_output=True, text=True, timeout=30,
+83:            ["bash", "-c", cmd], cwd=ROOT, capture_output=True, text=True, timeout=120
+
+--- tools/spot_audit.sh ---
+  [ -n ... ] guards (skip on absence):
+    (none)
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+    (none)
+  exit 0 on absent/empty:
+  wait/timeout patterns:
+
+--- .githooks/commit-msg ---
+  [ -n ... ] guards (skip on absence):
+    (none)
+  || true swallows:
+    (none)
+  grep-on-output verdicts (grep -q):
+21:if grep -qiE "$PATTERN" "$msg_file"; then
+46:if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^(core|sim)/'; then
+48:	if git diff --cached --name-only --diff-filter=ACMR | grep -qx 'docs/DECISIONS_LEDGER.md'; then
+51:		if comm -13 <(printf '%s\n' "$old_numbers") <(printf '%s\n' "$staged_numbers") | grep -q .; then
+56:		if ! grep -qiE '^[[:space:]]*no-ledger-entry:' "$msg_file"; then
+  exit 0 on absent/empty:
+68:exit 0
+  wait/timeout patterns:
+
+--- .githooks/pre-commit ---
+  [ -n ... ] guards (skip on absence):
+85:if [ -n "$files" ]; then
+108:if [ -n "$bad" ]; then
+122:if [ -n "$fmt_files" ]; then
+  || true swallows:
+26:want="$(git config --local user.email 2>/dev/null || true)"
+  grep-on-output verdicts (grep -q):
+63:if git diff --cached --name-only --diff-filter=ACM -- '*.gd' | grep -q .; then
+  exit 0 on absent/empty:
+10:# the final `exit 0`, and then still dead because the mojibake section below opens with
+11:# `[ -z "$files" ] && exit 0`, so a commit staging none of the types it scans returned before reaching it.
+44:# `[ -z "$files" ] && exit 0`, and an early return taken for an unrelated reason silently skips every
+134:exit 0
+  wait/timeout patterns:
+
+=== Untracked-but-permanent gate-or-test-shaped files ===
+Checking for untracked files matching test_/check_/gate_/capture_/probe_ prefixes:
+(none found: grep exit 1 is PASS per C10)
+
+Known baseline: tests/body/recordings/reveal_play_2026-09-01T16-32-34.log
+  matches none of the prefixes (reveal_play_ does not match test_/check_/gate_/capture_/probe_)
+  and is off-limits per AGENTS.md.
+
+=== Triage ===
+capture_moments.sh: already guarded (D0316, capture_colour_guard.sh + test_capture_moments.sh)
+capture_colour_guard.sh: already guarded (the guard itself, D0316)
+check_headed_boot.sh: fail-closed (MIN_COLOURS floor, agent-mode discriminator)
+surface_row.sh: fail-closed (exits non-zero on failure)
+probe_facing_flip.gd: partial (HUNT-F010, runs outside wrapper, hang caught by timeout)
+run_gd_test.sh: already guarded (D0115/D0116, detector controls)
+run_suites.sh: already guarded (D0262, exit-code-only, zero-suite refusal)
+run_local_battery.sh: HUNT-F002 (gate drop, GATE_FAILED not in exit code)
+check_trailers.sh: already guarded (shallow-clone refusal, 100-commit floor)
+check_base_namespace.sh: already guarded (floors + population reconciliation)
+commit-msg: fail-closed (refuses trailers, requires ledger entry)
+pre-commit: HUNT-F006 (base-namespace block silent no-op if check_base_namespace.sh missing)

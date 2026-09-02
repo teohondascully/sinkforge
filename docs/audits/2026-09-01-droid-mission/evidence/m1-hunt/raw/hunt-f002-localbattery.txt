@@ -1,0 +1,5 @@
+run_local_battery: 1 gate step(s) FAILED -- CI will fail the same way
+run_local_battery: 62/62 passed
+EXIT_CODE=0
+exit code: 0
+---

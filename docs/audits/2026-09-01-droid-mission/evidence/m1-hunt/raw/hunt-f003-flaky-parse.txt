@@ -1,0 +1,11 @@
+SUITE_RE matches against run_suites.sh stdout: 0
+  (expected 0: run_suites.sh writes verdicts to .result files, not stdout)
+SUITE_RE matches against expected format: 1
+  (expected 1: the regex IS correct for the format run_suites.sh never emits)
+
+Exit code path: parse_suites() returns empty -> 'continue' ->
+  suites absent from one run are never compared across runs.
+  Today: all runs parse zero -> VOID -> exit 2 (fail-closed by luck).
+  One format change away from quiet green: if run_suites.sh ever printed
+  the dotted format, partial parses would silently reconcile.
+exit code: 0

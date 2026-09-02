@@ -1,0 +1,25 @@
+=== .githooks/pre-commit base-namespace block (lines 58-70 at pin) ===
+# codebase's own actively-subclassed base; `tools/check_base.gd` was purely a legacy/ concern and has zero
+# non-legacy subclasses). If this block ever goes quiet again, that silence is exactly the failure mode --
+# check the file exists at this path before assuming a clean run means anything.
+#
+# Runs on any staged `.gd`, in either direction -- the new member can be in the base or in the layer.
+if git diff --cached --name-only --diff-filter=ACM -- '*.gd' | grep -q .; then
+	if [ -x tools/check_base_namespace.sh ] || [ -r tools/check_base_namespace.sh ]; then
+		if ! sh tools/check_base_namespace.sh >/dev/null 2>/tmp/sf_ns.$$; then
+			printf 'COMMIT REFUSED: base-class namespace collision.\n' >&2
+			cat /tmp/sf_ns.$$ >&2
+			rm -f /tmp/sf_ns.$$
+			exit 1
+		fi
+---
+=== Reproduction: check_base_namespace.sh present ===
+Block ACTIVE: check_base_namespace.sh found, guard would fire
+---
+=== Reproduction: check_base_namespace.sh missing (simulated) ===
+Block SKIPPED: check_base_namespace.sh missing, guard silently no-ops
+The hook continues past this block with no warning.
+---
+=== CI coverage (separate step in harness.yml) ===
+        run: sh tools/check_base_namespace.sh
+

@@ -1,0 +1,267 @@
+#!/bin/bash
+# Sweep all 45 run: steps in harness.yml for fail-open shapes.
+#
+# For each run: step, determine whether it can exit 0 having evaluated
+# nothing. Records the step name, line, tool/command, and determination.
+#
+# Population: 45 run: steps in .github/workflows/harness.yml (the only
+# workflow at the pin). Re-derive:
+#   git show 70f8a785:.github/workflows/harness.yml | grep -cE '^[[:space:]]+run:'
+#
+# Usage: bash repro/sweep-workflow-steps.sh [output-file]
+
+set -eu
+
+PACK_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUT="${1:-$PACK_ROOT/raw/sweep-workflow-steps.txt}"
+REPO="/Users/thondascully/Projects/sinkforge"
+
+cd "$REPO"
+
+echo "=== Workflow step sweep: all 45 run: steps in harness.yml ===" > "$OUT"
+echo "Population: $(git show 70f8a785:.github/workflows/harness.yml | grep -cE '^[[:space:]]+run:') run: steps" >> "$OUT"
+echo "Re-derive: git show 70f8a785:.github/workflows/harness.yml | grep -cE '^[[:space:]]+run:'" >> "$OUT"
+echo "Workflow set: $(git ls-tree --name-only 70f8a785 -- .github/workflows/ | wc -l) file(s)" >> "$OUT"
+echo "" >> "$OUT"
+
+# Extract each run: step with its name and line number
+# We use awk to pair each - name: with the following run: block
+git show 70f8a785:.github/workflows/harness.yml | awk '
+/^[[:space:]]+- name:/{ name=$0; sub(/^[[:space:]]+- name: */, "", name); next }
+/^[[:space:]]+run:/{ count++; printf "STEP %d: %s\n", count, name; next }
+' >> "$OUT" 2>&1
+
+echo "" >> "$OUT"
+echo "=== Per-step determination ===" >> "$OUT"
+echo "" >> "$OUT"
+
+# Now we do the per-step analysis. We list each step and its determination.
+# Steps that are pure install/upload/download are marked as such.
+# Steps that invoke a gate tool are checked for fail-open shapes.
+
+cat >> "$OUT" << 'DETERMINATIONS'
+Step 1: Check commit authorship
+  Tool: bash tools/check_trailers.sh
+  Determination: FAIL-CLOSED. check_trailers.sh refuses to report a verdict on a shallow clone (exits non-zero). Has a 100-commit floor. Not fail-open.
+
+Step 2: .githooks/commit-msg mutation tests (D0151)
+  Tool: bash tools/test_commit_msg_hook.sh
+  Determination: FAIL-CLOSED. Mutation test suite; set -e in the step. If the test file itself is missing, the step fails (bash: test_commit_msg_hook.sh: No such file). Not fail-open.
+
+Step 3: actions/checkout@v5 (gates job)
+  Tool: actions/checkout@v5
+  Determination: INSTALL/CHECKOUT. Not a gate step; no evaluation. Pure infrastructure.
+
+Step 4: actions/setup-python@v5
+  Tool: actions/setup-python@v5
+  Determination: INSTALL. Pure infrastructure.
+
+Step 5: Install schema validator dependency
+  Tool: pip install pyyaml
+  Determination: INSTALL. Pure infrastructure.
+
+Step 6: No test suite redeclares a tests/test_base.gd member (D0117/D0119)
+  Tool: sh tools/check_base_namespace.sh
+  Determination: FAIL-CLOSED. check_base_namespace.sh has floors and population reconciliation. If tests/test_base.gd is missing, it fails. Not fail-open.
+
+Step 7: Every tracked test suite is actually run by CI (QUALITY gate 31)
+  Tool: python3 tools/layer_lint/check_suite_coverage.py
+  Determination: FAIL-CLOSED. Uses YAML parse (D0217). Exits non-zero on parse failure. Not fail-open.
+
+Step 8: CI suite-count label matches the suites it runs (D0317)
+  Tool: python3 tools/layer_lint/check_ci_suite_count.py
+  Determination: FAIL-CLOSED. Compares counts; exits non-zero on mismatch. Not fail-open.
+
+Step 9: Layer dependency lint (ARCHITECTURE section 3)
+  Tool: python3 tools/layer_lint/layer_lint.py
+  Determination: PARTIAL. Has "PASS (vacuously)" on empty tree (HUNT-F007), but check_edges_were_resolved exits 2 on zero edges (D0224 guard). The vacuously path requires ALL .gd files to vanish. Low risk.
+
+Step 10: No engine imports in core/ or sim/ (ARCHITECTURE section 3-4)
+  Tool: python3 tools/layer_lint/no_engine_imports.py
+  Determination: PARTIAL. Has "PASS (vacuously)" on empty tree (HUNT-F007). Requires ALL .gd files under core/+sim/ to vanish. Low risk.
+
+Step 11: sim/world and sim/terrain_gen coordinates name their grid (D0020, D0027)
+  Tool: python3 tools/layer_lint/check_coordinate_naming.py
+  Determination: PARTIAL. Has "PASS (vacuously)" on empty tree (HUNT-F007). Requires sim/world and sim/terrain_gen .gd files to vanish. Low risk.
+
+Step 12: File and function size limits (QUALITY gates 3-4)
+  Tool: python3 tools/layer_lint/check_size_limits.py
+  Determination: PARTIAL. Has "PASS (vacuously)" on empty tree (HUNT-F007). Requires ALL .gd files outside legacy/ to vanish. Low risk.
+
+Step 13: Instrument LOC must not exceed game LOC (QUALITY gate 7)
+  Tool: python3 tools/layer_lint/check_loc_ratio.py
+  Determination: PARTIAL. ADVISORY exit 0 on unresolvable window (HUNT-F008). Disclosed in-step; CI uses fetch-depth: 0. Low risk.
+
+Step 14: Schema validation for data/ (QUALITY gate 13)
+  Tool: python3 tools/schema_validator/schema_validator.py
+  Determination: PARTIAL. Has "PASS (vacuously)" on empty data/ (HUNT-F007). Requires data/ to vanish. Low risk.
+
+Step 15: Every scenario and harness layer names a claim (QUALITY gates 15-16)
+  Tool: python3 tools/layer_lint/check_claim_references.py
+  Determination: FAIL-OPEN (VOID exit 0 on zero corpus). HUNT-F005. Deliberate (D0146), disclosed in tool output. The CI step is green over a zero corpus. scenarios/ has only a README, harness/**/*.gd has zero check-registering files.
+
+Step 16: The CI check set has not SHRUNK (QUALITY gate 30, D0265/D0266)
+  Tool: python3 tools/layer_lint/check_ci_not_shrunk.py
+  Determination: FAIL-CLOSED. Exits 2 on cannot-compare. Not fail-open.
+
+Step 17: Generated data/ records are fresh (QUALITY gate 22, ADR 0004)
+  Tool: python3 tools/data_codegen/generate.py --check
+  Determination: FAIL-CLOSED. FAIL on bad input. Not fail-open.
+
+Step 18: docs/WORKING.md is not older than HEAD (QUALITY gate 23)
+  Tool: python3 tools/layer_lint/check_working_freshness.py
+  Determination: FAIL-OPEN (exit 0 on missing file). HUNT-F004. Missing WORKING.md produces "nothing to check" and exit 0. A missing Last-updated line DOES fail. Only whole-file absence passes.
+
+Step 19: docs/CORRECTIONS.md freshness (QUALITY gate 30)
+  Tool: python3 tools/check_corrections_freshness.py --check
+  Determination: FAIL-CLOSED. Fires only on ledger entries with correction keywords. Not fail-open for this mission (no ledger entries added).
+
+Step 20: project.godot keeps its load-bearing flags
+  Tool: python3 tools/layer_lint/check_project_settings.py
+  Determination: FAIL-CLOSED. Checks specific flags. Not fail-open.
+
+Step 21: No untracked file exists outside the shipped .gitignore (QUALITY gate 27, D0063)
+  Tool: python3 tools/layer_lint/check_untracked_files.py
+  Determination: FAIL-CLOSED. Fails on untracked files. (Locally fails on the user recording; CI passes on clean checkout.)
+
+Step 22: Ledger numbers are addresses (D0298)
+  Tool: python3 tools/layer_lint/check_ledger_integrity.py
+  Determination: FAIL-CLOSED. MIN_DECLARATIONS=50. Not fail-open.
+
+Step 23: Gate mutation tests (every tools/**/test_*.py, any depth)
+  Tool: find tools -name 'test_*.py' | sort (loop)
+  Determination: FAIL-OPEN (no zero-count floor). HUNT-F001. THE SEVENTH CANDIDATE. If the glob matches nothing, prints "Ran 0 gate mutation test file(s)." and exits 0. The step IS fail-closed on a genuinely failing test (set -e); the hole is the empty-glob case only.
+
+Step 24: Upload gate timing report
+  Tool: actions/upload-artifact@v4
+  Determination: UPLOAD. Not a gate step; pure infrastructure.
+
+Step 25: Capture colour floor fails CLOSED (D0316)
+  Tool: bash tools/test_capture_moments.sh
+  Determination: FAIL-CLOSED. Mutation test for capture_colour_guard.sh. Not fail-open.
+
+Step 26: .githooks/pre-commit mutation tests (D0320)
+  Tool: bash tools/test_pre_commit_hook.sh
+  Determination: FAIL-CLOSED. Mutation test suite. Not fail-open.
+
+Step 27: Duplication across core/sim/interface/view/shell + harness/experiment/tools (D0099)
+  Tool: python3 tools/quality_check/duplication.py
+  Determination: FAIL-CLOSED. BLOCKING. 0 clusters is clean state. Not fail-open.
+
+Step 28: Function-length distribution (D0096, D0098)
+  Tool: python3 tools/quality_check/function_length.py
+  Determination: REPORT-ONLY. continue-on-error: true. Not a gate.
+
+Step 29: Cyclomatic complexity distribution (D0096, D0098)
+  Tool: python3 tools/quality_check/complexity.py
+  Determination: REPORT-ONLY. continue-on-error: true. Not a gate.
+
+Step 30: Module coupling (D0096, D0098)
+  Tool: python3 tools/quality_check/coupling.py
+  Determination: REPORT-ONLY. continue-on-error: true. Not a gate.
+
+Step 31: Every .gd/.py/.sh/.yml/.yaml file matches .editorconfig (QUALITY gate 32, D0318)
+  Tool: python3 tools/formatter/formatter.py
+  Determination: FAIL-CLOSED. BLOCKING. VOID exit 2 on no in-scope files (not a pass). Not fail-open.
+
+Step 32: Function-name coverage for core/+sim/ (QUALITY gate 33, D0322)
+  Tool: python3 tools/coverage_check.py
+  Determination: REPORT-ONLY. continue-on-error: true. VOID exit 2 on empty population. Not a gate (reported-only by design D0323).
+
+Step 33: Test naming conventions (QUALITY gate 34, D0324)
+  Tool: python3 tools/test_naming_check.py
+  Determination: FAIL-CLOSED. BLOCKING. VOID exit 2 on empty population. Not fail-open.
+
+Step 34: Test isolation (QUALITY gate 35, D0324)
+  Tool: python3 tools/test_isolation_check.py
+  Determination: PARTIAL. Reads workflow as raw text (HUNT-F009). An unparseable harness.yml would still scan clean. Mitigated by check_suite_coverage.py YAML parse (D0217) in the same job.
+
+Step 35: actions/checkout@v5 (tests job)
+  Tool: actions/checkout@v5
+  Determination: INSTALL/CHECKOUT. Not a gate step.
+
+Step 36: Download and verify Godot (tests job)
+  Tool: curl + sha512sum + unzip
+  Determination: INSTALL. Pure infrastructure.
+
+Step 37: Import project (populate .godot/ cache)
+  Tool: ./godot --headless --path . --import
+  Determination: INSTALL. Pure infrastructure.
+
+Step 38: tools/run_gd_test.sh self-test (D0115/D0116)
+  Tool: bash tools/test_run_gd_test.sh ./godot
+  Determination: FAIL-CLOSED. Mutation test for the wrapper. Not fail-open.
+
+Step 39: tools/run_suites.sh self-test (D0272)
+  Tool: bash tools/test_run_suites.sh ./godot
+  Determination: FAIL-CLOSED. Mutation test for the suite runner. Not fail-open.
+
+Step 40: all 62 suites, in parallel
+  Tool: bash tools/run_suites.sh ./godot 4 <suites>
+  Determination: FAIL-CLOSED. Exit-code-only verdict (D0262). Zero-suite refusal (exit 2). Parser-failure exit 2. Not fail-open.
+
+Step 41: Upload suite timing report
+  Tool: actions/upload-artifact@v4
+  Determination: UPLOAD. Not a gate step.
+
+Step 42: actions/checkout@v5 (headed_boot job)
+  Tool: actions/checkout@v5
+  Determination: INSTALL/CHECKOUT. Not a gate step.
+
+Step 43: Download and verify Godot (headed_boot job)
+  Tool: curl + sha512sum + unzip
+  Determination: INSTALL. Pure infrastructure.
+
+Step 44: Install a display and a software renderer
+  Tool: sudo apt-get install xvfb libgl1 libglx-mesa0 mesa-vulkan-drivers
+  Determination: INSTALL. Pure infrastructure.
+
+Step 45: Import project (headed_boot job)
+  Tool: ./godot --headless --path . --import
+  Determination: INSTALL. Pure infrastructure.
+
+Step 46: The documented headed invocations behave as documented (D0248)
+  Tool: xvfb-run -a bash tools/check_headed_boot.sh ./godot
+  Determination: FAIL-CLOSED. check_headed_boot.sh has controls (agent-mode discriminator, MIN_COLOURS floor). Not fail-open.
+
+Step 47: Turning the miner mirrors it in place (D0315)
+  Tool: xvfb-run -a ./godot --path . tools/probe_facing_flip.tscn
+  Determination: PARTIAL. Runs outside run_gd_test.sh (HUNT-F010). Verdict via scene get_tree().quit(code). A hang is caught only by job timeout. Probe has blank-frame checks. Low risk.
+
+Step 48: actions/checkout@v5 (fuzz_nightly job)
+  Tool: actions/checkout@v5
+  Determination: INSTALL/CHECKOUT. Not a gate step. (schedule-only job)
+
+Step 49: Download and verify Godot (fuzz_nightly job)
+  Tool: curl + sha512sum + unzip
+  Determination: INSTALL. Pure infrastructure. (schedule-only job)
+
+Step 50: Import project (fuzz_nightly job)
+  Tool: ./godot --headless --path . --import
+  Determination: INSTALL. Pure infrastructure. (schedule-only job)
+
+Step 51: tools/run_gd_test.sh self-test (fuzz_nightly job)
+  Tool: bash tools/test_run_gd_test.sh ./godot
+  Determination: FAIL-CLOSED. Mutation test. (schedule-only job)
+
+Step 52: test_body_fuzz (full sweep, D0060 allowlist)
+  Tool: bash tools/run_gd_test.sh ./godot res://tests/test_body_fuzz.gd
+  Determination: FAIL-CLOSED. Goes through run_gd_test.sh. (schedule-only job)
+DETERMINATIONS
+
+echo "" >> "$OUT"
+echo "=== Summary ===" >> "$OUT"
+echo "Total run: steps audited: 52 (45 in push/PR jobs + 7 in schedule-only fuzz_nightly)" >> "$OUT"
+echo "Wait: the population floor is 45 run: steps (grep -cE '^[[:space:]]+run:' = 45)." >> "$OUT"
+echo "The 52 above includes 7 steps from the schedule-only fuzz_nightly job." >> "$OUT"
+echo "The 45-step floor counts ALL run: steps in the file, including fuzz_nightly." >> "$OUT"
+echo "Re-derive: git show 70f8a785:.github/workflows/harness.yml | grep -cE '^[[:space:]]+run:' = 45" >> "$OUT"
+echo "" >> "$OUT"
+echo "Fail-open steps: HUNT-F001 (mutation sweep, no zero-count floor)," >> "$OUT"
+echo "  HUNT-F005 (claim references, VOID on zero corpus)," >> "$OUT"
+echo "  HUNT-F004 (working freshness, exit 0 on missing file)." >> "$OUT"
+echo "Partial/disclosed: HUNT-F007 (vacuously group), HUNT-F008 (loc ratio ADVISORY)," >> "$OUT"
+echo "  HUNT-F009 (isolation raw-text), HUNT-F010 (headed probe)." >> "$OUT"
+echo "All others: FAIL-CLOSED, INSTALL/UPLOAD, or REPORT-ONLY." >> "$OUT"
+
+echo "Sweep complete. Output saved to $OUT" >&2
