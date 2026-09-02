@@ -80,6 +80,12 @@ var _layers: Array[PaintLayer] = []
 ## The static painters, held until `bake_static()` decides whether they run once or every frame. See
 ## `add_baked_painter`.
 var _baked_painters: Array[Callable] = []
+
+## Cost of the last `Interface.observe()` call, in microseconds. See `_build_frame`.
+var last_observe_usec: int = 0
+## Cost of the last full `refresh()`, in microseconds — frame build, bake invalidation and every layer's
+## `queue_redraw`, but NOT the layers' own `_draw`, which Godot runs later and `PaintLayer` times itself.
+var last_refresh_usec: int = 0
 var _bake: TerrainBake = null
 ## Painters that keep state, held so they outlive the expression that created them. See
 ## `add_stateful_painter` — nothing reads this array, it exists to be a reference.
@@ -204,6 +210,15 @@ func bake_static(z: int) -> bool:
 
 ## One observation covering `rect`, margined exactly as the per-frame path margins its own. The bake's only
 ## route to world state — see `TerrainBake`'s header for why a chunk cannot reuse the camera's observation.
+## An observation over the current view that DECLINES the wall plane, for a test asserting that the
+## decline actually skips the work rather than merely setting a flag (D0338). Uses this file's own
+## envelope construction so the test measures the real conversion, not a restatement of it.
+func observe_declining_walls() -> Interface.Observation:
+	if _iface == null:
+		return null
+	return _iface.observe(Interface.Envelope.covering(view_world_rect(), WINDOW_MARGIN_CELLS, false))
+
+
 func observe_rect(rect: Rect2) -> Interface.Observation:
 	if _iface == null:
 		return null
@@ -293,6 +308,7 @@ func current_frame() -> Frame:
 func refresh() -> void:
 	if _iface == null:
 		return
+	var began: int = Time.get_ticks_usec()
 	_anim_ticks += 1
 	_frame = _build_frame()
 	# THE BAKE IS TOLD WHAT CHANGED HERE, not at the dig site, and deliberately: a retained target is
@@ -312,12 +328,14 @@ func refresh() -> void:
 	# of one tick differ.
 	if _post != null:
 		_post.set_anim_time(_frame.anim_time)
+	last_refresh_usec = Time.get_ticks_usec() - began
 
 
 ## Per-painter draw cost for the last rendered frame, slowest first. `view/draw_cost.gd` owns the ranking
 ## and the naming; this owns only the layer list it reads. See that file for why a total is not enough.
 func draw_cost_report() -> String:
-	return DrawCost.report(_layers)
+	return "%s | refresh=%.2fms (observe=%.2fms)" % [DrawCost.report(_layers),
+		float(last_refresh_usec) / 1000.0, float(last_observe_usec) / 1000.0]
 
 
 ## The cosmetic clock's current value, in seconds. Monotonic, deterministic in the number of rendered
@@ -339,7 +357,23 @@ func reset_anim_clock() -> void:
 func _build_frame() -> Frame:
 	var f: Frame = Frame.new()
 	var rect: Rect2 = view_world_rect()
-	f.obs = _iface.observe(Interface.Envelope.covering(rect, WINDOW_MARGIN_CELLS))
+	# TIMED SEPARATELY because it is the suspect for the ~13 ms that D0337 measured OUTSIDE the painters
+	# and deliberately did not attribute. `observe` builds a dictionary over the whole window, so it is the
+	# one per-tick cost that still scales with visible area after the painters stopped doing so.
+	var obs_began: int = Time.get_ticks_usec()
+	# THE WALL PLANE IS ASKED FOR ONLY WHEN SOMETHING ON THE PER-FRAME PATH STILL READS IT (D0338).
+	# Its one reader is `WallPainter`, and D0326 normally puts that painter INTO THE BAKE -- where it
+	# draws from the bake's own `observe_rect()`, which still requests the plane. So on the baked path
+	# the per-frame observation was building ~18,900 dictionary lookups a frame for nobody.
+	#
+	# **BUT THE BAKE CAN DECLINE**, and on that path (`bake_static` returning false -- headless, which is
+	# every CI run) `WallPainter` is mounted as an ordinary per-frame layer and reads THIS observation.
+	# Declining unconditionally would make it `push_error` every frame and lose the background plane in
+	# exactly the configuration the suites run under. `_bake` is nulled on decline, so it is the honest
+	# discriminator: ask for walls precisely when the per-frame stack still has a reader for them.
+	var needs_walls: bool = _bake == null
+	f.obs = _iface.observe(Interface.Envelope.covering(rect, WINDOW_MARGIN_CELLS, needs_walls))
+	last_observe_usec = Time.get_ticks_usec() - obs_began
 	f.anim_time = anim_time()
 	f.view_world_rect = rect
 	f.zoom = _camera.zoom.x if _camera != null else 1.0

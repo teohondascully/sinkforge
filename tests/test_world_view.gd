@@ -24,6 +24,7 @@ func _initialize() -> void:
 	_test_the_window_covers_partial_cells_rather_than_truncating()
 	await _test_the_frame_carries_the_ruled_contract()
 	await _test_a_stateful_painter_outlives_the_expression_that_created_it()
+	await _test_the_frame_asks_for_walls_exactly_when_a_per_frame_painter_reads_them()
 	_finish("world_view")
 
 
@@ -198,3 +199,37 @@ func _test_the_frame_carries_the_ruled_contract() -> void:
 	_check(view.view_world_rect().size.x > 0.0,
 		"control: the camera rect itself is non-zero (%s)" % view.view_world_rect().size)
 	view.queue_free()
+
+
+## THE WALL PLANE IS ASKED FOR ONLY WHEN SOMETHING PER-FRAME STILL READS IT (D0338) — and this asserts it
+## THROUGH `WorldView`, not by building an `Envelope` here. That distinction is the whole point: a test
+## that poses its own envelope cannot register a wiring error at the call site it bypassed, which is the
+## same trap D0326's bake test fell into when it passed its own margin and stayed green while the real
+## call site passed zero.
+##
+## **THE COUPLING THIS PROTECTS IS EASY TO GET WRONG IN THE DANGEROUS DIRECTION.** `WallPainter` normally
+## draws from the BAKE's own observation, so the per-frame one need not carry walls — ~18,900 dictionary
+## lookups a frame saved. But `bake_static` DECLINES with no render target, which is every headless CI
+## run, and then `WallPainter` mounts as an ordinary per-frame layer reading THIS observation. Declining
+## unconditionally would make it `push_error` every frame and drop the background plane in exactly the
+## configuration the suites run under — a regression that this suite, running headless, is the one thing
+## positioned to catch.
+func _test_the_frame_asks_for_walls_exactly_when_a_per_frame_painter_reads_them() -> void:
+	var view: WorldView = await _mount()
+	# No `bake_static` call at all, so `_bake` is null exactly as it is on the declined path.
+	view.refresh()
+	var obs: Interface.Observation = view.current_frame().obs
+	_check(obs.has_walls,
+		"with no bake, the per-frame observation carries the wall plane -- WallPainter reads it here")
+	_check(not obs.walls.is_empty(),
+		"and the plane is really built, not just flagged (%d bytes)" % obs.walls.size())
+	# The saving itself: an envelope that declines walls must produce an EMPTY plane, or the flag is
+	# cosmetic and the 4.24 ms this change measured would not exist.
+	var declined: Interface.Observation = view.observe_declining_walls()
+	_check(not declined.has_walls, "an envelope that declines walls says so on the observation")
+	_check(declined.walls.is_empty(),
+		"and builds nothing -- the saving is real, not a flag over a plane still being filled (%d bytes)"
+		% declined.walls.size())
+	_check(not declined.materials.is_empty(),
+		"CONTROL: the MATERIALS plane is still built, so declining walls dropped one plane and not the "
+		+ "observation itself")
