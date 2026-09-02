@@ -13807,3 +13807,75 @@ all 18 assertions passed, which is exactly what that check exists for (D0149's m
 **What this does NOT claim.** That the baked picture matches the per-frame picture (a capture comparison,
 which needs a headed run) and that the bake is measurably faster (a timing layer, which must run alone).
 Both are stated in the suite's own header so a later reader cannot over-read its green.
+
+## D0327 · 2026-09-01 · This build's terrain cell IS legacy's fine cell — so the molded rock ports as shading, not as a subdivision
+
+**THE MEASUREMENT THAT RE-SCOPED THE COMPONENT.** `docs/PORT_ORDER.md` V2 was written to port
+`legacy/scenes/fine_terrain.gd` (1,402 lines) whole. It should not be, and the reason is one comparison:
+
+```
+legacy    32 px = 1 m,  SUBDIV 4  ->  fine cell   8 px = 1/4 metre
+here      16 px = 1 m,               terrain cell 4 px = 1/4 metre
+```
+
+Legacy renders rock on a fine grid it subdivides out of its coarse cell. **This build's terrain cell is
+already at that granularity.** Porting the subdivision would have produced 1/16-metre cells — four times
+finer than legacy ever rendered, at sixteen times the cost — which is D0305's WG-4 regime trap in its
+sharpest form, and it would have been invisible in a screenshot because wrong-scale noise still looks
+like noise.
+
+So the ~435 lines of subdivision bookkeeping (`rebake`, `rebake_region`, `_fine_rect`, `bake_pending`,
+the byte buffer, the fine texture, the progressive fill) do not come over at all. Three of the file's
+five over-limit functions were in that half. What comes over is the SHADING, as
+`view/visuals/rock_tone.gd`.
+
+**AND EVERY FREQUENCY CONSTANT PORTS UNCHANGED, which is the payoff.** Legacy samples its fields at
+fine-cell indices; this file samples at terrain-cell indices. Same physical granularity, so a feature
+legacy calls "~11 fine cells" is ~11 cells here and 2.75 m in both. Nothing is rescaled, so nothing can
+be rescaled wrongly — `tests/test_rock_tone.gd` asserts five of legacy's own feature-size comments and
+one in metres, and a mutant rescaling `GRAIN_FREQ` by 4 is caught.
+
+**THE `grammar:` FIELD HAS BEEN IN `data/materials/*.yaml` SINCE SLICE 0 AND NOTHING HAS EVER READ IT.**
+Seven materials declare one, in two distinct values. `MaterialLook.grammar_of` is the first consumer —
+the same shape as the depth chip before D0271, where the data was entirely present and only the consumer
+was missing. Legacy's argument for why it matters: before grammars existed "every solid material in the
+world ran the identical noise at a different hue", so two materials "read as square variation before
+material" as a structural fact rather than a tuning choice. **No amplitude fixes a layer that cannot tell
+which material it is painting.**
+
+**THE SEAM DIRECTION, WHICH LEGACY SHIPPED BACKWARDS FOR ITS WHOLE FIRST LIFE.** `[3.00, 0.35]` for
+Bedded gave features 3.7 cells wide by 31.7 tall — vertical laminae in the material named for flat ones —
+under a comment asserting the opposite of what the arithmetic did. Legacy's own note on why nothing
+caught it: *"No number the layer prints could see it, because ANISO is disqualified by its own null rig
+and was the one cue that could have registered a direction error."* The check it prescribes is
+arithmetic, not a picture: `1 / (freq * multiplier)` per grammar, read against the sentence.
+`RockTone.seam_feature_cells` exists for that test alone, and the inverted table is a caught mutant.
+
+**TWO DEFECTS FOUND BY THE SUITE, both in my own work.**
+
+1. *The clamp was omitted.* Legacy clamps at its byte write (`fine_terrain.gd:1105`), so the clamp is
+   structural there rather than a choice; ported as a `Color` return it was simply missing, and the
+   additive drift carried channels NEGATIVE — 3,013 of 36,000 samples, worst luma -0.14.
+2. *The first version of that test used an invented fixture.* It swept a hand-written
+   `Color(0.10, 0.11, 0.13)` described as "the darkest shipped rock"; the darkest material this build
+   ships is coal at luma 0.160, and the invented value was darker than anything real. It found a genuine
+   defect anyway, but a bound derived from an invented fixture bounds nothing shipped. Rewritten to read
+   its population out of `MaterialsRecords`: measured, coal is 1.0–1.5% fully black and every other
+   material is 0.0%, so the bound is 3% with headroom rather than 0. Coal rendering black is coal.
+
+**MUTATION-TESTED 6/6, AND THE SIXTH REQUIRED A NEW TEST.** Flattening `GRAM_GRAIN` to `[1,1,1]` left the
+roughness test GREEN, because four other grammar tables still differentiate and that test measures the
+ENSEMBLE — a grammar cue could be silently switched off while the suite reported the grammar working.
+That is this repository's dominant failure class inside the instrument written to catch it.
+`_test_no_grammar_table_is_silently_uniform` names each of the eight tables as its own subject, which no
+measurement over the rendered colour can do because their effects are superimposed.
+
+**WHAT IS DELIBERATELY NOT PORTED YET.** Every term in legacy's `_paint_fine` needing a NEIGHBOUR: the
+carved-edge AO, the rim light, the sky-form gradient, the moss, the hanging tufts and the soil profile.
+All are reachable through `Observation.material_at` and are a follow-up. Keeping them out means every
+term in `rock_tone.gd` is a pure function of `(col, row, grammar)` and is assertable without posing a
+world. The combination and the floor are written so they slot in unchanged.
+
+**The verbatim 1,402-line copy is deleted rather than kept.** `legacy/scenes/fine_terrain.gd` is
+untouched and remains the source; a second copy in `view/` would be a file nothing references, which is
+the `art.gd` trap the migration map names.

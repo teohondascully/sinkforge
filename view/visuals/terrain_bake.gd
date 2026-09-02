@@ -76,6 +76,11 @@ var _painters: Array[Callable] = []
 var _observe: Callable = Callable()
 
 var _look: MaterialLook = null
+## THE BAKED FRAME MUST CARRY EVERYTHING THE LIVE FRAME CARRIES. Held for the same reason `_look` is: a
+## chunk builds its own `Frame`, and a field left null here is a field the baked picture silently lacks
+## while the headless fallback path has it -- two renderers disagreeing, with no gate able to see it
+## because CI only ever runs the fallback. D0327.
+var _tone: RockTone = null
 
 ## The zoom a baked painter sees, PINNED. Baked content is resolution-independent — drawn into world space
 ## once and sampled at whatever zoom the camera later uses — so a zoom-gated detail tier must not vary per
@@ -102,12 +107,13 @@ var _live: bool = false
 ## render target. A bake that silently produced blank pixels would be far worse than one that declines,
 ## because the fallback path is the code that is running today and is known correct.
 func setup(world_cells: Vector2i, cell_px: int, observe: Callable, look: MaterialLook,
-		painters: Array[Callable]) -> bool:
+		tone: RockTone, painters: Array[Callable]) -> bool:
 	if not plan(world_cells, cell_px):
 		return false
 	_painters = painters
 	_observe = observe
 	_look = look
+	_tone = tone
 	if painters.is_empty() or not observe.is_valid() or look == null:
 		return false
 	if DisplayServer.get_name() == "headless":
@@ -227,6 +233,7 @@ func _paint_chunk(ci: CanvasItem, rect: Rect2) -> void:
 	f.view_world_rect = rect
 	f.zoom = BAKE_ZOOM
 	f.look = _look
+	f.tone = _tone
 	f.marks = PackedVector2Array()
 	for paint: Callable in _painters:
 		paint.call(f, ci)

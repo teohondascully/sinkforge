@@ -71,5 +71,11 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 			var material: StringName = frame.obs.material_at(Vector2i(col, row))
 			if material == &"":
 				continue
-			ci.draw_rect(Rect2(col * cell_px, row * cell_px, cell_px, cell_px),
-				frame.look.cell_color(material, col, row), true)
+			var fill: Color = frame.look.cell_color(material, col, row)
+			# THE MOLDED SHADING, D0327. `null` is the pre-port picture -- a flat per-cell fill -- and is
+			# always correct, only flatter; a painter must not be the thing that turns a fixture without a
+			# tone into a crash. The mineral mark is toned along with the matrix here, unlike in the wall
+			# plane where legacy tones only the matrix (`world_renderer.gd:1204`, and D0299 carries why).
+			if frame.tone != null:
+				fill = frame.tone.shade(fill, col, row, frame.look.grammar_of(material))
+			ci.draw_rect(Rect2(col * cell_px, row * cell_px, cell_px, cell_px), fill, true)
