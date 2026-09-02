@@ -10,18 +10,38 @@ design limit; it is unported architecture.
 
 ## Where we are
 
-Measured as the SLOPE between a 200-tick and a 600-tick headed run, so the constant world-generation
-cost cancels rather than being estimated and subtracted.
+**Painters, measured inside the frame by `view/draw_cost.gd` — the number that is trustworthy:**
 
-| | ms/tick | fps | note |
-|---|---|---|---|
-| Before any of this | 64.6 | 15.5 | at the 40 m framing D0335 shipped |
-| After D0336 (veil lightmap) | 17.9 | 56 | veil 41.47 → 3.58 ms |
-| After D0337 (glint sparse cache) | — | — | glint 11.83 → 0.01 ms |
-| After D0338 (wall plane declined) | **15.9** | **63** | observe 10.60 → 6.36 ms |
-| Target | 8.33 | 120 | |
+```
+painters total=4.01ms (budget 8.33ms at 120Hz)
+  veil=2.99  sky=0.97  glint=0.03  bake=0.01  seam=0.01  crumble=0.01  crack=0.00
+refresh=0.05ms (observe=0.03ms)   plane_rebuilds=21/600 ticks
+```
 
-Current split of a 15.9 ms tick: **`observe` 6.36 ms**, **painters 4.46 ms**, remainder unattributed.
+Plus a sim tick of **1.58 ms**, measured with the tick clock unpinned. So the frame is ≈**5.6 ms against
+an 8.33 ms budget**. Legacy budgets its own fine-fill at *"4ms of the project's 8.33ms budget"*
+(`world_renderer.gd:2612`), so the painter total is at parity.
+
+| painter | before | after |
+|---|---|---|
+| veil | 41.47 ms | **2.99** |
+| glint | 11.86 ms | **0.03** |
+| observe (not a painter) | 10.60 ms | **0.03** |
+| terrain (baked, D0326) | — | 0.01 |
+
+### A CORRECTION: the wall-clock "ms/tick" figures below ~16.7 ms were measuring a clock
+
+`tests/body/reveal_scene.gd` ticks in `_physics_process`, which Godot pins at 60/sec. Three consecutive
+optimisations all measured "15.9 ms/tick" — which is 1/60 s — while the per-painter instrument showed the
+work inside the frame still falling. **The wall-clock slope had stopped measuring us.**
+
+The 64.6 → 17.9 ms improvement it reported was real, because that work exceeded the tick interval. Every
+number it gave below the interval was the clock. Vsync is the same trap one layer out and legacy warns
+about it explicitly (quoted below) — this document carried that warning before the session walked into
+its sibling.
+
+**Rule: a wall-clock slope over `_physics_process` ticks is only valid ABOVE the tick interval. Use the
+per-painter instrument, which is measured inside the frame and cannot be pinned by a refresh rate.**
 
 ## The instrument
 
