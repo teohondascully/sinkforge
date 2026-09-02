@@ -14337,3 +14337,37 @@ component is not — `factory_sim.gd:795`: *"handing the array over turns that l
 i.e. back `TileGrid`'s planes with a flat `PackedByteArray` indexed `row * width + col` instead of a
 `Vector2i`-keyed `Dictionary`, so a window read becomes row slices rather than 18,900 hashed lookups.
 That touches `state_signature`'s own storage and so needs its own pass, not a rider on this one.
+
+
+## D0339 · 2026-09-01 · Two ore assertions were claims about a 48-cell world, not about the generator
+
+D0335 widened `shallow_clay` from 48 cells to 256 and `tests/test_ore_bodies.gd` went red on two rows.
+**Neither was a generator regression, and the suite's own output said so**: the median body size, which is
+the property the WG-4 conversion exists to move, did not budge — `ore_copper` 514 against its recorded
+550, `coal` 329 against 402, both inside the ±25% band. Only the counts moved.
+
+**BOTH FAILING ROWS ASSERTED AN ABSOLUTE COUNT OVER A WORLD WHOSE SIZE HAD CHANGED.**
+
+  * `bodies_max` — a ceiling on the NUMBER of ore bodies. Ore cells went 26,556 -> 133,500 with the
+    world, and bodies rose with them, 168 against a ceiling of 120.
+  * total `cells` — a ±35% band on total ore VOLUME, which is proportional to how much world there is.
+    133,500 against a recorded 26,556 is 5.03x, and the world is 5.33x wider.
+
+This is `docs/CLAIMS.md`'s "name the frame" in its plainest form: a count has no meaning without the
+population it was counted over, and both numbers were measured on a 48-cell site that no longer exists.
+
+**THE REPAIR KEEPS THE CLAIM AND DROPS THE FRAME.** `bodies_max` is now read as the ratio it always
+implied — bodies per ore CELL, `bodies_max / cells` from the same recorded pair — which is scale-free and
+still fails for the reason the row exists, since a generator making more and smaller bodies raises
+bodies-per-cell at any world size. The volume band is scaled by the measured width, recorded as
+`MEASURED_WIDTH = 48` rather than left implicit, and still catches the thing it was written for: the
+x16-sizes-against-÷16-densities cancellation moves volume per column by 16x if either half is wrong, and
+no ±35% band absorbs that.
+
+**THE NEW CEILING IS LOOSER THAN THE OLD ONE AND THAT IS WORTH SAYING.** `ore_copper` measures 0.00126
+bodies per cell against a 0.00452 ceiling — a 3.6x margin, so this row would not catch a 3x regression.
+The old count ceiling was tighter *on the world it was written for* and unusable on any other. Ratcheting
+it to what shipping actually measured is the right next move (`docs/CLAIMS.md` — refusing to guess a
+bound is not a reason to refuse to ratchet what shipping decided), and is deliberately NOT done in the
+same change that repaired the frame: tightening a bound and fixing the population it is measured over are
+two claims, and doing both at once means neither was verified separately.

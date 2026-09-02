@@ -29,6 +29,12 @@ const NEIGHBOURS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0
 ##
 ## `bodies_max` is a CEILING, not a band: the whole point of the conversion is that this number came down
 ## (ore 477 -> 42), and a change that puts it back up is the regression this file exists to catch.
+## THE WORLD WIDTH THE TABLE BELOW WAS MEASURED ON (D0339). Every absolute count in it -- `cells` and
+## `bodies_max` -- is proportional to how much world there is, so the width is part of the measurement
+## and not a detail. D0335 widened `shallow_clay` to 256 and two rows of this suite failed for that
+## reason alone, with the median body size unmoved and the generator working correctly.
+const MEASURED_WIDTH: int = 48
+
 const EXPECTED: Dictionary = {
 	&"ore_copper": {"median": 550.0, "cells": 26556, "bodies_max": 120},
 	&"coal": {"median": 402.0, "cells": 17368, "bodies_max": 110},
@@ -57,8 +63,10 @@ func _initialize() -> void:
 func _measure(material: StringName) -> Dictionary:
 	var sizes: Array[int] = []
 	var cells: int = 0
+	var world_width: int = 0
 	for seed_value: int in SEEDS:
 		var grid: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, seed_value)
+		world_width = grid.width   ## read from the site, never assumed -- see the volume check below
 		var seen: Dictionary = {}
 		for col: int in grid.width:
 			for row: int in grid.height:
@@ -81,7 +89,7 @@ func _measure(material: StringName) -> Dictionary:
 				cells += size
 	sizes.sort()
 	var median: float = 0.0 if sizes.is_empty() else float(sizes[sizes.size() / 2])
-	return {"cells": cells, "bodies": sizes.size(), "median": median}
+	return {"cells": cells, "world_width": world_width, "bodies": sizes.size(), "median": median}
 
 
 ## THE ASSERTION THE CONVERSION EXISTS FOR. Two numbers, moving opposite ways: bodies down, median up.
@@ -111,9 +119,22 @@ func _test_ore_arrives_as_room_scale_bodies_not_specks() -> void:
 		_check(median > float(was["median"]) * 4.0,
 			"...and it is at least 4x the %.0f it was before WG-4 -- the conversion's whole deliverable "
 			% float(was["median"]) + "is that a vein is a place you work rather than a speck you pass")
-		_check(int(m["bodies"]) <= int(want["bodies_max"]),
-			"%s arrives as %d bodies, at or under the %d ceiling (was %d) -- fewer and larger, not more "
-			% [material, m["bodies"], want["bodies_max"], was["bodies"]] + "and smaller")
+		# THE CEILING IS A DENSITY, NOT A COUNT (D0339). It used to be the raw body count, which is a claim
+		# about the WORLD IT WAS MEASURED ON and nothing else: D0335 widened `shallow_clay` from 48 cells to
+		# 256, the ore cells went 26,556 -> 133,500, and the count rose with them from under 120 to 168
+		# while the median body size did NOT move (514 against its recorded 550). A wider world holding
+		# proportionally more ore bodies is the generator working, and a count ceiling called it a failure.
+		#
+		# So the recorded pair is read as the ratio it always implied -- bodies per ore CELL -- which is
+		# scale-free and still fails for the reason the row exists: a generator that made more, smaller
+		# bodies raises bodies-per-cell even at constant world size.
+		var per_cell: float = float(m["bodies"]) / maxf(1.0, float(m["cells"]))
+		var per_cell_max: float = float(want["bodies_max"]) / float(want["cells"])
+		_check(per_cell <= per_cell_max,
+			"%s arrives as %d bodies over %d ore cells -- %.5f per cell, at or under the %.5f ceiling "
+			% [material, m["bodies"], m["cells"], per_cell, per_cell_max]
+			+ "(%d/%d as measured) -- fewer and larger, not more and smaller"
+			% [want["bodies_max"], want["cells"]])
 
 
 ## THE CANCELLATION, asserted rather than assumed. Sizes went up 16x and densities down 16x, and the
@@ -122,9 +143,19 @@ func _test_ore_arrives_as_room_scale_bodies_not_specks() -> void:
 func _test_the_volume_survived_the_conversion_that_moved_the_sizes() -> void:
 	for material: StringName in EXPECTED:
 		var m: Dictionary = _measure(material)
-		var target: float = float(int(EXPECTED[material]["cells"]))
+		# SCALED BY WORLD WIDTH (D0339), the same frame problem the body-count ceiling had one row up. A
+		# total volume is proportional to how much world there is, so the recorded figure is a claim about
+		# the 48-cell `shallow_clay` it was measured on. D0335 widened that site to 256 and the volume rose
+		# with it -- the generator filling a bigger world, which this row read as "only one half landed".
+		#
+		# The band still does its job: it is the x16-sizes-against-/16-densities CANCELLATION being
+		# asserted, and a generator that got either half wrong moves volume per column by 16x, which no
+		# +/-35% band absorbs. Scaling removes only the world-size term, not the claim.
+		var width_now: float = float(int(m["world_width"]))
+		var target: float = float(int(EXPECTED[material]["cells"])) * width_now / float(MEASURED_WIDTH)
 		var cells: float = float(int(m["cells"]))
 		_check(absf(cells - target) <= target * VOLUME_BAND,
-			"%s's total volume is %d cells, near its measured %d (+/-%d%%) -- the x16 on sizes and the "
-			% [material, int(cells), int(target), int(VOLUME_BAND * 100.0)]
-			+ "/16 on densities cancel, and a world 16x either way means only one half landed")
+			"%s's total volume is %d cells over %d columns, near the %d its measured %d predicts at this "
+			% [material, int(cells), int(width_now), int(target), int(EXPECTED[material]["cells"])]
+			+ "width (+/-%d%%) -- the x16 on sizes and the /16 on densities cancel"
+			% int(VOLUME_BAND * 100.0))
