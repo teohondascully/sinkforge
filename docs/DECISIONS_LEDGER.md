@@ -13954,3 +13954,45 @@ every one of 100 cells on an exposed edge.
 
 The probe is bound ONCE per paint call rather than per cell: a `Callable` built inside the loop is one
 allocation per cell per frame, which on the per-frame fallback path is tens of thousands a second.
+
+## D0330 · 2026-09-01 · A partial re-bake needs a dilation, or it seams along every chunk edge
+
+**A DEFECT IN D0326, SHIPPED AND MERGED, FOUND BY READING LEGACY RATHER THAN BY LOOKING.** The director's
+instruction was to sweep the file being ported for its optimizations rather than only its algorithm.
+Legacy's `fine_terrain.gd:481` carries a constant this port had no equivalent of, with its reason stated:
+
+> "Fine-cell dilation for a region rebake. **It must cover the widest neighbour reach any paint term
+> reads, or a patched region stops being byte-identical to a full bake.**"
+
+`TerrainBake.bake_cells` mapped each dug cell to its OWN chunk and repainted only those. But every baked
+painter reads neighbours — `WallPainter.ao_alpha` probes 2 cells, `TerrainPainter` draws one past its
+rect, and D0329's carved-edge terms reach `FORM_REACH + 1` = **7**. A dig within seven cells of a chunk
+boundary therefore changes the correct colour of cells in the ADJACENT chunk, which was never marked
+dirty and never repainted.
+
+**THE FAILURE MODE IS WHY THIS SURVIVED REVIEW.** The stale cells are a seam along chunk edges that
+appears **only after mining**, **only near a boundary**, and **never in a fresh bake** — so a capture of a
+newly generated world is pixel-perfect and the defect accumulates as the player digs. No screenshot of an
+un-dug world can show it, and no test that inspects a picture would catch it.
+
+**THE DILATION IS THE OBSERVATION MARGIN, NOT A PAINTER'S CONSTANT.** The bake does not know which
+painters it was handed — that is the caller's business — so deriving from a specific painter would
+silently under-dilate the moment a different set is baked. `WorldView.WINDOW_MARGIN_CELLS` (9) is the
+widest ring any painter could possibly read, because a painter reading past it is already reading `&""`
+for cells it was never given. Over-dilating costs a few extra chunks per dig; under-dilating is
+permanent.
+
+**A MUTANT ESCAPED FIRST, and the reason is worth more than the fix.** Setting the call site's margin to
+0 — the actual defect — left the suite GREEN, because the test constructed its own `TerrainBake` and
+passed the margin itself. **A test that poses its own subject cannot register a wiring error at the call
+site it bypassed.** `WorldView.bake_margin()` exists to make that call site observable, and the
+assertion is against the painters' own reaches (`maxi(AO_RAMP_CELLS, FORM_REACH + 1)`) so it is a real
+bound rather than one constant restating another. Both mutants are now caught: margin 0, and an
+over-dilation that would quietly turn every dig into a full rebake while looking correct.
+
+**One optimization from the same sweep, recorded and NOT ported.** Legacy's `bake_pending`
+(`fine_terrain.gd:768-812`) fills the world progressively, a time-budgeted slice per frame — "the budget
+is time, not cells, because the point is to fit inside a frame" — so a boot bake does not hitch. This
+build's full bake paints every chunk in one `UPDATE_ONCE`. At the current 48x565-cell world that is ~27k
+cells and acceptable; at the 512-wide world it is ~289k and will hitch. Recorded here with its address so
+the next session does not have to rediscover it.

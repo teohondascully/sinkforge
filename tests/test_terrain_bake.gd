@@ -27,6 +27,7 @@ const H_CELLS: int = 300
 func _initialize() -> void:
 	_test_every_cell_lands_in_exactly_one_chunk_and_every_chunk_is_used()
 	_test_a_cell_outside_the_world_has_no_chunk()
+	_test_a_dig_near_a_chunk_edge_dirties_the_neighbouring_chunk()
 	_test_a_chunk_spans_legacys_world_AREA_not_legacys_cell_COUNT()
 	_test_plan_refuses_a_world_it_cannot_tile()
 	_test_the_full_rebake_threshold_decides_both_ways()
@@ -99,6 +100,78 @@ func _test_a_cell_outside_the_world_has_no_chunk() -> void:
 		"CONTROL: all four corners INSIDE the world do have a chunk -- %d of %d, so the row above is a "
 			% [accepted, inside.size()] + "real bounds test and not a function that rejects everything")
 	bake.free()
+
+
+## **THE SEAM THIS BAKE SHIPPED WITH, and the reason a partial re-bake needs a dilation** (D0330).
+##
+## Every baked painter reads NEIGHBOURS: `WallPainter.ao_alpha` probes 2 cells, `TerrainPainter` draws one
+## past its rect, and `RockTone`'s carved-edge terms reach `FORM_REACH + 1` = 7. Digging one cell therefore
+## changes the painted colour of cells up to seven away — and a cell near a chunk boundary has those
+## neighbours in a DIFFERENT chunk. Marking only the dug cell's own chunk leaves that neighbour stale.
+##
+## The failure is a permanent seam along chunk edges, visible only after mining, only near a boundary, and
+## never in a fresh bake — so a capture of a newly generated world looks perfect while the defect
+## accumulates as the player digs. Legacy carries the same dilation for the same stated reason
+## (`fine_terrain.gd:481`): a patched region must be byte-identical to a full bake.
+##
+## Asserted on `influenced_chunks` rather than through a picture, because no picture of an un-dug world
+## can show it.
+func _test_a_dig_near_a_chunk_edge_dirties_the_neighbouring_chunk() -> void:
+	var bake: TerrainBake = _planned()
+	# `plan` alone does not set the margin (that is `setup`, which declines headless), so pose it the way
+	# `WorldView` does -- from the observation margin, the widest ring any painter could read.
+	bake.free()
+	var b := TerrainBake.new()
+	b.setup(Vector2i(W_CELLS, H_CELLS), CELL_PX, Callable(), null, null, [], WorldView.WINDOW_MARGIN_CELLS)
+	# setup() declines headless BEFORE building chunks, but `plan` and the margin are set first by design.
+	_check(b.rebake_margin() == WorldView.WINDOW_MARGIN_CELLS,
+		"the dilation is the observation margin (%d), not a written literal" % b.rebake_margin())
+	# A cell one inside a chunk's left edge. 512px chunks over 4px cells = 128 cells per chunk, so column
+	# 128 is the first cell of chunk column 1 and its left neighbours live in chunk column 0.
+	var per_chunk: int = TerrainBake.CHUNK_PX / CELL_PX
+	var edge := Vector2i(per_chunk, 200)
+	var touched: Array[int] = b.influenced_chunks(edge)
+	_check(touched.size() >= 2,
+		"a dig at the first cell of a chunk dirties %d chunks, not just its own" % touched.size())
+	_check(touched.has(b.chunk_index(edge)) and touched.has(b.chunk_index(edge - Vector2i(1, 0))),
+		"and the set contains BOTH its own chunk and the one holding the cells its shading reaches into")
+	_check_the_coordinator_actually_passes_the_dilation()
+	# CONTROL: a cell deep inside a chunk dirties exactly one. Without this the row above passes on an
+	# `influenced_chunks` that returned every chunk in the world, which would silently make every dig a
+	# full rebake and undo the entire per-dig fast lane while looking correct.
+	var middle := Vector2i(per_chunk / 2, 200)
+	var one: Array[int] = b.influenced_chunks(middle)
+	_check(one.size() == 1,
+		"CONTROL: a dig in a chunk's interior dirties exactly 1 chunk (got %d), so the dilation is "
+			% one.size() + "targeted and has not quietly become a full rebake")
+	b.free()
+
+
+## THE CALL SITE, not just the unit. The test above poses its own `TerrainBake` and hands it the margin,
+## so it cannot see a `WorldView` that passes 0 -- which is the actual defect and which left the suite
+## green as a mutant. Asserted against the painters' own reaches so it is a real bound and not a
+## restatement of one constant by another.
+func _check_the_coordinator_actually_passes_the_dilation() -> void:
+	var grid: TileGrid = TileGrid.new(64, 64, 7)
+	for col: int in range(64):
+		for row: int in range(32, 64):
+			grid.set_material(Vector2i(col, row), &"clay")
+	var body: Body = Body.new(Fx.from_int(128), Fx.from_int(80))
+	var view := WorldView.new()
+	root.add_child(view)
+	view.setup(Interface.new(grid, body, Mining.new()), MaterialLook.new(), null)
+	view.add_baked_painter(WallPainter.paint)
+	view.add_baked_painter(TerrainPainter.paint)
+	view.bake_static(-60)
+	# The deepest neighbour reach among the painters actually baked. Derived from their own constants, so
+	# a painter that grows its reach moves this bound instead of silently outrunning it.
+	var deepest: int = maxi(WallPainter.AO_RAMP_CELLS, RockTone.FORM_REACH + 1)
+	_check(view.bake_margin() >= deepest,
+		"the coordinator hands the bake a dilation of %d, covering the deepest painter reach of %d"
+			% [view.bake_margin(), deepest])
+	_check(view.bake_margin() > 0,
+		"and it is not zero -- zero is the seam-along-chunk-edges defect this whole test exists for")
+	view.free()
 
 
 ## THE ONE CONSTANT IN THIS FILE THAT IS NOT LEGACY'S NUMBER, and the WG-4 regime question (D0305) in
