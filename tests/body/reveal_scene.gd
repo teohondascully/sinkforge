@@ -99,22 +99,7 @@ func _ready() -> void:
 	_spawn_row = Body._px_to_cell(_body.pos_y)
 	_score = Score.new()
 	add_child(_score)
-	_camera = Camera2D.new()
-	add_child(_camera)
-	_camera.make_current()
-	_camera.zoom = Vector2(_camera_zoom, _camera_zoom)  ## play_scene.gd never set this either (an open
-	## legibility gap, docs/WORKING.md's "camera zoom so the chamber fills more of the frame" item) --
-	## default 6x makes CELL's 4px cells ~24 screen-px, close enough to read a glimmer pocket's shape
-	## without the window mostly showing background. Overridable (`--zoom=`) since a density-contrast
-	## shot needs the opposite trade-off -- see `--wide-view` below.
-	if _wide_view:
-		# Centered on the topsoil band's own midpoint, not the full grid height -- the full grid runs to
-		# max_depth_m's ~1024 rows, and centering on that pointed the camera at empty rock far below the
-		# band this mode exists to show, producing a blank screenshot. Found by looking at the image, not
-		# assumed correct from the math. As of D0276 this frames the shot rather than bounding the draw:
-		# `TerrainPainter` culls against the observation's window, so whatever the camera frames is drawn.
-		var view_rows: int = mini(_grid.height, WIDE_VIEW_ROW_CAP)
-		_camera.position = Vector2(float(_grid.width * CELL) / 2.0, float(view_rows * CELL) / 2.0)
+	_camera = RevealCamera.build(self, _rig, _grid, _camera_zoom, _wide_view)
 	_build_view()
 	# THE GLOBAL RNG IS SEEDED FROM THIS RUN'S OWN SEED (D0304), and it is the last thing standing
 	# between a capture and being reproducible. `view/fx/particles.gd` uses `randf_range` and its header

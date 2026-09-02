@@ -33,9 +33,17 @@ extends RefCounted
 ##     nothing to set it is `view/visuals/art.gd` again: lifted, correct, and referenced by nothing for
 ##     four sessions. It also needs a deterministic source rather than `randf_range`, since a renderer
 ##     whose output moves between runs cannot be screenshot-compared.
-##   * **The camera limits.** Legacy clamps to the world rect. This build's `--wide-view` and
-##     `--camera=col,row` debug modes deliberately frame outside the body's world, and clamping would
-##     silently break the milestone captures those flags exist to produce.
+##   * ~~**The camera limits.**~~ **PORTED 2026-09-01 (D0333), and the reason for deferring them did not
+##     survive checking.** This paragraph said clamping "would silently break the milestone captures"
+##     that `--wide-view` and `--camera=col,row` exist to produce. It would not: both debug paths bypass
+##     the rig entirely — `reveal_scene._update_camera` returns before calling it under `--wide-view`,
+##     and assigns `_fixed_camera` directly under `--camera=`. Nothing that frames outside the world
+##     goes through `step()`, so a clamp inside it cannot reach them.
+##
+##     What made the omission visible was a capture at the ported wide framing: the body spawns near the
+##     world's left edge, the camera followed it past that edge, and **a third of the frame was flat
+##     grey void**. At the 12-metre framing this build shipped with, the camera never got far enough
+##     from the middle for it to show.
 
 ## Legacy's own constants, unchanged. Each is a feel judgement made against a playable build, which is
 ## exactly the kind of number `docs/MASTER_PLAN_AUG30.md` §0 says to port rather than re-derive.
@@ -106,6 +114,10 @@ static func metres_across(zoom: float, viewport_width: float = 1280.0) -> float:
 	return viewport_width / zoom / float(PIXELS_PER_METRE)
 
 
+## The world rect the camera may not show past, in world px. Empty means unlimited, which is the
+## behaviour every caller had before D0333 and is what a test posing a rig in isolation still gets.
+var _limits: Rect2 = Rect2()
+
 var _pos: Vector2 = Vector2.ZERO      ## the eased position, kept at FULL precision -- see the header
 var _lead: Vector2 = Vector2.ZERO
 var _started: bool = false
@@ -146,7 +158,42 @@ func step(body_pos: Vector2, body_vel: Vector2, zoom: float, screen_width: float
 		_pos = target
 	else:
 		_pos = _pos.lerp(target, 1.0 - exp(-FOLLOW_SPEED * delta))
-	return snap_to_pixel(_pos, zoom)
+	return snap_to_pixel(clamp_to_limits(_pos, zoom, screen_width), zoom)
+
+
+## Sets the world rect the view may not leave. Call once with the world's pixel bounds; pass an empty
+## `Rect2` to remove the limit.
+func set_world_limits(world_px: Rect2) -> void:
+	_limits = world_px
+
+
+## Clamps a camera centre so the visible rect stays inside the world. D0333.
+##
+## **CLAMPS THE RENDERED POSITION, NOT THE EASED ONE**, and that ordering is the same reason
+## `snap_to_pixel` is applied on the way out: the rig's internal `_pos` keeps converging on the body at
+## full precision, so walking along a wall does not push the eased position into the limit and then make
+## it crawl back out when the body turns around. The clamp is a view constraint, not a follow constraint.
+##
+## A WORLD NARROWER THAN THE VIEW IS CENTRED, not clamped to one edge. `min > max` on an axis means the
+## world does not fill the frame there, and clamping between crossed bounds would pin the camera to
+## whichever edge the expression happened to evaluate last — the world would sit against the left of the
+## screen rather than in the middle of it.
+func clamp_to_limits(pos: Vector2, zoom: float, screen_width: float) -> Vector2:
+	if _limits.size.x <= 0.0 or _limits.size.y <= 0.0 or zoom <= 0.0:
+		return pos
+	# The visible half-extent in WORLD px. Height is derived from the width by the viewport's own aspect,
+	# which this rig is not given -- so it uses the 16:9 the project renders at. A wrong aspect only ever
+	# makes the vertical clamp slightly loose or tight, never inverted.
+	var half_w: float = screen_width / zoom * 0.5
+	var half_h: float = half_w * 9.0 / 16.0
+	var out: Vector2 = pos
+	var min_x: float = _limits.position.x + half_w
+	var max_x: float = _limits.end.x - half_w
+	out.x = (_limits.position.x + _limits.size.x * 0.5) if min_x > max_x else clampf(pos.x, min_x, max_x)
+	var min_y: float = _limits.position.y + half_h
+	var max_y: float = _limits.end.y - half_h
+	out.y = (_limits.position.y + _limits.size.y * 0.5) if min_y > max_y else clampf(pos.y, min_y, max_y)
+	return out
 
 
 ## The distance past which `step` cuts rather than pans, in WORLD px. Separate and public because it is
