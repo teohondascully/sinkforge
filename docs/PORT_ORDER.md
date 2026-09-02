@@ -141,8 +141,30 @@ terrain, or the reseeding cost is paid twice.
 | **Lines** | ~222 |
 | **Done when** | the four are on their surfaces and a capture shows the grade |
 
-Pure lifts, zero sim, zero data. `rock_grit` hardcodes legacy's 8px fine cell and retunes to 4px — a
-constant, not a redesign (Q1 is ruled: adapt the art, never coarsen the world).
+**LANDED: `post_fx` (D0328) and `rock_grit` (D0331).** Still open: `rock_tooth` and `heat_haze`.
+
+**`rock_tooth` NEEDS A GRAMMAR MAP FIRST, and legacy's own header says why in numbers.** It is the one
+rock pass that draws ABOVE the darkness veil, adding absolute value levels — which is exactly what keeps
+deep rock readable now that D0332's skylight multiplies it down. But legacy shipped it isotropic and
+measured the cost: `hash(floor(world_pos))` is *"per-world-pixel white noise: the highest-frequency, most
+isotropic signal available, added on top of everything else at the largest amplitude any rock mark gets.
+It raised the horizontal and vertical gradients by the same amount everywhere and flattened the grammar
+underneath it."* Measured — stone's rendered anisotropy at +0.019 against earth's +0.022, indistinguishable
+from that layer's own earth-vs-earth null, while **with the pass disabled the gap was 0.038, six times
+wider.** Two materials whose seam sampling differs by 3.40 against 1.00 were rendering as one isotropic
+field.
+
+Legacy's fix is `gram_tex`: the coarse grammar map as a texture on the same world rect as the bake, so
+the hash cell can be stretched per material — soil square, bedded flat, massive steep. **This build has
+no equivalent yet.** The clean route is a second `SubViewport` target in `TerrainBake` holding one byte
+per cell, invalidated by exactly the same dig path the colour target already uses; a per-frame GDScript
+map would rebuild every tick for data that only changes when the terrain does.
+
+*Checked and clear:* the shipped `rock_grit` (D0331) does **not** carry this defect — legacy's grit is
+isotropic too, and only the tooth was made direction-aware.
+
+`rock_grit` hardcodes legacy's 8px fine cell and retunes to 4px — a constant, not a redesign (Q1 is
+ruled: adapt the art, never coarsen the world).
 
 ### V4 · The visuals registry — what things ARE
 
