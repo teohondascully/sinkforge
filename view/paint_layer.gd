@@ -21,6 +21,21 @@ extends Node2D
 var _view: WorldView = null
 var _paint: Callable = Callable()
 
+## PER-LAYER DRAW COST, in microseconds, for the last `_draw` this layer actually ran.
+##
+## **A FRAME BUDGET WITH NO ATTRIBUTION IS A COMPLAINT, NOT A MEASUREMENT.** The build renders at 15.4
+## fps against a 120 Hz bar and the stack is nine layers deep; "the renderer is slow" names none of them.
+## Recording it here rather than in the coordinator is what makes the number a per-PAINTER cost instead of
+## a per-frame total, and this is the only place that knows which painter a `_draw` belongs to.
+##
+## Two `Time.get_ticks_usec()` reads per layer per frame — about 40 ns against a 64 ms frame, so it is
+## always on rather than behind a debug flag that would be off exactly when someone needs the number.
+## It records ONLY; nothing here feeds the picture, so it cannot move a pixel or a determinism hash.
+var last_draw_usec: int = 0
+## Which painter this layer carries, for the cost report. Set by `WorldView.add_painter` from the
+## callable itself, so a layer cannot be mislabelled by a caller passing the wrong string.
+var label: StringName = &"?"
+
 
 ## THE BIND REFUSES A DEAD CALLABLE, LOUDLY, and D0289 is why that guard is here rather than in a
 ## comment. A `Callable` bound to a method on a `RefCounted` stores an object ID and **does not keep the
@@ -63,4 +78,9 @@ func _draw() -> void:
 	var frame: Frame = _view.current_frame()
 	if frame == null:
 		return
+	# Measured around the painter ONLY, not around the early returns above: a layer that returned before
+	# painting would otherwise report a real cost for having done nothing, and the whole point of the
+	# number is to rank painters against each other.
+	var began: int = Time.get_ticks_usec()
 	_paint.call(frame, self)
+	last_draw_usec = Time.get_ticks_usec() - began

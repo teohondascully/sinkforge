@@ -287,6 +287,11 @@ var _cached_rect: Rect2i = Rect2i()
 var _cached_hash: int = 0
 var _has_cache: bool = false
 
+## The lightmap this painter uploads to (D0336). Held per painter rather than per frame so the `Image` and
+## its `ImageTexture` are allocated once and mutated in place — which is also what lets the layer's
+## retained `draw_texture_rect` show new content without being re-queued.
+var _map: VeilMap = VeilMap.new()
+
 
 ## The field for this observation's window, from the cache when nothing that feeds it has changed.
 func field_for(obs: Interface.Observation) -> PackedFloat32Array:
@@ -306,10 +311,52 @@ func field_for(obs: Interface.Observation) -> PackedFloat32Array:
 ## An INSTANCE method, not a static one, because of the cache above — added through
 ## `WorldView.add_stateful_painter`, which exists because a `Callable` does not keep a `RefCounted` alive
 ## and D0289 lost a whole painter to exactly that.
+## THE LIGHTMAP PATH (D0336). One `draw_texture_rect` where this used to issue one `draw_rect` per visible
+## cell — 14,080 of them at the 40-metre framing, measured at **41.47 ms of a 54.23 ms frame** against a
+## 120 Hz budget of 8.33. Legacy's own shape, `world_renderer.gd:330` and `:2769`.
+##
+## `_paint_with` below is KEPT, and not as dead code: it is the per-cell reference this path is asserted
+## byte-equivalent to, and `paint()` still mounts it for any caller without a render target. Legacy's own
+## rule for a flattened hot path (`legacy/tools/check_paint_terms.gd:5`) is to keep the readable loop as
+## the specification rather than delete it.
+##
+## The composition is unchanged and that is provable rather than hoped: the old path drew black at alpha
+## `1 - s`, which composites to `dest * s`; a MULTIPLY blend against a texel of value `s` is `dest * s`.
+## Same expression, one call instead of fourteen thousand.
 func paint_frame(frame: Frame, ci: CanvasItem) -> void:
 	if frame == null or frame.obs == null or frame.obs.cell_px <= 0:
 		return
-	_paint_with(frame, ci, field_for(frame.obs))
+	var obs: Interface.Observation = frame.obs
+	var field: PackedFloat32Array = field_for(obs)
+	var baked: Rect2i = obs.window
+	var tex: ImageTexture = _map.build(baked, func(col: int, row: int) -> float:
+		return light_at(obs, baked, field, col, row))
+	if tex == null:
+		return
+	ci.draw_texture_rect(tex, _map.world_rect(obs.cell_px), false)
+
+
+## The composed light level for one cell: the ceiling, then mass and key, then the lamp. Lifted out of
+## `_paint_with`'s loop body unchanged so the lightmap and the per-cell reference evaluate the SAME
+## expression rather than two that are believed to agree.
+##
+## Answers 1.0 — full light, no darkening — outside the baked window. That is the honest answer for a
+## texel the observation cannot speak about, and it is the safe one: the alternative reads as a black bar
+## at the screen edge (D0238's trap, where `material_at` answers `&""` outside the window exactly as it
+## does for air).
+static func light_at(obs: Interface.Observation, baked: Rect2i, field: PackedFloat32Array,
+		col: int, row: int) -> float:
+	var li: int = col - baked.position.x
+	var lj: int = row - baked.position.y
+	if li < 0 or lj < 0 or li >= baked.size.x or lj >= baked.size.y:
+		return 1.0
+	# THE CEILING FIRST, then mass and key, then the lamp. Multiplying rather than subtracting keeps the
+	# composition monotone: a cell can lose light to depth and to burial independently and never go below
+	# zero, which is what a subtractive stack would do in deep buried rock.
+	var s: float = shade_at(obs, baked, field, li, lj) * skylight_ceiling(row)
+	# THE LAMP LIFTS WHAT THE VEIL LEFT, legacy's own composition rule: a light raises the light level
+	# rather than lowering an opacity, so a lit cell trends toward full light and can never overshoot it.
+	return s + (1.0 - s) * lamp_lift(obs, Vector2i(col, row))
 
 
 ## Split from `paint_frame` so the drawing half can be exercised against a field the caller supplies.
@@ -333,15 +380,9 @@ static func _paint_with(frame: Frame, ci: CanvasItem, field: PackedFloat32Array)
 			var lj: int = row - baked.position.y
 			if li < 0 or lj < 0 or li >= baked.size.x or lj >= baked.size.y:
 				continue
-			# THE CEILING FIRST, then mass and key, then the lamp. Multiplying rather than subtracting
-			# keeps the composition monotone: a cell can lose light to depth and to burial independently
-			# and never go below zero, which is what a subtractive stack would do in deep buried rock.
-			var s: float = shade_at(obs, baked, field, li, lj) * skylight_ceiling(row)
-			# THE LAMP LIFTS WHAT THE VEIL LEFT, which is legacy's own composition rule: a light raises
-			# the light level rather than lowering an opacity, so a lit cell trends toward full light and
-			# can never overshoot it. Applied here rather than baked into the field because the field is
-			# cached on the world's solidity and the lamp moves every tick.
-			s += (1.0 - s) * lamp_lift(obs, Vector2i(col, row))
+			# THE SAME EXPRESSION THE LIGHTMAP EVALUATES, called rather than restated (D0336). Two copies
+			# of this composition would be two things believed to agree; one function is one thing.
+			var s: float = light_at(obs, baked, field, col, row)
 			if is_equal_approx(s, 1.0):
 				continue
 			var box := Rect2(col * cell_px, row * cell_px, cell_px, cell_px)

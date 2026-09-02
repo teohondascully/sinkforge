@@ -33,8 +33,12 @@ extends RefCounted
 ## badly-aimed camera from a correct one, which is the same blindness one layer up — and it is not
 ## hypothetical: P017 moved the world's surface down eighty rows and every absolute camera row in the
 ## repository ended up pointing at empty sky (D0292, D0295). This line is what says so.
+## **IT ALSO PRINTS THE FRAME BUDGET**, for the same reason and one layer further in: a capture that
+## looks right and costs 64 ms is not a shippable frame, and nothing else in the tool would say so. `view`
+## is optional so every existing caller and every test posing a shutter without a renderer still works —
+## an absent renderer prints no budget line rather than erroring, since the picture is still the subject.
 static func capture(scene: Node2D, path: String, tick: int, camera: Camera2D, zoom: float,
-		body: Body) -> void:
+		body: Body, view: WorldView = null) -> void:
 	await scene.get_tree().process_frame
 	await scene.get_tree().process_frame
 	var img: Image = scene.get_viewport().get_texture().get_image()
@@ -43,6 +47,8 @@ static func capture(scene: Node2D, path: String, tick: int, camera: Camera2D, zo
 	print("reveal_scene: camera=%s zoom=%.1f body_cell=(%d,%d) body_px=(%.1f,%.1f)" %
 		[camera.position, zoom, Body._px_to_cell(body.pos_x), Body._px_to_cell(body.pos_y),
 		float(body.pos_x) / float(Fx.SCALE), float(body.pos_y) / float(Fx.SCALE)])
+	if view != null:
+		print("reveal_scene: %s" % view.draw_cost_report())
 	DebugSceneCommon.warn_if_blank(img, path)
 
 
