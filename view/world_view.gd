@@ -175,7 +175,25 @@ func bake_static(z: int) -> bool:
 		for paint: Callable in _baked_painters:
 			add_painter(paint).z_index = z
 		return false
-	add_painter(Callable(_bake, &"draw_quad")).z_index = z
+	# NEAREST ON THE QUAD, NOT ONLY INSIDE THE VIEWPORT (D0331). The SubViewport's own
+	# `canvas_item_default_texture_filter` governs how the chunk painters draw INTO the target; it says
+	# nothing about how the finished target is sampled when it is drawn OUT. The quad is world-sized and
+	# the camera magnifies it, so on the default LINEAR filter every baked texel is bilinearly
+	# interpolated across the pixels it covers -- pixel art through a blur, and the whole terrain reads as
+	# soft brown mush. Caught by looking at a capture, not by any gate: the bake is pixel-identical to the
+	# per-frame path in CONTENT, which is what the suite checks, and the filtering is applied afterwards.
+	var quad: PaintLayer = add_painter(Callable(_bake, &"draw_quad"))
+	quad.z_index = z
+	quad.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# THE SUB-CELL TOOTH (D0331), on the quad rather than in the bake. It must run per SCREEN pixel, and
+	# the bake holds one texel per world cell -- a tooth painted INTO the target would be one value per
+	# cell, which is the flatness it exists to fix. Legacy runs it the same way, as a material on the
+	# layer that draws the baked texture.
+	var grit: Shader = load("res://view/visuals/rock_grit.gdshader") as Shader
+	if grit != null:
+		var mat := ShaderMaterial.new()
+		mat.shader = grit
+		quad.material = mat
 	_bake.bake_full()
 	return true
 
