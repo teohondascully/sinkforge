@@ -141,7 +141,7 @@ const RECORDS: Dictionary = {
 	},
 	"shallow_clay": {
 		"id": "shallow_clay",
-		"width_cells": 48,
+		"width_cells": 256,
 		"max_depth_m": 256,
 		"layer_thresholds_m": {
 			"topsoil_shale_end": 40,

@@ -99,6 +99,12 @@ func _ready() -> void:
 	_spawn_row = Body._px_to_cell(_body.pos_y)
 	_score = Score.new()
 	add_child(_score)
+	# THE FRAMING IS DERIVED FROM THE WORLD, not from a constant (D0335). Done here rather than in
+	# `RevealArgs` because argv is parsed before the world exists and the right zoom depends on how wide
+	# the world turned out to be -- P031's whole finding was that one hardcoded number cannot be right for
+	# a 64-metre play site and a 12-metre test site at once.
+	if _camera_zoom <= 0.0:
+		_camera_zoom = CameraRig.default_zoom_for(float(_grid.width * CELL))
 	_camera = RevealCamera.build(self, _rig, _grid, _camera_zoom, _wide_view)
 	_build_view()
 	# THE GLOBAL RNG IS SEEDED FROM THIS RUN'S OWN SEED (D0304), and it is the last thing standing

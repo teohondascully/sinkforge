@@ -9,7 +9,18 @@
 # with a second file later, without touching sim/terrain_gen's code (docs/DECISIONS_LEDGER.md D0016).
 
 id: shallow_clay
-width_cells: 48          # terrain-grid (4px) cells wide -- a shaft, not an open world
+# 64 METRES WIDE, RULED BY THE DIRECTOR 2026-09-01 (`docs/NEEDS_DIRECTOR.md` P031). This said 48 cells
+# -- 12 metres -- and called itself "a shaft, not an open world". The framing is what forced the change:
+# legacy's ported zoom ladder (D0325) frames 40 m at its most zoomed-IN rung, and a 48-cell world is 192
+# world px, so filling a 1280-px frame needs zoom 6.67 -- the shipped default of 6.0 ALREADY framed wider
+# than the world existed, and the capture showed void bands at both screen edges. The framing could not
+# be fixed by a framing change.
+#
+# 256 rather than legacy's own 512: two screens wide at the ported framing, enough for the framing to be
+# right and for GDD 13's factory rungs to have a floor, while still reading as a shaft rather than as an
+# open world. Costs ~4 s of generation against 7.9 for 512 -- a one-time boot cost, and D0326's bake
+# makes play cost independent of world width.
+width_cells: 256
 max_depth_m: 256          # docs/ARCHITECTURE.md §9's stated depth budget
 
 layer_thresholds_m:
