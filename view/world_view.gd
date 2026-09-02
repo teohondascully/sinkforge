@@ -90,6 +90,7 @@ var _hud: HudLayer = null
 ## observation until `refresh()` runs. Held rather than rebuilt: its eight noise fields are constructed
 ## once and a per-frame rebuild would be both wasteful and, worse, a different world every frame.
 var _tone: RockTone = null
+var _post: PostFxLayer = null
 
 
 ## Constructor-by-method rather than `_init` arguments, so this node can also be instantiated from a
@@ -228,6 +229,24 @@ func add_hud() -> HudLayer:
 	return _hud
 
 
+## THE LENS, mounted between the world and the HUD. Created on demand, and a second call returns the same
+## layer rather than stacking a second graded pass on the first — which would apply the vignette and the
+## grade twice and read as "the corners are too dark" rather than as a doubled layer.
+##
+## Returns `null` when the shader could not be loaded, and the caller carries on without a lens: a missing
+## grade is a look regression, while a mounted ColorRect with no material is an opaque rectangle over the
+## whole world.
+func add_post_fx() -> PostFxLayer:
+	if _post == null:
+		var fx := PostFxLayer.new()
+		if not fx.setup():
+			fx.free()
+			return null
+		_post = fx
+		add_child(_post)
+	return _post
+
+
 ## The frame built for the current tick, or `null` before the first `refresh()`. `PaintLayer` reads this
 ## during its own `_draw`; it is not rebuilt per layer, so every painter in one tick sees one world.
 func current_frame() -> Frame:
@@ -252,6 +271,12 @@ func refresh() -> void:
 		layer.queue_redraw()
 	if _hud != null:
 		_hud.refresh()
+	# The lens rides the same deterministic clock as every animated painter (D0277). Fed here rather than
+	# from a `_process` for the same reason `refresh()` itself is: a headless capture must be able to step
+	# the renderer without a running SceneTree clock, and a grain on a wall clock would make two captures
+	# of one tick differ.
+	if _post != null:
+		_post.set_anim_time(_frame.anim_time)
 
 
 ## The cosmetic clock's current value, in seconds. Monotonic, deterministic in the number of rendered
