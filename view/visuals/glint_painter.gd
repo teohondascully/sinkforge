@@ -166,3 +166,75 @@ static func _star(ci: CanvasItem, p: Vector2, flare: float, metre_px: float, nug
 	ci.draw_line(p + Vector2(0.0, -r), p + Vector2(0.0, r), col, w)
 	ci.draw_circle(p, (CORE_MIN_M + CORE_GROW_M * flare) * metre_px,
 		Color(col, minf(1.0, alpha + 0.15)))
+
+
+## --- THE SPARSE CACHE (D0337) ----------------------------------------------------------------------
+##
+## **`paint` ABOVE ASKS EVERY VISIBLE CELL WHETHER IT COULD GLINT, EVERY FRAME.** `can_glint` is a
+## `MaterialsRecords` dictionary lookup plus four `solid_at` neighbour probes, so at the 40-metre framing
+## that is roughly **70,000 dictionary lookups a frame over a 160x88 rect** — measured by
+## `view/draw_cost.gd` at **11.83 ms against a 120 Hz budget of 8.33** (D0336), and the largest remaining
+## painter once the veil became a lightmap.
+##
+## Legacy never had this problem because its per-frame passes iterate SPARSE sim collections and cull each
+## entry, never cells. `legacy/scenes/world_renderer.gd:756` states the rule for its whole `_draw`:
+##
+##   > "This per-frame pass draws only the live and sparse content (machines, items, conduits, cursor),
+##   > with no full-world cell loop."
+##
+## This build's `view/` cannot reach a sparse ore list — `Interface.Observation` exposes a window, not the
+## world's deposits — so the sparse list is DERIVED once and cached, which is legacy's own second pattern
+## for exactly this (`_leaf_cells` / `_leaf_cache_dirty`, rebuilt only when terrain changes rather than
+## scanning all of `sim.solid` per frame for canopy cells).
+##
+## **KEYED ON THE MATERIALS HASH, like `VeilPainter.field_for` and for the same reasons.** A dug-cell count
+## is equal across a dig that removed one cell and added another; a tick number rebuilds every frame,
+## which is the thing being fixed. Which cells CAN glint is a pure function of (window, solidity), and
+## those two are exactly what the key holds. The time term is deliberately NOT cached: the flare cycle
+## moves every frame and is three cheap arithmetic ops, so caching it would freeze the animation.
+var _cells: Array[Vector2i] = []
+var _cached_rect: Rect2i = Rect2i()
+var _cached_hash: int = 0
+var _has_cache: bool = false
+
+
+## The cells in this observation's window that can ever glint, from the cache when nothing that feeds it
+## has changed. A miss costs what the old per-frame scan always cost; a hit costs one hash.
+func glint_cells(look: MaterialLook, obs: Interface.Observation) -> Array[Vector2i]:
+	var h: int = hash(obs.materials)
+	if _has_cache and _cached_rect == obs.window and _cached_hash == h:
+		return _cells
+	var found: Array[Vector2i] = []
+	var w: Rect2i = obs.window
+	for col: int in range(w.position.x, w.end.x):
+		for row: int in range(w.position.y, w.end.y):
+			var c := Vector2i(col, row)
+			if can_glint(look, obs, c):
+				found.append(c)
+	_cells = found
+	_cached_rect = w
+	_cached_hash = h
+	_has_cache = true
+	return _cells
+
+
+## The cached path. Identical picture to `paint` above, which is KEPT as the per-cell reference the way
+## `VeilPainter._paint_with` is: `tests/test_glint_painter.gd` asserts the two draw the same set.
+##
+## Iterates the cached cells rather than the visible rect, so per-frame cost is O(glinting cells) — a
+## handful of exposed ore faces — instead of O(visible cells). No view cull is applied to the list because
+## the window IS the visible rect plus `WorldView.WINDOW_MARGIN_CELLS`, so every cached cell is already at
+## most a margin off-screen, and a star drawn there is clipped by the viewport for free.
+func paint_frame(frame: Frame, ci: CanvasItem) -> void:
+	if frame == null or frame.obs == null or frame.look == null or frame.obs.cell_px <= 0:
+		return
+	var obs: Interface.Observation = frame.obs
+	var cell_px: int = obs.cell_px
+	var metre_px: float = float(cell_px * MaterialLook.CELLS_PER_METRE)
+	for c: Vector2i in glint_cells(frame.look, obs):
+		var a: float = 0.85 * flare_at(c, frame.anim_time) * depth_gate(frame.look, c.y)
+		if a <= 0.0:
+			continue
+		_star(ci, Vector2(c) * float(cell_px) + Vector2.ONE * (float(cell_px) * 0.5),
+			flare_at(c, frame.anim_time), metre_px,
+			frame.look.speck_color(obs.material_at(c), c.x, c.y), a)
