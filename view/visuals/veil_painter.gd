@@ -266,43 +266,18 @@ static func lamp_lift(obs: Interface.Observation, cell: Vector2i) -> float:
 	return clampf(lit, 0.0, 1.0)
 
 
-## --- THE CACHE ------------------------------------------------------------------------------------
-##
-## **RE-BAKING EVERY FRAME IS NOT AFFORDABLE, AND LEGACY SAYS SO IN ITS SIGNATURE.** `_bake_openness`
-## takes `dug_from`/`dug_to` and returns the band it actually refreshed: it keeps the field and re-bakes
-## only the columns whose solidity changed. Ported without that, this measured **3.63 ms per bake on a
-## 68x46 window — 21.8% of a 16.67 ms frame** — for a field that is usually identical to last frame's.
-##
-## The field is a pure function of (window rect, solidity inside it), so the cache is keyed on exactly
-## those two: the rect, and `hash(materials)`, which is one native pass over ~3,000 bytes against two
-## blur passes plus a fill. A miss costs what it always cost; a hit costs the hash.
-##
-## Keyed on the MATERIALS HASH rather than on a dug-cell count or a tick number, because those answer a
-## different question. A count is equal across a dig that removed one cell and added another, and a tick
-## number re-bakes on every tick whether or not anything moved — the first is wrong and the second is the
-## thing being fixed. `tests/test_veil_painter.gd` asserts a hit returns exactly what a fresh bake does
-## and that a single excavated cell MISSES.
-var _cached: PackedFloat32Array = PackedFloat32Array()
-var _cached_rect: Rect2i = Rect2i()
-var _cached_hash: int = 0
-var _has_cache: bool = false
+## The openness field held between frames. `view/visuals/veil_field_cache.gd` owns the keying and the
+## reason it is a hash rather than a tick; this owns only the field's definition.
+var _cache: VeilFieldCache = VeilFieldCache.new()
 
 ## The lightmap this painter uploads to (D0336). Held per painter rather than per frame so the `Image` and
-## its `ImageTexture` are allocated once and mutated in place — which is also what lets the layer's
-## retained `draw_texture_rect` show new content without being re-queued.
+## its `ImageTexture` are allocated once and mutated in place.
 var _map: VeilMap = VeilMap.new()
 
 
 ## The field for this observation's window, from the cache when nothing that feeds it has changed.
 func field_for(obs: Interface.Observation) -> PackedFloat32Array:
-	var h: int = hash(obs.materials)
-	if _has_cache and _cached_rect == obs.window and _cached_hash == h:
-		return _cached
-	_cached = openness(obs, obs.window)
-	_cached_rect = obs.window
-	_cached_hash = h
-	_has_cache = true
-	return _cached
+	return _cache.field_for(obs, openness)
 
 
 ## Sits above the terrain and the wall, below the HUD: it is a light layer, so everything it dims must
@@ -329,7 +304,18 @@ func paint_frame(frame: Frame, ci: CanvasItem) -> void:
 	var obs: Interface.Observation = frame.obs
 	var field: PackedFloat32Array = field_for(obs)
 	var baked: Rect2i = obs.window
-	var tex: ImageTexture = _map.build(baked, func(col: int, row: int) -> float:
+	# THE MAP COVERS WHAT IS DRAWN, NOT WHAT IS OBSERVED (D0340). The observation's window is deliberately
+	# larger than the screen -- `WINDOW_MARGIN_CELLS` for the blur's neighbours, and since D0340 snapped
+	# outward again so the plane cache can hold still while the camera moves. None of that extra needs a
+	# TEXEL: it exists so the light FIELD has real neighbours to blur against, which `field_for` above has
+	# already used. Building texels for it cost 4.73 ms against 3.58 for the visible rect alone.
+	#
+	# Clipped to the window rather than used raw, because `light_at` answers 1.0 outside it and a map that
+	# reached past the observation would fade to full light at the screen edge.
+	var drawn: Rect2i = TerrainPainter.visit_rect(obs, frame.view_world_rect, obs.cell_px).intersection(baked)
+	if drawn.size.x <= 0 or drawn.size.y <= 0:
+		return
+	var tex: ImageTexture = _map.build(drawn, func(col: int, row: int) -> float:
 		return light_at(obs, baked, field, col, row))
 	if tex == null:
 		return

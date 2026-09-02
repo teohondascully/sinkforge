@@ -272,6 +272,10 @@ var _grid: TileGrid
 var _body: Body
 var _mining: Mining
 var _tick: int = 0
+## The derived window planes, refreshed on terrain or window change rather than per tick (D0340). Held
+## per Interface, not per Observation, because an Observation is built and thrown away every frame and a
+## cache that died with its consumer would never hit.
+var _cache: WindowCache = WindowCache.new()
 
 
 func _init(grid: TileGrid, body: Body, mining: Mining) -> void:
@@ -283,6 +287,13 @@ func _init(grid: TileGrid, body: Body, mining: Mining) -> void:
 ## Pure read. Advances nothing, and a caller may make as many of these per tick as it likes without
 ## changing a single sim value -- `tests/test_interface.gd` asserts that against `state_signature()`
 ## rather than leaving it as a promise in this comment.
+## How many times the window planes were actually rebuilt. For confirming the cache SKIPS work rather
+## than merely returning right answers -- a cache that recomputed every time passes every correctness
+## assertion and none of the reason it exists.
+func plane_rebuilds() -> int:
+	return _cache.builds
+
+
 func observe(envelope: Envelope) -> Observation:
 	var o: Observation = Observation.new()
 	o.tick = _tick
@@ -333,33 +344,30 @@ func _fill_mining(o: Observation) -> void:
 ## Copies the window into the three derived fields. Split out of `observe` so that function stays a flat
 ## list of field reads a reader can check against `Observation` by eye.
 func _fill_window(o: Observation, envelope: Envelope) -> void:
-	var blocks: Array = WindowPlanes.of(o.window, _grid.get_material)
-	o.materials = blocks[0]
-	o.legend = blocks[1]
-	# THE WALL PLANE IS BUILT ONLY WHEN ASKED FOR (D0338). Its one reader, `WallPainter`, went into the
-	# bake at D0326 and now runs on terrain change rather than per frame -- so the per-frame observation
-	# was paying a dictionary lookup per cell for a plane nothing read. `Observation.wall_at` fails loudly
-	# rather than answering `&""` when it is absent, which is what makes the omission safe.
+	# REBUILT ONLY WHEN THE TERRAIN OR THE WINDOW CHANGED (D0340). This was 6.36 ms a tick against a
+	# 120 Hz budget of 8.33 -- the largest cost left after D0336-D0338 -- spent re-deriving planes that
+	# are a pure function of (window, terrain contents), neither of which moves on most frames.
+	# `interface/window_cache.gd` has the full account and the reason the key is a version and not a hash.
+	_cache.refresh(o.window, _grid.terrain_version, envelope.walls,
+		_grid.get_material, _grid.get_wall, _surface_over)
+	o.materials = _cache.materials
+	o.legend = _cache.legend
+	o.surface_y = _cache.surface_y
 	o.has_walls = envelope.walls
 	if envelope.walls:
-		var background: Array = WindowPlanes.of(o.window, _grid.get_wall)
-		o.walls = background[0]
-		o.wall_legend = background[1]
-	_fill_surface(o)
+		o.walls = _cache.walls
+		o.wall_legend = _cache.wall_legend
 
 
-## One `Fx` surface height per window column, scanned WITHIN the window only.
-##
-## `scan_from_row` is the window's top and `max_rows` its height, so this can never report a floor the
-## observation did not also hand over as cells. Widening the scan past the window would make
-## `surface_y` a second, unfiltered channel into the grid -- which is precisely the reach-around
-## `Observation` copies in order to prevent.
-func _fill_surface(o: Observation) -> void:
-	o.surface_y = PackedInt32Array()
-	o.surface_y.resize(o.window.size.x)
-	for i: int in range(o.window.size.x):
-		o.surface_y[i] = Heightfield.column_surface_y(
-			_grid, o.window.position.x + i, o.window.position.y, o.window.size.y)
+## One `Fx` surface height per window column, as a value rather than written onto an Observation, so the
+## cache can hold it beside the planes it is refreshed with.
+func _surface_over(window: Rect2i) -> PackedInt32Array:
+	var out: PackedInt32Array = PackedInt32Array()
+	out.resize(window.size.x)
+	for i: int in range(window.size.x):
+		out[i] = Heightfield.column_surface_y(_grid, window.position.x + i, window.position.y,
+			window.size.y)
+	return out
 
 
 ## The only mutator. Every rejection is a named reason, and a rejected command changes nothing at all --

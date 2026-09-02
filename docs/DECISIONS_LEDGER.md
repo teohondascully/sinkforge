@@ -14371,3 +14371,58 @@ it to what shipping actually measured is the right next move (`docs/CLAIMS.md` �
 bound is not a reason to refuse to ratchet what shipping decided), and is deliberately NOT done in the
 same change that repaired the frame: tightening a bound and fixing the population it is measured over are
 two claims, and doing both at once means neither was verified separately.
+
+
+## D0340 · 2026-09-01 · The observation is rebuilt on terrain change, not per tick — and two measurements that were measuring the clock
+
+D0338 left `observe` at 6.36 ms of the tick, the largest cost remaining. The planes are a pure function of
+(window, terrain contents) and neither moves on most frames, so they are now cached and refreshed on
+change — which is legacy's rule for every derived thing it holds (`_veil_base` on terrain change,
+`_leaf_cells` on terrain change, `repaint_world()` from exactly one place).
+
+**THE KEY IS A VERSION, NOT A HASH.** `TileGrid.terrain_version` is bumped by `_xor_term`, the one
+function every terrain mutation passes through — including any mutator added later, because a write that
+skipped it would also corrupt the state signature. Hashing the plane instead would be O(window), a
+per-cell pass to avoid a per-cell pass. It is deliberately NOT part of `state_signature`: two worlds
+holding identical cells must hash identically however they got there.
+
+**AND THE SNAP IS WHAT MAKES IT HIT.** A window in quarter-metre cells shifts several times a second as
+the body walks, so an unsnapped window is a cache that misses almost every frame and pays for its key on
+top. `Envelope.covering` now rounds outward to `SNAP_CELLS = 32` — a pure enlargement, so nothing that
+would have been drawn can be culled by it. **Measured: `observe` 6.36 ms -> 0.03 ms, 21 rebuilds over 600
+ticks (96.5% hit).**
+
+**THE SNAP IS OPT-IN, AND THAT IS A MEASUREMENT.** Applied to every caller it made things WORSE — 15.9 ms
+-> 21.5. `TerrainBake` observes one chunk at a time, and snapping each chunk out to a 32-cell block
+inflates every per-dig re-bake. Only the per-frame path asks for it.
+
+**THE LIGHTMAP COVERS WHAT IS DRAWN, NOT WHAT IS OBSERVED.** The window is deliberately larger than the
+screen — margin for the blur's neighbours, and now the snap — and none of that needs a TEXEL; it exists so
+the light FIELD has real neighbours, which `field_for` has already used. Building texels for it cost
+**4.73 ms against 2.99** for the visible rect alone.
+
+**TWO MEASUREMENTS IN THIS SESSION WERE MEASURING A CLOCK RATHER THAN THE GAME, and both are worth
+recording because the second was found only by disbelieving the first.**
+
+  * **Vsync.** Legacy states it at `legacy/tools/check_frametime.gd:29`: *"every frame that fits inside
+    the refresh interval measures as exactly the refresh interval… the number says nothing."* This
+    session quoted that into `docs/PERF_PLAN.md` and then walked into it.
+  * **The physics tick rate, which is the one that actually bit.** `tests/body/reveal_scene.gd` ticks in
+    `_physics_process`, pinned at 60/sec. Three consecutive optimisations all measured "15.9 ms/tick" —
+    which is 1/60 s — while the per-painter instrument showed the work inside the frame still falling.
+    The wall-clock slope had stopped moving because it had stopped measuring us. Unpinned, the sim tick
+    is **1.58 ms**.
+
+**SO THE WALL-CLOCK SLOPE IS ONLY VALID ABOVE THE TICK INTERVAL.** The 64.6 -> 17.9 ms improvement it
+reported was real; every number it gave below ~16.7 ms was the clock. What is trustworthy is the
+per-painter instrument, which is measured inside the frame and cannot be pinned by a refresh rate — and
+it now reads **4.01 ms of painters against the 8.33 ms budget**, with `veil=2.99 sky=0.97 glint=0.03
+bake=0.01`. Legacy budgets its own fine-fill at *"4ms of the project's 8.33ms budget"*, so this is parity.
+
+**WHY THIS BUILD HAD TO WORK HARDER THAN LEGACY FOR THE SAME PICTURE**, recorded because it explains every
+number above. Legacy's per-frame CPU passes ran over its COARSE one-metre cells — 40x22 = 880 at default
+zoom — and its quarter-metre fine grid existed only as a baked texture no per-frame code looped over.
+This build has no coarse tier, so every per-cell painter and the observation itself ran at quarter-metre
+resolution: **14,080 cells for the same 40 metres, a 16x multiplier on everything that loops.** That is
+why the same algorithm cost 41 ms here and was cheap there, and why the fixes that worked were the ones
+that moved work off the quarter-metre grid entirely.

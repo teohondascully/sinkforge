@@ -86,6 +86,17 @@ var _rig: CameraRig = CameraRig.new()  ## D0273: the ported follow; warped to th
 
 
 func _ready() -> void:
+	# **VSYNC OFF, BECAUSE A TIMING HARNESS MUST NOT MEASURE THE PANEL** (D0340). Legacy states the trap at
+	# `legacy/tools/check_frametime.gd:29`: *"When it is on, every frame that fits inside the refresh
+	# interval measures as exactly the refresh interval. A game with 4ms of headroom and one with 0.1ms
+	# both report a perfect 8.33, and the number says nothing."* This session walked into it — three
+	# consecutive optimisations measured 15.9 ms/tick, which is the 60 Hz interval, while the per-painter
+	# instrument showed the work inside the frame still falling. The wall-clock number had stopped moving
+	# because it had stopped measuring us.
+	#
+	# Safe to do unconditionally here: this scene is a harness, never the shipped game, and every frame it
+	# renders is either a screenshot or a tick it is deliberately timing.
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	var site: Dictionary = _parse_args()  ## sets `_play_mode` too, before the title below reads it
 	var site_id: StringName = site["site_id"]
 	var seed_value: int = site["seed"]
