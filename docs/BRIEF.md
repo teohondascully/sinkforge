@@ -4,10 +4,10 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, ninth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data
-leaves), 3b (world planes and verbs), 3c (items), 3d (machines + power), 3e (transport), 3f (the
-economy's live remainder) and 3g (save v3) done; `world_seeder` and the `main.gd` blocks close step 3.**
-Ledger: D0343–D0352; ADR 0009, ADR 0010.
+**Last updated: 2026-09-03, tenth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data leaves),
+3b (world planes and verbs), 3c (items), 3d (machines + power), 3e (transport), 3f (the economy's live
+remainder), 3g (save v3) and 3h (the world seeder) done; the `main.gd` blocks close step 3.** Ledger:
+D0343–D0353; ADR 0009, ADR 0010.
 
 **Headline: the factory moves.** Items flow between machines every hub tick: down a column by the
 landing rule, up it by a lift that pays in power, across a Freight Winch that queues a trip, flies it
@@ -71,6 +71,10 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
   tmp/readback/bak/rename protocol and its four read verdicts; the dangling-winch reconciliation. A
   lived-in world round-trips signature-identical, through memory and through disk, and stays identical
   over 100 ticks on both sides. 45 assertions. CI 76 → 77.
+- **Step 3h (D0353).** `data/starts/`: legacy's tutorial opening as a record (fourteen layout constants
+  become cells in metres from the spawn; materials and per-cell stocks translated) and an opt-in dev
+  kit; `sim/run/world_seeder.gd` generates, wraps, validates and stamps, and hands back the spawn. The
+  real `shallow_clay` site takes it. The tree and the tool kit are not carried. 36 assertions. CI 77 → 78.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -187,6 +191,10 @@ route to nowhere by hand. A posed field is a weaker witness than a reached one.
 first under a cap is state-affecting, so the sort rule applies; it is a documented deviation, and a
 replay of a legacy save would not match here on that detail. Nothing replays legacy saves.
 
+**The opening is legacy's tutorial, verbatim.** It teaches the bootstrap-forge loop of a game whose
+economy you retired. It is a data record now, so re-authoring it for the rig is a diff of
+`data/starts/`, not code; I did not guess at the new opening.
+
 **Pre-pivot saves are refused, where the plan asked for a migration.** A v2 envelope is a metre-cell
 world with dead systems; converting it is a world converter for saves nobody holds. The refusal names
 itself and leaves the file. It is a deviation from your plan and sits in §8 for you to overrule.
@@ -202,8 +210,9 @@ is D0115's pattern, and it means one green suite depends on an engine defect per
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks the rest of step 3 (`world_seeder`, the `main.gd` blocks) or step 4's wiring of
-`HubTick.step` and `SaveGame` behind `Interface.apply`. The splitter waits on §8.
+Nothing blocks the last of step 3 (the `main.gd` blocks: mining's aim, line of sight, dig plan and lode
+cycle into `sim/mining`; the verbs into `sim/commands`) or step 4's wiring of `HubTick.step`, `SaveGame`
+and `WorldSeeder` behind `Interface.apply`. The splitter waits on §8.
 
 ## Taste queue
 

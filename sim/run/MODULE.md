@@ -2,10 +2,11 @@
 
 ## Purpose — SHAPE OPEN, 2026-08-27; the hub tick lives here since 2026-09-03
 
-**What is here now (D0349):** `hub_tick.gd`, `HubTick` — legacy `FactorySim.tick()`'s fixed order as a
-stateless phase runner over the three services (`World`, `Items`, `Machines`), at `HUB_TICK_DIVISOR = 3`
-on the 60 Hz body tick (D0345). It is the sim's second phase group, not a session state machine, and
-it forecloses nothing below.
+**What is here now (D0349, D0353):** `hub_tick.gd`, `HubTick` — legacy `FactorySim.tick()`'s fixed
+order as a stateless phase runner over the three services (`World`, `Items`, `Machines`), at
+`HUB_TICK_DIVISOR = 3` on the 60 Hz body tick (D0345); and `world_seeder.gd`, `WorldSeeder` — the one
+door a new world comes through (generate, wrap, stamp a `data/starts` record, hand back the spawn).
+Neither is a session state machine, and both foreclose nothing below.
 
 This module's purpose used to be a session lifecycle: `MetaIdle -> SiteSelect
 -> RunConfig -> RunActive -> RunEnding -> RunResolved`, owning a flood clock
@@ -65,6 +66,10 @@ does the tick loop simply always run? Unresolved, part of the same open question
   in placement order, `Flow.step` (D0350), water, prune empty piles, `rates.sample` when a
   `ProductionRate` is handed in (D0351; seep and flora join on a ruling); `advance(body_tick, …) →
   fired`: `step` on every `HUB_TICK_DIVISOR`th tick.
+- `WorldSeeder` (`world_seeder.gd`, D0353) — `load_world(site, seed) → World`, `stamp(world, items,
+  machines, start_id, site_id = &"") → bool` (validates every fixture before stamping; `last_refusal`),
+  `stamp_record(…, dict)`, `spawn_logic_cell(start)`, `SURFACE_ROW_M` (the generator's datum in metres).
+  Lives here, not in `terrain_gen` as the plan filed it: stamping places machines and stocks the pack.
 
 ## Gotchas
 

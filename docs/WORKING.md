@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3g done, step 1 ruled; the seeder and the main.gd blocks next)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3h done, step 1 ruled; the main.gd blocks close step 3)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -74,9 +74,16 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   refused by name (§8 row). **Finding:** walls behind air are outside the terrain signature (D0261's rule);
   the save carries them through `TileGrid.wall_terrain_cells()`. 45 assertions.
 
+- **Step 3h — done (D0353).** `data/starts/` (a new kind: `tutorial.yaml` is legacy's opening as a record
+  of fixtures in metres from the spawn; `dev_kit.yaml` the opt-in stocked pack) and
+  `sim/run/world_seeder.gd` (`load_world`, `stamp` with validation before any write, `spawn_logic_cell`).
+  In `run`, not `terrain_gen`: it places machines and stocks the pack. The tree and the tool kit are not
+  carried. 36 assertions. **For the director:** the layout is legacy's tutorial verbatim; re-authoring
+  for the rig/Skipway opening is a diff of `data/starts/`.
+
 ### Next action
 
-The rest of step 3, in order: **`world_seeder`** (legacy's
+The last of step 3: **the `main.gd` blocks** (legacy's
 seeded placement of lodes, deposits, water onto the generated shaft). Then the **`main.gd` state-logic
 blocks** the plan's §3 lists. Each sub-step merged green on `main`. `HubTick.step` is not called from
 `Interface.apply` until step 4 opens the door. Every lifted `sort` goes through `Ordering`; every lifted

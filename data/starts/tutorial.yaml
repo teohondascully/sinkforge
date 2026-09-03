@@ -1,0 +1,36 @@
+# Legacy's tutorial opening (legacy/scenes/world_seeder.gd, MainView's layout constants at main.gd
+# 577-639), as a record. Columns are legacy's minus SPAWN_COL 49; rows are legacy's minus SURFACE.
+# Per-metre stocks become per-cell: 200 -> 13 (208 a metre), 45 -> 3 (48), 120 -> 8 (128), 400 -> 25 (400).
+id: tutorial
+site: shallow_clay
+spawn_col_m: 32
+fixtures:
+  # The surface ore vein beside spawn (STARTER_VEIN_CELL 47 and 48): the bootstrap ore you hand-mine.
+  - {kind: solid, dx: -2, dy: 0, material: ore_iron, deposit: 13}
+  - {kind: solid, dx: -1, dy: 0, material: ore_iron, deposit: 13}
+  # The guaranteed surface coal (TUTORIAL_COAL_CELLS 54): the drill's fuel.
+  - {kind: solid, dx: 5, dy: 0, material: coal, deposit: 13}
+  # The starter adit (ADIT_COLS 52, 53; chamber 54; ADIT_ROOF 1): a stepped cut, each column two rows
+  # tall and opening a row deeper than the last, so the body walks through at whatever height it arrives.
+  - {kind: open, cells: [[3, 1], [3, 2], [4, 1], [4, 2], [4, 3], [5, 2], [5, 3], [5, 4]]}
+  # The face: ore in the wall of the cells you stand in, at the back and bottom (ADIT_FACE_AMOUNT 45).
+  - {kind: lode, dx: 4, dy: 3, material: ore_iron, amount: 3}
+  - {kind: lode, dx: 5, dy: 2, material: ore_iron, amount: 3}
+  - {kind: lode, dx: 5, dy: 3, material: ore_iron, amount: 3}
+  - {kind: lode, dx: 5, dy: 4, material: ore_iron, amount: 3}
+  # The same vein continues behind rock, straight down off the bottom of the face (ADIT_DEEP_AMOUNT 120).
+  - {kind: lode, dx: 5, dy: 5, material: ore_iron, amount: 8}
+  - {kind: lode, dx: 5, dy: 6, material: ore_iron, amount: 8}
+  - {kind: lode, dx: 5, dy: 7, material: ore_iron, amount: 8}
+  # The bootstrap forge pocket (MINESHAFT_FORGE_CELL 46): a shallow one-deep well off the drill shaft.
+  - {kind: open, cells: [[-3, 0], [-3, 1]]}
+  - {kind: solid, dx: -3, dy: 2, material: clay, deposit: 0}
+  - {kind: machine, id: processor, dx: -3, dy: 0}
+  # The drill shaft (MINESHAFT_COL 56): an open mouth and drill cell so tossed coal drops onto the drill,
+  # a rich solid vein below it to bore (MINESHAFT_ORE_RICHNESS 400), the auto forge under that, a gap
+  # for ingots, a floor.
+  - {kind: open, cells: [[7, 0], [7, 1]]}
+  - {kind: solid, dx: 7, dy: 2, material: ore_iron, deposit: 25}
+  - {kind: open, cells: [[7, 3], [7, 4]]}
+  - {kind: solid, dx: 7, dy: 5, material: clay, deposit: 0}
+  - {kind: machine, id: processor, dx: 7, dy: 3}

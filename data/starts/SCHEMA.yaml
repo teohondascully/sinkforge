@@ -1,0 +1,15 @@
+fields:
+  id: {required: true, type: str}
+  # The site this start is authored against (a data/strata id); the seeder refuses any other.
+  site: {required: false, type: str}
+  # Where the body stands at a new game, in metres from the left edge, on the surface. Legacy's
+  # SPAWN_COL 49 of a 64-metre world, here the same fraction of a 64-metre one.
+  spawn_col_m: {required: false, type: int}
+  # The fixtures, stamped IN FILE ORDER. Each is a dict with a `kind` and the fields that kind reads;
+  # every cell is `dx`/`dy` in METRES from (spawn_col_m, the surface row), dy positive DOWN.
+  #   solid   dx dy material deposit   -- a metre of `material`; `deposit` per 4 px cell (16 to the metre)
+  #   open    cells: [[dx, dy], ...]   -- excavate whole metres (walls stay: the hole reveals them)
+  #   lode    dx dy material amount    -- a lode in the metre's wall, `amount` per 4 px cell
+  #   machine id dx dy                 -- a machine placed there (the cell must be open by then)
+  #   pack    item count               -- items in the pack, counted as produced (conservation holds)
+  fixtures: {required: true, type: list}

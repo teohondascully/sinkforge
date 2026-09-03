@@ -1,0 +1,13 @@
+# Legacy's `_dev_seed_pack`: a stocked pack so the build and automation loop can be exercised without
+# hand-mining a stack of ore first. Opt-in (legacy's dev_start). The splitter awaits its ruling and is
+# not here; `wood` has no material or use yet.
+id: dev_kit
+fixtures:
+  - {kind: pack, item: ore, count: 20}
+  - {kind: pack, item: ingot, count: 20}
+  - {kind: pack, item: coal, count: 20}
+  - {kind: pack, item: processor, count: 2}
+  - {kind: pack, item: lift, count: 1}
+  - {kind: pack, item: drill, count: 1}
+  - {kind: pack, item: generator, count: 1}
+  - {kind: pack, item: conduit, count: 10}

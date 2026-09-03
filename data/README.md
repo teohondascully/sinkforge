@@ -21,6 +21,8 @@ prevent.
 - `strata/` — terrain-gen tuning constants and per-site parameters.
 - `progression/` — meta-progression / unlock data.
 - `player/` — the player's own balance numbers: the pack's slot count and bulk cap.
+- `starts/` — a new game's opening: the hand-authored fixtures and pack stock a start stamps onto the
+  generated shaft (legacy's fourteen layout constants as a record).
 
 Each has its own README.md.
 

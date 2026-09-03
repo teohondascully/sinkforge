@@ -14950,3 +14950,42 @@ anyway) — rejected for legacy's reason, live references stay valid; a v2 conve
 save that exists).
 
 **Reverse cost:** CHEAP; one shell file, two accessors, one registry method, one suite, one ADR.
+
+## D0353 · 2026-09-03 · A′ step 3h: the world seeder — legacy's tutorial opening as a start record, stamped through the sim's verbs from `sim/run`
+
+**Decided:** (1) `data/starts/` is a new data kind (`SCHEMA.yaml`, README, codegen'd `StartsRecords`): a
+start is the hand-authored opening a new game stamps onto the generated shaft, as a list of fixtures
+(`solid`, `open`, `lode`, `machine`, `pack`) in file order, every cell `dx`/`dy` in metres from the spawn
+column on the surface row. `tutorial.yaml` is legacy `seed_tutorial` translated: the fourteen `MainView`
+layout constants (`main.gd` 577-639) become the record's cells, legacy's materials become this build's
+(`ore` → `ore_iron`, `earth` → `clay`), per-metre stocks become per-cell (÷16, D0349: 200 → 13, 45 → 3,
+120 → 8, 400 → 25). `dev_kit.yaml` is `_dev_seed_pack` minus the splitter (a ruling) and `wood` (no
+material). (2) `sim/run/world_seeder.gd` (`WorldSeeder`) is the procedure: `load_world` (legacy 735,
+reduced to `World.new(ShaftGenerator.generate(...))` — the generator writes the grid directly, so the
+ingestion is gone), `stamp`/`stamp_record` (validate every fixture's kind, material, machine id and
+bounds BEFORE stamping, so a bad record leaves the world untouched; the one refusal that comes after
+stamping began is a machine on a metre nothing opened, named with its cell), `spawn_logic_cell` (the
+air metre above the surface at the spawn column), `SURFACE_ROW_M` = `ShaftGenerator.SKY_ROWS` in metres.
+(3) It lives in `sim/run`, not the plan's `sim/terrain_gen`: stamping places machines and stocks the
+pack, which is above `terrain_gen`'s declared dependencies (`core`, `world`); `run` sits above all three.
+(4) Not carried: the tutorial tree (`_seed_tutorial_tree`: flora and the `wood`/`leaves` materials are
+not lifted) and the starter tool kit (`_seed_starter_kit`, the dead tool ladder, as the plan said).
+Opened metres keep the walls the generator gave them: legacy's "never write a backing wall behind an
+opened cell" was a rule of legacy's rendering dialect, and here a dug hole revealing its wall is the
+design (D0292). (5) `tests/test_world_seeder.gd`, 36 assertions: every fixture at its cell with its
+per-cell stock on a flat world, the spawn on solid ground, machines in file order, the placed and
+conservation invariants, a second stamp refused with the cell named, the dev kit's pack credited as
+produced, six refusals leaving every signature unchanged, twins signing the same, the running deposit
+and placed signatures agreeing with a rebuild, and the real generated `shallow_clay` site taking the
+start (64 metres wide, the spawn on solid ground, both forges placed). CI 77 → 78.
+
+**Content the director may want to re-author:** the layout is legacy's tutorial verbatim at the metre
+(spawn column 32 of 64, the same fraction as legacy's 49 of 64), teaching legacy's bootstrap-forge loop.
+Under the rig/Skipway design the opening may be different; the record is data and that pass is a diff
+of `data/starts/`.
+
+**Alternative:** the seeder in `terrain_gen` with `items`/`machines` added to its dependencies (inverts
+the tick-order reading of the module tower); the layout as constants in code (the plan and
+`data/README.md` both say no).
+
+**Reverse cost:** CHEAP; one data kind, one file, one suite.
