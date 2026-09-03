@@ -23,6 +23,22 @@ var was_on_floor: bool = false
 var landed_hard: bool = false  ## one tick, for the view: dust, shake, thump
 
 
+## The save's copy of this state and its inverse (A' step 4b, D0357): exactly the fields `signature`
+## covers plus `landed_hard`, so a loaded body walks on as the saved one would have.
+func capture() -> Dictionary:
+	return {"stride": stride, "stagger_ticks": stagger_ticks, "hold": hold, "fall_from_y": fall_from_y,
+		"was_on_floor": was_on_floor, "landed_hard": landed_hard}
+
+
+func restore(d: Dictionary) -> void:
+	stride = int(d.get("stride", 0))
+	stagger_ticks = int(d.get("stagger_ticks", 0))
+	hold = int(d.get("hold", 0))
+	fall_from_y = int(d.get("fall_from_y", 0))
+	was_on_floor = bool(d.get("was_on_floor", false))
+	landed_hard = bool(d.get("landed_hard", false))
+
+
 func signature() -> String:
 	return "%d,%d,%d,%d,%s" % [stride, stagger_ticks, hold, fall_from_y, was_on_floor]
 

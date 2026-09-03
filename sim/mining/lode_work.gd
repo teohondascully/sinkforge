@@ -48,5 +48,14 @@ func progress_per_mille() -> int:
 	return clampi(charge * 1000 / CYCLE_COST, 0, 1000)
 
 
+func capture() -> Dictionary:
+	return {"target": target, "charge": charge}
+
+
+func restore(d: Dictionary) -> void:
+	target = d.get("target", Mining.NO_CELL)
+	charge = int(d.get("charge", 0))
+
+
 func state_signature() -> String:
 	return "l%d,%d:%d" % [target.x, target.y, charge]

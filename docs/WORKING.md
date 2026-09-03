@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 1 (ruled), 2, 3 done; step 4 — the door — in progress, 4a done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–4 done; step 5, the grapple, next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -96,9 +96,23 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   window-bounded copies and the consumed flow-event channel; `MOVE` runs the hub every third tick;
   `Interface.state_signature()` over the whole session. 20 assertions.
 
+- **Step 4b — done (D0357). STEP 4 COMPLETE.** Nine `Command` kinds with details and named reasons;
+  the mine hold rides the move frame's aim (no second input format); `Session.capture`/`restore` (shell)
+  compose the session's save with the body's and the mining state's keys (the body required, checked
+  before the sim is touched); `Session.new_game` stands the body on the seeder's spawn. 34 assertions.
+
 ### Next action
 
-**Step 4b, the door's verbs** (plan §4): `Command` gains `mine_point`/`work` (the mine-hold loop:
+**Step 5, PRE-2 and the grapple** (plan §4): `core/fixed_point.gd` gains `normalize`, `dot`,
+`limit_length` (~40 lines, tests over hostile inputs, both roundings toward less energy);
+`sim/body/grapple.gd` from `legacy/scenes/grapple.gd` rewritten under `Fx` (`PUMP_CLAMP 1.05` stored as
+`21/20`; the two `delta` sites become per-tick integers; the aim is a recorded world cell); the swing
+coupling in `body.gd`; the nine missing body mechanisms from `player.gd` (rope climb, lift updraft,
+water wading, over-speed coast, step-down snap, machines-block, ramp glide (ruling), `place()`, carry
+weight); `view/visuals/rope_painter.gd`; `tests/test_grapple.gd` from legacy's rope checks. **Ruling
+gate:** the grapple's collision half touches the resolver (P-28); build the `Fx` layer and the solver
+first, the collision hookup waits. Golden re-pinned from CI Linux if body state changes. The plan's
+original text for step 4 follows, for the record: `Command` gains `mine_point`/`work` (the mine-hold loop:
 paint the plan, snap the aim, drain the plan, mine or work the lode, yield), `build`, `drop`, `collect`,
 `configure`, `link_winch`, `select`, `clear_plan`, with named rejection reasons; `Interface.capture()`
 /`restore()` add the body's and the mining state's keys over `SaveGame`; `Interface.new_game(site,

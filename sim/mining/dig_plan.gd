@@ -57,6 +57,16 @@ func clear() -> void:
 	marks.clear()
 
 
+func capture() -> Array[Vector2i]:
+	return Ordering.cells(marks)
+
+
+func restore(cells: Array) -> void:
+	marks.clear()
+	for cell: Vector2i in cells:
+		marks[cell] = true
+
+
 func state_signature() -> String:
 	var parts: PackedStringArray = []
 	for cell: Vector2i in Ordering.cells(marks):

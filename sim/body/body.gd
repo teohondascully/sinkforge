@@ -149,6 +149,27 @@ func state_signature() -> String:
 		gait.signature()]
 
 
+## The save's copy of the body (A' step 4b, D0357): every field `state_signature` covers, as ints.
+func capture() -> Dictionary:
+	return {"pos_x": pos_x, "pos_y": pos_y, "vel_x": vel_x, "vel_y": vel_y, "facing": facing,
+		"on_floor": on_floor, "coyote": _coyote_ticks_left, "jump_buffer": _jump_buffer_ticks_left,
+		"jump_held": _was_jump_held, "air_control_num": air_control_num, "gait": gait.capture()}
+
+
+func restore(d: Dictionary) -> void:
+	pos_x = int(d["pos_x"])
+	pos_y = int(d["pos_y"])
+	vel_x = int(d.get("vel_x", 0))
+	vel_y = int(d.get("vel_y", 0))
+	facing = int(d.get("facing", 1))
+	on_floor = bool(d.get("on_floor", false))
+	_coyote_ticks_left = int(d.get("coyote", 0))
+	_jump_buffer_ticks_left = int(d.get("jump_buffer", 0))
+	_was_jump_held = bool(d.get("jump_held", false))
+	air_control_num = int(d.get("air_control_num", AIR_CONTROL_NUM))
+	gait.restore(d.get("gait", {}))
+
+
 func _left_x() -> int:
 	return pos_x - (WIDTH_PX * Fx.SCALE) / 2
 

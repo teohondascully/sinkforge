@@ -7,8 +7,8 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 **Last updated: 2026-09-03, tenth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data leaves),
 3b (world planes and verbs), 3c (items), 3d (machines + power), 3e (transport), 3f (the economy's live
 remainder), 3g (save v3), 3h (the world seeder) and 3i (the main scene's blocks) done. STEP 3, THE
-HUB LIFT, IS COMPLETE; step 4, the door, is in progress (4a done).** Ledger: D0343–D0356; ADR 0009,
-ADR 0010.
+HUB LIFT, IS COMPLETE, AND SO IS STEP 4, THE DOOR; step 5, the grapple, is next.** Ledger:
+D0343–D0357; ADR 0009, ADR 0010.
 
 **Headline: the factory moves.** Items flow between machines every hub tick: down a column by the
 landing rule, up it by a lift that pays in power, across a Freight Winch that queues a trip, flies it
@@ -90,6 +90,10 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
   power, piles, the pack, rates, winch tables, the plan, the aim), a MOVE runs the hub on every third
   tick, flow events arrive on a consumed channel, and one signature covers the whole session. 20
   assertions. CI 80 → 81.
+- **Step 4b (D0357).** Nine command kinds with details and named reasons; the mine hold rides the move
+  frame's aim rather than becoming a second input format; the session saves and loads through the door's services from the shell
+  with the body's and the mining state's keys, signature-identical and ticking on; a new game stands
+  the body on the seeder's spawn. 34 assertions. CI 81 → 82. **Step 4 is complete.**
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.

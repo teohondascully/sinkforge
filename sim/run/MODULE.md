@@ -78,6 +78,9 @@ does the tick loop simply always run? Unresolved, part of the same open question
   2.5 m, not graced), `configure(cell) → toast`, `link_winch(cell) → armed|linked|failed`, `tick()` (ages
   the grace), `placeable()`, `body_occupies()`, `can_reach()` (`Aim.in_reach_logic`), `state_signature()`.
   Its state (selection, grace, the armed head) is session-scoped and not in the save.
+- `MineHold` (`mine_hold.gd`, D0357) — `step(frame, world, items, mining, plan, lode, body, building)`:
+  legacy `_update_mining`'s decision half over the step-3i blocks, one tick, riding the move frame's
+  aim and held button; `aim_cell`/`aim_is_lode` for the door's observation.
 
 ## Gotchas
 

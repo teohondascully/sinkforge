@@ -44,6 +44,7 @@ const HubPlanes = preload("res://interface/hub_planes.gd")
 class Result:
 	var ok: bool
 	var reason: StringName
+	var detail: StringName = &""   ## what an accepted verb did (`machine`, `picked_up`, `armed`, ...)
 
 	static func accepted() -> Result:
 		var r: Result = Result.new()
@@ -81,6 +82,8 @@ const REJECT_OUT_OF_BOUNDS: StringName = &"target_out_of_bounds"
 const REJECT_NOT_SOLID: StringName = &"target_not_solid"
 const REJECT_OUT_OF_REACH: StringName = &"target_out_of_reach"
 const REJECT_NO_LINE_OF_SIGHT: StringName = &"target_behind_rock"
+const REJECT_NOTHING_HAPPENED: StringName = &"nothing_to_do"     # a verb that found nothing to do there
+const REJECT_BAD_SELECTION: StringName = &"selection_out_of_range"
 
 ## THE SESSION'S SERVICES (A' step 4, D0356). The door owns the world with its planes, the item
 ## service, the machine registry, the body, the mining verb and its verb-layer siblings, the situated
@@ -96,9 +99,8 @@ var _plan: DigPlan = DigPlan.new()
 var _lode: LodeWork = LodeWork.new()
 var _verbs: Verbs
 var _rates: ProductionRate = ProductionRate.new()
+var _hold: MineHold = MineHold.new()
 var _events: Array[Dictionary] = []   # flow events since the last observe: the consumed channel
-var _aim_cell: Vector2i = Vector2i(-1, -1)
-var _aim_is_lode: bool = false
 var _tick: int = 0
 ## The derived window planes, refreshed on terrain or window change rather than per tick (D0340). Held
 ## per Interface, not per Observation, because an Observation is built and thrown away every frame and a
@@ -118,9 +120,10 @@ func _init(grid: TileGrid, body: Body, mining: Mining, world: World = null, item
 	_verbs = Verbs.new(_world, _items, _machines, _body)
 
 
-## Every owned state's signature, joined: the replay-determinism contract for the whole session.
+## Every owned state's signature, joined by `||` (the world's and the verbs' own signatures carry
+## single `|`s): the replay-determinism contract for the whole session.
 func state_signature() -> String:
-	return "|".join([_body.state_signature(), _world.state_signature(), _items.state_signature(),
+	return "||".join([_body.state_signature(), _world.state_signature(), _items.state_signature(),
 		_machines.state_signature(), _mining.state_signature(), _plan.state_signature(),
 		_lode.state_signature(), _verbs.state_signature()])
 
@@ -159,8 +162,8 @@ func observe(envelope: Envelope) -> Observation:
 	o.dig_marks = Ordering.cells(_plan.marks)
 	o.lode_target = _lode.target
 	o.lode_progress = _lode.progress_per_mille()
-	o.aim_cell = _aim_cell
-	o.aim_is_lode = _aim_is_lode
+	o.aim_cell = _hold.aim_cell
+	o.aim_is_lode = _hold.aim_is_lode
 	o.flow_events = _events.duplicate(true)
 	_events.clear()   # the consumed channel: not sim state, and the one thing observe empties
 	return o
@@ -231,12 +234,57 @@ func apply(command: Command) -> Result:
 			_body.tick(command.input, _world.grid)
 			_tick += 1
 			_verbs.tick()
+			var building: bool = _verbs.selected_machine_def() != null or _verbs.selected_build_material() != &""
+			_hold.step(command.input, _world, _items, _mining, _plan, _lode, _body, building)
 			HubTick.advance(_tick, _world, _items, _machines, _rates)   # every third body tick (D0345)
 			_drain_events()
 			return Result.accepted()
 		Command.Kind.MINE:
 			return _apply_mine(command.cell)
+		Command.Kind.BUILD:
+			return _outcome(_verbs.build(command.cell))
+		Command.Kind.DROP:
+			return _outcome(&"dropped" if _verbs.drop() > 0 else &"")
+		Command.Kind.COLLECT:
+			return _outcome(&"collected" if _verbs.collect() > 0 else &"")
+		Command.Kind.CONFIGURE:
+			return _outcome(StringName(_verbs.configure(command.cell)))
+		Command.Kind.LINK_WINCH:
+			return _outcome(_verbs.link_winch(command.cell))
+		Command.Kind.SELECT:
+			if command.index < 0 or command.index >= Pack.inventory_slots():
+				return Result.rejected(REJECT_BAD_SELECTION)
+			_verbs.selected = command.index
+			return Result.accepted()
+		Command.Kind.CLEAR_PLAN:
+			_plan.clear()
+			return Result.accepted()
 	return Result.rejected(REJECT_UNKNOWN_KIND)
+
+
+## A situated verb's outcome as a Result: what happened rides `detail`; nothing is a named rejection.
+func _outcome(detail: StringName) -> Result:
+	_drain_events()
+	if detail == &"":
+		return Result.rejected(REJECT_NOTHING_HAPPENED)
+	var r: Result = Result.accepted()
+	r.detail = detail
+	return r
+
+
+## THE SHELL'S HANDLE ON THE SESSION (A' step 4b, D0357): the owned services, for `shell/session.gd`'s
+## save and boot only. The layer lint lets the shell reach `sim/`; nothing else above L2 may take these,
+## and the view never does -- it reads observations. Not a second door: a save is the session's
+## exterior, and the shell writing it is what the door exists to keep everything else from doing.
+func services() -> Dictionary:
+	return {"world": _world, "items": _items, "machines": _machines, "body": _body, "mining": _mining,
+		"plan": _plan, "lode": _lode}
+
+
+## After a load: the consumed channel and the hold start clean, as a fresh process would have them.
+func reset_transients() -> void:
+	_events.clear()
+	_hold = MineHold.new()
 
 
 ## Validation lives HERE rather than in `sim/mining`, per `sim/commands/MODULE.md` ("validation and

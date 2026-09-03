@@ -37,6 +37,8 @@ scene (A′ step 3i, D0354) are their own interface files: `line_of_sight.gd`, `
   cursor (`nearest_reachable_solid`); else raw. `Aim.cell_of(point)`, `cell_center_fx(cell)`.
 - `DigPlan` — `marks` (STATE, signed), `paint(grid, from, to)` (a drag, sampled every half cell; cap
   `MAX_MARKS` 800), `nearest_workable(grid, body_x, body_y)` (prunes spent marks), `clear()`.
+- `Mining.capture()`/`restore()`, `DigPlan.capture()`/`restore()`, `LodeWork.capture()`/`restore()` —
+  the save's keys for the mining state, added by the door (D0357; ADR 0010 §1).
 - `LodeWork` — the hand on a lode: `work(world, items, mining, body_x, body_y, face, held) → item`
   (one unit every `LODE_CYCLE_TICKS` 33, quickened by the miner's rhythm, not banked; a full pack stalls
   it), `progress_per_mille()`, `target`/`charge` STATE, signed.

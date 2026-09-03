@@ -25,6 +25,10 @@ Everything: `core`, `sim`, `interface`, `harness`, `experiment`, `view`,
   service level; `last_invalid` names a refusal), `write(path, envelope)` (tmp, readback, `.bak`, rename),
   `read(path)` (falls back to `.bak`; `last_read` is `NONE / OK / RECOVERED / CORRUPT`), `SLOT`.
   Also `settings.gd` (`Settings`) and `settings_bindings.gd`, here since before the save.
+- `Session` (`session.gd`, D0357) — `capture(door) → envelope` (`SaveGame`'s keys plus the body's, the
+  mining state's, the plan's, the lode work's), `restore(door, envelope) → bool` (the body key required,
+  checked before the sim is touched), `new_game(site, seed, start_id) → Interface` (generate, stamp,
+  the body on the spawn). Takes the door's `services()`; the one place above L2 that may.
 
 ## Gotchas
 

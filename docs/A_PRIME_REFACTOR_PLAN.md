@@ -438,8 +438,11 @@ four services; one reach rule through `Aim`; 40 assertions). **STEP 3 COMPLETE.*
 
 **Status (2026-09-03), step 4:** 4a — DONE (D0356: the door owns every service; `Observation` in its own
 file with the hub's planes as window-bounded copies; the hub cadence inside `MOVE`; the consumed
-flow-event channel; one session signature; 20 assertions). Next: 4b (the `Command` kinds for the verbs
-and the mine-hold loop, the session's save keys, the new-game builder).
+flow-event channel; one session signature; 20 assertions). 4b — DONE (D0357: nine `Command` kinds
+with details and reasons, the mine hold on the move frame, the session captured and restored through
+the door with the body's and the mining state's keys, `new_game` on the spawn; 34 assertions). **STEP 4
+COMPLETE.** Next: step 5 (the `Fx` vector layer and the grapple; the resolver ruling gates its
+collision half).
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

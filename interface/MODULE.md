@@ -45,7 +45,13 @@ body, ages the verbs' grace and runs `HubTick` on every third tick (D0345). `sta
 every owned state's signature: the replay contract for the whole session.
 
 - `observe(Envelope) -> Observation` — pure. Any number of calls leave `state_signature()` identical.
-- `apply(Command) -> Result` — the only mutator. A rejected command changes nothing at all.
+- `apply(Command) -> Result` — the only mutator. A rejected command changes nothing at all. Since
+  A′ step 4b (D0357) every `Command` kind is matched: `MOVE` also runs the mine hold on the frame's
+  aim (`sim/run/mine_hold.gd`: paint the plan, snap the aim, drain the plan, mine or work the lode,
+  yield the break); the verbs answer with `Result.detail`.
+- `services() -> Dictionary` / `reset_transients()` — THE SHELL'S HANDLE: the owned services for
+  `shell/session.gd`'s save and boot (`Session.capture`/`restore`/`new_game`), and nothing else above
+  L2. The layer lint lets only the shell reach `sim/`; the view reads observations.
 - `Envelope`, `Observation`, `Result` are reached as `Interface.X`; `Envelope` and `Observation` live
   in their own files behind a `const` preload (one name, no second door).
 - `Observation` carries the hub's planes as window-bounded COPIES (`interface/hub_planes.gd`): water

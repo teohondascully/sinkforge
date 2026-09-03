@@ -36,14 +36,17 @@ that phase acts on.
 
 ## Public API
 
-`sim/commands/command.gd`, `class_name Command`. A tag plus a payload, no behaviour — two named
-constructors, `Command.move(InputFrame)` and `Command.mine(Vector2i)`, because a `Command.new()` with
-every payload defaulted would be a command with no kind and there is no valid one.
+`sim/commands/command.gd`, `class_name Command`. A tag plus a payload, no behaviour — named
+constructors only, because a `Command.new()` with every payload defaulted would be a command with no
+kind and there is no valid one. Nine members since A′ step 4b (D0357), one per verb the sim has:
+`move(InputFrame)`, `mine(terrain_cell)`, `build(logic_cell)`, `drop()`, `collect()`,
+`configure(logic_cell)`, `link_winch(logic_cell)`, `select(index)`, `clear_plan()`. Each is matched in
+`Interface.apply`, which answers with a `Result` whose `detail` says what a verb did and whose `reason`
+names why it did not (`nothing_to_do`, `selection_out_of_range`, the mine gates).
 
-**Two members because this build has two verbs.** `docs/ARCHITECTURE.md` §5 wants a vocabulary "small
-enough to read in one sitting"; writing the one the GDD eventually needs would put `Place`, `Haul` and
-`Craft` here as tags no submodule matches and no test can exercise, which is the failure this file's
-own gotcha below already records once. A third member arrives with a third verb.
+**A member arrives with its verb, never before it.** `docs/ARCHITECTURE.md` §5 wants a vocabulary
+"small enough to read in one sitting"; the mine hold is deliberately NOT a member: it rides `MOVE`'s
+`InputFrame`, whose aim cell and held button are already state-affecting input recorded per tick.
 
 `MOVE` carries a whole `InputFrame` rather than decomposing into per-key commands: that is §5's "raw"
 action level, a first-class member of the vocabulary rather than a legacy path. One command per

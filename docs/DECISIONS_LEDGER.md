@@ -15090,3 +15090,39 @@ consumed channel, and this is the pure-against-the-signature form of it. (6)
 envelope, `docs/adr/0007`); events cleared by the view (legacy's, a sim write from above L2).
 
 **Reverse cost:** CHEAP; two new files, one suite, one constructor extended.
+
+## D0357 · 2026-09-03 · A′ step 4b: the door's verbs — nine `Command` kinds, the mine hold on the move frame, the session captured and restored through the door, a new game on the spawn; step 4 complete
+
+**Decided:** (1) `Command` gains `build`, `drop`, `collect`, `configure`, `link_winch`, `select` and
+`clear_plan` beside `move` and `mine` — one member per verb the sim has, matched in `Interface.apply`,
+each answering a `Result` whose new `detail` carries what the verb did (`machine`, `picked_up`, `armed`,
+`linked`, …) and whose `reason` names why not (`nothing_to_do`, `selection_out_of_range`, the mine
+gates). `sim/commands/MODULE.md`'s "a member arrives with its verb" holds: every kind has a suite row.
+(2) THE MINE HOLD IS NOT A COMMAND. `InputFrame` already records `has_aim`/`aim_col`/`aim_row` and
+`mine_held` per tick as state-affecting input; a second input format is what §5 says not to build. So
+`MOVE` runs `sim/run/mine_hold.gd` (`MineHold.step`) after the body tick: legacy `_update_mining`'s
+decision half over 3i's blocks — paint the plan while held, snap the aim (exact while building), drain
+the nearest marked cell when the cursor offers nothing, charge rock or work a lode face, yield the
+break. `Command.mine(cell)` stays as the direct, gated form. (3) The session is captured and restored
+BY THE SHELL through the door's services: `shell/session.gd` (`Session`) composes `SaveGame`'s envelope
+with the body's key (new
+`Body.capture`/`restore`, `GaitState` too: exactly the fields the body's signature covers), the mining
+state's (`Mining.capture`/`restore`: the crack bank, rhythm, swing, bite radius), the plan's marks and
+the lode work's charge — ADR 0010 §1's "the caller adds" made concrete. The body key is REQUIRED and
+checked before `SaveGame.restore` runs, so a save without it refuses by name with every service
+untouched; the mining keys are additive. The verbs' state is not saved (D0355), and the suite pins that
+the selection differs after a load while body, world, items, machines, mining, plan and lode work sign
+identically and thirty held ticks on both sides agree. The first cut put this in `interface/` and the
+layer lint refused it — the door may hold neither `SaveGame` (shell) nor the start records (data) — so
+the door exposes `services()` for the shell alone, which is the one layer allowed to reach `sim/`; the
+view still reads observations only. (4) `Session.new_game(site, seed, start)`: `WorldSeeder` generates
+and stamps, the body stands on the spawn metre's floor. (5) The session
+signature joins its eight parts with `||`, because the world's and the verbs' own signatures carry
+single `|`s — found when a split-on-`|` comparison passed by coincidence on shifted indices. (6)
+`tests/test_interface_verbs.gd`, 34 assertions. CI 81 → 82. **Step 4 of A′ is complete.**
+
+**Alternative:** a `MINE_HOLD` command carrying the aim (a second input format); the verbs' state in
+the save (D0355 said session-scoped); the body key defaulted to the spawn (an error path that returns
+the passing value, D0352's rule).
+
+**Reverse cost:** CHEAP; two new files, one suite, seven kinds.

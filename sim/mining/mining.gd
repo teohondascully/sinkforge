@@ -260,16 +260,10 @@ static func hollow_at(grid: TileGrid, cell: Vector2i, dir: Vector2i) -> int:
 	return HollowTell.read(grid, cell, dir)
 
 
-## ONE TICK OF THE MINING VERB -- the seam described at the top of this file.
-##
-## `target` is the cell the player is aiming at, already resolved from a pointer by `view/controls.gd`;
-## this layer has no cursor and no viewport. `held` is the MINE button's raw held state, NOT an edge:
-## hold-to-charge is the whole mechanic.
-##
-## Returns the cell broken this tick, or `NO_CELL`. Order follows legacy exactly, because the order is
-## load-bearing: rhythm decays BEFORE it is read (so this tick charges at the already-decayed rate), and
-## cracks heal BEFORE the bank is advanced (so the cell being worked is excluded from ageing in the same
-## tick it is charged).
+## ONE TICK OF THE MINING VERB -- the seam described at the top of this file. `target` is the aimed
+## cell, already resolved; `held` is the MINE button's raw held state, NOT an edge: hold-to-charge is
+## the mechanic. Returns the cell broken this tick, or `NO_CELL`. Order follows legacy exactly and is
+## load-bearing: rhythm decays BEFORE it is read, cracks heal BEFORE the bank is advanced.
 func mine(grid: TileGrid, body_x: int, body_y: int, target: Vector2i, held: bool) -> Vector2i:
 	charging_cell = NO_CELL
 	broke_this_tick = false
@@ -318,6 +312,20 @@ func rhythm() -> int:
 	return _rhythm
 
 
+## The save's copy of the mining state (A' step 4b, D0357): the crack bank, the rhythm, the swing.
+func capture() -> Dictionary:
+	return {"cracks": _cracks.duplicate(), "rhythm": _rhythm, "rhythm_idle": _rhythm_idle,
+		"swing_ticks": _swing_ticks, "bite_radius": bite_radius}
+
+
+func restore(d: Dictionary) -> void:
+	_cracks = (d.get("cracks", {}) as Dictionary).duplicate()
+	_rhythm = int(d.get("rhythm", 0))
+	_rhythm_idle = int(d.get("rhythm_idle", 0))
+	_swing_ticks = int(d.get("swing_ticks", SWING_TICKS_X100 / 100))
+	bite_radius = int(d.get("bite_radius", DEFAULT_BITE_RADIUS))
+
+
 ## Age every banked crack except the one being worked; past the grace window they bleed off and evict.
 ## `keys()` returns a fresh Array in GDScript, so erasing inside the loop is safe; a port using a live
 ## iterator would need a snapshot.
@@ -354,15 +362,10 @@ func _break(grid: TileGrid, cell: Vector2i, material: StringName) -> Vector2i:
 	return cell
 
 
-## Clears the blow's whole disc, target first, then the rest in a fixed row-major scan -- a nested integer
-## `range`, never a `Dictionary` iteration, so the order is the same on every machine and `broke_cells` is
-## replay-stable (`CONTEXT.md`, "Determinism").
-##
-## Only SOLID, in-bounds cells are cleared and recorded, so `broke_cells.size()` is what the blow actually
-## removed rather than the disc's nominal area -- a bite at a wall's edge honestly reports the smaller
-## number. The disc is deliberately NOT reach-tested per cell: the charge was earned on the target, and at
-## r = 2 the rim reaches 8px past it against a 51.2px reach, which is the blow's own radius rather than a
-## way to mine further than the arm goes.
+## Clears the blow's whole disc, target first, then a fixed row-major scan (never a `Dictionary`
+## iteration), so `broke_cells` is replay-stable. Only SOLID, in-bounds cells are cleared and recorded:
+## a bite at a wall's edge honestly reports the smaller number. The disc is NOT reach-tested per cell:
+## the charge was earned on the target, and the rim is the blow's own radius, not extra reach.
 func _clear_bite(grid: TileGrid, target: Vector2i) -> void:
 	_cracks.erase(target)
 	broke_materials.append(grid.get_material(target))

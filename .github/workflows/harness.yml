@@ -379,6 +379,7 @@ jobs:
       #   test_mining_blocks.gd                          test_mining_blocks (the integer line of sight against legacy's float DDA, the aim snap, the dig plan, the break's yield, the hand on a lode -- A' step 3i, D0354)
       #   test_verbs.gd                                  test_verbs (the situated verbs: build and pick up every kind, drop into an eater or forward or down with its grace, scoop, configure, the two-press winch link -- A' step 3i, D0355)
       #   test_interface_hub.gd                          test_interface_hub (the door over the hub: every plane a window-bounded copy, the hub on every third tick, the consumed event channel, observe pure over the whole session -- A' step 4a, D0356)
+      #   test_interface_verbs.gd                        test_interface_verbs (every verb command with its detail or reason, the mine hold on the move frame, the session round trip through the door, a new game on the spawn -- A' step 4b, D0357)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -445,7 +446,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 81 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 82 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -468,6 +469,7 @@ jobs:
             res://tests/test_mining_blocks.gd \
             res://tests/test_verbs.gd \
             res://tests/test_interface_hub.gd \
+            res://tests/test_interface_verbs.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \

@@ -8,13 +8,11 @@ extends RefCounted
 ## `interface` and in each target submodule, not here"). If a method here ever needs a `TileGrid`, it has
 ## stopped being a command.
 ##
-## SMALL ON PURPOSE, and small because the game is small, not because this is a sketch. §5 says the
-## vocabulary "is small enough to read in one sitting"; there are two verbs in this build -- move the body
-## and mine a cell -- so there are two members. A third arrives with a third verb, not before. The
-## alternative, writing the vocabulary the GDD eventually needs, would put `Place`, `Haul` and `Craft`
-## here as unreachable tags that no submodule matches and no test can exercise, and
-## `sim/commands/MODULE.md`'s own gotcha exists because that has already happened once in this project's
-## history (the Freight Winch regrowing as ad hoc verbs on the pre-pivot entry point).
+## SMALL ON PURPOSE: §5 says the vocabulary "is small enough to read in one sitting". Two verbs until A'
+## step 4b (D0357) lifted legacy's situated verbs (`sim/run/verbs.gd`) and named each here: a member
+## arrives with its verb, never before it, and `sim/commands/MODULE.md`'s gotcha records why (the Freight
+## Winch once regrew as ad hoc verbs on the pre-pivot entry point). The mine-hold loop is NOT a member:
+## it rides `MOVE`'s `InputFrame`, whose `aim_col`/`aim_row`/`mine_held` already record it per tick.
 ##
 ## `MOVE` carries a whole `InputFrame` rather than decomposing it into per-key commands. That is §5's
 ## "raw" action level, stated there as a first-class member of the vocabulary rather than a legacy path:
@@ -23,13 +21,21 @@ extends RefCounted
 ## incompatible input format, which §5 names as the thing not to build.
 
 enum Kind {
-	MOVE,  ## one tick of raw input -- payload `input`
-	MINE,  ## excavate one cell -- payload `cell`
+	MOVE,        ## one tick of raw input -- payload `input` (the aim and the mine hold ride here)
+	MINE,        ## excavate one cell directly -- payload `cell`, a terrain cell
+	BUILD,       ## RMB at a metre: pick up what is there, else place what is selected -- payload `cell`
+	DROP,        ## Q: drop the selected stack (into an eater, forward, or down)
+	COLLECT,     ## scoop the piles within reach
+	CONFIGURE,   ## R at a metre -- payload `cell`
+	LINK_WINCH,  ## L at a metre: arm a head, then commit to a station -- payload `cell`
+	SELECT,      ## the hotbar index -- payload `index`
+	CLEAR_PLAN,  ## forget every dig mark
 }
 
 var kind: Kind
 var input: InputFrame = null   ## MOVE only
-var cell: Vector2i = Vector2i.ZERO  ## MINE only, terrain-cell coordinates
+var cell: Vector2i = Vector2i.ZERO  ## MINE: a terrain cell; BUILD/CONFIGURE/LINK_WINCH: a metre (logic) cell
+var index: int = 0             ## SELECT only
 
 
 ## Named constructors rather than a public `_init` with optional arguments: a `Command.new()` with every
@@ -40,6 +46,36 @@ static func move(frame: InputFrame) -> Command:
 
 static func mine(target: Vector2i) -> Command:
 	return _of(Kind.MINE, null, target)
+
+
+static func build(logic_cell: Vector2i) -> Command:
+	return _of(Kind.BUILD, null, logic_cell)
+
+
+static func drop() -> Command:
+	return _of(Kind.DROP, null, Vector2i.ZERO)
+
+
+static func collect() -> Command:
+	return _of(Kind.COLLECT, null, Vector2i.ZERO)
+
+
+static func configure(logic_cell: Vector2i) -> Command:
+	return _of(Kind.CONFIGURE, null, logic_cell)
+
+
+static func link_winch(logic_cell: Vector2i) -> Command:
+	return _of(Kind.LINK_WINCH, null, logic_cell)
+
+
+static func select(hotbar_index: int) -> Command:
+	var c: Command = _of(Kind.SELECT, null, Vector2i.ZERO)
+	c.index = hotbar_index
+	return c
+
+
+static func clear_plan() -> Command:
+	return _of(Kind.CLEAR_PLAN, null, Vector2i.ZERO)
 
 
 ## Both constructors funnel through here, which is not ceremony: written out separately they were
@@ -63,4 +99,6 @@ func _to_string() -> String:
 				input.move_dir, input.jump_pressed, input.mantle_hold, input.dig_pressed]
 		Kind.MINE:
 			return "Mine(%d,%d)" % [cell.x, cell.y]
-	return "Command(unknown kind %d)" % kind
+		Kind.SELECT:
+			return "Select(%d)" % index
+	return "%s(%d,%d)" % [Kind.keys()[kind].capitalize(), cell.x, cell.y]
