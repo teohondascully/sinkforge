@@ -4,143 +4,120 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-01. This round: the overnight run — eighteen PRs merged green (#16–#34), ledger
-D0286–D0314, every one rebase-merged with authorship clean.** WG-4 fully converted, five legacy ports
-landed with their sources named, and **six separate greens found to be measuring nothing.**
+**Last updated: 2026-09-02. This round: the FLIP-vs-FINISH feasibility analysis you asked for —
+Phase 1 only, analysis and recommendation, nothing executed.** Report: `docs/FLIP_ANALYSIS_2026-09-02.md`.
+Ledger: D0341. Four doc files changed; no code, no branch, nothing under `legacy/` touched.
 
-**Headline: a capture diff of ZERO pixels has two causes — the painter drew nothing, or the moment did
-not pose it — and nothing in the output separates them.** `SeamPainter` shipped correct, mounted on the
-real coordinator, mutation-tested, and its verification read **0 of 2,073,600 pixels changed**, which is
-exactly the signature D0289 taught this project to read as a dead layer. It was not the painter. The
-move that separates the two, in one run, is an **ungated full-viewport fill from the same layer**: it
-read 99.8% and proved the plumbing live and the gate closed. Then the fix went stale **inside the hour**
-when a world constant moved under it, and the replacement control passed on a frame that *still* diffed
-at zero — because the subject was **posed and off-camera**. "Posed" and "in frame" are different claims.
+**Headline: legacy's sim was never the non-deterministic part.** `FactorySim.tick()` is already
+node-free, fixed-tick at 20 Hz and integer-shaped — 24 live breakers, 77 lines, all mechanical. The
+non-determinism is the *scene layer*: two clocks (`sim.advance(delta)` in `_process`, the body in
+`_physics_process`) and state decided at frame rate in `main.gd`, `player.gd` and `grapple.gd`. That is
+23 rows out of 172, one structural fix of ~250–350 lines plus ~55, and the rebuild has already
+replaced its two largest pieces (`sim/body`, `sim/mining`). `FastNoiseLite` is not on legacy's state
+path. So the flip does not buy determinism; it buys day-one playability at the cost of the architecture.
 
 ---
 
 ## What landed
 
-**WG-4 is fully converted (D0305, D0307).** `cave.frequency` 0.11 → 0.0656, tuned and BUILT-PARKED per
-your ruling. The sweep behind it **falsified two predictions, one of them load-bearing**:
+**A complete read of every code file in the repository**, not a sample: 491 files (210 legacy, 281
+current) enumerated by `git ls-files`, split into 17 disjoint slices, read by 17 read-only workers,
+with a mechanical self-check — **491 of 491 accounted, 0 unaccounted, 0 duplicated** — before any
+conclusion was drawn. 197 breaker rows aggregated (172 legacy, 22 current, 3 host-bound tests), each
+with `file:line`, class, severity and conversion cost. 14 of 14 randomly sampled citations verified
+against the tree. Control greps with a positive control.
 
-| `freq` | lateral periods | void | pockets | median pocket | shelf carved |
-|---|---|---|---|---|---|
-| `0.11000` (before) | 2.51 | 0.0866 | 271 | 7 | 1 / 46080 |
-| **`0.06560` (shipped)** | **1.50** | **0.0845** | **139** | **15** | **6 / 46080** |
-| `0.02750` (metre-correct) | 0.63 | 0.0822 | 47 | **121** | **0 / 46080** |
+**The determinism verdict:** within-platform, about one working week. Cross-platform: open in BOTH
+trees — legacy carries 102 float rows (52 in the world generator), the current build carries 16 of the
+same class on its own terrain path (D0171/D0183, still at HEAD). Same fix either way.
 
-The metre-correct value does **not** make lateral caves vanish — it **consolidates** them, seventeen-fold.
-And **void fraction is flat across the whole 4× range**, which excludes `MASTER_PLAN_AUG30`'s stated
-most-likely explanation for P021's missing 15%.
-
-**Five ports, sources named.** The grain reveal (**D0308**, `world_renderer.gd:2262-2344`) — which
-closed PRE-4 and gave `core/seams.gd` its first caller after four sessions unwired behind one `int`. The
-stride and the stagger (**D0310**, `player.gd:45-71, 411-432, 625-643`), T1 #9 and #10. Per-material
-strike voices (**D0313**, `sfx.gd:26-35`). The bedding depth boost (**D0312**,
-`world_renderer.gd:1591-1594`) and `cave.frequency` (**D0307**) are the other two, both below.
-
-**PRE-1, PRE-3 and PRE-4 are all closed** and `LEGACY_GAP` had recorded none of it. **PRE-2, the `Fx`
-vector layer, is the only prerequisite genuinely open** — verified in the tree, not inferred. It gates
-the grapple.
+**The recommendation: FINISH, amended.** Lift `FactorySim` + `water_flow` + `power_flow` + `flora` +
+`save_game` into `sim/` as a block, split at their own seams (A′, 4.5–5.5 weeks), instead of
+per-component (A, 5.5–7) or the flip (B, 3.5–4 weeks, which forfeits the layer boundaries, size caps,
+L2 door and the 4 px world). Low–medium confidence on every duration; the ratios are firmer.
 
 ---
 
 ## What was learned
 
-**The house failure class ran six times this session and five were my own instruments.** Listed
-together because the shape is the lesson:
-
-1. **A capture that could not pose its subject** (D0309/D0311) — above. Twice, with the second failure
-   being a control that answered a *different question* from the one that mattered.
-2. **A suite printing `ALL PASS`, exit 0, with three tests calling methods that no longer existed**
-   (D0310). Only the D0115 masked-crash detector failed the run.
-3. **A palette test measuring a material that does not exist** (D0312). `matrix_color` answers an
-   unmapped material with a flat debug brown, so every patch measured a **constant**; spread read 0.0000
-   at both depths and the surviving comparison was `0 >= 0` and **passed**.
-4. **A mutation escaping because the population could not pose the gate** (D0308). The assertion "every
-   cell shares the worked cell's seam" was posed on a HORIZONTAL run — which walks `(1,0)`, and
-   `Seams.at` keys HORIZONTAL to the row. Every cell in it is horizontal *by construction*.
-5. **A probe wrong by a factor of fifteen** (D0314). It carved an already-carved grid and reported 66
-   shelf cells where the truth is 990. Only routing the *suite* through the same function exposed it —
-   **a shared implementation is a parity check that runs itself.**
-6. **A shipped Tier-0 closure resting on one cell** (D0307) — see below. The only one that is not mine.
-
-**And two harness traps I had already recorded and hit again:** `grep -c "ALL PASS"` as a pass detector
-matches `run_gd_test`'s own *"never printed its own ALL PASS line"* failure; and `godot ... | grep -m2`
-kills the engine with SIGPIPE **before the shutter fires**, writing no PNG while reporting nothing wrong.
-
-**Constants do not all convert the same way, and the check is comparing them, not reasoning about
-them.** WG-4 converts world-gen by ×4/×16/×0.5 because legacy's cell was a metre. The body is the
-**opposite regime**: `RUN_SPEED` 150, `GRAVITY` 900, `JUMP` −365, `MAX_FALL` 560 — four for four against
-legacy. So the stride and stagger port in **pixels**, unchanged. Converting them would have been the
-right procedure in the wrong regime.
+1. **The brief's premises did not survive measurement, and each error ran in the same direction.**
+   Legacy took 27 commit-days from 2026-06-27, not "under a week" (FactorySim is in commit 2). The
+   rebuild's game-LOC/day is at parity with legacy's (1,146 vs 1,056). The port is 35.9% by raw lines,
+   ~44% of live legacy. Legacy has 143 harness files and its own same-process determinism corpus. The
+   "wall-clock `advance`" is a ten-line accumulator over a fixed tick. Measure the tree, not the story.
+2. **What is actually slow, and why (C2's finding).** Three of the ledger's headline performance wins
+   — D0330, D0336, D0337 — are restorations of architecture legacy already had and the port dropped;
+   3,930 of `view/`'s 5,878 lines are smaller re-expressions of larger legacy originals. The rebuild has
+   been re-deriving leaves without porting the architecture, and treating the sim hub as KEEP-CURRENT
+   when its machines/items/water/power half has no current equivalent at all.
+3. **The flip's real cost is structural, not determinism.** Of 39 CI steps, 24 drop onto legacy free
+   and 11 are red on contact (15 game files over 400 lines, layer lint by construction, ~70 engine-import
+   lines). And five structural gates print `PASS (vacuously)` on a tree with no `core/` or `sim/` — a
+   flip that forgets the remap keeps a green CI with the architecture switched off.
+4. **`sim/body` does not lift back onto legacy.** Every determinism-carrying `sim/` file takes a
+   `TileGrid` (4 px terrain, 16 px logic); legacy's authoritative grid is a 32 px dictionary and its body
+   is 0.44 cells wide. No facade exists in either tree. Converting `player.gd` in place is cheaper — and
+   a flip therefore does not inherit the 102 body tests.
+5. **Legacy has instrument discipline the current build lacks** (L10, L12): a runner protocol with
+   VOID verdicts, stand-downs, a machine lock, a save sentinel and quotability gates (~1,850 lines of
+   shell), and a `check_base._verdict` that refuses a green which asserted nothing. `tools/run_suites.sh`
+   has none of it. Transfer regardless of the decision.
+6. **My own probe returned zero for every pattern once**, including one I knew was there: zsh does
+   not word-split a two-directory variable, so `git grep -- $G` searched a path that did not exist. Caught
+   by the positive control, not by looking at the numbers. The house failure class, in my hands.
+7. **Six workers "failed" per the harness (a session rate limit cut their final message) and all six
+   had complete reports on disk.** Neither the failure notice nor a completion message was evidence;
+   the mechanical 491/491 self-check was. Also: my dependency graph drew one edge that was a
+   name-shadow artefact (`factory_sim.gd:19`'s local `FineTerrain` const); L3 caught it.
 
 ---
 
 ## The decisions this round is waiting on
 
-**P028 · ANSWERED, and the answer changes P026 (D0314).** The 200-seed run is done. **990 shelf cells of
-3,072,000 — the mechanism is REAL**, WG-3's octave port genuinely gave the field a tail, and D0258's
-sentence is correct. **And 62.5% of individual seeds carve no shelf cell at all**, so `shelf_frac > 0.0`
-over six of them is a lottery: the shipped suite passes on **1 of its 6 seeds**, now printed every run.
+**The go/no-go.** A′ (finish, lift the hub whole) is the recommendation; B (flip) is viable, planned in
+the report, and roughly a week faster on this evidence at the price of the thesis. Phase 2 of either
+does not start without your word.
 
-*What is yours:* whether to replace it with a rate criterion. My own P028 proposed "≥1% of the non-shelf
-rate" — **measured, it is 0.52%**, so my recommendation would have failed a correct build. Derived, the
-threshold is ~0.3%.
+**If A′: one EXPENSIVE ruling before the lift starts** — giving `TileGrid` the machine/item/water/power
+planes at the 16 px logic cell (legacy's 32 px cell is one metre; so is this build's 16 px logic cell;
+the 4 px terrain and heightfield collision stay). It shapes the tick order's data, which is your call.
 
-***And this un-blocks P026.*** D0307 read "0 of 46,080 over 3 seeds at `cave.frequency` 0.0275" as WG-2
-re-opening. Against a base rate where 62.5% of seeds carve nothing, **three zeros is expected ~24% of the
-time at the shipped frequency**. **The blocker on the seventeen-fold larger cave was a sample size, not a
-defect** — and that reasoning was mine, hours earlier, drawing a categorical conclusion from n=3.
+**Three rulings the read surfaced regardless:** the Splitter, the Ore Vent and power gating (16 of
+legacy's 54 live tests hinge on them); and the Crusher/packing/seep chain (133 lines that exist only for
+the Drift Rig and are not on GDD §9's list).
 
-**P029 · legacy's bedding boost and this build's glimmer floor cannot both be satisfied.** Legacy's 2×
-requirement needs a constant ≥1.83; anything above ~1.0 pushes deepstone inside glimmer's shipped **0.25**
-distinctness floor, and glimmer is the reveal material. **No value satisfies both.** Shipped 1.0 — the
-largest that breaks nothing, still a **53% recovery** of post-veil deep spread. Option (2) in the entry,
-re-hueing glimmer away from deepstone, buys the whole range back and is an art call.
-
-**P026 · `cave.frequency`** — BUILT at 0.0656, full sweep table in the entry. **P027 · the veil's two
-missing halves.** **P004 · the per-commit fuzzer** now provably cannot pose a third mechanic: its longest
-unbroken heading in 50,000 ticks is **10**, against the **55** a stride needs.
+**Standing:** P026–P029, P004, P015/P017, T001–T004, unchanged.
 
 ---
 
 ## Anything that felt wrong even though it passed
 
-**I merged PR #30 before its post-rebase CI reported.** The branch had been green, I rebased it twice
-more against a moving main, and the `until` loop I used to wait returned an empty string rather than a
-count — so it fell through and the merge went ahead. **Main was then verified directly** (seven suites
-plus every structural gate, all green, and CI on main is green), so the outcome is fine and the
-*process* was not. A wait condition that can't distinguish "zero pending" from "I couldn't tell" is the
-same defect class as everything in "What was learned", one layer up.
+**The durations are estimates over a rate that is not stationary.** Aug 25–29 ran +235 game lines a
+day; Aug 29–Sep 1 ran +2,665. The sequential model has one day of data. I committed to numbers because
+a decision needs them, and stated the confidence; the ratios between directions are what I would
+trust, not the absolutes.
 
-**The `grain` capture moment is pinned to a tick, and a tick is a claim about a world.** It went stale
-once already, within an hour. It now carries its own positive control and the tool fails when the frame
-does not contain the subject — but the underlying fragility is unfixed: the right answer is a shutter
-that holds until its subject is posed, and I did not build one.
+**Nothing was run.** No test, no game, no probe. Everything in the report is a read of the tree, with
+greps and a spot-check as the controls. Four questions in the report's §9 are only answerable by a run
+— `randi_range`'s integer purity, `store_var`'s double round-trip, `str(float)`'s precision, and whether
+IEEE ops actually diverge across the two CI platforms — and the last has a zero-code probe waiting
+(`legacy/tools/frontier_corpus.gd` on both platforms).
 
-**A probe I wrote to answer P028 was wrong by a factor of fifteen, and only parity caught it.** Its first
-version carved an already-carved grid; it reported 66 shelf cells where the truth is 990. What exposed it
-was routing the *suite* through the same function and finding the six-seed numbers no longer reproduced.
-**A shared implementation is a parity check that runs itself** — two copies would have let the tool be
-confidently wrong forever.
-
-**Five of the six "instrument measured nothing" findings were in code I wrote this session.** The rate
-is not obviously falling. The one structural improvement that came out of it is worth more than the
-individual fixes: *when a verification reads zero, the second move is an ungated full-strength version of
-the same thing* — it separates "the mechanism is dead" from "the gate is closed" in a single run.
+**Three instruments in the current suite are quietly wrong today** (C5): `gate_status.py`
+mis-addresses the double-numbered gate 30 and its NO-CODE docstring is stale; `flaky_test_detector.py`
+can never parse `run_suites.sh`'s output; `run_local_battery.sh` exits 0 on failing gates unless
+`GATES_ONLY=1`. And gate 27 is red on this machine (36 untracked recording logs). Reported, not fixed —
+out of this task's scope.
 
 ---
 
 ## Blocked, and what it's waiting on
 
-**Nothing is in flight.** Every branch this run opened is merged and deleted; **zero open PRs**, and
-`origin/main` is green.
+**Phase 2 — on your go.** The 120 Hz programme and the sequential port are paused where WORKING.md
+left them; PR #47 merged 2026-09-02 and D0340 landed after it, so nothing is in flight.
 
-**Determinism held at every world and body change** — two processes bit-identical (first mismatch −1),
-seed+1 control diverging at checkpoint 0, at all three re-pins. Goldens harvested from CI's own Linux
-build per D0167 and cross-checked elementwise against local macOS: **0 of 200 differ, all three times.**
+**Determinism status unchanged:** gate 8 green on CI's Linux build at the last re-pin; the four
+D0183 float sites confirmed still present at HEAD (three at drifted line numbers).
 
 ## Taste queue
 

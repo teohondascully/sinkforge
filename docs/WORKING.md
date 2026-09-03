@@ -4,9 +4,48 @@ Not a log. Current stage, what's actually happening, and what would be lost if t
 right now. Updated as work happens. Resets when a stage closes — durable content moves to an ADR,
 a MODULE.md, or a claim first.
 
-**Last updated: 2026-09-01.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-09-02.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date, so a session that lands commits without touching this file is
 caught mechanically rather than relying on someone noticing later.
+
+## DIRECTOR TASK 2026-09-02 — FLIP vs FINISH analysis: DONE, awaiting the director's go/no-go
+
+**Phase 1 is complete; Phase 2 has not started and must not without the director's explicit
+approval.** The report is `docs/FLIP_ANALYSIS_2026-09-02.md`; the judgment call is D0341. This
+interrupted the 120 Hz programme; nothing below this section changed.
+
+**The one-line answer:** legacy's sim can be made deterministic within a platform in about a week,
+because it already is — `FactorySim.tick()` is fixed-tick and integer-shaped (24 live breakers, 77 lines,
+mechanical); the non-determinism is the scene layer's two clocks and frame-rate decisions (23 rows, one
+structural fix of 250–350 lines in `main.gd` plus ~55 in player/grapple). Cross-platform is open in BOTH
+trees (legacy 102 float rows, current 16, same class, same fix). `FastNoiseLite` is not on legacy's
+state path.
+
+**Recommendation:** FINISH, amended — lift `FactorySim` + water/power/flora/save into `sim/` whole
+(A′, 4.5–5.5 weeks) rather than per-component (A, 5.5–7) or flip (B, 3.5–4 weeks, forfeits layers,
+size caps, L2 door, and the 4 px world). Numbers are low–medium confidence; ratios firmer than absolutes.
+
+**Coverage (the addendum's gate):** 491 code files enumerated by `git ls-files`, 17 disjoint slices,
+17 read-only workers, 491/491 accounted, 0 unaccounted, 0 duplicated; 197 breaker rows aggregated
+(172 legacy); 14/14 random citations verified against the tree; control greps with a positive control.
+Raw reports live in the session scratchpad, not the repo.
+
+**Waiting on the director:** (1) go/no-go on A′ vs B; (2) if A′, the EXPENSIVE ruling on giving
+`TileGrid` the machine/item/water/power planes at the 16 px logic cell before the lift starts;
+(3) three rulings the analysis surfaced that gate 16 of legacy's live tests — Splitter, Ore Vent, power
+gating — and the Crusher/packing/seep chain not on GDD §9's list.
+
+**Transfer regardless of the decision (named in the report §7):** legacy's harness protocol and
+verdict discipline (`run_harness.sh`, `check_base._verdict`, lock, sentinel — absent from
+`tools/run_suites.sh`); the zero-code cross-platform probe (`legacy/tools/frontier_corpus.gd` on both
+CI platforms); a bit-exact state signature.
+
+**Instrument defects found on the way, not fixed (report §9):** `gate_status.py` mis-addresses the
+double-numbered gate 30 and its NO-CODE docstring is stale; `flaky_test_detector.py` can never parse
+`run_suites.sh`; `run_local_battery.sh` exits 0 on failing gates unless `GATES_ONLY=1`; gate 27 is red
+on this machine (36 untracked recordings); `view/fx/light_layer.gd:13`'s "NO CONSUMER" is stale;
+`erase.gdshader` is an uncited lift. `LEGACY_GAP.md`'s "15 call sites in five surfaces" is 23 in 6;
+`PORT_ORDER.md`'s "18 of 36" tokens is 13.
 
 ## CURRENT STAGE — the 120 Hz programme (2026-09-01)
 
@@ -36,8 +75,8 @@ built a per-frame observation at all; the fix is legacy-SHAPED (`factory_sim.gd:
 over turns that loop into a memcpy") but the component is ours. It touches `state_signature`'s storage,
 so it needs its own determinism pass and golden re-pin.
 
-**In flight: PR #47** (D0335–D0339). Its `test_shaft_replay_determinism` golden must be re-pinned from
-that PR's own CI Linux run — D0335 widens the world, which is a world-GENERATION change.
+**PR #47** (D0335–D0339) merged 2026-09-02 05:39Z; D0340 landed after it. Nothing in flight on the
+120 Hz programme.
 
 ## The sequential port (2026-09-01)
 

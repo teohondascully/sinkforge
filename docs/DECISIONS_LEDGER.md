@@ -14426,3 +14426,36 @@ This build has no coarse tier, so every per-cell painter and the observation its
 resolution: **14,080 cells for the same 40 metres, a 16x multiplier on everything that loops.** That is
 why the same algorithm cost 41 ms here and was cheap there, and why the fixes that worked were the ones
 that moved work off the quarter-metre grid entirely.
+
+## D0341 · 2026-09-02 · FLIP vs FINISH: the recommendation is FINISH, amended to lift `FactorySim` whole — legacy's sim was never the non-deterministic part
+
+**Decided:** recommend FINISH (Direction A) with one amendment — lift legacy's `FactorySim` live sim,
+`water_flow`, `power_flow`, `flora`, `machine_state` and `save_game` into `sim/` as a block, split at
+their own seams, instead of rebuilding machines/items/water/power/transport one component at a time.
+Recommendation only; Phase 2 does not start without the director's go. Full evidence:
+`docs/FLIP_ANALYSIS_2026-09-02.md`.
+
+**Alternative:** B, the flip — legacy as the base, the substrate's pieces inserted. Viable, planned in
+the same document, ~1 week faster on this evidence, and it forfeits the layer boundaries, the size caps,
+the L2 door and the 4 px world (reverts `docs/ARCHITECTURE.md` §9). Also considered: A as practised
+(slowest, and its slowness has a measured cause).
+
+**Why:** a complete read of all 491 code files (17 read-only workers, 491/491 self-check, 14/14
+spot-check, orchestrator control greps) found 172 breaker rows in legacy, only 23 of them within-platform,
+and all 23 one structural defect in the SCENE layer (two clocks; frame-rate state decisions in `main.gd`,
+`player.gd`, `grapple.gd`). `FactorySim.tick()` is already fixed-tick and integer-shaped: 24 live rows,
+77 lines, mechanical. `FastNoiseLite` is off legacy's state path (fine terrain is render-only; the
+player collides on the coarse grid). The 102 cross-platform rows are the same float class the current
+build carries on its own terrain path (16 rows, D0171/D0183 still at HEAD) — open in both directions,
+same fix. So the flip does not buy determinism; it buys day-one playability at the cost of the thesis.
+Meanwhile the rebuild's measured slowness is the re-derivation tax (C2: D0330/D0336/D0337 restored
+architecture legacy had; 3,930 view lines are smaller re-expressions of larger originals) plus treating
+the sim hub as KEEP-CURRENT when its machines/items/water/power half has no current equivalent at all.
+
+**Also corrected, measured:** legacy took 27 commit-days from 2026-06-27, not "under a week"; the
+rebuild's game-LOC/day is at parity with legacy's (1,146 vs 1,056); the port stands at 35.9% by raw
+lines, ~44% of live legacy; legacy has its own same-process determinism corpus and a harness protocol
+the current build lacks.
+
+**Reverse cost:** CHEAP for the document (delete it); the recommendation binds nothing until the
+director rules. The grid-planes step inside A′ is EXPENSIVE and is flagged for a ruling before it starts.
