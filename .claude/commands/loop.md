@@ -12,7 +12,7 @@ a unit, reported to the director, and treated the report as a terminus — same 
    State in one line which lane and item you are on. (Every iteration, not once — this is what makes the
    loop survive a compaction mid-run.)
 2. Read the queue. Take the first unchecked **DECISION-FREE** item, from any lane.
-3. Do it. Port-and-refactor per `docs/MASTER_PLAN_AUG30.md` §0 — never rewrite what legacy solved. Name
+3. Do it. Port-and-refactor per `docs/archive/MASTER_PLAN_AUG30.md` §0 (archived 2026-09-03; the rule now lives in `docs/A_PRIME_REFACTOR_PLAN.md` §1) — never rewrite what legacy solved. Name
    the legacy source you lifted from.
 4. Run the gates for what you touched (`tools/select_suites.py` picks the suites; the full sweep before
    push). A red you cannot clear in one attempt: revert that item, log it, **take the next item** — do

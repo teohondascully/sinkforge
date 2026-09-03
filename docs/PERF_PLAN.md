@@ -1,5 +1,9 @@
 # Performance — the 120 Hz programme
 
+> **Status: REFERENCE (2026-09-03, D0342).** The measurements and rules stand and `docs/A_PRIME_REFACTOR_PLAN.md`
+> §7 restates the ones the executor holds to. Two hypotheses to measure before the next perf change are
+> recorded there: the 262,144-cell one-shot bake after D0335, and the unmeasured widest zoom rung.
+
 **The bar, set by the director 2026-09-01: 120 Hz. 8.33 ms a frame.** This document is the ranked,
 sourced plan for getting there, and the recovered record of how legacy already did.
 

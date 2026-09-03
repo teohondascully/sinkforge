@@ -1,3 +1,8 @@
+> **ARCHIVED 2026-09-03.** The overnight fleet/lane plan of 2026-08-30. Superseded twice: by the
+> sequential-port directive of 2026-09-01 (`docs/PORT_ORDER.md`) and then by `docs/A_PRIME_REFACTOR_PLAN.md`
+> (D0341/D0342). Its §0 cardinal rule — port the logic, refactor the form, never rewrite from scratch —
+> survives verbatim in the A′ plan §1. Its "current (~15%)" figure and its lanes are historical.
+
 # MASTER PLAN — maximum verified progress by morning
 
 *For the engineer/orchestrator agent. Standing plan; re-read at the top of every /loop cycle. GOAL: the director wakes to a large amount of REAL, MERGED, GREEN progress — not five symptoms fixed, not a pile of half-branches, not a rewrite that reproduces what already worked. Close the legacy↔current gap comprehensively and fast, by PORTING working logic and refactoring it clean, to A+ modularity, self-tested by deterministic agent-playthroughs, merged frequently to ONE main. Foot on the gas. The only brakes are the corrupting-failure class (determinism) and the one corrupt-everything module (the collision resolver).*

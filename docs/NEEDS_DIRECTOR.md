@@ -798,7 +798,7 @@ believing it, and it is false** — the table below is the measurement, three se
    completely wrong.
 2. **Void fraction is FLAT across the entire range** (0.0822–0.0871, a 6% spread over a 4× frequency
    change). Frequency redistributes carved volume; it does not create or destroy it. So `cave.frequency`
-   **cannot** be the explanation for P021's missing 15% — `docs/MASTER_PLAN_AUG30.md` names it as "the
+   **cannot** be the explanation for P021's missing 15% — `docs/archive/MASTER_PLAN_AUG30.md` names it as "the
    explanation I find most likely" and this rules it out. That line should not survive into the next plan.
 3. **The real cost of `0.0275` is that WG-2 re-opens.** At the metre-correct value the shelf bands carve
    **exactly zero** cells, which is the impermeable-wall defect WG-2 existed to close, and

@@ -1,5 +1,9 @@
 # The coordinator→painter contract — Phase 0, awaiting the director's ruling
 
+> **Status: REFERENCE (2026-09-03, D0342).** The line below, "PROPOSED. Nothing here is built", was true
+> on 2026-08-30. The coordinator and the Frame contract it proposes LANDED as `view/world_view.gd`,
+> `view/frame.gd`, `view/paint_layer.gd` (D0240, D0244). The measured reach-in table is why it is kept.
+
 **Status: PROPOSED. Nothing here is built.** This is the Phase-0 deliverable of the coordinator-rebuild
 brief: the measured reach-in surface, a proposed contract, and the honest split between what `observe()`
 can answer today and what it cannot. The director rules on this before Phase 1 (the skeleton) starts.

@@ -1,3 +1,7 @@
+> **ARCHIVED 2026-09-03.** The WG-4 cell-denominated-constant conversion plan. EXECUTED in full
+> (D0305, D0307; `docs/BRIEF.md` 2026-09-01 carries the sweep table). Kept for the measurements and the
+> per-constant reasoning; nothing in it is pending.
+
 # WG-4 — the conversion plan
 
 **Read-only diagnostic pass. Nothing outside this file was touched.**

@@ -14459,3 +14459,36 @@ the current build lacks.
 
 **Reverse cost:** CHEAP for the document (delete it); the recommendation binds nothing until the
 director rules. The grid-planes step inside A′ is EXPENSIVE and is flagged for a ruling before it starts.
+
+## D0342 · 2026-09-03 · Doc hygiene for the A′ hand-off: two plans archived, four re-headed as reference, WORKING.md reset, the plan written — no code touched
+
+**Decided:** (1) `docs/A_PRIME_REFACTOR_PLAN.md` written as the single, self-contained execution plan
+for A′ (D0341), with a LIVE / LIFT / REFERENCE / DEAD / STALE-DOC classification of every code file
+(281 current LIVE; legacy 48 LIFT + 44 `.tres`, 112 REFERENCE, 50 DEAD = 210), eight ordered steps with
+acceptance signals and re-pins, the 24 + 8 determinism rows to fix on the way in, and the rulings only
+the director can make. (2) `docs/MASTER_PLAN_AUG30.md` and `docs/WG4_CONVERSION_PLAN.md` moved to
+`docs/archive/` with dated headers (the first superseded twice, the second executed in full). (3)
+`LEGACY_GAP.md`, `PORT_ORDER.md`, `PERF_PLAN.md`, `COORDINATOR_CONTRACT.md` given a **reference** status
+header and a `docs/README.md` "Reference" section — a third status alongside normative and archived,
+because each carries measurements that stand and a sequence or status line that does not, and archiving
+would lose the durable half (`docs/README.md`'s own rule against wholesale archiving). (4)
+`LEGACY_MIGRATION_MAP_2026-08-29.md` amended: its KEEP-CURRENT verdict on `factory_sim.gd` is reversed.
+(5) `ONBOARDING.md`'s stage sequence marked superseded; `CONTEXT.md` gains one closing paragraph. (6)
+`docs/WORKING.md` reset from 515 lines to the current stage per its own rule (history in
+`git log -p`). (7) `README.md` rewritten in an engineer's voice with measured numbers and proof links.
+
+**Alternative:** delete the superseded plans; leave WORKING.md accumulating; fold the plan into
+WORKING.md. Rejected: deletion loses the measurements and the cardinal rule; a 500-line WORKING.md is
+the fog the director named; a plan inside a file that resets does not survive.
+
+**Why:** the director's stated burnout is 500 files with live, reference, stale and dead
+indistinguishable and no single document saying "execute this". The plan's §3 is that distinction,
+generated from the 2026-09-02 complete read's per-file verdicts rather than retyped. The reference
+status is a judgment call outside `docs/README.md`'s two-status taxonomy and is recorded here as one.
+
+**Not done, on purpose:** no dead code removed (the plan lists it), no instrument fixed (the six known
+defects are listed in WORKING.md), no refactor step executed. `CONTRIBUTING.md` left as is: it already
+declares itself stale in its own header. `NEEDS_DIRECTOR.md` (1,104 lines) not audited row by row.
+
+**Reverse cost:** CHEAP — `git mv` back, delete the headers, restore WORKING.md from history; the plan
+and README are single files.

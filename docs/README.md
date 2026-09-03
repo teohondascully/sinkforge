@@ -31,6 +31,7 @@ Read in this order. These describe what is true now and what must remain true.
 | `NEEDS_DIRECTOR.md` | The parked queue: diagnoses with proposed remedies that a session stopped on rather than plowed through, because the call is the director's. Nothing in it has been applied. | Picking a run up cold, before `WORKING.md`; and whenever a session parks something. |
 | `LEGACY_MIGRATION_MAP_2026-08-29.md` | The pinned-hash file-level verdict on every legacy file (LIFT/MERGE/REBUILD/KEEP/DEAD/SKIP), plus the slice plan and the five director rulings. Dated in its own name because it describes two specific commits. | Before porting anything out of `legacy/`, or citing what a slice contains. |
 | `FLIP_ANALYSIS_2026-09-02.md` | The directional feasibility analysis the director asked for on 2026-09-02: flip the substrate into `legacy/` versus finish the rebuild. A complete read of all 491 code files by 17 read-only workers with a 491/491 coverage self-check, the exact determinism-breaker enumeration for legacy (172 rows, 23 within-platform), the measured cost of each direction, and the recommendation (FINISH, amended to lift `FactorySim` whole — D0341). Dated in its name because it describes one pinned commit. | Before deciding or re-litigating the project's direction; before treating legacy's sim as a rewrite target. |
+| `A_PRIME_REFACTOR_PLAN.md` | The self-contained execution plan for A′: the decision and why, the LIVE/LIFT/REFERENCE/DEAD classification of every file in the tree, the eight ordered steps with acceptance signals and re-pins, the determinism rows to fix, the rulings only the director can make. Written to survive compaction: a session should need only it, the analysis, and the tree. | Before touching `legacy/` or any empty `sim/` module; at the start of every A′ session. |
 
 Plus `adr/` — numbered decision records. An ADR is normative from the moment it merges.
 
@@ -39,13 +40,30 @@ a reader who has not yet found it should have read it first.
 
 ---
 
+## Reference (not normative, not archived)
+
+Plans and diagnostics whose measurements stand but whose sequence or status has been superseded. Each
+carries a dated status header saying what superseded it. Read them for their numbers and legacy
+addresses, never for what to do next.
+
+| Document | What it holds | Superseded by |
+|---|---|---|
+| `LEGACY_GAP.md` | ~667 capability rows with legacy addresses, ranked; the generator-defect findings. | `A_PRIME_REFACTOR_PLAN.md` §3.2 (sequence); `FLIP_ANALYSIS_2026-09-02.md` (two counts corrected). |
+| `PORT_ORDER.md` | Per-component port notes V1–V13, the unit regime, done-when signals. | `A_PRIME_REFACTOR_PLAN.md` (its KEEP-CURRENT line reversed, D0341). |
+| `PERF_PLAN.md` | The 120 Hz measurements, the two measurement traps, the rules extracted from legacy. | `A_PRIME_REFACTOR_PLAN.md` §7 restates the executor's rules. |
+| `COORDINATOR_CONTRACT.md` | The measured painter reach-in table and the Frame contract. | Landed as D0240/D0244; the status line is historical. |
+
+
 ## Archived
 
 `archive/` holds superseded documents. Each carries a dated header saying what superseded it.
 
 They are kept, not deleted, for one reason: `legacy/` still contains code that implements them, and an agent reading that code needs to be able to find out why it exists. A deleted rationale becomes an agent guessing.
 
-Two archived documents are worth knowing about specifically:
+Four archived documents are worth knowing about specifically:
+
+- **`MASTER_PLAN_AUG30.md`** (archived 2026-09-03) is where the cardinal rule of the A′ plan comes from: port the logic, refactor the form, never rewrite from scratch.
+- **`WG4_CONVERSION_PLAN.md`** (archived 2026-09-03) was executed in full (D0305/D0307) and is kept for the per-constant reasoning.
 
 - **The compatibility audit** measured the prior codebase against a target architecture. It remains accurate about the code it measured, and its methodology (thresholds stated before measurements, mechanical decision rule, a section on where the audit itself is likely wrong) is the standard for future audits.
 - **The pivot plan** is the source of most of what is in `GDD.md` §9 about which dead systems are entangled with which. It found, among other things, that removing power gating without replacing it fails silently rather than loudly.

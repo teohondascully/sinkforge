@@ -1,5 +1,11 @@
 # Legacy revival — Phase 1 file-level map
 
+> **Amended 2026-09-03 (D0341/D0342):** the `KEEP-CURRENT` verdict on `legacy/src/core/factory_sim.gd`
+> is REVERSED. It conflated the body and terrain (where the current build wins) with machines, items,
+> water, power and transport (where the current build has zero lines). The complete read of 2026-09-02
+> found the hub already fixed-tick and integer-shaped; `docs/A_PRIME_REFACTOR_PLAN.md` lifts it whole.
+> Every other verdict in this file stands as the pinned-hash record it was.
+
 **Committed 2026-08-29 as the pinned-hash record, per the director's Q5 ruling.** Nothing was ported,
 copied, or migrated to produce it; the working tree was returned to its opening state.
 

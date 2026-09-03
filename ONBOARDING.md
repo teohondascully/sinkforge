@@ -1,5 +1,10 @@
 # Sinkforge — Session Onboarding
 
+> **Amended 2026-09-03.** The stage-by-stage build sequence below (stages 1–7 toward C003, and the five
+> after) is superseded by `docs/A_PRIME_REFACTOR_PLAN.md`, which is the execution plan a fresh session
+> works from. The reading order, the working rules and the prohibitions here still hold. Read the plan
+> after `docs/WORKING.md`.
+
 *Paste this as the opening message of a fresh Claude Code session in the sinkforge repository. Everything you need is either in this message or in the documents it names.*
 
 ---

@@ -1,177 +1,93 @@
 # Sinkforge
 
-Sinkforge is a 2D vertical excavation and factory game: bore a persistent shaft, automate the extraction
-and routing inside it, and haul what you refine back to a permanent rig that stands as a continuous
-demand for specific material, unlocking the next capability each time it's satisfied. It is equally, and
-not incidentally, a measurement instrument for game design — the entire simulation runs headless and
-deterministic, so scripted agents can play it thousands of times and produce falsifiable evidence about
-whether the design works, rather than an opinion about whether it might.
+Sinkforge is a 2D vertical mining and factory game with a deterministic, engine-free simulation
+underneath it. You bore a shaft from a permanent surface rig, build extraction and routing inside the
+shaft, and haul refined material back up to a rig that keeps asking for more. The simulation runs
+headless and byte-identically on replay, so scripted agents can play the same game a human plays and
+the results can be compared.
 
-**Stage 4 of 7 toward `C003`, the first playable milestone — last updated 2026-08-27.** The build
-sequence toward `claims/C003-cold-start-reaches-d1.md` — a scripted agent satisfying the rig's first
-demand from a cold start, entirely headless — is ordered and stage-gated (`ONBOARDING.md`). `core/`
-(stage 1), a stub determinism harness (stage 2), and `sim/world`+`sim/terrain_gen` (stage 3) landed
-first. `sim/body` — collision, the heightfield ground plane, the full forgiveness set (step-up, corner
-correction, coyote time, jump buffer) — is stage 4, and its movement acceptance suite is green against a
-hostile fixed chamber (`docs/ARCHITECTURE.md` §9). Next: `sim/commands`+`interface` (5), session/save
-infrastructure (6, shape open as of the second pivot below), and `harness/` (7) — the first
-scripted-agent run through the full interface. `ONBOARDING.md` lists five more stages after that
-(items/machines/behaviors/transport, `sim/fluid`, extraction and haul, a minimal `view/`, then closing
-`C003` itself) toward the fuller game. Live detail: `docs/WORKING.md` (current state) and `docs/BRIEF.md`
-(this session's digest).
+The repository holds two things: the game, and the instrument that measures it. Neither is finished.
+This file says what exists, what does not, and where the proof is.
 
-## Two pivots, and why they're a strength
+## State of the build, 2026-09-03
 
-Until 2026-08-25 this was a persistent-world factory game. It didn't get rewritten on a hunch — it got
-measured, twice, independently. A 20-agent structural audit found the simulation layer roughly 72%
-compatible with an engine-free, deterministic rewrite, with zero dependency cycles across the entire
-script graph (`docs/archive/COMPAT_AUDIT_2026-08-25.md`). A second pass, reading the shipped economy
-rather than the code's shape, found the core loop had no continuous demand at the top of its own tech
-tree: two of its highest-tier products were dead ends nobody needed more of, and the material meant to
-anchor the economy had quietly become a currency standing in for one
-(`docs/archive/PIVOT_PLAN_2026-08-25.md`). The architecture was sound. The game built on top of it
-wasn't demanding enough of the player to keep being a game.
+A complete, playable version of this game exists in `legacy/`, frozen at tag `pre-pivot`
+(2026-08-25). It has a forge, drills, ingots, water, a winch, a grapple, a full HUD and synthesized
+audio, and it runs headless end to end. Its economy was terminal: demand died about fifteen minutes in.
+Its simulation was not verifiable the way this project wants (two clocks, float kinematics in the
+scene layer, no cross-process replay).
 
-The first pivot's fix was a run-based roguelite: delete the factory every few minutes to force demand.
-It worked, but for the wrong reason — the diagnosis (no continuous demand) was correct, the persistence
-of the world was not the actual cause. A second pivot on 2026-08-27 kept the diagnosis and replaced the
-fix: the permanent surface rig is the continuous demand now, sitting above the player instead of below,
-wanting specific material instead of everything. Both pivots kept the architecture, nearly all the code,
-and the central asymmetry — down is free, up is powered — intact; neither touched `core/`, `sim/world`,
-`sim/terrain_gen`, or `sim/body` (confirmed directly, `docs/DECISIONS_LEDGER.md` D0076). Full design
-reasoning: `docs/GDD.md`.
+The current tree is the rebuild of that game on a deterministic substrate. What is in it, measured at
+`6f0d894e`:
 
-## What exists, and what doesn't
+| area | lines | what it is |
+|---|---|---|
+| `core/` | 422 | i32 fixed point, seeded splittable RNG, generational ids |
+| `sim/` | 2,992 | tile grid with a running state hash, seeded terrain generator, tick-only body, integer mining |
+| `interface/` | 622 | `observe()` and `apply()`, the one door into the sim |
+| `view/` | 5,706 | 17 visual modules and 3 shaders, HUD chips, audio, particles, all reading observations only |
+| `tests/` | 16,438 | 68 suites run by CI under the pinned engine, 446 test functions |
+| `tools/` | 8,709 py + 1,704 sh | 36 quality gates under 35 numbers (gate 30 is numbered twice) plus their mutation tests |
 
-Real and tested: `core/` (fixed-point arithmetic, a seeded splittable RNG, generational entity IDs),
-`sim/world` (the tile grid and material registry), `sim/terrain_gen` (seeded strata generation, cave
-carving, ore/coal/iron veins), `sim/body` (kinematics, collision, the sub-pixel heightfield ground
-plane, step-up/mantle/corner-correction/coyote/jump-buffer), and the first real check in
-`sim/invariants` (a diagnostic guard on `sim/body`'s floor resolution, `docs/adr/0005`). All of it is
-engine-free GDScript, verified against a from-scratch reference wherever the algorithm mattered,
-mutation-tested wherever it guards a real regression risk — every `tests/test_*.gd` suite, all green
-(`.github/workflows/harness.yml` runs each one under the real, pinned engine on every push, not only
-locally; see that file for the current count and list rather than a number here that would only drift).
+What is not in it: machines, items, water, power, transport, an economy, a grapple, a main scene.
+`sim/machines`, `sim/items`, `sim/transport`, `sim/fluid` and `sim/economy` are `MODULE.md` files with
+zero lines of code. You cannot play the current build as a game yet; you can run its debug scenes.
 
-Scaffolded and not yet built: ten more `sim/` modules (`commands`, `run`, `meta`, `items`, `machines`,
-`behaviors`, `transport`, `fluid`, `economy`, `telemetry`) each have a `MODULE.md` stating their
-responsibility and boundaries, and zero lines of code — `run`/`meta`'s own split is itself an open
-question again after the second pivot below, not just unbuilt. There is no `interface/`, no `harness/`,
-no `view/`, no playable build, and no packaged release. Three claims exist (`claims/`): one `RETIRED`
-(the design it measured no longer exists), two `BLOCKED`, never measured, because the modules they
-depend on don't exist yet. None of this is softened elsewhere in the repository — `docs/WORKING.md` and
-`docs/BRIEF.md` say the same thing in more detail, and the claim files carry their real status in their
-own front matter.
+The plan to close that gap is `docs/A_PRIME_REFACTOR_PLAN.md`: lift legacy's simulation hub, which a
+complete read found to be already fixed-tick and integer-shaped, onto the substrate as a block, then
+port the views it unblocks, then redesign the economy. The analysis behind that decision, including a
+per-file verdict on all 491 code files, is `docs/FLIP_ANALYSIS_2026-09-02.md`.
 
-## The architecture, and why
+## What is verified, and how
 
-The simulation is a pure, engine-free library, deterministic within a single platform/build — proven
-bit-identical across two independent processes on the same seed, not yet proven bit-identical ACROSS
-platforms for anything touching generated terrain, since multiple sites on the terrain-generation and RNG
-state path use real floats rather than fixed-point (corrected 2026-08-29, fix queue R5 — a prior version
-of this line named only the cave-carving noise as the exception; `docs/DECISIONS_LEDGER.md` D0183
-enumerates all four known sites, D0171 is the canonical crack reference, D0172 the fix diagnosis; the fix
-is a real design cycle, not yet scheduled). Everything else — Godot's renderer, a human player, a scripted
-agent — is a client of it, through one interface:
+Determinism is proven within a platform and open across platforms. `tests/test_shaft_replay_determinism.gd`
+runs a real generated world with a body driven 20,000 ticks by seeded random input in two separate OS
+processes and asserts 200 checkpoint hashes identical, then asserts them against goldens captured
+from CI's Linux build. It is green. The same run diverges between macOS-arm64 and Linux-x86_64 at
+checkpoint 3, because four sites on the terrain-generation path use floats (`docs/DECISIONS_LEDGER.md`
+D0171, D0183). That is a known, diagnosed gap with a scoped fix, not a surprise.
+
+The body is fuzzed goallessly every commit (100 seeds × 500 ticks) and nightly (1,000 × 1,500), with
+six invariants held at zero. The tracked human play recordings replay as a binding regression corpus.
+Every gate is mutation-tested: a check that has never been seen failing is not counted as a check
+(`docs/QUALITY.md` §2). Run `python3 tools/gate_status.py` for the live gate state; it reads the CI
+workflow rather than a hand-typed list.
+
+CI: `.github/workflows/harness.yml`, green on `main` at the time of writing.
+
+## Architecture in one screen
 
 ```
-L4  experiment   claims, sweeps, ablations, reports
-L3  harness      scenarios, envelopes, driver, aggregation
-L2  interface    observe() and apply(). THE ONLY DOOR into the sim.
-L1  sim          the entire game. deterministic. no engine.
-L0  core         fixed-point, seeded RNG, generational entity IDs
+L4  experiment   claims, sweeps, ablations          (README-only today)
+L3  harness      scenarios, envelopes, driver       (README-only today)
+L2  interface    observe() and apply()              (built)
+L1  sim          the game, deterministic, no engine (terrain, body, mining built; machines etc. not)
+L0  core         fixed point, seeded RNG, ids       (built)
+view/ and shell/ hang off L2 as peers of the agents.
 ```
 
-Dependency flow is one-way and lint-enforced (`tools/layer_lint/layer_lint.py`): `L0 ← L1 ← L2 ← L3 ←
-L4`, with `view/` and `shell/` hanging off L2 as peers of the agents rather than layered above the sim.
+Dependency direction is lint-enforced. `sim/` imports no engine class, reads no clock, does no IO.
+Positions and velocities are fixed point. The sim advances only by explicit tick. Full detail:
+`docs/ARCHITECTURE.md`; the design: `docs/GDD.md`; the four rules the design will not break: `CONTEXT.md`.
 
-Two invariants carry the whole design and neither is negotiable. A run must complete with no renderer
-open, or the research loop this instrument exists to run is dead. And agents and humans enter through
-the same door — `observe()`/`apply()` — because different doors would make their numbers incomparable
-and the whole instrument unfalsifiable. Full detail: `docs/ARCHITECTURE.md`.
+## Reading order
 
-## The method
-
-*No layer may certify all six questions.* That line is the clearest statement of what this project's
-evaluation program actually believes, and it belongs here rather than buried in a specification
-document. A technical pass can prove a state transition is correct; it cannot certify that the result
-is fun. An agent that fails a journey doesn't, by itself, prove the game is broken — the failure might
-be the agent's own capability limit, not a defect. So the evaluation program
-(`docs/EXPERIENCE_EVALUATION.md`) is deliberately six separate layers: deterministic system checks,
-real-engine encounter checks, calibrated agent journeys with actor-validity controls, screenshot-only
-criticism from an observer with no code access, counterfactual A/B on a pinned actor and seed, and
-human calibration sessions captured through the same interface an agent uses. Each layer answers a
-narrower question than the others on purpose, and no single number from any one of them is allowed to
-stand in for the rest.
-
-## The claim corpus
-
-Every design assertion the project currently defends is a file in `claims/`: an English statement, the
-scenario that exercises it, a metric, a threshold fixed before anything was measured, the current
-measured value, and a status. `C001-two-minute-run.md`, the original tracer bullet, is `RETIRED` — it
-measured a bounded two-minute run, and the run-based structure it depended on no longer exists (second
-pivot, below). `C003-cold-start-reaches-d1.md` replaces it: a scripted agent starts from a cold
-checkpoint and satisfies the rig's first demand, entirely headless. It's `BLOCKED` on nearly the entire
-remaining build sequence — no save/load code, no `interface/`, no `harness/`, no `data/economy/` yet.
-`C002-traversal-over-rubble.md` is narrower and further out — the same 0.92 velocity-efficiency
-threshold already required over clean geometry, measured instead against terrain the player just dug,
-because a controller that only passes on clean floors hasn't actually proven the resolution-split
-collision architecture works. It's blocked on `sim/body` and `sim/world`'s heightfield derivation.
-Every claim states plainly, in its own "what this does not measure" section, exactly what passing it
-would and wouldn't prove — a claim that oversells its own result is a defect in the claim, not a
-virtue.
-
-## The gates
-
-Ten structural gates run in CI on every push (`tools/layer_lint/`, `.github/workflows/harness.yml`):
-
-| Gate | What it checks |
-| --- | --- |
-| `layer_lint.py` | dependency direction between layers is one-way |
-| `no_engine_imports.py` | `core/`/`sim/` never touch the scene tree, file IO, the wall clock, unseeded randomness, or several other categories of engine coupling |
-| `check_coordinate_naming.py` | every coordinate crossing `sim/world`/`sim/terrain_gen`'s API names which of two grids it's on |
-| `check_size_limits.py` | no file over 400 lines, no function over 50 |
-| `check_loc_ratio.py` | instrument code isn't outgrowing game code |
-| `schema_validator.py` | every data file matches its schema |
-| `check_claim_references.py` | every scenario names a claim that actually exists |
-| `data_codegen/generate.py --check` | every generated `data/<kind>/generated.gd` matches its YAML source |
-| `check_working_freshness.py` | `docs/WORKING.md`'s stated date isn't older than `HEAD`'s own commit |
-| `check_project_settings.py` | `project.godot` keeps its load-bearing flags (static typing as a build failure, `DECISIONS.md`'s "Enforcement tripwire #1") — added after a non-headless Godot launch silently stripped it once |
-
-A separate `tests` job (added 2026-08-26, D0047) downloads the exact pinned Godot version this project
-develops against and runs every `tests/test_*.gd` suite under it — the gates above are static analysis
-over the source tree and answer questions that don't need the engine; the suites answer the ones that
-do (determinism, conservation, the movement acceptance thresholds in `docs/ARCHITECTURE.md` §9). Before
-this, "all green" above was locally verified only; every suite passing is now a CI fact, not a claim.
-
-Two findings this stage show the gates doing real work rather than performing it. `no_engine_imports.py`
-had checked for engine coupling since the project's restructuring, but only against a handful of
-hand-picked class names — an audit against Godot's actual class registry found it would have let 276
-more engine classes through silently, including something as ordinary as extending `Timer`. It's now
-derived directly from that registry (`docs/DECISIONS_LEDGER.md` D0026). Separately, mutation-testing
-`sim/terrain_gen`'s safety guards found that two of them survived being deliberately broken under the
-project's own full-scale integration test, because the condition each one protects against is rare
-enough that a normal run never happens to exercise it (D0024) — a real defect a green suite would not
-have caught, found by breaking the code on purpose rather than trusting that it passed. Both are now
-`docs/QUALITY.md` §2 rules, not one-off fixes to one file.
+`CONTEXT.md`, then `docs/GDD.md`, `docs/ARCHITECTURE.md`, `docs/QUALITY.md`, `docs/CLAIMS.md`, then
+`docs/WORKING.md` for what is happening now. `docs/README.md` says which documents are normative; if a
+document is not in that table it is not.
 
 ## `legacy/`
 
-`legacy/` holds the pre-pivot codebase: read-only, excluded from every build and every gate, tagged in
-full at `pre-pivot`. It's kept because the compatibility audit found most of it worth porting, not
-rewriting — deleting it to start clean would have thrown that finding away and read, correctly, as a
-panic rewrite it wasn't. Files leave one at a time: each commit that moves code out of `legacy/` names
-the original path, states what changed and why, and the result has to fit the new layer boundaries,
-size limits, and naming conventions or it doesn't leave yet. `legacy/README.md` has the detail.
+The pre-pivot game, read-only, excluded from the engine's import scan and from every gate, byte-identical
+to tag `pre-pivot`. It is kept because it is the worked reference the rebuild ports from, file by file,
+each commit naming the source path. `docs/A_PRIME_REFACTOR_PLAN.md` §3 classifies every file in it as
+LIFT, REFERENCE or DEAD.
 
-## Clone size
+## Repository size
 
-This is a large clone on purpose. `.git` is 351 MB and the tracked working tree is 332 MB;
-`history/` (229 MB, 166 dated screenshots) and `docs/media/` (104 MB, the canonical visual record of
-named moments) together account for nearly all of it, and both are tracked deliberately rather than
-referenced externally. Eighty-four screenshots from an earlier version of this archive were once
-permanently lost during a refactor, which is the entire reason `docs/DECISIONS.md`'s "never destroy a
-curated file" rule exists (LOCKED) — a release attachment or an LFS store was considered and rejected
-for the same reason a moved file isn't a deleted one: it would trade a strong protection for a weaker
-one. `legacy/` itself, the frozen pre-pivot code, adds only 7.3 MB on top of that. Neither `history/`
-nor `docs/media/` is read by the game; both carry a `.gdignore` so the engine's import scan skips them.
+The pack is about 511 MB. `history/` (170 files) and `docs/media/` (72) are tracked captures and are
+most of it; both are deliberate, both carry `.gdignore`. `legacy/` is 4.3 MB of tracked files.
+
+## License
+
+MIT. See `LICENSE`.

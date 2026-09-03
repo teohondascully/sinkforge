@@ -1,6 +1,13 @@
 # LEGACY_GAP — the ranked backlog
 
-**Generated 2026-08-30 per `docs/MASTER_PLAN_AUG30.md` §3.** The complete capability-level gap between
+> **Status: REFERENCE, superseded in sequence by `docs/A_PRIME_REFACTOR_PLAN.md` (2026-09-03, D0342).**
+> Its capability rows and legacy addresses stand and the plan's §3.2 view table is built from them. Two of
+> its numbers were corrected by the complete read of 2026-09-02 (`docs/FLIP_ANALYSIS_2026-09-02.md`):
+> "16.0%" is 35.9% by raw lines at `7bedcbd8` (~44% of live legacy), and "15 call sites in five
+> surfaces" (§Corrections 2) is 15 accessor NAMES at 23 sites in 6 surfaces. Rows marked open here may
+> have landed since 2026-08-31 (T1 #9 and #10 did, D0310); trust the ledger over this file's checkboxes.
+
+**Generated 2026-08-30 per `docs/archive/MASTER_PLAN_AUG30.md` §3.** The complete capability-level gap between
 `legacy/` (a finished game, 28,522 lines of game code in 55 files) and the current build (4,574 lines in
 32 files). This is a *living worklist*: pull the highest-ranked open item each cycle, and mark rows as
 they land.
@@ -45,7 +52,7 @@ Captured before any of this run's work, so later claims have something to be mea
 - `tools/capture_moments.sh` at seed 20260826, site `reveal_test_dense`: surface 192 / delve 178 / aim 149
   / horizon 168 distinct colours.
 - `test_shaft_replay_determinism` **74.4 s**, `test_replay_determinism` 9.5 s, `test_body_fuzz_fast` 5.8 s.
-  This confirms `MASTER_PLAN_AUG30.md` §6's number exactly, and `TileGrid.state_signature()` is the cause:
+  This confirms `docs/archive/MASTER_PLAN_AUG30.md` §6's number exactly, and `TileGrid.state_signature()` is the cause:
   it re-serialises every occupied cell into a `String` per checkpoint.
 - All structural gates PASS. `check_claim_references` is VOID by design.
 - One deliberately-untracked file: `tests/body/recordings/play_2026-08-31T05-14-20.log`, the director's

@@ -1,5 +1,12 @@
 # PORT_ORDER — the dependency-ordered port sequence
 
+> **Status: REFERENCE, superseded in sequence by `docs/A_PRIME_REFACTOR_PLAN.md` (2026-09-03, D0342).**
+> The per-component notes (V1–V13: legacy addresses, dependencies, done-when, the unit regime) stand and
+> the plan's step 6 follows this file's view order. What is reversed: the "What this order does not
+> include" line calling `factory_sim.gd` KEEP-CURRENT — the complete read found legacy's hub already
+> fixed-tick and integer-shaped (24 live breakers, 77 lines), so A′ lifts it whole and V5/V6/V8/V10/V11
+> close together (D0341). The "18 of 36" ui_theme figure in V7 is 13 of 36.
+
 **Written 2026-09-01 on the director's sequential-port directive.** One complete vertical at a time, in
 dependency order, each RUNNING and verified before the next begins.
 

@@ -279,3 +279,9 @@ pivot: the run/meta split `sim/run`/`sim/meta` assumed no longer applies, and no
 retired (`docs/GDD.md` §9, `docs/DECISIONS_LEDGER.md` D0076). Start point now: `claims/C003-cold-start-reaches-d1.md`,
 BLOCKED on nearly the entire remaining build sequence (its own `blocked_on` names what's missing). It is
 the definition of done for the entire first sequence of work.
+
+**2026-09-03:** the direction question is settled and planned. `docs/FLIP_ANALYSIS_2026-09-02.md` is
+the complete-read analysis (491 of 491 code files) and `docs/A_PRIME_REFACTOR_PLAN.md` is the
+self-contained execution plan: lift legacy's `FactorySim` hub whole onto this substrate, then the views
+it unblocks, then the rig-as-consumer economy. A session executing it needs only that file, the analysis,
+and the tree. Nothing in it had been executed at the time of writing.
