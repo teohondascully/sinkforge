@@ -14898,3 +14898,55 @@ and tempts a signature); a float rate (the one float the sim would carry, for a 
 reads).
 
 **Reverse cost:** CHEAP; one file, one suite, one optional parameter.
+
+## D0352 · 2026-09-03 · A′ step 3g: save v3 — one envelope over the planes, the item service and the registry; this game's first version, pre-pivot saves refused by name
+
+**Decided:** (1) `shell/save_game.gd` (`SaveGame`) per ADR 0010, lifted from `legacy/src/core/save_game.gd`:
+the transactional stage/commit, `REQUIRED_KEYS`, the no-default keys (legacy's "an error path that
+returns the passing value" rule, applied to `world_seed`, `width`, `height`), the migration chain that
+must arrive (empty, for v4), the winch reconciliation, the tmp/readback/bak/rename write and `read()`'s
+four verdicts. The keys are this game's: 22 top-level over `TileGrid` (blocks, walls, dig extents),
+`LogicGrid` (placed minus machines, tiers, saplings), `WaterPlane`, `DepositPlane`, `Pack`, `GroundPiles`,
+the ledger, the registry and the winch tables; 12 per machine. (2) **v3 is the first version;
+`OLDEST_READABLE = 3`.** Plan §5.3 asked for a v2→v3 migration unit-tested against a stored v2 fixture.
+A legacy v2 envelope (`solid` per metre, `fill`, `research`, `seep_tick`) is a different game's world,
+so that migration is a world converter for saves nobody holds: the current build has never saved. It is
+refused with the reason `pre-pivot save (v2): the world format changed`, the file left on disk, and the
+deviation is listed under §8 for the director; a converter can be a later migration branch. (3) Restore
+is in place at the SERVICE level: `_stage` builds fresh planes through each plane's public mutators
+(so every running signature is right by construction and a machine on a closed cell refuses the whole
+save), `_commit` swaps them into the caller's `World`, `Items`, `Machines` (new `Machines.adopt_from`),
+resets derived state and re-attaches `Items`. Holders keep the services; nothing may cache a plane.
+(4) **Finding: walls behind air are outside the terrain signature.** `TileGrid.set_wall`'s own comment
+says the signature sees a wall only through an occupied cell, so the first capture, which walked
+`occupied_terrain_cells()`, dropped every wall behind an open cell — and the round-trip signatures
+still agreed. The renderer draws those walls; the save now carries them through a new
+`TileGrid.wall_terrain_cells()`. Two worlds differing only in a wall behind air sign identically today;
+that is D0261's documented rule, and the golden cannot see such an edit. Recorded, not changed here.
+(5) Machine cells are not written into `placed`: `Machines.place` re-registers them on restore, so the
+plane cannot disagree with the registry. Order is preserved everywhere it is state (the machines array,
+the pack's hotbar, every buffer's keys): `store_var` keeps Dictionary order and restore never sorts.
+(6) The fixture guard is by PATH: this harness has no isolated user directory (`docs/QUALITY.md` §7's
+sentinel is unbuilt), so a `--script`/`-s` fixture may write any path except `SLOT` unless
+`SF_REAL_HOME=1`. The message is a `push_warning`: `tools/run_gd_test.sh` counts an `ERROR:` line as a
+masked crash. (7) The durability test damages the primary with a decodable non-envelope, not truncated
+bytes: a truncated file makes `FileAccess.get_var` print an engine-level error that the runner counts as
+a crash. `_read_file` handles the null the same way; the truncation branch is covered by reading, not
+exercised. (8) The body's keys (`player_pos` as `Fx`) are the caller's, added when the interface owns the
+body (steps 4–5); `restore` ignores keys it does not know. (9) `TileGrid.occupied_terrain_cells` now
+returns `Ordering.cells(_blocks)`, the same row-major order it sorted by hand; the golden did not move.
+(10) `tests/test_save_game.gd`, 45 assertions: a lived-in world (every plane, a latched hopper, a trip
+in flight) round-tripped with every signature equal and every rebuilt signature agreeing, then 100
+ticks on both sides; the same through disk; the fixture guard; nine refusals each naming its reason
+with the live services untouched; the additive keys defaulting; legacy's dangling-route reconciliation
+through a save (cargo to the surviving Head; with no Head, down its column into the machine below);
+and the write protocol with `OK / RECOVERED / CORRUPT / NONE`. CI 76 → 77.
+
+**Not here:** a v2 converter (ruling); the isolated user directory and its sentinel (QUALITY §7,
+harness work); the body's keys (step 5); the save's wiring into a session (step 4/6).
+
+**Alternative:** restore by returning fresh services (every holder re-wires; the interface is step 4's
+anyway) — rejected for legacy's reason, live references stay valid; a v2 converter now (large, for no
+save that exists).
+
+**Reverse cost:** CHEAP; one shell file, two accessors, one registry method, one suite, one ADR.

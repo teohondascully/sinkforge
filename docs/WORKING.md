@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3f done, step 1 ruled; save v3, the seeder and the main.gd blocks next)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3g done, step 1 ruled; the seeder and the main.gd blocks next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -67,11 +67,16 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   integer centi-items a minute, derived and unsigned (the plan files it "not saved"), sampled last in
   `HubTick.step` when a `ProductionRate` is handed in. 19 assertions.
 
+- **Step 3g — done (D0352, ADR 0010).** `shell/save_game.gd`: the v3 envelope (22 keys over every plane,
+  the ledger, the registry, the winch tables; 12 per machine), staged through public mutators then
+  committed in place at the service level, legacy's durability protocol and read verdicts, the
+  dangling-winch reconciliation. **Deviation:** v3 is this game's first version; a pre-pivot v2 save is
+  refused by name (§8 row). **Finding:** walls behind air are outside the terrain signature (D0261's rule);
+  the save carries them through `TileGrid.wall_terrain_cells()`. 45 assertions.
+
 ### Next action
 
-The rest of step 3, in order: **save
-v3** (`SaveGame.capture`/`restore` over the planes, the registry, the winch tables, the pack, the piles;
-legacy's dangling-route reconciliation test comes over with it). Then **`world_seeder`** (legacy's
+The rest of step 3, in order: **`world_seeder`** (legacy's
 seeded placement of lodes, deposits, water onto the generated shaft). Then the **`main.gd` state-logic
 blocks** the plan's §3 lists. Each sub-step merged green on `main`. `HubTick.step` is not called from
 `Interface.apply` until step 4 opens the door. Every lifted `sort` goes through `Ordering`; every lifted

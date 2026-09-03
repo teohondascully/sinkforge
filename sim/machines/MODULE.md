@@ -84,7 +84,8 @@ lift, splitter, winch, crusher and spur follow in step 3e or wait on a ruling (p
   in flight, lands in the Station's input; a dead route returns cargo to the Head), `status_mover()`,
   `status_winch_head()` (`unlinked`/`working`/`idle`/`no_power`/`blocked_station`).
 - On `Machines`: `winch_routes` (Head → Station) and `winch_transit` (Head → {items, ticks_remaining}),
-  STATE, in the signature; `link_winch()`, `purge_winch_route(cell) → cargo`; `remove` purges too.
+  STATE, in the signature; `link_winch()`, `purge_winch_route(cell) → cargo`; `remove` purges too;
+  `adopt_from(other)` takes a staged registry's contents whole (the save's commit, ADR 0010).
 
 ## Gotchas
 

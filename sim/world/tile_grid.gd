@@ -131,13 +131,21 @@ func extend_terrain_dig_extent(col: int, touch_top: int, touch_bottom: int) -> V
 ## to smuggle a wrong-scale coordinate past a caller as a parameter is, and `occupied_cells()` didn't
 ## carry the `terrain_cell` naming discipline every parameter here does -- an untyped `Array` from a
 ## function whose name doesn't say "terrain" told a reader nothing about scale at all.
+## A copy of the dug-extent table (col -> Vector2i(min_row, max_row)) for the save; `extend_terrain_dig_extent`
+## is its inverse. Read-only: the copy is the caller's.
+func dig_extents() -> Dictionary:
+	return _dig_extent.duplicate()
+
+
 func occupied_terrain_cells() -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for terrain_cell: Vector2i in _blocks:
-		cells.append(terrain_cell)
-	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		return a.y < b.y or (a.y == b.y and a.x < b.x))
-	return cells
+	return Ordering.cells(_blocks)
+
+
+## Every cell with a wall, behind rock or behind air, in scan order. The signature sees a wall only
+## through an occupied cell (see `set_wall`); the save must carry the ones behind air too, since the
+## renderer draws them (ADR 0010).
+func wall_terrain_cells() -> Array[Vector2i]:
+	return Ordering.cells(_walls)
 
 
 ## THE MIXER LIVES IN `core/state_hash.gd` (D0344). It was three private statics here (`_fold`, `_mix`,

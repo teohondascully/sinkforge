@@ -20,8 +20,16 @@ Everything: `core`, `sim`, `interface`, `harness`, `experiment`, `view`,
 
 ## Public API
 
-None yet. This directory is a skeleton — no code has been written.
+- `SaveGame` (`save_game.gd`, ADR 0010, D0352) — `capture(world, items, machines) → envelope` (v3, 22
+  keys), `restore(world, items, machines, envelope) → bool` (staged then committed in place at the
+  service level; `last_invalid` names a refusal), `write(path, envelope)` (tmp, readback, `.bak`, rename),
+  `read(path)` (falls back to `.bak`; `last_read` is `NONE / OK / RECOVERED / CORRUPT`), `SLOT`.
+  Also `settings.gd` (`Settings`) and `settings_bindings.gd`, here since before the save.
 
 ## Gotchas
 
-None yet.
+- **A `--script` fixture may not write `SLOT`.** The harness has no isolated user directory yet, so the
+  guard is by path; suites write scratch paths under `user://`. `SF_REAL_HOME=1` overrides.
+- **Holders keep the services, never a plane.** `restore` swaps `World`'s four planes, `Items`' pack,
+  piles and ledger, and the registry's contents; anything that cached `world.grid` is stale after a load.
+- **Pre-pivot (v2) saves are refused by name**, not migrated (ADR 0010 §2, plan §8).

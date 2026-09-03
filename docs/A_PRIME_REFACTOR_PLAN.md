@@ -424,8 +424,11 @@ here rather than transport, with the machine buffer as a Callable — `Items`, `
 `Flow` as the hub tick's third phase, `column_rise`, `updraft_at`, `Movers` for the lift and the
 Freight Winch with routes and transit on the registry and in the signature; the splitter waits on §8;
 58 assertions). 3f economy's live remainder — DONE (D0351: `ProductionRate`, centi-items a minute over a
-61-sample window, derived and unsigned, sampled by `HubTick` when handed one; 19 assertions). Next: save
-v3 (§5.3); `world_seeder`; the `main.gd` blocks.
+61-sample window, derived and unsigned, sampled by `HubTick` when handed one; 19 assertions). 3g save v3
+— DONE (D0352, ADR 0010: `shell/save_game.gd`, 22 keys over every plane, the ledger and the registry;
+staged then committed in place; legacy's durability protocol; 45 assertions). **Deviation from §5.3:** v3
+is this game's first version and a pre-pivot v2 envelope is refused by name, not migrated — listed
+under §8. Next: `world_seeder`; the `main.gd` blocks.
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 
@@ -633,6 +636,7 @@ Measured 2026-09-01 at the default framing: painters 4.01 ms (`veil 2.99 sky 0.9
 | Crusher + gravel + packing + seep (133 lines, exists for the Drift Rig) | step 3 | not on §9's list; rule before calling it dead |
 | `press_plate`, `mill_gear` (terminal products) | 2 recipes | machines survive; outputs need a consumer or go |
 | Material id vs item id (D0349): a bored `ore_iron` block yields the item `ore_iron`; the recipes take `ore`, `iron`, `rich_ore` | the automated line end to end; step 7 | a `yields:` field on the material record, or recipes renamed to the material ids |
+| Pre-pivot (v2) saves (D0352, ADR 0010): refused by name, not migrated — §5.3 asked for a migration | nothing: no player holds one, the current build never saved | keep the refusal; a converter is a later migration branch if you want legacy worlds to open |
 | HARDNESS `earth` 0.28 s = 5.6 ticks | `sim/mining` | 6 ticks |
 | `sim.ramp_dir` authored ramps vs `Heightfield` | step 5 body mechanisms | superseded by the heightfield |
 | The resolver (P-28) | step 5's collision half | — |

@@ -1,2 +1,3 @@
 Numbered architecture decision records, starting at 0001. An ADR is normative from the moment it merges. Required for any change to: tick phase order, save schema, layer boundaries, the behavior primitive set, the determinism strategy, the four design rules, or the language decision.
 - [0009](0009-metre-cell-planes-over-the-terrain-grid.md) — the metre-cell planes (`LogicGrid`, `WaterPlane`) sit beside `TileGrid` under one `World`; every metre-cell fact derives from its sixteen 4 px cells (D0345, D0347).
+- [0010](0010-save-envelope-v3.md) — one versioned save envelope (v3, this game's first) over the planes, the item service and the registry; staged then committed in place; legacy's durability protocol; pre-pivot v2 refused by name (D0352).

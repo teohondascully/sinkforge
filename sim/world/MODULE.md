@@ -43,7 +43,8 @@ phases — not itself one of the fixed tick phases.
 - `TileGrid` (`tile_grid.gd`) — the fine (4px) terrain/digging grid, sparse `Dictionary`-backed. Every
   coordinate is named `terrain_cell: Vector2i` (never a bare `cell`) — `docs/DECISIONS_LEDGER.md` D0020.
   `.get_material()`/`.set_material()`, `.get_wall()`/`.set_wall()` (the background layer, revealed by
-  `.excavate()` rather than erased with it), `.is_solid()`, `.in_bounds()`, `.occupied_terrain_cells()`
+  `.excavate()` rather than erased with it), `.is_solid()`, `.in_bounds()`, `.occupied_terrain_cells()`,
+  `.wall_terrain_cells()` and `.dig_extents()` (the save's reads, ADR 0010),
   (`Array[Vector2i]`, sorted, block cells only — named and typed this way, not the bare `Array` it
   returned before D0026's resolution audit, so a caller sees "terrain" without reading the doc comment),
   `.state_signature()` (canonical, for determinism checks; includes dig history, see below).
@@ -75,8 +76,7 @@ phases — not itself one of the fixed tick phases.
   refusals in legacy's order, minus the pack.
 
 **`Seams` is NOT here any more** (D0227 in, D0237 out to `core/seams.gd`: `view/` may reach `core`, never
-`sim`). It was never listed here while it was — a public-API list that omits a module's own file is the
-same shape as a gate that cannot see its subject.
+`sim`). It was never listed here while it was — the shape of a gate that cannot see its subject.
 
 ## Gotchas
 

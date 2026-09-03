@@ -150,6 +150,16 @@ func purge_winch_route(logic_cell: Vector2i) -> Dictionary:
 	return (transit.get("items", {}) as Dictionary)
 
 
+## Take over another registry's contents (the save's staged registry, ADR 0010 §4): the array, the
+## index, the winch tables. The derived field is cleared; the caller re-attaches `Items`.
+func adopt_from(other: Machines) -> void:
+	machines = other.machines
+	_by_cell = other._by_cell
+	winch_routes = other.winch_routes
+	winch_transit = other.winch_transit
+	power.clear()
+
+
 ## Give `Items` the two windows it needs into machine buffers: the buffer at a cell (for the landing
 ## rule and `deposit`) and the total of an item across every buffer and trip in flight (conservation).
 func attach_to(items: Items) -> void:

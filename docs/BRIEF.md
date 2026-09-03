@@ -4,10 +4,10 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, eighth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data
-leaves), 3b (world planes and verbs), 3c (items), 3d (machines + power), 3e (transport) and 3f (the
-economy's live remainder) done; the rest of step 3 (save v3, `world_seeder`, the `main.gd` blocks) is
-next.** Ledger: D0343–D0351; ADR 0009.
+**Last updated: 2026-09-03, ninth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data
+leaves), 3b (world planes and verbs), 3c (items), 3d (machines + power), 3e (transport), 3f (the
+economy's live remainder) and 3g (save v3) done; `world_seeder` and the `main.gd` blocks close step 3.**
+Ledger: D0343–D0352; ADR 0009, ADR 0010.
 
 **Headline: the factory moves.** Items flow between machines every hub tick: down a column by the
 landing rule, up it by a lift that pays in power, across a Freight Winch that queues a trip, flies it
@@ -66,6 +66,11 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
 - **Step 3f (D0351).** `sim/economy/production_rate.gd`: the production-rate ring buffer, the one live
   piece of legacy's economy, as integer centi-items a minute over a 61-sample window; derived, never
   signed; `HubTick` samples it when handed one. 19 assertions. CI 75 → 76.
+- **Step 3g (D0352, ADR 0010).** `shell/save_game.gd`: one v3 envelope over every plane, the ledger, the
+  registry and the winch tables, staged through public mutators and committed in place; legacy's
+  tmp/readback/bak/rename protocol and its four read verdicts; the dangling-winch reconciliation. A
+  lived-in world round-trips signature-identical, through memory and through disk, and stays identical
+  over 100 ticks on both sides. 45 assertions. CI 76 → 77.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -123,7 +128,16 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
     assertions; the verdict line has said 78 since the file was written. The standing rule is "verify a
     numeric claim against actual tool output" and I did not, for the one number that is easiest to
     verify. Corrected in D0350; every count in this brief was read off a verdict line today.
-14. **The transport contract's weakest call answered itself.** Its author could not decide whether
+14. **The terrain signature is blind to walls behind air, by its own rule.** The first capture walked
+    occupied cells, dropped every wall behind an open cell, and the round-trip signatures still agreed:
+    the instrument that was supposed to catch the loss cannot register that subject (`set_wall`'s comment
+    says so). The renderer draws those walls. The save now walks the wall plane itself; the golden's
+    blindness to such edits is recorded (D0352), not changed.
+15. **A runner that counts engine errors as crashes bounds what a durability test may do.** Truncating a
+    save file makes `get_var` print an engine-level error, which the masked-crash guard rightly refuses
+    to ignore. The test damages the file with a decodable non-envelope instead and says which branch it
+    therefore does not exercise.
+16. **The transport contract's weakest call answered itself.** Its author could not decide whether
     transport moves items or only prices routes. The lift decided: transport moves buffers the registry
     owns, and the things that fill a buffer are machine behaviours. The dependency now runs
     `transport → machines`, declared, with the old note replaced rather than left as a live question.
@@ -173,6 +187,10 @@ route to nowhere by hand. A posed field is a weaker witness than a reached one.
 first under a cap is state-affecting, so the sort rule applies; it is a documented deviation, and a
 replay of a legacy save would not match here on that detail. Nothing replays legacy saves.
 
+**Pre-pivot saves are refused, where the plan asked for a migration.** A v2 envelope is a metre-cell
+world with dead systems; converting it is a world converter for saves nobody holds. The refusal names
+itself and leaves the file. It is a deviation from your plan and sits in §8 for you to overrule.
+
 **The deposit correction moves a number a committed ledger entry stated.** D0348 is append-only and
 still says 250; D0349 corrects it with the reasoning. A reader of D0348 alone gets the wrong number.
 
@@ -184,8 +202,8 @@ is D0115's pattern, and it means one green suite depends on an engine defect per
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks the rest of step 3 (save v3, `world_seeder`, the `main.gd` blocks) or step 4's wiring
-of `HubTick.step` behind `Interface.apply`. The splitter waits on §8.
+Nothing blocks the rest of step 3 (`world_seeder`, the `main.gd` blocks) or step 4's wiring of
+`HubTick.step` and `SaveGame` behind `Interface.apply`. The splitter waits on §8.
 
 ## Taste queue
 
