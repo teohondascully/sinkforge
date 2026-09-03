@@ -21,6 +21,12 @@ extends RefCounted
 var machines: Array[MachineState] = []   # placement order, state
 var _by_cell: Dictionary = {}            # logic_cell -> MachineState
 var power: Dictionary = {}               # logic_cell -> milli-power, derived each tick
+## The Freight Winch's route table and in-flight trips (D0350): Head cell -> Station cell, and Head
+## cell -> {"items": Dictionary, "ticks_remaining": int}. Both STATE, both in the signature; a trip's
+## cargo counts as present. Edited from exactly three places: `link_winch`, `purge_winch_route`, and
+## the Head's own tick advancing a trip already in flight (`Movers`).
+var winch_routes: Dictionary = {}
+var winch_transit: Dictionary = {}
 
 
 func machine_at(logic_cell: Vector2i) -> MachineState:
@@ -51,15 +57,15 @@ func place(world: World, def: MachineDef, logic_cell: Vector2i, facing: int = 1)
 	return state
 
 
-## Remove the machine at a cell, if any. Items still in its buffers are DESTROYED with the machine and
-## credited to `total_consumed`, so present == produced - consumed holds. `MachineVerbs.pickup_machine`
-## salvages the buffers into the pack first and reaches here with nothing to destroy. Fuel and progress
-## are not items and are not credited. Returns the removed state, or null.
+## Remove the machine at a cell, if any. Items still in its buffers, and any winch cargo in flight
+## from or to it, are DESTROYED with the machine and credited to `total_consumed`, so present ==
+## produced - consumed holds. `MachineVerbs.pickup_machine` salvages both into the pack first and
+## reaches here with nothing to destroy. Fuel and progress are not items. Returns the removed state.
 func remove(world: World, items: Items, logic_cell: Vector2i) -> MachineState:
 	var state: MachineState = machine_at(logic_cell)
 	if state == null:
 		return null
-	for buffer: Dictionary in [state.input_buffer, state.output_buffer]:
+	for buffer: Dictionary in [state.input_buffer, state.output_buffer, purge_winch_route(logic_cell)]:
 		for item: StringName in Ordering.ids(buffer):
 			items.consumed(item, int(buffer[item]))
 	_by_cell.erase(logic_cell)
@@ -110,8 +116,42 @@ func power_throttle(logic_cell: Vector2i, demand_milli: int) -> int:
 	return clampi(power_at(logic_cell) * 1000 / demand_milli, 0, 1000)
 
 
+## The link verb: join an unlinked Head to an unlinked Station, writing one route. Both ends must be
+## the right machine AND unclaimed, which is what lets `purge_winch_route` assume at most one route
+## touches a cell. Reach is the caller's job.
+func link_winch(head_cell: Vector2i, station_cell: Vector2i) -> bool:
+	var head: MachineState = machine_at(head_cell)
+	if head == null or head.def.behavior != &"winch_head" or winch_routes.has(head_cell):
+		return false
+	var station: MachineState = machine_at(station_cell)
+	if station == null or station.def.behavior != &"winch_station":
+		return false
+	for existing: Vector2i in winch_routes.values():
+		if existing == station_cell:
+			return false                          # that Station already answers to a different Head
+	winch_routes[head_cell] = station_cell
+	return true
+
+
+## Does a route touch `cell`, as Head or Station? Purge it and any trip in flight on it, and hand back
+## the cargo ({} if none) for the caller to dispose of: `pickup_machine` salvages it, `remove` credits it.
+func purge_winch_route(logic_cell: Vector2i) -> Dictionary:
+	var head_cell: Vector2i = logic_cell if winch_routes.has(logic_cell) else Runners.NONE
+	if head_cell == Runners.NONE:
+		for h: Vector2i in Ordering.cells(winch_routes):
+			if winch_routes[h] == logic_cell:
+				head_cell = h
+				break
+	if head_cell == Runners.NONE:
+		return {}
+	winch_routes.erase(head_cell)
+	var transit: Dictionary = winch_transit.get(head_cell, {})
+	winch_transit.erase(head_cell)
+	return (transit.get("items", {}) as Dictionary)
+
+
 ## Give `Items` the two windows it needs into machine buffers: the buffer at a cell (for the landing
-## rule and `deposit`) and the total of an item across every buffer (for conservation).
+## rule and `deposit`) and the total of an item across every buffer and trip in flight (conservation).
 func attach_to(items: Items) -> void:
 	items.machine_buffer = func(logic_cell: Vector2i) -> Variant:
 		var m: MachineState = machine_at(logic_cell)
@@ -120,6 +160,8 @@ func attach_to(items: Items) -> void:
 		var n: int = 0
 		for m: MachineState in machines:
 			n += int(m.input_buffer.get(item, 0)) + int(m.output_buffer.get(item, 0))
+		for transit: Dictionary in winch_transit.values():
+			n += int((transit["items"] as Dictionary).get(item, 0))
 		return n
 
 
@@ -140,4 +182,24 @@ func state_signature() -> String:
 		var t: Vector2i = StateHash.text_term(body)
 		a ^= head.x ^ StateHash.mix(i, 0, t.x, 0, StateHash.LANE_A)
 		b ^= head.y ^ StateHash.mix(i, 0, t.y, 0, StateHash.LANE_B)
+	var winch: String = _winch_text()
+	if not winch.is_empty():
+		var w: Vector2i = StateHash.text_term(winch)
+		a ^= w.x
+		b ^= w.y
 	return "m%d:%d" % [a, b]
+
+
+## The winch state as text, routes then trips, each in cell order with cargo in text order.
+func _winch_text() -> String:
+	var out: String = ""
+	for h: Vector2i in Ordering.cells(winch_routes):
+		out += "r%d,%d>%d,%d;" % [h.x, h.y, winch_routes[h].x, winch_routes[h].y]
+	for h: Vector2i in Ordering.cells(winch_transit):
+		var transit: Dictionary = winch_transit[h]
+		out += "t%d,%d@%d" % [h.x, h.y, int(transit["ticks_remaining"])]
+		var cargo: Dictionary = transit["items"]
+		for item: StringName in Ordering.ids(cargo):
+			out += "|%s=%d" % [item, int(cargo[item])]
+		out += ";"
+	return out

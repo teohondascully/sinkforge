@@ -420,9 +420,11 @@ here rather than transport, with the machine buffer as a Callable — `Items`, `
 `DepositPlane` as `World`'s fourth plane, `check_item_conservation`). 3d machines + power — DONE
 (D0349: `Machines`, `PowerFlow` in milli-units, `Runners` for recipe/generator/hopper/pump/drill,
 `MachineStatus`, `MachineVerbs`, `HubTick` at `HUB_TICK_DIVISOR = 3`; the deposit default corrected to
-16 a 4 px cell; the drill bores the metre cell by cell; 112 assertions). Next: 3e transport (`_flow`,
-`_destinations`, `_deliver`, `_column_rise`, the lift, the winch, `updraft_at`; the splitter waits on
-§8); then economy; save; `world_seeder`; the `main.gd` blocks.
+16 a 4 px cell; the drill bores the metre cell by cell; 112 assertions). 3e transport — DONE (D0350:
+`Flow` as the hub tick's third phase, `column_rise`, `updraft_at`, `Movers` for the lift and the
+Freight Winch with routes and transit on the registry and in the signature; the splitter waits on §8;
+58 assertions). Next: economy's live remainder (`_sample_production`/`production_rate`, the rest is
+DEAD per D0341 and step 7's); save v3; `world_seeder`; the `main.gd` blocks.
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

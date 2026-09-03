@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3d done, step 1 ruled, 3e next)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3e done, step 1 ruled; economy/save/seeder/main.gd blocks next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -47,7 +47,7 @@ self-contained: a session executing A′ needs only that file, the analysis, and
 - **Step 3c — done (D0348).** `sim/items`: `Pack` (cap arithmetic; slots and cap from
   `data/player/pack.yaml`), `GroundPiles`, `Landing` (the column landing, machine below via a Callable),
   `Items` (take/spill/drop/collect/resettle/lode/deposit + the ledger), `BuildVerbs` (spend on place,
-  recover on removal), `DepositPlane` as `World`'s fourth plane, `check_item_conservation`. 79 assertions.
+  recover on removal), `DepositPlane` as `World`'s fourth plane, `check_item_conservation`. 78 assertions (D0348 and its commit said 79; the verdict line says 78 -- corrected in D0350).
 
 - **Step 3d — done (D0349).** `sim/machines`: `Machines` (the registry; placement order is state; the
   derived `power` field, `power_throttle` per-mille), `PowerFlow` (legacy's pass in milli-units off the
@@ -57,17 +57,23 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   cell (256 a metre), not D0348's 250 a cell — stocks per cell convert ÷16, rates ×16. **Finding for
   §8:** a bored `ore_iron` block yields `ore_iron`; the recipes take `ore`/`iron`/`rich_ore`.
 
+- **Step 3e — done (D0350).** `sim/transport/flow.gd` (`Flow`: every output to its one destination,
+  the hub tick's third phase; `column_rise`; `updraft_at`), `sim/machines/movers.gd` (the lift by the
+  throttle; the Freight Winch: link, trip, 40-tick flight, landing, station hold, purge on pickup or
+  removal, dead-route fallback), `winch_routes`/`winch_transit` on the registry and in the signature,
+  transit counted as present. 58 assertions; the machines suite re-expressed where outputs now flow.
+
 ### Next action
 
-Step 3e, transport: item flow between machines — `_flow` (the tick's third phase), `_destinations`,
-`_deliver`, `_column_rise` (the lift's mirror of the landing rule), `_run_lift`/`_status_mover` with the
-power throttle, `updraft_at` 585 (reads the registry's `updraft` flag), the Freight Winch (`_run_winch_head`,
-`_advance_winch_transit`, `_run_winch_station`, `link_winch`, `_purge_winch_route`; `winch_routes` and
-`winch_transit` are state and enter the signature), `machine_census`/`machine_problems` only if a
-consumer needs them before step 6. The splitter waits on §8. Then economy (`_sample_production`,
-`production_rate`); save v3; `world_seeder`; the `main.gd` state-logic blocks. Each sub-step merged
-green on `main`. `HubTick.step` is not called from `Interface.apply` until step 4 opens the door. Every
-lifted `sort` goes through `Ordering`; every lifted `call(name)` becomes a `match`.
+The rest of step 3, in order: **economy's live remainder** — `_sample_production`/`production_rate`/
+`production_rates` (a ring buffer of `total_produced` snapshots: state, so it enters the signature) as
+`sim/economy`; everything else in legacy's economy is DEAD (D0341) and step 7 redesigns it. Then **save
+v3** (`SaveGame.capture`/`restore` over the planes, the registry, the winch tables, the pack, the piles;
+legacy's dangling-route reconciliation test comes over with it). Then **`world_seeder`** (legacy's
+seeded placement of lodes, deposits, water onto the generated shaft). Then the **`main.gd` state-logic
+blocks** the plan's §3 lists. Each sub-step merged green on `main`. `HubTick.step` is not called from
+`Interface.apply` until step 4 opens the door. Every lifted `sort` goes through `Ordering`; every lifted
+`call(name)` becomes a `match`; every per-cell constant is asked "per what?".
 
 ### Waiting on the director
 

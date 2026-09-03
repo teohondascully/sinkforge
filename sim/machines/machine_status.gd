@@ -15,6 +15,10 @@ static func of(m: MachineState, world: World, machines: Machines) -> StringName:
 			return _status_hopper(m, world, machines)
 		&"pump":
 			return _status_pump(m, world, machines)
+		&"lift", &"winch_station":
+			return Movers.status_mover(m)
+		&"winch_head":
+			return Movers.status_winch_head(m, machines)
 	var recipe: RecipeDef = m.def.recipe
 	if recipe == null:
 		return &"idle"

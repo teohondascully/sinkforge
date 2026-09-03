@@ -14826,3 +14826,46 @@ dispatch on a runner instance (legacy's; needs the instance and a name that can 
 holding `Items` (the cycle).
 
 **Reverse cost:** CHEAP; eight new files, one suite, three touched.
+
+## D0350 · 2026-09-03 · A′ step 3e: transport — the flow phase, the lift's rise and updraft, the Freight Winch with its state in the registry
+
+**Decided:** (1) `sim/transport/flow.gd` (`Flow`) is legacy's `_flow` 2963, `_destinations` 3068,
+`_destinations_lift`, `_deliver` 3057, `_column_rise` 2409 and `updraft_at` 585, the hub tick's third
+phase between the runners and water, where legacy ran it. `sim/transport/MODULE.md` now declares
+`machines` as a dependency: the flow walks the registry and moves the buffers it owns, which also
+settles the contract's own "weakest-confidence" note (transport moves buffers; the registry owns them;
+the movers that fill an output are behaviours). (2) Every machine has ONE destination until the
+splitter is ruled (§8); `_split_pattern` and the round-robin dealing over `route_toggle` are not
+lifted, and the field is carried unused. (3) `column_rise`'s ceiling is any rock in the metre, the
+mirror of the landing rule's floor (D0348). (4) The lift and the Freight Winch run as `Movers`
+(`sim/machines/movers.gd`): `_run_lift` 2124 with `throughput`/`powered_throughput`/
+`power_demand_milli` off the record, `_run_winch_head` 2184, `_advance_winch_transit` 2229,
+`_run_winch_station` (a pure receiver: `pass`), `_status_mover` 547, `_status_winch_head` 2267 with the
+Station's cap read from the STATION's record. Which item rides first under a cap is state-affecting,
+so the lift's take and the winch's load walk the buffer in text order (`Ordering.ids`), where legacy
+walked insertion order — plan §5.1's sort rule applied; the hopper's latch stays insertion-ordered
+(row 016). (5) `winch_routes` and `winch_transit` live on `Machines`, are STATE, enter the signature
+(as text, cell-ordered, cargo text-ordered; an empty winch adds nothing so an empty registry still
+signs zero), and a trip's cargo counts as present through `machine_total`. `link_winch` and
+`purge_winch_route` are the registry's; `MachineVerbs.link_winch` is the verb. (6) `Machines.remove`
+purges the route and credits in-flight cargo as consumed, as legacy's `remove_machine` did — 3d
+omitted it because no winch existed; `pickup_machine` purges BEFORE removing and salvages the cargo,
+legacy's order. (7) The dead-route fallback (cargo returns to the Head when the Station is gone
+without a purge) is pinned by POSING the route to nowhere mid-flight: the only live path to it is a
+save that outlived its Station, which is save v3's test to write. (8) `tests/test_transport.gd`, 58
+assertions: legacy's `_test_lift` plus the powered and brownout caps, `column_rise` and `updraft_at`
+on the metre, a hopper's release ARRIVING in the forge and the ingots on the floor (what 3d could not
+show), the winch's link refusals, trip, exact 40-tick flight, landing, station hold, pickup salvage,
+raw-remove destruction, and the signature. `tests/test_machines.gd` re-expressed where an output
+buffer used to hold and now flows (same 112 assertions). CI 74 → 75. **Correction to D0348:**
+`tests/test_items.gd` has 78 assertions, not 79 — the verdict line has printed 78 since the file was
+written; the 79 in D0348 and its commit message was written without reading it.
+
+**Not here:** the splitter (ruling), `_run_crush`/spur (rulings), the save-reconciliation half of
+legacy's winch test (save v3), `machine_census`/`machine_problems` (step 6).
+
+**Alternative:** `Flow` inside `sim/machines` (keeps transport empty and its contract untouched, but
+puts R1's routing in the module that runs machines); insertion-order takes (legacy's, saved-order
+dependent).
+
+**Reverse cost:** CHEAP; two new files, one suite, five touched.

@@ -37,9 +37,7 @@ in an invalid cell" read machine state), `run` (extraction resolution may
 reference machine state — "termination" dropped from this line 2026-08-27:
 there is no more run-ending event to have a condition for).
 
-Note: `transport` is a peer of `items`/`machines`, not a consumer or a
-dependency of this module — it implements R1 (down free, up powered)
-alongside them, not through them.
+`transport` walks the registry and moves the buffers it owns (D0350).
 
 ## Tick phase
 
@@ -79,7 +77,14 @@ lift, splitter, winch, crusher and spur follow in step 3e or wait on a ruling (p
 - `MachineStatus.of(m, world, machines)` (`machine_status.gd`) — `working`/`idle`/`no_input`/`no_fuel`/
   `blocked`/`spent`, each read mirroring its runner's gates in order.
 - `MachineVerbs` (`machine_verbs.gd`) — static: `build_from_pack()`, `pickup_machine()` (salvage, then
-  remove, then spill — the order fix), `configure_machine()`.
+  remove, then spill — the order fix; purges a winch route and salvages its cargo), `configure_machine()`,
+  `link_winch()`.
+- `Movers` (`movers.gd`, D0350) — `run_lift()` (throughput → powered_throughput by the throttle),
+  `run_winch_head()`/`advance_winch_transit()` (a trip of `trip_capacity` × throttle, `transit_ticks`
+  in flight, lands in the Station's input; a dead route returns cargo to the Head), `status_mover()`,
+  `status_winch_head()` (`unlinked`/`working`/`idle`/`no_power`/`blocked_station`).
+- On `Machines`: `winch_routes` (Head → Station) and `winch_transit` (Head → {items, ticks_remaining}),
+  STATE, in the signature; `link_winch()`, `purge_winch_route(cell) → cargo`; `remove` purges too.
 
 ## Gotchas
 

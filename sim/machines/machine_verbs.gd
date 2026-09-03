@@ -37,12 +37,22 @@ static func pickup_machine(items: Items, machines: Machines, logic_cell: Vector2
 		for item: StringName in buffer:
 			salvaged[item] = int(salvaged.get(item, 0)) + int(buffer[item])
 		buffer.clear()   # salvaged out either way, and cleared so remove has nothing to destroy
+	# Freight Winch: purge before remove for the identical reason -- extract what this cell owed the
+	# route and transit tables so remove's own purge finds nothing left to destroy.
+	var transit_items: Dictionary = machines.purge_winch_route(logic_cell)
+	for item: StringName in transit_items:
+		salvaged[item] = int(salvaged.get(item, 0)) + int(transit_items[item])
 	machines.remove(items.world, items, logic_cell)
 	for item: StringName in Ordering.ids(salvaged):
 		items.take_into_pack(item, int(salvaged[item]), logic_cell)
 	items.pack.add(state.def.id, 1)
 	items.produced(state.def.id, 1)   # mirrors build's consume
 	return true
+
+
+## The link verb (legacy `link_winch` 3042): join an unlinked Head to an unlinked Station.
+static func link_winch(machines: Machines, head_cell: Vector2i, station_cell: Vector2i) -> bool:
+	return machines.link_winch(head_cell, station_cell)
 
 
 ## The configure verb (R in legacy): a hopper clears its filter and re-tastes. The splitter's ratio

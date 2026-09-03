@@ -152,6 +152,26 @@ func _solid_grid(material: StringName, size: int = 64) -> TileGrid:
 
 ## Body centre placed exactly on a terrain cell's centre, so every distance in a mining test is a clean
 ## multiple of the cell size rather than an offset that has to be reasoned about at each assertion.
+## A hub rig for the machine and transport suites (A' step 3d/3e): a fresh world of `logic_w` x
+## `logic_h` metres, all air, with an item service on it. `_hub_machines` makes the registry and attaches
+## it, so `Items.deposit` and conservation see machine buffers the way the hub wires them.
+func _hub_items(logic_w: int = 16, logic_h: int = 16) -> Items:
+	return Items.new(World.new(TileGrid.new(logic_w * LogicGrid.TERRAIN_PER_LOGIC, logic_h * LogicGrid.TERRAIN_PER_LOGIC, 1)))
+
+
+func _hub_machines(items: Items) -> Machines:
+	var machines: Machines = Machines.new()
+	machines.attach_to(items)
+	return machines
+
+
+## Hand `n` of `item` straight into a machine's input buffer from a pack that just received them.
+func _feed_machine(items: Items, logic_cell: Vector2i, item: StringName, n: int) -> void:
+	items.pack.add(item, n)
+	items.produced(item, n)
+	items.deposit(logic_cell, item, n)
+
+
 func _at_cell_centre(cell: Vector2i) -> Vector2i:
 	var cell_px: int = Heightfield.TERRAIN_CELL_PX * Fx.SCALE
 	return Vector2i(cell.x * cell_px + cell_px / 2, cell.y * cell_px + cell_px / 2)

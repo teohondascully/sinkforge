@@ -13,8 +13,8 @@ extends RefCounted
 ## has no instance to call by name, so the registry keeps the FLAGS and dispatch is a `match` on the same
 ## tag, which reads the same and cannot name a method that does not exist.
 ##
-## Lift, splitter, winch, crusher and spur run in step 3e (transport) or wait on a ruling (plan §8); a
-## tag with no runner here runs the default recipe exactly as legacy's table did for an unknown tag.
+## The lift and the winch are `Movers` (step 3e, D0350); splitter, crusher and spur wait on a ruling
+## (plan §8). A tag with no runner runs the default recipe, as legacy's table did for an unknown tag.
 ##
 ## THE DRILL ON THE METRE GRID (D0349): its target is a metre cell (`World.logic_ore_body`), it bores one
 ## unit a cycle with `World.bore_one`, which drains and excavates the metre's 4 px cells in scan order,
@@ -46,6 +46,12 @@ static func run(m: MachineState, world: World, items: Items, machines: Machines)
 			_run_hopper(m, world, machines)
 		&"pump":
 			_run_pump(m, world, machines)
+		&"lift":
+			Movers.run_lift(m, machines)
+		&"winch_head":
+			Movers.run_winch_head(m, machines)
+		&"winch_station":
+			pass                                  # a pure receiver: the Head lands trips in it
 		_:
 			_run_recipe(m, items)
 

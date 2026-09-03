@@ -4,15 +4,18 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, sixth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data leaves),
-3b (world planes and verbs), 3c (items) and 3d (machines + power) done; step 3e (transport) is next.**
-Ledger: D0343–D0349; ADR 0009.
+**Last updated: 2026-09-03, seventh round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data
+leaves), 3b (world planes and verbs), 3c (items), 3d (machines + power) and 3e (transport) done; the
+rest of step 3 (economy's remainder, save v3, `world_seeder`, the `main.gd` blocks) is next.** Ledger:
+D0343–D0350; ADR 0009.
 
-**Headline: machines run on the substrate.** A drill bores ore, burns coal and pours the units down its
-column; a generator lights a power field in milli-units that conduits carry down and sideways but never
-up; a pump drains only while powered; a hopper tastes, filters and meters; a forge smelts — all on the
-metre cell, in legacy's order, on every third 60 Hz tick, with the item ledger balanced through every
-buffer. One number in yesterday's step was wrong and is corrected: the ore deposit default was written
+**Headline: the factory moves.** Items flow between machines every hub tick: down a column by the
+landing rule, up it by a lift that pays in power, across a Freight Winch that queues a trip, flies it
+for forty ticks and lands it in its Station. A hopper's trickle now arrives in the forge below and the
+forge's ingots fall on to the floor. That sits on this morning's machines (a drill that bores, a
+generator that lights a milli-unit power field, a pump, a hopper, a forge), all on the metre cell, in
+legacy's order, on every third 60 Hz tick, with the item ledger balanced through every buffer and
+every trip in flight. One number in yesterday's step was wrong and is corrected: the ore deposit default was written
 per 4 px cell at legacy's per-metre value, which would have made a metre sixteen times richer and a
 drill sixteen times slower; it is 16 a cell now, 256 a metre against legacy's 250 (D0349). Earlier
 today: the metre-cell planes (D0347, ADR 0009), items (D0348), the data leaves (D0346), water (D0344),
@@ -47,14 +50,19 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
 - **Step 3c (D0348).** `sim/items`: the pack and its cap (the two numbers now `data/player/pack.yaml`),
   ground piles and the sink, the landing rule (lifted here, not transport; a machine below via a
   Callable so items never imports machines), `Items` with the ledger, `BuildVerbs` (spend on place,
-  recover on removal), the `DepositPlane` as `World`'s fourth plane, `check_item_conservation`. 79
-  assertions. CI 72 → 73.
+  recover on removal), the `DepositPlane` as `World`'s fourth plane, `check_item_conservation`. 78
+  assertions (recorded as 79 at the time; corrected, D0350). CI 72 → 73.
 - **Step 3d (D0349).** `sim/machines`: `Machines` (the registry — placement order is state; the derived
   `power` field; `power_throttle` per-mille is the one cost rule), `PowerFlow` (legacy's pass, milli-int,
   every constant a record field), `Runners` (recipe, generator, hopper, pump, drill), `MachineStatus`,
   `MachineVerbs` (build; pickup salvages, removes, THEN spills — legacy's order fix); `sim/run/hub_tick.gd`
   (`HubTick.step` in legacy's order, `advance` on every third body tick, D0345's cadence made).
   `World.bore_one`/`logic_ore_body` for the drill at the metre; `Items.eject`. 112 assertions. CI 73 → 74.
+- **Step 3e (D0350).** `sim/transport/flow.gd` (`Flow`: the flow phase, `column_rise`, `updraft_at`),
+  `sim/machines/movers.gd` (the lift by the throttle; the Freight Winch: link, trip, flight, landing,
+  station hold, purge on pickup or removal, dead-route fallback), `winch_routes`/`winch_transit` on the
+  registry and in the signature, transit counted as present. The splitter waits on your ruling. 58
+  assertions. CI 74 → 75.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -104,6 +112,18 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
 11. **The materials and the items no longer share a name.** Legacy's `ore` block yielded `ore`; the
     current world has `ore_iron`, and the recipes take `ore`/`iron`/`rich_ore`. The automated line cannot
     close until a material says what it yields — filed under §8, it is the economy's call (step 7).
+12. **A phase that lands later re-writes the tests of the phase before.** Six of 3d's assertions read
+    an output buffer that 3e's flow now empties on the same tick. They were true of a world without
+    flow and false of the game; re-expressed to read where the items land. A suite written against a
+    half-built tick order pins the half, and the header now says so.
+13. **A count I wrote from memory was wrong by one.** D0348 and its commit say the items suite has 79
+    assertions; the verdict line has said 78 since the file was written. The standing rule is "verify a
+    numeric claim against actual tool output" and I did not, for the one number that is easiest to
+    verify. Corrected in D0350; every count in this brief was read off a verdict line today.
+14. **The transport contract's weakest call answered itself.** Its author could not decide whether
+    transport moves items or only prices routes. The lift decided: transport moves buffers the registry
+    owns, and the things that fill a buffer are machine behaviours. The dependency now runs
+    `transport → machines`, declared, with the old note replaced rather than left as a live question.
 
 ---
 
@@ -142,6 +162,14 @@ the cost is that the table now lists only flags, and the dispatch is read from t
 **`head_coverage` is the head alone.** The drill's Spur reach is a one-line stub until Spur is ruled;
 the lode-head path is exercised through it, so the ruling changes one function, not the runner.
 
+**The dead-route fallback is pinned by posing a field.** The only live path to "the Station vanished
+without a purge" is a save that outlived it, which save v3 will test; until then the suite writes the
+route to nowhere by hand. A posed field is a weaker witness than a reached one.
+
+**The lift and the winch take items in text order where legacy took insertion order.** Which item rides
+first under a cap is state-affecting, so the sort rule applies; it is a documented deviation, and a
+replay of a legacy save would not match here on that detail. Nothing replays legacy saves.
+
 **The deposit correction moves a number a committed ledger entry stated.** D0348 is append-only and
 still says 250; D0349 corrects it with the reasoning. A reader of D0348 alone gets the wrong number.
 
@@ -153,8 +181,8 @@ is D0115's pattern, and it means one green suite depends on an engine defect per
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks step 3e (transport: `_flow`, the lift, the winch, `updraft_at`; the splitter waits on §8)
-or step 4's wiring of `HubTick.step` behind `Interface.apply`.
+Nothing blocks the rest of step 3 (economy's live remainder, save v3, `world_seeder`, the `main.gd`
+blocks) or step 4's wiring of `HubTick.step` behind `Interface.apply`. The splitter waits on §8.
 
 ## Taste queue
 

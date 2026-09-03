@@ -10,8 +10,9 @@ extends RefCounted
 ## phase of the one tick rather than a second clock (ADR 0005). `advance` is the hook the body tick calls
 ## with its tick index; `step` is one hub tick, which tests drive directly the way legacy's did.
 ##
-## Order, as legacy's: power field, each machine in placement order, (item flow between machines: step
-## 3e), water, (seep, flora: rulings pending), prune empty piles, (production sampling: step 3e economy).
+## Order, as legacy's: power field, each machine in placement order, item flow between machines
+## (`Flow`, D0350), water, (seep, flora: rulings pending), prune empty piles, (production sampling:
+## economy).
 
 const HUB_TICK_DIVISOR: int = 3
 
@@ -27,5 +28,6 @@ static func step(world: World, items: Items, machines: Machines) -> void:
 	machines.power = PowerFlow.compute(world, machines)
 	for m: MachineState in machines.machines:
 		Runners.run(m, world, items, machines)
+	Flow.step(world, items, machines)
 	WaterFlow.step(world.water, world.grid)
 	items.piles.prune_empty()

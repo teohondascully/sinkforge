@@ -4,7 +4,7 @@ extends "res://tests/test_base.gd"
 ## recipe/generator/hopper/pump/drill runners, the status reads, the build/pickup verbs, `HubTick`.
 ## Legacy's power-field, conduit, pump, production, hopper, drill, coal-and-fuel, machine-status,
 ## behaviour-registry and automated-line tests (`legacy/tests/test_sim.gd`) plus the pickup order fix, at
-## the metre cell over a 4 px grid. Item FLOW between machines is step 3e: an output buffer holds here.
+## the metre cell over a 4 px grid. Outputs flow on the same tick (`Flow`, 3e): they are read where they land.
 
 const ROCK: StringName = &"hardrock"
 const ORE: StringName = &"ore_iron"
@@ -32,21 +32,17 @@ func _initialize() -> void:
 
 
 func _rig(logic_w: int = 16, logic_h: int = 16) -> void:
-	world = World.new(TileGrid.new(logic_w * LogicGrid.TERRAIN_PER_LOGIC, logic_h * LogicGrid.TERRAIN_PER_LOGIC, 1))
-	items = Items.new(world)
-	machines = Machines.new()
-	machines.attach_to(items)
+	items = _hub_items(logic_w, logic_h)
+	world = items.world
+	machines = _hub_machines(items)
 
 
 func _put(id: StringName, cell: Vector2i) -> MachineState:
 	return machines.place(world, MachineDef.of(id), cell)
 
 
-## Hand `n` of `item` straight into a machine's input buffer from a pack that just received them.
 func _feed(cell: Vector2i, item: StringName, n: int) -> void:
-	items.pack.add(item, n)
-	items.produced(item, n)
-	items.deposit(cell, item, n)
+	_feed_machine(items, cell, item, n)
 
 
 func _steps(n: int) -> void:
@@ -151,17 +147,17 @@ func _test_recipe_runner_consumes_produces_and_passes_junk_through() -> void:
 	_feed(Vector2i(5, 6), &"ore", 5)
 	_feed(Vector2i(5, 6), &"coal", 1)
 	_steps(1)
-	_check(int(forge.output_buffer.get(&"coal", 0)) == 1 and not forge.input_buffer.has(&"coal"), "coal is not in the recipe: passed through to the output on the first tick")
+	_check(int(items.piles.sink.get(&"coal", 0)) == 1 and not forge.input_buffer.has(&"coal"), "coal is not in the recipe: passed through and fell on out (to the sink, no floor) on the first tick")
 	_check(forge.progress_ticks == 1, "progress counts in ticks")
 	_steps(38)
-	_check(int(forge.output_buffer.get(&"ingot", 0)) == 0, "39 ticks: nothing yet")
+	_check(int(items.total_produced.get(&"ingot", 0)) == 0, "39 ticks: nothing yet")
 	_steps(1)
-	_check(int(forge.output_buffer.get(&"ingot", 0)) == 1 and int(forge.input_buffer[&"ore"]) == 3, "tick 40: one ingot, two ore eaten")
+	_check(int(items.piles.sink.get(&"ingot", 0)) == 1 and int(forge.input_buffer[&"ore"]) == 3, "tick 40: one ingot (fallen on out), two ore eaten")
 	_check(int(items.total_produced[&"ingot"]) == 1 and int(items.total_consumed[&"ore"]) == 2, "the ledger saw the craft")
 	_steps(40)
-	_check(int(forge.output_buffer[&"ingot"]) == 2 and int(forge.input_buffer[&"ore"]) == 1, "a second craft; the odd ore waits")
+	_check(int(items.total_produced[&"ingot"]) == 2 and int(forge.input_buffer[&"ore"]) == 1, "a second craft; the odd ore waits")
 	_steps(200)
-	_check(int(forge.output_buffer[&"ingot"]) == 2 and forge.progress_ticks == 0, "starved: no progress accrues without a full input set")
+	_check(int(items.total_produced[&"ingot"]) == 2 and forge.progress_ticks == 0, "starved: no progress accrues without a full input set")
 	_check(Invariants.check_item_conservation(items, 280) == null, "present == produced - consumed across buffers, with machine_total attached")
 	_check(_status(Vector2i(5, 6)) == &"no_input", "one ore short reads no_input")
 
@@ -173,7 +169,7 @@ func _test_unknown_tag_runs_the_recipe_and_flags_read_the_registry() -> void:
 	var furnace: MachineState = _put(&"blast_furnace", Vector2i(4, 4))
 	_feed(Vector2i(4, 4), &"rich_ore", 1)
 	_steps(44)
-	_check(int(furnace.output_buffer.get(&"ingot", 0)) == 2, "blast_furnace is a tag the table does not know: it runs its recipe (1 rich ore -> 2 ingots in 44 ticks)")
+	_check(int(items.total_produced.get(&"ingot", 0)) == 2 and furnace.output_buffer.is_empty(), "blast_furnace is a tag the table does not know: it runs its recipe (1 rich ore -> 2 ingots in 44 ticks)")
 	_check(_status(Vector2i(4, 4)) == &"no_input", "and reads status by the recipe path")
 	_put(&"rope", Vector2i(6, 6))
 	_steps(3)
@@ -233,21 +229,20 @@ func _test_hopper_latches_filters_meters_and_holds_under_back_pressure() -> void
 	_feed(Vector2i(5, 3), &"coal", 2)
 	_steps(3)
 	_check(hop.filter == &"ore", "latched on the first thing it tasted (insertion order), consumer or not")
-	_check(int(hop.output_buffer.get(&"coal", 0)) == 2 and not hop.input_buffer.has(&"coal"), "the other item passed straight through")
+	_check(int(items.piles.sink.get(&"coal", 0)) == 2 and not hop.input_buffer.has(&"coal"), "the other item passed straight through and fell on out")
 	_check(int(hop.input_buffer[&"ore"]) == 4, "no consumer below: the banked good is stored")
 	var forge: MachineState = _put(&"processor", Vector2i(5, 7))
 	_steps(1)
-	_check(int(hop.output_buffer[&"ore"]) == 1 and int(hop.input_buffer[&"ore"]) == 3, "a consumer below: metered, release 1 a tick")
+	_check(int(forge.input_buffer[&"ore"]) == 1 and int(hop.input_buffer[&"ore"]) == 3 and _status(Vector2i(5, 3)) == &"working", "a consumer below: metered, release 1 a tick, into the forge")
 	_steps(2)
-	_check(int(hop.output_buffer[&"ore"]) == 3 and int(hop.input_buffer[&"ore"]) == 1 and _status(Vector2i(5, 3)) == &"working", "one a tick, working")
-	_feed(Vector2i(5, 7), &"ore", 3)
+	_check(int(forge.input_buffer[&"ore"]) == 3 and int(hop.input_buffer[&"ore"]) == 1 and _status(Vector2i(5, 3)) == &"blocked", "the forge holds feed_cap 3: the hopper holds its last one and reads blocked")
 	_steps(1)
-	_check(int(hop.input_buffer[&"ore"]) == 1 and _status(Vector2i(5, 3)) == &"blocked", "the forge holds feed_cap 3: the hopper holds its last one and reads blocked")
+	_check(int(hop.input_buffer[&"ore"]) == 1, "and keeps holding it")
 	_check(MachineVerbs.configure_machine(machines, Vector2i(5, 3)).begins_with("hopper") and hop.filter == &"", "configure clears the filter to re-taste")
 	_check(MachineVerbs.configure_machine(machines, Vector2i(5, 7)) == "" and MachineVerbs.configure_machine(machines, Vector2i(1, 1)) == "", "nothing to configure on a forge or an empty cell")
 	forge.input_buffer.clear()
 	_steps(1)
-	_check(hop.input_buffer.is_empty() and int(hop.output_buffer[&"ore"]) == 4, "cap lifted: the last unit released; the buffer stays free of zero keys")
+	_check(hop.input_buffer.is_empty() and int(forge.input_buffer[&"ore"]) == 1, "cap lifted: the last unit released; the buffer stays free of zero keys")
 
 
 ## legacy `_test_finite_deposit_and_drill` + the undermine half of `_test_coal_and_fuel`.
@@ -287,7 +282,7 @@ func _test_drill_bores_the_deepest_ore_bottom_up_burns_coal_and_pours_down() -> 
 	var forge: MachineState = _put(&"processor", Vector2i(5, 7))
 	_feed(Vector2i(5, 3), &"coal", 1)
 	_steps(20)
-	_check(int(forge.output_buffer.get(ORE, 0)) == 1, "a machine below collects the bored unit; not its recipe, so it passed to the forge's output (the automated line's first link)")
+	_check(items.piles.count_at(Vector2i(5, 8), ORE) == 1 and forge.output_buffer.is_empty(), "a machine below collects the bored unit; not its recipe, so it passed through and fell on to the floor (the line's first link)")
 	world.grid.set_material(Vector2i(20, 22), ROCK)   # one stone cell inside ore metre (5, 5)
 	_check(Runners.drill_target(world, machines, Vector2i(5, 3)) == Runners.NONE and _status(Vector2i(5, 3)) == &"no_input", "a single stone cell inside the metre caps the column: the bit only takes ore")
 
