@@ -15126,3 +15126,32 @@ the save (D0355 said session-scoped); the body key defaulted to the spawn (an er
 the passing value, D0352's rule).
 
 **Reverse cost:** CHEAP; two new files, one suite, seven kinds.
+
+## D0358 · 2026-09-03 · A′ step 5a (PRE-2): the `Fx` vector layer — `normalize`, `dot`, `limit_length`, both divisions rounding toward less energy
+
+**Decided:** (1) A fixed-point vector is a pair of `Fx` ints returned as a `Vector2i`, because its
+components ARE i32: the container is the format. Arithmetic on the `Vector2i` itself is forbidden by the
+file's contract (Godot's operators wrap silently and are not fixed point); callers read the components
+out. (2) `normalize` and `limit_length` divide by the CEILING square root of the squared length and
+truncate each component toward zero, so a unit vector is never longer than 1.0 and a clamped vector is
+never longer than its cap. `isqrt`'s floor was the obvious choice and the wrong one: a floor root lets
+the quotient overshoot by up to a unit, and a position-projection solver (the grapple, step 5b) is
+unconditionally stable only while rounding cannot ADD energy. The suite pins the direction: no unit
+vector over `SCALE`, no clamped vector over the cap, everything of a pixel or more within two units
+below. (3) `dot` is the exact i64 sum of products shifted once (floor, like `mul`), defined where a unit
+vector meets a velocity (under 2^47); two arbitrary i32 vectors may wrap and no caller passes them. (4)
+The i32 minimum is clamped to −(2^31 − 1) on entry to both vector functions: its square summed twice
+overflows i64 and `isqrt` of the wrapped negative is zero, so without the clamp `normalize(I32_MIN,
+I32_MIN)` returned the zero vector — the instrument reading its own overflow as "no direction". One unit
+of error at a magnitude no world coordinate reaches, in exchange for no reachable zero. (5) The tests
+found two of my own expectations wrong before the code was: `(0.6, 0.8)·(3, 4)` is not exactly 5 in
+`Fx` (each normalized component truncates by under a unit, the dot inherits at most 7 below), and a
+sub-unit component legitimately truncates TO zero under the cap; both assertions now state the bound
+that holds (`<= 5` by at most 7 units; never crosses zero) rather than the identity that does not. 96
+assertions in `tests/test_fixed_point.gd` (was 79).
+
+**Alternative:** `isqrt`'s floor with a post-check that shrinks an overshooting result (two roundings
+where one suffices); a `Vector2i`-returning `mul`/`div` pair (the plan's ~40 lines are these three,
+nothing else is needed yet).
+
+**Reverse cost:** CHEAP; ~60 lines in one file, one suite.

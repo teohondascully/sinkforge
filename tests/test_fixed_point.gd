@@ -18,6 +18,9 @@ func _initialize() -> void:
 	_test_length_works_far_beyond_the_old_181px_limit()
 	_test_length_sq_no_overflow_at_fx_own_outer_limit()
 	_test_mul_self_square_overflow_boundary_is_exactly_181()
+	_test_normalize_never_exceeds_unit_length()
+	_test_dot_against_unit_vectors()
+	_test_limit_length_caps_without_lengthening()
 	_finish("fixed_point")
 
 
@@ -186,3 +189,85 @@ func _test_mul_self_square_overflow_boundary_is_exactly_181() -> void:
 	var unsafe: int = Fx.from_int(182)
 	var unsafe_sq: float = Fx.to_float(Fx.mul(unsafe, unsafe))
 	_check(unsafe_sq < 0.0, "mul(182, 182) silently wraps negative (%s) -- this IS the documented boundary" % unsafe_sq)
+
+
+## A' step 5 (PRE-2, D0358). The hostile set: the axes, the diagonal, a 3-4-5 triple, the i32 extremes
+## (including the minimum, whose square summed twice wraps i64 -- clamped on entry), and sub-pixel vectors.
+## The floor is exact on the axes and the triple; the ceiling root plus truncation may lose a unit or two
+## elsewhere, but NEVER gains one: a projection solver built on this cannot add energy by rounding.
+const _I32_MAX: int = 2147483647
+const _I32_MIN: int = -2147483648
+
+
+func _test_normalize_never_exceeds_unit_length() -> void:
+	var s: int = Fx.SCALE
+	var cases: Array = [[s, 0], [0, -s], [s, s], [-3 * s, 4 * s], [_I32_MAX, _I32_MAX], [_I32_MIN, 0],
+		[_I32_MIN, _I32_MIN], [1, 0], [1, 1], [7, -2], [150 * s, -365 * s]]
+	var over: int = 0
+	var short: int = 0
+	for c: Array in cases:
+		var n: Vector2i = Fx.normalize(c[0], c[1])
+		var len: int = Fx.length(n.x, n.y)
+		if len > s:
+			over += 1
+		# Anything a pixel or longer must normalize to within a hair of the unit: the ceiling root's slack
+		# is one unit in 65536 at that magnitude.
+		if Fx.length_sq(c[0], c[1]) >= s * s and len < s - 2:
+			short += 1
+	_check(over == 0, "no unit vector is longer than SCALE (%d of %d over)" % [over, cases.size()])
+	_check(short == 0, "every input of a pixel or more normalizes to within 2 units of SCALE (%d short)" % short)
+	_check(Fx.normalize(s, 0) == Vector2i(s, 0), "normalize(1, 0) is exactly (1, 0)")
+	_check(Fx.normalize(0, -s) == Vector2i(0, -s), "normalize(0, -1) is exactly (0, -1)")
+	var t: Vector2i = Fx.normalize(-3 * s, 4 * s)
+	_check(t.x == -(3 * s) / 5 and t.y == (4 * s) / 5, "normalize(-3, 4) is exactly (-0.6, 0.8) (got %s)" % t)
+	_check(Fx.normalize(0, 0) == Vector2i.ZERO, "the zero vector normalizes to zero, not to a default")
+	var m: Vector2i = Fx.normalize(_I32_MIN, _I32_MIN)
+	_check(m.x < 0 and m.y < 0 and Fx.length(m.x, m.y) > s - 3,
+		"the i32 minimum on both axes still yields a unit diagonal (got %s), not a wrapped zero" % m)
+
+
+func _test_dot_against_unit_vectors() -> void:
+	var s: int = Fx.SCALE
+	_check(Fx.dot(s, 0, 150 * s, -365 * s) == 150 * s, "x-axis . (150, -365) == 150")
+	_check(Fx.dot(0, s, 150 * s, -365 * s) == -365 * s, "y-axis . (150, -365) == -365")
+	_check(Fx.dot(s, 0, 0, s) == 0, "orthogonal unit vectors dot to zero")
+	# (0.6, 0.8) is not exact in Fx: each component truncates by under a unit, and the dot inherits at most
+	# 3 + 4 of those units, always BELOW the real 5 -- the direction a projection may err in.
+	var n: Vector2i = Fx.normalize(3 * s, 4 * s)
+	var d: int = Fx.dot(n.x, n.y, 3 * s, 4 * s)
+	_check(d <= 5 * s and d >= 5 * s - 7, "(0.6, 0.8) . (3, 4) is 5 less at most 7 units (got %d)" % (5 * s - d))
+	# The extreme velocity against an exact unit vector stays inside i64 (2^31 * 2^16 = 2^47) and lands on
+	# the i32 it is; a half-unit vector floors the odd maximum's half.
+	_check(Fx.dot(s, 0, _I32_MAX, 0) == _I32_MAX, "(1, 0) . (I32_MAX, 0) == I32_MAX exactly")
+	_check(Fx.dot(s / 2, 0, _I32_MAX, 0) == 1073741823, "(0.5, 0) . (I32_MAX, 0) floors to 1073741823")
+	_check(Fx.dot(-s, 0, -7, 0) == 7, "signs multiply: (-1, 0) . (-7, 0) == 7")
+
+
+func _test_limit_length_caps_without_lengthening() -> void:
+	var s: int = Fx.SCALE
+	var cap: int = 150 * s
+	_check(Fx.limit_length(100 * s, 0, cap) == Vector2i(100 * s, 0), "a vector under the cap is returned unchanged")
+	_check(Fx.limit_length(0, cap, cap) == Vector2i(0, cap), "a vector exactly at the cap is returned unchanged")
+	_check(Fx.limit_length(5 * s, 5 * s, 0) == Vector2i.ZERO, "a zero cap returns zero")
+	_check(Fx.limit_length(5 * s, 5 * s, -1) == Vector2i.ZERO, "a negative cap returns zero")
+	var cases: Array = [[300 * s, 0], [300 * s, 400 * s], [_I32_MAX, _I32_MAX], [_I32_MIN, 1], [0, _I32_MIN],
+		[-200 * s, 150 * s], [cap + 1, 0]]
+	var over: int = 0
+	var short: int = 0
+	var turned: int = 0
+	for c: Array in cases:
+		var v: Vector2i = Fx.limit_length(c[0], c[1], cap)
+		var len: int = Fx.length(v.x, v.y)
+		if len > cap:
+			over += 1
+		if len < cap - 2:
+			short += 1
+		# Direction kept: no component crosses zero. A sub-unit component may truncate TO zero (the
+		# i32-minimum case scales 1 unit down to nothing); it may never come out the other side.
+		if signi(v.x) * signi(c[0]) < 0 or signi(v.y) * signi(c[1]) < 0:
+			turned += 1
+	_check(over == 0, "no clamped vector is longer than the cap (%d of %d over)" % [over, cases.size()])
+	_check(short == 0, "every clamped vector lands within 2 units of the cap (%d short)" % short)
+	_check(turned == 0, "no clamped component crosses zero (%d turned)" % turned)
+	var t: Vector2i = Fx.limit_length(300 * s, 400 * s, cap)
+	_check(t == Vector2i(90 * s, 120 * s), "(300, 400) capped at 150 is exactly (90, 120) (got %s)" % t)
