@@ -4,13 +4,15 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, second round. A′ execution began: step 0 and step 2 are done and
-committed on `main`; step 3 is next. Nothing pushed.** Ledger: D0343 (step 0), D0344 (step 2).
+**Last updated: 2026-09-03, second round. A′ execution began: step 0 and step 2 are done, step 1 is
+ruled, all pushed to `origin/main`; step 3 is next.** Ledger: D0343 (step 0), D0344 (step 2), D0345
+(the ruling).
 
 **Headline: legacy's water is on the substrate, verbatim, conserved over 10,000 fuzzed ticks; and every
 suite verdict now says how many properties it stood on, refusing a green that asserted nothing.** The
 plan's "EXPENSIVE" step 1 collapsed on re-reading: two of its three parts were already ruled in
-`docs/ARCHITECTURE.md` §9, the third is forced by `TileGrid`'s size cap. One word is still yours (below).
+`docs/ARCHITECTURE.md` §9, the third is forced by `TileGrid`'s size cap; you ruled the remainder in one
+line (D0345): water follows the dug shape.
 
 ---
 
@@ -55,17 +57,13 @@ plan's "EXPENSIVE" step 1 collapsed on re-reading: two of its three parts were a
 
 ## The decisions this round is waiting on
 
-**Step 1, one word:** water at the 4 px terrain grid as §9 states (cost: 16× legacy's cells per flooded
-volume, a quarter metre of descent per fluid tick), or override to metre-cell water and accept that
-hand-dug tunnels take water badly. Recommendation: the fine grid. Gates only step 4's water wiring.
-
-**Two executor calls stated, say if you disagree:** the hub runs at legacy's 20 Hz cadence on every
-third 60 Hz body tick (every legacy constant ports verbatim); `BRANCHING.md`'s main-only rule stands.
+**Step 1: ruled (D0345).** Water at the 4 px grid, §9 stands. Both executor calls approved (20 Hz hub
+cadence on every third tick; `BRANCHING.md` main-only). Nothing is waiting on you for steps 3 or 4.
 
 **Plan §8's other rulings:** unchanged — Splitter, Ore Vent, power gating, the Crusher chain,
 `press_plate`/`mill_gear`, `earth` 5.6 → 6 ticks, ramps vs `Heightfield`, the resolver (P-28); the 36
 untracked recordings (gate 27 red); the `history/` cull. **Standing:** P004, P015/P017, P026–P029,
-T001–T004. **`main` is five commits ahead of `origin/main`, not pushed** — your call.
+T001–T004. **Pushed** on your instruction; CI's verdict on the six commits is the next thing to read.
 
 ---
 
@@ -91,7 +89,7 @@ with its ledger entry.
 ## Blocked, and what it's waiting on
 
 Nothing blocks step 3's first sub-steps (`machine_state`, the data records, the `sim/world` verbs
-against a temporary owner). Step 4's water wiring waits on the one-word ruling. Push waits on you.
+against a temporary owner) or step 4's water wiring.
 
 ## Taste queue
 

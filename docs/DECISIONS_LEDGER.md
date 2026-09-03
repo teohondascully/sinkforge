@@ -14601,3 +14601,29 @@ copy `_mix` into `WaterPlane` (two conventions, and the duplication gate); expos
 
 **Reverse cost:** CHEAP. Three new files, two suites, two CI lines; the `TileGrid` change is a pure
 extraction with the same arithmetic.
+
+## D0345 · 2026-09-03 · Step 1 ruled: water at the fine 4 px grid, §9 stands — "water follows the dug shape"; both executor calls approved; push authorised
+
+**Decided (director):** water flows through the fine 4 px terrain grid, as `docs/ARCHITECTURE.md` §9
+already states. The director's reasoning, kept in their words: *"Water follows the dug shape — the
+hole-as-conveyor premise wins over the compute saving; 120hz is optimizable, a broken water mechanic
+isn't."* The metre-cell alternative (D0343's cost/benefit) is closed. Approved with it, the two executor
+calls stated in D0343/D0344: **the hub keeps legacy's 20 Hz cadence on every third 60 Hz body tick**, so
+every legacy tick constant ports verbatim (`HUB_TICK_DIVISOR = 3`, ledger entry when the runner lands in
+step 3); and **`docs/BRANCHING.md`'s main-only rule stands** over the plan's stale "branch per step" line,
+which `aae6f3a3` already corrected. The director also authorised pushing `main` (five commits ahead at
+the time): "real working progress … should not live only on your local machine."
+
+**What it unblocks:** step 4's water wiring (`WaterFlow.step` from the fluid phase, the water plane's
+signature in the golden, the `Observation` water fields) has no open question. The `LogicGrid` sibling
+for the metre-cell planes was already ruled by §9 and D0019/D0020; the ADR gate 20 asks for is written
+at the start of step 4 and records this ruled state rather than proposing one.
+
+**What it costs, stated so the perf work knows where to look:** sixteen times legacy's water cells per
+flooded volume, a quarter metre of descent per fluid tick at 20 Hz (5 m/s against legacy's 20 m/s — a
+tunable divisor, not a redesign), and a water painter (step 6) that must draw quarter-metre cells the
+way D0336's veil draws its lightmap: one texture, one draw. `WaterFlow` itself iterates wet cells only,
+so its tick cost follows flooded volume, not world size.
+
+**Reverse cost:** EXPENSIVE once step 4 has wired the plane into the golden and step 6 has painted it —
+which is why it was asked before either.

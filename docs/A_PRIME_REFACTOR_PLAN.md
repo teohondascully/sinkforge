@@ -2,7 +2,8 @@
 
 **Status:** normative execution plan, written 2026-09-03 on the director's approval of
 `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation. **Execution began 2026-09-03: step 0 done (D0343),
-step 2 done (D0344). Each step in §4 carries a status line; a step with none has not started.**
+step 2 done (D0344), step 1 ruled (D0345). Each step in §4 carries a status line; a step with none has not
+started.**
 The tree it describes is `6f0d894e` (`main`); legacy is `legacy/` in that tree, byte-identical to tag
 `pre-pivot` (`666e5518`).
 
@@ -310,7 +311,7 @@ before quoting as settled). Legacy's `FastNoiseLite` generator does not diverge 
 current build's divergence (gate 8 checkpoint 3) is therefore likely the libm transcendental sites
 (`cave_passes.gd:86-91`) and the `lerpf`/hash-to-float roundings, not noise as such — a step 8 hypothesis.
 
-### Step 1 — the grid planes: mostly already ruled; one confirmation pending (blocks step 4's water plane wiring only)
+### Step 1 — the grid planes: RULED 2026-09-03 (D0345), nothing blocks step 4
 
 **Re-read against the tree on 2026-09-03 (D0343): two of this step's three parts were already ruled and
 the third is forced.** `docs/ARCHITECTURE.md` §9's resolution table rules that machines, items, power,
@@ -329,11 +330,11 @@ Vector2i`, with `TileGrid`'s two-lane running signature via `StateHash.term` (`c
 golden's checkpoint hash. Written up as an ADR (gate 20) before step 4 touches `TileGrid`/`Interface`.
 Reversible: moving a plane between classes later is mechanical and re-pins a golden that re-pins anyway.
 
-**The one thing only the director can say (asked 2026-09-03):** confirm water at the 4 px grid as §9
-states, knowing the cost — sixteen times legacy's cells per flooded volume, a quarter metre of descent per
-fluid tick, so flooding reads finer and slower than legacy; or override to metre-cell water and accept
-that hand-dug tunnels take water badly. Recommendation: the fine grid. Until answered, step 2's plane
-stands at the terrain cell and steps 3's sub-steps that do not touch water proceed.
+**Ruled (director, 2026-09-03, D0345): water at the 4 px grid; §9 stands.** "Water follows the dug shape
+— the hole-as-conveyor premise wins over the compute saving; 120hz is optimizable, a broken water
+mechanic isn't." Also approved: the hub's 20 Hz cadence on every third 60 Hz tick, and `BRANCHING.md`'s
+main-only rule. Step 2's plane stands as built; step 4 wires it; the `LogicGrid` ADR records this ruled
+state at the start of step 4.
 
 ### Step 2 — water, verbatim (no ruling needed)
 
@@ -609,7 +610,7 @@ Measured 2026-09-01 at the default framing: painters 4.01 ms (`veil 2.99 sky 0.9
 
 | ruling | blocks | proposal on the table |
 |---|---|---|
-| Grid planes — reduced to ONE confirmation (D0343): water at the 4 px terrain cell as ARCHITECTURE §9 states, or override to the metre cell | step 4's water wiring | the 4 px grid (§9 as written); machines/items/power at 16 px on a `LogicGrid` sibling is already ruled and is built without asking |
+| ~~Grid planes~~ **RULED 2026-09-03 (D0345):** water at the 4 px terrain cell, §9 stands; machines/items/power at 16 px on a `LogicGrid` sibling; ADR written at the start of step 4 | nothing | — |
 | Splitter (GDD §9: "two carved chutes are a splitter… must be a stated decision") | 4 legacy tests, `_run_splitter`, `_split_pattern`, `split_mode` | — |
 | Ore Vent (an infinite free source; fights R2) | 10 legacy tests fixture on it | — |
 | Power gating (R1-entangled; removing power silently freezes upward machines) | 2 legacy tests, V11 wiring | port the mechanism, do not wire the tier (Q3) |
