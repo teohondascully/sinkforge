@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 1 (ruled), 2, 3 done; step 4 — the door — next)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 1 (ruled), 2, 3 done; step 4 — the door — in progress, 4a done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -91,9 +91,19 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   kind by what is selected, drop into an eater or forward or down with a 78-tick grace, scoop within
   2.5 m, configure, the two-press winch link; one reach rule through `Aim.in_reach_point`. 40 assertions.
 
+- **Step 4a — done (D0356).** The door owns every service (optional trailing constructor args; the
+  three-argument shape still works); `Observation` in its own file with the hub's planes as
+  window-bounded copies and the consumed flow-event channel; `MOVE` runs the hub every third tick;
+  `Interface.state_signature()` over the whole session. 20 assertions.
+
 ### Next action
 
-**Step 4, the door** (plan §4): `Interface` owns `World`, `Items`, `Machines`, `Mining`, `Verbs`, a
+**Step 4b, the door's verbs** (plan §4): `Command` gains `mine_point`/`work` (the mine-hold loop:
+paint the plan, snap the aim, drain the plan, mine or work the lode, yield), `build`, `drop`, `collect`,
+`configure`, `link_winch`, `select`, `clear_plan`, with named rejection reasons; `Interface.capture()`
+/`restore()` add the body's and the mining state's keys over `SaveGame`; `Interface.new_game(site,
+seed, start)` builds a session from the seeder with the body at the spawn. Then step 5. The plan's
+original text for step 4 follows: `Interface` owns `World`, `Items`, `Machines`, `Mining`, `Verbs`, a
 `ProductionRate` and the `HubTick` cadence; `Command` gains the verb kinds (`build`, `drop`, `collect`,
 `configure`, `link_winch`, `select`, `paint_plan`, `work_lode`; the fixture primitives) with named
 rejection reasons; `Observation` gains the accessors legacy's renderer reads (deposits, lode per mille,

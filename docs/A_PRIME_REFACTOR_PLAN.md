@@ -434,7 +434,12 @@ places machines and stocks the pack; the tree and the tool kit not carried; 36 a
 `main.gd` blocks, mining half — DONE (D0354: `LineOfSight` in exact integers pinned against legacy's
 float walk off the ties, `Aim`, `DigPlan`, `LodeWork`, `Items.yield_break`; LOS gates the verbs, not the
 primitive; 48 assertions). 3i verbs half — DONE (D0355: `sim/run/verbs.gd`, the situated verbs over the
-four services; one reach rule through `Aim`; 40 assertions). **STEP 3 COMPLETE.** Next: step 4.
+four services; one reach rule through `Aim`; 40 assertions). **STEP 3 COMPLETE.**
+
+**Status (2026-09-03), step 4:** 4a — DONE (D0356: the door owns every service; `Observation` in its own
+file with the hub's planes as window-bounded copies; the hub cadence inside `MOVE`; the consumed
+flow-event channel; one session signature; 20 assertions). Next: 4b (the `Command` kinds for the verbs
+and the mine-hold loop, the session's save keys, the new-game builder).
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

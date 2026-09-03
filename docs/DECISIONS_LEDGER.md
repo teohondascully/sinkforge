@@ -15056,3 +15056,37 @@ its contract); a `Player` object holding the body and the verbs (legacy's shape,
 scene object A′ retires).
 
 **Reverse cost:** CHEAP; one file, one suite, the reach delegation.
+
+## D0356 · 2026-09-03 · A′ step 4a: the door owns the session — every hub plane on the observation as a copy, the hub cadence inside `MOVE`, one signature for the whole session
+
+**Decided:** (1) `Interface` owns the session's services: `World`, `Items`, `Machines`, `Body`,
+`Mining`, `DigPlan`, `LodeWork`, `Verbs`, `ProductionRate`. The constructor keeps its three-argument
+shape (ten suites and the view build it that way) and takes the world, items and registry as optional
+trailing arguments; fresh ones wrap the grid otherwise. `_grid` is gone: the grid is read through the
+world each time, because a load swaps the grid object (ADR 0010 §4). (2) `Observation` moved into
+`interface/observation.gd` behind a `const` preload, exactly as `Envelope` did at D0294, because
+`interface.gd` was at the size cap and the observation gains twenty-odd fields. (3) The hub's planes
+(plan §4 step 4's list, minus `fill`, `is_foliage_material`, `ramp_dir` and `terrain_dirty`, which have
+no subject here) are copied by `interface/hub_planes.gd`, window-bounded: terrain-cell planes over
+`window`, metre-cell planes over `logic_window` (the metres the window covers), the session state
+(pack, rates, winch tables, plan, lode work, aim) whole. Every container is duplicated; the suite
+mangles each and asserts the session's signature unmoved. `deposit_at` answers a lode's amount, a
+seeded ore cell's yield, or `ore_default` for unseeded ore (an ore-like legend travels so no `sim/`
+symbol is needed to ask). (4) `MOVE` ticks the body, ages the verbs' grace, runs `HubTick.advance` on
+every third tick (D0345, the cadence made real at the door), and drains `Items.flow_events` onto the
+door's channel; `MINE` now also yields the break through `Items.yield_break`. (5) THE CONSUMED CHANNEL:
+`observe` copies the events since the last observe onto `flow_events` and empties the door's buffer —
+the one thing observe empties. It is not sim state and no signature carries it; the purity assertion
+is against `state_signature()`, which now joins body, world, items, machines, mining, plan, lode work
+and verbs. Legacy's `FallingItems` cleared the sim's array from the view; the plan (§3.2) asked for a
+consumed channel, and this is the pure-against-the-signature form of it. (6)
+`tests/test_interface_hub.gd`, 20 assertions; every suite that builds an `Interface` still green. CI
+80 → 81.
+
+**Not here (4b):** the `Command` kinds for the verbs and the mine-hold loop, the session's save keys
+(body, mining), the new-game builder.
+
+**Alternative:** an `Observation` that hands over references to the planes (cheaper, and deletes the
+envelope, `docs/adr/0007`); events cleared by the view (legacy's, a sim write from above L2).
+
+**Reverse cost:** CHEAP; two new files, one suite, one constructor extended.
