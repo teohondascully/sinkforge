@@ -13,6 +13,7 @@ const RECORDS: Dictionary = {
 		"kind": "rock",
 		"hardness": 1.0,
 		"display_name": "Clay",
+		"soil": true,
 		"base_color": [
 			0.34,
 			0.24,

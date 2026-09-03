@@ -4,6 +4,7 @@ layer: topsoil_shale
 kind: rock
 hardness: 1.0
 display_name: Clay
+soil: true   # legacy SAPLING_SOILS = [earth]; a sapling roots in this (ADR 0009)
 
 # --- appearance (Slice 0) ---------------------------------------------------------------
 # Appearance lifted from `legacy/src/data/materials/earth.tres` via `legacy/src/data/material_def.gd`'s

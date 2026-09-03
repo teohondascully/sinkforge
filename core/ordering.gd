@@ -22,6 +22,24 @@ static func less(a: StringName, b: StringName) -> bool:
 	return String(a) < String(b)
 
 
+## Row-major cell order: top-to-bottom, then left-to-right -- the scan order every plane walks in
+## (`WaterFlow`'s, lifted with it). For `Vector2i` keys; ids go through `less`.
+static func cell_less(a: Vector2i, b: Vector2i) -> bool:
+	if a.y != b.y:
+		return a.y < b.y
+	return a.x < b.x
+
+
+## The `Vector2i` keys of a plane's dictionary in row-major scan order, as a fresh typed array -- the one
+## walk every plane uses when it must iterate in state-affecting code.
+static func cells(keyed: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for c: Vector2i in keyed:
+		out.append(c)
+	out.sort_custom(cell_less)
+	return out
+
+
 ## The ids of `names`, lexically sorted, as a fresh typed array. Accepts any iterable of `StringName`
 ## (or `String`, converted) -- an `Array`, a typed array, or a `Dictionary` whose keys are the ids.
 static func ids(names: Variant) -> Array[StringName]:

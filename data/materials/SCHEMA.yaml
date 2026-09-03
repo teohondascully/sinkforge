@@ -4,6 +4,9 @@ fields:
   kind: {required: true, type: str}
   hardness: {required: true, type: float}
   display_name: {required: false, type: str}
+  # A sapling roots in this material (ADR 0009 §3; legacy `SAPLING_SOILS = [&"earth"]`, and `clay` is
+  # legacy's earth). Optional; absent reads as false.
+  soil: {required: false, type: bool}
 
   # Appearance, lifted from legacy/src/data/material_def.gd (D0189). Every field is OPTIONAL: a material
   # with no appearance block still validates and falls back in tests/body/material_look.gd (Slice 0; moves to view/ at Slice 3), so adding a

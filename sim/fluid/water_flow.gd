@@ -1,8 +1,8 @@
 class_name WaterFlow
 extends RefCounted
 
-## The deterministic per-tick fluid algorithm. Stateless, operating on a `WaterPlane` and the `TileGrid`
-## it flows through. Integer levels only, snapshot-based and order-stable, so two identical sims flow
+## The deterministic per-tick fluid algorithm. Stateless, operating on a `WaterPlane` (`sim/world`) and the
+## `TileGrid` it flows through. Integer levels only, snapshot-based and order-stable, so two identical sims flow
 ## identically (the determinism test depends on it). Water only moves: no source, no drain, sum invariant.
 ##
 ## LIFTED VERBATIM in A' step 2 from `legacy/src/core/water_flow.gd` (100 lines, zero determinism rows in
@@ -102,7 +102,7 @@ static func _open(grid: TileGrid, terrain_cell: Vector2i) -> bool:
 
 
 ## Deterministic cell ordering for the water passes: top-to-bottom (row), then left-to-right (col).
+## Legacy's body, now `Ordering.cell_less` so every plane shares one scan order (the one deliberate
+## deviation from verbatim in this file, D0347).
 static func _cell_less(a: Vector2i, b: Vector2i) -> bool:
-	if a.y != b.y:
-		return a.y < b.y
-	return a.x < b.x
+	return Ordering.cell_less(a, b)

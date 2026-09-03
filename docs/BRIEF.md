@@ -4,14 +4,15 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, third round. A′: steps 0 and 2 done, step 1 ruled, step 3a (the data
-leaves) done; step 3b (the world plane verbs) is next.** Ledger: D0343, D0344, D0345, D0346.
+**Last updated: 2026-09-03, fourth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (the data
+leaves) and 3b (the world planes and verbs) done; step 3c (items) is next.** Ledger: D0343–D0347; ADR 0009.
 
-**Headline: the hub lift has begun on its leaves — every machine and recipe is now a validated data
-record carrying legacy's numbers, `craft_cost` is refused at the gate, and a determinism trap that every
-"sort keys" row of the lift would have carried was found and closed before the first runner moved:
-`StringName` sorts by pointer, not text.** Earlier today: water on the substrate verbatim (D0344), the
-vacuous-green refusal (D0343), and your one-line step 1 ruling (D0345).
+**Headline: the world now has its metre-cell planes.** `World` owns terrain, the placed layers and water
+under one signature; every metre-cell fact (solid, air, half-dug, a full face to build on, soil) is
+derived from the sixteen 4 px cells under it, and legacy's conduit, rope, torch, sapling and block verbs
+run on that, refusals in legacy's order — ADR 0009 says how, from your ruling. Earlier today: the data
+leaves with `craft_cost` refused at the gate (D0346), the `StringName` sort trap closed (D0346), water
+verbatim (D0344), the vacuous-green refusal (D0343), your step 1 ruling (D0345).
 
 ---
 
@@ -34,6 +35,11 @@ vacuous-green refusal (D0343), and your one-line step 1 ruling (D0345).
   `craft_count` fail with the reason printed — and its first mutation test (8 branches). `MachineDef`,
   `RecipeDef`, `MachineState` in `sim/machines`; `core/ordering.gd` for lexical id order. The population
   is pinned: the four ruling machines and three dead ones are not records. CI 69 → 71 suites.
+- **Step 3b (D0347, ADR 0009).** `sim/world/logic_grid.gd` (one `placed` plane, saplings, running
+  signature), `world.gd` (the owner; the derivations; `set_solid` displaces water and returns the units),
+  `placed_verbs.gd` (legacy's verbs minus the pack), `WaterPlane` moved beside the other planes,
+  `check_placed_not_in_rock`, a `soil` flag on materials. 89 assertions. Deferred with reasons: `fill`,
+  foliage, `surface_row`/`ramp_dir`, `updraft_at`. CI 71 → 72.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -64,7 +70,13 @@ vacuous-green refusal (D0343), and your one-line step 1 ruling (D0345).
    now the one door; nothing in the live tree sorted a `StringName` before today.
 7. **A module contract from before the code existed was wrong, and the plan overrides it.**
    `sim/machines/MODULE.md` forbade per-type runners; the approved plan lifts them. Amended with the
-   reasoning attached rather than silently ignored.
+   reasoning attached rather than silently ignored. Same shape in `sim/world`: "know nothing of
+   machines" became "know no machine TYPE", because occupancy has to be one plane.
+8. **A metre cell has three states.** Legacy's `solid.has(cell)` answered every question; over a 4 px
+   grid a metre is rock, air, or half-dug, and every lifted consumer has to say which it means. The
+   suite pins each on a half-dug metre and the support rule on a half floor. I put the water plane in
+   `sim/fluid` yesterday and moved it today: an owner in one module holding a plane in another, whose
+   algorithm reads the first, is a cycle — planes live with planes, phases with phases.
 
 ---
 
@@ -105,8 +117,8 @@ is D0115's pattern, and it means one green suite depends on an engine defect per
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks step 3b (the `sim/world` plane verbs against a temporary owner, where rock placement
-starts calling `WaterPlane.displace`) or step 4's water wiring.
+Nothing blocks step 3c (items: the pack, ground piles, lode, and the ledger-wrapping of the world
+verbs) or step 4's water wiring.
 
 ## Taste queue
 

@@ -281,3 +281,32 @@ static func check_water_not_in_rock(water: WaterPlane, grid: TileGrid, tick: int
 
 static func report_water_not_in_rock(water: WaterPlane, grid: TileGrid, tick: int) -> WaterInRockViolation:
 	return _reported(check_water_not_in_rock(water, grid, tick))
+
+
+## THE PLACED LAYERS NEVER SIT IN ROCK (ADR 0009 §2-3). `World.place_*` refuses any metre with rock in it,
+## and `World.set_solid` is the only way rock arrives; so this fires only when something wrote terrain
+## under a placed thing without vacating it first -- the mirror of `check_water_not_in_rock`. Returns
+## the first offending cell in scan order, or null.
+class PlacedInRockViolation:
+	var logic_cell: Vector2i
+	var kind: StringName
+	var tick: int
+	func _to_string() -> String:
+		return ("Invariants: a placed %s at logic cell (%d,%d) has rock inside its metre at tick %d -- " +
+			"terrain was written under a placed layer without vacating it.") % [kind, logic_cell.x, logic_cell.y, tick]
+
+
+static func check_placed_not_in_rock(world: World, tick: int) -> PlacedInRockViolation:
+	for kind: StringName in [LogicGrid.KIND_MACHINE, LogicGrid.KIND_CONDUIT, LogicGrid.KIND_ROPE, LogicGrid.KIND_TORCH]:
+		for logic_cell: Vector2i in world.logic.placed_logic_cells(kind):
+			if not world.logic_air(logic_cell):
+				var v: PlacedInRockViolation = PlacedInRockViolation.new()
+				v.logic_cell = logic_cell
+				v.kind = kind
+				v.tick = tick
+				return v
+	return null
+
+
+static func report_placed_not_in_rock(world: World, tick: int) -> PlacedInRockViolation:
+	return _reported(check_placed_not_in_rock(world, tick))

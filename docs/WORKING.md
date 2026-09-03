@@ -22,8 +22,8 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   67/67, 0 VACUOUS. The harness-protocol transfer is scoped to that piece; the rest port with their
   subjects (list in D0343). The cross-platform probe: legacy's worldgen tallies identical on all 48 rows,
   macOS arm64 vs Linux x86_64 (emulated in a container, not native — re-run on CI before quoting).
-- **Step 2 — done (D0344).** `sim/fluid/water_flow.gd` (legacy's algorithm verbatim), `sim/fluid/water_plane.gd`
-  (the owner, 4 px terrain cell, running signature), two water invariants, `tests/test_water_flow.gd`
+- **Step 2 — done (D0344).** `sim/fluid/water_flow.gd` (legacy's algorithm verbatim), `sim/world/water_plane.gd`
+  (the owner, 4 px terrain cell, running signature; moved from `sim/fluid` in 3b), two water invariants, `tests/test_water_flow.gd`
   (45 assertions, 10,000 fuzzed ticks conserved). The mixer `TileGrid` hashed with is now
   `core/state_hash.gd` (`StateHash`), shared by every plane, arithmetic unchanged, pins in
   `tests/test_state_hash.gd`. CI: 67 → 69 suites.
@@ -38,12 +38,20 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   lifted. **Finding:** `StringName` sorts by pointer, not text — `core/ordering.gd` is now the one way to
   sort ids, and every "sort keys" row of the hub goes through it.
 
+- **Step 3b — done (D0347, ADR 0009).** `LogicGrid` (one `placed` plane, saplings, running signature),
+  `World` (owner of the three planes; the metre-cell derivations: solid / air / half-dug, full-face
+  support, soil; `set_solid` displaces water), `PlacedVerbs` (legacy's conduit/rope/torch/sapling verbs
+  minus the pack), `WaterPlane` moved into `sim/world`, `check_placed_not_in_rock`. 89 assertions.
+  Deferred with reasons in the ADR: `fill`, foliage/`Flora.grow`, `surface_row`/`ramp_dir`, `updraft_at`.
+
 ### Next action
 
-Step 3b onward, in the plan's order inside the step: the `sim/world` plane verbs (`set_solid`, `set_wall`,
-`place_block`, conduits, ropes, torches, saplings, `block_supported`, `cell_occupied`, `surface_row`,
-`ramp_dir`, `updraft_at`, foliage — `factory_sim.gd` 585-1240) against a temporary dictionary owner; this
-is where `set_solid`/`place_block` call `WaterPlane.displace`. Then items; then machines + power; then
+Step 3c, items: legacy's inventory and pack (`inventory_slots` 1564, `deposit` 1574, `drop_item` 1599,
+`take_into_pack` 1860, `can_carry`/`pack_room`/`carried_bulk` 1822-1859, `is_bulk_item` 1809 via
+`MachineDef.exists`), ground piles (`collect_ground` 3176, `_ground_pile` 3147, `_resettle_pile_above`
+3158, `_prune_empty_ground` 2047, `pile_reachable` 3224), lode (`lode_at`/`lode_workable`/`take_lode`
+1509-1560, `ore_deposit_at` 1481), and the ledger-wrapping of the world verbs (spend one rope per
+segment, `total_consumed`/`total_produced`). Then machines + power; then machines + power; then
 transport; then economy; then save v3; then `world_seeder`; then the `main.gd` state-logic blocks. Each
 sub-step merged green on `main`. The hub keeps legacy's 20 Hz cadence on every third 60 Hz body tick
 (`HUB_TICK_DIVISOR = 3`, approved D0345; ledger entry when the runner lands). `WaterFlow.step` is not

@@ -14678,3 +14678,42 @@ the live tree sorted a `StringName` before today; the sweep found only `Vector2i
 
 **Reverse cost:** CHEAP — 21 YAML files, two schemas, four 30-to-80-line classes; the MODULE.md
 amendment is prose with the reasoning attached.
+
+## D0347 · 2026-09-03 · A′ step 3b: the metre-cell planes and legacy's world verbs — `LogicGrid`, `World`, the derivations of ADR 0009, `WaterPlane` moved beside the other planes
+
+**Decided:** (1) `docs/adr/0009-metre-cell-planes-over-the-terrain-grid.md` records the ruled state
+(D0345, §9, D0019/D0020) and fixes the derivation rules: a metre cell is `logic_solid` (all sixteen 4 px
+cells rock), `logic_air` (all sixteen air), or neither; `logic_open` is air with nothing placed;
+`cell_occupied` is any rock or anything placed; support and torch backing read a FULL FACE (the four
+terrain cells of the neighbouring metre along the shared edge, all solid) or a wall behind any of the
+sixteen; soil is a full face of a `soil: true` material. (2) `sim/world/logic_grid.gd`: ONE `placed`
+plane (cell → kind) makes legacy's five-way mutual exclusion structural; machines register as the opaque
+kind `&"machine"`, which is why `sim/world/MODULE.md`'s must-not is amended from "know about machines"
+to "know about machine TYPES". Saplings keep legacy's known exception (their own plane, not in the
+exclusive set), except that `logic_open` now refuses a piped cell, which legacy's sapling gate omitted —
+recorded in the ADR. (3) `sim/world/world.gd` owns the three planes and joins their signatures; its
+`set_solid` writes sixteen cells and calls `WaterPlane.displace` on each, returning the units — the
+coupling D0344 deferred to the verb, landed. `place_block` does not check `block_supported`, as in
+legacy: the command layer gates it because machines are exempt. (4) `sim/world/placed_verbs.gd`: legacy's
+conduit, rope, torch and sapling verbs with their refusals in legacy's order, minus the pack; each
+returns what it did (`hung`, `cut`, bool) so the items sub-step ledgers it (ADR 0009 §5). (5)
+`WaterPlane` moves from `sim/fluid` to `sim/world`, one day after D0344 put it there: `World` owning a
+plane in `fluid` while `WaterFlow` reads `world` was a module cycle; planes live in `world`, phases in
+their modules. `Ordering.cell_less` is the one row-major comparator every plane sorts with;
+`WaterFlow._cell_less` delegates to it, the one deliberate deviation from verbatim in that file. (6)
+`Invariants.check_placed_not_in_rock` with a positive control that bypasses the verbs. (7)
+`tests/test_world_verbs.gd`: legacy's five tests at the metre cell, the three states pinned on a half-dug
+metre, the full-face rule pinned on a half floor, and all three planes' running signatures against the
+rebuild over 300 randomised mutations. 89 assertions. CI 71 → 72 suites.
+
+**Deferred, with the reason (ADR 0009):** `fill` (packed/loose) waits on the crusher-chain ruling;
+foliage settling and `Flora.grow` wait on wood/leaves materials and ground piles (items); `surface_row`
+and `ramp_dir` are superseded by `Heightfield` pending the ramps ruling; `updraft_at` reads a machine
+flag and lands with transport.
+
+**Alternative:** keep legacy's per-layer dictionaries and a five-way `cell_occupied` (five ways to
+forget one); "any solid cell in the neighbour supports" (a block resting on a 4 px sliver);
+derive `TERRAIN_PER_LOGIC` from `Body` (a world → body dependency, the wrong way round; the relation is
+asserted in the suite instead).
+
+**Reverse cost:** CHEAP until step 4 wires `World` into the golden; four files and one suite.

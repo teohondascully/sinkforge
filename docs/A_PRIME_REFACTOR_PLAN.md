@@ -326,7 +326,7 @@ cell) contradicted §9 and is withdrawn.
 **What the executor builds under that, without asking:** `sim/world/logic_grid.gd` — the metre-cell
 planes (machine index, ground piles, conduit, rope, torch, sapling, power, fill) keyed `logic_cell:
 Vector2i`, with `TileGrid`'s two-lane running signature via `StateHash.term` (`core/state_hash.gd`); the water plane is
-`sim/fluid/water_plane.gd` at the terrain cell (step 2, landed); every plane's signature folds into the
+`sim/world/water_plane.gd` at the terrain cell (step 2, moved beside the other planes in 3b); every plane's signature folds into the
 golden's checkpoint hash. Written up as an ADR (gate 20) before step 4 touches `TileGrid`/`Interface`.
 Reversible: moving a plane between classes later is mechanical and re-pins a golden that re-pins anyway.
 
@@ -347,11 +347,10 @@ holds over 10,000 fuzzed ticks; two-process golden green (no re-pin, water is no
 yet). Gate 3: 100 lines, fine.
 
 **Status (2026-09-03): DONE — D0344.** `sim/fluid/water_flow.gd` (algorithm verbatim, `_settle_run` split
-for the 50-line cap), `sim/fluid/water_plane.gd` (the owner: legacy's `water` dict + accessors, running
-signature, `displace()`), `Invariants.check_water_conservation` / `check_water_not_in_rock`,
+for the 50-line cap), `sim/world/water_plane.gd` (the owner: legacy's `water` dict + accessors, running
+signature, `displace()`; written to `sim/fluid` in D0344 and moved beside the other planes in D0347), `Invariants.check_water_conservation` / `check_water_not_in_rock`,
 `tests/test_water_flow.gd` (45 assertions; 10,000 fuzzed ticks conserved). Keyed on the 4 px terrain cell
-(step 1). **Left for step 3:** the `set_solid`/`place_block` → `displace()` coupling lives with the world
-verb; **left for step 4:** `WaterFlow.step` is not yet called from `Interface.apply` (no fluid phase runner
+(step 1). **Landed in 3b (D0347):** the `set_solid`/`place_block` → `displace()` coupling, in `World.set_solid`; **left for step 4:** `WaterFlow.step` is not yet called from `Interface.apply` (no fluid phase runner
 exists until step 3's tick order lands).
 
 ### Step 3 — lift the hub (no ruling needed for the lift; §8's rulings decide four records)
@@ -411,6 +410,13 @@ fuzzed commands; every structural gate green (no file over 400, no function over
 new modules in its world, **re-pinned from CI Linux** because the world's contents change.
 Ledger: one entry reversing the migration map's KEEP-CURRENT on `factory_sim.gd` (cite D0341), one per
 judgment call inside the split.
+
+**Status (2026-09-03):** 3a the leaves — DONE (D0346: 15 machine + 6 recipe records with legacy's
+constants as integer fields, `craft_cost` refused at the gate, `MachineDef`/`RecipeDef`/`MachineState`,
+`core/ordering.gd` after the `StringName` finding). 3b the world planes and verbs — DONE (D0347, ADR
+0009: `LogicGrid`, `World`, `PlacedVerbs`, `WaterPlane` moved to `sim/world`; the deferred items are
+listed in the ADR). Next: 3c items (inventory, pack, ground piles, lode) wrapping the world verbs with
+the ledger; then machines + power; transport; economy; save; `world_seeder`; the `main.gd` blocks.
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

@@ -35,8 +35,8 @@ Every other layer: sim, interface, harness, experiment, view, shell.
 - `EntityIdPool` (`entity_id_pool.gd`) — generational-index entity IDs, packed as one 64-bit int
   (`(generation << 32) | index`) so ids compare with plain `==` and serialize as one integer. `.allocate()`,
   `.release(id) -> bool` (false on double-release or a never-allocated id, never a crash), `.is_valid(id)`, `.live_count()`.
-- `Ordering` (`ordering.gd`) — ids sorted by TEXT. `StringName <` is a pointer compare in Godot 4, so a bare
-  `.sort()` over ids is creation order, a within-platform determinism breaker (D0346). `.ids(names)`, `.less(a, b)`.
+- `Ordering` (`ordering.gd`) — the one way to sort in `sim/`: `.ids(names)`/`.less(a, b)` by TEXT (`StringName <`
+  is a pointer compare, so a bare `.sort()` is creation order — D0346) and `.cells(dict)`/`.cell_less(a, b)` row-major.
 - `StateHash` (`state_hash.gd`) — the two-lane running-signature mixer every sim plane hashes with (from
   `TileGrid`, A′ step 2, D0344; arithmetic unchanged from D0261, outputs pinned in `tests/test_state_hash.gd`).
   `.fold()`, `.mix()`, `.term(x, y, m: Vector2i, w: Vector2i)` (both lanes), `.text_term()`, `.id_fold()` (memoised).

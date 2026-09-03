@@ -3,10 +3,11 @@ extends RefCounted
 
 ## The water plane: an integer level per terrain cell, sparse, with a running state signature.
 ##
-## Lifted in A' step 2 from `legacy/src/core/factory_sim.gd:1100-1135` -- the `water` dictionary and its
+## Lifted in A' step 2 (D0344) from `legacy/src/core/factory_sim.gd:1100-1135` -- the `water` dictionary and its
 ## accessors `water_at`, `add_water`, `remove_water`, `total_water` -- which sat on `FactorySim` because
-## legacy had one grid and one owner. Here the plane is its own owner and `WaterFlow` (the algorithm,
-## verbatim) steps it against a `TileGrid` for solidity. `docs/ARCHITECTURE.md` §9: water flows through
+## legacy had one grid and one owner. Here the plane lives in `sim/world` beside `TileGrid` and
+## `LogicGrid` under one `World` (ADR 0009, moved from `sim/fluid` in step 3b, D0347), and `WaterFlow`
+## (`sim/fluid`, the algorithm, verbatim) steps it against the `TileGrid` for solidity. `docs/ARCHITECTURE.md` §9: water flows through
 ## the fine 4 px terrain grid, so every key here is a `terrain_cell` (D0020), the same cell `TileGrid`
 ## is keyed on. Legacy's cell was one metre; this one is a quarter metre, so a metre of water is sixteen
 ## cells of `WATER_MAX` and every legacy per-cell rate that meets this plane converts x16 (plan §3.2).
@@ -83,11 +84,7 @@ func total_water() -> int:
 ## Every wet cell in `WaterFlow`'s own scan order: top-to-bottom, then left-to-right. Sorted, so anything
 ## that iterates the plane in state-affecting code has a total order to stand on (ARCHITECTURE §4).
 func wet_terrain_cells() -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for terrain_cell: Vector2i in levels:
-		cells.append(terrain_cell)
-	cells.sort_custom(WaterFlow._cell_less)
-	return cells
+	return Ordering.cells(levels)
 
 
 ## THE ONE WRITE. A level <= 0 erases the cell. Levels above WATER_MAX are legal here on purpose:

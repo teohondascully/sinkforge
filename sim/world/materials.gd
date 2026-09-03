@@ -18,3 +18,10 @@ static func hardness(material_id: StringName) -> float:
 
 static func exists(material_id: StringName) -> bool:
 	return MaterialsRecords.RECORDS.has(material_id)
+
+
+## A sapling can root in this material: the record's optional `soil` flag (ADR 0009 §3). Absent or
+## unknown reads false, so a new material is not soil until someone says so.
+static func is_soil(material_id: StringName) -> bool:
+	var record: Dictionary = MaterialsRecords.RECORDS.get(material_id, {})
+	return bool(record.get("soil", false))

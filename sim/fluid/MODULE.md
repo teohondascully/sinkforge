@@ -27,8 +27,9 @@ ends up owning local flood/pump state," not a confirmed dependency.
 
 ## Dependencies
 
-`core`, `world` (the automaton operates over the tile grid: `WaterFlow` reads `TileGrid.is_solid` and
-`in_bounds` for every move, and `WaterPlane` hashes with `StateHash.term` (`core/state_hash.gd`, the mixer `TileGrid` uses)).
+`core`, `world` (the automaton operates over `World`'s planes: `WaterFlow` reads `TileGrid.is_solid` and
+`in_bounds` for every move and writes the `WaterPlane`, which lives in `sim/world` beside the other planes
+— ADR 0009, D0347; it was here for one day after D0344).
 
 ## Source
 
@@ -52,7 +53,7 @@ naming, see the open question noted under Purpose above).
 
 ## Public API
 
-- `WaterPlane` (`water_plane.gd`) — the owner. `levels: Dictionary` (terrain_cell → int, absent = dry,
+- `WaterPlane` (`sim/world/water_plane.gd`, moved there in D0347) — the plane. `levels: Dictionary` (terrain_cell → int, absent = dry,
   never a stored 0), `WATER_MAX` (8 per cell). `.water_at()`, `.add_water(grid, terrain_cell, amount)
   → added` (refuses rock and out-of-bounds, clamps to room), `.remove_water(terrain_cell, amount) →
   removed`, `.displace(terrain_cell) → removed` (rock arrived: the world verb calls this),
