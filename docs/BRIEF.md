@@ -4,10 +4,10 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, seventh round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data
-leaves), 3b (world planes and verbs), 3c (items), 3d (machines + power) and 3e (transport) done; the
-rest of step 3 (economy's remainder, save v3, `world_seeder`, the `main.gd` blocks) is next.** Ledger:
-D0343–D0350; ADR 0009.
+**Last updated: 2026-09-03, eighth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data
+leaves), 3b (world planes and verbs), 3c (items), 3d (machines + power), 3e (transport) and 3f (the
+economy's live remainder) done; the rest of step 3 (save v3, `world_seeder`, the `main.gd` blocks) is
+next.** Ledger: D0343–D0351; ADR 0009.
 
 **Headline: the factory moves.** Items flow between machines every hub tick: down a column by the
 landing rule, up it by a lift that pays in power, across a Freight Winch that queues a trip, flies it
@@ -63,6 +63,9 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
   station hold, purge on pickup or removal, dead-route fallback), `winch_routes`/`winch_transit` on the
   registry and in the signature, transit counted as present. The splitter waits on your ruling. 58
   assertions. CI 74 → 75.
+- **Step 3f (D0351).** `sim/economy/production_rate.gd`: the production-rate ring buffer, the one live
+  piece of legacy's economy, as integer centi-items a minute over a 61-sample window; derived, never
+  signed; `HubTick` samples it when handed one. 19 assertions. CI 75 → 76.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -181,8 +184,8 @@ is D0115's pattern, and it means one green suite depends on an engine defect per
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks the rest of step 3 (economy's live remainder, save v3, `world_seeder`, the `main.gd`
-blocks) or step 4's wiring of `HubTick.step` behind `Interface.apply`. The splitter waits on §8.
+Nothing blocks the rest of step 3 (save v3, `world_seeder`, the `main.gd` blocks) or step 4's wiring
+of `HubTick.step` behind `Interface.apply`. The splitter waits on §8.
 
 ## Taste queue
 

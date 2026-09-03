@@ -423,8 +423,9 @@ here rather than transport, with the machine buffer as a Callable — `Items`, `
 16 a 4 px cell; the drill bores the metre cell by cell; 112 assertions). 3e transport — DONE (D0350:
 `Flow` as the hub tick's third phase, `column_rise`, `updraft_at`, `Movers` for the lift and the
 Freight Winch with routes and transit on the registry and in the signature; the splitter waits on §8;
-58 assertions). Next: economy's live remainder (`_sample_production`/`production_rate`, the rest is
-DEAD per D0341 and step 7's); save v3; `world_seeder`; the `main.gd` blocks.
+58 assertions). 3f economy's live remainder — DONE (D0351: `ProductionRate`, centi-items a minute over a
+61-sample window, derived and unsigned, sampled by `HubTick` when handed one; 19 assertions). Next: save
+v3 (§5.3); `world_seeder`; the `main.gd` blocks.
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

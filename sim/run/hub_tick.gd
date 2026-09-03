@@ -11,23 +11,25 @@ extends RefCounted
 ## with its tick index; `step` is one hub tick, which tests drive directly the way legacy's did.
 ##
 ## Order, as legacy's: power field, each machine in placement order, item flow between machines
-## (`Flow`, D0350), water, (seep, flora: rulings pending), prune empty piles, (production sampling:
-## economy).
+## (`Flow`, D0350), water, (seep, flora: rulings pending), prune empty piles, production sampling
+## (`ProductionRate`, D0351, when the caller keeps one: it is HUD history, not state).
 
 const HUB_TICK_DIVISOR: int = 3
 
 
-static func advance(body_tick: int, world: World, items: Items, machines: Machines) -> bool:
+static func advance(body_tick: int, world: World, items: Items, machines: Machines, rates: ProductionRate = null) -> bool:
 	if body_tick % HUB_TICK_DIVISOR != 0:
 		return false
-	step(world, items, machines)
+	step(world, items, machines, rates)
 	return true
 
 
-static func step(world: World, items: Items, machines: Machines) -> void:
+static func step(world: World, items: Items, machines: Machines, rates: ProductionRate = null) -> void:
 	machines.power = PowerFlow.compute(world, machines)
 	for m: MachineState in machines.machines:
 		Runners.run(m, world, items, machines)
 	Flow.step(world, items, machines)
 	WaterFlow.step(world.water, world.grid)
 	items.piles.prune_empty()
+	if rates != null:
+		rates.sample(items)

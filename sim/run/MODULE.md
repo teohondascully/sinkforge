@@ -61,9 +61,10 @@ does the tick loop simply always run? Unresolved, part of the same open question
 
 ## Public API
 
-- `HubTick` (`hub_tick.gd`) — `step(world, items, machines)`: power field, each machine in placement
-  order, `Flow.step` (D0350), water, prune empty piles (seep, flora, production sampling join it on a
-  ruling or with economy); `advance(body_tick, …) → fired`: `step` on every `HUB_TICK_DIVISOR`th tick.
+- `HubTick` (`hub_tick.gd`) — `step(world, items, machines, rates = null)`: power field, each machine
+  in placement order, `Flow.step` (D0350), water, prune empty piles, `rates.sample` when a
+  `ProductionRate` is handed in (D0351; seep and flora join on a ruling); `advance(body_tick, …) →
+  fired`: `step` on every `HUB_TICK_DIVISOR`th tick.
 
 ## Gotchas
 

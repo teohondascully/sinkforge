@@ -14869,3 +14869,32 @@ puts R1's routing in the module that runs machines); insertion-order takes (lega
 dependent).
 
 **Reverse cost:** CHEAP; two new files, one suite, five touched.
+
+## D0351 · 2026-09-03 · A′ step 3f: economy's live remainder — the production-rate ring buffer, in centi-items a minute, derived and unsigned
+
+**Decided:** (1) `sim/economy/production_rate.gd` (`ProductionRate`) is legacy's `_sample_production`
+1959, `production_rate` 1969 and `production_rates` 1983 with `RATE_SAMPLE_TICKS`/`RATE_WINDOW_SAMPLES`
+363-364: a snapshot of `total_produced` every 20 hub ticks, 61 kept, the rate over the window's span.
+It is the one live piece of legacy's economy; the plan's seam map already files it "derived, not
+saved", so it is not in any signature and a loaded game starts with an empty window, as legacy's did.
+(2) The rate is an integer, CENTI-items a minute (legacy's `8.2/min` float is 820): `made × 20 × 60 × 100
+/ span_ticks`, exact for a steady producer, floored otherwise; the view formats. (3) It is owned by
+whoever runs the hub: `HubTick.step`/`advance` take an optional `ProductionRate` and sample it last,
+where legacy's tick did, so a test or a headless run that wants no HUD history passes nothing. (4)
+`HUB_HZ = 20` is written in the module rather than read from `Body.TICK_HZ / HubTick.HUB_TICK_DIVISOR`,
+which would make `economy` depend on `run` against the declared order; the suite pins the identity.
+(5) `rates()` lists items above 0, not legacy's `r > 0.05`: one unit inside a 1200-tick window is 100
+centi, so a 5-centi floor could never fire in integers — a guard that cannot be false, removed rather
+than carried. Ties sort in text order (`Ordering.less`); legacy's `sort_custom` by rate alone left ties
+to the engine. (6) `tests/test_economy.gd`, 19 assertions: legacy's `_test_production_rate` fed by hand
+(its ore vent is a ruling), the 20-tick threshold, the exact rate, the 61-sample window sliding, the
+sorted list with a tie, the window's edge (one unit a minute is the smallest visible rate), no
+signature moving over 100 sampled ticks, and the `HUB_HZ` identity. CI 75 → 76.
+
+**Not here:** `machine_census`/`machine_problems` (step 6 with the HUD), the demand side (step 7).
+
+**Alternative:** the ring buffer on `Items` (puts HUD history beside the ledger it is derived from,
+and tempts a signature); a float rate (the one float the sim would carry, for a number only the view
+reads).
+
+**Reverse cost:** CHEAP; one file, one suite, one optional parameter.

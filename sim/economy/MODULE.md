@@ -7,6 +7,11 @@ rule that deep material is required in large quantity rather than simply
 worth more (R2) — this module is where "large quantity" gets enforced, not
 just priced.
 
+**What is here now (A′ step 3f, D0351):** `production_rate.gd`, `ProductionRate` — legacy's
+production-rate ring buffer, the one live piece of its economy. Recipes are `data/recipes` read by
+`sim/machines`; the produced/consumed ledger is `Items`; the demand side (rig-as-consumer) is plan
+step 7 and is not here. Legacy's bazaars, research and crafting are DEAD (D0341).
+
 ## Must-not
 
 - Hardcode quantities. All balance numbers (recipe ratios, tier thresholds,
@@ -43,8 +48,15 @@ correctly).
 
 ## Public API
 
-None yet.
+- `ProductionRate` (`production_rate.gd`) — `sample(items)` (a `total_produced` snapshot every
+  `SAMPLE_TICKS` = 20 hub ticks, `WINDOW_SAMPLES` = 61 kept), `rate_centi(items, item)` (centi-items a
+  minute over the window; 0 until a second of history), `rates(items)` (live items fastest first, ties
+  in text order), `sample_count()`. `HubTick.step` samples it when handed one.
 
 ## Gotchas
 
-See the dependency note above re: `machines`/`behaviors`.
+- **Derived, not saved, not signed.** The ring buffer is HUD history; a loaded game starts with an
+  empty window, as legacy's did. Integer centi-items a minute: the view formats.
+- **`HUB_HZ = 20` is written, not read** (`Body.TICK_HZ / HubTick.HUB_TICK_DIVISOR`), so this module
+  does not depend on `sim/run`; `tests/test_economy.gd` pins the identity.
+- See the dependency note above re: `machines`/`behaviors`.

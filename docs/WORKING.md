@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3e done, step 1 ruled; economy/save/seeder/main.gd blocks next)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3f done, step 1 ruled; save v3, the seeder and the main.gd blocks next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -63,11 +63,13 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   removal, dead-route fallback), `winch_routes`/`winch_transit` on the registry and in the signature,
   transit counted as present. 58 assertions; the machines suite re-expressed where outputs now flow.
 
+- **Step 3f — done (D0351).** `sim/economy/production_rate.gd`: legacy's production-rate ring buffer as
+  integer centi-items a minute, derived and unsigned (the plan files it "not saved"), sampled last in
+  `HubTick.step` when a `ProductionRate` is handed in. 19 assertions.
+
 ### Next action
 
-The rest of step 3, in order: **economy's live remainder** — `_sample_production`/`production_rate`/
-`production_rates` (a ring buffer of `total_produced` snapshots: state, so it enters the signature) as
-`sim/economy`; everything else in legacy's economy is DEAD (D0341) and step 7 redesigns it. Then **save
+The rest of step 3, in order: **save
 v3** (`SaveGame.capture`/`restore` over the planes, the registry, the winch tables, the pack, the piles;
 legacy's dangling-route reconciliation test comes over with it). Then **`world_seeder`** (legacy's
 seeded placement of lodes, deposits, water onto the generated shaft). Then the **`main.gd` state-logic
