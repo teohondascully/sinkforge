@@ -1,0 +1,5 @@
+# Lifted verbatim from legacy/src/data/recipes/mill_gear.tres (D0346). Legacy `time = 2.5` s -> 50 ticks at 20 Hz.
+id: mill_gear
+inputs: {iron_ingot: 1, ingot: 1}
+outputs: {gear: 2}
+time_ticks: 50

@@ -1,0 +1,5 @@
+# Lifted verbatim from legacy/src/data/recipes/press_plate.tres (D0346). Legacy `time = 3.0` s -> 60 ticks at 20 Hz.
+id: press_plate
+inputs: {iron_ingot: 2}
+outputs: {plate: 1}
+time_ticks: 60

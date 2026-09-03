@@ -14,8 +14,8 @@ prevent.
 
 ## Subdirectories
 
-- `machines/` — machine definitions (id, tier, footprint, placement rule,
-  behaviors list, states, build cost).
+- `machines/` — machine definitions (id, display name, legacy's behaviour
+  tag, recipe, and the per-type integer parameters; never a craft cost).
 - `materials/` — material definitions.
 - `recipes/` — recipe definitions (implements R2's quantity-based economy).
 - `strata/` — terrain-gen tuning constants and per-site parameters.

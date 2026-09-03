@@ -512,7 +512,8 @@ deferred and never silently broken. A determinism divergence pauses everything e
 | 024 | 355-356, 829-831 | `FineTerrain.sync_block` samples `FastNoiseLite` inside tick (render-only output) | do not port |
 
 Godot 4 dictionaries preserve insertion order, so every HASH-ITER row is deterministic today; the sort
-is the ARCHITECTURE rule's cost and each one changes the golden. Insertion order of the `machines`
+is the ARCHITECTURE rule's cost and each one changes the golden. **"Sort keys" means `Ordering.ids(dict)`
+(text order), never `keys().sort()`: `StringName` sorts by pointer (D0346, §9).** Insertion order of the `machines`
 Array is real state (placement order is unrecoverable from the grid) and the save preserves it.
 
 ### 5.2 The 8 rows in `power_flow.gd` and the 6 elsewhere
@@ -634,6 +635,9 @@ Measured 2026-09-01 at the default framing: painters 4.01 ms (`veil 2.99 sky 0.9
 - **`Player.note_dig` is labelled "Cosmetic only" and sets `facing`**, which decides a drop's target cell
   and a placed machine's direction (`main.gd`). `FallingItems` clears a sim array. Do not trust
   comments about what is cosmetic; trust the state trace.
+- **`StringName` sorts by pointer, not text** (D0346). `.sort()` / `sort_custom(<)` / `keys().sort()` over
+  ids return creation order — a within-platform breaker that reads as "sorted". Every "sort keys" row in
+  §5.1 goes through `core/ordering.gd` (`Ordering.ids`); grep `sort` on every lifted block.
 - **The reciprocal literal**: `1.05*65536 = 68812` and `1/1.05*65536 = 62415` are not inverses. Store
   `21/20` and use integer mul/div, as `AIR_CONTROL_NUM/DEN` and `Mining.REACH_NUM/DEN` do.
 - **Unit regime** (§3.2): ask which of three regimes a constant is in before converting. Body constants

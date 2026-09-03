@@ -12,7 +12,14 @@ rules:
       tier:     {required: true, type: int}
       build_cost: {required: false, type: dict}
 
-Supported types: str, int, float, bool, list, dict. This is deliberately not
+Supported types: str, int, float, bool, list, dict. A schema may also carry a
+`forbidden:` mapping of field name -> reason; a record naming one of those
+fields FAILS, and the reason is printed with the failure (D0346 -- the first
+use is `craft_cost`/`craft_count` in data/machines, the dead one-time-purchase
+economy the director ruled must not come back "as a craft_cost data field").
+Fields the schema neither lists nor forbids are still accepted: this validator
+does not reject unknown fields, and that boundary is stated here rather than
+assumed closed. This is deliberately not
 a full JSON-Schema implementation — docs/ARCHITECTURE.md §8 asks for
 "schema-validated at build time" so a malformed data file fails the build,
 not a general-purpose validation framework. If nested-structure validation
@@ -47,6 +54,12 @@ def validate_file(data_path: Path, schema: dict) -> list[str]:
     if not isinstance(doc, dict):
         return [f"{data_path.relative_to(ROOT)}: top level must be a mapping"]
 
+    forbidden = schema.get("forbidden", {}) or {}
+    for name in sorted(forbidden):
+        if name in doc:
+            errors.append(
+                f"{data_path.relative_to(ROOT)}: field '{name}' is FORBIDDEN by the schema -- {forbidden[name]}"
+            )
     fields = schema.get("fields", {})
     for name, rule in fields.items():
         if rule.get("required") and name not in doc:

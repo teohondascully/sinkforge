@@ -1,0 +1,4 @@
+# Lifted from legacy/src/data/machines/processor.tres (D0346); craft_cost dropped by ruling. the default recipe-runner: no tag at all in legacy.
+id: processor
+display_name: Forge
+recipe: smelt_ingot

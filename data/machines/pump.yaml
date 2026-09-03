@@ -1,0 +1,7 @@
+# Lifted from legacy/src/data/machines/pump.tres (D0346); craft_cost dropped by ruling. PUMP_REACH 4, PUMP_RATE 3, PUMP_POWER_DEMAND 4.0 -> 4000 (:49-51). Rate is per legacy metre cell; the water plane is quarter-metre (D0344), so the pump runner converts x16 when it lands.
+id: pump
+display_name: Pump
+behavior: pump
+reach: 4
+rate: 3
+power_demand_milli: 4000

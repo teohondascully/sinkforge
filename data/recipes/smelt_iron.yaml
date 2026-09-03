@@ -1,0 +1,5 @@
+# Lifted verbatim from legacy/src/data/recipes/smelt_iron.tres (D0346). Legacy `time = 2.5` s -> 50 ticks at 20 Hz.
+id: smelt_iron
+inputs: {iron: 2}
+outputs: {iron_ingot: 1}
+time_ticks: 50

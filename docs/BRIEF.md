@@ -4,15 +4,14 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, second round. A′ execution began: step 0 and step 2 are done, step 1 is
-ruled, all pushed to `origin/main`; step 3 is next.** Ledger: D0343 (step 0), D0344 (step 2), D0345
-(the ruling).
+**Last updated: 2026-09-03, third round. A′: steps 0 and 2 done, step 1 ruled, step 3a (the data
+leaves) done; step 3b (the world plane verbs) is next.** Ledger: D0343, D0344, D0345, D0346.
 
-**Headline: legacy's water is on the substrate, verbatim, conserved over 10,000 fuzzed ticks; and every
-suite verdict now says how many properties it stood on, refusing a green that asserted nothing.** The
-plan's "EXPENSIVE" step 1 collapsed on re-reading: two of its three parts were already ruled in
-`docs/ARCHITECTURE.md` §9, the third is forced by `TileGrid`'s size cap; you ruled the remainder in one
-line (D0345): water follows the dug shape.
+**Headline: the hub lift has begun on its leaves — every machine and recipe is now a validated data
+record carrying legacy's numbers, `craft_cost` is refused at the gate, and a determinism trap that every
+"sort keys" row of the lift would have carried was found and closed before the first runner moved:
+`StringName` sorts by pointer, not text.** Earlier today: water on the substrate verbatim (D0344), the
+vacuous-green refusal (D0343), and your one-line step 1 ruling (D0345).
 
 ---
 
@@ -29,6 +28,12 @@ line (D0345): water follows the dug shape.
   controls, `tests/test_water_flow.gd` (45 assertions, 3.9 s). The hash mixer moved out of `TileGrid`
   into `core/state_hash.gd`, arithmetic unchanged, outputs pinned in `tests/test_state_hash.gd`; the
   golden did not move. CI 67 → 69 suites.
+- **Step 3a (D0346).** `data/machines` (15 LIFT records) and `data/recipes` (6), schema-validated and
+  codegen'd, with legacy's per-type constants as integer fields (power in milli, fractions in percent,
+  recipe time in 20 Hz ticks, all exact). The validator grew a `forbidden:` rule — `craft_cost` and
+  `craft_count` fail with the reason printed — and its first mutation test (8 branches). `MachineDef`,
+  `RecipeDef`, `MachineState` in `sim/machines`; `core/ordering.gd` for lexical id order. The population
+  is pinned: the four ruling machines and three dead ones are not records. CI 69 → 71 suites.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -52,6 +57,14 @@ line (D0345): water follows the dug shape.
    `set_level` can reach it, and pinned through that door.
 5. **The refusal found no live vacuous suite** (0 of 67). Its value is forward: step 3 adds twenty-odd
    suites and every one will have to have asserted something.
+6. **`StringName <` is a pointer compare.** `Array[StringName].sort()`, `sort_custom(<)` and
+   `keys().sort()` over ids return creation order reversed; a three-key dictionary in the same probe came
+   out alphabetical by coincidence. Found because a suite pinned a sorted population and the pin failed —
+   a sort claim about ids needs a pin of the actual order, never an `is_sorted` pass. `Ordering.ids` is
+   now the one door; nothing in the live tree sorted a `StringName` before today.
+7. **A module contract from before the code existed was wrong, and the plan overrides it.**
+   `sim/machines/MODULE.md` forbade per-type runners; the approved plan lifts them. Amended with the
+   reasoning attached rather than silently ignored.
 
 ---
 
@@ -84,12 +97,16 @@ one-line twins would have been clearer.
 **The hub cadence is stated, not made.** It lives in the plan and this brief until step 3's runner lands
 with its ledger entry.
 
+**`Ordering`'s baseline test asserts the engine's bug.** If a Godot update makes `StringName <` lexical,
+`test_ordering.gd` goes red on purpose so the header gets rewritten rather than the helper deleted. That
+is D0115's pattern, and it means one green suite depends on an engine defect persisting.
+
 ---
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks step 3's first sub-steps (`machine_state`, the data records, the `sim/world` verbs
-against a temporary owner) or step 4's water wiring.
+Nothing blocks step 3b (the `sim/world` plane verbs against a temporary owner, where rock placement
+starts calling `WaterPlane.displace`) or step 4's water wiring.
 
 ## Taste queue
 

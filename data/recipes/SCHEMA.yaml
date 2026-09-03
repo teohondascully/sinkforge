@@ -1,0 +1,8 @@
+# Recipe records, lifted in A' step 3 (D0346) from legacy/src/data/recipes/*.tres (RecipeDef). One change on
+# the way in: legacy's `time: float` seconds is `time_ticks: int` at the hub's 20 Hz cadence (plan §5.1
+# row 001; every legacy time is exact in ticks: 1.0 s = 20, 2.0 = 40, 2.2 = 44, 2.5 = 50, 3.0 = 60).
+fields:
+  id: {required: true, type: str}
+  inputs: {required: true, type: dict}      # item id -> count consumed per craft; empty = a source
+  outputs: {required: true, type: dict}     # item id -> count produced per craft
+  time_ticks: {required: true, type: int}   # hub ticks per craft (20 Hz)

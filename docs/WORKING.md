@@ -31,15 +31,23 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   The hub's 20 Hz cadence on every third 60 Hz tick and `BRANCHING.md`'s main-only rule both approved.
   Nothing blocks step 4.
 
+- **Step 3a — done (D0346).** `data/machines` (15 records) and `data/recipes` (6) as schema-validated,
+  codegen'd data carrying legacy's per-type constants as integers; `craft_cost`/`craft_count` refused by
+  the validator's new `forbidden:` rule, which got the validator its first mutation test; `MachineDef`,
+  `RecipeDef`, `MachineState` in `sim/machines`; `sim/machines/MODULE.md`'s must-not amended to what is
+  lifted. **Finding:** `StringName` sorts by pointer, not text — `core/ordering.gd` is now the one way to
+  sort ids, and every "sort keys" row of the hub goes through it.
+
 ### Next action
 
-Step 3, in the plan's order inside the step: `machine_state` + the data records (`data/machines/*.yaml`,
-`data/recipes/*.yaml`, schemas, codegen) first, since they are leaves; then the `sim/world` plane verbs
-against a temporary dictionary owner (this is where `set_solid`/`place_block` call `WaterPlane.displace`);
-then items; then machines + power; then transport; then economy; then save v3; then `world_seeder`; then
-the `main.gd` state-logic blocks. Each sub-step merged green on `main`. The hub keeps legacy's 20 Hz
-cadence on every third 60 Hz body tick (`HUB_TICK_DIVISOR = 3`; ledger entry when the runner lands).
-`WaterFlow.step` is not called from `Interface.apply` until step 4 opens the door.
+Step 3b onward, in the plan's order inside the step: the `sim/world` plane verbs (`set_solid`, `set_wall`,
+`place_block`, conduits, ropes, torches, saplings, `block_supported`, `cell_occupied`, `surface_row`,
+`ramp_dir`, `updraft_at`, foliage — `factory_sim.gd` 585-1240) against a temporary dictionary owner; this
+is where `set_solid`/`place_block` call `WaterPlane.displace`. Then items; then machines + power; then
+transport; then economy; then save v3; then `world_seeder`; then the `main.gd` state-logic blocks. Each
+sub-step merged green on `main`. The hub keeps legacy's 20 Hz cadence on every third 60 Hz body tick
+(`HUB_TICK_DIVISOR = 3`, approved D0345; ledger entry when the runner lands). `WaterFlow.step` is not
+called from `Interface.apply` until step 4 opens the door. Every lifted `sort` goes through `Ordering`.
 
 ### Waiting on the director
 

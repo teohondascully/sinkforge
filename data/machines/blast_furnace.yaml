@@ -1,0 +1,5 @@
+# Lifted from legacy/src/data/machines/blast_furnace.tres (D0346); craft_cost dropped by ruling. a recipe-runner; the tag is its look.
+id: blast_furnace
+display_name: Blast Furnace
+behavior: blast_furnace
+recipe: smelt_rich

@@ -1,0 +1,7 @@
+# Lifted from legacy/src/data/machines/generator.tres (D0346); craft_cost dropped by ruling. GENERATOR_POWER 6.0 -> 6000 milli, GENERATOR_FUEL_TICKS 100 (:56-57), POWER_AURA 2 (:112).
+id: generator
+display_name: Generator
+behavior: generator
+power_milli: 6000
+fuel_ticks: 100
+aura: 2

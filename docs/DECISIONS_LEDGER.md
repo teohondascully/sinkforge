@@ -14627,3 +14627,54 @@ so its tick cost follows flooded volume, not world size.
 
 **Reverse cost:** EXPENSIVE once step 4 has wired the plane into the golden and step 6 has painted it —
 which is why it was asked before either.
+
+## D0346 · 2026-09-03 · A′ step 3a, the leaves: machine and recipe records as data with legacy's constants, `craft_cost` refused at the gate, `sim/machines`' contract amended to what is actually being lifted
+
+**Decided:** (1) `data/machines/` (15 records) and `data/recipes/` (6) exist, schema-validated and
+codegen'd, lifted from legacy's `.tres` records. The per-type constants legacy kept as `const` on
+`FactorySim` (`factory_sim.gd:36-136`: `LIFT_POWER_DEMAND`, `PUMP_RATE`, `GENERATOR_FUEL_TICKS`,
+`CONDUIT_V_KEEP`, the winch four, …) are fields of the machine's record, each on the record whose runner
+reads it — plan §5.1 row 009 and `data/README.md`'s rule that a tuning pass is a diff of `data/`. All
+integers: power in milli-units (4.0 → 4000), fractions in percent (0.92 → 92). `POWER_AURA` sits on the
+generator; the four conduit constants on the conduit. (2) Recipe `time` is `time_ticks` at 20 Hz; the six
+legacy times (1.0, 2.0, 2.2, 2.5, 2.5, 3.0 s) are 20, 40, 44, 50, 50, 60 — all exact, pinned in
+`tests/test_machine_defs.gd`. (3) `craft_cost` and `craft_count` are **refused by the validator**: the
+schema grew a `forbidden:` mapping (field → reason, printed with the failure) and
+`tools/schema_validator/test_schema_validator.py` — the validator's first test in eleven days — observes
+it firing and not firing, plus the two pre-existing rules as positive controls, plus the stated boundary
+that unknown fields are still accepted. (4) `sim/machines/machine_def.gd` and `recipe_def.gd` are the
+thin typed adapters ADR 0004 asks for (cached flyweights over `RECORDS`, `StringName` keys, `PARAMS`
+read by name); `machine_state.gd` is legacy's, with `progress` → `progress_ticks: int`, `power_factor` →
+`power_permille: int` (rows 010), `spoil_buffer` dropped (Drift Rig, dead), and the cell named
+`logic_cell` (D0020 reserved the name for exactly this module). (5) **`sim/machines/MODULE.md`'s must-not
+is amended.** It forbade per-machine-type code and promised a `sim/behaviors` decomposition — an
+aspiration written 2026-08-26 before any machine existed. The approved plan lifts legacy's runners as
+they are; rewriting working logic into primitives is the from-scratch work A′ exists to stop. The
+runners are code, their numbers are data, `sim/behaviors` stays empty until something needs it. The two
+data READMEs' informal schemas (tier, footprint, placement_rule, states, build_cost) described the same
+unbuilt system and are replaced by the real one.
+
+**Population, pinned:** exactly the 15 LIFT machines; the four ruling machines (`splitter`, `spur`,
+`ore_vent`, `crusher`) and the three dead ones are NOT records, and the suite fails by name if one
+appears. `press_plate`/`mill_gear` are converted because `plate_press`/`gear_mill` are LIFT and would
+dangle otherwise; the plan §8 ruling on their outputs deletes a YAML, not a class.
+
+**Alternative:** keep the constants in code as legacy did (violates `data/README.md` and the economy
+module's must-not, and makes step 7's tuning a code change); a `params: dict` field (validated as an
+opaque dict — the validator cannot see inside it, so a typo in a parameter name would read as 0
+silently); strict unknown-field rejection (a bigger change to a gate with no test until today; the
+forbidden list is the ruling's exact scope and the boundary is stated).
+
+**Finding, from the suite's population pin failing:** `StringName <` in Godot 4 compares the interned
+POINTERS. `Array[StringName].sort()`, `sort_custom(func(a, b): return a < b)` and `Dictionary.keys().sort()`
+over `StringName` keys all return creation order reversed (probed: seven machine ids came back as the
+exact reverse of the order their literals were written; a three-key dictionary in the same probe
+happened to come out alphabetical, which is how it hides). Creation order differs between a fresh run
+and a loaded save, so every "sort keys" fix in plan §5.1 rows 012–022 written as a bare sort would have
+been a within-platform determinism breaker wearing the fix's costume. `core/ordering.gd` (`Ordering.ids`,
+`Ordering.less`, text order) is now the one way to sort ids in `sim/`; `tests/test_ordering.gd` keeps the
+hazard as a live baseline (D0115's pattern) so an engine that changes the operator is noticed. Nothing in
+the live tree sorted a `StringName` before today; the sweep found only `Vector2i` and int sorts.
+
+**Reverse cost:** CHEAP — 21 YAML files, two schemas, four 30-to-80-line classes; the MODULE.md
+amendment is prose with the reasoning attached.

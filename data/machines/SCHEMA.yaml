@@ -1,0 +1,42 @@
+# Machine records, lifted in A' step 3 (D0346) from legacy/src/data/machines/*.tres (MachineDef) with the
+# per-type constants legacy kept as `const` on FactorySim (factory_sim.gd:36-136) moved here as DATA, per
+# data/README.md: a tuning pass is a diff of data/, not a code change. Every number is an integer; power
+# is in milli-units (legacy 4.0 -> 4000) and keep/bleed fractions are percentages (0.92 -> 92), plan §5.1
+# row 009. The per-type RUNNER stays code (sim/machines, dispatched by its behaviour table); what a
+# runner reads is here.
+fields:
+  id: {required: true, type: str}
+  display_name: {required: true, type: str}
+  # Legacy's routing/look tag. Empty or absent = the default named recipe-runner. Tags the behaviour table
+  # does not know are recipe-runners with a look of their own (iron_forge, blast_furnace, plate_press,
+  # gear_mill in legacy).
+  behavior: {required: false, type: str}
+  # A data/recipes id. Absent = runs no recipe (lift, pump, hopper, conduit, ...).
+  recipe: {required: false, type: str}
+
+  # --- per-type parameters, each only on the records that read it -----------------------------------
+  throughput: {required: false, type: int}           # lift: items/tick unpowered (the brownout floor)
+  powered_throughput: {required: false, type: int}   # lift: items/tick at full power
+  power_demand_milli: {required: false, type: int}   # lift/pump/winch_head: power at its cell for full effect
+  reach: {required: false, type: int}                # pump: cells straight down (incl. its own) it can pull from
+  rate: {required: false, type: int}                 # pump: units drained per tick at full power
+  power_milli: {required: false, type: int}          # generator: power emitted at its source while fueled
+  fuel_ticks: {required: false, type: int}           # generator/drill: ticks one coal burns
+  aura: {required: false, type: int}                 # generator: innate radius (cells) powered with no conduit
+  release: {required: false, type: int}              # hopper: items released downward per tick
+  feed_cap: {required: false, type: int}             # hopper: hold once the consumer below holds this many
+  capacity_milli: {required: false, type: int}       # conduit: max power a tube carries (caps the additive merge)
+  v_keep_pct: {required: false, type: int}           # conduit: percent kept crossing one cell DOWN
+  h_keep_pct: {required: false, type: int}           # conduit: percent kept crossing one cell SIDEWAYS
+  bleed_pct: {required: false, type: int}            # conduit: percent shared to adjacent cells
+  trip_capacity: {required: false, type: int}        # winch_head: items queued into transit per trip at full power
+  transit_ticks: {required: false, type: int}        # winch_head: ticks one trip spends in flight
+  station_cap: {required: false, type: int}          # winch_station: input load that pauses new trips
+
+# NOT PERMITTED, enforced (D0346). craft_cost / craft_count re-import the one-time-purchase economy as
+# DATA. The director's ruling (docs/LEGACY_MIGRATION_MAP_2026-08-29.md 8): the terminal economy stays
+# dead "not as code, not as a craft_cost data field, not as a save-schema field." The validator prints
+# this reason with the failure; tools/schema_validator/test_schema_validator.py proves it fires.
+forbidden:
+  craft_cost: "the one-time-purchase economy is dead (GDD section 9); a build cost belongs to the rig-as-consumer economy of plan step 7, not to the machine record"
+  craft_count: "yield-per-craft belongs to the dead crafting screen; placeables are placed, not crafted"

@@ -1,0 +1,5 @@
+# Lifted from legacy/src/data/machines/iron_forge.tres (D0346); craft_cost dropped by ruling. a recipe-runner; the tag is its look, not a behaviour-table entry.
+id: iron_forge
+display_name: Iron Forge
+behavior: iron_forge
+recipe: smelt_iron

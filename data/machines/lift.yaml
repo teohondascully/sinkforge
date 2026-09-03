@@ -1,0 +1,7 @@
+# Lifted from legacy/src/data/machines/lift.tres (D0346); craft_cost dropped by ruling. LIFT_THROUGHPUT 2, LIFT_POWERED_THROUGHPUT 6, LIFT_POWER_DEMAND 4.0 -> 4000 (:41-43).
+id: lift
+display_name: Lift
+behavior: lift
+throughput: 2
+powered_throughput: 6
+power_demand_milli: 4000

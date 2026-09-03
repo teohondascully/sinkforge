@@ -33,9 +33,10 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   order-independent), `.get_state()` / `.set_state()` for serialization. Naming the actual per-subsystem
   streams (`world`, `terrain_gen`, ...) is each sim/ module's job, not core's — it doesn't know sim/'s list.
 - `EntityIdPool` (`entity_id_pool.gd`) — generational-index entity IDs, packed as one 64-bit int
-  (`(generation << 32) | index`) so ids compare with plain `==` and serialize as one integer.
-  `.allocate()`, `.release(id) -> bool` (false on double-release or an id that was never allocated,
-  never a crash), `.is_valid(id) -> bool`, `.live_count()`.
+  (`(generation << 32) | index`) so ids compare with plain `==` and serialize as one integer. `.allocate()`,
+  `.release(id) -> bool` (false on double-release or a never-allocated id, never a crash), `.is_valid(id)`, `.live_count()`.
+- `Ordering` (`ordering.gd`) — ids sorted by TEXT. `StringName <` is a pointer compare in Godot 4, so a bare
+  `.sort()` over ids is creation order, a within-platform determinism breaker (D0346). `.ids(names)`, `.less(a, b)`.
 - `StateHash` (`state_hash.gd`) — the two-lane running-signature mixer every sim plane hashes with (from
   `TileGrid`, A′ step 2, D0344; arithmetic unchanged from D0261, outputs pinned in `tests/test_state_hash.gd`).
   `.fold()`, `.mix()`, `.term(x, y, m: Vector2i, w: Vector2i)` (both lanes), `.text_term()`, `.id_fold()` (memoised).
@@ -53,8 +54,7 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   boundary inside the range a valid `Fx` value can occupy. `mul()` ITSELF still has the ~181-per-axis
   limit when used to square a value directly; that's a `mul()` property, not a `length()` one.
 - `Seams` (`seams.gd`) — the rock's grain as a pure function of `(coordinate, world_seed)`. `.at()`,
-  `.terrain_axis()`, `.aligned()`, `.grain()`. Moved here from `sim/world/` so `view/` can reach
-  `grain()`; that move's caveats are in the file's own header and D0237, not repeated here.
+  `.terrain_axis()`, `.aligned()`, `.grain()`. Moved from `sim/world/` so `view/` can reach `grain()` (D0237).
 
 ## Gotchas
 

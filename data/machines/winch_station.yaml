@@ -1,0 +1,5 @@
+# Lifted from legacy/src/data/machines/winch_station.tres (D0346); craft_cost dropped by ruling. WINCH_STATION_CAP 60 (:136).
+id: winch_station
+display_name: Winch Station
+behavior: winch_station
+station_cap: 60

@@ -1,0 +1,5 @@
+# Lifted verbatim from legacy/src/data/recipes/mine_ore.tres (D0346). Legacy `time = 1.0` s -> 20 ticks at 20 Hz.
+id: mine_ore
+inputs: {}
+outputs: {ore: 1}
+time_ticks: 20

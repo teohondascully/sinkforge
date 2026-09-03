@@ -1,0 +1,4 @@
+# Lifted from legacy/src/data/machines/torch.tres (D0346); craft_cost dropped by ruling. a placed block; its light is the view's (legacy craft_count 4 dropped with craft_cost).
+id: torch
+display_name: Torch
+behavior: torch

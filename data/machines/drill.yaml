@@ -1,0 +1,6 @@
+# Lifted from legacy/src/data/machines/drill.tres (D0346); craft_cost dropped by ruling. DRILL_FUEL_TICKS 60 (factory_sim.gd:58): ticks one coal runs a Drill, 3 s at 20 Hz.
+id: drill
+display_name: Drill
+behavior: drill
+recipe: mine_ore
+fuel_ticks: 60

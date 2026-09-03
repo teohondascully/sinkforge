@@ -1,0 +1,7 @@
+# Lifted from legacy/src/data/machines/winch_head.tres (D0346); craft_cost dropped by ruling. WINCH_TRIP_CAPACITY 8, WINCH_TRANSIT_TICKS 40, WINCH_POWER_DEMAND 4.0 -> 4000 (:133-135); legacy calls all four winch numbers first-pass placeholders.
+id: winch_head
+display_name: Winch Head
+behavior: winch_head
+trip_capacity: 8
+transit_ticks: 40
+power_demand_milli: 4000

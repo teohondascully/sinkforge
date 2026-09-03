@@ -8,12 +8,13 @@ large quantity rather than simply worth more, and this directory is where
 that "large quantity" is a number someone can read and tune, not logic
 buried in `sim/economy`.
 
-## Schema (informal, not yet fixed)
+## Schema
 
-- `id` — stable identifier.
-- `inputs` — material id + quantity pairs.
-- `outputs` — material id + quantity pairs.
-- Which `data/machines` entries can run this recipe.
+`SCHEMA.yaml` (gate 13), codegen'd to `generated.gd` (gate 22). Lifted in A′ step 3 (D0346) from
+legacy's six `RecipeDef` `.tres` records: `id`, `inputs` and `outputs` (item id → count), and
+`time_ticks` — legacy's `time` seconds × 20 at the hub's cadence, every one exact. Which machine runs
+a recipe is the machine record's `recipe` field, not a list here. `press_plate` and `mill_gear` are
+converted because their machines are LIFT; whether their outputs keep a consumer is a plan §8 ruling.
 
 ## Consumers
 
@@ -24,7 +25,7 @@ for the unresolved question of exactly where conversion is triggered).
 
 ## Public API
 
-None yet. No schema has been finalized or validated yet.
+`RecipesRecords.RECORDS` (generated) read through `RecipeDef` (`sim/machines/recipe_def.gd`).
 
 ## Gotchas
 

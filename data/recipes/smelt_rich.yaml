@@ -1,0 +1,5 @@
+# Lifted verbatim from legacy/src/data/recipes/smelt_rich.tres (D0346). Legacy `time = 2.2` s -> 44 ticks at 20 Hz.
+id: smelt_rich
+inputs: {rich_ore: 1}
+outputs: {ingot: 2}
+time_ticks: 44

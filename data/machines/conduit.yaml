@@ -1,0 +1,8 @@
+# Lifted from legacy/src/data/machines/conduit.tres (D0346); craft_cost dropped by ruling. CONDUIT_CAPACITY 12.0 -> 12000 milli, V_KEEP 0.92 -> 92, H_KEEP 0.80 -> 80, BLEED 0.6 -> 60 (:119-122).
+id: conduit
+display_name: Power Conduit
+behavior: conduit
+capacity_milli: 12000
+v_keep_pct: 92
+h_keep_pct: 80
+bleed_pct: 60

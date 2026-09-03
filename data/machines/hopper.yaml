@@ -1,0 +1,6 @@
+# Lifted from legacy/src/data/machines/hopper.tres (D0346); craft_cost dropped by ruling. HOPPER_RELEASE 1, HOPPER_FEED_CAP 3 (:110-111).
+id: hopper
+display_name: Hopper
+behavior: hopper
+release: 1
+feed_cap: 3

@@ -1,0 +1,5 @@
+# Lifted from legacy/src/data/machines/gear_mill.tres (D0346); craft_cost dropped by ruling. a recipe-runner whose output has no consumer yet (plan section 8: mill_gear ruling).
+id: gear_mill
+display_name: Gear Mill
+behavior: gear_mill
+recipe: mill_gear
