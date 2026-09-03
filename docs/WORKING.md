@@ -9,27 +9,45 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03, not started)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0 and 2 done, step 3 next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
 self-contained: a session executing A′ needs only that file, the analysis, and the tree.
 
-**Nothing in the plan has been executed.** No code, no instrument, no dead code was touched on
-2026-09-03; that session wrote the plan, rewrote `README.md`, and archived or re-headed the stale docs
-(D0342).
+**Executed so far (2026-09-03), each step's status line is in the plan's §4:**
+- **Step 0 — done (D0343).** `tests/test_base.gd::_finish` refuses a green that asserted nothing and prints
+  the asserted count on every verdict line; `tools/test_test_base.sh` mutation-tests it (observed failing
+  on the pre-fix base first) and CI runs it before the suites under gate 28. Full local sweep after:
+  67/67, 0 VACUOUS. The harness-protocol transfer is scoped to that piece; the rest port with their
+  subjects (list in D0343). The cross-platform probe: legacy's worldgen tallies identical on all 48 rows,
+  macOS arm64 vs Linux x86_64 (emulated in a container, not native — re-run on CI before quoting).
+- **Step 2 — done (D0344).** `sim/fluid/water_flow.gd` (legacy's algorithm verbatim), `sim/fluid/water_plane.gd`
+  (the owner, 4 px terrain cell, running signature), two water invariants, `tests/test_water_flow.gd`
+  (45 assertions, 10,000 fuzzed ticks conserved). The mixer `TileGrid` hashed with is now
+  `core/state_hash.gd` (`StateHash`), shared by every plane, arithmetic unchanged, pins in
+  `tests/test_state_hash.gd`. CI: 67 → 69 suites.
+- **Step 1 — mostly already ruled** (plan §4 step 1 as re-read in D0343): machines/items/power on the
+  16 px metre cell and water through the 4 px grid are `docs/ARCHITECTURE.md` §9's own table. One
+  confirmation asked of the director (below).
 
 ### Next action
 
-Step 0 of the plan: orient, transfer legacy's harness protocol into `tools/harness/`, add the
-asserted-count refusal to `tests/test_base.gd`, and run the zero-code cross-platform probe
-(`legacy/tools/frontier_corpus.gd` on the Mac and on CI Linux, diff the tallies). Then step 2 (water,
-verbatim). Step 1 is the director's grid-planes ruling and gates step 4 only.
+Step 3, in the plan's order inside the step: `machine_state` + the data records (`data/machines/*.yaml`,
+`data/recipes/*.yaml`, schemas, codegen) first, since they are leaves; then the `sim/world` plane verbs
+against a temporary dictionary owner (this is where `set_solid`/`place_block` call `WaterPlane.displace`);
+then items; then machines + power; then transport; then economy; then save v3; then `world_seeder`; then
+the `main.gd` state-logic blocks. Each sub-step merged green on `main`. The hub keeps legacy's 20 Hz
+cadence on every third 60 Hz body tick (`HUB_TICK_DIVISOR = 3`; ledger entry when the runner lands).
+`WaterFlow.step` is not called from `Interface.apply` until step 4 opens the door.
 
 ### Waiting on the director
 
-- **Step 1, EXPENSIVE:** `TileGrid` planes for machines/items/water/power at the 16 px logic cell, or a
-  separate `LogicGrid`. Needs an ADR. Gates step 4.
+- **Step 1, one word:** confirm water at the 4 px terrain grid as `docs/ARCHITECTURE.md` §9 already
+  states (cost: sixteen times legacy's cells per flooded volume, a quarter metre of descent per fluid
+  tick), or override to metre-cell water and accept that hand-dug 13-cell-disc tunnels take water badly.
+  Recommendation: the fine grid. Everything else in step 1 is ruled or forced (D0343) and the executor
+  builds it under an ADR without asking. Gates only step 4's water wiring.
 - **Rulings the analysis surfaced** (plan §8): Splitter, Ore Vent, power gating (16 of legacy's 54 live
   tests hinge on them); the Crusher/packing/seep chain (133 lines, not on GDD §9's list); the two
   terminal-product recipes; `earth` hardness 5.6 → 6 ticks; authored ramps vs `Heightfield`; the

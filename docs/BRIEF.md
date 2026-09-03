@@ -4,96 +4,94 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03. This round: the A′ hand-off — the execution plan, the README, and the
-stale-doc cleanup. Docs only. No code, no instrument, no dead code touched; nothing in the plan
-executed.** Ledger: D0342 (D0341 is yesterday's recommendation).
+**Last updated: 2026-09-03, second round. A′ execution began: step 0 and step 2 are done and
+committed on `main`; step 3 is next. Nothing pushed.** Ledger: D0343 (step 0), D0344 (step 2).
 
-**Headline: `docs/A_PRIME_REFACTOR_PLAN.md` exists and is self-contained.** A fresh session should
-need only it, the flip analysis, and the tree. Its centrepiece is the classification the fog was
-missing: of 491 code files, 281 are LIVE (the whole current build), and legacy's 210 split into **48
-LIFT, 112 REFERENCE, 50 DEAD**, every one named with its destination or its reason. Then eight ordered
-steps, each with files, acceptance signal, what re-pins, and whether it needs you.
+**Headline: legacy's water is on the substrate, verbatim, conserved over 10,000 fuzzed ticks; and every
+suite verdict now says how many properties it stood on, refusing a green that asserted nothing.** The
+plan's "EXPENSIVE" step 1 collapsed on re-reading: two of its three parts were already ruled in
+`docs/ARCHITECTURE.md` §9, the third is forced by `TileGrid`'s size cap. One word is still yours (below).
 
 ---
 
 ## What landed
 
-- **`docs/A_PRIME_REFACTOR_PLAN.md`** (§0 compaction contract; §1 the decision and why; §2 goal state
-  and acceptance; §3 the file map incl. the 44 `.tres` records, the 144 legacy tools bucketed by the step
-  whose subject they test, and the non-code corpus; §4 steps 0–8; §5 the 24 + 8 determinism rows with
-  the fix per row and the save v3 keys; §6 code vs pattern; §7 the 120 Hz rules and two hypotheses; §8
-  the eleven rulings only you can make; §9 traps; §10 done).
-- **`README.md` rewritten.** What the old one had: a "Stage 4 of 7" status paragraph two pivots stale; a
-  "Two pivots, and why they're a strength" section of dev-narrative; a ten-gate table that undercounts
-  35; "there is no `view/`" when `view/` is 5,706 lines; adjectives where numbers belong. What the new
-  one does: two concrete sentences up front; a measured table of what exists at `6f0d894e`; a plain
-  paragraph of what does not; proof links (gate 8, the fuzzers, the recorded corpus, CI green); the
-  legacy/plan pointer; size; license. No em dashes, no pivot story, no listicle.
-- **Stale docs.** Archived with dated headers: `MASTER_PLAN_AUG30.md` (superseded twice; its cardinal
-  rule survives in the plan), `WG4_CONVERSION_PLAN.md` (executed in full). Re-headed **reference** and
-  given a `docs/README.md` section of their own: `LEGACY_GAP.md`, `PORT_ORDER.md`, `PERF_PLAN.md`,
-  `COORDINATOR_CONTRACT.md` — measurements stand, sequence or status line does not. Amended in place:
-  `LEGACY_MIGRATION_MAP` (KEEP-CURRENT on `factory_sim.gd` reversed), `ONBOARDING.md` (stage sequence
-  superseded), `CONTEXT.md` (one closing paragraph), `docs/README.md` (plan row, reference section,
-  archive notes). **`WORKING.md` reset** from 515 lines to the current stage per its own rule.
-- Kept as is, deliberately: the flip analysis, the migration map, the ledger, GDD, ARCHITECTURE,
-  QUALITY, CLAIMS, CORRECTIONS, `NEEDS_DIRECTOR.md` (not audited row by row), `CONTRIBUTING.md` (already
-  declares itself stale).
+- **Step 0 (D0343).** `tests/test_base.gd::_finish` prints `VACUOUS` and exits 1 on zero assertions,
+  and `-- N asserted` on every verdict line; `tools/test_test_base.sh` mutation-tests it and was seen
+  failing on the pre-fix base first (5 of 7). CI runs it before the suites (gate 28). Full sweep after:
+  67/67, 0 VACUOUS. The 15-file harness-protocol transfer is scoped to this piece; the rest port with
+  their subjects (the list is in D0343). Probe: legacy's worldgen tallies identical on 48/48 rows,
+  macOS arm64 vs Linux x86_64 — **emulated in a container, not native; re-run on CI before quoting.**
+- **Step 2 (D0344).** `sim/fluid/water_flow.gd` (legacy line for line), `sim/fluid/water_plane.gd`
+  (the owner, 4 px terrain cell, running signature, `displace()`), two invariants with positive
+  controls, `tests/test_water_flow.gd` (45 assertions, 3.9 s). The hash mixer moved out of `TileGrid`
+  into `core/state_hash.gd`, arithmetic unchanged, outputs pinned in `tests/test_state_hash.gd`; the
+  golden did not move. CI 67 → 69 suites.
+- **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
+  `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
+  step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
 
 ---
 
 ## What was learned
 
-1. **The classification is generatable, not authored.** Every legacy row in the plan came from the 17
-   workers' per-file `FLIP_VERDICT` lines, re-bucketed for A′ by a script, and the buckets reconcile
-   (src 8/8/2, scenes 20/15/8, tests 5/0/0, tools 15/89/40 = 48/112/50 = 210). A hand-typed version
-   would have drifted the way `LEGACY_GAP.md`'s counts did.
-2. **The director's question about 16 px was a units question.** Both builds' logic cell is one metre;
-   the lag axis is cells per metre the per-frame code touches (880 vs 14,080 for the same view, D0340),
-   not pixels per metre. The plan makes "machines, items, water and power live on the metre cell" a rule
-   and names the two likely live causes of lag as hypotheses to measure, not facts.
-3. **A third doc status was needed.** `docs/README.md` allowed normative or archived. Four plans carry
-   measurements that stand and a sequence that does not; archiving them loses the measurements, keeping
-   them normative misleads. "Reference" is that status, recorded as a judgment call (D0342).
-4. **My own Write was refused once** because my amendment script had touched `WORKING.md` first in the
-   same turn. Harmless here, but the same shape as every "two writers, one file" collision the fleet
-   memory warns about; sequence writes to a file through one path.
+1. **I re-opened a decided question.** Step 1's proposal (water on the metre cell) contradicted §9's
+   own table, which I had not re-read against the proposal. Screen before asking for a ruling: grep the
+   normative docs for the nouns in the question. The tree agreed with §9 too: a 13-cell bite at 4 px
+   never aligns to metres.
+2. **Legacy's float noise does not diverge across arm64/x86_64** (in the emulated frame). The current
+   build's proven crack (gate 8, checkpoint 3) is therefore not "noise diverges"; the suspects narrow to
+   libm transcendentals (`cave_passes.gd:86-91`) and the `lerpf`/hash-to-float roundings. Hypothesis.
+3. **A gate steered a design, correctly.** The coordinate-naming gate refused the mixer as a `TileGrid`
+   method with non-coordinate `Vector2i` parameters; the mixer belonged in `core/`, and moving it also
+   shrank `TileGrid` by 99 lines.
+4. **A legacy branch was unreachable.** `WaterFlow`'s cap-overflow branch cannot fire through legacy's
+   public API (gravity never fills past the cap, `add_water` clamps). Kept verbatim because our owner's
+   `set_level` can reach it, and pinned through that door.
+5. **The refusal found no live vacuous suite** (0 of 67). Its value is forward: step 3 adds twenty-odd
+   suites and every one will have to have asserted something.
 
 ---
 
 ## The decisions this round is waiting on
 
-**Step 1 of the plan, EXPENSIVE, gates step 4:** where machines, items, water and power live —
-`TileGrid` planes at the 16 px logic cell (proposed), or a separate `LogicGrid`. Needs an ADR.
+**Step 1, one word:** water at the 4 px terrain grid as §9 states (cost: 16× legacy's cells per flooded
+volume, a quarter metre of descent per fluid tick), or override to metre-cell water and accept that
+hand-dug tunnels take water badly. Recommendation: the fine grid. Gates only step 4's water wiring.
 
-**Plan §8's other rulings:** Splitter, Ore Vent, power gating (16 of legacy's 54 live tests); the
-Crusher/packing/seep chain; `press_plate`/`mill_gear`; `earth` hardness 5.6 → 6 ticks; authored ramps
-vs `Heightfield`; the resolver (P-28) before the grapple's collision half; the 36 untracked recordings
-(gate 27 red); the `history/` cull.
+**Two executor calls stated, say if you disagree:** the hub runs at legacy's 20 Hz cadence on every
+third 60 Hz body tick (every legacy constant ports verbatim); `BRANCHING.md`'s main-only rule stands.
 
-**Standing:** P004, P015/P017, P026–P029, T001–T004.
+**Plan §8's other rulings:** unchanged — Splitter, Ore Vent, power gating, the Crusher chain,
+`press_plate`/`mill_gear`, `earth` 5.6 → 6 ticks, ramps vs `Heightfield`, the resolver (P-28); the 36
+untracked recordings (gate 27 red); the `history/` cull. **Standing:** P004, P015/P017, P026–P029,
+T001–T004. **`main` is five commits ahead of `origin/main`, not pushed** — your call.
 
 ---
 
 ## Anything that felt wrong even though it passed
 
-**The plan's line estimates are the workers' estimates, not measurements.** Where a number is an
-estimate the plan says "est." The counts (rows, files, dead lines) are measured; the effort is not.
+**The Linux probe frame is emulation.** Rosetta is instruction-exact, but "identical under emulation" is
+not "identical on CI". Named as such everywhere it is quoted.
 
-**Two performance claims are hypotheses and are labelled so.** The 262,144-cell one-shot bake after
-D0335 and the unmeasured widest zoom rung are the likely causes of the lag you feel, and nothing was
-run to confirm either. The plan says measure first.
+**I wrote a `_check(... or true)` while drafting the water suite** and caught it by reading, not by a
+gate. No gate here refuses a constant-true condition; legacy's `check_vacuous_assertions` had two other
+shapes, not this one. The asserted-count refusal would not have caught it either — it counts, it does
+not read.
 
-**`NEEDS_DIRECTOR.md` is 1,104 lines and I did not audit it.** Its own header already admits three
-items said "open" after their rulings shipped. It is the one document in the normative table that may
-still mislead by staleness.
+**`Invariants._reported` returns `Variant` into typed `report_*` returns.** Legal GDScript, runs green,
+but the type system is not checking that path. Chosen to satisfy the duplication gate; a typed pair of
+one-line twins would have been clearer.
+
+**The hub cadence is stated, not made.** It lives in the plan and this brief until step 3's runner lands
+with its ledger entry.
 
 ---
 
 ## Blocked, and what it's waiting on
 
-**A′ step 0 can start now** (no ruling needed). Step 4 waits on step 1's ruling. `main` is two
-commits ahead of `origin/main` and not pushed.
+Nothing blocks step 3's first sub-steps (`machine_state`, the data records, the `sim/world` verbs
+against a temporary owner). Step 4's water wiring waits on the one-word ruling. Push waits on you.
 
 ## Taste queue
 

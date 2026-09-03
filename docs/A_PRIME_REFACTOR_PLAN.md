@@ -1,7 +1,8 @@
 # A′ refactor plan — lift legacy's sim hub onto the substrate, then finish the game
 
 **Status:** normative execution plan, written 2026-09-03 on the director's approval of
-`docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation. **Nothing in this document has been executed.**
+`docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation. **Execution began 2026-09-03: step 0 done (D0343),
+step 2 done (D0344). Each step in §4 carries a status line; a step with none has not started.**
 The tree it describes is `6f0d894e` (`main`); legacy is `legacy/` in that tree, byte-identical to tag
 `pre-pivot` (`666e5518`).
 
@@ -283,8 +284,10 @@ landed as D0240). Amended in place: `docs/LEGACY_MIGRATION_MAP_2026-08-29.md` (K
 
 Each step: what, which files, the acceptance signal, what re-pins, and whether it needs the director.
 **Run the two-process golden (`tests/test_shaft_replay_determinism.gd`) after every step; pin goldens
-from CI Linux, never from a Mac (D0167).** Work on a branch per step, rebase-merge to `main` through a
-green PR (`docs/BRANCHING.md`). Every judgment call gets a ledger entry in the same commit.
+from CI Linux, never from a Mac (D0167).** Work lands on `main` in small green commits, one per sub-step:
+`docs/BRANCHING.md`'s rule is main only, no feature branches, temporary worktrees allowed for comparisons
+— an earlier line here said "branch per step" and contradicted it (corrected 2026-09-03, D0343). Every
+judgment call gets a ledger entry in the same commit.
 
 ### Step 0 — orient, and transfer the harness protocol (no ruling needed)
 
@@ -293,23 +296,44 @@ green PR (`docs/BRANCHING.md`). Every judgment call gets a ledger entry in the s
 2. Port the 15 harness-protocol files (§3.2) into `tools/harness/`, and add an asserted-count refusal to
    `tests/test_base.gd::_finish` modelled on `legacy/tools/check_base.gd:145-160`. Mutation-test it: a
    suite with zero `_check` calls must print VACUOUS and exit non-zero.
-3. Run the zero-code cross-platform probe: `legacy/tools/frontier_corpus.gd` prints integer worldgen
-   tallies for 12 seeds headless; run it on the Mac and on CI Linux and diff. Record the result in the
-   ledger. It settles whether legacy's `FastNoiseLite` generator diverges in practice.
+3. Run the cross-platform probe: `legacy/tools/frontier_corpus.gd` prints integer worldgen tallies for
+   12 seeds headless. **`legacy/` has no `project.godot`**, so run it from a scratch worktree at tag
+   `pre-pivot` (import first); the Linux half runs in a `linux/amd64` container or on CI. Diff, record.
 Acceptance: gates green, the new refusal caught by its mutation test, the probe result recorded.
 
-### Step 1 — the director's ruling on the grid planes (EXPENSIVE, blocks step 4)
+**Status (2026-09-03): DONE — D0343.** The refusal is in `tests/test_base.gd::_finish` with the count on
+every verdict line; `tools/test_test_base.sh` was observed failing on the pre-fix base (5 of 7) then
+passing (7 of 7); CI runs it before the suites under gate 28; the full sweep was 67/67 with 0 VACUOUS. Item
+2's "15 files" is scoped to the refusal now and the rest port with their subjects (the list is in D0343).
+The probe: **48 of 48 rows identical**, macOS arm64 vs Linux x86_64 (emulated, not native — re-run on CI
+before quoting as settled). Legacy's `FastNoiseLite` generator does not diverge across that pair; the
+current build's divergence (gate 8 checkpoint 3) is therefore likely the libm transcendental sites
+(`cave_passes.gd:86-91`) and the `lerpf`/hash-to-float roundings, not noise as such — a step 8 hypothesis.
 
-The one design decision in this plan. Machines, items, water, power, conduits, ropes, torches,
-saplings, lode and deposits need a home. Legacy keyed all of them on its 32 px, one-metre cell.
-Proposal: `TileGrid` gains planes at the **16 px logic cell** (one metre, the same metre), leaving the
-4 px terrain planes and heightfield collision untouched. Legacy's own note applies: at quarter-metre
-resolution the same 128×128 world is 16 times more water cells, and legacy's per-frame passes ran over
-880 coarse cells where ours run over 14,080 (D0340). Alternatives the director may prefer: a separate
-`LogicGrid` class alongside `TileGrid`; or machine planes on `TileGrid` and water on its own grid.
-Whatever is ruled shapes the tick order's data and the save schema, so it needs an ADR
-(`docs/QUALITY.md` gate 20). Steps 2 and 3 can start before this ruling because water and the hub can
-run against a temporary in-module dictionary; step 4 cannot.
+### Step 1 — the grid planes: mostly already ruled; one confirmation pending (blocks step 4's water plane wiring only)
+
+**Re-read against the tree on 2026-09-03 (D0343): two of this step's three parts were already ruled and
+the third is forced.** `docs/ARCHITECTURE.md` §9's resolution table rules that machines, items, power,
+conduits, ropes, torches and saplings live on the **16 px metre cell**, and that water "flows through"
+the **fine 4 px grid**. D0019/D0020 and `TileGrid`'s own header rule that the 16 px grid is not a second
+array of terrain; new planes are new state, not a copy, so they break neither, and `TileGrid` at 312 of
+400 lines forces them into a sibling class regardless. The tree agrees with §9 on water: `Mining` clears a
+13-cell disc at 4 px, so hand-dug tunnels never align to metres, and metre-cell water would either refuse
+a tunnel the body walks through or draw over rock. The plan's original proposal here (water on the metre
+cell) contradicted §9 and is withdrawn.
+
+**What the executor builds under that, without asking:** `sim/world/logic_grid.gd` — the metre-cell
+planes (machine index, ground piles, conduit, rope, torch, sapling, power, fill) keyed `logic_cell:
+Vector2i`, with `TileGrid`'s two-lane running signature via `StateHash.term` (`core/state_hash.gd`); the water plane is
+`sim/fluid/water_plane.gd` at the terrain cell (step 2, landed); every plane's signature folds into the
+golden's checkpoint hash. Written up as an ADR (gate 20) before step 4 touches `TileGrid`/`Interface`.
+Reversible: moving a plane between classes later is mechanical and re-pins a golden that re-pins anyway.
+
+**The one thing only the director can say (asked 2026-09-03):** confirm water at the 4 px grid as §9
+states, knowing the cost — sixteen times legacy's cells per flooded volume, a quarter metre of descent per
+fluid tick, so flooding reads finer and slower than legacy; or override to metre-cell water and accept
+that hand-dug tunnels take water badly. Recommendation: the fine grid. Until answered, step 2's plane
+stands at the terrain cell and steps 3's sub-steps that do not touch water proceed.
 
 ### Step 2 — water, verbatim (no ruling needed)
 
@@ -320,6 +344,14 @@ legacy source in the header. `WaterFlow.step` runs in the `fluid` phase of the t
 Acceptance: legacy's water tests pass; the conservation property ("no source, no drain, sum invariant")
 holds over 10,000 fuzzed ticks; two-process golden green (no re-pin, water is not in the golden's world
 yet). Gate 3: 100 lines, fine.
+
+**Status (2026-09-03): DONE — D0344.** `sim/fluid/water_flow.gd` (algorithm verbatim, `_settle_run` split
+for the 50-line cap), `sim/fluid/water_plane.gd` (the owner: legacy's `water` dict + accessors, running
+signature, `displace()`), `Invariants.check_water_conservation` / `check_water_not_in_rock`,
+`tests/test_water_flow.gd` (45 assertions; 10,000 fuzzed ticks conserved). Keyed on the 4 px terrain cell
+(step 1). **Left for step 3:** the `set_solid`/`place_block` → `displace()` coupling lives with the world
+verb; **left for step 4:** `WaterFlow.step` is not yet called from `Interface.apply` (no fluid phase runner
+exists until step 3's tick order lands).
 
 ### Step 3 — lift the hub (no ruling needed for the lift; §8's rulings decide four records)
 
@@ -363,7 +395,10 @@ lines, each function ≤ 50, so the groups below become several files each):
 What changes on the way (all of §5.1 and §5.2): `progress` → ticks; power → milli-int; the recipe
 `time` → ticks; sort before every state-affecting dictionary iteration except the hopper latch;
 `advance(delta)` is NOT ported (the tick is driven by `Interface.apply`); `MAX_TICKS_PER_ADVANCE` and
-`_tick_accumulator` do not come over; `terrain_dirty` and `flow_events` become Observation channels,
+`_tick_accumulator` do not come over; **the hub keeps legacy's 20 Hz cadence** — the body ticks at 60 Hz
+(`Body.TICK_HZ`, ARCHITECTURE §4) and the machine/transport/items/fluid/economy phases run on every third
+body tick (`HUB_TICK_DIVISOR = 3`), so every legacy tick constant ports verbatim and the hub's per-tick
+cost lands at a third of the frequency; record the ledger entry when the runner lands; `terrain_dirty` and `flow_events` become Observation channels,
 not sim fields the view clears; `_fine_solid`, `_fine_edge`, `_fine_grit` and `FineTerrain` do not come
 over at all (render-only; the current bake owns the fine look).
 Order inside the step: `machine_state` + data records first (they are leaves); then `sim/world` planes
@@ -550,8 +585,11 @@ Measured 2026-09-01 at the default framing: painters 4.01 ms (`veil 2.99 sky 0.9
 0.01`), sim tick 1.58 ms, frame ≈ 5.6 ms against 8.33. The rules, from `docs/PERF_PLAN.md` and D0340:
 - Nothing loops per cell per frame. Per dirty chunk or per screen at metre resolution only. The
   quarter-metre grid is for digging and collision; per-frame code reads it only through the bake.
-- Machines, items, water and power live on the metre cell (step 1). Legacy's 128×128 world is 16k water
-  cells at a metre and 262k at a quarter-metre.
+- Machines, items and power live on the metre cell; water flows through the 4 px terrain cell
+  (ARCHITECTURE §9; step 1 as re-read in D0343). Legacy's 128×128 world is 16k water cells at a metre and
+  262k at a quarter-metre, but `WaterFlow` iterates WET cells only, so its cost follows flooded volume,
+  not world size; the water painter (step 6) is where quarter-metre resolution has to be paid for, and it
+  pays the way D0336's veil did — one texture, one draw.
 - Measure with `view/draw_cost.gd` inside the frame. A wall-clock slope under `_physics_process` is the
   clock below ~16.7 ms (D0340). Vsync makes a millisecond number unanswerable (`check_frametime.gd:29`).
 - Budget the widest zoom rung (9.2× the default area), not the default. Unmeasured since D0336; the
@@ -571,7 +609,7 @@ Measured 2026-09-01 at the default framing: painters 4.01 ms (`veil 2.99 sky 0.9
 
 | ruling | blocks | proposal on the table |
 |---|---|---|
-| Grid planes: `TileGrid` at the 16 px logic cell vs a separate `LogicGrid` (ADR) | step 4 | planes on `TileGrid` at 16 px |
+| Grid planes — reduced to ONE confirmation (D0343): water at the 4 px terrain cell as ARCHITECTURE §9 states, or override to the metre cell | step 4's water wiring | the 4 px grid (§9 as written); machines/items/power at 16 px on a `LogicGrid` sibling is already ruled and is built without asking |
 | Splitter (GDD §9: "two carved chutes are a splitter… must be a stated decision") | 4 legacy tests, `_run_splitter`, `_split_pattern`, `split_mode` | — |
 | Ore Vent (an infinite free source; fights R2) | 10 legacy tests fixture on it | — |
 | Power gating (R1-entangled; removing power silently freezes upward machines) | 2 legacy tests, V11 wiring | port the mechanism, do not wire the tier (Q3) |
