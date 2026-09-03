@@ -15025,3 +15025,34 @@ legacy-plausible pockets, which is honest but not what legacy gated there); per-
 ore a blow); a float DDA (the one float on the input path).
 
 **Reverse cost:** CHEAP; four files, one suite, two touched.
+
+## D0355 · 2026-09-03 · A′ step 3i (verbs half): the situated verbs into `sim/run` — build, drop, scoop, configure and the two-press link over the four services; step 3 complete
+
+**Decided:** (1) `sim/run/verbs.gd` (`Verbs`) is legacy `main.gd`'s `try_build` 2645 + `_placeable` 2778,
+`try_drop` 2534 + `_reachable_eater` 2571, `_collect_ground_under_player` 2323 + the drop grace 2237,
+`try_configure` 2148 and `try_link_winch` 1487, over `World`, `Items`, `Machines` and `Body`: it decides
+which discrete verb a press means and every edit goes through `BuildVerbs`, `MachineVerbs` and `Items`.
+The particles, sounds and toasts legacy fired beside each verb are the view's, read off the outcome
+each verb returns. (2) It lives in `sim/run` beside `HubTick` and `WorldSeeder`, not in `sim/commands`:
+that module's contract says commands are values without logic, and step 4 gives it the `Command` kinds
+that name these verbs; nor in `interface`, which validates and dispatches but does not hold the
+hotbar. (3) ONE REACH RULE: `Mining.in_reach` now delegates to `Aim.in_reach_point`, and the verbs use
+`Aim.in_reach_logic` on the metre's centre, so the mining circle and the build/drop/link circle are the
+same compare (the plan's "`_can_reach` = `Mining.in_reach`"). (4) Legacy's float gates as integers:
+`_player_occupies`' rect intersection as `Fx` interval overlap on the body's box; the scoop reach 2.5 m
+squared; `DROP_GRACE_S` 1.3 s = 78 ticks, aged by `tick()`. (5) The verbs' own state — the hotbar
+selection (a drop's subject), the grace table, the armed head — is signed and session-scoped; legacy
+saved none of it and neither does v3. (6) Kept as legacy had it: conduits, ropes and torches are not
+gated by `placeable` (only machines and blocks are), so a conduit can be laid in the body's own cell;
+the hotbar index stays put when a stack empties, so the selection slides to the next stack — the suite
+found both by tripping over them. (7) `Body.facing` is the drop's direction and the placed machine's,
+state as the plan said (`Player.note_dig` was never cosmetic). (8) `tests/test_verbs.gd`, 40 assertions.
+CI 79 → 80. **Step 3 of A′ is complete**: every LIFT row of plan §3.2 for `factory_sim.gd`, `power_flow.gd`,
+`save_game.gd`, `world_seeder.gd` and `main.gd`'s state-logic blocks is on the substrate, minus the four
+rulings (§8) and flora.
+
+**Alternative:** verbs on `Interface` (mixes the hotbar into the door); verbs in `sim/commands` (against
+its contract); a `Player` object holding the body and the verbs (legacy's shape, and the two-clock
+scene object A′ retires).
+
+**Reverse cost:** CHEAP; one file, one suite, the reach delegation.

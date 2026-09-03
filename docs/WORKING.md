@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3h and 3i's mining half done, step 1 ruled; the verbs close step 3)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 1 (ruled), 2, 3 done; step 4 — the door — next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -87,9 +87,22 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   `Items.yield_break` (a burst a blow, the rest opens as lode, rubble sixteenths into blocks). LOS gates
   the verbs (`Interface._apply_mine` refuses `target_behind_rock`), not the primitive. 48 assertions.
 
+- **Step 3i, verbs half — done (D0355). STEP 3 COMPLETE.** `sim/run/verbs.gd`: build/pick-up of every
+  kind by what is selected, drop into an eater or forward or down with a 78-tick grace, scoop within
+  2.5 m, configure, the two-press winch link; one reach rule through `Aim.in_reach_point`. 40 assertions.
+
 ### Next action
 
-The last of step 3: **the verbs half of the `main.gd` blocks** (legacy's
+**Step 4, the door** (plan §4): `Interface` owns `World`, `Items`, `Machines`, `Mining`, `Verbs`, a
+`ProductionRate` and the `HubTick` cadence; `Command` gains the verb kinds (`build`, `drop`, `collect`,
+`configure`, `link_winch`, `select`, `paint_plan`, `work_lode`; the fixture primitives) with named
+rejection reasons; `Observation` gains the accessors legacy's renderer reads (deposits, lode per mille,
+machines and their status, water per cell, conduits and power, torches, piles, saplings, the pack, the
+plan, climbable); `observe()` stays pure against `state_signature()`; the save grows the body's and the
+mining state's keys (ADR 0010 §1); the golden re-pinned from CI Linux if the world's contents change
+(the seeder in the probe would; keep the probe as it is unless step 4 needs it). Then step 5 (the
+grapple; the resolver ruling gates its collision half), step 6 (views), step 7 (the economy, director-
+scoped), step 8 (cross-platform). Old text follows for the record: **the `main.gd` blocks** (legacy's
 seeded placement of lodes, deposits, water onto the generated shaft). Then the **`main.gd` state-logic
 blocks** the plan's §3 lists. Each sub-step merged green on `main`. `HubTick.step` is not called from
 `Interface.apply` until step 4 opens the door. Every lifted `sort` goes through `Ordering`; every lifted

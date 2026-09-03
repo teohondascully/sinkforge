@@ -433,7 +433,8 @@ under §8. 3h `world_seeder` — DONE (D0353: `data/starts/` with legacy's tutor
 places machines and stocks the pack; the tree and the tool kit not carried; 36 assertions). 3i the
 `main.gd` blocks, mining half — DONE (D0354: `LineOfSight` in exact integers pinned against legacy's
 float walk off the ties, `Aim`, `DigPlan`, `LodeWork`, `Items.yield_break`; LOS gates the verbs, not the
-primitive; 48 assertions). Next: the verbs half (`sim/commands/` + the situated verbs).
+primitive; 48 assertions). 3i verbs half — DONE (D0355: `sim/run/verbs.gd`, the situated verbs over the
+four services; one reach rule through `Aim`; 40 assertions). **STEP 3 COMPLETE.** Next: step 4.
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

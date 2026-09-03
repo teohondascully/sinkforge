@@ -2,11 +2,12 @@
 
 ## Purpose — SHAPE OPEN, 2026-08-27; the hub tick lives here since 2026-09-03
 
-**What is here now (D0349, D0353):** `hub_tick.gd`, `HubTick` — legacy `FactorySim.tick()`'s fixed
-order as a stateless phase runner over the three services (`World`, `Items`, `Machines`), at
-`HUB_TICK_DIVISOR = 3` on the 60 Hz body tick (D0345); and `world_seeder.gd`, `WorldSeeder` — the one
-door a new world comes through (generate, wrap, stamp a `data/starts` record, hand back the spawn).
-Neither is a session state machine, and both foreclose nothing below.
+**What is here now (D0349, D0353, D0355):** `hub_tick.gd`, `HubTick` — legacy `FactorySim.tick()`'s
+fixed order as a stateless phase runner over the three services (`World`, `Items`, `Machines`), at
+`HUB_TICK_DIVISOR = 3` on the 60 Hz body tick (D0345); `world_seeder.gd`, `WorldSeeder` — the one door
+a new world comes through (generate, wrap, stamp a `data/starts` record, hand back the spawn); and
+`verbs.gd`, `Verbs` — the situated verbs the body does from where it stands, legacy's main-scene
+state-logic blocks over the four services. None is a session state machine; all foreclose nothing below.
 
 This module's purpose used to be a session lifecycle: `MetaIdle -> SiteSelect
 -> RunConfig -> RunActive -> RunEnding -> RunResolved`, owning a flood clock
@@ -70,6 +71,13 @@ does the tick loop simply always run? Unresolved, part of the same open question
   machines, start_id, site_id = &"") → bool` (validates every fixture before stamping; `last_refusal`),
   `stamp_record(…, dict)`, `spawn_logic_cell(start)`, `SURFACE_ROW_M` (the generator's datum in metres).
   Lives here, not in `terrain_gen` as the plan filed it: stamping places machines and stocks the pack.
+- `Verbs` (`verbs.gd`, D0355) — `Verbs.new(world, items, machines, body)`; `build(cell) → outcome`
+  (pick up a machine/conduit/rope/torch/sapling there, else place what `selected` names: sapling, torch,
+  conduit, rope, machine facing the body's way, supported block), `drop() → units` (into a reachable
+  eater, else forward, else down; the landing gets `DROP_GRACE_TICKS`), `collect() → units` (piles within
+  2.5 m, not graced), `configure(cell) → toast`, `link_winch(cell) → armed|linked|failed`, `tick()` (ages
+  the grace), `placeable()`, `body_occupies()`, `can_reach()` (`Aim.in_reach_logic`), `state_signature()`.
+  Its state (selection, grace, the armed head) is session-scoped and not in the save.
 
 ## Gotchas
 

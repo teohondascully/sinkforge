@@ -248,14 +248,7 @@ static func hardness_halves(material: StringName) -> int:
 ## the bottom of a 4096px world squaring a full-height delta in Fx runs to ~1.8e18, inside int64 but with
 ## less headroom than this is worth; after it, both terms are bounded by the reach itself.
 static func in_reach(body_x: int, body_y: int, cell: Vector2i) -> bool:
-	var dx: int = _cell_center_fx(cell.x) - body_x
-	var dy: int = _cell_center_fx(cell.y) - body_y
-	var bound: int = ((REACH_NUM * LOGIC_TILE_PX) / REACH_DEN + 1) * Fx.SCALE
-	if absi(dx) > bound or absi(dy) > bound:
-		return false
-	var radius_px_fx: int = LOGIC_TILE_PX * Fx.SCALE
-	return (REACH_DEN * REACH_DEN) * (dx * dx + dy * dy) <= \
-		(REACH_NUM * REACH_NUM) * (radius_px_fx * radius_px_fx)
+	return Aim.in_reach_point(body_x, body_y, _cell_center_fx(cell.x), _cell_center_fx(cell.y))
 
 
 static func _cell_center_fx(cell_axis: int) -> int:

@@ -11,6 +11,7 @@ extends RefCounted
 ## the caller's (a recorded world point, never the raw OS pointer: the-human-is-inside-the-measurement).
 
 const CELL_FX: int = Mining.CELL_PX * Fx.SCALE
+const LOGIC_FX: int = Mining.LOGIC_TILE_PX * Fx.SCALE
 ## The snap tolerance is one reach radius from the cursor, squared, scaled by REACH_DEN^2 so the compare
 ## stays integer: point at or near a wall and it snaps; point at open air far off and it does not.
 const REACH_PX_FX_NUM: int = Mining.REACH_NUM * Mining.LOGIC_TILE_PX * Fx.SCALE
@@ -18,12 +19,38 @@ const REACH_PX_FX_NUM: int = Mining.REACH_NUM * Mining.LOGIC_TILE_PX * Fx.SCALE
 const SPAN: int = (Mining.REACH_NUM * Mining.LOGIC_TILE_PX + Mining.REACH_DEN * Mining.CELL_PX - 1) / (Mining.REACH_DEN * Mining.CELL_PX) + 1
 
 
+## THE ONE REACH RULE (`Mining.REACH_NUM/DEN` metres, Euclidean, inclusive, compared squared): is the
+## `Fx` point within reach of the body? `Mining.in_reach` delegates here for a terrain cell's centre and
+## `in_reach_logic` for a metre's, so the verbs that work at the metre share the primitive's circle.
+## Squared, never `sqrt`. The axis reject first BOUNDS the operands: without it a body at the bottom of a
+## 4096 px world squaring a full-height delta runs near int64's headroom; after it both terms are bounded.
+static func in_reach_point(body_x: int, body_y: int, point_x: int, point_y: int) -> bool:
+	var dx: int = point_x - body_x
+	var dy: int = point_y - body_y
+	var bound: int = ((Mining.REACH_NUM * Mining.LOGIC_TILE_PX) / Mining.REACH_DEN + 1) * Fx.SCALE
+	if absi(dx) > bound or absi(dy) > bound:
+		return false
+	var radius_px_fx: int = Mining.LOGIC_TILE_PX * Fx.SCALE
+	return (Mining.REACH_DEN * Mining.REACH_DEN) * (dx * dx + dy * dy) <= \
+		(Mining.REACH_NUM * Mining.REACH_NUM) * (radius_px_fx * radius_px_fx)
+
+
+static func in_reach_logic(body_x: int, body_y: int, logic_cell: Vector2i) -> bool:
+	var half: int = LOGIC_FX / 2
+	return in_reach_point(body_x, body_y, logic_cell.x * LOGIC_FX + half, logic_cell.y * LOGIC_FX + half)
+
+
 ## The terrain cell an `Fx` world point is in (floor division, so a point just left of zero is cell -1).
 static func cell_of(point_x: int, point_y: int) -> Vector2i:
-	return Vector2i(_floor_div(point_x, CELL_FX), _floor_div(point_y, CELL_FX))
+	return Vector2i(floor_div(point_x, CELL_FX), floor_div(point_y, CELL_FX))
 
 
-static func _floor_div(a: int, b: int) -> int:
+## The metre cell an `Fx` world point is in.
+static func logic_cell_of(point_x: int, point_y: int) -> Vector2i:
+	return Vector2i(floor_div(point_x, LOGIC_FX), floor_div(point_y, LOGIC_FX))
+
+
+static func floor_div(a: int, b: int) -> int:
 	var q: int = a / b
 	if a % b != 0 and ((a < 0) != (b < 0)):
 		q -= 1
