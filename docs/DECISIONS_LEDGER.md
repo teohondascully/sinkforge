@@ -15155,3 +15155,43 @@ where one suffices); a `Vector2i`-returning `mul`/`div` pair (the plan's ~40 lin
 nothing else is needed yet).
 
 **Reverse cost:** CHEAP; ~60 lines in one file, one suite.
+
+## D0359 · 2026-09-03 · A′ step 5b: the grapple's solver under `Fx` — exact one-cell probes, the wrapping polyline, the projection and the radial cancel through the raw delta, the pump as one 21/20 ratio
+
+**Decided:** (1) `sim/body/grapple.gd` is legacy `scenes/grapple.gd` rewritten under `Fx` with its
+physics unchanged: a position-based distance constraint solved once per tick, the outward radial
+component of velocity cancelled and nothing else, the pump conserving angular momentum off `hauled`, the
+line a polyline that catches on corners and comes off them. (2) UNITS: identical pixels. The body's
+constants ported unchanged (plan §3.2) and the winch is calibrated against them (150 px/s legs, 232
+stride, 420 reel), so the grapple's speeds port as px/tick integers (`(1800 * SCALE) / 60`, exact) and
+its range as 480 px — legacy's 15 cells of 32 px, 30 metres here, the same ×2 the field of view took
+(D0325). The probe is one terrain cell (4 px): legacy's quarter-cell of 32 px was 8 px, so the hook here
+samples twice as finely in pixels and at the finest feature the world has. (3) `PUMP_CLAMP` is
+`21/20` as one ratio with its reciprocal `20/21` derived from the same two ints, per the plan; the same
+ratio will be the body's `RELEASE_KICK` in 5c. (4) THE PROJECTION DOES NOT GO THROUGH A UNIT VECTOR.
+The first cut projected `pin + normalize(d) * free`; the suite's "within 4 units of the circle" failed on
+five of seven probes because a 16-bit unit vector's truncation, multiplied by a 100 px radius, is about
+a hundred units short. The shipped form is `d * free / ceil|d|` (`Fx.isqrt_ceil`, made public for it):
+truncation toward zero over a ceiling root, within a few units and still never outside — D0358's
+direction kept, at the precision the radius deserves. The radial cancel and the pump take the same road
+(`v·d / |d|`, then `d * radial / |d|`), safe in i64 while `|d|` is under the winch's range. (5) One-shots
+(`just_planted`, `just_cut`) are not in the signature or the capture: they are what the tick just did,
+read once by the observation. (6) `_catch` catches where the rope FIRST touches rock (the entry cell's
+corner nearest the last clear sample, nudged 2 px back), which is legacy's rule verbatim; the suite's
+first expectation put the pivot at the shelf's tip and was wrong about legacy, not about the port.
+`tests/test_grapple.gd`, 63 assertions: bite within 12 ticks, miss stows at exactly 480 px, the ghost and
+the hook agree on 48 compass shots (whether AND where), reel/pay/floors/caps, projection never outside,
+tangent kept, pump 100→105 exactly under the clamp, wrap and unwrap, chained miss keeps the old line and a
+chained bite takes the distance as it is, signature round-trip. CI 82 → 83. (7) THE COORDINATE GATE
+GAINS A THIRD TAG. `check_coordinate_naming` reads every public `Vector2i` in `sim/body` as a cell index
+and wanted `terrain_`/`logic_` on the grapple's pixel points (14 hits); its docstring expected pixel
+positions to be float `Vector2`, which D0358 changed. The rule's spirit — every coordinate crossing a
+public API names its space — is kept by adding `fx` as the tag for a fixed-point pixel point (`pos_fx`,
+`hitch_fx()`), not by exempting the file. Mutation-tested: with one parameter left untagged the amended
+gate reported exactly that one; tagged, it passed.
+
+**Alternative:** a finer probe (2 px) for corner clips (legacy accepted the quarter-cell miss; the world's
+smallest feature is one cell); `Vector2i.INF`-style sentinel for "no catch" (none exists for ints; the
+i32 minimum pair is the sentinel, and no world point is there).
+
+**Reverse cost:** CHEAP; one file, one suite, one public root.

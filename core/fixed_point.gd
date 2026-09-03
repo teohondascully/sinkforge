@@ -141,7 +141,9 @@ static func _clamp_min(x: int) -> int:
 	return maxi(x, _I32_MIN_SAFE)
 
 
-static func _isqrt_ceil(x: int) -> int:
+## ceil(sqrt(x)): never below the real root, so a quotient divided by it can only fall short. The divisor
+## a solver wants when the result must not exceed a bound (`normalize`, `limit_length`, the grapple).
+static func isqrt_ceil(x: int) -> int:
 	var r: int = isqrt(x)
 	return r + 1 if r * r < x else r
 
@@ -151,7 +153,7 @@ static func _isqrt_ceil(x: int) -> int:
 static func normalize(dx: int, dy: int) -> Vector2i:
 	dx = _clamp_min(dx)
 	dy = _clamp_min(dy)
-	var len: int = _isqrt_ceil(length_sq(dx, dy))
+	var len: int = isqrt_ceil(length_sq(dx, dy))
 	if len == 0:
 		return Vector2i.ZERO
 	return Vector2i(_wrap32((dx * SCALE) / len), _wrap32((dy * SCALE) / len))
@@ -176,5 +178,5 @@ static func limit_length(dx: int, dy: int, max_len: int) -> Vector2i:
 	var sq: int = length_sq(dx, dy)
 	if sq <= max_len * max_len:
 		return Vector2i(dx, dy)
-	var len: int = _isqrt_ceil(sq)
+	var len: int = isqrt_ceil(sq)
 	return Vector2i(_wrap32((dx * max_len) / len), _wrap32((dy * max_len) / len))

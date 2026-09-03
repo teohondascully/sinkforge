@@ -221,6 +221,8 @@ func _test_normalize_never_exceeds_unit_length() -> void:
 	var t: Vector2i = Fx.normalize(-3 * s, 4 * s)
 	_check(t.x == -(3 * s) / 5 and t.y == (4 * s) / 5, "normalize(-3, 4) is exactly (-0.6, 0.8) (got %s)" % t)
 	_check(Fx.normalize(0, 0) == Vector2i.ZERO, "the zero vector normalizes to zero, not to a default")
+	_check(Fx.isqrt_ceil(25) == 5 and Fx.isqrt_ceil(26) == 6 and Fx.isqrt_ceil(0) == 0,
+		"isqrt_ceil is exact on a square and rounds up otherwise")
 	var m: Vector2i = Fx.normalize(_I32_MIN, _I32_MIN)
 	_check(m.x < 0 and m.y < 0 and Fx.length(m.x, m.y) > s - 3,
 		"the i32 minimum on both axes still yields a unit diagonal (got %s), not a wrapped zero" % m)

@@ -33,8 +33,11 @@ collections" check, and folding the two together would make this a different, br
 that was actually requested.
 
 Scoped to Vector2i only, not Vector2: the ambiguity this exists to catch is specifically about which
-GRID an integer cell index belongs to, not about continuous positions (sim/body's eventual pixel-space
-Vector2 values are a different axis entirely, unaffected by D0020).
+GRID an integer cell index belongs to, not about continuous positions. D0358 (A' step 5a) made Vector2i
+ALSO the container for a pair of `Fx` fixed-point pixel values (its components are i32, so the container
+is the format), and sim/body's grapple carries positions that way; a pixel point is not a cell on either
+grid, so it names its space with the third tag, "fx" (`pos_fx`, `hitch_fx()`), and the rule stays what it
+was -- every coordinate crossing a public API says which space it lives in. D0359.
 """
 import re
 import sys
@@ -50,7 +53,7 @@ _FUNC_RE = re.compile(
     r'^\s*(?:static\s+)?func\s+(?P<name>\w+)\s*\((?P<params>.*)\)\s*'
     r'(?:->\s*(?P<ret>[\w\[\],\s]+?))?\s*:'
 )
-_GRID_TAGS = ("terrain_", "logic_")
+_GRID_TAGS = ("terrain_", "logic_", "fx_", "_fx")
 
 
 def _split_top_level(params: str) -> list[str]:
@@ -110,12 +113,12 @@ def _check_file(path: Path):
             param_type = rest.split("=")[0].strip()
             if _is_coordinate_type(param_type) and not _names_its_grid(param_name):
                 yield lineno, (f"{func_name}()'s parameter `{param_name}: {param_type}` doesn't name "
-                                f"its grid (needs 'terrain_' or 'logic_' in the parameter name)")
+                                f"its grid (needs 'terrain_', 'logic_' or 'fx' in the parameter name)")
 
         ret = (m.group("ret") or "").strip()
         if ret and _is_coordinate_type(ret) and not _names_its_grid(func_name):
             yield lineno, (f"{func_name}() -> {ret} doesn't name its grid "
-                            f"(needs 'terrain_' or 'logic_' in the function name)")
+                            f"(needs 'terrain_', 'logic_' or 'fx' in the function name)")
 
 
 def find_gd_files():

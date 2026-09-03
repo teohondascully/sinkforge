@@ -52,7 +52,12 @@ depend on `body` directly yet.
 
 ## Public API
 
-None yet.
+`Grapple` (`grapple.gd`, A' step 5b, D0359): legacy's ninja-rope solver under `Fx` -- `fire`/`advance`/
+`trace` walk a shot in exact one-cell probes so the aiming ghost and the hook agree; `reel`; the wrapping
+polyline (`update_line`, `hitch_fx`, `free_length`); `constrain_position_fx` (never outside the circle,
+D0358), `resolve_velocity_fx`, `pump_fx` (one 21/20 ratio); `capture`/`restore`/`state_signature`. Pixel
+points are `Vector2i` pairs of `Fx` and name their space with the `fx` tag the coordinate gate accepts
+(D0359). Coupled into `Body.tick` in step 5c; the collision half waits on the resolver ruling (plan §8).
 
 ## Gotchas
 
