@@ -14,8 +14,10 @@ frame-rate dependent. Every accumulator here is an integer on a fixed 60 Hz tick
 
 ## Public API
 
-`mining.gd` is the module's interface file; nothing outside `sim/mining/` should
-reference `hollow_tell.gd` directly (`Mining.hollow_at` delegates to it).
+`mining.gd` is the primitive; nothing outside `sim/mining/` should reference `hollow_tell.gd`
+directly (`Mining.hollow_at` delegates to it). The four verb-layer blocks lifted from legacy's main
+scene (A′ step 3i, D0354) are their own interface files: `line_of_sight.gd`, `aim.gd`,
+`dig_plan.gd`, `lode_work.gd`.
 
 - `mine(grid, body_x, body_y, target, held) -> Vector2i` — one tick of the verb.
   Returns the cell broken this tick, or `Mining.NO_CELL`. **This is the seam:**
@@ -26,7 +28,18 @@ reference `hollow_tell.gd` directly (`Mining.hollow_at` delegates to it).
 - `hollow_at(grid, cell, dir) -> int` — per mille, 0..1000.
 - `state_signature() -> String` — the crack bank is real sim state.
 - Per-tick telemetry, not auto-cleared: `charging_cell`, `broke_this_tick`,
-  `broke_material`, `breach_this_tick`.
+  `broke_material`, `breach_this_tick`; `broke_cells` and `broke_materials` (parallel: what each
+  cleared cell WAS, for `Items.yield_break`); `rhythm()`.
+- `LineOfSight.clear(grid, a, b)` — the integer Amanatides-Woo walk between terrain cells; the target
+  may be solid; ties step y first. Legacy's float walk, re-derived in exact rationals.
+- `Aim.effective(grid, body_x, body_y, point_x, point_y, building) → cell` — exact while building; an
+  open or visible solid cell in reach as aimed; else the nearest visible face within a reach of the
+  cursor (`nearest_reachable_solid`); else raw. `Aim.cell_of(point)`, `cell_center_fx(cell)`.
+- `DigPlan` — `marks` (STATE, signed), `paint(grid, from, to)` (a drag, sampled every half cell; cap
+  `MAX_MARKS` 800), `nearest_workable(grid, body_x, body_y)` (prunes spent marks), `clear()`.
+- `LodeWork` — the hand on a lode: `work(world, items, mining, body_x, body_y, face, held) → item`
+  (one unit every `LODE_CYCLE_TICKS` 33, quickened by the miner's rhythm, not banked; a full pack stalls
+  it), `progress_per_mille()`, `target`/`charge` STATE, signed.
 
 ## Invariants
 
@@ -70,8 +83,10 @@ own position, and before invariants.
 
 ## Not here, deliberately
 
-- **Line of sight.** Legacy gates mining on `_line_of_sight_clear`, a float DDA.
-  Its integer re-derivation needs its own tests; deferred (D0195). Without it a
-  player can mine through one tile of rock.
+- **Line of sight in the primitive.** `LineOfSight` exists now (D0354) and every player-facing path
+  refuses through rock (`Interface._apply_mine`, `Aim`, `DigPlan`, `LodeWork`), but `Mining.mine`
+  itself stays reach-only, as legacy's `FactorySim.mine` was: fixtures pose a body in rock.
+- **The save.** The crack bank, the rhythm, the plan and the lode charge are state and are not in the
+  v3 envelope yet; they join the body's keys when the interface owns them (ADR 0010 §1, D0354).
 - **Tool tiers.** Legacy's `MiningRules.can_mine` gate is the terminal economy,
   which stays dead by the director's ruling.

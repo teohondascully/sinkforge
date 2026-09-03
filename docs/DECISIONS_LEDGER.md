@@ -14989,3 +14989,39 @@ the tick-order reading of the module tower); the layout as constants in code (th
 `data/README.md` both say no).
 
 **Reverse cost:** CHEAP; one data kind, one file, one suite.
+
+## D0354 · 2026-09-03 · A′ step 3i (mining half): the main scene's mining blocks into `sim/mining` — integer line of sight, the aim snap, the dig plan, the hand on a lode, and the break's yield on the ledger
+
+**Decided:** (1) `sim/mining/line_of_sight.gd` (`LineOfSight.clear`) is legacy `main.gd`
+`_line_of_sight_clear` 2877 re-derived in exact integers: with the ray from a's centre to b's, the k-th
+x-boundary lies at (2k+1)/(2|dx|) of it, so legacy's float "t_max_x < t_max_y" is the integer
+`(2kx+1)·|dy| < (2ky+1)·|dx|`; ties step y first as legacy's `<` did; the walk is bounded by |dx|+|dy|.
+Pinned against a port of legacy's float walk as an oracle over 400 random pairs on a noisy grid, OFF
+THE TIES: a tie is the ray through a cell corner (both |dx|/g and |dy|/g odd), where legacy decided by
+the rounding drift of `t_max += t_delta` — platform-dependent, a within-legacy determinism hazard the
+integer rule closes. (2) LINE OF SIGHT IS THE VERB'S GATE, not the primitive's, as legacy's was:
+`Interface._apply_mine` gains `REJECT_NO_LINE_OF_SIGHT` (`target_behind_rock`), and `Aim`, `DigPlan`
+and `LodeWork` refuse through rock, while `Mining.mine` stays reach-only like `FactorySim.mine`, so
+fixtures may pose a body in rock (the mining and bite suites do, deliberately). The first cut put it in
+`Mining._workable` and 16 charge-mechanic assertions went red on posed geometry legacy itself never
+gated at that layer. (3) `Aim` (`_effective_aim` 1855, `_nearest_reachable_solid` 1866) with float
+distances as `Fx` squares and the reach tolerance scaled by `REACH_DEN²`; the pointer is a recorded
+world point. (4) `DigPlan` (`_paint_dig_marks` 1806, `_nearest_marked_workable` 1824): a drag sampled
+every half cell with integer interpolation, the cap 200 → 800 because a line crosses four times as many
+4 px cells, the tool-tier gate dropped; marks are STATE and signed (a mark decides the next cell the
+hand digs). (5) `LodeWork` (`_update_mining`'s lode branch, `try_work_lode` 1963): `LODE_CYCLE` 0.55 s
+= 33 ticks, quickened by `Mining.rhythm()`, not banked; a full pack stalls at full charge because
+`take_lode` refuses rather than spills (D0348). (6) `Items.yield_break` is legacy `mine()` 840's keep
+half over `Mining.broke_cells`/`broke_materials` (new, parallel): one 3–6 burst PER BLOW (`_ore_burst`'s
+hash on the target), off the ore cells' latent yield in scan order, the rest of each cell OPENING AS A
+LODE ("the blow opened the vein"); plain rock banks sixteenths of a block in `_rubble` (a metre is one
+block and sixteen cells: per-cell stocks ÷16, D0349), STATE in the signature; a pile on a metre the
+blow emptied falls. Foliage is not lifted. (7) Not saved yet: the crack bank, rhythm, plan and lode
+charge are state outside the v3 envelope until the interface owns them (ADR 0010 §1). (8)
+`tests/test_mining_blocks.gd`, 48 assertions. CI 78 → 79.
+
+**Alternative:** LOS inside the primitive (what the first cut did; it rewrites two suites' geometry to
+legacy-plausible pockets, which is honest but not what legacy gated there); per-cell bursts (16× the
+ore a blow); a float DDA (the one float on the input path).
+
+**Reverse cost:** CHEAP; four files, one suite, two touched.

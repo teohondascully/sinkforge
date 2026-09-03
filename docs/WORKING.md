@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3h done, step 1 ruled; the main.gd blocks close step 3)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3h and 3i's mining half done, step 1 ruled; the verbs close step 3)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -81,9 +81,15 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   carried. 36 assertions. **For the director:** the layout is legacy's tutorial verbatim; re-authoring
   for the rig/Skipway opening is a diff of `data/starts/`.
 
+- **Step 3i, mining half — done (D0354).** `sim/mining/line_of_sight.gd` (legacy's float DDA re-derived
+  in exact integers; pinned against a port of the float walk off the ties, which legacy decided by
+  rounding drift), `aim.gd`, `dig_plan.gd` (marks are state), `lode_work.gd` (33-tick cycle, rhythm),
+  `Items.yield_break` (a burst a blow, the rest opens as lode, rubble sixteenths into blocks). LOS gates
+  the verbs (`Interface._apply_mine` refuses `target_behind_rock`), not the primitive. 48 assertions.
+
 ### Next action
 
-The last of step 3: **the `main.gd` blocks** (legacy's
+The last of step 3: **the verbs half of the `main.gd` blocks** (legacy's
 seeded placement of lodes, deposits, water onto the generated shaft). Then the **`main.gd` state-logic
 blocks** the plan's §3 lists. Each sub-step merged green on `main`. `HubTick.step` is not called from
 `Interface.apply` until step 4 opens the door. Every lifted `sort` goes through `Ordering`; every lifted

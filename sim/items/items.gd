@@ -32,6 +32,10 @@ var flow_events: Array[Dictionary] = []
 var last_drop_landing: Vector2i = Vector2i(-1, -1)
 var machine_buffer: Callable = Callable()
 var machine_total: Callable = Callable()
+## Sixteenths of a block per material, banked from broken 4 px cells until a whole block is pocketed
+## (D0354): a metre of rock is one placeable block and sixteen cells, so a bite of thirteen cells is
+## thirteen sixteenths of one. STATE, in the signature: it decides when the next block appears.
+var _rubble: Dictionary = {}
 
 
 func _init(p_world: World) -> void:
@@ -135,6 +139,64 @@ func resettle_pile_above(logic_cell: Vector2i) -> void:
 	piles.prune_empty()   # column_landing may have created an empty landing pile it didn't fill
 
 
+## THE YIELD OF A BREAK: legacy `mine()` 840's keep half, over the cells a blow cleared (parallel arrays
+## from `Mining.broke_cells`/`broke_materials`, read after the excavation). Ore-like cells give one
+## 3-6 burst PER BLOW (legacy's `_ore_burst`, hashed on the target so it is deterministic and per-blow,
+## not per 4 px cell), taken off the cells' latent yield in scan order; what is left of each cell's yield
+## OPENS as a lode in that cell ("the blow opened the vein; the rest is still there to work"), so hand
+## mining a rich body pockets a little and exposes the face the drill or the hand keeps working. Plain
+## rock banks sixteenths toward a block. Piles resting on a metre that just became air fall.
+func yield_break(cells: Array[Vector2i], materials: Array[StringName]) -> void:
+	if cells.is_empty():
+		return
+	var burst_left: int = _ore_burst(cells[0])
+	var metres: Dictionary = {}
+	for i: int in cells.size():
+		var cell: Vector2i = cells[i]
+		var material: StringName = materials[i]
+		if WorldMaterials.is_ore_like(material):
+			burst_left -= _yield_ore(cell, material, burst_left)
+		elif material != &"":
+			_yield_rubble(cell, material)
+		metres[Vector2i(cell.x / World.N, cell.y / World.N)] = true
+	for metre: Vector2i in Ordering.cells(metres):
+		if world.logic_air(metre):
+			resettle_pile_above(metre)
+
+
+## Hand-mining pockets 3..6 loose ore a blow; the rest is the drill's job, or the hand's at the face.
+static func _ore_burst(terrain_cell: Vector2i) -> int:
+	var h: int = (terrain_cell.x * 73856093) ^ (terrain_cell.y * 19349663)
+	return 3 + (absi(h) % 4)
+
+
+## One ore cell's share: up to `burst_left` off its latent yield into the pack (through the cap, and
+## counted as produced in full), the remainder opening as a lode. Returns the units taken.
+func _yield_ore(terrain_cell: Vector2i, material: StringName, burst_left: int) -> int:
+	var latent: int = int(world.deposits.deposits.get(terrain_cell, DepositPlane.DEFAULT_ORE_DEPOSIT))
+	var taken: int = clampi(burst_left, 0, latent)
+	if taken > 0:
+		take_into_pack(material, taken, Vector2i(terrain_cell.x / World.N, terrain_cell.y / World.N))
+		produced(material, taken)
+	var left: int = latent - taken
+	if left > 0:
+		world.deposits.seed_lode(terrain_cell, material, left)
+	else:
+		world.deposits.set_deposit(terrain_cell, 0)   # a thin seam the burst took whole: nothing to open
+	return taken
+
+
+## A plain cell banks a sixteenth; sixteen make a block in the pack (dig-and-carry, D0348's `place_block`
+## consumes it back, so conservation holds).
+func _yield_rubble(terrain_cell: Vector2i, material: StringName) -> void:
+	_rubble[material] = int(_rubble.get(material, 0)) + 1
+	if int(_rubble[material]) < World.N * World.N:
+		return
+	_rubble[material] = int(_rubble[material]) - World.N * World.N
+	take_into_pack(material, 1, Vector2i(terrain_cell.x / World.N, terrain_cell.y / World.N))
+	produced(material, 1)
+
+
 ## Take ONE UNIT from an exposed lode: the hand verb. THIS VERB REFUSES WHERE `mine` SPILLS: a lode face
 ## is not destroyed by being worked, so a full pack simply does not take the unit and the vein stays
 ## intact rather than being drained onto the floor one click at a time. Returns the item, or &"".
@@ -179,4 +241,9 @@ func state_signature() -> String:
 		var t2: Vector2i = StateHash.term(f2.x, f2.y, Vector2i(0, int(total_consumed[item])), Vector2i(2, 2))
 		a ^= t2.x
 		b ^= t2.y
+	for item: StringName in Ordering.ids(_rubble):
+		var f3: Vector2i = StateHash.id_fold(item)
+		var t3: Vector2i = StateHash.term(f3.x, f3.y, Vector2i(int(_rubble[item]), 0), Vector2i(3, 3))
+		a ^= t3.x
+		b ^= t3.y
 	return "%s|%s|i%d:%d" % [pack.state_signature(), piles.recomputed_signature(), a, b]

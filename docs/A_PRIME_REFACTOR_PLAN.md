@@ -430,8 +430,10 @@ staged then committed in place; legacy's durability protocol; 45 assertions). **
 is this game's first version and a pre-pivot v2 envelope is refused by name, not migrated — listed
 under §8. 3h `world_seeder` — DONE (D0353: `data/starts/` with legacy's tutorial opening as a record,
 `sim/run/world_seeder.gd` stamping it through the sim's verbs — in `run`, not `terrain_gen`, because it
-places machines and stocks the pack; the tree and the tool kit not carried; 36 assertions). Next: the
-`main.gd` blocks (`sim/mining/` aim, LOS, dig plan, lode cycle; `sim/commands/` the verbs).
+places machines and stocks the pack; the tree and the tool kit not carried; 36 assertions). 3i the
+`main.gd` blocks, mining half — DONE (D0354: `LineOfSight` in exact integers pinned against legacy's
+float walk off the ties, `Aim`, `DigPlan`, `LodeWork`, `Items.yield_break`; LOS gates the verbs, not the
+primitive; 48 assertions). Next: the verbs half (`sim/commands/` + the situated verbs).
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

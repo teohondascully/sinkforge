@@ -61,7 +61,7 @@ mechanism that tick).
   sink. No slope roll (ADR 0009's deferred list).
 - `Items` (`items.gd`) — THE SERVICE: `pack`, `piles`, `total_produced`/`total_consumed`, `flow_events`
   (view channel, never read back), `last_drop_landing`, `machine_buffer`/`machine_total` Callables.
-  `.take_into_pack(item, n, spill_at) → taken` (the rest spills), `.eject()` (units not in the pack pour down a column: the spill, the drill's bite), `.drop_item()`, `.collect_ground()`
+  `.take_into_pack(item, n, spill_at) → taken` (the rest spills), `.eject()` (units not in the pack pour down a column: the spill, the drill's bite), `.yield_break(cells, materials)` (a break's yield, D0354: one 3–6 burst a blow off the ore cells' latent yield, the rest opening as lodes; plain cells bank sixteenths of a block in `_rubble`, STATE), `.drop_item()`, `.collect_ground()`
   (capped too), `.resettle_pile_above()`, `.take_lode(terrain_cell)` (refuses a full pack), `.deposit()`,
   `.present(item)`, `.produced()`/`.consumed()`, `.state_signature()`.
 - `BuildVerbs` (`build_verbs.gd`) — static over `Items`: `place_block`, `place_conduit`/`remove_conduit`,

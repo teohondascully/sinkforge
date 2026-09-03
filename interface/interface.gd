@@ -22,14 +22,12 @@ extends RefCounted
 ## SMALL BECAUSE THE GAME IS SMALL. §5 names four envelope dimensions (vision, planning, motor, priors)
 ## and three standard envelopes (Oracle, Constrained, Language). Exactly one of those has a mechanism in
 ## this build -- a window, which is vision's spatial half -- and the rest are DELIBERATELY ABSENT rather
-## than stubbed. There is no fog to filter, no planner to bound, no motor noise model, and no priors
-## table; a field for each would be four lies in the type system, and `docs/adr/0007-l2-interface.md`
-## argues that choice out in full. They arrive when the mechanism does.
+## than stubbed: no fog, no planner bound, no motor noise, no priors table. A field for each would be four
+## lies in the type system (`docs/adr/0007-l2-interface.md`). They arrive when the mechanism does.
 ##
 ## NOT A COORDINATOR. This object owns no scene, draws nothing, and runs no loop. It is constructed
 ## around a grid, a body and a mining verb that its caller already owns, and it advances them only when
-## handed a `Command`. `tests/body/reveal_scene.gd` and friends are unchanged by its arrival and continue
-## to drive `sim/` directly; migrating them is separate work, deliberately not bundled here.
+## handed a `Command`. `tests/body/reveal_scene.gd` and friends still drive `sim/` directly, on purpose.
 
 
 ## One tick's readable state, as a value. Holds no reference into `sim/`.
@@ -267,6 +265,7 @@ const REJECT_UNKNOWN_KIND: StringName = &"unknown_command_kind"
 const REJECT_OUT_OF_BOUNDS: StringName = &"target_out_of_bounds"
 const REJECT_NOT_SOLID: StringName = &"target_not_solid"
 const REJECT_OUT_OF_REACH: StringName = &"target_out_of_reach"
+const REJECT_NO_LINE_OF_SIGHT: StringName = &"target_behind_rock"
 
 var _grid: TileGrid
 var _body: Body
@@ -395,5 +394,7 @@ func _apply_mine(cell: Vector2i) -> Result:
 		return Result.rejected(REJECT_NOT_SOLID)
 	if not Mining.in_reach(_body.pos_x, _body.pos_y, cell):
 		return Result.rejected(REJECT_OUT_OF_REACH)
+	if not LineOfSight.clear(_grid, Aim.cell_of(_body.pos_x, _body.pos_y), cell):
+		return Result.rejected(REJECT_NO_LINE_OF_SIGHT)   # legacy's `_mineable` gate, integer DDA (D0354)
 	_mining.mine(_grid, _body.pos_x, _body.pos_y, cell, true)
 	return Result.accepted()

@@ -6,8 +6,8 @@ session boundary, since a brief written mid-session goes stale the moment anothe
 
 **Last updated: 2026-09-03, tenth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data leaves),
 3b (world planes and verbs), 3c (items), 3d (machines + power), 3e (transport), 3f (the economy's live
-remainder), 3g (save v3) and 3h (the world seeder) done; the `main.gd` blocks close step 3.** Ledger:
-D0343–D0353; ADR 0009, ADR 0010.
+remainder), 3g (save v3), 3h (the world seeder) and 3i's mining half done; the verbs close step 3.**
+Ledger: D0343–D0354; ADR 0009, ADR 0010.
 
 **Headline: the factory moves.** Items flow between machines every hub tick: down a column by the
 landing rule, up it by a lift that pays in power, across a Freight Winch that queues a trip, flies it
@@ -75,6 +75,11 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
   become cells in metres from the spawn; materials and per-cell stocks translated) and an opt-in dev
   kit; `sim/run/world_seeder.gd` generates, wraps, validates and stamps, and hands back the spawn. The
   real `shallow_clay` site takes it. The tree and the tool kit are not carried. 36 assertions. CI 77 → 78.
+- **Step 3i, mining half (D0354).** The main scene's mining blocks into `sim/mining`: line of sight
+  re-derived in exact integers and pinned against legacy's float walk, the aim snap, the dig plan
+  (state), the hand on a lode, and the break's yield on the ledger (a burst a blow, the rest opening as a
+  lode, rubble into blocks). Line of sight gates every player-facing path, never the primitive. 48
+  assertions. CI 78 → 79.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -137,7 +142,15 @@ the vacuous-green refusal (D0343), your step 1 ruling (D0345).
     the instrument that was supposed to catch the loss cannot register that subject (`set_wall`'s comment
     says so). The renderer draws those walls. The save now walks the wall plane itself; the golden's
     blindness to such edits is recorded (D0352), not changed.
-15. **A runner that counts engine errors as crashes bounds what a durability test may do.** Truncating a
+15. **Legacy's line of sight was not deterministic at ties.** Its float DDA accumulated `t_max +=
+    t_delta`, so a ray through a cell corner was decided by rounding drift, which differs by platform.
+    The integer walk decides ties by rule and the oracle comparison excludes them, which is the only
+    honest way to pin an exact re-derivation against an inexact original.
+16. **Where a gate lives is a design decision the tests encode.** Line of sight inside the mining
+    primitive turned sixteen charge-mechanic assertions red on bodies posed in rock. Legacy gated it at
+    the verb, never in the sim's `mine()`; the port now does the same, and the primitive keeps its posed
+    fixtures.
+17. **A runner that counts engine errors as crashes bounds what a durability test may do.** Truncating a
     save file makes `get_var` print an engine-level error, which the masked-crash guard rightly refuses
     to ignore. The test damages the file with a decodable non-envelope instead and says which branch it
     therefore does not exercise.

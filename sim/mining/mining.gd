@@ -159,6 +159,7 @@ var _swing_ticks: int = SWING_TICKS_X100 / 100
 ## walks. A view wanting to spray debris per cleared cell reads this rather than re-deriving the disc, which
 ## would be a second copy of the shape free to drift from the one that ran.
 var broke_cells: Array[Vector2i] = []
+var broke_materials: Array[StringName] = []   # parallel to `broke_cells`: what each cell WAS (D0354)
 
 
 ## Canonical state signature, for the replay-determinism check. The crack bank is real sim state: two runs
@@ -261,8 +262,7 @@ static func _cell_center_fx(cell_axis: int) -> int:
 	return cell_axis * CELL_PX * Fx.SCALE + (CELL_PX * Fx.SCALE) / 2
 
 
-## The hollow reading behind `cell`, per mille. Delegates to `sim/mining/hollow_tell.gd`; routed through
-## this file because it is the module's interface (`tools/layer_lint`'s no-sibling-reach-in rule).
+## The hollow reading behind `cell`, per mille. Delegates to `sim/mining/hollow_tell.gd`.
 static func hollow_at(grid: TileGrid, cell: Vector2i, dir: Vector2i) -> int:
 	return HollowTell.read(grid, cell, dir)
 
@@ -285,6 +285,7 @@ func mine(grid: TileGrid, body_x: int, body_y: int, target: Vector2i, held: bool
 	hollow_this_tick = 0
 	swing_this_tick = false
 	broke_cells.clear()
+	broke_materials.clear()
 
 	_rhythm_idle += 1
 	if _rhythm_idle > RHYTHM_GRACE_TICKS:
@@ -312,13 +313,16 @@ func mine(grid: TileGrid, body_x: int, body_y: int, target: Vector2i, held: bool
 	return _break(grid, target, material)
 
 
-## A cell is workable if it is a real solid cell inside the world and within reach. Legacy also required
-## `_line_of_sight_clear` -- a float DDA -- and a tool-tier gate through `MiningRules.can_mine`. Neither is
-## ported: the tier gate is the terminal economy (dead by the director's ruling), and LOS is a real rule
-## whose integer re-derivation needs its own tests, deliberately deferred (D0195). Without it a player can
-## mine a cell through one tile of rock, which is ordinary for the genre but IS a behaviour change.
+## Workable: a real solid cell inside the world, within reach. LINE OF SIGHT IS THE VERB'S GATE, not the
+## primitive's, as legacy's was (`main.gd` `_mineable`, never `FactorySim.mine`): `Interface`, `Aim`,
+## `DigPlan` and `LodeWork` all refuse through rock via `LineOfSight` (D0354), and fixtures may pose a
+## body in rock. Legacy's tool-tier gate is the terminal economy, dead by the director's ruling.
 func _workable(grid: TileGrid, body_x: int, body_y: int, cell: Vector2i) -> bool:
 	return grid.in_bounds(cell) and grid.is_solid(cell) and in_reach(body_x, body_y, cell)
+
+
+func rhythm() -> int:
+	return _rhythm
 
 
 ## Age every banked crack except the one being worked; past the grace window they bleed off and evict.
@@ -368,6 +372,7 @@ func _break(grid: TileGrid, cell: Vector2i, material: StringName) -> Vector2i:
 ## way to mine further than the arm goes.
 func _clear_bite(grid: TileGrid, target: Vector2i) -> void:
 	_cracks.erase(target)
+	broke_materials.append(grid.get_material(target))
 	grid.excavate(target)
 	broke_cells.append(target)
 	for dy: int in range(-bite_radius, bite_radius + 1):
@@ -378,16 +383,15 @@ func _clear_bite(grid: TileGrid, target: Vector2i) -> void:
 			if cell == target or not grid.in_bounds(cell) or not grid.is_solid(cell):
 				continue
 			_cracks.erase(cell)  ## a cell that no longer exists may not keep banked charge
+			broke_materials.append(grid.get_material(cell))
 			grid.excavate(cell)
 			broke_cells.append(cell)
 
 
 ## Which way the blow faces -- the axis the tell's probe box looks along. Axis-dominant from the body
 ## centre toward the cell centre, falling back to straight down when the two coincide, exactly as legacy
-## (`main.gd::_swing_dir`). Ties go to the vertical, which is the axis this game is about.
-##
-## Public because the view needs the same direction to place a draught puff on the near face, and a second
-## copy of this rule in the renderer would be free to drift from the one the tell was read along.
+## (`main.gd::_swing_dir`). Ties go to the vertical, which is the axis this game is about. Public because
+## the view places a draught puff on the near face and a second copy of this rule would be free to drift.
 static func swing_dir(body_x: int, body_y: int, cell: Vector2i) -> Vector2i:
 	var dx: int = _cell_center_fx(cell.x) - body_x
 	var dy: int = _cell_center_fx(cell.y) - body_y
