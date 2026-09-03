@@ -1,0 +1,8 @@
+# The player's own balance numbers, lifted in A' step 3c (D0348) from constants `legacy/src/core/factory_sim.gd`
+# kept in code (`INVENTORY_SLOTS` :223, `PACK_BULK_CAP` :242). data/README.md: a tuning pass is a diff of
+# data/, and the bulk cap is the most-tuned number in the pack's history (legacy measured 90 against a
+# 263-unit lode face: uncapped 1 trip, 130 three, 90 three, 65 five).
+fields:
+  id: {required: true, type: str}
+  inventory_slots: {required: true, type: int}   # distinct stacks the hotbar shows
+  bulk_cap: {required: true, type: int}          # units of BULK freight the pack holds at once

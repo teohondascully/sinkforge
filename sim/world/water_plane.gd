@@ -1,5 +1,5 @@
 class_name WaterPlane
-extends RefCounted
+extends SignedPlane
 
 ## The water plane: an integer level per terrain cell, sparse, with a running state signature.
 ##
@@ -20,16 +20,14 @@ extends RefCounted
 ## (`factory_sim.gd:708`). That coupling belongs to whoever owns both planes (the `sim/world` verbs, plan
 ## step 3); the primitive it calls is `displace()` here.
 ##
-## THE RUNNING SIGNATURE follows `TileGrid`'s (D0261): two 32-bit XOR lanes, one term per wet cell keyed
-## by coordinate and level (`core/state_hash.gd`, the mixer shared with `TileGrid`), so a checkpoint costs
-## nothing and `recomputed_signature()` can catch a write that bypassed the lanes. Every write passes through `set_level`, the only place the lanes move -- a
-## fifth mutator added later cannot avoid it without also breaking the signature.
+## THE RUNNING SIGNATURE is `SignedPlane`'s (D0261's two lanes, `core/signed_plane.gd`): one term per wet
+## cell keyed by coordinate and level, so a checkpoint costs nothing and `recomputed_signature()` can
+## catch a write that bypassed the lanes. Every write passes through `set_level`, the only place the
+## lanes move -- a fifth mutator added later cannot avoid it without also breaking the signature.
 
 const WATER_MAX: int = 8  ## units a full cell holds (legacy `FactorySim.WATER_MAX`, unchanged per cell)
 
 var levels: Dictionary = {}  # terrain_cell: Vector2i -> level: int; absent means dry, never a stored 0
-var _sig_a: int = 0
-var _sig_b: int = 0
 
 
 func water_at(terrain_cell: Vector2i) -> int:
@@ -91,45 +89,28 @@ func wet_terrain_cells() -> Array[Vector2i]:
 ## `WaterFlow`'s lateral settle parks a run's surplus on its leftmost cell to fall next tick, and clamping
 ## it would delete water (legacy `water_flow.gd`, the `cap_total` branch).
 func set_level(terrain_cell: Vector2i, level: int) -> void:
-	_xor_term(_cell_term(terrain_cell))  # out with the old (zero, and a no-op, if the cell was dry)
-	if level <= 0:
-		levels.erase(terrain_cell)
-	else:
-		levels[terrain_cell] = level
-	_xor_term(_cell_term(terrain_cell))  # in with the new
+	_write_int(levels, terrain_cell, level)
 
 
 func state_signature() -> String:
-	return "w%d:%d" % [_sig_a, _sig_b]
+	return _lanes("w")
 
 
 ## The signature rebuilt from the cells themselves, for the self-check `tests/test_water_flow.gd` runs
 ## after randomised mutation. Agreeing with `state_signature()` is what proves no write skipped the lanes.
 func recomputed_signature() -> String:
-	var a: int = 0
-	var b: int = 0
-	for terrain_cell: Vector2i in wet_terrain_cells():
-		var t: Vector2i = _cell_term(terrain_cell)
-		a ^= t.x
-		b ^= t.y
-	return "w%d:%d" % [a, b]
+	return _rebuilt("w", wet_terrain_cells())
 
 
 func clone() -> WaterPlane:
 	var copy: WaterPlane = WaterPlane.new()
-	copy.levels = levels.duplicate()
-	copy._sig_a = _sig_a
-	copy._sig_b = _sig_b
+	_clone_into(copy, [&"levels"])
 	return copy
 
 
-func _cell_term(terrain_cell: Vector2i) -> Vector2i:
+func _term_of(key: Variant) -> Vector2i:
+	var terrain_cell: Vector2i = key
 	var level: int = water_at(terrain_cell)
 	if level <= 0:
 		return Vector2i.ZERO
 	return StateHash.term(terrain_cell.x, terrain_cell.y, Vector2i(level, level), Vector2i.ONE)
-
-
-func _xor_term(t: Vector2i) -> void:
-	_sig_a ^= t.x
-	_sig_b ^= t.y

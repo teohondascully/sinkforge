@@ -2,7 +2,7 @@ class_name World
 extends RefCounted
 
 ## THE ONE OWNER OF THE PLANES: `grid` (4 px terrain, `TileGrid`), `logic` (the 16 px placed planes,
-## `LogicGrid`) and `water` (4 px levels, `WaterPlane`). `docs/adr/0009-metre-cell-planes-over-the-terrain-grid.md`
+## `LogicGrid`), `water` (4 px levels, `WaterPlane`) and `deposits` (ore yield and the lode, `DepositPlane`, D0348). `docs/adr/0009-metre-cell-planes-over-the-terrain-grid.md`
 ## is the contract; this file is its derivations and the terrain verbs. Lifted in A' step 3b (D0347) from
 ## the verbs `legacy/src/core/factory_sim.gd` kept on the hub -- `set_solid` 703, `set_wall` 723,
 ## `block_supported` 908, `cell_occupied` 927, `place_block` 935 -- with one change of shape: legacy's
@@ -17,6 +17,7 @@ const ORTHO: Array[Vector2i] = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0),
 var grid: TileGrid
 var logic: LogicGrid = LogicGrid.new()
 var water: WaterPlane = WaterPlane.new()
+var deposits: DepositPlane = DepositPlane.new()
 
 
 func _init(terrain: TileGrid) -> void:
@@ -172,17 +173,18 @@ func place_block(logic_cell: Vector2i, material: StringName) -> bool:
 	return true
 
 
-## The three planes' running signatures, joined. Each keeps its own lanes and its own rebuild check.
+## The planes' running signatures, joined. Each keeps its own lanes and its own rebuild check.
 func state_signature() -> String:
-	return "%s|%s|%s" % [grid.state_signature(), logic.state_signature(), water.state_signature()]
+	return "%s|%s|%s|%s" % [grid.state_signature(), logic.state_signature(), water.state_signature(), deposits.state_signature()]
 
 
 func recomputed_signature() -> String:
-	return "%s|%s|%s" % [grid.recomputed_signature(), logic.recomputed_signature(), water.recomputed_signature()]
+	return "%s|%s|%s|%s" % [grid.recomputed_signature(), logic.recomputed_signature(), water.recomputed_signature(), deposits.recomputed_signature()]
 
 
 func clone() -> World:
 	var copy: World = World.new(grid.clone())
 	copy.logic = logic.clone()
 	copy.water = water.clone()
+	copy.deposits = deposits.clone()
 	return copy

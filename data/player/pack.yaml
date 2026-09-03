@@ -1,0 +1,5 @@
+# Lifted from legacy factory_sim.gd:223 and :242 (D0348). The cap is INTERRUPTION, never speed: a full pack
+# ends a trip, it never slows a body down. Ore, rock and refined goods are bulk; machine items are not.
+id: pack
+inventory_slots: 10
+bulk_cap: 90

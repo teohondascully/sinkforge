@@ -20,6 +20,7 @@ prevent.
 - `recipes/` — recipe definitions (implements R2's quantity-based economy).
 - `strata/` — terrain-gen tuning constants and per-site parameters.
 - `progression/` — meta-progression / unlock data.
+- `player/` — the player's own balance numbers: the pack's slot count and bulk cap.
 
 Each has its own README.md.
 

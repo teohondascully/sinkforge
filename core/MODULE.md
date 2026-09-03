@@ -19,8 +19,7 @@ Every other layer: sim, interface, harness, experiment, view, shell.
 
 - No engine imports (no Godot types, nodes, or singletons).
 - No file IO.
-- No wall clock — no `OS.get_ticks_*`, no `Time` singleton, nothing that
-  reads real-world time on any path that affects state.
+- No wall clock — no `OS.get_ticks_*`, no `Time` singleton, nothing that reads real-world time on a state path.
 - No global mutable state. RNG streams are values the caller owns and threads through explicitly, not statics.
 - No `sin`/`cos`/`pow` (or any other transcendental/floating-point-only
   function) on a path that affects simulation state. Determinism across
@@ -37,9 +36,10 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   `.release(id) -> bool` (false on double-release or a never-allocated id, never a crash), `.is_valid(id)`, `.live_count()`.
 - `Ordering` (`ordering.gd`) — the one way to sort in `sim/`: `.ids(names)`/`.less(a, b)` by TEXT (`StringName <`
   is a pointer compare, so a bare `.sort()` is creation order — D0346) and `.cells(dict)`/`.cell_less(a, b)` row-major.
-- `StateHash` (`state_hash.gd`) — the two-lane running-signature mixer every sim plane hashes with (from
-  `TileGrid`, A′ step 2, D0344; arithmetic unchanged from D0261, outputs pinned in `tests/test_state_hash.gd`).
-  `.fold()`, `.mix()`, `.term(x, y, m: Vector2i, w: Vector2i)` (both lanes), `.text_term()`, `.id_fold()` (memoised).
+- `StateHash` (`state_hash.gd`) — the two-lane mixer every plane hashes with (from `TileGrid`, D0344; arithmetic
+  unchanged from D0261, pinned in `tests/test_state_hash.gd`): `.fold()`, `.mix()`, `.term()`, `.text_term()`, `.id_fold()`.
+- `SignedPlane` (`signed_plane.gd`, D0348) — the running-signature plane base: the two lanes, `_xor_term`, the
+  `_write_int` sandwich, `_lanes`, `_rebuilt`, `_clone_into`; a subclass supplies `_term_of(key)`. `TileGrid` predates it.
 - `BitOps` (`bit_ops.gd`) — bit-level integer primitives with no domain concept of their own.
   `.ushr(x: int, n: int) -> int`, a logical (zero-fill) right shift of a 64-bit bit pattern held in a
   signed GDScript int. Why it is its own file rather than a helper: see Gotchas.

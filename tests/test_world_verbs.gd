@@ -246,7 +246,7 @@ func _test_all_three_signatures_fold_and_agree_with_the_rebuild() -> void:
 				free = Vector2i(x, y)
 	_check(free.x >= 0 and copy.logic.occupy(free, LogicGrid.KIND_MACHINE), "an open metre was found and a machine registered in it")
 	_check(copy.state_signature() != w.state_signature(), "one more placed thing changes the joined signature")
-	_check(copy.state_signature().count("|") == 2, "the joined signature has three parts")
+	_check(copy.state_signature().count("|") == 3, "the joined signature has four parts: terrain, placed, water, deposits")
 
 
 func _test_is_soil_reads_the_record() -> void:

@@ -310,3 +310,42 @@ static func check_placed_not_in_rock(world: World, tick: int) -> PlacedInRockVio
 
 static func report_placed_not_in_rock(world: World, tick: int) -> PlacedInRockViolation:
 	return _reported(check_placed_not_in_rock(world, tick))
+
+
+## CONSERVATION OF ITEMS (`sim/items`): for every item ever produced or consumed, what is present --
+## pack, ground, sink, machine buffers -- equals produced minus consumed. Items are created and destroyed
+## only by a recipe or a placement, both of which write the ledger. Returns the first item in text
+## order whose books do not balance, or null.
+class ItemConservationViolation:
+	var item: StringName
+	var present: int
+	var net: int
+	var tick: int
+	func _to_string() -> String:
+		return ("Invariants: %s is not conserved at tick %d -- present %d, produced minus consumed %d. " +
+			"An item was created or destroyed outside a recipe or a placement.") % [item, tick, present, net]
+
+
+static func check_item_conservation(items: Items, tick: int) -> ItemConservationViolation:
+	var ids: Dictionary = {}
+	for item: StringName in items.total_produced:
+		ids[item] = true
+	for item: StringName in items.total_consumed:
+		ids[item] = true
+	for item: StringName in items.pack.items:
+		ids[item] = true
+	for item: StringName in Ordering.ids(ids):
+		var present: int = items.present(item)
+		var net: int = int(items.total_produced.get(item, 0)) - int(items.total_consumed.get(item, 0))
+		if present != net:
+			var v: ItemConservationViolation = ItemConservationViolation.new()
+			v.item = item
+			v.present = present
+			v.net = net
+			v.tick = tick
+			return v
+	return null
+
+
+static func report_item_conservation(items: Items, tick: int) -> ItemConservationViolation:
+	return _reported(check_item_conservation(items, tick))

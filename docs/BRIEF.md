@@ -4,8 +4,9 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, fourth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (the data
-leaves) and 3b (the world planes and verbs) done; step 3c (items) is next.** Ledger: D0343–D0347; ADR 0009.
+**Last updated: 2026-09-03, fifth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data leaves),
+3b (world planes and verbs) and 3c (items) done; step 3d (machines + power) is next.** Ledger:
+D0343–D0348; ADR 0009.
 
 **Headline: the world now has its metre-cell planes.** `World` owns terrain, the placed layers and water
 under one signature; every metre-cell fact (solid, air, half-dug, a full face to build on, soil) is
@@ -40,6 +41,11 @@ verbatim (D0344), the vacuous-green refusal (D0343), your step 1 ruling (D0345).
   `placed_verbs.gd` (legacy's verbs minus the pack), `WaterPlane` moved beside the other planes,
   `check_placed_not_in_rock`, a `soil` flag on materials. 89 assertions. Deferred with reasons: `fill`,
   foliage, `surface_row`/`ramp_dir`, `updraft_at`. CI 71 → 72.
+- **Step 3c (D0348).** `sim/items`: the pack and its cap (the two numbers now `data/player/pack.yaml`),
+  ground piles and the sink, the landing rule (lifted here, not transport; a machine below via a
+  Callable so items never imports machines), `Items` with the ledger, `BuildVerbs` (spend on place,
+  recover on removal), the `DepositPlane` as `World`'s fourth plane, `check_item_conservation`. 79
+  assertions. CI 72 → 73.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -117,8 +123,8 @@ is D0115's pattern, and it means one green suite depends on an engine defect per
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks step 3c (items: the pack, ground piles, lode, and the ledger-wrapping of the world
-verbs) or step 4's water wiring.
+Nothing blocks step 3d (machines + power: the registry, `power_flow` in milli-int, the runners, the
+hub tick at every third body tick) or step 4's water wiring.
 
 ## Taste queue
 

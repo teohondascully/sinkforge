@@ -44,14 +44,21 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   minus the pack), `WaterPlane` moved into `sim/world`, `check_placed_not_in_rock`. 89 assertions.
   Deferred with reasons in the ADR: `fill`, foliage/`Flora.grow`, `surface_row`/`ramp_dir`, `updraft_at`.
 
+- **Step 3c — done (D0348).** `sim/items`: `Pack` (cap arithmetic; slots and cap from
+  `data/player/pack.yaml`), `GroundPiles`, `Landing` (the column landing, machine below via a Callable),
+  `Items` (take/spill/drop/collect/resettle/lode/deposit + the ledger), `BuildVerbs` (spend on place,
+  recover on removal), `DepositPlane` as `World`'s fourth plane, `check_item_conservation`. 79 assertions.
+
 ### Next action
 
-Step 3c, items: legacy's inventory and pack (`inventory_slots` 1564, `deposit` 1574, `drop_item` 1599,
-`take_into_pack` 1860, `can_carry`/`pack_room`/`carried_bulk` 1822-1859, `is_bulk_item` 1809 via
-`MachineDef.exists`), ground piles (`collect_ground` 3176, `_ground_pile` 3147, `_resettle_pile_above`
-3158, `_prune_empty_ground` 2047, `pile_reachable` 3224), lode (`lode_at`/`lode_workable`/`take_lode`
-1509-1560, `ore_deposit_at` 1481), and the ledger-wrapping of the world verbs (spend one rope per
-segment, `total_consumed`/`total_produced`). Then machines + power; then machines + power; then
+Step 3d, machines + power: the registry and lifecycle (`place_machine` 1887, `remove_machine` 1901,
+`build_from_pack` 1715, `pickup_machine` 1752, `machine_at` 374, `machine_eats` 388, `configure_machine`
+3014, census/problems 1996-2046, the `_status_*` reads), `power_flow.gd` (89 lines, all-float → milli-int,
+§5.2's 8 rows) + `power_at`/`power_throttle` 2055-2066 as per-mille, the runners (`_run_machine` dispatch
+2071, `_run_recipe` 2081, `_run_generator` 2946, `_run_hopper` 2301, `_run_pump` 2150, `_run_drill`
+2532 with `drill_target`/`head_coverage`), the `_BEHAVIORS` table, and the hub tick runner at
+`HUB_TICK_DIVISOR = 3` (ledger entry with it). Machines register in `LogicGrid` as `&"machine"` and supply
+`Items.machine_buffer`/`machine_total`. Then transport; then machines + power; then
 transport; then economy; then save v3; then `world_seeder`; then the `main.gd` state-logic blocks. Each
 sub-step merged green on `main`. The hub keeps legacy's 20 Hz cadence on every third 60 Hz body tick
 (`HUB_TICK_DIVISOR = 3`, approved D0345; ledger entry when the runner lands). `WaterFlow.step` is not

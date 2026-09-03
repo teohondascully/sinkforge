@@ -1,5 +1,5 @@
 class_name LogicGrid
-extends RefCounted
+extends SignedPlane
 
 ## The metre-cell planes: what is PLACED on the 16 px logic grid, beside `TileGrid`'s 4 px terrain.
 ## `docs/adr/0009-metre-cell-planes-over-the-terrain-grid.md`; lifted in A' step 3b (D0347) from the
@@ -28,8 +28,6 @@ const KIND_SAPLING: StringName = &"sapling"   # signature namespace only; saplin
 var placed: Dictionary = {}         # logic_cell -> kind: StringName (mutually exclusive per cell)
 var conduit_tiers: Dictionary = {}  # logic_cell -> tier: int, only where placed[cell] == KIND_CONDUIT
 var sapling: Dictionary = {}        # logic_cell -> age in hub ticks
-var _sig_a: int = 0
-var _sig_b: int = 0
 
 
 func occupant(logic_cell: Vector2i) -> StringName:
@@ -134,7 +132,7 @@ func sapling_logic_cells() -> Array[Vector2i]:
 
 
 func state_signature() -> String:
-	return "l%d:%d" % [_sig_a, _sig_b]
+	return _lanes("l")
 
 
 func recomputed_signature() -> String:
@@ -153,11 +151,7 @@ func recomputed_signature() -> String:
 
 func clone() -> LogicGrid:
 	var copy: LogicGrid = LogicGrid.new()
-	copy.placed = placed.duplicate()
-	copy.conduit_tiers = conduit_tiers.duplicate()
-	copy.sapling = sapling.duplicate()
-	copy._sig_a = _sig_a
-	copy._sig_b = _sig_b
+	_clone_into(copy, [&"placed", &"conduit_tiers", &"sapling"])
 	return copy
 
 
@@ -196,8 +190,3 @@ func _sapling_term(logic_cell: Vector2i) -> Vector2i:
 		return Vector2i.ZERO
 	var age: int = int(sapling[logic_cell])
 	return StateHash.term(logic_cell.x, logic_cell.y, StateHash.id_fold(KIND_SAPLING), Vector2i(age + 1, age + 1))
-
-
-func _xor_term(t: Vector2i) -> void:
-	_sig_a ^= t.x
-	_sig_b ^= t.y

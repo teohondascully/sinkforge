@@ -415,8 +415,11 @@ judgment call inside the split.
 constants as integer fields, `craft_cost` refused at the gate, `MachineDef`/`RecipeDef`/`MachineState`,
 `core/ordering.gd` after the `StringName` finding). 3b the world planes and verbs — DONE (D0347, ADR
 0009: `LogicGrid`, `World`, `PlacedVerbs`, `WaterPlane` moved to `sim/world`; the deferred items are
-listed in the ADR). Next: 3c items (inventory, pack, ground piles, lode) wrapping the world verbs with
-the ledger; then machines + power; transport; economy; save; `world_seeder`; the `main.gd` blocks.
+listed in the ADR). 3c items — DONE (D0348: `Pack` with its two numbers in `data/player/`, `GroundPiles`, `Landing` — lifted
+here rather than transport, with the machine buffer as a Callable — `Items`, `BuildVerbs`, the
+`DepositPlane` as `World`'s fourth plane, `check_item_conservation`). Next: 3d machines + power (the
+registry and lifecycle, `power_flow.gd` in milli-int, the runners, the behaviour table, the hub tick at
+`HUB_TICK_DIVISOR = 3`); then transport; economy; save; `world_seeder`; the `main.gd` blocks.
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

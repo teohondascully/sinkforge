@@ -25,3 +25,12 @@ static func exists(material_id: StringName) -> bool:
 static func is_soil(material_id: StringName) -> bool:
 	var record: Dictionary = MaterialsRecords.RECORDS.get(material_id, {})
 	return bool(record.get("soil", false))
+
+
+## Ore-like: a block whose yield is a deposit (`kind: ore` or `kind: fuel` in `data/materials`). Legacy's
+## `_is_ore_like` (`factory_sim.gd:1466`) was a four-name literal list; the record's kind is the same
+## question with no list to keep in step.
+static func is_ore_like(material_id: StringName) -> bool:
+	var record: Dictionary = MaterialsRecords.RECORDS.get(material_id, {})
+	var kind: String = String(record.get("kind", ""))
+	return kind == "ore" or kind == "fuel"

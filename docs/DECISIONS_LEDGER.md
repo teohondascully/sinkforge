@@ -14717,3 +14717,57 @@ derive `TERRAIN_PER_LOGIC` from `Body` (a world → body dependency, the wrong w
 asserted in the suite instead).
 
 **Reverse cost:** CHEAP until step 4 wires `World` into the golden; four files and one suite.
+
+## D0348 · 2026-09-03 · A′ step 3c: items — the pack and its cap, ground piles, the landing rule, the ledger, the builder verbs, the deposit plane
+
+**Decided:** (1) `sim/items` is filled from `legacy/src/core/factory_sim.gd`: `Pack` (the `inventory`
+dictionary, `inventory_slots`, `_take_from_pack`, `is_bulk_item`, `carried_bulk`/`pack_room`/`can_carry`),
+`GroundPiles` (`ground`, `sink`, `_ground_pile`, `_prune_empty_ground`), `Landing` (`_column_landing`),
+`Items` (`take_into_pack` — the one door into the pack, `_spill_to_world`, `drop_item`, `collect_ground`,
+`_resettle_pile_above`, `take_lode`, `deposit`, the `total_produced`/`total_consumed` ledger,
+`flow_events` as a view channel) and `BuildVerbs` (the pack half of every world verb: spend on place,
+recover on removal, ADR 0009 §5). (2) The pack's two numbers — `INVENTORY_SLOTS 10`, `PACK_BULK_CAP 90`,
+the latter the most-measured constant in legacy's pack history — are `data/player/pack.yaml`
+(`PlayerRecords`), a new data kind with a README and schema, per `data/README.md`'s rule. (3) "Machine
+item" is `MachineDef.exists`, not `ResourceLoader.exists(...tres)` (plan §5.1 row 023); legacy's tool
+and bit exemptions are dead with their tables, so everything else is bulk. (4) The landing rule comes
+over with ITEMS, not transport as the plan filed it: `drop_item`, the spill and the resettle all need
+it, and `sim/items/MODULE.md` names falling and settling as this module's own. A machine below catches
+items through `Items.machine_buffer`, a `Callable(logic_cell) → Dictionary or null` the hub supplies,
+so `sim/items` keeps its declared dependencies (`core`, `world`, `data`) and never imports a machine.
+Two deviations from legacy's landing, both in ADR 0009's deferred list: no `_settle_on_slope` (it reads
+`surface_row`/`ramp_dir`, superseded by `Heightfield` pending the ramps ruling), and "the first solid" is
+the first metre with ANY rock, so a pile rests above a half-dug floor as above a whole one. (5)
+`sim/world/deposit_plane.gd`: legacy's `deposits`/`lode`/`lode_max` as a fourth plane of `World`, keyed
+on the terrain cell, with a running signature; `lode_fraction` is `lode_permille`; `_is_ore_like`'s
+four-name literal list is `WorldMaterials.is_ore_like` reading the record's `kind` (`ore` or `fuel`).
+(6) `Invariants.check_item_conservation`: present (pack + ground + sink + machine buffers) equals produced
+minus consumed for every item, with a positive control. (7) `tests/test_items.gd`, 79 assertions:
+legacy's inventory-slot, drop-toss (three cases plus the sink and the half-dug floor), pile-falls and
+no-empty-pile tests, the pack halves of the rope/torch/block/conduit/sapling tests, the cap on take,
+spill and collect, `take_lode`'s refusal and retirement, the deposit reads, the pack's signature over 200
+mutations. CI 72 → 73 suites.
+
+**Kept as legacy had it, on purpose:** the pack's insertion order is state (the hotbar draws pickup order
+and a save preserves it) — `slots()` walks it for the view, `ids()` is text order for anything
+state-affecting; piles are live inner dictionaries mutated in place, so `GroundPiles` has only a
+from-scratch signature; `deposit` is unfiltered ("would this machine eat it" is the machines' question).
+
+**Not here:** `mine()`'s yield (`_ore_burst`, foliage settle, keep/spill) — merges into `Mining` in a later
+sub-step; `_column_rise` (the lift's mirror) — transport; `pile_reachable` (a presentation query with a
+BFS budget) — with the HUD that asks it; `Flora.grow`'s uprooted-seed drop — with flora.
+
+**Alternative:** let `sim/items` import `sim/machines` for the buffer (inverts the declared dependency
+and the tick order); keep `PACK_BULK_CAP` in code (violates `data/README.md`); port `_settle_on_slope`
+against `surface_row` (a function ruled superseded).
+
+**And the base class the fourth plane forced:** the duplication gate refused `Pack` because its lanes,
+its write sandwich and its `clone` were the third and fourth copies of what `WaterPlane`, `LogicGrid`
+and `DepositPlane` each carried. `core/signed_plane.gd` (`SignedPlane`) is now the one copy — the two
+lanes, `_xor_term`, `_write_int`, `_lanes`, `_rebuilt`, `_clone_into`, with `_term_of(key)` supplied by
+each plane — and the four planes extend it. `TileGrid` predates it and stands alone on purpose: its
+`_xor_term` also bumps `terrain_version` (D0340) and its golden is the one thing the extraction must
+not move; it did not (`test_shaft_replay_determinism` green). The gate steering this was the gate
+working, the same shape as D0344's mixer move.
+
+**Reverse cost:** CHEAP until step 4 puts `Items` in the golden; seven files and one suite.
