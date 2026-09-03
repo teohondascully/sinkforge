@@ -333,6 +333,14 @@ jobs:
       - name: tools/run_suites.sh self-test (D0272 — a failing suite's own diagnostic must reach the log)
         run: bash tools/test_run_suites.sh ./godot
 
+      # D0343 (A' step 0), the verdict itself: `_finish()` refuses a suite that reached its verdict having
+      # asserted nothing (prints VACUOUS, exits 1, never prints ALL PASS) and puts the asserted count on
+      # every verdict line. Lifted from legacy/tools/check_base.gd:145-160. Proved here against generated
+      # zero / one / one-failing probes BEFORE any suite below is read through it -- the same bar as the
+      # two self-tests above, and observed FAILING on the pre-fix test_base.gd before it was trusted.
+      - name: tests/test_base.gd verdict self-test (D0343 — a green that asserted nothing is refused; QUALITY gate 28)
+        run: bash tools/test_test_base.sh ./godot
+
       # THE SUITES, RUN IN PARALLEL (docs/DECISIONS_LEDGER.md D0263, D0264, D0265).
       #
       # These were 42 sequential steps. Measured locally, serial was 794s and `jobs=8` was 350s over the

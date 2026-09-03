@@ -16,19 +16,40 @@ extends SceneTree
 ## alone -- use it, not the bare invocation, for anything whose result will be trusted.
 
 var _failures: int = 0
+var _passes: int = 0
 
 
+## THE COUNT IS PART OF THE VERDICT, ALWAYS (lifted from `legacy/tools/check_base.gd:145-160` in A' step 0,
+## D0343). A green that does not say how many properties it stood on is a claim with its evidence withheld,
+## and a green that asserted NOTHING is refused outright: nothing downstream can tell it from a real one --
+## both are exit 0 over a log with no FAIL line -- so it has to be loud here. A suite whose every `_test_*`
+## returned before its first `_check` has reached its verdict without testing anything, which is the house
+## defect (an instrument that cannot register its subject) arriving inside the instrument.
+## `tools/test_test_base.sh` is the mutation test: a suite with zero `_check` calls must print VACUOUS and
+## exit non-zero and must never print ALL PASS.
+##
+## `quit()` DOES NOT RETURN. It asks the main loop to stop at the end of the current iteration and execution
+## carries straight on through this function, so the `return` after the refusal is load-bearing: without
+## it the refusal would fall through to the ALL PASS line and exit 0 anyway. Legacy's own probe of this
+## guard hit exactly that -- the guard against a green that asserted nothing was itself exiting green.
 func _finish(suite: String) -> void:
+	if _failures == 0 and _passes == 0:
+		printerr("VACUOUS -- %s made NO ASSERTIONS and reached its verdict anyway; exit 0 would claim a"
+			% suite + " property nobody tested. Every _test_* returned before its first _check, or the"
+			+ " suite has none.")
+		quit(1)
+		return
 	if _failures == 0:
-		print("ALL PASS (%s)" % suite)
+		print("ALL PASS (%s) -- %d asserted" % [suite, _passes])
 		quit(0)
 	else:
-		printerr("%d FAILURE(S) (%s)" % [_failures, suite])
+		printerr("%d FAILURE(S) of %d asserted (%s)" % [_failures, _failures + _passes, suite])
 		quit(1)
 
 
 func _check(condition: bool, label: String) -> void:
 	if condition:
+		_passes += 1
 		print("  PASS: %s" % label)
 	else:
 		_failures += 1

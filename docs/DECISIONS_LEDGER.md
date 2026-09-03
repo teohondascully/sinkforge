@@ -14492,3 +14492,65 @@ declares itself stale in its own header. `NEEDS_DIRECTOR.md` (1,104 lines) not a
 
 **Reverse cost:** CHEAP — `git mv` back, delete the headers, restore WORKING.md from history; the plan
 and README are single files.
+
+## D0343 · 2026-09-03 · A′ step 0: the asserted-count refusal lifted into `test_base.gd`, the harness-protocol transfer scoped to its live subjects, and the cross-platform probe run — legacy's generator does not diverge
+
+**Decided:** (1) `tests/test_base.gd::_finish` refuses a green that asserted nothing — `_passes == 0 and
+_failures == 0` prints `VACUOUS`, exits 1 and never prints `ALL PASS` — and prints the asserted count on
+every verdict line, passing and failing alike (`ALL PASS (suite) -- N asserted`, `F FAILURE(S) of N
+asserted (suite)`). Lifted from `legacy/tools/check_base.gd:145-160`, including its load-bearing `return`
+after `quit(1)`. `tools/test_test_base.sh` is the mutation test (generated zero / one / one-failing probes
+through `tools/run_gd_test.sh`); it was **observed failing on the pre-fix base first** (5 of 7 checks red,
+including "zero assertions exits non-zero (got 0)") and passing on the fixed one (7 of 7). Wired into CI's
+`tests` job before any suite runs, cited under QUALITY gate 28, whose text is amended. The full local
+sweep after the change: **67 passed, 0 failed, 0 VACUOUS** — no live suite asserted nothing; the four
+`tests/fixture_*` probes with no `_check` extend `SceneTree`, not the base, and are untouched.
+(2) The plan's step 0 item "port the 15 harness-protocol files into `tools/harness/`" is **scoped to the
+piece with a live subject today**, which is (1). The rest port when their subject exists in this tree, and
+not before: the machine lock (`lock_lib.sh`, `with_machine.sh`, `check_lock.sh`) and wall-clock cap
+(`cap_lib.sh`) when a runner other than CI needs them; `harness_verdict.sh` + `check_exit_codes.sh` when
+`run_suites.sh` grows an exit table; `assert_floors.sh` + `assert_skip_route.sh` once the new count line
+has a stable population to ratchet (after step 3's twenty-odd suites land, not during); `save_sentinel.gd`
++ `check_save_isolation.gd` with step 3's save; `check_posed_fields.gd` with the capture fixtures;
+`check_hash_mixing.gd` with the `LogicGrid` hash (step 4); `check_shared_constants.gd`,
+`check_verdict_route.gd`, `check_verdict_claims.gd` when `tests/` carries more than one verdict shape.
+(3) The probe. `legacy/` has no `project.godot`, so "zero-code" was wrong: `legacy/tools/frontier_corpus.gd`
+ran from a scratch worktree at tag `pre-pivot`, imported first. macOS arm64 native versus Godot's official
+Linux x86_64 binary (4.6.2, same SHA-512 CI pins) inside a `linux/amd64` Docker container on this Mac:
+**48 of 48 rows identical across all 12 seeds**, every integer tally (`mass`, `mass250`, `orecells`,
+`rockcells`, `noamt`) and every derived float column. Logs in the session scratchpad; the CSVs are
+`probe_mac.csv` / `probe_linux.csv`. (4) Three plan corrections under its own compaction contract:
+`docs/BRANCHING.md` (main only, small green commits) overrides the plan's "branch per step" line; step 0's
+probe is not zero-code; step 1 is two-thirds already ruled (below).
+
+**The frame, named:** the Linux run is x86_64 code emulated on Apple silicon (`VirtualApple` CPU), not
+native x86 hardware. Rosetta translates instruction-for-instruction and IEEE arithmetic is exact under it,
+so a sameness here is strong evidence but weaker than a CI run; re-run on CI Linux on the next push and
+diff again before quoting it as settled.
+
+**What it changes:** legacy's `FastNoiseLite` worldgen is not the cross-platform diverger the flip
+analysis's 102 CROSS rows feared. The current build's proven divergence (gate 8, checkpoint 3, real CI
+Linux vs Mac, D0171/D0183) is therefore not explained by "float noise diverges"; the suspects narrow to
+the sites calling libm transcendentals (`sim/terrain_gen/cave_passes.gd:86-91` `cos`/`sin`) and the
+`lerpf`/hash-to-float roundings. **A hypothesis for step 8, not a finding** — nothing was run against the
+current build.
+
+**Step 1, re-read against the tree:** `docs/ARCHITECTURE.md` §9 already rules that machines, items,
+power and the placed things live on the 16 px metre cell and that water "flows through" the fine 4 px
+grid; D0019/D0020 and `TileGrid`'s header already rule that the 16 px grid is not a second array of
+terrain. New planes are new state, not a copy, so they break neither; `TileGrid` at 312 of 400 lines
+forces them into a sibling class anyway. What remains for the director is one confirmation — water at the
+4 px grid as §9 states, with its cost (sixteen times legacy's cells per flooded volume; a quarter metre of
+descent per fluid tick) — and the plan's "EXPENSIVE" label on step 1 was mine and over-cautious. Asked
+2026-09-03. The tree's own evidence for §9: `Mining.bite_radius` clears a 13-cell disc at 4 px, so
+hand-dug tunnels never align to metres, and metre-cell water would either refuse a tunnel the body walks
+through or draw over rock.
+
+**Alternative:** port all 15 files now (4,792 lines referencing legacy's `check_base.gd`,
+`run_harness.sh` and `res://tools/...` paths — a gate that runs nowhere, this tree's own memory class);
+skip the probe (its result reshapes step 8's question); leave the plan's wrong lines for the next session
+to trip on.
+
+**Reverse cost:** CHEAP. The refusal is 20 lines in one file plus one shell test and one CI step; the
+probe is a scratch worktree the director can delete; the plan edits are prose.
+
