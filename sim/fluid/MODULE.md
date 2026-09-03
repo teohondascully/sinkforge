@@ -27,7 +27,16 @@ ends up owning local flood/pump state," not a confirmed dependency.
 
 ## Dependencies
 
-`core`, `world` (the automaton operates over the tile grid).
+`core`, `world` (the automaton operates over the tile grid: `WaterFlow` reads `TileGrid.is_solid` and
+`in_bounds` for every move, and `WaterPlane` hashes with `StateHash.term` (`core/state_hash.gd`, the mixer `TileGrid` uses)).
+
+## Source
+
+Lifted in A′ step 2 (`docs/A_PRIME_REFACTOR_PLAN.md` §4, D0344) from `legacy/src/core/water_flow.gd`
+(the algorithm, verbatim) and `legacy/src/core/factory_sim.gd:1100-1135` (the `water` dictionary and
+its accessors, now `WaterPlane`). Legacy's cell was one metre; this plane's is the 4 px terrain cell
+(`docs/ARCHITECTURE.md` §9: "what water flows through"), so a metre of water is sixteen cells of
+`WATER_MAX` and legacy's per-cell rates convert ×16 where they meet it (pump, seep — step 3).
 
 ## Consumers
 
@@ -43,7 +52,23 @@ naming, see the open question noted under Purpose above).
 
 ## Public API
 
-None yet.
+- `WaterPlane` (`water_plane.gd`) — the owner. `levels: Dictionary` (terrain_cell → int, absent = dry,
+  never a stored 0), `WATER_MAX` (8 per cell). `.water_at()`, `.add_water(grid, terrain_cell, amount)
+  → added` (refuses rock and out-of-bounds, clamps to room), `.remove_water(terrain_cell, amount) →
+  removed`, `.displace(terrain_cell) → removed` (rock arrived: the world verb calls this),
+  `.total_water()` (the conservation probe), `.wet_terrain_cells()` (sorted in the flow's scan order),
+  `.set_level()` (THE one write; levels above `WATER_MAX` are legal transiently, see `WaterFlow`),
+  `.state_signature()` / `.recomputed_signature()` (running two-lane XOR, `TileGrid`'s pattern, D0261),
+  `.clone()`.
+- `WaterFlow` (`water_flow.gd`) — the algorithm, stateless. `WaterFlow.step(water, grid)` once per
+  `fluid` phase: gravity over a snapshot, then lateral even-fill of each maximal open run with the
+  remainder biased left. Both passes iterate the WET cells only (the active set the must-not demands).
+
+## Invariants
+
+`Invariants.check_water_conservation(water, expected_total, tick)` and
+`Invariants.check_water_not_in_rock(water, grid, tick)` (`sim/invariants`), with `report_*` twins that
+`push_error`. `tests/test_water_flow.gd` holds both over 10,000 fuzzed ticks.
 
 ## Gotchas
 

@@ -2,11 +2,10 @@
 
 ## Purpose
 
-Fixed-point arithmetic (i32, 16 fractional bits), a seeded splittable RNG (one
-stream per subsystem; streams are serialized state, not wall-clock seeded),
-generational-index entity IDs, and the seam/grain hash. Small, pure, fully
-unit-tested. Every other layer in the stack (sim, interface, harness,
-experiment, view, shell) depends on this one; this one depends on nothing.
+Fixed-point arithmetic (i32, 16 fractional bits), a seeded splittable RNG (one stream per subsystem;
+streams are serialized state, not wall-clock seeded), generational-index entity IDs, the seam/grain hash
+and the state-signature mixer. Small, pure, fully unit-tested. Every other layer in the stack (sim,
+interface, harness, experiment, view, shell) depends on this one; this one depends on nothing.
 
 ## Dependencies
 
@@ -22,23 +21,24 @@ Every other layer: sim, interface, harness, experiment, view, shell.
 - No file IO.
 - No wall clock — no `OS.get_ticks_*`, no `Time` singleton, nothing that
   reads real-world time on any path that affects state.
-- No global mutable state. RNG streams are values the caller owns and
-  threads through explicitly, not statics.
+- No global mutable state. RNG streams are values the caller owns and threads through explicitly, not statics.
 - No `sin`/`cos`/`pow` (or any other transcendental/floating-point-only
   function) on a path that affects simulation state. Determinism across
   platforms depends on this module staying pure fixed-point integer math.
 
 ## Public API
 
-- `SplitRng` (`split_rng.gd`) — seeded, splittable PRNG stream. SplitMix64. `.next_u64()`,
-  `.split(label: String) -> SplitRng` (deterministic, keyed off the root seed not current draw
-  position — order-independent), `.get_state()` / `.set_state()` for serialization. Naming the actual
-  per-subsystem streams (`world`, `terrain_gen`, ...) is each sim/ module's job, not core's — this file
-  doesn't know sim/'s module list.
+- `SplitRng` (`split_rng.gd`) — seeded, splittable PRNG stream. SplitMix64. `.next_u64()`, `.split(label:
+  String) -> SplitRng` (deterministic, keyed off the root seed not current draw position —
+  order-independent), `.get_state()` / `.set_state()` for serialization. Naming the actual per-subsystem
+  streams (`world`, `terrain_gen`, ...) is each sim/ module's job, not core's — it doesn't know sim/'s list.
 - `EntityIdPool` (`entity_id_pool.gd`) — generational-index entity IDs, packed as one 64-bit int
   (`(generation << 32) | index`) so ids compare with plain `==` and serialize as one integer.
   `.allocate()`, `.release(id) -> bool` (false on double-release or an id that was never allocated,
   never a crash), `.is_valid(id) -> bool`, `.live_count()`.
+- `StateHash` (`state_hash.gd`) — the two-lane running-signature mixer every sim plane hashes with (from
+  `TileGrid`, A′ step 2, D0344; arithmetic unchanged from D0261, outputs pinned in `tests/test_state_hash.gd`).
+  `.fold()`, `.mix()`, `.term(x, y, m: Vector2i, w: Vector2i)` (both lanes), `.text_term()`, `.id_fold()` (memoised).
 - `BitOps` (`bit_ops.gd`) — bit-level integer primitives with no domain concept of their own.
   `.ushr(x: int, n: int) -> int`, a logical (zero-fill) right shift of a 64-bit bit pattern held in a
   signed GDScript int. Why it is its own file rather than a helper: see Gotchas.

@@ -280,12 +280,12 @@ func _check_the_memo_is_populated_by_use() -> void:
 	# What CAN be checked without a clock is that the cache is actually populated by use: if it never
 	# filled, the lookup could never hit however the code was written. The measured saving itself is in
 	# D0334, taken by removing the subject.
-	var before: int = TileGrid._id_folds.size()
+	var before: int = StateHash._id_folds.size()
 	var probe: TileGrid = TileGrid.new(8, 8, 1)
 	probe.set_material(Vector2i(1, 1), &"a_material_no_other_test_uses")
 	probe.set_wall(Vector2i(1, 1), &"another_unused_material")
-	_check(TileGrid._id_folds.size() > before,
+	_check(StateHash._id_folds.size() > before,
 		"folding two unseen ids populated the memo (%d -> %d entries), so the lookup has something to hit"
-			% [before, TileGrid._id_folds.size()])
-	_check(TileGrid._id_folds.has(&"a_material_no_other_test_uses"),
+			% [before, StateHash._id_folds.size()])
+	_check(StateHash._id_folds.has(&"a_material_no_other_test_uses"),
 		"and it is keyed by the id itself")

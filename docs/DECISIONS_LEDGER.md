@@ -14554,3 +14554,50 @@ to trip on.
 **Reverse cost:** CHEAP. The refusal is 20 lines in one file plus one shell test and one CI step; the
 probe is a scratch worktree the director can delete; the plan edits are prose.
 
+## D0344 · 2026-09-03 · A′ step 2: legacy's water lifted verbatim — `WaterFlow` the algorithm, `WaterPlane` the owner at the 4 px terrain cell, two invariants, one shared hash mixer
+
+**Decided:** (1) `legacy/src/core/water_flow.gd` → `sim/fluid/water_flow.gd`, the algorithm and its
+constants line for line; the one structural change is `_settle_run` split out of `step` for the 50-line
+function cap (gate 4), its body unchanged. Legacy's `sim.water` is `water.levels`, every write is
+`water.set_level` so the running signature moves with it, `sim.solid.has(c)` is `grid.is_solid(c)`.
+(2) Legacy's `water` dictionary and its accessors (`factory_sim.gd:1100-1135`: `water_at`, `add_water`,
+`remove_water`, `total_water`) → `sim/fluid/water_plane.gd` as the plane's own owner, with `TileGrid`'s
+two-lane running XOR signature (D0261) and a `recomputed_signature()` self-check. `displace()` is the
+primitive of legacy's `set_solid` coupling ("rock displaces water", `factory_sim.gd:708`); **the coupling
+itself is not here** — it belongs to the `sim/world` verb that places rock, step 3, and
+`Invariants.check_water_not_in_rock` exists to catch a verb that forgets it. (3) The two-lane mixer
+(`_fold`, `_mix`, `_id_fold`) extracted from `TileGrid` into `core/state_hash.gd` (`StateHash.term`,
+`text_term`, `id_fold`; arithmetic unchanged, literal outputs pinned by `tests/test_state_hash.gd`) so
+`WaterPlane` and the metre-cell planes to come hash with one mixer instead of a copy the duplication gate
+would refuse — and because a hash utility is core's, not the terrain grid's; the coordinate-naming gate
+refused it as a `TileGrid` method with payload parameters that are not coordinates, which was the right
+call. **No golden moved** (`test_shaft_replay_determinism` green after the change). (4) `Invariants.check_water_conservation`
+and `check_water_not_in_rock`, each with a `report_*` twin, each with a positive control in the suite.
+(5) `tests/test_water_flow.gd`: legacy's five groups re-expressed, plus the 10,000-tick fuzz the plan's
+acceptance names (conserved on 10,000 of 10,000, in rock on 0 of 10,000, seed 1337, 24×24, 35% rock,
+155 units), the running-vs-rebuilt signature over 400 randomised mutations, the cap-overflow branch, and
+the refusals. 45 assertions, 3.9 s. CI's parallel step goes 67 → 68 suites, label checked by gate.
+
+**The cell.** The plane is keyed on the 4 px terrain cell, per `docs/ARCHITECTURE.md` §9 ("what water
+flows through") and D0343's re-read of step 1; the director's one-word confirmation is pending. If it is
+overridden to the metre cell, what changes is the solidity query and the key scale, not the algorithm.
+`WATER_MAX` stays 8 per cell (legacy's number, per cell), so a metre of water is sixteen cells and every
+legacy per-cell rate that meets this plane converts ×16 at step 3 (the pump's 3 units a tick, the seep).
+
+**A legacy finding kept verbatim:** the `cap_total` branch ("surplus rides the leftmost cell") is
+unreachable through legacy's public API — gravity moves `min(level, room)` so no cell ever exceeds
+`WATER_MAX`, and `add_water` clamps — so in legacy it was a conservation guarantee that never fired.
+Kept, because `set_level` here legitimately can exceed the cap and the branch is what keeps the sum
+invariant when it does; the suite pins it through `set_level`.
+
+**Not done, on purpose:** `WaterFlow.step` is not yet called from `Interface.apply` — there is no fluid
+phase runner until step 3's tick order lands (step 4 opens the door). Water is not in the golden's world,
+so no re-pin. Seepage (the module's one sanctioned conservation violation) does not exist yet.
+
+**Alternative:** rewrite water at the metre cell on `TileGrid` as the plan's step 1 proposed (contradicts
+§9 and the 13-cell bite); a from-scratch signature instead of the running lanes (D0261 measured why not);
+copy `_mix` into `WaterPlane` (two conventions, and the duplication gate); expose the mixer as a
+`TileGrid` static (tried; the coordinate-naming gate refused its non-coordinate `Vector2i` parameters).
+
+**Reverse cost:** CHEAP. Three new files, two suites, two CI lines; the `TileGrid` change is a pure
+extraction with the same arithmetic.

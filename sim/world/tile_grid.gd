@@ -140,32 +140,14 @@ func occupied_terrain_cells() -> Array[Vector2i]:
 	return cells
 
 
-## Canonical state signature -- sorted by (y, x) so it doesn't depend on `Dictionary` insertion order,
-## same shape as `tests/test_base.gd`'s `_canon()`. Used by the shaft-determinism check.
+## THE MIXER LIVES IN `core/state_hash.gd` (D0344). It was three private statics here (`_fold`, `_mix`,
+## `_id_fold`) while this was the only plane; `WaterPlane` and the metre-cell planes to come hash with the
+## same `StateHash.term`, arithmetic unchanged from D0261 -- 31 bits per lane so no implementation-defined
+## int32 narrowing can differ between architectures, a polynomial fold over integers rather than an engine
+## `String.hash()` whose cross-process stability is not guaranteed, two seeds for two lanes (that file's
+## header carries the reasons). The memoised id fold that D0334 measured as a third of world generation is
+## `StateHash.id_fold`. What is this grid's own is the two terms below.
 ##
-## Includes `_dig_extent` (D0125), sorted by column -- not derivable from `_blocks`/`_walls` alone (a
-## column can have a natural, generation-time opening far from anywhere dug, so "what's currently open"
-## doesn't say "what's been dug"), and it is real state that affects future gameplay (the next dig
-## touching a column). A signature that omitted it could match on `_blocks` while silently diverging on
-## dig history -- exactly the "instrument cannot register its subject" class this project keeps finding.
-## Deterministic string fold. NOT `String.hash()`: that is engine-provided, and the determinism contract
-## may not rest on a value Godot is free to change between versions.
-##
-## Masked to **31** bits, not 32, and that one bit is load-bearing. The lanes travel in `Vector2i`, whose
-## components are `int32_t`; a 32-bit mask produces values above 2^31-1, and narrowing those to a signed
-## int32 is an implementation-defined conversion in C++. It happens to be two's-complement wrap on every
-## platform Godot ships, and it showed up here as a perfectly stable `-1422115007` -- deterministic on
-## this machine, and precisely the kind of thing that is deterministic on this machine right up until CI
-## runs a different architecture. A determinism contract may not contain an implementation-defined
-## narrowing. 31 bits per lane always fits positively, costs one bit of a 64-bit budget, and removes the
-## question entirely.
-static func _fold(text: String, h0: int) -> int:
-	var h: int = h0
-	for i: int in text.length():
-		h = ((h * 31) + text.unicode_at(i)) & 0x7FFFFFFF
-	return h
-
-
 ## One occupied cell's contribution, or ZERO if the cell holds no block. The zero case is what makes
 ## `_write_layer` safe to xor unconditionally on both sides of a mutation: xoring zero is a no-op, so a
 ## cell that was air before and after contributes nothing either time, and a cell that changed occupancy
@@ -173,65 +155,15 @@ static func _fold(text: String, h0: int) -> int:
 func _cell_term(terrain_cell: Vector2i) -> Vector2i:
 	if not _blocks.has(terrain_cell):
 		return Vector2i.ZERO
-	var m: Vector2i = _id_fold(_blocks[terrain_cell])
-	var w: Vector2i = _id_fold(get_wall(terrain_cell))
-	return Vector2i(
-		_mix(terrain_cell.x, terrain_cell.y, m.x, w.x, 2166136261),
-		_mix(terrain_cell.x, terrain_cell.y, m.y, w.y, 486187739))
-
-
-## THE MEMOISED HALF, AND IT IS A THIRD OF WORLD GENERATION (D0334).
-##
-## This used to build `"%d,%d:%s/%s"` and run `_fold` -- a per-character loop -- over the whole string,
-## TWICE, on every write. `_write_layer` calls `_cell_term` twice per write and generation writes both a
-## block and a wall per cell, so a 512-cell-wide world paid four string allocations and roughly 160
-## character iterations for each of its 565,248 cells.
-##
-## **Measured by removing the subject rather than by reasoning about it**: generation went 16.69 -> 11.11
-## microseconds per cell with the hashing stubbed out, so it was 33% of the total and 3.15 seconds of the
-## wide world's 9.4.
-##
-## A world holds about eight distinct material ids against hundreds of thousands of cells, so the id fold
-## is the same handful of answers computed over and over. Cached here, keyed by the id itself. The cache
-## is `static` because it memoises a PURE function -- same id, same pair, forever -- so it carries no
-## per-world state and cannot leak between grids.
-static var _id_folds: Dictionary = {}
-
-
-static func _id_fold(id: StringName) -> Vector2i:
-	var hit: Variant = _id_folds.get(id)
-	if hit != null:
-		return hit
-	var text: String = String(id)
-	var pair := Vector2i(_fold(text, 2166136261), _fold(text, 486187739))
-	_id_folds[id] = pair
-	return pair
-
-
-## The coordinate half, as integer arithmetic rather than as formatted text.
-##
-## SAME 31-MULTIPLY FOLD, SAME MASK, so it stays a hand-rolled hash over integers and inherits the
-## cross-platform stability that is why `_fold` exists instead of `String.hash()` -- a signature compared
-## between two PROCESSES cannot rest on an engine hash whose stability is not guaranteed.
-##
-## Mixing x and y as separate terms is also strictly better than the string form it replaces: `"1,23"`
-## and `"12,3"` were distinguished only by where the comma fell, and here they are different inputs at
-## different fold positions.
-static func _mix(x: int, y: int, m: int, w: int, h0: int) -> int:
-	var h: int = h0
-	h = ((h * 31) + x) & 0x7FFFFFFF
-	h = ((h * 31) + y) & 0x7FFFFFFF
-	h = ((h * 31) + m) & 0x7FFFFFFF
-	h = ((h * 31) + w) & 0x7FFFFFFF
-	return h
+	return StateHash.term(terrain_cell.x, terrain_cell.y,
+		StateHash.id_fold(_blocks[terrain_cell]), StateHash.id_fold(get_wall(terrain_cell)))
 
 
 func _dig_term(col: int) -> Vector2i:
 	if not _dig_extent.has(col):
 		return Vector2i.ZERO
 	var extent: Vector2i = _dig_extent[col]
-	var body: String = "dig%d:%d,%d" % [col, extent.x, extent.y]
-	return Vector2i(_fold(body, 2166136261), _fold(body, 486187739))
+	return StateHash.text_term("dig%d:%d,%d" % [col, extent.x, extent.y])
 
 
 ## Both layers maintain the running signature the same way, and saying that ONCE is the point: the

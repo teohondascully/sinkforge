@@ -213,3 +213,71 @@ static func report_translation_consent(move_dir: int, entry_vel_x: int, entry_po
 		v.pos_y = pos_y
 		push_error(v._to_string())
 	return v
+
+
+## THE FLUID CONTRACT (`sim/fluid/MODULE.md`): total water is conserved across a flow step. Water only
+## MOVES inside `WaterFlow`; every unit that enters or leaves the world does so through `WaterPlane`'s
+## `add_water`/`remove_water`/`displace`, each of which returns what it did so the caller can account for
+## it. So between two such calls the total is a constant, and a caller holding that constant can ask this
+## after every step. `tests/test_water_flow.gd` does, over 10,000 fuzzed ticks (A' step 2, D0344). The one
+## deliberate violation the module allows -- seepage upkeep -- does not exist yet and, when it does, must
+## be one named function outside the flow passes, which is exactly what makes this check stay true.
+class WaterConservationViolation:
+	var expected_total: int
+	var observed_total: int
+	var tick: int
+	func _to_string() -> String:
+		return ("Invariants: water total changed across a flow step -- expected %d, observed %d " +
+			"(tick %d). Water only moves in WaterFlow; a source or drain has appeared where none is " +
+			"allowed.") % [expected_total, observed_total, tick]
+
+
+static func check_water_conservation(water: WaterPlane, expected_total: int, tick: int) -> WaterConservationViolation:
+	var observed: int = water.total_water()
+	if observed == expected_total:
+		return null
+	var v: WaterConservationViolation = WaterConservationViolation.new()
+	v.expected_total = expected_total
+	v.observed_total = observed
+	v.tick = tick
+	return v
+
+
+static func report_water_conservation(water: WaterPlane, expected_total: int, tick: int) -> WaterConservationViolation:
+	return _reported(check_water_conservation(water, expected_total, tick))
+
+
+## The `report_*` twins of the two water checks share this: log the violation if there is one, hand it
+## back either way. One helper rather than two identical bodies (`tools/quality_check/duplication.py`).
+static func _reported(v: Variant) -> Variant:
+	if v != null:
+		push_error(v._to_string())
+	return v
+
+
+## The other half of the same contract: water and rock never share a cell. `WaterFlow` never flows into
+## rock and `add_water` refuses it, so the only way this fires is a rock placed over a wet cell whose owner
+## forgot to call `WaterPlane.displace` -- the coupling legacy kept inline in `set_solid` and A' moves to
+## the `sim/world` verbs (plan step 3). Returns the first offending cell in scan order, or null.
+class WaterInRockViolation:
+	var terrain_cell: Vector2i
+	var level: int
+	var tick: int
+	func _to_string() -> String:
+		return ("Invariants: %d unit(s) of water inside solid terrain cell (%d,%d) at tick %d -- rock " +
+			"was placed over water without displacing it.") % [level, terrain_cell.x, terrain_cell.y, tick]
+
+
+static func check_water_not_in_rock(water: WaterPlane, grid: TileGrid, tick: int) -> WaterInRockViolation:
+	for terrain_cell: Vector2i in water.wet_terrain_cells():
+		if grid.is_solid(terrain_cell):
+			var v: WaterInRockViolation = WaterInRockViolation.new()
+			v.terrain_cell = terrain_cell
+			v.level = water.water_at(terrain_cell)
+			v.tick = tick
+			return v
+	return null
+
+
+static func report_water_not_in_rock(water: WaterPlane, grid: TileGrid, tick: int) -> WaterInRockViolation:
+	return _reported(check_water_not_in_rock(water, grid, tick))
