@@ -62,21 +62,21 @@ phases — not itself one of the fixed tick phases.
   `.placed_logic_cells(kind)`/`.sapling_logic_cells()` (scan order), running `.state_signature()` +
   `.recomputed_signature()`, `.clone()`.
 - `WaterPlane` (`water_plane.gd`, D0344, here since D0347) — integer water per terrain cell; API in `sim/fluid/MODULE.md`.
-- `World` (`world.gd`, ADR 0009) — THE OWNER: `grid: TileGrid`, `logic: LogicGrid`, `water: WaterPlane`.
-  The metre-cell derivations `.logic_in_bounds()`, `.terrain_cells_of()`, `.terrain_face_cells(cell, dir)`,
+- `World` (`world.gd`, ADR 0009) — THE OWNER: `grid`, `logic`, `water`, `deposits`. The metre-cell derivations `.logic_in_bounds()`, `.terrain_cells_of()`, `.terrain_face_cells(cell, dir)`,
   `.logic_solid()` (all sixteen rock), `.logic_air()` (all sixteen air), `.logic_open()` (air, in bounds,
   nothing placed), `.cell_occupied()` (any rock or anything placed), `.wall_backs()`, `.face_solid(cell,
-  dir)`, `.soil_below()`, `.block_supported()`, `.backed()`; the terrain verbs `.set_solid(cell, material)
-  → water displaced` (sixteen cells; `&""` excavates), `.set_wall()`, `.place_block()`; the joined
-  `.state_signature()`/`.recomputed_signature()`, `.clone()`.
+  dir)`, `.soil_below()`, `.block_supported()`, `.backed()`, `.logic_ore_body()` (every rock cell ore-like);
+  the terrain verbs `.set_solid(cell, material) → water displaced` (sixteen cells; `&""` excavates),
+  `.set_wall()`, `.place_block()`, `.bore_one() → material` (the drill's bite: one unit off the first
+  solid ore cell, excavated when spent, D0349); the joined `.state_signature()`/`.recomputed_signature()`, `.clone()`.
 - `PlacedVerbs` (`placed_verbs.gd`) — static over a `World`: `place_conduit`/`remove_conduit`,
   `place_rope(world, anchor, max_segments) → hung`/`retract_rope`/`remove_rope → cut`,
   `place_torch`/`remove_torch`, `can_plant_sapling`/`plant_sapling`/`remove_sapling`. Legacy's
   refusals in legacy's order, minus the pack.
 
-**`Seams` is NOT here any more** (D0227 in, D0237 out to `core/seams.gd`, because `view/` may reach
-`core` but never `sim`). It was never listed here while it was — a public-API list that omits a module's
-own file is the same shape as a gate that cannot see its subject.
+**`Seams` is NOT here any more** (D0227 in, D0237 out to `core/seams.gd`: `view/` may reach `core`, never
+`sim`). It was never listed here while it was — a public-API list that omits a module's own file is the
+same shape as a gate that cannot see its subject.
 
 ## Gotchas
 

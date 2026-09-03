@@ -417,9 +417,12 @@ constants as integer fields, `craft_cost` refused at the gate, `MachineDef`/`Rec
 0009: `LogicGrid`, `World`, `PlacedVerbs`, `WaterPlane` moved to `sim/world`; the deferred items are
 listed in the ADR). 3c items — DONE (D0348: `Pack` with its two numbers in `data/player/`, `GroundPiles`, `Landing` — lifted
 here rather than transport, with the machine buffer as a Callable — `Items`, `BuildVerbs`, the
-`DepositPlane` as `World`'s fourth plane, `check_item_conservation`). Next: 3d machines + power (the
-registry and lifecycle, `power_flow.gd` in milli-int, the runners, the behaviour table, the hub tick at
-`HUB_TICK_DIVISOR = 3`); then transport; economy; save; `world_seeder`; the `main.gd` blocks.
+`DepositPlane` as `World`'s fourth plane, `check_item_conservation`). 3d machines + power — DONE
+(D0349: `Machines`, `PowerFlow` in milli-units, `Runners` for recipe/generator/hopper/pump/drill,
+`MachineStatus`, `MachineVerbs`, `HubTick` at `HUB_TICK_DIVISOR = 3`; the deposit default corrected to
+16 a 4 px cell; the drill bores the metre cell by cell; 112 assertions). Next: 3e transport (`_flow`,
+`_destinations`, `_deliver`, `_column_rise`, the lift, the winch, `updraft_at`; the splitter waits on
+§8); then economy; save; `world_seeder`; the `main.gd` blocks.
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 
@@ -626,6 +629,7 @@ Measured 2026-09-01 at the default framing: painters 4.01 ms (`veil 2.99 sky 0.9
 | Power gating (R1-entangled; removing power silently freezes upward machines) | 2 legacy tests, V11 wiring | port the mechanism, do not wire the tier (Q3) |
 | Crusher + gravel + packing + seep (133 lines, exists for the Drift Rig) | step 3 | not on §9's list; rule before calling it dead |
 | `press_plate`, `mill_gear` (terminal products) | 2 recipes | machines survive; outputs need a consumer or go |
+| Material id vs item id (D0349): a bored `ore_iron` block yields the item `ore_iron`; the recipes take `ore`, `iron`, `rich_ore` | the automated line end to end; step 7 | a `yields:` field on the material record, or recipes renamed to the material ids |
 | HARDNESS `earth` 0.28 s = 5.6 ticks | `sim/mining` | 6 ticks |
 | `sim.ramp_dir` authored ramps vs `Heightfield` | step 5 body mechanisms | superseded by the heightfield |
 | The resolver (P-28) | step 5's collision half | — |

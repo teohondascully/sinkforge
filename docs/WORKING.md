@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0 and 2 done, step 1 ruled, step 3 next)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0, 2, 3a–3d done, step 1 ruled, 3e next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -49,20 +49,25 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   `Items` (take/spill/drop/collect/resettle/lode/deposit + the ledger), `BuildVerbs` (spend on place,
   recover on removal), `DepositPlane` as `World`'s fourth plane, `check_item_conservation`. 79 assertions.
 
+- **Step 3d — done (D0349).** `sim/machines`: `Machines` (the registry; placement order is state; the
+  derived `power` field, `power_throttle` per-mille), `PowerFlow` (legacy's pass in milli-units off the
+  records), `Runners` (recipe, generator, hopper, pump, drill), `MachineStatus`, `MachineVerbs`
+  (build/pickup with the order fix/configure); `sim/run/hub_tick.gd` (`HubTick.step` in legacy's order,
+  `advance` on every third body tick). 112 assertions. **Corrected:** the deposit default is 16 a 4 px
+  cell (256 a metre), not D0348's 250 a cell — stocks per cell convert ÷16, rates ×16. **Finding for
+  §8:** a bored `ore_iron` block yields `ore_iron`; the recipes take `ore`/`iron`/`rich_ore`.
+
 ### Next action
 
-Step 3d, machines + power: the registry and lifecycle (`place_machine` 1887, `remove_machine` 1901,
-`build_from_pack` 1715, `pickup_machine` 1752, `machine_at` 374, `machine_eats` 388, `configure_machine`
-3014, census/problems 1996-2046, the `_status_*` reads), `power_flow.gd` (89 lines, all-float → milli-int,
-§5.2's 8 rows) + `power_at`/`power_throttle` 2055-2066 as per-mille, the runners (`_run_machine` dispatch
-2071, `_run_recipe` 2081, `_run_generator` 2946, `_run_hopper` 2301, `_run_pump` 2150, `_run_drill`
-2532 with `drill_target`/`head_coverage`), the `_BEHAVIORS` table, and the hub tick runner at
-`HUB_TICK_DIVISOR = 3` (ledger entry with it). Machines register in `LogicGrid` as `&"machine"` and supply
-`Items.machine_buffer`/`machine_total`. Then transport; then machines + power; then
-transport; then economy; then save v3; then `world_seeder`; then the `main.gd` state-logic blocks. Each
-sub-step merged green on `main`. The hub keeps legacy's 20 Hz cadence on every third 60 Hz body tick
-(`HUB_TICK_DIVISOR = 3`, approved D0345; ledger entry when the runner lands). `WaterFlow.step` is not
-called from `Interface.apply` until step 4 opens the door. Every lifted `sort` goes through `Ordering`.
+Step 3e, transport: item flow between machines — `_flow` (the tick's third phase), `_destinations`,
+`_deliver`, `_column_rise` (the lift's mirror of the landing rule), `_run_lift`/`_status_mover` with the
+power throttle, `updraft_at` 585 (reads the registry's `updraft` flag), the Freight Winch (`_run_winch_head`,
+`_advance_winch_transit`, `_run_winch_station`, `link_winch`, `_purge_winch_route`; `winch_routes` and
+`winch_transit` are state and enter the signature), `machine_census`/`machine_problems` only if a
+consumer needs them before step 6. The splitter waits on §8. Then economy (`_sample_production`,
+`production_rate`); save v3; `world_seeder`; the `main.gd` state-logic blocks. Each sub-step merged
+green on `main`. `HubTick.step` is not called from `Interface.apply` until step 4 opens the door. Every
+lifted `sort` goes through `Ordering`; every lifted `call(name)` becomes a `match`.
 
 ### Waiting on the director
 

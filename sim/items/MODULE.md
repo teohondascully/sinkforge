@@ -27,7 +27,7 @@ without this module knowing one exists.
 
 Lifted in A′ step 3c (D0348) from `legacy/src/core/factory_sim.gd`: the
 `inventory`/`ground`/`sink` dictionaries and the ledger, `take_into_pack`
-(THE ONE DOOR into the pack), `_spill_to_world`, `drop_item`, `collect_ground`,
+(THE ONE DOOR into the pack), `eject` (legacy `_spill_to_world`), `drop_item`, `collect_ground`,
 `_resettle_pile_above`, `_column_landing`, `take_lode`, `deposit`, and the pack
 half of every world verb (spend on place, recover on removal).
 
@@ -61,7 +61,7 @@ mechanism that tick).
   sink. No slope roll (ADR 0009's deferred list).
 - `Items` (`items.gd`) — THE SERVICE: `pack`, `piles`, `total_produced`/`total_consumed`, `flow_events`
   (view channel, never read back), `last_drop_landing`, `machine_buffer`/`machine_total` Callables.
-  `.take_into_pack(item, n, spill_at) → taken` (the rest spills), `.drop_item()`, `.collect_ground()`
+  `.take_into_pack(item, n, spill_at) → taken` (the rest spills), `.eject()` (units not in the pack pour down a column: the spill, the drill's bite), `.drop_item()`, `.collect_ground()`
   (capped too), `.resettle_pile_above()`, `.take_lode(terrain_cell)` (refuses a full pack), `.deposit()`,
   `.present(item)`, `.produced()`/`.consumed()`, `.state_signature()`.
 - `BuildVerbs` (`build_verbs.gd`) — static over `Items`: `place_block`, `place_conduit`/`remove_conduit`,

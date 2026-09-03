@@ -4,16 +4,19 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, fifth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data leaves),
-3b (world planes and verbs) and 3c (items) done; step 3d (machines + power) is next.** Ledger:
-D0343–D0348; ADR 0009.
+**Last updated: 2026-09-03, sixth round. A′: steps 0 and 2 done, step 1 ruled, step 3a (data leaves),
+3b (world planes and verbs), 3c (items) and 3d (machines + power) done; step 3e (transport) is next.**
+Ledger: D0343–D0349; ADR 0009.
 
-**Headline: the world now has its metre-cell planes.** `World` owns terrain, the placed layers and water
-under one signature; every metre-cell fact (solid, air, half-dug, a full face to build on, soil) is
-derived from the sixteen 4 px cells under it, and legacy's conduit, rope, torch, sapling and block verbs
-run on that, refusals in legacy's order — ADR 0009 says how, from your ruling. Earlier today: the data
-leaves with `craft_cost` refused at the gate (D0346), the `StringName` sort trap closed (D0346), water
-verbatim (D0344), the vacuous-green refusal (D0343), your step 1 ruling (D0345).
+**Headline: machines run on the substrate.** A drill bores ore, burns coal and pours the units down its
+column; a generator lights a power field in milli-units that conduits carry down and sideways but never
+up; a pump drains only while powered; a hopper tastes, filters and meters; a forge smelts — all on the
+metre cell, in legacy's order, on every third 60 Hz tick, with the item ledger balanced through every
+buffer. One number in yesterday's step was wrong and is corrected: the ore deposit default was written
+per 4 px cell at legacy's per-metre value, which would have made a metre sixteen times richer and a
+drill sixteen times slower; it is 16 a cell now, 256 a metre against legacy's 250 (D0349). Earlier
+today: the metre-cell planes (D0347, ADR 0009), items (D0348), the data leaves (D0346), water (D0344),
+the vacuous-green refusal (D0343), your step 1 ruling (D0345).
 
 ---
 
@@ -46,6 +49,12 @@ verbatim (D0344), the vacuous-green refusal (D0343), your step 1 ruling (D0345).
   Callable so items never imports machines), `Items` with the ledger, `BuildVerbs` (spend on place,
   recover on removal), the `DepositPlane` as `World`'s fourth plane, `check_item_conservation`. 79
   assertions. CI 72 → 73.
+- **Step 3d (D0349).** `sim/machines`: `Machines` (the registry — placement order is state; the derived
+  `power` field; `power_throttle` per-mille is the one cost rule), `PowerFlow` (legacy's pass, milli-int,
+  every constant a record field), `Runners` (recipe, generator, hopper, pump, drill), `MachineStatus`,
+  `MachineVerbs` (build; pickup salvages, removes, THEN spills — legacy's order fix); `sim/run/hub_tick.gd`
+  (`HubTick.step` in legacy's order, `advance` on every third body tick, D0345's cadence made).
+  `World.bore_one`/`logic_ore_body` for the drill at the metre; `Items.eject`. 112 assertions. CI 73 → 74.
 - **Plan and state docs** amended under the plan's own compaction contract: status lines per step,
   `BRANCHING.md`'s main-only rule over the plan's "branch per step", the probe is not zero-code,
   step 1 re-framed, the hub's 20 Hz cadence stated for step 3. `WORKING.md` says step 3 is next.
@@ -83,6 +92,18 @@ verbatim (D0344), the vacuous-green refusal (D0343), your step 1 ruling (D0345).
    suite pins each on a half-dug metre and the support rule on a half floor. I put the water plane in
    `sim/fluid` yesterday and moved it today: an owner in one module holding a plane in another, whose
    algorithm reads the first, is a cycle — planes live with planes, phases with phases.
+9. **The unit-regime rule has a mirror I had not stated.** §3.2 says per-cell RATES convert ×16 to the
+   4 px plane (the pump did, D0344). Per-cell STOCKS convert ÷16, or a metre holds sixteen times what
+   it did. D0348 carried `DEFAULT_ORE_DEPOSIT = 250` across unchanged; the drill's arithmetic exposed it
+   the moment a bore was timed against legacy's. Screen every lifted constant by asking "per what?".
+10. **Twelve of thirteen first-run failures in the machines suite were the fixture, not the runner.**
+    An unwalled pool leaked sideways out of the pump's reach (water flows in tests too); a coal counted
+    twice; gears are bulk; the generator burns then refuels so a lit coal reads 100; the hopper latches
+    before it looks for a consumer; and the typed-array cast inside a comparison, for the fourth time.
+    Legacy's runners came over and behaved; what had to be learned was legacy's ORDER inside a tick.
+11. **The materials and the items no longer share a name.** Legacy's `ore` block yielded `ore`; the
+    current world has `ore_iron`, and the recipes take `ore`/`iron`/`rich_ore`. The automated line cannot
+    close until a material says what it yields — filed under §8, it is the economy's call (step 7).
 
 ---
 
@@ -91,10 +112,11 @@ verbatim (D0344), the vacuous-green refusal (D0343), your step 1 ruling (D0345).
 **Step 1: ruled (D0345).** Water at the 4 px grid, §9 stands. Both executor calls approved (20 Hz hub
 cadence on every third tick; `BRANCHING.md` main-only). Nothing is waiting on you for steps 3 or 4.
 
-**Plan §8's other rulings:** unchanged — Splitter, Ore Vent, power gating, the Crusher chain,
-`press_plate`/`mill_gear`, `earth` 5.6 → 6 ticks, ramps vs `Heightfield`, the resolver (P-28); the 36
-untracked recordings (gate 27 red); the `history/` cull. **Standing:** P004, P015/P017, P026–P029,
-T001–T004. **Pushed** on your instruction; CI's verdict on the six commits is the next thing to read.
+**Plan §8's other rulings:** Splitter, Ore Vent, power gating, the Crusher chain, `press_plate`/
+`mill_gear`, `earth` 5.6 → 6 ticks, ramps vs `Heightfield`, the resolver (P-28), and new today: the
+material-id/item-id map (`ore_iron` yields `ore_iron`; recipes take `ore`); the 36 untracked
+recordings (gate 27 red); the `history/` cull. **Standing:** P004, P015/P017, P026–P029, T001–T004.
+**CI:** green on every push so far (3c's `e7435707`: all four jobs); 3d's verdict is the next to read.
 
 ---
 
@@ -112,8 +134,16 @@ not read.
 but the type system is not checking that path. Chosen to satisfy the duplication gate; a typed pair of
 one-line twins would have been clearer.
 
-**The hub cadence is stated, not made.** It lives in the plan and this brief until step 3's runner lands
-with its ledger entry.
+**`match` where legacy had `call(name)`.** The behaviour table no longer names its runners; a new
+behaviour is a `match` arm in two files (run and status) rather than one table row. Chosen because a
+static class has no instance to call by name and a `match` cannot name a method that does not exist;
+the cost is that the table now lists only flags, and the dispatch is read from the code.
+
+**`head_coverage` is the head alone.** The drill's Spur reach is a one-line stub until Spur is ruled;
+the lode-head path is exercised through it, so the ruling changes one function, not the runner.
+
+**The deposit correction moves a number a committed ledger entry stated.** D0348 is append-only and
+still says 250; D0349 corrects it with the reasoning. A reader of D0348 alone gets the wrong number.
 
 **`Ordering`'s baseline test asserts the engine's bug.** If a Godot update makes `StringName <` lexical,
 `test_ordering.gd` goes red on purpose so the header gets rewritten rather than the helper deleted. That
@@ -123,8 +153,8 @@ is D0115's pattern, and it means one green suite depends on an engine defect per
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks step 3d (machines + power: the registry, `power_flow` in milli-int, the runners, the
-hub tick at every third body tick) or step 4's water wiring.
+Nothing blocks step 3e (transport: `_flow`, the lift, the winch, `updraft_at`; the splitter waits on §8)
+or step 4's wiring of `HubTick.step` behind `Interface.apply`.
 
 ## Taste queue
 

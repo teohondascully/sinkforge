@@ -3,7 +3,7 @@ extends RefCounted
 
 ## THE ITEM SERVICE: the pack, the piles, the ledger, and every verb that moves an item between them and
 ## the world. Lifted in A' step 3c (D0348) from `legacy/src/core/factory_sim.gd`: `take_into_pack` 1860
-## (THE ONE DOOR into the pack for anything the cap counts), `_spill_to_world` 1879, `drop_item` 1599,
+## (THE ONE DOOR into the pack for anything the cap counts), `eject` (legacy `_spill_to_world` 1879), `drop_item` 1599,
 ## `collect_ground` 3176, `_resettle_pile_above` 3158, `take_lode` 1525, `deposit` 1574, and the
 ## conservation ledger `total_produced`/`total_consumed` (:255). The builder verbs that spend the pack on
 ## a placed thing are `BuildVerbs`, kept in their own file for the size cap.
@@ -63,16 +63,20 @@ func take_into_pack(item: StringName, n: int, spill_at: Vector2i) -> int:
 		pack.add(item, taken)
 	var rest: int = n - taken
 	if rest > 0:
-		_spill_to_world(spill_at, item, rest)
+		eject(spill_at, item, rest)
 	return taken
 
 
-## The overflow half of `take_into_pack`: `drop_item`'s tail with the pack half removed. The units land
-## exactly the way dropped items land, so a spilled unit is indistinguishable from a dropped one.
-func _spill_to_world(logic_cell: Vector2i, item: StringName, n: int) -> void:
+## Pour `n` units of `item` that are NOT in the pack down a column: the overflow half of `take_into_pack`
+## (`drop_item`'s tail with the pack half removed), and the drill's ejection of what it bores. The units
+## land exactly the way dropped items land, so a spilled or bored unit is indistinguishable from a
+## dropped one. `from_cell` colours the flow event only (the bored cell, so the visual pours from the
+## vein). Does not count production: the caller that freed the units does.
+func eject(logic_cell: Vector2i, item: StringName, n: int, from_cell: Vector2i = Vector2i(-1, -1)) -> void:
+	var origin: Vector2i = logic_cell if from_cell == Vector2i(-1, -1) else from_cell
 	var dest: Dictionary = Landing.column_landing(world, piles, machine_buffer, logic_cell.x, logic_cell.y)
 	dest["target"][item] = int(dest["target"].get(item, 0)) + n
-	flow_events.append({"item": item, "from": logic_cell, "to": dest["to_cell"], "count": n})
+	flow_events.append({"item": item, "from": origin, "to": dest["to_cell"], "count": n})
 	last_drop_landing = dest["to_cell"]
 
 

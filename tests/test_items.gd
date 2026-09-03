@@ -222,11 +222,11 @@ func _test_deposit_plane_reads_and_signature() -> void:
 	var d: DepositPlane = items.world.deposits
 	var g: TileGrid = items.world.grid
 	g.set_material(Vector2i(4, 4), &"ore_iron")
-	_check(d.ore_deposit_at(g, Vector2i(4, 4)) == DepositPlane.DEFAULT_ORE_DEPOSIT and d.deposit_material_at(g, Vector2i(4, 4)) == &"ore_iron", "a solid ore block with no seed reads the default 250, identified by its own material")
+	_check(d.ore_deposit_at(g, Vector2i(4, 4)) == DepositPlane.DEFAULT_ORE_DEPOSIT and d.deposit_material_at(g, Vector2i(4, 4)) == &"ore_iron", "a solid ore block with no seed reads the default (16 per 4 px cell, 256 a metre), identified by its own material")
 	d.set_deposit(Vector2i(4, 4), 7)
 	_check(d.ore_deposit_at(g, Vector2i(4, 4)) == 7, "a seeded ore block reads its seed")
 	g.set_material(Vector2i(5, 4), &"coal")
-	_check(WorldMaterials.is_ore_like(&"coal") and d.ore_deposit_at(g, Vector2i(5, 4)) == 250, "coal (kind fuel) is ore-like")
+	_check(WorldMaterials.is_ore_like(&"coal") and d.ore_deposit_at(g, Vector2i(5, 4)) == DepositPlane.DEFAULT_ORE_DEPOSIT, "coal (kind fuel) is ore-like")
 	g.set_material(Vector2i(6, 4), ROCK)
 	_check(not WorldMaterials.is_ore_like(ROCK) and d.ore_deposit_at(g, Vector2i(6, 4)) == 0 and d.deposit_material_at(g, Vector2i(6, 4)) == &"", "plain rock has no yield and no identity")
 	d.seed_lode(Vector2i(6, 4), &"ore_copper", 9)

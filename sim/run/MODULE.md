@@ -1,6 +1,11 @@
 # sim/run
 
-## Purpose — SHAPE OPEN, 2026-08-27
+## Purpose — SHAPE OPEN, 2026-08-27; the hub tick lives here since 2026-09-03
+
+**What is here now (D0349):** `hub_tick.gd`, `HubTick` — legacy `FactorySim.tick()`'s fixed order as a
+stateless phase runner over the three services (`World`, `Items`, `Machines`), at `HUB_TICK_DIVISOR = 3`
+on the 60 Hz body tick (D0345). It is the sim's second phase group, not a session state machine, and
+it forecloses nothing below.
 
 This module's purpose used to be a session lifecycle: `MetaIdle -> SiteSelect
 -> RunConfig -> RunActive -> RunEnding -> RunResolved`, owning a flood clock
@@ -56,7 +61,9 @@ does the tick loop simply always run? Unresolved, part of the same open question
 
 ## Public API
 
-None yet.
+- `HubTick` (`hub_tick.gd`) — `step(world, items, machines)`: power field, each machine in placement
+  order, water, prune empty piles (item flow, seep, flora, production sampling join it in step 3e or on
+  a ruling); `advance(body_tick, …) → fired`: `step` on every `HUB_TICK_DIVISOR`th body tick.
 
 ## Gotchas
 

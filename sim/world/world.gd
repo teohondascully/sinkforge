@@ -154,6 +154,40 @@ func set_solid(logic_cell: Vector2i, material: StringName) -> int:
 	return displaced
 
 
+## Is this metre a BORABLE ORE BODY: at least one rock cell, and every rock cell in it ore-like? A single
+## cell of stone or earth inside the metre caps a drill's column exactly as a stone metre did in legacy
+## (`_is_ore_like(solid[c])`): the bit only takes ore. Air cells inside it are what the bore left behind.
+func logic_ore_body(logic_cell: Vector2i) -> bool:
+	var rock: int = 0
+	for terrain_cell: Vector2i in terrain_cells_of(logic_cell):
+		if not grid.is_solid(terrain_cell):
+			continue
+		if not WorldMaterials.is_ore_like(grid.get_material(terrain_cell)):
+			return false
+		rock += 1
+	return rock > 0
+
+
+## BORE ONE UNIT out of the metre: the drill's bite. Drains one unit from the first solid ore cell in scan
+## order and EXCAVATES that cell when its yield is spent, so the shaft deepens cell by cell and a metre is
+## bored out after its sixteen cells' yields (legacy's 250 a metre, 16 a cell here, D0349). Returns the
+## material freed, or &"" when nothing in the metre is borable. Water displacement does not apply: an
+## excavation makes room, it takes none.
+func bore_one(logic_cell: Vector2i) -> StringName:
+	for terrain_cell: Vector2i in terrain_cells_of(logic_cell):
+		var left: int = deposits.ore_deposit_at(grid, terrain_cell)
+		if left <= 0 or not grid.is_solid(terrain_cell):
+			continue
+		var item: StringName = grid.get_material(terrain_cell)
+		if left > 1:
+			deposits.set_deposit(terrain_cell, left - 1)
+		else:
+			deposits.set_deposit(terrain_cell, 0)
+			grid.excavate(terrain_cell)
+		return item
+	return &""
+
+
 ## Set or clear the background wall across a whole metre (`&""` clears). Discrete edit like set_solid.
 func set_wall(logic_cell: Vector2i, material: StringName) -> void:
 	if not logic_in_bounds(logic_cell):

@@ -16,7 +16,12 @@ extends SignedPlane
 ## The hand verb `take_lode` (the pack, the ledger, the cap) is `Items.take_lode`; this plane's
 ## primitive is `take_one`, which decrements and retires a worked-out vein.
 
-const DEFAULT_ORE_DEPOSIT: int = 250  ## legacy :200 -- an ore block with no explicit seed reads this
+## An ore cell with no explicit seed reads this. Legacy's `DEFAULT_ORE_DEPOSIT` was 250 PER METRE CELL;
+## this plane is keyed on the 4 px cell, sixteen to the metre, and it is quantities per METRE the economy
+## is balanced on (2 ore to an ingot, a 3-6 burst per hand strike, a drill at one unit a cycle), so the
+## per-cell default is 250 / 16 rounded to 16: a metre of unseeded ore holds 256, 2.4% over legacy's 250,
+## and a drill bores a metre in the same number of cycles it did (D0349, correcting D0348's 250).
+const DEFAULT_ORE_DEPOSIT: int = 16
 
 var deposits: Dictionary = {}  # terrain_cell -> units left
 var lode: Dictionary = {}      # terrain_cell -> ore material behind the wall

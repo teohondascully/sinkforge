@@ -14771,3 +14771,58 @@ not move; it did not (`test_shaft_replay_determinism` green). The gate steering 
 working, the same shape as D0344's mixer move.
 
 **Reverse cost:** CHEAP until step 4 puts `Items` in the golden; seven files and one suite.
+
+## D0349 · 2026-09-03 · A′ step 3d: machines + power — the registry, the field in milli-units, five runners, the status reads, the verbs, and the hub tick on every third body tick
+
+**Decided:** (1) `sim/machines` gains `Machines` (the registry: `machines` in placement order — state,
+as legacy's array was — a cell index, and the derived `power` field; `place`/`remove`/`machine_at`/
+`first_machine_below`/`machine_eats`/`power_at`/`power_throttle`/`attach_to`/`state_signature`),
+`PowerFlow` (`legacy/src/core/power_flow.gd` verbatim in milli-units, plan §5.2's eight rows: the
+generator's `power_milli`/`aura` and the conduit's `capacity_milli`/`v_keep_pct`/`h_keep_pct`/
+`bleed_pct` read from their records), `Runners` (`_run_recipe`, `_run_generator`, `_run_hopper`,
+`_run_pump`, `_run_drill` with `drill_target`/`_drill_blocked`/`drill_lode_target`/`head_coverage`, and
+the behaviour registry's flags), `MachineStatus` (`machine_status` and the `_status_*` reads),
+`MachineVerbs` (`build_from_pack`, `pickup_machine` with legacy's salvage-remove-spill order fix,
+`configure_machine`); `sim/run/hub_tick.gd` `HubTick` is `FactorySim.tick()`'s order as a stateless
+runner, `advance(body_tick)` firing `step` on every third 60 Hz tick (`HUB_TICK_DIVISOR = 3`, the cadence
+D0345 approved). (2) **The deposit default is corrected, 250 → 16 per 4 px cell.** D0348 wrote legacy's
+`DEFAULT_ORE_DEPOSIT = 250` onto a plane keyed sixteen cells to the metre, which would have made a
+metre 16× richer and a drill 16× slower than legacy's; it is quantities per METRE the economy is
+balanced on (2 ore an ingot, 3–6 a strike, one unit a drill cycle), so a metre holds 256 (+2.4% on
+250) and a drill bores a metre in the cycles it did. Per-cell rates convert ×16 (the pump, D0344);
+per-cell STOCKS convert ÷16 — the unit-regime rule §3.2 stated for rates, applied to its mirror. (3) The
+drill at the metre: its target is the deepest metre in its column that is an ORE BODY (`World.
+logic_ore_body`: at least one rock cell, every rock cell ore-like — one stone cell caps the column,
+as a stone metre did); `World.bore_one` drains one unit from the first solid ore cell in scan order
+and excavates the cell when spent; the freed unit ejects down the column from the target metre; piles
+above resettle when the metre is air. A head on a lode drains the metre's lode cells one unit a cycle
+by the same `take_one` the hand uses. (4) The pump's `reach` is metres, its budget `rate × 16 ×
+throttle` rounded, and a SOLID metre caps its reach (a half-dug metre still drains). (5) Dispatch is a
+`match` on the tag, not legacy's `call(entry["run"])`: a static class has no instance to call by name,
+and a `match` cannot name a method that does not exist; the table keeps only the flags (`updraft`,
+`power_source`). (6) `head_coverage` is the head alone until Spur is ruled (§8). (7) `Machines` holds
+no `Items`: runners and verbs take it as a parameter and `attach_to` hands `Items` its two Callables
+one way, so no RefCounted cycle. (8) `power_permille` is in the signature (written each tick, read
+between ticks); `power` is not (derived). (9) `Items._spill_to_world` is public `eject`: the drill's
+ejection is the same landing as a spill. (10) Kept as legacy had it: the field is computed before the
+generator lights, so a lit coal powers from the NEXT tick; the generator burns then refuels (a coal
+just lit reads 100), the drill refuels then burns (59); the hopper latches on insertion order before
+it looks for a consumer. (11) `tests/test_machines.gd`, 112 assertions: legacy's power-field, conduit,
+pump, production, hopper, drill, coal-and-fuel, machine-status, behaviour-registry tests and the
+pickup order fix, at the metre cell. CI 73 → 74 suites.
+
+**Finding, for §8:** a solid `ore_iron` block yields the item `ore_iron`, and the recipes take `ore`,
+`iron`, `rich_ore`. Legacy's materials and items shared one name (`ore`); the current materials do not.
+The automated line runs end to end only once a material says what it yields (a `yields:` field on the
+material record, or recipes renamed) — the economy's call (step 7), listed under §8.
+
+**Not here:** `machine_census`/`machine_problems` (HUD reads, with step 6), `drill_preview`/
+`drill_column_remaining` (the placement preview, step 6), `_flow`/`_destinations`/`_deliver`/
+`_column_rise`/lift/winch/`updraft_at` (step 3e transport), splitter/crusher/spur (rulings),
+`_seep_step`/`Flora.grow` (rulings), `_sample_production`/`production_rate` (economy).
+
+**Alternative:** deposits re-keyed per metre (breaks the 4 px wall lode and `take_lode`); a Callable
+dispatch on a runner instance (legacy's; needs the instance and a name that can be stale); `Machines`
+holding `Items` (the cycle).
+
+**Reverse cost:** CHEAP; eight new files, one suite, three touched.
