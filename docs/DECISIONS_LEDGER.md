@@ -16323,3 +16323,56 @@ cave_passes 24, vertical_passes 39, shaft_replay_determinism ALL PASS 21 with th
 **Gaps:** at chance 1.0 a tooth's tip seeds the next tooth and a block's top the next block (legacy's
 passes read the world they write); the suite checks the rock at the roots, where it is decided, rather
 than by row. The real rates on the real world are 8h's to measure and the director's to judge.
+
+## D0385 · 2026-09-03 · A′ step 8e: the plane passes — aquifers flooded on the water plane with a vein off the rim, lodes grown on the deposit plane with per-cell amounts, through `ShaftGenerator.enrich` after the grid
+
+**Decided:** (1) `sim/terrain_gen/plane_passes.gd` (`PlanePasses`) is legacy's `_seed_aquifers`,
+`_seed_aquifer_treasure`, `_seed_lodes` and `_grow_lode` (`layered_world_gen.gd:775-905`). They write
+PLANES beside the terrain — `WaterPlane` and `DepositPlane` — so they cannot run inside
+`generate(site, seed) -> TileGrid`; they run on the `World` through a new `ShaftGenerator.enrich(world,
+site, seed)`, and `WorldSeeder.load_world`, the one door a new world comes through, calls both. A site
+without the `aquifer`/`lode` records leaves the world exactly as `generate` made it (asserted: the grid's
+signature is unchanged by an enrich with nothing to do). (2) An aquifer is an integer ellipse of solid rock
+excavated and set to `WATER_MAX` cell by cell, refusing the cave band under every column and its own
+`min_depth_m` floor (legacy's `AQUIFER_MIN_ROW`, an absolute row, becomes metres below the datum); its rim
+— host rock touching the water — seeds one vein through `grow_vein`, iron from `stonereach_end` down and
+copper above (legacy's `rich_ore` below the seal). Legacy's erasure of a flooded vein cell's amount has no
+counterpart: nothing carries an amount at generation. (3) A lode is an accretion blob through host rock
+on the deposit plane, each cell `seed_lode(cell, material, amount)`, refusing the column's `min_depth_m`,
+a cell that already holds a lode, and water. The material is the SEED's by depth (legacy's rule; a blob
+may straddle the boundary). Size and amount are integers in thousandths of depth: `depth_permille` is
+measured from the DATUM over the rock's height, where legacy divided the absolute row by the world's rows
+with its sky inside the fraction — a port adjustment, so this build's eighty rows of sky do not shift
+every lode toward "deep". (4) Per-cell amounts follow the start record's rule (D0353, "per-metre stocks
+become per-cell: 200 → 13"): legacy's `40 + 170·depth` a metre-cell over the sixteen cells of a metre
+square, at least one — so a lode holds 3 a cell at the surface and 13 at the floor. This is the first
+generated deposit amount in the build; the tutorial's own lodes carry 3 and 8 by the same rule. Ore
+BLOCK amounts (`pending_sim_economy`) are still not read: step 7. (5) `sim/terrain_gen/content_passes.gd`
+(`ContentPasses`) now holds the order and the splits of every gated pass — `vertical`, `studding` (moved
+out of the generator) and `planes` — so `shaft_generator.gd` stays under the cap (344 lines) and reads
+as the sequence it is. `grow_vein` returns the cells it placed. (6) `shallow_clay` carries no record yet:
+the golden and the boot are unchanged.
+
+**Why:** plan step 8's content half: aquifers and lodes. Legacy's own reason for running lodes dead last,
+kept in the file: "every lode guard tests the final world, while the seal overwrites blocks wholesale and
+the aquifers carve rock away and flood it".
+
+**Evidence:** `tests/test_plane_passes.gd` 31: `depth_permille` 0 at the datum, 1000 at the last row,
+498 at the integer halfway, 0 in the sky; at a raised rate 20 pockets flood 5824 cells, every wet cell open
+and at `WATER_MAX`, the plane's total 46592 = cells × 8, 2064 treasure cells with 217 wet cells touching
+ore, and a world of air floods nothing; in a world forty rows deeper than the band no flooded cell lies
+in the band or above the floor (0 of 1512) with 397 within two metres of the floor as the control; lodes
+seed 2660 cells, none above 14 m, every one behind solid host rock, copper well above the deep row and
+iron well below, every deposit 1..14, the lower half's mean deposit above the upper half's
+(19031/1887 over 4823/773), a fresh lode at 1000 per mille; with dense lodes over aquifers none of 11485
+lode cells is in water or air, and a lode grown over another's seed adds nothing; on a generated world the
+records put 11544 water and 2580 lode cells in it, every wet cell at or below the record's 30 m, and
+without the records no water, no lode and the grid untouched; `load_world` enriches, twice the same,
+the running signature equal to the recomputed one, another seed other planes. Neighbours: shaft_generator
+34, vertical_passes 39, studding_passes 33, main_boot 36, world_seeder 36, shaft_replay_determinism ALL
+PASS 21 with the golden matched.
+
+**Gaps:** three rows were reposed after failing honestly — the integer halfway, a control the random
+pockets did not pose (now every pocket poses it), and the lode metal judged by the cell's row when it is
+the seed's; none changed what the pass does. Water at generation is a sealed full pocket; what the tick's
+flow does to a pocket a dig opens is the water phase's, already ported (D0344).

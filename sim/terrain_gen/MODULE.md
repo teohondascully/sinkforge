@@ -40,7 +40,8 @@ per-tick phase order.
 
 ## Public API
 
-- `ShaftGenerator` (`shaft_generator.gd`) — `.generate(site: Dictionary, seed: int) -> TileGrid`. Reads a
+- `ShaftGenerator` (`shaft_generator.gd`) — `.generate(site: Dictionary, seed: int) -> TileGrid`, then
+  `.enrich(world, site, seed)` for the planes. Reads a
   `StrataData` site config and a seed, returns a fully generated `TileGrid`. Depth-bands the base rock
   into `docs/GDD.md` §11's three layers, carves caves, scatters ore/coal/iron veins, places one empty
   ruin chamber. Deterministic in `(site, seed)` only — no session state, per this module's Must-not.
@@ -56,6 +57,11 @@ per-tick phase order.
 - `StuddingPasses` (`studding_passes.gd`) — ledges, spires, rubble over a snapshot of the open set, and
   the drought pass that plants a vein or a vug wherever a column runs too long through plain rock
   (`studding` record; A' 8d, D0384).
+- `PlanePasses` (`plane_passes.gd`) — aquifers carved and flooded on the water plane with a vein off
+  the rim, lodes grown on the deposit plane with per-cell amounts (`aquifer`, `lode` records); run by
+  `ShaftGenerator.enrich(world, site, seed)` after `World.new` (A' 8e, D0385).
+- `ContentPasses` (`content_passes.gd`) — the order and the splits of the gated passes above; `generate`
+  calls its grid half, `enrich` its plane half.
 - `ValueNoise` (`value_noise.gd`) — engine-free 2D noise, `.sample(x, y, seed) -> float` in roughly
   [-1, 1]. Real `float` arithmetic, one of the four D0183 sites on the generation path that depart from
   `docs/ARCHITECTURE.md`'s fixed-point rule. Measured bit-identical across macOS-arm64 and CI's
@@ -73,15 +79,10 @@ per-tick phase order.
 - **No per-cell richness/deposit amount.** `data/strata/*.yaml`'s `amount_base`, `rich_chance`, etc. are
   schema-validated but unread by `ShaftGenerator` — a vein cell is just its material id. Richness
   accounting is `sim/economy`/`sim/items` territory, neither of which exists yet.
-- **`FastNoiseLite` and `RandomNumberGenerator` cannot be used here** — both are Godot engine classes,
-  forbidden in `sim/` (`docs/ARCHITECTURE.md` engine-free rule), and both are now caught by
-  `tools/layer_lint/no_engine_imports.py` (D0023, closed after this module needed to route around the
-  gap). Use `ValueNoise` for noise fields and `core/SplitRng` (via `.split("terrain_gen")`) for
-  randomness — see `docs/DECISIONS_LEDGER.md` D0005 for why the label match matters.
-  `SplitRng.next_float()`/`.next_range()` were added this stage specifically to support this.
-  `ShaftGenerator._carve_caves` samples `ValueNoise` off the raw world seed directly (like legacy's
-  `FastNoiseLite`), NOT off the `SplitRng` vein stream — the two are independent by construction, so
-  the order cave carving runs in relative to vein scattering doesn't affect either one's own sequence.
+- **`FastNoiseLite` and `RandomNumberGenerator` cannot be used here** — engine classes, forbidden in
+  `sim/` and caught by `tools/layer_lint/no_engine_imports.py` (D0023). Use `ValueNoise` and `SplitRng`
+  (`.split("terrain_gen")`, D0005). `_carve_caves` samples the noise off the raw world seed, not the vein
+  stream, so the two are independent by construction.
 - **A full-generation test can miss a floor a targeted unit test would catch** (D0024). `_grow_vein`'s
   `min_row` argument and its host-rock-only replacement rule both need a test built to force them, not
   a test that merely runs code that happens to contain them — an accretion blob is compact enough, and

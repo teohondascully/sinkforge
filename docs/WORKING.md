@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts, 8e aquifers and lodes done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -231,13 +231,17 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   thick from a wall with headroom, teeth tapering from a metre to a cell, rubble standing only over
   what holds it, and the drought pass that plants a vug or a vein wherever a column runs 18 m of plain
   rock. Gated on a site's `studding:` record. 33 assertions; the golden unchanged.
+- **Step 8e — done (D0385).** `sim/terrain_gen/plane_passes.gd` (`PlanePasses`): aquifers carved and
+  flooded on the water plane with a vein off the rim, lodes grown on the deposit plane with per-cell
+  amounts by the start record's rule; `ShaftGenerator.enrich(world, site, seed)` runs them after the
+  grid and `WorldSeeder.load_world` calls it. `ContentPasses` holds the order of every gated pass.
+  Gated on `aquifer:`/`lode:` records. 31 assertions; the golden unchanged.
 
 ### Next action
 
 **Step 8, the worldgen content** (plan §4 step 8, second half; D0381 set the shape): each pass
 config-gated on a site key, committed green with the world unchanged, then one switch-on commit for
-`shallow_clay` with one golden re-pin from CI Linux. Remaining: 8e aquifers and lodes
-on the water and deposit planes (`ShaftGenerator.enrich(world, site, seed)` after `World.new`), 8f the
+`shallow_clay` with one golden re-pin from CI Linux. Remaining: 8f the
 richness field, 8g trees (two material records), 8h the switch-on and re-pin. Step 7 (economy) is
 director-scoped and stops at the director. **Open rulings from
 step 5 (plan §8):** the resolver (the swing's collision stand-in), the ramp glide.

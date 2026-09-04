@@ -22,3 +22,9 @@ fields:
   # Legacy's studding (_stud_ledges, _stud_spires, _scatter_rubble) and drought (_seed_droughts) passes:
   # `ledge`, `spire`, `rubble`, `drought` sub-records in legacy's units. Absent studs none (A' 8d, D0384).
   studding: {required: false, type: dict}
+  # Legacy's aquifers (_seed_aquifers, _seed_aquifer_treasure): flooded pockets on the water plane with
+  # a vein off the rim; `min_depth_m` below the datum. Absent floods none (A' 8e, D0385).
+  aquifer: {required: false, type: dict}
+  # Legacy's lodes (_seed_lodes, _grow_lode): ore behind the wall on the deposit plane, per-cell amounts
+  # as legacy's per-metre stock over the cells of a metre square (D0353). Absent seeds none (A' 8e, D0385).
+  lode: {required: false, type: dict}

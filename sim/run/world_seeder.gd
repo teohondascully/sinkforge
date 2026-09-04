@@ -24,7 +24,9 @@ static var last_refusal: String = ""
 ## A fresh world from a site record and a seed. Legacy's `load_world`, minus the ingestion the generator
 ## no longer needs a middleman for.
 static func load_world(site: Dictionary, seed: int) -> World:
-	return World.new(ShaftGenerator.generate(site, seed))
+	var world: World = World.new(ShaftGenerator.generate(site, seed))
+	ShaftGenerator.enrich(world, site, seed)   # the planes: aquifers and lodes (A' step 8e, D0385)
+	return world
 
 
 ## Stamp the start record `start_id` onto a world. Refuses an unknown record, a record authored for a

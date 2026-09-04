@@ -535,8 +535,10 @@ one switch-on commit for `shallow_clay`, one re-pin.**
 DONE (D0382: `Relief`, the surface a row per column through every pass, `SIN_MILLI`; 44 assertions; the
 golden unchanged). 8c rifts, their wall ore, the sinkhole mouths — DONE (D0383: `VerticalPasses`, the
 width sine and the `pow` flare as tables; 39 assertions; the golden unchanged). 8d ledges, spires, rubble,
-droughts — DONE (D0384: `StuddingPasses`; 33 assertions; the golden unchanged). Next: 8e aquifers and
-lodes on the planes, 8f the richness field, 8g trees, 8h the switch-on for `shallow_clay` and the re-pin.
+droughts — DONE (D0384: `StuddingPasses`; 33 assertions; the golden unchanged). 8e aquifers and lodes on
+the planes — DONE (D0385: `PlanePasses`, `ShaftGenerator.enrich` called by `WorldSeeder.load_world`,
+`ContentPasses` holding the order; 31 assertions; the golden unchanged). Next: 8f the richness field, 8g
+trees, 8h the switch-on for `shallow_clay` and the re-pin.
 
 ---
 
