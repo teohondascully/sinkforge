@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items and 6f (i) the beds done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items and 6f the audio done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -150,8 +150,12 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   RNG, every buffer padded so the loop closes on whole cycles, 44 assertions), `beds.gd` (the driver;
   mix maps static, rates named, `ambience_db` injected, 23), `bed_levels.gd` (the eight levels off the
   observation; depth against `Observation.SKY_ROWS`, the generated datum; the haul stateful, 37). The
-  play scene's audio moved into `tests/body/reveal_audio.gd`. Pending under (ii): the one-shot voices
-  and the space bus. No ear verdict.
+  play scene's audio moved into `tests/body/reveal_audio.gd`. No ear verdict.
+- **Step 6f (ii) — done (D0367).** `voice_bank.gd` (eleven one-shots, 39), `voice_cues.gd` (every
+  one-shot as an edge over two observations, three scalars remembered rather than the object, 39),
+  `sfx_space.gd` (the room and occlusion off the observation, 20); `Sfx` gains grain banks, `ui()`,
+  `sound_db`, `step_voice` off the data's hardness; the fallback is legacy's `crunch` (D0313's `hollow`
+  stood in while no crunch existed). Not ported with reasons: ding/chime, boom, skid. No ear verdict.
 
 ### Next action
 

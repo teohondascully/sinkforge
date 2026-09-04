@@ -218,10 +218,11 @@ func _test_every_mapped_material_has_a_voice_the_bank_can_build() -> void:
 
 
 func _test_the_fallback_is_the_stone_voice_and_not_a_fifth_one() -> void:
-	_check(Sfx.strike_voice(&"hardrock") == &"hollow",
-		"hardrock falls back to `hollow` -- legacy calls the default 'the plain crunch, which is itself "
-		+ "the stone voice', so the material with no entry keeps the voice that already shipped")
-	_check(Sfx.strike_voice(&"no_such_material") == &"hollow",
+	_check(Sfx.strike_voice(&"hardrock") == &"crunch",
+		"hardrock falls back to `crunch` -- legacy calls the default 'the plain crunch, which is itself "
+		+ "the stone voice'; D0313 stood this on `hollow` while no crunch existed, and 6f (ii) (D0367) "
+		+ "restored legacy's own structure once VoiceBank carried it")
+	_check(Sfx.strike_voice(&"no_such_material") == &"crunch",
 		"...and so does a material that does not exist at all")
 	_check(Sfx.strike_voice(&"coal") == &"hit_coal",
 		"...while a MAPPED material does not (coal -> hit_coal), so the fallback is a fallback and not "

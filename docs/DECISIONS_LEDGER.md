@@ -15479,3 +15479,53 @@ Two engine-name clashes were caught at parse and renamed (`_set` on `Node`, `loa
 **Gaps:** no ear verdict on any bed. The thresholds are legacy's numbers carried under our unit regime,
 unlistened. The bed players are non-positional as legacy's were. The space bus and the one-shots wait
 for (ii).
+
+## D0367 · 2026-09-03 · A′ step 6f (ii): the one-shot voices, the cues as edges over two observations, the room off the observation, the fallback restored to legacy's crunch
+
+**Decided:** (1) `view/audio/voice_bank.gd` is legacy `scenes/sfx.gd`'s eleven one-shots (step, step on
+rock, step on wood, crunch, thump, clunk, pop, drip, ignite, vein, catch) verbatim in arithmetic on the
+split RNG, with legacy's `_norm` pinning the peak of the four normed voices. NOT ported, each for a
+stated reason in the file: `ding`/`chime` (craft, research and sonar have no verb), `boom` (dead by
+the plan), `skid` (the sim has no cannot-bite state). (2) `view/audio/voice_cues.gd` turns legacy's
+verb hooks scattered through `main.gd` into EDGES READ OFF TWO OBSERVATIONS, returning cues as data
+(`{voice, at, pitch, db, ui}`): every blow strikes with the struck material's voice at a pitch from
+the data's hardness; a break thumps and an ore break adds the vein; the plant strikes the rock it bit,
+the cut pops, the catch is the rising edge of the pivot count; a landing at 240 px/s or more thumps by
+impact; a stride is 22 body px on the floor over the ground's own voice; a machine appearing clunks, one
+leaving pops, the first ever to run ignites once, and the first frame PRIMES the set so a loaded base
+does not clunk twenty times (the machine painter's construction-flash rule, D0364); a pack gain pops at
+the hand (the payout's rule, D0365); the dark drips past a cave level of 0.3 on a 3–9 s clock. The
+layer remembers three SCALARS of the last frame, never the observation: holding the object would alias
+a reused one and an edge against yourself never fires — the suite found exactly that by mutating one
+observation in place. (3) `view/audio/sfx_space.gd` is legacy's room measured off the observation's
+window: twelve rays in logic cells, closed and mean free path, the reverb bus made once and released by
+its owner, and occlusion as the fraction of rock on the line from the source to the ear, taken off the
+voice on top of distance falloff at `OCCLUSION_DB_MAX = 10` — legacy's own placeholder, unlistened.
+(4) `Sfx` grows into the pool legacy described: grain banks for the often-fired voices (four takes,
+never twice running, drawn by the split RNG), the dry `ui()` player, `sound_db` injected, `step_voice`
+reading the footstep split off the data's hardness (wood by id, rock at 1.5 and above, soil below)
+rather than legacy's id table. (5) THE FALLBACK IS `crunch`. D0313 stood it on `hollow` because no
+crunch existed; with the plain fracture in the library the port is legacy's own structure, the ring
+layered above the threshold by `voice_for_frame` (which now names `hollow`, the ring, and nothing
+else) and the material strike on every blow from the cues. `tests/test_sfx_driver.gd`'s two fallback
+rows moved with it and say why. (6) The rig (`RevealAudio.note_frame`) probes the room, plays the ring,
+drives the beds and plays every cue through the room.
+
+**Why:** the plan's row: the sfx port is ~1,030 of legacy's 1,125 lines, and everything left after (i)
+had a verb here to fire it. Legacy's blow was always the pick's thud with the ring layered over it —
+"the pick sounds the same, the wall does not" — and this build had only the ring.
+
+**Evidence:** `tests/test_voice_bank.gd` 39 (lengths, pinned peaks 0.88/0.80/0.84/0.92, grains differ
+and share the peak, the vein's two tones 3× over 700 Hz, the pop's zero crossings denser in its second
+half, the drip's energy jumping at 0.14 s, the catch longer and duller at 3 kHz than the crunch),
+`tests/test_voice_cues.gd` 39 (every rule posed; one row rewritten: hardrock's hardness is 3.0 in the
+data, not the 5.0 the draft assumed — deepstone is the material that pins the pitch floor),
+`tests/test_sfx_space.gd` 20 (open air dry; a crawlway closed with a tiny room, a hall closed with a
+far larger one, walls past the reach open; a thin wall a small fraction and a thick one more; the
+smoothing's first step partial and sixty probes closing in; the bus once, released by its owner),
+`tests/test_sfx_driver.gd` 48 with the fallback rows updated, `test_sfx_bank` 34 unchanged. Three
+engine-name clashes were caught at parse this step (`_set` twice, `load` once) and renamed.
+
+**Gaps:** no ear verdict on any voice, and none of the pitch and level numbers has been listened to under
+our unit regime. Legacy's blow pitch carried a cadence term this build has no reading for. Occlusion's
+curve is a listening call. The cue layer fires a pop for ANY pack rise, as the payout does.

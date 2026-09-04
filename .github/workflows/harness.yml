@@ -392,6 +392,9 @@ jobs:
       #   test_bed_bank.gd                               test_bed_bank (the ten looping beds: exact closed length, the seam blends tail into head and no bed steps at the wrap, the tonal beds carry their partials and the broadband ones do not, the rush is brighter than the wind, one seed one bed -- A' step 6f, D0366)
       #   test_beds.gd                                   test_beds (the bed driver's static mix maps: silent at 0, the ceilings at 1, monotone, the hum's threshold layers, the winch snaps and the rope drags; the node builds ten players and the injected slider reaches volume_db -- A' step 6f, D0366)
       #   test_bed_levels.gd                             test_bed_levels (eight levels off a posed observation: working machines within reach, depth against the generated datum, the rush from a run, a pour over an open unfull cell, working pumps, the haul as a length delta per tick, the load on a taut line -- A' step 6f, D0366)
+      #   test_voice_bank.gd                             test_voice_bank (the eleven one-shots: stated lengths, pinned peaks on the normed voices, grains differ and share the peak, the vein's beat, the pop sweeps up, the drip's echo, the catch duller and longer than the crunch -- A' step 6f (ii), D0367)
+      #   test_voice_cues.gd                             test_voice_cues (every one-shot as an edge over two posed observations: the blow's material voice and hardness pitch, break and vein, the line's three edges, landing vs step-off, the stride over the ground, machines clunk/pop/ignite once with a primed first frame, a pack gain pops, the drip gate -- A' step 6f (ii), D0367)
+      #   test_sfx_space.gd                              test_sfx_space (the room off the observation: open air dry, a crawlway vs a hall, occlusion counts the rock between, the reverb map and the smoothing, the bus made once and released by its owner -- A' step 6f (ii), D0367)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -458,7 +461,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 94 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 97 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -494,6 +497,9 @@ jobs:
             res://tests/test_bed_bank.gd \
             res://tests/test_beds.gd \
             res://tests/test_bed_levels.gd \
+            res://tests/test_voice_bank.gd \
+            res://tests/test_voice_cues.gd \
+            res://tests/test_sfx_space.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \
