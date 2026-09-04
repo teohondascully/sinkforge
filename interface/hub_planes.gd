@@ -26,9 +26,12 @@ static func fill(o: RefCounted, world: World, items: Items, machines: Machines) 
 static func _fill_terrain_planes(o: RefCounted, world: World, w: Rect2i) -> void:
 	o.water = PackedByteArray()
 	o.water.resize(w.size.x * w.size.y)
+	var wet: Array[Vector2i] = []   # typed local, then assigned: an untyped `[]` cannot land on a typed field
 	for terrain_cell: Vector2i in world.water.wet_terrain_cells():
 		if w.has_point(terrain_cell):
 			o.water[(terrain_cell.y - w.position.y) * w.size.x + (terrain_cell.x - w.position.x)] = world.water.water_at(terrain_cell)
+			wet.append(terrain_cell)
+	o.wet_cells = wet
 	o.lodes = {}
 	for terrain_cell: Vector2i in world.deposits.lode_terrain_cells():
 		if w.has_point(terrain_cell):

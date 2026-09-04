@@ -206,8 +206,14 @@ func _offset_of(c: Vector2i) -> int:
 ## The metre cells `window` covers, in `logic_cell` units.
 var logic_window: Rect2i
 var hub_tick: int = 0
-## Row-major over `window`, one byte per terrain cell: water units, 0..WATER_MAX.
+## Row-major over `window`, one byte per terrain cell: water units, 0..WATER_MAX. The two constants a
+## painter needs are restated HERE, because the view may not reach into `sim/` for them (layer lint).
+const WATER_MAX: int = WaterPlane.WATER_MAX
+const CELL_PX: int = Heightfield.TERRAIN_CELL_PX
 var water: PackedByteArray
+## The wet terrain cells inside `window`, in `Ordering.cells` order: the sparse walk a per-frame painter
+## takes instead of the whole window (A' step 6a, D0362).
+var wet_cells: Array[Vector2i] = []
 ## terrain_cell -> {"material": StringName, "amount": int, "permille": int}, for lodes in the window.
 var lodes: Dictionary = {}
 ## terrain_cell -> remaining yield, for SOLID ore cells in the window with an explicit yield; a solid

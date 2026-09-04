@@ -213,6 +213,8 @@ func _step_mining_feedback(delta: float) -> void:
 	var frame: Frame = _sky_view.current_frame() if _sky_view != null else null
 	DebugSceneCommon.step_mining_feedback(_particles, _mining,
 		frame.obs if frame != null else null, _look, CELL, delta)
+	if frame != null and _sky_view != null:
+		WaterDrips.spawn(frame.obs, _particles, _sky_view.view_world_rect(), delta)   # 6a, D0362
 	if _sfx != null:
 		_sfx.note_frame(frame)
 

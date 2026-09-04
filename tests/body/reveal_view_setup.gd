@@ -41,6 +41,7 @@ const TERRAIN_Z: int = -50
 ## POST-veil for a measured reason its own header records: drawn UNDER the veil, "every flare was scaled
 ## by `_dark`, the LightLayer with BLEND_MODE_MUL that makes rock dark", so the flare's own darkness
 ## compensation and the veil's attenuation were the same number and cancelled exactly.
+const WATER_Z: int = -48  ## over the terrain, under the veil: deep water reads dark, daylit bright (6a, D0362)
 const VEIL_Z: int = -45
 const GLINT_Z: int = -40
 ## THE GRAIN SITS ABOVE THE VEIL, for the same reason the glint does and one more (D0308). It is an AIM
@@ -77,6 +78,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_baked_painter(WallPainter.paint)
 	view.add_baked_painter(TerrainPainter.paint)
 	view.bake_static(WALL_Z)
+	view.add_painter(WaterPainter.paint).z_index = WATER_Z
 	_mount_veil(view)
 	# STATEFUL for its sparse cache (D0337): the per-frame scan of every visible cell was 11.83 ms.
 	view.add_stateful_painter(GlintPainter.new(), &"paint_frame").z_index = GLINT_Z

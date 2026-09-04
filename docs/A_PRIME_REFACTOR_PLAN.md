@@ -456,6 +456,10 @@ contract — placed ropes, the bowed cord, the hook, the aim ghost from the door
 `carry_look.gd`; 20 assertions). **STEP 5 COMPLETE.** Next: step 6 (the views the systems unblock and
 the boot main scene in `shell/`); open rulings from step 5 in §8 (the resolver, the ramp glide).
 
+**Status (2026-09-03), step 6:** 6a — DONE (D0362: `view/visuals/water_painter.gd` with the layout split
+from the paint, `view/fx/water_drips.gd`, `Observation.wet_cells`; 33 assertions; the capture pair
+waits on a start record with water in frame). Next: 6b, the look registries (machine, item, status).
+
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 
 Files: `sim/world/tile_grid.gd` (planes per the ruling; each plane enters `state_signature()` and

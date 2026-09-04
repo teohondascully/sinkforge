@@ -15282,3 +15282,39 @@ the hook, the exact defect legacy's `check_aim` existed to catch); a `Grapple.St
 view (the layer lint forbids it, and rightly).
 
 **Reverse cost:** CHEAP; two view files, one suite, three observation fields.
+
+## D0362 · 2026-09-03 · A′ step 6a: the water painter on the `Frame` contract, the drips in the fx layer, the wet cells on the observation
+
+**Decided:** (1) `view/visuals/water_painter.gd` is legacy `scenes/water_view.gd`'s `_draw_water`,
+`_water_surface_y` and `_water_depth` lifted onto `Frame`, with the layout split from the paint:
+`cell_shape(o, c, t)` returns one cell's five-point fill, its meniscus and its bright line, and the
+paint pass only draws them. The geometry is legacy's — the fill anchored at the cell floor, a three-point
+top edge whose sides average with a water neighbour so a level step tapers and whose midpoint is the
+cell's own height, an interior cell drawn to its top because the water above rests on it, only the top
+cell owning a waterline that ripples, both bands hung off the same three points as the fill. (2) UNITS:
+every length in the file is a WORLD texture (a ripple wavelength, a caustic band, the depth the gradient
+runs out over), so each converts at ×0.5 in pixels and the depth's 7 legacy cells are 28 terrain cells;
+legacy's documented ripple fold (a 46 px crest sampled every 16 px) is gone at a 2 px sample, and the
+header says so rather than carrying the fold's apology. (3) THE OBSERVATION LISTS ITS WET CELLS.
+`wet_cells: Array[Vector2i]`, window-bounded and in cell order, filled in the same walk that fills the
+byte plane: a per-frame painter takes the sparse walk, not the whole window. (4) THE DRIPS ARE NOT THE
+PAINTER'S. Legacy spawned them inside the draw; here they write the particle layer, which is state a
+static painter must not own, so `view/fx/water_drips.gd` spawns them from the observation and the play
+scene calls it beside the mining feedback. Its layout decisions are public and tested: pouring is the
+sim's own fall rule, the per-cell phase is stable, the splash lands on the first blocker down the column
+(reach 32 cells: legacy's 8 of 32 px). (5) NOT PORTED: the fill tells (packed aggregate, the weeping wall),
+because `fill` has no subject in this build (3b deferred it with reasons); a future fill system brings
+its own tells. (6) `tests/test_water_painter.gd`, 33 assertions, structural, and a real redraw over a
+forty-cell pool through `WorldView`. (7) THE ACCEPTANCE GAP, stated: the plan asks for a capture pair per
+painter, and a capture needs water in the frame; the tutorial start stamps none and the seeder has no
+water verb, so the pair waits on a start record with a pool (a data decision, the director's). The
+suite pins the geometry; the look is unverdicted. CI 86 → 87. (8) The layer lint caught the first cut
+reading the cell size and the water cap off `Heightfield` and `WaterPlane` from `view/`; both are
+restated as constants on the observation (`Observation.CELL_PX`, `WATER_MAX`), which is the door's job —
+the view sees the sim's numbers only through it.
+
+**Alternative:** the painter walking the whole window byte plane per frame (twenty thousand reads a
+frame for a puddle); the drips as a stateful painter owning its own particle layer (a second layer to
+draw and seed).
+
+**Reverse cost:** CHEAP; two view files, one field, one suite.
