@@ -24,9 +24,8 @@ extends RefCounted
 static func step(water: WaterPlane, grid: TileGrid) -> void:
 	if water.is_empty():
 		return
-	# --- 1. Gravity: a snapshot of the current levels, then every wet cell tries to fall. ---
-	var snap: Dictionary = water.levels.duplicate()
-	var wet: Array[Vector2i] = Ordering.cells_native(snap)
+	# --- 1. Gravity: every wet cell tries to fall, processed top-to-bottom. ---
+	var wet: Array[Vector2i] = Ordering.cells_native(water.levels)
 	for c: Vector2i in wet:
 		var level: int = water.water_at(c)                        # read live (a higher cell may have topped it up)
 		if level <= 0:
@@ -42,7 +41,7 @@ static func step(water: WaterPlane, grid: TileGrid) -> void:
 		water.set_level(c, level - moved)                         # a remainder of 0 erases the cell
 	# --- 2. Lateral settle: even-fill each maximal horizontal open run holding water. ---
 	# A snapshot of levels after gravity, then process runs left-to-right, top-to-bottom, each once.
-	snap = water.levels.duplicate()
+	var snap: Dictionary = water.levels.duplicate()
 	wet = Ordering.cells_native(snap)
 	var done: Dictionary = {}                                 # cells already levelled as part of a run
 	for c: Vector2i in wet:

@@ -19,15 +19,8 @@ extends RefCounted
 ##     up-facing surface), negative where it is below (an overhang), and already smooth because the field
 ##     was blurred. Light in a mine comes down, so up-facing mass gains and down-facing mass loses.
 ##
-## **THIS IS WHERE DARKNESS LIVES.** `view/visuals/wall_painter.gd` records legacy's own regression on
-## exactly this point: the wall was darkened in its own paint AND again by the veil, so a lit chamber came
-## out as a black rectangle. The wall paints what the wall IS; this decides how lit it is. Neither file
-## may take the other's job, and both say so.
-##
-## THE WINDOW QUESTION, WHICH WAS A MEASUREMENT AND NOT A DECISION. `docs/LEGACY_GAP.md` listed T1 #2 as
-## blocked on a "window-vs-world scope decision" — legacy bakes over the whole world and `view/` holds
-## only a window. The blur has a bounded reach, so the question has a number: see `REACH_CELLS` and
-## `MARGIN_CELLS` below, and `WorldView.WINDOW_MARGIN_CELLS`, which now covers it.
+## **THIS IS WHERE DARKNESS LIVES.** The wall paints what the wall IS; this decides how lit it is.
+## The blur has a bounded reach (`REACH_CELLS`); `WorldView.WINDOW_MARGIN_CELLS` covers it.
 
 ## Legacy's four constants. Three are dimensionless and come over untouched; only the reach is a length.
 const MASS_SHADE: float = 0.55       ## light a fully-buried cell loses against one at an opening
@@ -325,9 +318,17 @@ func paint_frame(frame: Frame, ci: CanvasItem) -> void:
 	var drawn: Rect2i = TerrainPainter.visit_rect(obs, frame.view_world_rect, obs.cell_px).intersection(baked)
 	if drawn.size.x <= 0 or drawn.size.y <= 0:
 		return
+	var cpt: int = VeilMap.CELLS_PER_TEXEL
+	var base_ref: PackedFloat32Array = _cache.base_for(obs, baked, drawn, field, cpt)
 	var cuts: Array[Dictionary] = VeilSources.cuts_for(frame, drawn, _ore, _falling)
+	var base_w: int = int(ceil(float(drawn.size.x) / float(cpt)))
 	var tex: ImageTexture = _map.build(drawn, func(col: int, row: int) -> Color:
-		return light_rgb_at(obs, baked, field, col, row, cuts))
+		var bi: int = (col - drawn.position.x) / cpt
+		var bj: int = (row - drawn.position.y) / cpt
+		var idx: int = bj * base_w + bi
+		var s: float = base_ref[idx] if idx >= 0 and idx < base_ref.size() else 1.0
+		s = s + (1.0 - s) * lamp_lift(obs, Vector2i(col, row))
+		return VeilSources.compose(s, cuts, Vector2i(col, row)))
 	if tex == null:
 		return
 	ci.draw_texture_rect(tex, _map.world_rect(obs.cell_px), false)
