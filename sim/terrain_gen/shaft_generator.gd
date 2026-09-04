@@ -101,19 +101,28 @@ static func generate(site: Dictionary, seed: int) -> TileGrid:
 	_scatter_vein_material(grid, rng, site["ore"], &"ore_copper", surface, hfield)
 	_scatter_vein_material(grid, rng, site["coal"], &"coal", surface, hfield)
 	_scatter_iron(grid, rng, site["iron"], stonereach_end, SKY_ROWS)
-	# The vertical passes run after the ore, and the order is load-bearing both ways (legacy): a rift
-	# cut through finished rock slices veins, so its walls show ore. Config-gated (A' step 8c, D0383).
-	if site.has("vertical"):
-		ContentPasses.vertical(grid, rng, site, surface, stonereach_end)
-	# Then rock put back so that open space has form, and the drought pass over what is left (8d, D0384).
-	if site.has("studding"):
-		ContentPasses.studding(grid, rng, site, surface, stonereach_end)
+	# Legacy's content after the ore, in its order (A' step 8, D0383-D0387): each pass gated on its record.
+	_content(grid, rng, site, surface, stonereach_end)
 	_place_ruins(grid, rng, site["ruin"], SKY_ROWS)
 	# Optional (docs/GDD.md §12, claims/C004) -- absent from the real `shallow_clay` site on purpose, so
 	# this stays a test-only addition, not a commitment the real economy has to honor yet.
 	if site.has("reveal"):
 		_scatter_reveal_material(grid, rng, site["reveal"], topsoil_end, surface)
 	return grid
+
+
+## The gated grid passes, in legacy's order. The vertical passes run after the ore because the order is
+## load-bearing both ways: a rift cut through finished rock slices veins, so its walls show ore (8c). Then
+## rock put back so that open space has form, and the drought pass over what is left (8d). Then the trees
+## on the shaped ground, clear of the start's pad (8g). A site without a record skips its pass.
+static func _content(grid: TileGrid, rng: SplitRng, site: Dictionary, surface: PackedInt32Array,
+		deep_row: int) -> void:
+	if site.has("vertical"):
+		ContentPasses.vertical(grid, rng, site, surface, deep_row)
+	if site.has("studding"):
+		ContentPasses.studding(grid, rng, site, surface, deep_row)
+	if site.has("tree"):
+		ContentPasses.trees(grid, rng, site, surface)
 
 
 ## The spawn column in cells: the site's `spawn_col_m`, or the middle of the width without one.

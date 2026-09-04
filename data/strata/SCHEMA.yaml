@@ -31,3 +31,6 @@ fields:
   # Legacy's per-column richness field (_horizontal_field): `strength`, `freq_per_m`, `frontier_bias`.
   # Pulls the ore and coal scatters and the lodes' amounts. Absent reads one everywhere (A' 8f, D0386).
   richness: {required: false, type: dict}
+  # Legacy's surface trees (_plant_trees): trunks of `wood` and a canopy of `leaves`, none on the start's
+  # pad (`keepout_m` about spawn_col_m). Absent plants none (A' 8g, D0387).
+  tree: {required: false, type: dict}

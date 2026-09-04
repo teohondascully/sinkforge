@@ -1,0 +1,15 @@
+# The canopy of a surface tree (A' step 8g, D0387). Hardness on this build's scale, where `clay` is 1.0:
+# legacy `mining_rules.gd` HARDNESS leaves 0.10 s against earth's 0.28 -> 0.35.
+id: leaves
+layer: topsoil_shale
+kind: plant
+hardness: 0.35
+display_name: Leaves
+
+# --- appearance -----------------------------------------------------------------------------------
+# Lifted from `legacy/src/data/materials/leaves.tres`: colour verbatim, grain on, no cap, no nugget, no
+# depth darkening.
+base_color: [0.18, 0.40, 0.23]
+grain: true
+depth_darken: 0.0
+glitters: false

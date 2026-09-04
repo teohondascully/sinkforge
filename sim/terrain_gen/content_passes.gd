@@ -49,3 +49,12 @@ static func planes(world: World, rng: SplitRng, site: Dictionary, surface: Packe
 		PlanePasses.seed_aquifers(world, rng.split("aquifers"), site["aquifer"], surface, band, min_row, deep_row, cpm)
 	if site.has("lode"):
 		PlanePasses.seed_lodes(world, rng.split("lodes"), site["lode"], surface, ShaftGenerator.SKY_ROWS, deep_row, cpm, hfield)
+
+
+## Surface trees on the `trees` split, kept off the start's pad by the record's own keepout about the spawn
+## column (legacy started planting past its flat ground and its ruin).
+static func trees(grid: TileGrid, rng: SplitRng, site: Dictionary, surface: PackedInt32Array) -> void:
+	var cpm: int = ShaftGenerator.TERRAIN_CELLS_PER_METER
+	var spawn: int = ShaftGenerator.spawn_col(site, grid.width)
+	var keep: int = int(site["tree"]["keepout_m"]) * cpm
+	TreePass.plant(grid, rng.split("trees"), site["tree"], surface, Vector2i(spawn - keep, spawn + keep), cpm)

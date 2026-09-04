@@ -64,6 +64,8 @@ per-tick phase order.
   calls its grid half, `enrich` its plane half.
 - `Richness` (`richness.gd`) — the per-column field in thousandths (`richness` record; one everywhere
   without it): the ore and coal scatters' acceptance and size, the lodes' amount (A' 8f, D0386).
+- `TreePass` (`tree_pass.gd`) — surface trees of `wood` and `leaves` on solid ground off the pad (`tree`
+  record; A' 8g, D0387).
 - `ValueNoise` (`value_noise.gd`) — engine-free 2D noise, `.sample(x, y, seed) -> float` in roughly
   [-1, 1]. Real `float` arithmetic, one of the four D0183 sites on the generation path that depart from
   `docs/ARCHITECTURE.md`'s fixed-point rule. Measured bit-identical across macOS-arm64 and CI's
@@ -76,7 +78,7 @@ per-tick phase order.
 
 - **Port scope grew in A' step 8 (D0381-D0384).** D0017 carried strata banding, cave carving and the
   ore/coal/iron scatters; D0291 the caverns and tunnels; step 8 the rest of legacy's content as
-  config-gated passes (`relief`, `vertical`, `studding`, `aquifer`, `lode`, `richness` records). Still not
+  config-gated passes (`relief`, `vertical`, `studding`, `aquifer`, `lode`, `richness`, `tree` records). Not
   carried: the L1/L2 seal, the bazaar ruin, `routes`; ore BLOCK amounts (`pending_sim_economy`) are step 7's.
 - **`FastNoiseLite` and `RandomNumberGenerator` cannot be used here** — engine classes, forbidden in
   `sim/` and caught by `tools/layer_lint/no_engine_imports.py` (D0023). Use `ValueNoise` and `SplitRng`
@@ -86,7 +88,6 @@ per-tick phase order.
   `min_row` argument and its host-rock-only replacement rule both need a test built to force them, not
   a test that merely runs code that happens to contain them — an accretion blob is compact enough, and
   the relevant cells sparse enough, that a real generation run may never actually probe either guard.
-- **Ruin placement is deliberately minimal** (D0018): one carved-empty chamber, nothing inside it.
 - **Reveal-layer placeholder scatter** (`docs/GDD.md` §12, `claims/C004`, `docs/DECISIONS_LEDGER.md`
   D0110/D0111): an optional `site["reveal"]` config, read only if present (`shallow_clay`, the real
   site, deliberately does not carry one). Reuses `_grow_vein` (the same already-legacy-ported accretion

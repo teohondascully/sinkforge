@@ -16409,3 +16409,40 @@ matched.
 
 **Gaps:** the band's lattice is coarser than simplex (one value per 22 m, smoothstepped), which is the
 shape legacy's frequency implies but not its texture; a taste call for the switch-on's eye pass.
+
+## D0387 · 2026-09-03 · A′ step 8g: surface trees — trunks of `wood` and a canopy of `leaves` on the shaped ground, off the pad; the two materials with legacy's colours and hardness on this build's scale
+
+**Decided:** (1) `sim/terrain_gen/tree_pass.gd` (`TreePass`) is legacy's `_plant_trees`
+(`layered_world_gen.gd:920-955`): walking the columns, a tree at most every `gap_m`, at `chance` a metre
+of ground (the per-cell chance divides by the cells a metre), on a column whose surface cell is solid (a
+cave mouth or a rift plants none), with sky enough for trunk and canopy, and with nothing already in the
+trunk's space; a trunk two to three metres tall, a canopy over it. Legacy's trunk was one metre-cell wide
+and its canopy six cells in a T; here the trunk is `trunk_w_m` (0.5 m, two cells) wide and the canopy an
+integer ellipse `canopy_w_m` by `canopy_h_m` (3 by 2.5 m), so a tree reads as one at the four-pixel cell.
+A tree is blocks with no wall behind them, as legacy's were: dug, it leaves sky. (2) `wood` and `leaves`
+are material records (`data/materials/`, codegen regenerated): colours verbatim from legacy's
+`wood.tres`/`leaves.tres`, `kind: plant`, hardness on this build's scale where `clay` (legacy's `earth`,
+0.28 s) is 1.0 — legacy `mining_rules.gd` HARDNESS wood 0.50 s → 1.8, leaves 0.10 s → 0.35. Neither is
+ore-like, neither is soil. `ItemLook.PURPOSE` gains a line for `leaves` (`wood` had one); the palette
+suite's emitted list names both. (3) The generator runs the pass when the site has a `tree` record, after
+the studding, on the `trees` split, kept off the start's pad by the record's `keepout_m` about the spawn
+column — legacy planted past its flat ground and its ruin. (4) `shallow_clay` carries no record yet: the
+golden is unchanged.
+
+**Why:** plan step 8's content half, "trees" — the surface's only living thing, and the wood the ropes
+and torches are made of comes from somewhere.
+
+**Evidence:** `tests/test_tree_pass.gd` 21: both materials exist with legacy's colours, neither ore-like,
+leaves cutting faster than clay and wood slower (0.35, 1.00, 1.80); on flat ground 7 trees rooted with
+trunks of two or three metres, leaves on every top, every trunk two cells wide, 617 leaf cells and none
+below ground; at every column asking, no two trunks within 3 m (10 trunks), no wood on the pad and a
+trunk within 3 m of its edge; with every column due, the mouth at column 48 is skipped and the tree lands
+on 49, and six rows of sky plant nothing; no cell at or below the surface changes and no tree has a wall
+behind it; a generated world with the record carries 120 wood and 660 tree cells in the sky band and the
+plain one none; same seed same trees, another seed others. Neighbours: material_palette 21, looks 27,
+shaft_generator 34, shaft_replay_determinism ALL PASS 21 with the golden matched.
+
+**Gaps:** the mouth fixture first asserted a trunk at a column that was never due — the rate is per metre
+of ground, so `chance` 1.0 is a quarter per column; the fixture now sets 4.0, which is every column. A
+bored tree yields the material id as its item (D0349's open ruling applies to `wood` and `leaves` as to
+every material). Saplings (`soil`) still grow nothing.

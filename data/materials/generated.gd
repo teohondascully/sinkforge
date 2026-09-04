@@ -105,6 +105,21 @@ const RECORDS: Dictionary = {
 		"depth_darken": 0.3,
 		"glitters": true,
 	},
+	"leaves": {
+		"id": "leaves",
+		"layer": "topsoil_shale",
+		"kind": "plant",
+		"hardness": 0.35,
+		"display_name": "Leaves",
+		"base_color": [
+			0.18,
+			0.4,
+			0.23,
+		],
+		"grain": true,
+		"depth_darken": 0.0,
+		"glitters": false,
+	},
 	"ore_copper": {
 		"id": "ore_copper",
 		"layer": "topsoil_shale",
@@ -148,5 +163,20 @@ const RECORDS: Dictionary = {
 			0.95,
 		],
 		"nugget_count": 6,
+	},
+	"wood": {
+		"id": "wood",
+		"layer": "topsoil_shale",
+		"kind": "plant",
+		"hardness": 1.8,
+		"display_name": "Wood",
+		"base_color": [
+			0.42,
+			0.28,
+			0.16,
+		],
+		"grain": true,
+		"depth_darken": 0.0,
+		"glitters": false,
 	},
 }

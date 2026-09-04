@@ -539,7 +539,8 @@ droughts — DONE (D0384: `StuddingPasses`; 33 assertions; the golden unchanged)
 the planes — DONE (D0385: `PlanePasses`, `ShaftGenerator.enrich` called by `WorldSeeder.load_world`,
 `ContentPasses` holding the order; 31 assertions; the golden unchanged). 8f the richness field — DONE
 (D0386: `Richness`, an integer band pulling the scatters and the lodes; 17 assertions; the golden
-unchanged). Next: 8g trees, 8h the switch-on for `shallow_clay` and the re-pin.
+unchanged). 8g trees — DONE (D0387: `TreePass`, `wood` and `leaves` records; 21 assertions; the golden
+unchanged). Next: 8h the switch-on for `shallow_clay` and the re-pin.
 
 ---
 

@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts, 8e aquifers and lodes, 8f the richness field done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts, 8e aquifers and lodes, 8f the richness field, 8g trees done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -240,11 +240,15 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   field as an integer band on a lattice from the stream's own split, mixed with the spawn-distance ramp;
   the ore and coal scatters' acceptance and size and the lodes' amounts read it. Gated on a `richness:`
   record. 17 assertions; the golden unchanged.
+- **Step 8g — done (D0387).** `sim/terrain_gen/tree_pass.gd` (`TreePass`): trunks of `wood` two to three
+  metres tall with an elliptical canopy of `leaves`, one at most every 3 m, none over a mouth or on the
+  pad; the two materials with legacy's colours and hardness on this build's scale. Gated on a `tree:`
+  record. 21 assertions; the golden unchanged.
 
 ### Next action
 
 **Step 8, the worldgen content** (plan §4 step 8, second half; D0381 set the shape): each pass
 config-gated on a site key, committed green with the world unchanged, then one switch-on commit for
-`shallow_clay` with one golden re-pin from CI Linux. Remaining: 8g trees (two material records), 8h the switch-on and re-pin. Step 7 (economy) is
+`shallow_clay` with one golden re-pin from CI Linux. Remaining: 8h the switch-on for `shallow_clay` and the re-pin. Step 7 (economy) is
 director-scoped and stops at the director. **Open rulings from
 step 5 (plan §8):** the resolver (the swing's collision stand-in), the ramp glide.

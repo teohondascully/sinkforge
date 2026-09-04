@@ -37,6 +37,7 @@ const PURPOSE: Dictionary = {
 	&"gear": "milled cog (iron ingot + ingot)",
 	&"coal": "FUEL — generators and drills burn it (drop it on them)",
 	&"wood": "placeable block — and what ropes and torches are made of",
+	&"leaves": "the canopy — clears in a swing; the trunk under it is the wood",
 	&"rope": "place it above a drop — it unrolls down; W/S climbs it",
 	&"torch": "place it on a wall-backed cell — light that STAYS",
 	&"conduit": "lays power tube — power flows down and sideways, never up",
