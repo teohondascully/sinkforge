@@ -397,6 +397,10 @@ jobs:
       #   test_sfx_space.gd                              test_sfx_space (the room off the observation: open air dry, a crawlway vs a hall, occlusion counts the rock between, the reverb map and the smoothing, the bus made once and released by its owner -- A' step 6f (ii), D0367)
       #   test_hotbar.gd                                 test_hotbar (legacy's hotbar on the layout/paint split: the bar is the pack with a floor of one, the window contains the selection, keys stop where the keyboard does, the tooltip off the pointer clamped on-canvas, PACK FULL only without room, legacy's geometry under the scale, a redraw through the HUD host -- A' step 6g, D0368)
       #   test_inspector.gd                              test_inspector (the readout for the aimed cell: nothing out of reach, the terrain answers, the drill and the generator, the hopper and the winch, recipe machines and the rate line, legacy's panel rules and the plate stand-down, a redraw through the HUD host -- A' step 6h, D0369)
+      #   test_objectives.gd                             test_objectives (the ladder off the observation: the first frame primes, gains are rises a spend cannot lower, the pack and machine steps, the line's rate after the drill, latching, the step clock and the finish -- A' step 6h (ii), D0370)
+      #   test_hints.gd                                  test_hints (legacy's teaching mechanism on this build's content: the acquisition edge once per world, one bubble at a time in table order, the moments as rising edges off the observation, busy freezes and hides, the ceremony holds, the linger cap, taught ids and resync -- A' step 6h (ii), D0370)
+      #   test_objective_line.gd                         test_objective_line (the banner's alphas and layout: the opening how-to fades, nothing offered until stalled, clamped to the corner chips' free span, the finish, a redraw through the HUD host -- A' step 6h (ii), D0370)
+      #   test_hint_bubble.gd                            test_hint_bubble (world to canvas through the view rect, the placement rule: above the anchor, flips near the top, lifts over a pivot, on-canvas; the layout follows the lesson; a redraw through the host -- A' step 6h (ii), D0370)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -463,7 +467,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 99 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 103 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -504,6 +508,10 @@ jobs:
             res://tests/test_sfx_space.gd \
             res://tests/test_hotbar.gd \
             res://tests/test_inspector.gd \
+            res://tests/test_objectives.gd \
+            res://tests/test_hints.gd \
+            res://tests/test_objective_line.gd \
+            res://tests/test_hint_bubble.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \

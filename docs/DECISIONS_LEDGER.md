@@ -15607,3 +15607,48 @@ types and doubled — both corrected.
 
 **Gaps:** no eye verdict. The minimap that legacy stacked this panel under does not exist yet, so the
 panel sits at the FORGED slot's height; when the minimap lands the anchor moves with it.
+
+## D0370 · 2026-09-03 · A′ step 6h (ii): objectives and hints — legacy's mechanisms lifted whole off the observation, every content row re-authored, the banner and the bubble on the layout/paint split
+
+**Decided:** (1) `view/hud/objectives.gd` is legacy's ladder MECHANISM (stable ids, latched completions,
+deltas against a baseline so a stocked pack ticks nothing, the step clock, the finish linger) with every
+content row re-authored: legacy's chain taught the Bazaar, research, crafting and the Descent Engine;
+this one walks mine → smelt → wood → the drill built, fuelled, running → the coal hopper above it → the
+generator burning → the winch head raised. "Gained" is the pack's rises between observations (D0365's
+rule) banked into a counter a spend cannot lower; "the line has run" is the economy's ingot rate after
+the drill was first seen (D0351), not a ground pile. The labels name this build's verbs and the one
+bound action (`MINE`); a key that is not bound is named as a verb, not invented. (2) `view/hud/hints.gd`
+is legacy's just-in-time teaching lifted whole — the acquisition edge against a snapshot, latched shown
+hints, one bubble with a queue in table order, the relevance gate (kept, unused by any row here), the
+calm-only countdown with the linger cap, the ceremony hold — with the controller's pokes computed OFF
+THE OBSERVATION: busy from the body's speed with legacy's 1.25×/0.9× hysteresis, wading from `wet`,
+depth against the datum, the rope moments (chain, pump, wrapped) from the grapple's fields and the
+landing from the same rule the voice cue uses. Nine pack lessons and six moments, re-authored; the
+scanner, splitter, borer, drift rig, crusher, sapling and Descent rows are gone with their machines.
+(3) `objective_line.gd` and `hint_bubble.gd` are the two drawers in `DepthChip`'s shape; each owns its
+mechanism and steps it from the frame, so the banner, the bubble and the world are one tick. The
+banner keeps legacy's rules (the opening how-to fades over HOLD + FADE; nothing offered after the first
+lesson until stalled; clamped to the span the corner chips leave, the how-to giving first; the finish
+lingers five seconds); the bubble keeps legacy's placement (above the anchor, flipped below near the
+banner's band, LIFTED over the rope's pivots, on-canvas) and maps the body's head through the frame's
+view rect, since the HUD canvas is the viewport. Both consult the arrival plate: the bubble's ceremony
+is the plate's `on_screen`. (4) The mount order follows legacy's tag ranks: ambient (depth, hotbar,
+PACK FULL), active (banner, inspector), critical (bubble, plate), the legend last.
+
+**Why:** the plan's trio, second and third parts; legacy's own reason for the hints — "it carries the
+chain's signposting out of the tutorial and into the open game, so a Generator unlocked two hours in is
+still explained".
+
+**Evidence:** `tests/test_objectives.gd` 25 (prime, rises across spends, the three pack steps, every
+machine predicate with its negatives — a hopper two cells up, a hopper banking stone, a cold generator,
+a winch with nothing to bore — the rate before and after the drill, latching, the clock, the finish;
+one row corrected: the completing frame's own delta counts toward the finish, as legacy's did);
+`tests/test_hints.gd` 26 (the edge once per world, table order, expiry, the four moments posed, busy
+freezes and hides with hysteresis, the ceremony holds and returns, the fade and the linger cap, taught
+ids sorted, restore drops unknown, resync re-arms); `tests/test_objective_line.gd` 16;
+`tests/test_hint_bubble.gd` 18. Size and duplication gates green with the whole battery read.
+
+**Gaps:** no eye verdict on either surface. The taught ids are exposed for the save but not yet written
+into it (the plan's BRK-L7-001 note: tick-sampled, shell work at the save's envelope). The rope lessons
+name verbs because the play scene binds no grapple key yet. Legacy's `HELPER_TAGS` registry and its
+`check_hud_layout` gate are still not ported; the order is honoured in `_mount_hud`'s comment.
