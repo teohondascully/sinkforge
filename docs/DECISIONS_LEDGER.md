@@ -16030,3 +16030,50 @@ humus, and a paint row drew on a bare Node2D outside `_draw` (engine errors); bo
 
 **Gaps:** no eye verdict — the cap band and the moss have not been photographed; the cap's 1-cell
 thickness against legacy's 3–6 px is a quantum decision a picture may overturn.
+
+## D0379 · 2026-09-03 · A′ step 6p: the two shaders — the heat haze on the deterministic clock, the rock tooth over the veil with the grammar map it was waiting for
+
+**Decided:** (1) `view/visuals/heat_haze.gdshader` is legacy's lifted whole with ONE change, the one
+`post_fx.gdshader` took (D0328): the ripple climbs on an `anim_time` uniform, never `TIME`, because a
+capture must reproduce (D0277). `view/visuals/haze_painter.gd` is legacy `_paint_heat_haze`: a plume quad
+over every WORKING furnace or generator (keyed on the glyph kind, as legacy keys, so recipe-runners do not
+shimmer), 0.72 of a cell wide, 2.1 cells tall, tapering, its vertex alpha the shader's strength mask
+(0.85 at the casing, 0 at the top); the painter writes the frame's clock into its own layer's material
+each frame — the one place a painter touches its canvas, because the uniform IS the frame's time and the
+layer has no other route to it. Mounted at `HAZE_Z = -43`, over the veil and the tooth, under the
+additive pools: legacy's "hot air bends the rock but not the light". (2) `view/visuals/rock_tooth.gdshader`
+is legacy's lifted whole (it never read TIME), with `world_pos` doubled before hashing to keep legacy's
+1/32-metre tooth cell at our 16 px metre — the same conversion `rock_grit.gdshader` records — and its
+`gram_tex` finally bound: `view/visuals/gram_map.gd` is one byte per terrain cell (`RockTone`'s grammar
+enum; 0 for air) as an `Image` the bake fills chunk by chunk as it paints (`TerrainBake._paint_chunk`,
+`cells_of`) and refills on the same dig path, uploaded to ONE `ImageTexture` updated in place so the
+tooth's uniform keeps pointing at it across every rebake. Not a SubViewport (PORT_ORDER V3's suggestion):
+the data changes only when the terrain does, and a byte is exact where a rendered target is a blended
+read. `view/visuals/tooth_layer.gd` mounts the tooth as the baked quad drawn a second time through the
+tooth material at `TOOTH_Z = -44` (over the veil, under the haze), NEAREST; it declines when the bake did
+(headless), since the tooth is a reading of the target. Lives outside `WorldView`, which sat at 419 lines
+with it and 399 without. `LIGHT_Z` moved from -44 to -42 to make room; no test named it.
+(3) The z order over the veil is now: VEIL -45, TOOTH -44, HAZE -43, LIGHT -42, GLINT -40.
+
+**Why:** PORT_ORDER V3's two open shaders, and its own measured reason for the tooth's map: without it
+legacy's tooth "raised the horizontal and vertical gradients by the same amount everywhere and flattened
+the grammar underneath it" (stone +0.019 against earth +0.022; six times wider a gap with the pass off).
+
+**Evidence:** `tests/test_haze_painter.gd` 18: a working forge and burner convect, an idle forge and a
+working drill do not, one plume for the forge alone, none without an observation; the quad's width,
+rise, taper, root and mask; the shader loads, climbs on `anim_time` with no `TIME` in its uncommented
+code, reads the screen with a strength and the vertex alpha, the uniform settable; on a real view the
+painter ran and left the layer's clock at the view's. `tests/test_gram_map.gd` 22: the map at the world's
+size, empty and oversized refused, unfilled cells clastic and out-of-range -1, the texture matching and
+the same object on the next call, none without a map; a fill writing clay's, hardrock's and deepstone's
+grammars (control: not all one grammar) and 0 for air, a dug cell refilled to air beside its rock through
+the same texture, the bake's cell-rect read-back; the tooth shader additive with the grammar sampler
+reading clastic unbound, no TIME, direction-aware (bedded wide, massive tall, soil square — read off the
+source, since a material answers null for an unset uniform and headless holds no compiled default), the
+1/32-metre cell kept; headless declines the bake and the tooth with it, and a null view. Neighbours:
+terrain_bake 24, world_view 28, post_fx 15, light 31, veil 29, rock_tone 24. Two rows of the drafts read a
+COMMENT naming the wall clock as a use of it, and a uniform's default off the material; both re-read.
+
+**Gaps:** no eye verdict — neither shader has been photographed on this build; the tooth's `tooth_add`
+and the haze's `strength_px` are legacy's numbers at a different pixel scale (the haze displaces in SCREEN
+pixels, which did not change; the tooth's sample cell is converted).

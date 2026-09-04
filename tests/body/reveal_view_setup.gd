@@ -44,7 +44,9 @@ const TERRAIN_Z: int = -50
 const LODE_Z: int = -58   ## the lode's live metal over the wall bake that leaves its socket bare (6l, D0374)
 const WATER_Z: int = -48  ## over the terrain, under the veil: deep water reads dark, daylit bright (6a, D0362)
 const VEIL_Z: int = -45
-const LIGHT_Z: int = -44  ## the additive pools, over the veil they punch through, under the glint (6k, D0373)
+const TOOTH_Z: int = -44  ## the rock tooth: absolute levels added over the veil so deep rock keeps its grain (6p, D0379)
+const HAZE_Z: int = -43   ## the heat haze: bends the rock and the tooth, not the light (6p, D0379)
+const LIGHT_Z: int = -42  ## the additive pools, over the veil they punch through, under the glint (6k, D0373)
 const GLINT_Z: int = -40
 ## THE GRAIN SITS ABOVE THE VEIL, for the same reason the glint does and one more (D0308). It is an AIM
 ## READOUT, not scenery: it answers "which way will this rock part" at the moment of the blow, and a
@@ -86,6 +88,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_baked_painter(WallPainter.paint)
 	view.add_baked_painter(TerrainPainter.paint)
 	view.bake_static(WALL_Z)
+	ToothLayer.mount(view, TOOTH_Z)
 	view.add_painter(OrePainter.paint_lode).z_index = LODE_Z
 	view.add_painter(WaterPainter.paint).z_index = WATER_Z
 	# One glint painter and one ore painter, shared: the veil's seam cuts, the seam glow and the glint all
@@ -93,6 +96,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	var glint: GlintPainter = GlintPainter.new()
 	var ore: OrePainter = OrePainter.new(glint)
 	_mount_veil(view, ore, falling)
+	_mount_haze(view)
 	_mount_over_veil(view, glint)
 	_mount_scene_layers(view, falling, payouts)
 	_mount_light(view, falling, ore)
@@ -158,6 +162,19 @@ static func _mount_veil(view: WorldView, ore: OrePainter = null, falling: Fallin
 	# squares: the hardware sampler does the interpolation the old per-cell loop was paying for.
 	# `project.godot` sets NEAREST project-wide for pixel art, so this must be stated per layer.
 	veil.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+
+
+## THE HEAT HAZE (6p, D0379): a screen-space distortion whose strength is the plume quads' vertex alpha,
+## on its own canvas between the veil and the additive pools -- "so hot air bends the rock but not the
+## light". The shader is the layer's material; the painter feeds it the deterministic clock.
+static func _mount_haze(view: WorldView) -> void:
+	var haze: PaintLayer = view.add_painter(HazePainter.paint)
+	haze.z_index = HAZE_Z
+	var shader: Shader = load("res://view/visuals/heat_haze.gdshader") as Shader
+	if shader != null:
+		var mat := ShaderMaterial.new()
+		mat.shader = shader
+		haze.material = mat
 
 
 ## THE LIGHT PASS IS AN ADD OVER THE VEIL (6k, D0373): legacy's third blend, "the light pass is ADD". The

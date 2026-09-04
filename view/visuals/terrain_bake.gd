@@ -103,6 +103,10 @@ var _look: MaterialLook = null
 ## while the headless fallback path has it -- two renderers disagreeing, with no gate able to see it
 ## because CI only ever runs the fallback. D0327.
 var _tone: RockTone = null
+## The grammar map the rock tooth samples (6p, D0379): one byte per cell, filled as each chunk paints and
+## refilled on the same dig path, so it can never disagree with the colour target about which cells are
+## which rock.
+var _gram: GramMap = GramMap.new()
 
 ## The zoom a baked painter sees, PINNED. Baked content is resolution-independent — drawn into world space
 ## once and sampled at whatever zoom the camera later uses — so a zoom-gated detail tier must not vary per
@@ -132,6 +136,7 @@ func setup(world_cells: Vector2i, cell_px: int, observe: Callable, look: Materia
 		tone: RockTone, painters: Array[Callable], rebake_margin: int) -> bool:
 	if not plan(world_cells, cell_px):
 		return false
+	_gram.setup(world_cells)
 	_rebake_margin = maxi(rebake_margin, 0)
 	_painters = painters
 	_observe = observe
@@ -260,6 +265,20 @@ func _paint_chunk(ci: CanvasItem, rect: Rect2) -> void:
 	f.marks = PackedVector2Array()
 	for paint: Callable in _painters:
 		paint.call(f, ci)
+	_gram.fill_rect(f.obs, cells_of(rect), _look)
+
+
+## A pixel rect as the terrain cells it covers.
+func cells_of(rect: Rect2) -> Rect2i:
+	var px: int = maxi(_cell_px, 1)
+	var lo := Vector2i(int(floor(rect.position.x / float(px))), int(floor(rect.position.y / float(px))))
+	var hi := Vector2i(int(ceil(rect.end.x / float(px))), int(ceil(rect.end.y / float(px))))
+	return Rect2i(lo, hi - lo)
+
+
+## The grammar map's texture, for the tooth's `gram_tex`; updated in place across rebakes.
+func gram_texture() -> ImageTexture:
+	return _gram.texture()
 
 
 ## Legacy `:739-741`. The material's `blend_disabled` is what makes this a clear rather than a no-op.
