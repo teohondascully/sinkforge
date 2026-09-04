@@ -210,3 +210,8 @@ legacy/tools/test_director_bus.sh
 # session's call to make; flagged in ANVIL step 1's report as a follow-up disposition question (track
 # once acted on, archive if rejected, or something else) rather than decided here.
 /incoming/
+
+# Director's play-session recordings: kept on disk, not shipped. The milestone recordings
+# the director selects from these move into history/ as committed captures; the raw logs
+# are working material. Resolves gate 27's expected red on these files (D0389).
+tests/body/recordings/

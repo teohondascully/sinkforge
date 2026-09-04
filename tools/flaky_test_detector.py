@@ -30,14 +30,14 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "tools" / "run_suites.sh"
 
 # run_suites.sh prints lines like:
-#   test_body.gd ......... PASS (1.2s)
-#   test_shaft_replay_determinism.gd ......... FAIL (5.3s)
-SUITE_RE = re.compile(r"^(test_\S+\.gd)\s+\.+\s+(PASS|FAIL)", re.MULTILINE)
+#   PASS  res://tests/test_body.gd (5s)
+#   FAIL  res://tests/test_shaft_replay_determinism.gd -- its FULL output follows:
+SUITE_RE = re.compile(r"^(PASS|FAIL)\s+\S*?(test_\S+\.gd)", re.MULTILINE)
 
 
 def parse_suites(output: str) -> dict[str, str]:
     """Extract per-suite verdicts from run_suites.sh output."""
-    return {match.group(1): match.group(2) for match in SUITE_RE.finditer(output)}
+    return {match.group(2): match.group(1) for match in SUITE_RE.finditer(output)}
 
 
 def run_once(root: Path, suite_pattern: str | None) -> str:

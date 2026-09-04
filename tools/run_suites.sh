@@ -109,6 +109,7 @@ for f in "$OUT"/*.result; do
   echo "$secs $suite" >> "$OUT/timings"
   if [ "$verdict" = "PASS" ]; then
     PASSED=$((PASSED+1))
+    echo "PASS  $suite (${secs}s)"
   else
     FAILED=$((FAILED+1))
     echo "FAIL  $suite -- its FULL output follows:"

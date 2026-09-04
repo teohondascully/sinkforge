@@ -109,3 +109,6 @@ if [ "${#FAILED[@]}" -gt 0 ]; then
 	printf '  FAILED: %s\n' "${FAILED[@]}"
 	exit 1
 fi
+if [ "$GATE_FAILED" -gt 0 ]; then
+	exit 1
+fi
