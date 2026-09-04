@@ -96,15 +96,22 @@ func _fill(shade: Callable) -> void:
 			# `_dark` multiplies at z 50, `_lights` ADDS at z 51 — rather than by letting one pass do
 			# both. Until that additive layer is ported the lift is clamped, which keeps every darkening
 			# cue exact and loses only the above-ambient half of the key. Recorded rather than silent.
-			var s: float = clampf(float(shade.call(col, row)), 0.0, 1.0)
-			var v: int = int(round(s * 255.0))
+			var lit: Variant = shade.call(col, row)
 			var at: int = (j * _w + i) * 4
-			# Grey, opaque: under a multiply the RGB IS the light level and the alpha must not attenuate
-			# it. A texel of (v, v, v, v) would multiply the destination by v twice on a premultiplied
-			# path and darken the world quadratically.
-			_bytes[at] = v
-			_bytes[at + 1] = v
-			_bytes[at + 2] = v
+			# Opaque: under a multiply the RGB IS the light level and the alpha must not attenuate it. A
+			# texel of (v, v, v, v) would multiply the destination by v twice on a premultiplied path and
+			# darken the world quadratically. Grey for a float, tinted for a Color (6l (ii), D0375):
+			# legacy's cuts lift each channel toward the source's tint, so lamp-lit rock comes out amber.
+			if lit is Color:
+				var c: Color = lit
+				_bytes[at] = int(round(clampf(c.r, 0.0, 1.0) * 255.0))
+				_bytes[at + 1] = int(round(clampf(c.g, 0.0, 1.0) * 255.0))
+				_bytes[at + 2] = int(round(clampf(c.b, 0.0, 1.0) * 255.0))
+			else:
+				var v: int = int(round(clampf(float(lit), 0.0, 1.0) * 255.0))
+				_bytes[at] = v
+				_bytes[at + 1] = v
+				_bytes[at + 2] = v
 			_bytes[at + 3] = 255
 
 
@@ -133,3 +140,12 @@ func texel(i: int, j: int) -> float:
 	if i < 0 or j < 0 or i >= _w or j >= _h:
 		return -1.0   ## out of range is distinguishable from every real level, which are all in [0, 1]
 	return float(_bytes[(j * _w + i) * 4]) / 255.0
+
+
+## The three channels of one texel, for a test that has to see the tint (D0375) -- `get_image()` on the
+## texture reads back nothing under the headless renderer, exactly as `texel()` above records.
+func texel_rgb(i: int, j: int) -> Color:
+	var at: int = (j * _w + i) * 4
+	if at < 0 or at + 3 >= _bytes.size():
+		return Color(0.0, 0.0, 0.0, 0.0)
+	return Color(float(_bytes[at]) / 255.0, float(_bytes[at + 1]) / 255.0, float(_bytes[at + 2]) / 255.0, float(_bytes[at + 3]) / 255.0)

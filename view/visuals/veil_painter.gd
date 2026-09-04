@@ -274,6 +274,16 @@ var _cache: VeilFieldCache = VeilFieldCache.new()
 ## its `ImageTexture` are allocated once and mutated in place.
 var _map: VeilMap = VeilMap.new()
 
+## The other sources' feeders (6l (ii), D0375): the ore painter for its seams, the scene's falling items
+## for their motes; either may be null. `VeilSources` owns what they cut.
+var _ore: OrePainter = null
+var _falling: FallingItems = null
+
+
+func _init(ore: OrePainter = null, falling: FallingItems = null) -> void:
+	_ore = ore
+	_falling = falling
+
 
 ## The field for this observation's window, from the cache when nothing that feeds it has changed.
 func field_for(obs: Interface.Observation) -> PackedFloat32Array:
@@ -315,8 +325,9 @@ func paint_frame(frame: Frame, ci: CanvasItem) -> void:
 	var drawn: Rect2i = TerrainPainter.visit_rect(obs, frame.view_world_rect, obs.cell_px).intersection(baked)
 	if drawn.size.x <= 0 or drawn.size.y <= 0:
 		return
-	var tex: ImageTexture = _map.build(drawn, func(col: int, row: int) -> float:
-		return light_at(obs, baked, field, col, row))
+	var cuts: Array[Dictionary] = VeilSources.cuts_for(frame, drawn, _ore, _falling)
+	var tex: ImageTexture = _map.build(drawn, func(col: int, row: int) -> Color:
+		return light_rgb_at(obs, baked, field, col, row, cuts))
 	if tex == null:
 		return
 	ci.draw_texture_rect(tex, _map.world_rect(obs.cell_px), false)
@@ -343,6 +354,13 @@ static func light_at(obs: Interface.Observation, baked: Rect2i, field: PackedFlo
 	# THE LAMP LIFTS WHAT THE VEIL LEFT, legacy's own composition rule: a light raises the light level
 	# rather than lowering an opacity, so a lit cell trends toward full light and can never overshoot it.
 	return s + (1.0 - s) * lamp_lift(obs, Vector2i(col, row))
+
+
+## The composed light for one cell WITH the other sources (6l (ii), D0375): `light_at`'s grey level,
+## then every cut lifts each channel toward its tint (`VeilSources.compose`). No cuts: `light_at` thrice.
+static func light_rgb_at(obs: Interface.Observation, baked: Rect2i, field: PackedFloat32Array,
+		col: int, row: int, cuts: Array[Dictionary]) -> Color:
+	return VeilSources.compose(light_at(obs, baked, field, col, row), cuts, Vector2i(col, row))
 
 
 ## Split from `paint_frame` so the drawing half can be exercised against a field the caller supplies.

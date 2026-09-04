@@ -218,17 +218,7 @@ func _test_both_passes_run_on_a_real_view() -> void:
 
 ## A world solid from `ROCK_TOP` down in `material`, with `dug` excavated to pose faces (the glint suite's).
 func _world(material: StringName, dug: Array[Vector2i]) -> Array:
-	var grid: TileGrid = TileGrid.new(GRID_W, GRID_H, 11)
-	for col: int in range(GRID_W):
-		for row: int in range(ROCK_TOP, GRID_H):
-			grid.set_material(Vector2i(col, row), material)
-			grid.set_wall(Vector2i(col, row), material)
-	for c: Vector2i in dug:
-		grid.excavate(c)
-	var body: Body = Body.new(Fx.from_int(GRID_W * CELL / 2), Fx.from_int(4 * CELL))
-	var iface: Interface = Interface.new(grid, body, Mining.new())
-	var view := Rect2(0.0, 0.0, float(GRID_W * CELL), float(GRID_H * CELL))
-	return [iface.observe(Interface.Envelope.covering(view, WorldView.WINDOW_MARGIN_CELLS)), MaterialLook.new()]
+	return _rock_world(material, dug, ROCK_TOP, GRID_W, GRID_H)
 
 
 ## Legacy's shaped cases, each coordinate scaled by four (a legacy cell is four of ours), so every case

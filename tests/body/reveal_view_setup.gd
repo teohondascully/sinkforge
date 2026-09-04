@@ -85,10 +85,14 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.bake_static(WALL_Z)
 	view.add_painter(OrePainter.paint_lode).z_index = LODE_Z
 	view.add_painter(WaterPainter.paint).z_index = WATER_Z
-	_mount_veil(view)
-	var glint: GlintPainter = _mount_over_veil(view)
+	# One glint painter and one ore painter, shared: the veil's seam cuts, the seam glow and the glint all
+	# read the same population (6l, D0374/D0375).
+	var glint: GlintPainter = GlintPainter.new()
+	var ore: OrePainter = OrePainter.new(glint)
+	_mount_veil(view, ore, falling)
+	_mount_over_veil(view, glint)
 	_mount_scene_layers(view, falling, payouts)
-	_mount_light(view, falling, glint)
+	_mount_light(view, falling, ore)
 	view.add_painter(RopePainter.paint).z_index = ROPE_Z
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
 	# rather than as a bound Callable. D0289: `add_painter(CrumblePainter.new().paint)` freed the painter
@@ -141,8 +145,8 @@ static func _mount_hud(view: WorldView) -> void:
 ## Set here rather than inside the painter because the blend belongs to the CANVAS: a painter that reached
 ## out to configure its own layer would be the coordinator contract (`docs/COORDINATOR_CONTRACT.md` §2a)
 ## inverted, and the painter would stop being a pure function of `(Frame, CanvasItem)`.
-static func _mount_veil(view: WorldView) -> void:
-	var veil: PaintLayer = view.add_stateful_painter(VeilPainter.new(), &"paint_frame")
+static func _mount_veil(view: WorldView, ore: OrePainter = null, falling: FallingItems = null) -> void:
+	var veil: PaintLayer = view.add_stateful_painter(VeilPainter.new(ore, falling), &"paint_frame")
 	veil.z_index = VEIL_Z
 	var veil_mat := CanvasItemMaterial.new()
 	veil_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_MUL
@@ -156,11 +160,10 @@ static func _mount_veil(view: WorldView) -> void:
 ## THE LIGHT PASS IS AN ADD OVER THE VEIL (6k, D0373): legacy's third blend, "the light pass is ADD". The
 ## blend belongs to the canvas, as the veil's does; the painter stays a function of (Frame, CanvasItem).
 ## It takes the scene's falling items for the motes, so it is mounted after the scene layers exist.
-static func _mount_light(view: WorldView, falling: FallingItems, glint: GlintPainter) -> void:
+static func _mount_light(view: WorldView, falling: FallingItems, ore: OrePainter) -> void:
 	_mount_additive(view, LightPainter.new(falling))
-	# The ore seams glow on the same canvas, drawn after the pools; they share the glint's population
-	# cache rather than rescanning for it (6l, D0374).
-	_mount_additive(view, OrePainter.new(glint))
+	# The ore seams glow on the same canvas, drawn after the pools (6l, D0374).
+	_mount_additive(view, ore)
 
 
 ## One ADD-blended, LINEAR-filtered canvas at LIGHT_Z for a stateful painter. Two painters get two
@@ -176,14 +179,12 @@ static func _mount_additive(view: WorldView, painter: RefCounted) -> void:
 
 ## The readouts that sit over the veil because the veil must not dim them: the glint (STATEFUL for its
 ## sparse cache, D0337: the per-frame scan of every visible cell was 11.83 ms), the rock's grain, the
-## cracks, the machines. Returns the glint painter so the ore seams can share its population.
-static func _mount_over_veil(view: WorldView) -> GlintPainter:
-	var glint: GlintPainter = GlintPainter.new()
+## cracks, the machines.
+static func _mount_over_veil(view: WorldView, glint: GlintPainter) -> void:
 	view.add_stateful_painter(glint, &"paint_frame").z_index = GLINT_Z
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
 	view.add_painter(CrackPainter.paint_frame)
 	view.add_stateful_painter(MachinePainter.new(), &"paint_frame").z_index = MACHINE_Z
-	return glint
 
 
 ## The scene OWNS the falling-item layer (6e, D0365): it consumes the landings for its particle pops, so

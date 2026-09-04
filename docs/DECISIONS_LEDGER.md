@@ -15827,3 +15827,51 @@ interior. A real world's edges are far off screen; recorded so the number is not
 
 **Gaps:** no eye verdict; the pip density and the 1-in-4 pick are untested against a picture. The veil cut,
 above.
+
+## D0375 · 2026-09-03 · A′ step 6l (ii): every light but the lamp cuts the veil — legacy's source loop as a list of cuts, light with a colour, the map's texel tinted
+
+**Decided:** (1) `view/visuals/veil_sources.gd` is legacy `_update_veil`'s source loop and `_veil_cut`'s
+tint as DATA: `cuts(obs, seams, motes, t, cull)` returns `{centre, radius, strength, tint}` in cells for
+the machines (legacy's table verbatim: 0.6 for any machine, a furnace 0.85, a burner 0.9 fuelled and
+NOTHING dry, a lift 0.35 + 0.55 × power — and NO status gate, which is legacy's veil rule and differs
+from the pool's IDLE_GLOW gate of D0373 on purpose: the pool is the machine's own light, the cut is what
+its light shows), the torches (two cuts, 7.6 m at 0.52 and a 4.4 m core at 0.94 — "one quadratic pool
+alone put a 2-cell bright disc on the wall and left the rest of a hung chamber black"), the conduits
+(1.8 m at 0.7 × level, only over 0.04 of capacity), the ore seams (their own radius, strength
+0.62 + 0.26 × the SAME breath their glow uses, so reveal and pool never disagree) and the motes (1.4 m at
+0.5). Culled to the drawn rect grown by the widest pool, the torch's 7.6 m. (2) LIGHT HAS A COLOUR:
+`VeilPainter.light_rgb_at` is `light_at`'s grey level composed per channel through `VeilSources.compose`
+— every cut lifts each channel toward its tint by `cut_lift`, "a light only ever adds light to a
+channel", stacked cuts brighten toward the tint and never overshoot it — and the tint is the source's
+colour 0.28 of the way from white, legacy's LIGHT_TINT ("a full-colour tint would strangle a channel").
+`VeilMap._fill` writes a Color shade as a tinted opaque texel and a float shade as grey, so every
+existing texel test holds. (3) The veil painter takes the ore painter and the falling items at
+construction; the view hoists ONE glint, ONE ore painter and ONE falling-items layer and hands them to the
+veil, the light canvas and the glint's slot, so the seam the veil cuts is the seam the glow lights is the
+face the glint flares. (4) `VeilMap.texel_rgb` reads the three channels back for the test, because
+`get_image()` on the texture returns nothing under the headless renderer — which `texel()` already
+recorded and the first draft of the suite re-learned (three rows read 0.000). NOT here: the LAMP's own
+cuts stay untinted (legacy lifts them toward `_light_tint(lamp_color)`, amber); the lamp lives in
+`light_at`, the per-cell reference that `tests/test_veil_painter.gd` holds byte-equivalent to the map,
+and tinting it means giving that reference a colour too — a follow-up on its own, not a side effect here.
+
+**Why:** the half of legacy's light model 6k and 6l (i) left out. Legacy's own reason for the reduced
+additive strengths ("the additive pass could drop to a fraction of its old strength: revealing in colour
+beats repainting in colour") was FALSE in this build until the veil took the other sources — a working
+furnace in the deep showed its ember on black rock.
+
+**Evidence:** `tests/test_veil_sources.gd` 37: the tint's arithmetic and warmth, white tints nothing, the
+cull margin; the machine table (furnace working or not, burner dry/fuelled/coal-in-input, lift
+powered/unpowered, drill); a drill, a torch's two cuts and a conduit over the gate cut while a 10-milli
+trickle does not, the torch's radii and strengths in cells centred on the logic cell, the machine's tint
+its casing colour's, every source dropped past the cull, no observation no cuts; the seam at its own
+centre and radius in cyan's tint, its strength inside 0.62..0.88 with the glow's breath, a mote at px
+(40, 80) at cell (10, 20); the composition with no cuts the grey level thrice, a torch at the cell lifting
+every channel warm and never past the tint, a far cut changing nothing, a black tint unable to take light
+away, two stacked cuts brighter and bounded; a Color shade a tinted opaque texel, a float grey, channels
+clamped; the veil redrawn on a real view with a forge, a torch and a mote (5 cuts or more). Neighbours:
+veil_painter 29, veil_map 9, ore 43, light 31, terrain_bake 24, glint 29. `veil_painter.gd` at 396 lines
+after moving the composition out (it reached 419). The duplication gate paired the suite's two fixtures with the light and ore suites' copies, so `_machine_rec` and `_rock_world` moved into `tests/test_base.gd` and all three suites call them.
+
+**Gaps:** no eye verdict — the tinted veil under the additive pools is the picture legacy tuned and nobody
+here has looked at it. The lamp tint, above.

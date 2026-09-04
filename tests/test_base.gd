@@ -214,3 +214,32 @@ func _canon(v: Variant) -> String:
 			return "[%s]" % ",".join(parts)
 		_:
 			return str(v)
+
+
+## A machine record as the observation publishes one, for a painter suite that poses machines without a
+## hub: the behaviour doubles as the id, `source` follows the record's recipe, and `extra` overrides fields.
+func _machine_rec(behavior: StringName, cell: Vector2i, status: StringName = &"working", extra: Dictionary = {}) -> Dictionary:
+	var data: Dictionary = MachinesRecords.RECORDS.get(String(behavior), {})
+	var r: Dictionary = {"cell": cell, "id": behavior, "behavior": behavior, "source": String(data.get("recipe", "")) == "mine_ore" or behavior == &"iron_forge",
+		"status": status, "fuel": 0, "input": {}, "power_permille": 0}
+	for k: Variant in extra:
+		r[k] = extra[k]
+	return r
+
+
+## A world solid from `rock_top` down in `material`, wall behind it, with `dug` excavated to pose faces;
+## observed whole through a bare interface. Returns [observation, look]. The glint, ore and veil suites
+## pose their faces on it.
+func _rock_world(material: StringName, dug: Array[Vector2i], rock_top: int, grid_w: int, grid_h: int) -> Array:
+	var cell: int = Heightfield.TERRAIN_CELL_PX
+	var grid: TileGrid = TileGrid.new(grid_w, grid_h, 11)
+	for col: int in range(grid_w):
+		for row: int in range(rock_top, grid_h):
+			grid.set_material(Vector2i(col, row), material)
+			grid.set_wall(Vector2i(col, row), material)
+	for c: Vector2i in dug:
+		grid.excavate(c)
+	var body: Body = Body.new(Fx.from_int(grid_w * cell / 2), Fx.from_int(4 * cell))
+	var iface: Interface = Interface.new(grid, body, Mining.new())
+	var view := Rect2(0.0, 0.0, float(grid_w * cell), float(grid_h * cell))
+	return [iface.observe(Interface.Envelope.covering(view, WorldView.WINDOW_MARGIN_CELLS)), MaterialLook.new()]

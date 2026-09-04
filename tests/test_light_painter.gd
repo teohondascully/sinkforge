@@ -21,12 +21,7 @@ func _initialize() -> void:
 
 
 func _rec(behavior: StringName, cell: Vector2i, status: StringName = &"working", extra: Dictionary = {}) -> Dictionary:
-	var data: Dictionary = MachinesRecords.RECORDS.get(String(behavior), {})
-	var r: Dictionary = {"cell": cell, "id": behavior, "behavior": behavior, "source": String(data.get("recipe", "")) == "mine_ore" or behavior == &"iron_forge",
-		"status": status, "fuel": 0, "input": {}, "power_permille": 0}
-	for k: Variant in extra:
-		r[k] = extra[k]
-	return r
+	return _machine_rec(behavior, cell, status, extra)
 
 
 func _test_the_glow_texture() -> void:

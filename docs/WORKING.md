@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights and 6l (i) the ore seams done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -185,7 +185,12 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   metres (3 m = 12 cells, floor one metre of face, radius capped at the torch's 7.6 m), the population
   the glint's own cache, the seam glow in the seam's mineral hue on a second ADD canvas, pips one face
   cell in four; the lode's flecks a live pass at `LODE_Z` over the wall's baked socket, draining
-  monotonically by per mille. 43 assertions. Owed next: the veil's cuts for every source but the lamp.
+  monotonically by per mille. 43 assertions.
+- **Step 6l (ii) — done (D0375).** `view/visuals/veil_sources.gd`: every light but the lamp cuts the veil,
+  legacy's table as data with a colour at 0.28 toward white; `VeilPainter.light_rgb_at` composes per
+  channel (a cut only ever adds); `VeilMap` writes tinted texels. One glint, one ore painter, one
+  falling-items layer shared across the veil, the light canvas and the glint. 37 assertions. The lamp's
+  own cuts stay untinted (follow-up).
 
 ### Next action
 
