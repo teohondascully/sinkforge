@@ -29,6 +29,16 @@ const WATER_MAX: int = 8  ## units a full cell holds (legacy `FactorySim.WATER_M
 
 var levels: Dictionary = {}  # terrain_cell: Vector2i -> level: int; absent means dry, never a stored 0
 
+## THE REST MARKER, derived bookkeeping outside the signature and the save. `WaterFlow.step` is a pure
+## function of the levels and the grid's solidity, so a step that changed nothing will change nothing
+## again until one of those moves: these record the (plane `version`, grid `terrain_version`, grid) a
+## no-change step was measured at, and `at_rest` answers whether that measurement still describes the
+## plane. 23K settled aquifer cells cost 10 ms a hub tick before this (2026-09-04); at rest costs one
+## comparison. The grid's instance id is part of the key because two grids built alike share a version.
+var rest_version: int = -1
+var rest_terrain: int = -1
+var rest_grid: int = 0
+
 
 func water_at(terrain_cell: Vector2i) -> int:
 	return int(levels.get(terrain_cell, 0))
@@ -87,9 +97,28 @@ func wet_terrain_cells() -> Array[Vector2i]:
 
 ## THE ONE WRITE. A level <= 0 erases the cell. Levels above WATER_MAX are legal here on purpose:
 ## `WaterFlow`'s lateral settle parks a run's surplus on its leftmost cell to fall next tick, and clamping
-## it would delete water (legacy `water_flow.gd`, the `cap_total` branch).
+## it would delete water (legacy `water_flow.gd`, the `cap_total` branch). A write that stores what is
+## already there returns before the sandwich: xor-out then xor-in of one term is the identity, so the
+## signature is untouched either way, and the settle pass rewrites every cell of every level run.
 func set_level(terrain_cell: Vector2i, level: int) -> void:
+	if maxi(level, 0) == water_at(terrain_cell):
+		return
 	_write_int(levels, terrain_cell, level)
+
+
+## True when a `WaterFlow.step` measured at this exact (version, terrain_version, grid) changed nothing,
+## and nothing has written the plane or the terrain since.
+func at_rest(grid: TileGrid) -> bool:
+	return version == rest_version and grid.terrain_version == rest_terrain and grid.get_instance_id() == rest_grid
+
+
+## Called by `WaterFlow.step` after its passes with the `version` it saw on entry: a step that wrote
+## nothing marks the plane at rest against the terrain it was measured on.
+func note_rest(version_before: int, grid: TileGrid) -> void:
+	if version == version_before:
+		rest_version = version
+		rest_terrain = grid.terrain_version
+		rest_grid = grid.get_instance_id()
 
 
 func state_signature() -> String:

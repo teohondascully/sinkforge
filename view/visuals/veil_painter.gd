@@ -85,20 +85,21 @@ static func openness(obs: Interface.Observation, rect: Rect2i) -> PackedFloat32A
 ## O(cells) via a running sum: advance the window by adding the entering sample and dropping the leaving
 ## one, both clamped, so the divisor stays `2R+1` at the edges and the clamped samples are counted the
 ## same way legacy counts them.
-static func _blur_axis(src: PackedFloat32Array, w: int, h: int, horizontal: bool) -> PackedFloat32Array:
+static func _blur_axis(src: PackedFloat32Array, w: int, h: int, horizontal: bool,
+		reach: int = REACH_CELLS) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
 	out.resize(w * h)
 	var n: int = w if horizontal else h
 	var lines: int = h if horizontal else w
-	var span: float = float(REACH_CELLS * 2 + 1)
+	var span: float = float(reach * 2 + 1)
 	for line: int in range(lines):
 		var acc: float = 0.0
-		for d: int in range(-REACH_CELLS, REACH_CELLS + 1):
+		for d: int in range(-reach, reach + 1):
 			acc += src[_at(w, line, clampi(d, 0, n - 1), horizontal)]
 		for i: int in range(n):
 			out[_at(w, line, i, horizontal)] = acc / span
-			acc -= src[_at(w, line, clampi(i - REACH_CELLS, 0, n - 1), horizontal)]
-			acc += src[_at(w, line, clampi(i + REACH_CELLS + 1, 0, n - 1), horizontal)]
+			acc -= src[_at(w, line, clampi(i - reach, 0, n - 1), horizontal)]
+			acc += src[_at(w, line, clampi(i + reach + 1, 0, n - 1), horizontal)]
 	return out
 
 

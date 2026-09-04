@@ -44,6 +44,21 @@ static func report(layers: Array[PaintLayer]) -> String:
 		float(total) / 1000.0, BUDGET_MS, " ".join(parts)]
 
 
+## The whole frame's line: the world painters ranked, the refresh and observe cost, the two plane caches'
+## rebuild counts against the ticks drawn, and the HUD chips ranked -- a budget that left the HUD out was
+## measuring part of the frame (D0390).
+static func frame_report(layers: Array[PaintLayer], hud: Array[PaintLayer], refresh_usec: int,
+		observe_usec: int, iface: Interface, ticks: int) -> String:
+	var rebuilds: String = ""
+	if iface != null:
+		rebuilds = " plane_rebuilds=%d hub_rebuilds=%d /%d ticks" % [iface.plane_rebuilds(), iface.hub_rebuilds(), ticks]
+	var chips: String = ""
+	if not hud.is_empty():
+		chips = " | hud " + report(hud)
+	return "%s | refresh=%.2fms (observe=%.2fms)%s%s" % [report(layers),
+		float(refresh_usec) / 1000.0, float(observe_usec) / 1000.0, rebuilds, chips]
+
+
 ## The painter's own name, for the report. **THE METHOD NAME ALONE IS NOT AN IDENTIFIER**: four painters
 ## on this stack expose `paint` and two expose `paint_frame`, so a report keyed on the method prints
 ## `paint=1.40ms paint=0.65ms` and names nothing — which is the same blindness as reporting a total, one

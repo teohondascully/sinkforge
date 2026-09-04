@@ -16520,3 +16520,49 @@ the observation layer copying 30K+ objects per frame and sorting 23K water cells
 **Reverse cost:** Low. All three caches are derived from the same data and invalidated conservatively.
 The native sort produces the identical order (verified by `test_ordering` and `test_water_flow`). No sim
 behaviour or determinism change.
+
+## D0390 · 2026-09-04 · Performance, second pass: the stall the director felt, measured on a MOVING camera and removed at the cause
+
+**Decided:** D0389's "100fps" was `Engine.get_frames_per_second()`, an average over a second; the director
+felt "20fps" and was right. A wall-clock meter (`shell/frame_meter.gd`, `--perf`) measuring render-frame
+spacing and splitting physics ticks by whether the hub ran found one 30 ms stall per hub tick (20 a second)
+at standstill, and 60-110 ms stalls on every camera move (`--perf-drive`, a scripted walk). Five fixes,
+each at its cause, none touching what the sim computes:
+(1) `WaterPlane` rest marker — `WaterFlow.step` is a pure function of (levels, solidity), so a step that
+changed nothing is skipped until the plane's `version` or the grid's `terrain_version` (or the grid
+itself) moves. 15.1 → 0.4 ms a hub tick. `set_level` returns before the XOR sandwich when the stored level
+is unchanged (identity either way). `SignedPlane.version` is the universal derived plane version.
+(2) `HubCache` — the four hub planes copied onto the observation are each keyed on their own plane's
+version and the window (the yield and lode planes on the terrain version too, since they read solidity);
+D0389's outer `_hub_dirty` flag is REMOVED — it missed every write nobody announced through the door.
+(3) `TileGrid.block_index`/`wall_index` — world-sized flat byte planes with a per-grid `legend`, maintained
+at the three mutators like `coarse`, outside the signature; `WindowPlanes.of_plane` cuts a window as row
+slices. The Callable-per-cell form stays as the asserted-equal reference. 12 → 4 ms on a window change.
+(4) The veil on the GPU — `view/visuals/veil.gdshader` + `VeilLayer`: the observation's material bytes
+uploaded as a texture with no loop, the openness field at ONE TEXEL PER METRE (legacy's own resolution;
+this build's cell is a quarter of legacy's, so the cell-resolution field was 16x legacy's work) off the
+coarse map, lamp and cuts as uniforms; `VeilPainter`'s expression evaluated per pixel. 60-76 ms on every
+window move and 3.6-4.7 ms every frame → ~1.5 ms on a window move, ~0.1 ms a frame. `VeilPainter` stays
+as the specification and CPU reference; a same-frame capture through each was compared by eye.
+(5) `GlintPainter.glint_cells`/`OrePainter.seams_for` keyed on `(window, terrain_version)` instead of
+`hash(materials)` (80K bytes hashed every frame), the scan through `PackedByteArray.find` per glittering
+ordinal and an exposure test on the plane's bytes. 25-33 ms on a window move → 1.2 ms.
+Also: `--warp`, `--zoom`, `--screenshot-*` on the REAL seat (`SeatFlags`), because the visual catalogue's
+"deep is black" captures came from the reveal scene with its camera 70 m from the miner's lamp.
+
+**Measured** (`--perf-drive`, 15 s, boot seed, 1920x1080 window, M-series Mac, 120 Hz display):
+before: frame p50 8.9 ms, p99 93 ms, max 112 ms, 44 frames over 16.7 ms per 5 s; physics p99 12.7 ms.
+after: frame p50 5.6-7.4 ms, p99 21 ms, max 24 ms, 14-19 frames over 16.7 ms per 5 s; physics p99 6 ms;
+painters 6 → 2 ms a frame. Standstill after: zero frames over 16.7 ms, hub tick p50 0.4 ms.
+
+**Alternative:** Keep the CPU lightmap and shrink its field to metre resolution (kills the spike, keeps
+~3.5 ms a frame). Rejected: at 120 Hz the whole frame is 8.3 ms and the lighting pass is where every
+visual fix that follows will land; a shader makes each of those free.
+
+**Why:** Every prior perf claim on this game was a standstill number. A 2D pixel-art game that lags while
+walking has something O(window) on the camera path, and here there were five.
+
+**Reverse cost:** Low for (1), (2), (3), (5): derived caches with version keys; delete and the dictionaries
+are still the truth. (4) is a mount swap in `ViewStack._mount_veil` — the CPU painter is still there and
+tested. Remaining known cost: the window-change tick still filters ~17K plane entries (2-3 ms) and rebuilds
+the metre field (~1.5 ms), so a snap frame can still drop one 120 Hz frame; no bucket index yet.

@@ -252,21 +252,23 @@ self-contained: a session executing A′ needs only that file, the analysis, and
 
 ### Performance (post-A′)
 
-**5fps → 100fps, three changes.** Profiled: `Interface.observe` took 20ms/frame (`HubPlanes.fill`
-iterating 23K water cells, 7K lodes, thousands of deposits per frame), and `WaterFlow.step` took 19ms
-per hub tick (two GDScript Callable sorts of 23K elements).
+**D0389's "100fps" was the Engine counter and was wrong; the director felt "20fps" and was right.** The
+wall-clock meter (`godot --path . -- --perf` still, `--perf-drive` on a scripted walk; `shell/frame_meter.gd`)
+found one 30 ms stall per hub tick at standstill and 60-110 ms stalls on every camera move. D0390 removed
+them at the cause: the water rest marker (hub tick 15 → 0.4 ms), per-plane `HubCache` keys, `TileGrid`'s
+flat index planes (a window is row slices), the veil on the GPU (`veil.gdshader` + `VeilLayer`, the CPU
+`VeilPainter` kept as the reference), and the glint/seam caches keyed on the terrain version.
 
-- **Hub planes cache on `Interface`**: a `_hub_dirty` flag set on hub ticks and verb actions; non-event
-  frames skip the 20ms hub fill entirely and restore cached fields. 2/3 of frames now cost 0ms for observe.
-- **Native int sort** (`Ordering.cells_native`): pack Vector2i into int64, sort with
-  `PackedInt64Array.sort()` (C++ comparisons), unpack. Replaces `sort_custom(cell_less)` (GDScript Callable
-  comparisons). `WaterFlow.step` and all `Ordering.cells` callers use it. Water flow: 19ms → 10ms.
-- **Veil field cache key**: `terrain_version` (O(1), bumps on every terrain mutation) replaces
-  `hash(obs.materials)` (O(window), ~67K entries).
-- **Hub planes fill**: removed three `Ordering.cells()` sort calls where the results went into
-  dictionaries (iteration order doesn't matter for consumers). Hub fill: 20ms → 4ms.
-- Remaining ceiling: the veil lightmap build (4.7ms/frame, ~4,250 texels of GDScript math). Legacy's
-  base/scratch split would cut it to ~1ms but is a bigger port.
+| moving camera (15 s) | before | after |
+|---|---|---|
+| frame p50 / p99 / max | 8.9 / 93 / 112 ms | 5.6-7.4 / 21 / 24 ms |
+| frames over 16.7 ms per 5 s | 44 | 14-19 |
+| painters per frame | 6.0 ms | 2.0 ms |
+
+Standstill: zero frames over 16.7 ms. **Remaining:** a window-snap tick still filters ~17K plane entries
+(2-3 ms) and rebuilds the metre field (1.5 ms), so one 120 Hz frame can drop per snap; the sky painter is
+1 ms every frame. Captures of the REAL seat: `godot --path . -- --warp=col,row --zoom=Z --screenshot-tick=40
+--screenshot-out=PATH` (`shell/seat_flags.gd`).
 
 ### Instruments (post-A′)
 

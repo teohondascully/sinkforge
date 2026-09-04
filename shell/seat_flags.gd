@@ -1,0 +1,68 @@
+class_name SeatFlags
+extends RefCounted
+
+## THE SEAT'S COMMAND LINE, as a pure function of the argv so a test can pose it (D0390). `godot --path .`
+## takes no flags for a player; every flag here is for a smoke, a meter or a capture of the REAL seat --
+## the reveal scene (`tests/body/reveal_scene.gd`) is the agent's debug scene and its camera flag moves the
+## camera away from the body and its lamp, which is how a "deep" capture of the game came out black
+## (2026-09-04): 70 m from the only light, of course it did. A capture of the game has the miner IN it.
+##
+##   --quit-after=N          run N ticks and exit 0, printing the boot line (the smoke's flag)
+##   --perf / --perf-drive   the wall-clock frame meter, still or on a scripted walk (`FrameMeter`)
+##   --warp=col,row          stand the body on the nearest floor to a terrain cell before the first tick
+##   --zoom=Z                the camera zoom, overriding the saved setting
+##   --screenshot-tick=N     at tick N save the viewport to --screenshot-out, then quit unless
+##   --screenshot-out=PATH   --quit-after says otherwise
+
+const NO_WARP: Vector2i = Vector2i(-1, -1)
+
+
+static func parse(args: PackedStringArray) -> Dictionary:
+	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
+		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": ""}
+	for a: String in args:
+		if a.begins_with("--quit-after="):
+			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
+		elif a == "--perf":
+			f["perf"] = true
+		elif a == "--perf-drive":
+			f["perf"] = true
+			f["drive"] = true
+		elif a.begins_with("--warp="):
+			var parts: PackedStringArray = a.substr("--warp=".length()).split(",")
+			if parts.size() == 2:
+				f["warp"] = Vector2i(int(parts[0]), int(parts[1]))
+		elif a.begins_with("--zoom="):
+			f["zoom"] = maxf(float(a.substr("--zoom=".length())), 0.0)
+		elif a.begins_with("--screenshot-tick="):
+			f["screenshot_tick"] = int(a.substr("--screenshot-tick=".length()))
+		elif a.begins_with("--screenshot-out="):
+			f["screenshot_out"] = a.substr("--screenshot-out=".length())
+	return f
+
+
+## The nearest cell to `near` where a body can stand: air for the body's height above a solid floor,
+## searched in growing rings so the warp lands in the cave the caller pointed at, not inside its wall.
+## `NO_WARP` when nothing within `reach` cells qualifies.
+static func stand_near(grid: TileGrid, near: Vector2i, body_cells_tall: int, reach: int = 48) -> Vector2i:
+	for r: int in range(0, reach + 1):
+		for dy: int in range(r, -r - 1, -1):          # below first: a floor is found by falling
+			for dx_abs: int in range(0, r + 1):       # then the column closest to the one asked for
+				for dx: int in ([dx_abs] if dx_abs == 0 else [dx_abs, -dx_abs]):
+					if maxi(dx_abs, absi(dy)) != r:
+						continue
+					var c: Vector2i = near + Vector2i(dx, dy)
+					if _standable(grid, c, body_cells_tall):
+						return c
+	return NO_WARP
+
+
+## `c` is the cell the feet stand in: solid below it, air from it up through the body's height.
+static func _standable(grid: TileGrid, c: Vector2i, tall: int) -> bool:
+	if not grid.in_bounds(c) or not grid.in_bounds(c + Vector2i(0, 1)) or not grid.is_solid(c + Vector2i(0, 1)):
+		return false
+	for i: int in range(0, tall):
+		var up: Vector2i = c - Vector2i(0, i)
+		if not grid.in_bounds(up) or grid.is_solid(up):
+			return false
+	return true

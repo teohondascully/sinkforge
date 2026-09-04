@@ -55,8 +55,7 @@ const CELL: float = float(Interface.Observation.CELL_PX)
 
 var _glint: GlintPainter
 var _seams: Array[Dictionary] = []
-var _cached_rect: Rect2i = Rect2i()
-var _cached_hash: int = 0
+var _cached_key: Array = []
 var _has_cache: bool = false
 
 
@@ -145,12 +144,11 @@ static func seam_of(group: Array[Vector2i]) -> Dictionary:
 ## glint's population is (window + materials hash): which cells are exposed ore is a pure function of
 ## those two, and legacy refloods only on a dig near ore or a pan for the same reason.
 func seams_for(look: MaterialLook, obs: Interface.Observation) -> Array[Dictionary]:
-	var h: int = hash(obs.materials)
-	if _has_cache and _cached_rect == obs.window and _cached_hash == h:
+	var key: Array = [obs.window, obs.terrain_version]   # `GlintPainter.glint_cells` says why not a hash
+	if _has_cache and _cached_key == key:
 		return _seams
 	_seams = cluster(_glint.glint_cells(look, obs))
-	_cached_rect = obs.window
-	_cached_hash = h
+	_cached_key = key
 	_has_cache = true
 	return _seams
 

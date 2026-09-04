@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_the_planes_reach_the_door_as_copies()
 	_test_a_move_runs_the_hub_every_third_tick_and_events_are_consumed_once()
 	_test_the_window_bounds_the_metre_planes_and_observe_is_pure()
+	_test_the_hub_planes_are_kept_until_their_own_plane_moves()
 	_finish("interface_hub")
 
 
@@ -113,3 +114,38 @@ func _test_the_window_bounds_the_metre_planes_and_observe_is_pure() -> void:
 	_check(iface.state_signature() != before, "a hub tick (water settling) moves the session signature")
 	var again: Interface = Interface.new(world.grid, body, Mining.new())
 	_check(again.state_signature() != iface.state_signature(), "the compatibility constructor wraps the grid in fresh services: a different session")
+
+
+## The hub planes cache (2026-09-04): a hub tick that moved no plane refills nothing; a write to one plane
+## refills that plane and the observation reads the new content. Counted, not only checked for correctness,
+## for the same reason `plane_rebuilds` is -- a cache that recomputes every time passes every content assertion.
+func _test_the_hub_planes_are_kept_until_their_own_plane_moves() -> void:
+	_rig()
+	var env: Interface.Envelope = Interface.Envelope.new(Rect2i(0, 30, 24, 12))
+	var wet: Vector2i = world.terrain_cells_of(Vector2i(2, 9))[0]
+	world.water.set_level(wet, 3)
+	iface.observe(env)
+	var after_first: int = iface.hub_rebuilds()
+	_check(after_first >= 4, "the first observe filled every keyed plane (%d refills)" % after_first)
+	for _i: int in 3:
+		iface.apply(Command.move(InputFrame.new()))   # one hub tick, the water settling under it
+	var o: Interface.Observation = iface.observe(env)
+	var after_hub: int = iface.hub_rebuilds()
+	_check(o.water_at(wet) == 3 or o.wet_cells.size() > 0, "the water is still in the observation after the hub tick")
+	for _i: int in 3:
+		iface.apply(Command.move(InputFrame.new()))
+	iface.observe(env)
+	for _i: int in 3:
+		iface.apply(Command.move(InputFrame.new()))
+	iface.observe(env)
+	var settled: int = iface.hub_rebuilds()
+	for _i: int in 3:
+		iface.apply(Command.move(InputFrame.new()))
+	iface.observe(env)
+	_check(iface.hub_rebuilds() == settled, "once the water rests a hub tick refills no plane (%d after, %d before)" % [iface.hub_rebuilds(), settled])
+	_check(after_hub > after_first or settled > after_first, "and the settling ticks before it did refill the water plane (%d -> %d)" % [after_first, settled])
+	world.deposits.seed_lode(Vector2i(9, 36), &"ore_iron", 40)
+	var lode_only: int = iface.hub_rebuilds()
+	var moved: Interface.Observation = iface.observe(env)
+	_check(iface.hub_rebuilds() == lode_only + 2, "a lode write refills the lode and yield planes and nothing else (%d -> %d)" % [lode_only, iface.hub_rebuilds()])
+	_check(moved.lodes.has(Vector2i(9, 36)) and moved.lodes[Vector2i(9, 36)]["material"] == &"ore_iron", "and the observation reads the lode it was refilled from")

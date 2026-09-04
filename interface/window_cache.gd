@@ -54,12 +54,11 @@ var wall_builds: int = 0
 ## Refreshes whatever has gone stale and leaves the rest alone. `read_material` and `read_wall` are the
 ## grid's own getters, passed in rather than reached for, so this file needs no `TileGrid` import and the
 ## caller keeps deciding what a consumer is allowed to see.
-func refresh(window: Rect2i, version: int, want_walls: bool,
-		read_material: Callable, read_wall: Callable, surface_of: Callable) -> void:
+func refresh(window: Rect2i, version: int, want_walls: bool, grid: TileGrid, surface_of: Callable) -> void:
+	var world := Vector2i(grid.width, grid.height)
 	if _version != version or _window != window:
-		var blocks: Array = WindowPlanes.of(window, read_material)
-		materials = blocks[0]
-		legend = blocks[1]
+		materials = WindowPlanes.of_plane(window, grid.block_index, world)
+		legend = grid.legend
 		surface_y = surface_of.call(window)
 		_window = window
 		_version = version
@@ -67,9 +66,8 @@ func refresh(window: Rect2i, version: int, want_walls: bool,
 	# The wall plane has its own key, so declining it on one call and asking for it on the next does not
 	# invalidate the materials plane that is still perfectly good.
 	if want_walls and (_walls_version != version or _walls_window != window):
-		var background: Array = WindowPlanes.of(window, read_wall)
-		walls = background[0]
-		wall_legend = background[1]
+		walls = WindowPlanes.of_plane(window, grid.wall_index, world)
+		wall_legend = grid.legend
 		_walls_window = window
 		_walls_version = version
 		wall_builds += 1

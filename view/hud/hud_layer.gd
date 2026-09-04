@@ -78,3 +78,9 @@ func refresh() -> void:
 ## than the array so nothing outside can mutate the list this object maintains.
 func chip_count() -> int:
 	return _layers.size()
+
+
+## The chips themselves, for `DrawCost.report` -- a HUD chip is a `PaintLayer` and stamps its own cost,
+## and a frame budget that leaves the HUD out is measuring part of the frame.
+func layers() -> Array[PaintLayer]:
+	return _layers

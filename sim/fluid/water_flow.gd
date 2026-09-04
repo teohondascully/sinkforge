@@ -24,6 +24,10 @@ extends RefCounted
 static func step(water: WaterPlane, grid: TileGrid) -> void:
 	if water.is_empty():
 		return
+	# A plane at rest over unchanged terrain would settle to itself again: skip it (`WaterPlane.at_rest`).
+	if water.at_rest(grid):
+		return
+	var version_before: int = water.version
 	# --- 1. Gravity: every wet cell tries to fall, processed top-to-bottom. ---
 	var wet: Array[Vector2i] = Ordering.cells_native(water.levels)
 	for c: Vector2i in wet:
@@ -48,6 +52,7 @@ static func step(water: WaterPlane, grid: TileGrid) -> void:
 		if done.has(c):
 			continue
 		_settle_run(water, grid, snap, done, c)
+	water.note_rest(version_before, grid)
 
 
 ## One maximal horizontal open run, levelled. Split out of `step` only for the 50-line function cap

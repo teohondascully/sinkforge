@@ -181,15 +181,12 @@ static func _mount_hud(view: WorldView, stack: ViewStack) -> void:
 ## out to configure its own layer would be the coordinator contract (`docs/COORDINATOR_CONTRACT.md` §2a)
 ## inverted, and the painter would stop being a pure function of `(Frame, CanvasItem)`.
 static func _mount_veil(view: WorldView, ore: OrePainter = null, falling: FallingItems = null) -> void:
-	var veil: PaintLayer = view.add_stateful_painter(VeilPainter.new(ore, falling), &"paint_frame")
+	# THE GPU VEIL (D0390): `VeilLayer` feeds `veil.gdshader`, which multiplies (`render_mode blend_mul`)
+	# and evaluates `VeilPainter`'s expression per pixel; the layer sets its own material on first draw.
+	# `VeilPainter.paint_frame`, the CPU lightmap, is the reference it is checked against, not a fallback
+	# mounted here: two veils on one stack would darken the world twice.
+	var veil: PaintLayer = view.add_stateful_painter(VeilLayer.new(ore, falling), &"paint_frame")
 	veil.z_index = VEIL_Z
-	var veil_mat := CanvasItemMaterial.new()
-	veil_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_MUL
-	veil.material = veil_mat
-	# LINEAR is the half that makes one texel per metre read as a gradient rather than as a grid of
-	# squares: the hardware sampler does the interpolation the old per-cell loop was paying for.
-	# `project.godot` sets NEAREST project-wide for pixel art, so this must be stated per layer.
-	veil.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 
 
 ## THE HEAT HAZE (6p, D0379): a screen-space distortion whose strength is the plume quads' vertex alpha,

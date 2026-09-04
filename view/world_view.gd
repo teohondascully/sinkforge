@@ -334,11 +334,8 @@ func refresh() -> void:
 ## Per-painter draw cost for the last rendered frame, slowest first. `view/draw_cost.gd` owns the ranking
 ## and the naming; this owns only the layer list it reads. See that file for why a total is not enough.
 func draw_cost_report() -> String:
-	var rebuilds: String = ""
-	if _iface != null:
-		rebuilds = " plane_rebuilds=%d/%d ticks" % [_iface.plane_rebuilds(), _anim_ticks]
-	return "%s | refresh=%.2fms (observe=%.2fms)%s" % [DrawCost.report(_layers),
-		float(last_refresh_usec) / 1000.0, float(last_observe_usec) / 1000.0, rebuilds]
+	return DrawCost.frame_report(_layers, _hud.layers() if _hud != null else [], last_refresh_usec,
+		last_observe_usec, _iface, _anim_ticks)
 
 
 ## The cosmetic clock's current value, in seconds. Monotonic, deterministic in the number of rendered

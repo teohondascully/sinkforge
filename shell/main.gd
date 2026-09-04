@@ -39,23 +39,32 @@ var audio: SceneAudio = null
 var hands: PlayInput = PlayInput.new()
 var last_input: InputFrame = InputFrame.new()
 var save_path: String = SaveGame.SLOT
-## `--quit-after=N`: run N ticks and exit 0, printing the boot line with the count -- the smoke
-## `tools/check_headed_boot.sh` boots `godot --path .` with, so "the game runs" is a checked claim.
+## The seat's flags (`shell/seat_flags.gd`): `--quit-after=N` is the smoke's (`tools/check_headed_boot.sh`
+## boots with it, so "the game runs" is a checked claim); the meter, the warp and the screenshot are the
+## instrument's. A player passes none.
+var flags: Dictionary = SeatFlags.parse(PackedStringArray())
 var quit_after: int = -1
+## `--perf`: the wall-clock frame meter (`shell/frame_meter.gd`) prints a PERF line every five seconds
+## and at quit. Off by default; costs two clock reads a frame when on.
+var meter: FrameMeter = null
+## `--perf-drive`: with the meter, a scripted hand -- 240 ticks right, 240 left, a jump every 90 -- so
+## the meter measures a MOVING camera. Standstill numbers flatter every window-keyed cache (2026-09-04).
+var drive: bool = false
 
 
 func _ready() -> void:
-	quit_after = parse_quit_after(OS.get_cmdline_user_args())
+	flags = SeatFlags.parse(OS.get_cmdline_user_args())
+	quit_after = flags["quit_after"]
+	if flags["perf"]:
+		meter = FrameMeter.new()
+	drive = flags["drive"]
 	if autoboot:
 		boot(true)
 
 
-## The one flag the seat takes, as a pure function of the argv so a test can pose it.
+## Kept as the smoke's own entry point; `SeatFlags.parse` is the parser.
 static func parse_quit_after(args: PackedStringArray) -> int:
-	for a: String in args:
-		if a.begins_with("--quit-after="):
-			return maxi(int(a.substr("--quit-after=".length())), 0)
-	return -1
+	return SeatFlags.parse(args)["quit_after"]
 
 
 ## Build the session and the seat. Returns false when the start refuses.
@@ -72,12 +81,15 @@ func boot(load_save: bool) -> bool:
 	if camera.is_inside_tree():
 		camera.make_current()
 	zoom = CameraRig.ZOOM_LEVELS[clampi(Settings.zoom_idx, 0, CameraRig.ZOOM_LEVELS.size() - 1)]
+	if float(flags["zoom"]) > 0.0:
+		zoom = float(flags["zoom"])
 	camera.zoom = Vector2(zoom, zoom)
 	stack = ViewStack.build_stack(self, door, look, camera, true, falling, payouts)
 	view = stack.view
 	if load_save and FileAccess.file_exists(save_path):
 		restore(SaveGame.read(save_path))
 	var body: Body = door.services()["body"]
+	_warp(body)
 	rig.warp_to(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE))
 	camera.position = rig.step(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE), Vector2.ZERO, zoom, 1280.0, 0.0)
 	audio = SceneAudio.new()
@@ -88,6 +100,35 @@ func boot(load_save: bool) -> bool:
 	booted = true
 	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, SEED, START])
 	return true
+
+
+## `--warp=col,row`: stand the body on the nearest floor to the cell, for a capture of the game at depth.
+func _warp(body: Body) -> void:
+	var at: Vector2i = flags["warp"]
+	if at == SeatFlags.NO_WARP:
+		return
+	var grid: TileGrid = (door.services()["world"] as World).grid
+	var cell_px: int = Interface.Observation.CELL_PX
+	var feet: Vector2i = SeatFlags.stand_near(grid, at, (Body.HEIGHT_PX + cell_px - 1) / cell_px + 1)
+	if feet == SeatFlags.NO_WARP:
+		push_warning("--warp=%s: no floor within reach; the body stays at the spawn" % at)
+		return
+	body.place((feet.x * cell_px + cell_px / 2) * Fx.SCALE, ((feet.y + 1) * cell_px - Body.HEIGHT_PX / 2) * Fx.SCALE)
+	print("%s warped to feet cell %s" % [BOOT_LINE, feet])
+
+
+## `--screenshot-tick=N --screenshot-out=PATH`: the frame after tick N, saved; quits unless the smoke's
+## own flag is running the clock.
+func _shutter() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var img: Image = get_viewport().get_texture().get_image()
+	img.save_png(flags["screenshot_out"])
+	var body: Body = door.services()["body"]
+	print("%s screenshot %s tick=%d zoom=%.2f body_cell=(%d,%d)" % [BOOT_LINE, flags["screenshot_out"], tick, zoom,
+		Body._px_to_cell(body.pos_x), Body._px_to_cell(body.pos_y)])
+	if quit_after < 0:
+		get_tree().quit(0)
 
 
 ## The session with the shell's own key: the lessons the hints have taught.
@@ -110,9 +151,17 @@ func save() -> bool:
 	return SaveGame.write(save_path, capture_session())
 
 
+func _process(_delta: float) -> void:
+	if meter != null:
+		meter.note_process()
+		if meter.last_was_slow() and booted:
+			meter.note_slow("tick=%d %s" % [tick, view.draw_cost_report().left(160)])
+
+
 func _physics_process(delta: float) -> void:
 	if not booted:
 		return
+	var began: int = Time.get_ticks_usec()
 	var page_open: bool = stack.settings != null and stack.settings.open
 	var frame_in: InputFrame = _read_hands(page_open)
 	door.apply(Command.move(frame_in))
@@ -124,14 +173,34 @@ func _physics_process(delta: float) -> void:
 	view.refresh()
 	_effects(delta)
 	tick += 1
+	if meter != null:
+		_meter_tick(began)
+	if tick == int(flags["screenshot_tick"]) and String(flags["screenshot_out"]) != "":
+		_shutter()
 	if quit_after >= 0 and tick >= quit_after:
 		print("%s ticked=%d" % [BOOT_LINE, tick])
+		if meter != null:
+			print(meter.report())
+			print(view.draw_cost_report())
 		get_tree().quit(0)
 		return
 	var body: Body = door.services()["body"]
 	camera.position = rig.step(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE),
 		Vector2(float(body.vel_x), float(body.vel_y)) / float(Fx.SCALE), zoom, float(get_viewport().get_visible_rect().size.x), delta)
 	queue_redraw()
+
+
+## The meter's physics sample, split by whether this tick ran the hub; a report every 300 ticks.
+func _meter_tick(began: int) -> void:
+	var frame: Frame = view.current_frame()
+	var hub: bool = frame != null and frame.obs != null and frame.obs.tick % HubTick.HUB_TICK_DIVISOR == 0
+	meter.note_physics(Time.get_ticks_usec() - began, hub)
+	if tick % 300 == 0:
+		print(meter.report())
+		print(view.draw_cost_report())
+		for line: String in meter.slow:
+			print(line)
+		meter.reset()
 
 
 ## The hands, deaf while the settings page is open: a modal takes the keys, and the body stands still.
@@ -141,7 +210,20 @@ func _read_hands(page_open: bool) -> InputFrame:
 		return hands.read(func(_a: StringName) -> bool: return false, Vector2.ZERO, cell_px, func(_c: Vector2i) -> bool: return false)
 	var grid: TileGrid = (door.services()["world"] as World).grid
 	var grid_ok: Callable = func(c: Vector2i) -> bool: return grid.in_bounds(c)
+	if drive:
+		return hands.read(_driven, Controls.pointer_world(self), cell_px, grid_ok)
 	return hands.read(Controls.pressed, Controls.pointer_world(self), cell_px, grid_ok)
+
+
+## The scripted hand for `--perf-drive`, a pure function of the tick.
+func _driven(action: StringName) -> bool:
+	if action == Controls.RIGHT:
+		return tick % 480 < 240
+	if action == Controls.LEFT:
+		return tick % 480 >= 240
+	if action == Controls.JUMP:
+		return tick % 90 < 4
+	return false
 
 
 static func _digit_down(i: int) -> bool:

@@ -6,12 +6,14 @@ extends RefCounted
 const N: int = LogicGrid.TERRAIN_PER_LOGIC
 
 
-static func fill(o: RefCounted, world: World, items: Items, machines: Machines) -> void:
+static func fill(o: RefCounted, world: World, items: Items, machines: Machines, cache: HubCache) -> void:
 	var w: Rect2i = o.window
 	o.logic_window = Rect2i(Vector2i(Aim.floor_div(w.position.x, N), Aim.floor_div(w.position.y, N)), Vector2i.ZERO)
 	var far := Vector2i((w.end.x + N - 1) / N, (w.end.y + N - 1) / N)
 	o.logic_window.size = far - o.logic_window.position
-	_fill_terrain_planes(o, world, w)
+	_fill_water(o, world, w, cache)
+	_fill_deposits(o, world, w, cache)
+	_fill_placed(o, world, cache)
 	_fill_metre_planes(o, world, items, machines)
 	o.ore_default = DepositPlane.DEFAULT_ORE_DEPOSIT
 	o.pack = items.pack.slots()
@@ -23,44 +25,79 @@ static func fill(o: RefCounted, world: World, items: Items, machines: Machines) 
 	o.winch_transit = machines.winch_transit.duplicate(true)
 
 
-static func _fill_terrain_planes(o: RefCounted, world: World, w: Rect2i) -> void:
-	o.water = PackedByteArray()
-	o.water.resize(w.size.x * w.size.y)
-	var wet: Array[Vector2i] = []   # typed local, then assigned: an untyped `[]` cannot land on a typed field
-	for terrain_cell: Vector2i in world.water.wet_terrain_cells():
+## The keys of `keyed` inside `w`, in scan order: filter first, then sort the few that are in the window.
+static func _inside(keyed: Dictionary, w: Rect2i) -> Array[Vector2i]:
+	var hit: Dictionary = {}
+	for terrain_cell: Vector2i in keyed:
 		if w.has_point(terrain_cell):
-			o.water[(terrain_cell.y - w.position.y) * w.size.x + (terrain_cell.x - w.position.x)] = world.water.water_at(terrain_cell)
-			wet.append(terrain_cell)
-	o.wet_cells = wet
-	o.lodes = {}
-	for terrain_cell: Vector2i in world.deposits.lode_terrain_cells():
-		if w.has_point(terrain_cell):
-			o.lodes[terrain_cell] = {"material": world.deposits.lode_at(terrain_cell),
+			hit[terrain_cell] = true
+	return Ordering.cells_native(hit)
+
+
+static func _fill_water(o: RefCounted, world: World, w: Rect2i, cache: HubCache) -> void:
+	var key: Array = [world.water.version, w]
+	if cache.water_key != key:
+		cache.rebuilds += 1
+		cache.water_key = key
+		cache.water = PackedByteArray()
+		cache.water.resize(w.size.x * w.size.y)
+		cache.wet_cells = _inside(world.water.levels, w)
+		for terrain_cell: Vector2i in cache.wet_cells:
+			cache.water[(terrain_cell.y - w.position.y) * w.size.x + (terrain_cell.x - w.position.x)] = world.water.water_at(terrain_cell)
+	o.water = cache.water
+	o.wet_cells = cache.wet_cells
+
+
+static func _fill_deposits(o: RefCounted, world: World, w: Rect2i, cache: HubCache) -> void:
+	var lode_key: Array = [world.deposits.version, world.grid.terrain_version, w]   # `ore_deposit_at` reads solidity
+	if cache.lode_key != lode_key:
+		cache.rebuilds += 1
+		cache.lode_key = lode_key
+		cache.lodes = {}
+		for terrain_cell: Vector2i in _inside(world.deposits.lode, w):
+			cache.lodes[terrain_cell] = {"material": world.deposits.lode_at(terrain_cell),
 				"amount": world.deposits.ore_deposit_at(world.grid, terrain_cell),
 				"permille": world.deposits.lode_permille(terrain_cell)}
-	o.ore_yield = {}
-	for terrain_cell: Vector2i in world.deposits.deposits:
-		if w.has_point(terrain_cell) and not o.lodes.has(terrain_cell) and world.grid.is_solid(terrain_cell):
-			o.ore_yield[terrain_cell] = int(world.deposits.deposits[terrain_cell])
+	o.lodes = cache.lodes
+	var yield_key: Array = [world.deposits.version, world.grid.terrain_version, w]   # reads solidity too
+	if cache.yield_key != yield_key:
+		cache.rebuilds += 1
+		cache.yield_key = yield_key
+		cache.ore_yield = {}
+		for terrain_cell: Vector2i in world.deposits.deposits:
+			if w.has_point(terrain_cell) and not cache.lodes.has(terrain_cell) and world.grid.is_solid(terrain_cell):
+				cache.ore_yield[terrain_cell] = int(world.deposits.deposits[terrain_cell])
+	o.ore_yield = cache.ore_yield
 	o.ore_like_legend = PackedByteArray()
 	o.ore_like_legend.resize(o.legend.size())
 	for i: int in o.legend.size():
 		o.ore_like_legend[i] = 1 if WorldMaterials.is_ore_like(StringName(o.legend[i])) else 0
 
 
+static func _fill_placed(o: RefCounted, world: World, cache: HubCache) -> void:
+	var lw: Rect2i = o.logic_window
+	var key: Array = [world.logic.version, lw]
+	if cache.placed_key != key:
+		cache.rebuilds += 1
+		cache.placed_key = key
+		cache.placed = {}
+		cache.conduit_tiers = {}
+		for cell: Vector2i in world.logic.placed:
+			if lw.has_point(cell):
+				cache.placed[cell] = world.logic.placed[cell]
+				if world.logic.has_conduit(cell):
+					cache.conduit_tiers[cell] = world.logic.conduit_tier(cell)
+		cache.saplings = {}
+		for cell: Vector2i in world.logic.sapling_logic_cells():
+			if lw.has_point(cell):
+				cache.saplings[cell] = world.logic.sapling_age(cell)
+	o.placed = cache.placed
+	o.conduit_tiers = cache.conduit_tiers
+	o.saplings = cache.saplings
+
+
 static func _fill_metre_planes(o: RefCounted, world: World, items: Items, machines: Machines) -> void:
 	var lw: Rect2i = o.logic_window
-	o.placed = {}
-	o.conduit_tiers = {}
-	for cell: Vector2i in world.logic.placed:
-		if lw.has_point(cell):
-			o.placed[cell] = world.logic.placed[cell]
-			if world.logic.has_conduit(cell):
-				o.conduit_tiers[cell] = world.logic.conduit_tier(cell)
-	o.saplings = {}
-	for cell: Vector2i in world.logic.sapling_logic_cells():
-		if lw.has_point(cell):
-			o.saplings[cell] = world.logic.sapling_age(cell)
 	var records: Array[Dictionary] = []   # typed here: `o` is reached dynamically and an untyped [] refuses
 	for m: MachineState in machines.machines:
 		if lw.has_point(m.logic_cell):

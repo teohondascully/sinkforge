@@ -1,5 +1,5 @@
 class_name TileGrid
-extends RefCounted
+extends SignedPlane
 
 ## The single source of truth for "what is at this cell" -- solid rock, an excavated void, what
 ## material. `sim/world/MODULE.md`: foundational, nearly everything else queries or mutates this.
@@ -33,7 +33,13 @@ var _walls: Dictionary = {}   # terrain_cell: Vector2i -> material: StringName
 ## `_walls` themselves; this is derived bookkeeping about how many times they were touched, and two worlds
 ## that hold identical cells must hash identically however they got there. Including it would make a
 ## replay that reached the same world by a different route look like a divergence.
-var terrain_version: int = 0
+## `SignedPlane.version` under the name every cache on the terrain already keys on (D0340): one counter,
+## bumped in the one `_xor_term` every mutation passes through. D0390 made the plane's origin its base.
+var terrain_version: int:
+	get:
+		return version
+	set(v):
+		version = v
 var _dig_extent: Dictionary = {}  # col: int -> Vector2i(min_row_ever_dug, max_row_ever_dug)
 
 ## THE COARSE PLANE (A' step 6i, D0371): one CLASS byte per LOGIC cell, row-major over
@@ -52,23 +58,25 @@ var coarse: PackedByteArray = PackedByteArray()
 var coarse_width: int = 0
 var coarse_height: int = 0
 var coarse_version: int = 0
+## THE FLAT INDEX PLANES (D0390): one byte per terrain cell, row-major over `width x height`, holding the
+## ordinal in `legend` of the cell's block (`block_index`) or wall (`wall_index`); 0 is air. Maintained at
+## the same three mutators as `coarse`, never rebuilt, outside the signature. They exist so a window of the
+## world is row SLICES (`WindowPlanes.of_plane`) instead of a Callable and a hashed lookup per cell -- the
+## remedy `interface/window_planes.gd` recorded from legacy's `factory_sim.gd:795`, done as a derived
+## plane beside the dictionary rather than as a change to what the signature is computed over.
+## `legend` is per grid, index 0 the empty id, every other id appended when first written, never reordered.
+var legend: PackedStringArray = PackedStringArray([""])
+var _ordinal: Dictionary = {&"": 0}
+var block_index: PackedByteArray = PackedByteArray()
+var wall_index: PackedByteArray = PackedByteArray()
 
-## D0261. Two 32-bit XOR lanes carrying `state_signature()` incrementally, so a checkpoint costs nothing
-## instead of re-serialising the whole grid. MEASURED, not assumed: at 47,603 occupied cells one
+## D0261's two 32-bit XOR lanes (`_sig_a`, `_sig_b`) and `_xor_term` are inherited from `SignedPlane`
+## since D0390 -- this file was the pattern's origin and carried a private copy until the duplication gate
+## refused it. The arithmetic is unchanged: MEASURED, not assumed, at 47,603 occupied cells one string
 ## signature was a **1,148,776-character string taking 109.55 ms**, and `test_shaft_replay_determinism`
-## builds 200 of them in each of three processes -- 21.9 s per process, **65.7 s of the suite's 72 s**.
-##
-## XOR because the accumulator must be order-independent AND self-inverting: cells arrive in whatever
-## order generation and digging touch them, and `excavate` has to REMOVE a cell's contribution without
-## rebuilding. XOR gives both for free, and its usual weakness -- equal terms cancelling -- cannot arise
-## here because every term is keyed by the coordinate it belongs to, so no two live terms are equal.
-##
-## Two lanes with different multipliers rather than one 64-bit accumulator: GDScript ints are signed
-## 64-bit and multiplication wraps silently, so staying inside 32 bits per lane keeps every operation
-## provably in range (`sim/terrain_gen/value_noise.gd` makes the same choice for the same reason). Two
-## independent 32-bit lanes give the collision resistance of one 64-bit hash without the overflow.
-var _sig_a: int = 0
-var _sig_b: int = 0
+## builds 200 of them in each of three processes -- so the lanes exist, and XOR because the accumulator
+## must be order-independent AND self-inverting (`excavate` removes a cell's contribution without a
+## rebuild). Two lanes rather than one 64-bit accumulator because GDScript ints wrap silently past 63 bits.
 
 
 func _init(p_width: int, p_height: int, p_seed: int) -> void:
@@ -78,6 +86,8 @@ func _init(p_width: int, p_height: int, p_seed: int) -> void:
 	coarse_width = ceili(float(width) / float(LogicGrid.TERRAIN_PER_LOGIC))
 	coarse_height = ceili(float(height) / float(LogicGrid.TERRAIN_PER_LOGIC))
 	coarse.resize(coarse_width * coarse_height)
+	block_index.resize(width * height)
+	wall_index.resize(width * height)
 
 
 ## The class a terrain cell would give its logic cell: what the coarse plane holds at that cell's centre.
@@ -119,7 +129,7 @@ func get_material(terrain_cell: Vector2i) -> StringName:
 
 func set_material(terrain_cell: Vector2i, material_id: StringName) -> void:
 	_write_layer(_blocks, terrain_cell, material_id)
-	_coarse_refresh(terrain_cell)
+	_stamp(terrain_cell, material_id, true)
 
 
 func get_wall(terrain_cell: Vector2i) -> StringName:
@@ -133,6 +143,17 @@ func get_wall(terrain_cell: Vector2i) -> StringName:
 ## recomputed one, which is exactly what `_recomputed_signature()` exists to catch.
 func set_wall(terrain_cell: Vector2i, material_id: StringName) -> void:
 	_write_layer(_walls, terrain_cell, material_id)
+	_stamp(terrain_cell, material_id, false)
+
+
+## After a layer write: the flat index plane and the coarse class, the two derived planes.
+func _stamp(terrain_cell: Vector2i, material_id: StringName, block: bool) -> void:
+	if in_bounds(terrain_cell):
+		var i: int = terrain_cell.y * width + terrain_cell.x
+		if block:
+			block_index[i] = ordinal_of(material_id)
+		else:
+			wall_index[i] = ordinal_of(material_id)
 	_coarse_refresh(terrain_cell)
 
 
@@ -145,7 +166,24 @@ func is_solid(terrain_cell: Vector2i) -> bool:
 func excavate(terrain_cell: Vector2i) -> void:
 	_xor_term(_cell_term(terrain_cell))
 	_blocks.erase(terrain_cell)
+	if in_bounds(terrain_cell):
+		block_index[terrain_cell.y * width + terrain_cell.x] = 0
 	_coarse_refresh(terrain_cell)
+
+
+## The byte `legend` gives a material id; a first-seen id joins the legend. A grid holds at most 255 ids,
+## which is an error worth hearing about rather than a wrapped byte.
+func ordinal_of(material_id: StringName) -> int:
+	var known: Variant = _ordinal.get(material_id)
+	if known != null:
+		return int(known)
+	if legend.size() >= 256:
+		push_error("TileGrid.ordinal_of: more than 255 material ids on one grid (%s)" % material_id)
+		return 0
+	var i: int = legend.size()
+	legend.append(String(material_id))
+	_ordinal[material_id] = i
+	return i
 
 
 ## D0125: `_dig_extent`'s own high/low-water-mark update, per column, and its authority ("what should
@@ -236,16 +274,6 @@ func _write_layer(layer: Dictionary, terrain_cell: Vector2i, material_id: String
 	_xor_term(_cell_term(terrain_cell))  # in with the new
 
 
-func _xor_term(t: Vector2i) -> void:
-	_sig_a ^= t.x
-	_sig_b ^= t.y
-	# EVERY TERRAIN MUTATION PASSES THROUGH HERE, which is the whole reason the counter lives in this
-	# function rather than in the three public mutators: `set_material`, `set_wall` and `excavate` all
-	# reach it, and a fourth mutator added later cannot avoid it without also breaking the signature.
-	# A cache keyed on this cannot go stale behind a write nobody remembered to announce (D0340).
-	terrain_version += 1
-
-
 ## A deep copy: same cells, same walls, same dig extents, same signature, sharing no state with the
 ## original. Exists for tests that need N independent copies of one expensive world (D0267) --
 ## `ShaftGenerator.generate` is ~858 ms for a 48x1024 shaft, of which ~414 ms is five-octave noise, so a
@@ -270,6 +298,10 @@ func clone() -> TileGrid:
 	copy._sig_b = _sig_b
 	copy.coarse = coarse.duplicate()
 	copy.coarse_version = coarse_version
+	copy.legend = legend.duplicate()
+	copy._ordinal = _ordinal.duplicate()
+	copy.block_index = block_index.duplicate()
+	copy.wall_index = wall_index.duplicate()
 	return copy
 
 

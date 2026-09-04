@@ -17,6 +17,11 @@ extends RefCounted
 
 var _sig_a: int = 0
 var _sig_b: int = 0
+## DERIVED BOOKKEEPING, outside the signature and the save, `TileGrid.terrain_version`'s twin: bumps on
+## every term that moves through the sandwich, so a cache keyed on it cannot go stale behind a write --
+## no mutator on any subclass can reach the lanes without passing here. Two bumps a write (out, in) is
+## fine for a key; nothing reads it as a count.
+var version: int = 0
 
 
 ## The record at `key` as a two-lane term, or ZERO when absent. Override.
@@ -27,6 +32,7 @@ func _term_of(_key: Variant) -> Vector2i:
 func _xor_term(t: Vector2i) -> void:
 	_sig_a ^= t.x
 	_sig_b ^= t.y
+	version += 1
 
 
 ## The sandwich for a one-integer-per-key plane: a value at or below zero erases the record.

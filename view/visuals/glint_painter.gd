@@ -97,6 +97,24 @@ static func is_exposed_face(obs: Interface.Observation, c: Vector2i) -> bool:
 	return false
 
 
+## `is_exposed_face` on the plane's own bytes: a solid cell with an air (0) neighbour on one of its four
+## faces, where a neighbour past the plane's edge reads as air exactly as `solid_at` answers false there.
+## Byte reads instead of four `material_at` lookups: the scan visits every buried ore cell to find the
+## exposed ones, and there are thousands of those in a window (D0390).
+static func exposed_index(materials: PackedByteArray, at: int, w: int, h: int) -> bool:
+	if materials[at] == 0:
+		return false
+	var x: int = at % w
+	var y: int = at / w
+	if x == 0 or materials[at - 1] == 0:
+		return true
+	if x == w - 1 or materials[at + 1] == 0:
+		return true
+	if y == 0 or materials[at - w] == 0:
+		return true
+	return y == h - 1 or materials[at + w] == 0
+
+
 ## Whether this cell can EVER glint, ignoring time: an exposed face of a glittering, nugget-bearing
 ## material. Split from the time term so a test can pose the population without posing the clock — and so
 ## the two can fail separately, which they did twice: the first version returned true for coal, and the
@@ -193,29 +211,46 @@ static func _star(ci: CanvasItem, p: Vector2, flare: float, metre_px: float, nug
 ## those two are exactly what the key holds. The time term is deliberately NOT cached: the flare cycle
 ## moves every frame and is three cheap arithmetic ops, so caching it would freeze the animation.
 var _cells: Array[Vector2i] = []
-var _cached_rect: Rect2i = Rect2i()
-var _cached_hash: int = 0
+var _cached_key: Array = []
 var _has_cache: bool = false
 
 
 ## The cells in this observation's window that can ever glint, from the cache when nothing that feeds it
-## has changed. A miss costs what the old per-frame scan always cost; a hit costs one hash.
+## has changed. KEYED ON THE WINDOW AND THE TERRAIN VERSION, not a hash of the plane: hashing ~80K bytes
+## a frame was 0.5 ms of every frame, and the miss path visited every cell through `material_at` and a
+## record lookup -- 25-33 ms on every camera move (D0390). A miss now asks the plane, natively, where each
+## glittering ordinal occurs (`PackedByteArray.find`), and visits only those. A posed observation that
+## changes its plane without bumping `terrain_version` is posing a state the door never produces.
 func glint_cells(look: MaterialLook, obs: Interface.Observation) -> Array[Vector2i]:
-	var h: int = hash(obs.materials)
-	if _has_cache and _cached_rect == obs.window and _cached_hash == h:
+	var key: Array = [obs.window, obs.terrain_version]
+	if _has_cache and _cached_key == key:
 		return _cells
 	var found: Array[Vector2i] = []
 	var w: Rect2i = obs.window
-	for col: int in range(w.position.x, w.end.x):
-		for row: int in range(w.position.y, w.end.y):
-			var c := Vector2i(col, row)
-			if can_glint(look, obs, c):
-				found.append(c)
+	if look != null and w.size.x > 0:
+		for g: int in glittering_ordinals(obs.legend):
+			var at: int = obs.materials.find(g)
+			while at >= 0:
+				if exposed_index(obs.materials, at, w.size.x, w.size.y):
+					found.append(Vector2i(w.position.x + at % w.size.x, w.position.y + at / w.size.x))
+				at = obs.materials.find(g, at + 1)
+	found.sort()   # column-major, the order the per-cell scan produced
 	_cells = found
-	_cached_rect = w
-	_cached_hash = h
+	_cached_key = key
 	_has_cache = true
 	return _cells
+
+
+## The legend indices of every material that can glint: has a nugget colour and glitters.
+static func glittering_ordinals(legend: PackedStringArray) -> PackedInt32Array:
+	var out: PackedInt32Array = PackedInt32Array()
+	for i: int in legend.size():
+		if legend[i] == "":
+			continue
+		var rec: Dictionary = MaterialsRecords.RECORDS.get(legend[i], {})
+		if rec.has("nugget_color") and bool(rec.get("glitters", false)):
+			out.append(i)
+	return out
 
 
 ## The cached path. Identical picture to `paint` above, which is KEPT as the per-cell reference the way
