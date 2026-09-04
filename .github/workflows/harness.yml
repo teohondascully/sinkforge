@@ -416,6 +416,7 @@ jobs:
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
+      #   test_relief.gd                                 test_relief (legacy's surface: pad, waves off an integer sine table, scarps — A' 8b, D0382)
       #   test_shaft_generator.gd                        test_shaft_generator
       #   test_carve_fraction.gd                         test_carve_fraction (HOW MUCH of the world opens -- WG-2/WG-3's instrument, split from test_shaft_generator at the file cap, D0307)
       #   test_ore_bodies.gd                             test_ore_bodies (vein size distribution — the only thing that can see WG-4, D0305)
@@ -479,7 +480,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 115 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 116 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -539,6 +540,7 @@ jobs:
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \
+            res://tests/test_relief.gd \
             res://tests/test_shaft_generator.gd \
             res://tests/test_carve_fraction.gd \
             res://tests/test_ore_bodies.gd \

@@ -531,6 +531,11 @@ checkpoints by a local macOS run that digs 360 times; "diverges at checkpoint 3"
 four float sites stay (IEEE basic ops only). The content half is the remaining work: config-gated passes,
 one switch-on commit for `shallow_clay`, one re-pin.**
 
+**Status (2026-09-03):** 8a the determinism half — DONE by measurement (D0381). 8b relief and scarps —
+DONE (D0382: `Relief`, the surface a row per column through every pass, `SIN_MILLI`; 44 assertions; the
+golden unchanged). Next: 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts, 8e aquifers and
+lodes on the planes, 8f the richness field, 8g trees, 8h the switch-on for `shallow_clay` and the re-pin.
+
 ---
 
 ## 5. The determinism specifics

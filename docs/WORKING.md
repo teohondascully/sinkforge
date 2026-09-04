@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -216,14 +216,21 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   payloads, capture, keys). `ViewStack`, `SceneAudio`, `MinerDraw` moved into `view/`; the hints' lessons
   ride the save. 36 assertions; `check_headed_boot.sh` case C boots `godot --path .` to its thirtieth
   tick. Owed: the settings page's remap rows for the eleven new actions.
+- **Step 8a — done by measurement (D0381).** Gate 8's golden, pinned from CI Linux, matched at all 200
+  checkpoints by a local macOS-arm64 run that digs generated terrain 360 times (ALL PASS 21). The plan's
+  "diverges at checkpoint 3" was D0167's world; the four float sites use IEEE basic ops only and stay.
+- **Step 8b — done (D0382).** `sim/terrain_gen/relief.gd` (`Relief`): legacy's pad, three waves and
+  scarps, the sines from `SIN_MILLI` (a 256-entry integer table), all integer; the generator's surface
+  is a row per column through every pass (`CavePasses` take per-column floors). Config-gated on a site's
+  `relief:` key — `shallow_clay` has none yet, so the golden is unchanged. 44 assertions.
 
 ### Next action
 
-**Step 6, the views the systems unblock and the boot main scene** (plan §4 step 6, §3.2's view table in
-`PORT_ORDER.md`'s sequence): `water_painter.gd` (no water painter exists), the machine look/painter and
-the item/status looks, `payouts.gd`, `falling_items.gd` on the consumed flow-event channel, the sfx
-beds, the HUD split (hotbar, inspector, minimap, objective card, alerts), hints/hover/objectives with
-every content table re-authored, the settings page; and the boot main scene in `shell/` (no main scene
-exists; `--play` is a debug scene; the view never calls `apply`). Look verdicts are the director's. Then
-step 7 (economy, director-scoped rulings) and step 8 (cross-platform determinism). **Open rulings from
+**Step 8, the worldgen content** (plan §4 step 8, second half; D0381 set the shape): each pass
+config-gated on a site key, committed green with the world unchanged, then one switch-on commit for
+`shallow_clay` with one golden re-pin from CI Linux. Remaining: 8c rifts and sinkhole mouths (the width
+sine and the `pow` flare as integer tables), 8d ledges, spires, rubble and droughts, 8e aquifers and lodes
+on the water and deposit planes (`ShaftGenerator.enrich(world, site, seed)` after `World.new`), 8f the
+richness field, 8g trees (two material records), 8h the switch-on and re-pin. Step 7 (economy) is
+director-scoped and stops at the director. **Open rulings from
 step 5 (plan §8):** the resolver (the swing's collision stand-in), the ramp glide.

@@ -47,6 +47,9 @@ per-tick phase order.
 - `StrataData` (`strata_data.gd`) — reads `data/strata/generated.gd`, codegen'd from
   `data/strata/*.yaml`. `.get_site(id)`, `.exists(id)`. Same mechanism as `sim/world/materials.gd` —
   `docs/adr/0004-data-codegen.md`.
+- `Relief` (`relief.gd`) — legacy's surface: `.surface_rows(site, width, datum, cells_per_m)` is a row
+  per column (the datum everywhere without a `relief` key), `.ground_row`, `.terrace`, `.on_scarp`; the
+  sines come from `SIN_MILLI`, an integer table (A' 8b, D0382). Every pass measures from this array.
 - `ValueNoise` (`value_noise.gd`) — engine-free 2D noise, `.sample(x, y, seed) -> float` in roughly
   [-1, 1]. Real `float` arithmetic, one of the four D0183 sites on the generation path that depart from
   `docs/ARCHITECTURE.md`'s fixed-point rule. Measured bit-identical across macOS-arm64 and CI's

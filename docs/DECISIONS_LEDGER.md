@@ -16176,3 +16176,49 @@ the 200/200 comes from the suite's own PASS line, not from its notes.
 **Gaps:** one platform pair, one seed, one scenario. A libm call introduced into the generation path
 (sin, cos, pow, exp) would break this silently at the next re-pin — which is exactly why the content
 half ports its four transcendental shapes as integer tables.
+
+## D0382 · 2026-09-03 · A′ step 8b: the surface is a row per column — legacy's pad, waves and scarps ported as `Relief`, the sines an integer table, every pass measuring from the column's own ground
+
+**Decided:** (1) `sim/terrain_gen/relief.gd` (`Relief`) is legacy's `ground_row`/`terrace`/`on_scarp`
+(`heightmap_world_gen.gd:122-163`): a flat pad about the start's spawn column, one wave fading in over the
+first ramp beyond it and two over the second, authored scarps stepping the terraces, the whole clamped to
+an authored rise and fall. Every quantity is an integer; the three sines read `SIN_MILLI`, a 256-entry
+table of `round(sin(2πi/256)·1000)` indexed by an angle in 1/65536ths of a turn, because `sin` is libm
+and the generation path may not call it (D0381). The record (`relief:` in a site, schema-optional) keeps
+legacy's units — metres and radians — so each number can be checked against its source line; they convert
+once with a multiply, a divide and a round. A site without the key is flat at the datum: the generator
+as it was. (2) The generator's surface is a `PackedInt32Array`, a row per column, threaded through
+`_fill_base`, `_carve_caves`, both `CavePasses` (their `min_depth: int` became `floors`, with `lowest()`
+for the one-number pre-check so a flat floor reproduces the scalar draw for draw), the ore and coal
+scatters and the reveal scatter; iron, the ruin and the layer thresholds keep the absolute row, as
+legacy's `DEEPSLATE_ROW` and seal did. Attempt counts are taken from the datum, so a site seeds the same
+number of veins whatever its relief. (3) Evaluated per terrain column, a quarter metre, rather than per
+legacy metre: the hills legacy rounded to metre steps come out in quarter-metre steps here, at most one
+cell between neighbours off a scarp face (measured, below). (4) The config the tests carry, and that the
+switch-on commit will author for `shallow_clay`: pad centre 32 m (the tutorial's spawn), half-width 10 m
+(legacy's −9/+10 about `SPAWN_COL`), ramp 16 m, legacy's three waves verbatim, two of its three scarps
+(+5 m at 10 m, +4 m at 52 m: the plateau to the left, the lowland to the right) at half its distances
+because this world is half as wide, and the third fell beyond the edge. Data, so a re-tune is a yaml
+edit. (5) `shallow_clay` carries no key yet, so the world — and the golden — are unchanged.
+
+**Why:** plan step 8's content half, first item: "relief and scarps (`heightmap:122-163`)", with
+`heightmap:129-135`'s sines as an integer table. The per-column surface is the precondition for every
+later pass legacy measured from `ground_row(col)`: rifts, sinkhole mouths, droughts, trees.
+
+**Evidence:** `tests/test_relief.gd` 44: the table's quarter points, octant (707) and odd symmetry, rising
+through the first quarter; `sin_milli` wrapping and taking a negative angle; the conversions worked by hand
+(548, 782, 287 units a column; 5215 and 17732 for the phases; 3400 and 6400 milli-cells); half-away
+rounding; no key → every column at the datum; the pad columns 88..168 all at the datum with 143 columns
+off it and a 25-cell extreme as the control; the steepest off-scarp step 1 cell against a scarp face of 4;
+the second scarp's terrace +16 over its span, the pad's first column the terrace zero, `on_scarp` the
+half-open span; all 31 left columns more than 2.5 m up and all 36 past column 220 more than 2 m down; the
+clamp; a generated world solid at each column's authored row with nothing above it; the cave band
+protected under every column, with the control that fails harder: the same 4-cell disc under a valley
+column opens 57 cells and breaches 9 columns' bands with the scalar floor and opens 0 with the per-column
+one. Neighbours: cave_passes 24, cave_geometry 20, shaft_generator 34, carve_fraction 6, and
+shaft_replay_determinism ALL PASS 21 with the golden matched at 200 of 200 after the refactor — the
+per-column threading moved nothing in the flat world.
+
+**Gaps:** no site carries the key yet, so no body has walked these hills; the seeder validates a record's
+cells in bounds, not that the pad is flat under its footprint — that assertion lands with the switch-on.
+The relief is seed-independent, as legacy's was.

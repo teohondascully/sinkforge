@@ -40,6 +40,12 @@ func _deep_row() -> int:
 	return H / 2
 
 
+## One floor for every column: the passes take a per-column floor since A' step 8b (D0382); a flat one is
+## the scalar these tests were written against.
+func _floors(row: int) -> PackedInt32Array:
+	return Relief.flat(W, row)
+
+
 ## Open cells over a row range. ONE function with two bindings rather than two functions: the
 ## duplication gate (D0099) caught the first version, where "how much of the world is open" and "did
 ## anything breach the protected band" were byte-identical under identifier normalization. It was right
@@ -66,13 +72,13 @@ func _test_both_passes_open_cells_rather_than_running_and_doing_nothing() -> voi
 	var grid: TileGrid = _solid_world()
 	_check(_void_count(grid) == 0, "sanity: the fixture starts completely solid (%d void)" % _void_count(grid))
 	var rng: SplitRng = SplitRng.new(2026).split("carve_passes")
-	var halls: int = CavePasses.carve_big_caverns(grid, rng, _deep_row(), MIN_DEPTH, CELLS_PER_M)
+	var halls: int = CavePasses.carve_big_caverns(grid, rng, _deep_row(), _floors(MIN_DEPTH), CELLS_PER_M)
 	_check(halls > 0, "the cavern pass opens cells (%d)" % halls)
 	_check(_void_count(grid) == halls,
 		"and the grid holds exactly that many (%d vs %d) -- the count is the world, not a tally kept "
 		% [_void_count(grid), halls] + "beside it")
 	var after_halls: int = _void_count(grid)
-	var worms: int = CavePasses.carve_tunnels(grid, rng, MIN_DEPTH, CELLS_PER_M)
+	var worms: int = CavePasses.carve_tunnels(grid, rng, _floors(MIN_DEPTH), CELLS_PER_M)
 	_check(worms > 0, "the tunnel pass opens cells (%d)" % worms)
 	_check(_void_count(grid) > after_halls,
 		"and the world has more void after it than before (%d -> %d)" % [after_halls, _void_count(grid)])
@@ -113,8 +119,8 @@ func _band_openings(grid: TileGrid) -> int:
 func _carved_with(seed: int, min_depth: int) -> TileGrid:
 	var grid: TileGrid = _solid_world()
 	var rng: SplitRng = SplitRng.new(seed).split("carve_passes")
-	CavePasses.carve_big_caverns(grid, rng, _deep_row(), min_depth, CELLS_PER_M)
-	CavePasses.carve_tunnels(grid, rng, min_depth, CELLS_PER_M)
+	CavePasses.carve_big_caverns(grid, rng, _deep_row(), _floors(min_depth), CELLS_PER_M)
+	CavePasses.carve_tunnels(grid, rng, _floors(min_depth), CELLS_PER_M)
 	return grid
 
 
@@ -138,7 +144,7 @@ func _test_the_worms_thread_the_pockets_into_one_system() -> void:
 		"sanity: the fixture really is a field of SEPARATE pockets (%d regions, largest %d of %d open)"
 		% [before_regions, before_largest, before_void])
 	var rng: SplitRng = SplitRng.new(4242).split("carve_passes")
-	CavePasses.carve_tunnels(grid, rng, MIN_DEPTH, CELLS_PER_M)
+	CavePasses.carve_tunnels(grid, rng, _floors(MIN_DEPTH), CELLS_PER_M)
 	var after_regions: int = _region_count(grid)
 	var after_largest: int = _largest_region(grid)
 	_check(after_largest > before_largest,
@@ -161,7 +167,7 @@ func _test_the_worms_thread_the_pockets_into_one_system() -> void:
 func _test_a_chamber_keeps_a_floor_under_it() -> void:
 	var grid: TileGrid = _solid_world()
 	var rng: SplitRng = SplitRng.new(99).split("carve_passes")
-	CavePasses.carve_big_caverns(grid, rng, _deep_row(), MIN_DEPTH, CELLS_PER_M)
+	CavePasses.carve_big_caverns(grid, rng, _deep_row(), _floors(MIN_DEPTH), CELLS_PER_M)
 	# For every open cell, is there solid rock somewhere below it in the same column? A chamber cut clean
 	# through would have open cells with nothing under them all the way down.
 	var unfloored: int = 0
@@ -257,8 +263,8 @@ func _test_the_same_seed_carves_the_same_world() -> void:
 func _carved(seed: int) -> TileGrid:
 	var grid: TileGrid = _solid_world()
 	var rng: SplitRng = SplitRng.new(seed).split("carve_passes")
-	CavePasses.carve_big_caverns(grid, rng, _deep_row(), MIN_DEPTH, CELLS_PER_M)
-	CavePasses.carve_tunnels(grid, rng, MIN_DEPTH, CELLS_PER_M)
+	CavePasses.carve_big_caverns(grid, rng, _deep_row(), _floors(MIN_DEPTH), CELLS_PER_M)
+	CavePasses.carve_tunnels(grid, rng, _floors(MIN_DEPTH), CELLS_PER_M)
 	return grid
 
 

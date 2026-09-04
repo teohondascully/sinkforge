@@ -76,36 +76,41 @@ static func generate(site: Dictionary, seed: int) -> TileGrid:
 	var topsoil_end: int = SKY_ROWS + int(thresholds["topsoil_shale_end"]) * TERRAIN_CELLS_PER_METER
 	var stonereach_end: int = SKY_ROWS + int(thresholds["stonereach_end"]) * TERRAIN_CELLS_PER_METER
 
-	_fill_base(grid, SKY_ROWS, topsoil_end, stonereach_end)
+	# THE SURFACE IS A ROW PER COLUMN (A' step 8b, D0382): the datum everywhere for a site without a
+	# `relief` key, legacy's hills and scarps for one with it. Every pass below that legacy measured from
+	# `ground_row(col)` measures from this array; the three that legacy measured from an absolute row
+	# (iron, the ruin, the layer thresholds) still do.
+	var surface: PackedInt32Array = Relief.surface_rows(site, width, SKY_ROWS, TERRAIN_CELLS_PER_METER)
+	_fill_base(grid, surface, topsoil_end, stonereach_end)
 	# Cave noise is a pure function of the world seed, not the vein RNG stream -- order-independent of
 	# how many vein draws happen before or after it, matching legacy's own separation of the two.
-	_carve_caves(grid, site["cave"], site["strata_shelf"], seed, SKY_ROWS)
+	_carve_caves(grid, site["cave"], site["strata_shelf"], seed, surface)
 	# P021's two unported passes, in legacy's own order: halls first, then the worms that thread them and
 	# the noise pockets into one system. Both draw from a SPLIT of the terrain stream rather than from it
 	# directly, so adding them cannot shift a single vein or ruin draw -- the whole point of `SplitRng`,
 	# and what keeps this from re-rolling every ore body in every world (`CavePasses`, D0291).
 	var carve_rng: SplitRng = rng.split("carve_passes")
-	var cave_floor: int = SKY_ROWS + int(site["cave"]["min_depth_cells"])
+	var cave_floor: PackedInt32Array = Relief.offset(surface, int(site["cave"]["min_depth_cells"]))
 	CavePasses.carve_big_caverns(grid, carve_rng, stonereach_end, cave_floor, TERRAIN_CELLS_PER_METER)
 	CavePasses.carve_tunnels(grid, carve_rng, cave_floor, TERRAIN_CELLS_PER_METER)
 	# Caves carved first: vein growth only ever replaces solid host rock, so an already-open cave cell
 	# is naturally skipped, same as legacy.
-	_scatter_vein_material(grid, rng, site["ore"], &"ore_copper", SKY_ROWS)
-	_scatter_vein_material(grid, rng, site["coal"], &"coal", SKY_ROWS)
+	_scatter_vein_material(grid, rng, site["ore"], &"ore_copper", surface)
+	_scatter_vein_material(grid, rng, site["coal"], &"coal", surface)
 	_scatter_iron(grid, rng, site["iron"], stonereach_end, SKY_ROWS)
 	_place_ruins(grid, rng, site["ruin"], SKY_ROWS)
 	# Optional (docs/GDD.md §12, claims/C004) -- absent from the real `shallow_clay` site on purpose, so
 	# this stays a test-only addition, not a commitment the real economy has to honor yet.
 	if site.has("reveal"):
-		_scatter_reveal_material(grid, rng, site["reveal"], topsoil_end, SKY_ROWS)
+		_scatter_reveal_material(grid, rng, site["reveal"], topsoil_end, surface)
 	return grid
 
 
-## Rows above `surface` are left with NO material and NO wall — that is the sky, and a cell with no wall
-## behind it is what `WallPainter` leaves transparent so the backdrop shows through (P017, D0292).
-static func _fill_base(grid: TileGrid, surface: int, topsoil_end: int, stonereach_end: int) -> void:
+## Rows above a column's surface are left with NO material and NO wall — that is the sky, and a cell with
+## no wall behind it is what `WallPainter` leaves transparent so the backdrop shows through (P017, D0292).
+static func _fill_base(grid: TileGrid, surface: PackedInt32Array, topsoil_end: int, stonereach_end: int) -> void:
 	for col: int in grid.width:
-		for row: int in range(surface, grid.height):
+		for row: int in range(surface[col], grid.height):
 			var material: StringName
 			if row < topsoil_end:
 				material = &"clay"
@@ -138,18 +143,18 @@ static func _is_shelf_band(row: int, band_height: int, shelf_every: int) -> bool
 
 
 static func _carve_caves(grid: TileGrid, cave_cfg: Dictionary, shelf_cfg: Dictionary, seed: int,
-		surface: int) -> void:
+		surface: PackedInt32Array) -> void:
 	var frequency: float = cave_cfg["frequency"]
 	var threshold_top: float = cave_cfg["threshold_top"]
 	var threshold_deep: float = cave_cfg["threshold_deep"]
-	var min_depth: int = surface + int(cave_cfg["min_depth_cells"])   ## cells below the SURFACE, not row 0
+	var min_depth_cells: int = int(cave_cfg["min_depth_cells"])   ## cells below the column's SURFACE
 	var x_stretch: float = cave_cfg["x_stretch"]
 	var band_height: int = int(shelf_cfg["band_height_cells"])
 	var shelf_every: int = int(shelf_cfg["shelf_every"])
 	var shelf_resist: float = shelf_cfg["shelf_resist"]
-	var carve_span: int = maxi(1, grid.height - min_depth)
-
 	for col: int in grid.width:
+		var min_depth: int = surface[col] + min_depth_cells
+		var carve_span: int = maxi(1, grid.height - min_depth)
 		for row: int in range(min_depth, grid.height):
 			var cell: Vector2i = Vector2i(col, row)
 			if not grid.is_solid(cell):
@@ -195,14 +200,16 @@ static func _banded(depth_frac: float, floor_frac: float) -> float:
 ## only in their constants -- one function, two configs, per `docs/DECISIONS_LEDGER.md`'s port-the-
 ## algorithm-not-the-structure instruction.
 static func _scatter_vein_material(grid: TileGrid, rng: SplitRng, cfg: Dictionary, material: StringName,
-		surface: int) -> void:
+		surface: PackedInt32Array) -> void:
 	# Against the ROCK, not the grid: the sky is not volume ore can be in, and counting it would raise
-	# every density by the sky band's share of the world.
-	var attempts: int = _density_count(grid.width, grid.height - surface, cfg["attempts_per_col"])
+	# every density by the sky band's share of the world. Counted from the datum, not the hills, so the
+	# same site seeds the same number of veins whatever its relief.
+	var attempts: int = _density_count(grid.width, grid.height - SKY_ROWS, cfg["attempts_per_col"])
 	for _i: int in attempts:
 		var cx: int = rng.next_range(0, grid.width - 1)
-		var cy: int = rng.next_range(surface + 1, grid.height - 1)
-		var depth_frac: float = float(cy - surface) / float(maxi(1, grid.height - 1 - surface))
+		var top: int = surface[cx]
+		var cy: int = rng.next_range(top + 1, grid.height - 1)
+		var depth_frac: float = float(cy - top) / float(maxi(1, grid.height - 1 - top))
 		var accept: float = _banded(depth_frac, cfg["shallow_floor"]) * float(cfg["chance_deep"])
 		if rng.next_float() > accept:
 			continue
@@ -273,13 +280,15 @@ static func _grow_vein(grid: TileGrid, rng: SplitRng, seed_cell: Vector2i, size:
 ## sweep compares different generations, never the same generation re-sampled (docs/DECISIONS_LEDGER.md
 ## D0109's density-sweep note).
 static func _scatter_reveal_material(grid: TileGrid, rng: SplitRng, cfg: Dictionary, topsoil_end: int,
-		surface: int) -> void:
-	if topsoil_end <= surface:
+		surface: PackedInt32Array) -> void:
+	if topsoil_end <= SKY_ROWS:
 		return
-	var attempts: int = _density_count(grid.width, topsoil_end - surface, cfg["attempts_per_col"])
+	var attempts: int = _density_count(grid.width, topsoil_end - SKY_ROWS, cfg["attempts_per_col"])
 	for _i: int in attempts:
 		var cx: int = rng.next_range(0, grid.width - 1)
-		var cy: int = rng.next_range(surface, topsoil_end - 1)
+		if surface[cx] >= topsoil_end:
+			continue   # a valley floor below the band: nothing to seed in
+		var cy: int = rng.next_range(surface[cx], topsoil_end - 1)
 		# `topsoil_end` bounds the GROWTH, not just the seed -- see `_grow_vein` (D0254).
 		_grow_vein(grid, rng, Vector2i(cx, cy), int(cfg["size_min"]), &"glimmer", 0, topsoil_end)
 

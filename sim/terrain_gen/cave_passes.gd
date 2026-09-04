@@ -94,16 +94,21 @@ static func count_for(width_cells: int, height_cells: int, per_m_col: float, cel
 ## WIDE HALLS DEEP IN THE ROCK. A squashed ellipse with its bottom third left solid, so a chamber has a
 ## flat floor to stand on rather than being a lens you slide through — legacy's own note, and the reason
 ## `floor_cut` exists.
-static func carve_big_caverns(grid: TileGrid, rng: SplitRng, deep_row: int, min_depth: int,
+static func carve_big_caverns(grid: TileGrid, rng: SplitRng, deep_row: int, floors: PackedInt32Array,
 		cells_per_m: int) -> int:
 	var count: int = maxi(2, count_for(grid.width, grid.height, CAVERN_PER_M_COL, cells_per_m))
-	var lo: int = maxi(min_depth, deep_row - CAVERN_ABOVE_DEEP_M * cells_per_m)
+	var above_deep: int = deep_row - CAVERN_ABOVE_DEEP_M * cells_per_m
 	var hi: int = grid.height - CAVERN_FLOOR_MARGIN_M * cells_per_m
-	if hi <= lo:
+	if hi <= maxi(lowest(floors), above_deep):
 		return 0
 	var carved: int = 0
 	for _c: int in count:
 		var cx: int = rng.next_range(4, maxi(4, grid.width - 5))
+		# The column's own floor (A' step 8b, D0382): under a hill the band starts higher, under a valley
+		# lower. With one floor for every column this is the scalar it was, draw for draw.
+		var lo: int = maxi(floors[cx], above_deep)
+		if hi <= lo:
+			continue
 		var cy: int = rng.next_range(lo, hi)
 		var rx: int = rng.next_range(CAVERN_RX_MIN_M, CAVERN_RX_MAX_M) * cells_per_m
 		var ry: int = rng.next_range(CAVERN_RY_MIN_M, CAVERN_RY_MAX_M) * cells_per_m
@@ -118,28 +123,31 @@ static func carve_big_caverns(grid: TileGrid, rng: SplitRng, deep_row: int, min_
 				# shape does not depend on float rounding the goldens would have to reproduce.
 				if dx * dx * ry * ry + dy * dy * rx * rx > rx * rx * ry * ry:
 					continue
-				carved += _open(grid, Vector2i(cx + dx, cy + dy), min_depth)
+				carved += _open(grid, Vector2i(cx + dx, cy + dy), floors)
 	return carved
 
 
 ## THE WORMS. Legacy's own reason, which is the whole point of the pass: noise carving alone leaves
 ## isolated pockets, and these thread them into one connected system.
-static func carve_tunnels(grid: TileGrid, rng: SplitRng, min_depth: int, cells_per_m: int) -> int:
+static func carve_tunnels(grid: TileGrid, rng: SplitRng, floors: PackedInt32Array, cells_per_m: int) -> int:
 	var worms: int = maxi(3, count_for(grid.width, grid.height, TUNNEL_PER_M_COL, cells_per_m))
 	var radius: int = TUNNEL_RADIUS_M * cells_per_m
-	var start_depth: int = min_depth + 2 * cells_per_m
-	if start_depth >= grid.height - 2:
+	var head_room: int = 2 * cells_per_m
+	if lowest(floors) + head_room >= grid.height - 2:
 		return 0
 	var carved: int = 0
 	for _w: int in worms:
 		# Position carried in fixed point, exactly as legacy carries it in floats: a worm that rounded to
 		# whole cells each step could not have a heading between two of them and would walk in staircases.
 		var x: int = rng.next_range(2, maxi(2, grid.width - 3)) * DIR_SCALE
+		var start_depth: int = floors[x / DIR_SCALE] + head_room
+		if start_depth >= grid.height - 2:
+			continue
 		var y: int = rng.next_range(start_depth, grid.height - 2) * DIR_SCALE
 		var heading: int = rng.next_range(0, DIRS.size() - 1)
 		var length: int = rng.next_range(TUNNEL_MIN_LEN_M, TUNNEL_MAX_LEN_M) * cells_per_m
 		for _s: int in length:
-			carved += _carve_disc(grid, Vector2i(x / DIR_SCALE, y / DIR_SCALE), radius, min_depth)
+			carved += _carve_disc(grid, Vector2i(x / DIR_SCALE, y / DIR_SCALE), radius, floors)
 			heading = posmod(heading + rng.next_range(-WANDER_STEPS, WANDER_STEPS), DIRS.size())
 			var step: Vector2i = DIRS[heading]
 			x += step.x
@@ -151,13 +159,13 @@ static func carve_tunnels(grid: TileGrid, rng: SplitRng, min_depth: int, cells_p
 
 ## A disc of open air, block erased and wall kept. Legacy's `_carve_disc`, including its `+ 1` slack on
 ## the radius test, which is what stops a small disc reading as a diamond.
-static func _carve_disc(grid: TileGrid, centre: Vector2i, radius: int, min_depth: int) -> int:
+static func _carve_disc(grid: TileGrid, centre: Vector2i, radius: int, floors: PackedInt32Array) -> int:
 	var carved: int = 0
 	for dy: int in range(-radius, radius + 1):
 		for dx: int in range(-radius, radius + 1):
 			if dx * dx + dy * dy > radius * radius + 1:
 				continue
-			carved += _open(grid, centre + Vector2i(dx, dy), min_depth)
+			carved += _open(grid, centre + Vector2i(dx, dy), floors)
 	return carved
 
 
@@ -165,8 +173,17 @@ static func _carve_disc(grid: TileGrid, centre: Vector2i, radius: int, min_depth
 ## opened something, so every caller can report what it actually did rather than being trusted — a carve
 ## pass that silently carved nothing is the exact shape `tools/measure_void_fraction.gd` was written to
 ## catch (D0285).
-static func _open(grid: TileGrid, cell: Vector2i, min_depth: int) -> int:
-	if cell.x < 0 or cell.x >= grid.width or cell.y < min_depth or cell.y >= grid.height:
+## The shallowest floor across the width: the one-number pre-check a per-column floor still needs, so a
+## world too short for a pass returns before it draws, exactly as the scalar did.
+static func lowest(floors: PackedInt32Array) -> int:
+	var out: int = 0x7FFFFFFF
+	for f: int in floors:
+		out = mini(out, f)
+	return out
+
+
+static func _open(grid: TileGrid, cell: Vector2i, floors: PackedInt32Array) -> int:
+	if cell.x < 0 or cell.x >= grid.width or cell.y >= grid.height or cell.y < floors[cell.x]:
 		return 0
 	if not grid.is_solid(cell):
 		return 0

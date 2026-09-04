@@ -10,3 +10,6 @@ fields:
   iron: {required: true, type: dict}
   ruin: {required: true, type: dict}
   reveal: {required: false, type: dict}
+  # Legacy's surface (heightmap_world_gen.gd ground_row/terrace): a flat pad about the start's spawn
+  # column, waves and scarps beyond it. Absent reads flat at the datum (A' step 8b, D0382).
+  relief: {required: false, type: dict}

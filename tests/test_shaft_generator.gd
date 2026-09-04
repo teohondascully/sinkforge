@@ -39,7 +39,7 @@ func _test_band_hash_matches_reference() -> void:
 
 func _test_base_fill_bands_by_depth() -> void:
 	var grid: TileGrid = TileGrid.new(4, 20, 1)
-	ShaftGenerator._fill_base(grid, 0, 8, 14)
+	ShaftGenerator._fill_base(grid, Relief.flat(grid.width, 0), 8, 14)
 	_check(grid.get_material(Vector2i(0, 0)) == &"clay", "row 0 (< topsoil_end) is clay")
 	_check(grid.get_material(Vector2i(0, 7)) == &"clay", "row 7 (< topsoil_end) is clay")
 	_check(grid.get_material(Vector2i(0, 8)) == &"hardrock", "row 8 (== topsoil_end) is hardrock")
@@ -51,10 +51,10 @@ func _test_base_fill_bands_by_depth() -> void:
 
 func _test_caves_never_carve_above_min_depth() -> void:
 	var grid: TileGrid = TileGrid.new(12, 60, 1)
-	ShaftGenerator._fill_base(grid, 0, 20, 50)
+	ShaftGenerator._fill_base(grid, Relief.flat(grid.width, 0), 20, 50)
 	var cave_cfg: Dictionary = StrataData.SHALLOW_CLAY["cave"]
 	var shelf_cfg: Dictionary = StrataData.SHALLOW_CLAY["strata_shelf"]
-	ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, 1, 0)
+	ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, 1, Relief.flat(grid.width, 0))
 	var min_depth: int = int(cave_cfg["min_depth_cells"])
 	var violations: int = 0
 	for col: int in grid.width:
@@ -66,10 +66,10 @@ func _test_caves_never_carve_above_min_depth() -> void:
 
 func _test_caves_carve_something() -> void:
 	var grid: TileGrid = TileGrid.new(48, 400, 1)
-	ShaftGenerator._fill_base(grid, 0, 40, 140)
+	ShaftGenerator._fill_base(grid, Relief.flat(grid.width, 0), 40, 140)
 	var cave_cfg: Dictionary = StrataData.SHALLOW_CLAY["cave"]
 	var shelf_cfg: Dictionary = StrataData.SHALLOW_CLAY["strata_shelf"]
-	ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, 1, 0)
+	ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, 1, Relief.flat(grid.width, 0))
 	var open_count: int = 0
 	for col: int in grid.width:
 		for row: int in grid.height:

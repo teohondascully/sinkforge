@@ -23,14 +23,14 @@ static func measure(seeds: Array, cave_cfg: Dictionary, shelf_cfg: Dictionary) -
 		"open_carved": 0, "seeds_hit": 0}
 	for seed_value: int in seeds:
 		var grid: TileGrid = TileGrid.new(48, 1024, 1)
-		ShaftGenerator._fill_base(grid, 0, 40, 140)
+		ShaftGenerator._fill_base(grid, Relief.flat(grid.width, 0), 40, 140)
 		var solid_before: Array[Vector2i] = []
 		for col: int in grid.width:
 			for row: int in range(min_depth, grid.height):
 				var cell: Vector2i = Vector2i(col, row)
 				if grid.is_solid(cell):
 					solid_before.append(cell)
-		ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, seed_value, 0)
+		ShaftGenerator._carve_caves(grid, cave_cfg, shelf_cfg, seed_value, Relief.flat(grid.width, 0))
 		var hit: int = 0
 		for cell: Vector2i in solid_before:
 			var shelf: bool = ShaftGenerator._is_shelf_band(cell.y, band_height, shelf_every)
