@@ -270,7 +270,7 @@ func _test_no_column_runs_dry_after_the_drought_pass() -> void:
 
 
 func _studding_site() -> Dictionary:
-	var site: Dictionary = StrataData.SHALLOW_CLAY.duplicate(true)
+	var site: Dictionary = _site_without_content(StrataData.SHALLOW_CLAY)
 	site["max_depth_m"] = 96
 	site["layer_thresholds_m"] = {"topsoil_shale_end": 30, "stonereach_end": 60}
 	site["studding"] = {"ledge": _ledge_cfg(), "spire": _spire_cfg(), "rubble": _rubble_cfg(), "drought": _drought_cfg()}

@@ -20,7 +20,7 @@ static func vertical(grid: TileGrid, rng: SplitRng, site: Dictionary, surface: P
 	var cave_band: int = int(site["cave"]["min_depth_cells"])
 	var rifts: Array[Vector2i] = VerticalPasses.carve_rifts(grid, v_rng, cfg["rift"], surface, cave_band,
 		spawn, ShaftGenerator.TERRAIN_CELLS_PER_METER)
-	VerticalPasses.ore_rift_walls(grid, v_rng, cfg["rift"], rifts, deep_row)
+	VerticalPasses.ore_rift_walls(grid, v_rng, cfg["rift"], rifts, deep_row, ShaftGenerator.TERRAIN_CELLS_PER_METER)
 	VerticalPasses.open_sinkholes(grid, v_rng, cfg["sinkhole"], rifts, surface, spawn, ShaftGenerator.TERRAIN_CELLS_PER_METER)
 
 

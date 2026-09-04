@@ -195,7 +195,7 @@ func _test_every_row_stays_inside_the_authored_rise_and_fall() -> void:
 ## A short world with the relief on: the generator's first pass fills from the authored row, so the top
 ## face of every column is where `Relief` said, and nothing is generated above it.
 func _relief_site() -> Dictionary:
-	var site: Dictionary = StrataData.SHALLOW_CLAY.duplicate(true)
+	var site: Dictionary = _site_without_content(StrataData.SHALLOW_CLAY)
 	site["max_depth_m"] = 64
 	site["layer_thresholds_m"] = {"topsoil_shale_end": 20, "stonereach_end": 40}
 	site["relief"] = _cfg()

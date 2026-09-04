@@ -94,11 +94,15 @@ static func _carve_row(grid: TileGrid, carved: Array[Vector2i], surface: PackedI
 
 
 ## Enrich the host rock touching the carved cells: plain rock in a rift wall becomes ore at
-## `wall_ore_chance`, iron from `deep_row` down and copper above it (legacy gated the material by its
-## seal; this build gates it by the same depth threshold iron itself uses). Returns cells turned.
+## `wall_ore_chance` a metre of wall (the per-cell chance divides by the cells a metre), iron from
+## `deep_row` down and copper above it (legacy gated the material by its seal; this build gates it by the
+## same depth threshold iron itself uses). Legacy turned the one metre-cell; a single cell here is a
+## four-pixel speck, so each turned cell grows a nugget of `wall_ore_size_m2` -- a metre square by default,
+## which is the cell legacy turned (found by the ore-body pin at the switch-on, D0388). Returns ore cells.
 static func ore_rift_walls(grid: TileGrid, rng: SplitRng, cfg: Dictionary, carved: Array[Vector2i],
-		deep_row: int) -> int:
-	var chance: float = float(cfg["wall_ore_chance"])
+		deep_row: int, cells_per_m: int) -> int:
+	var chance: float = float(cfg["wall_ore_chance"]) / float(cells_per_m)
+	var size: int = maxi(1, int(round(float(cfg["wall_ore_size_m2"]) * float(cells_per_m * cells_per_m))))
 	var touched: Dictionary = {}
 	var placed: int = 0
 	for c: Vector2i in carved:
@@ -110,8 +114,8 @@ static func ore_rift_walls(grid: TileGrid, rng: SplitRng, cfg: Dictionary, carve
 			if not ShaftGenerator.HOST_ROCK.has(grid.get_material(cell)):
 				continue
 			if rng.next_float() < chance:
-				grid.set_material(cell, &"ore_iron" if cell.y >= deep_row else &"ore_copper")
-				placed += 1
+				var material: StringName = &"ore_iron" if cell.y >= deep_row else &"ore_copper"
+				placed += ShaftGenerator.grow_vein(grid, rng, cell, size, material)
 	return placed
 
 

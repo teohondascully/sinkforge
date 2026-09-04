@@ -59,13 +59,21 @@ func _initialize() -> void:
 	_finish("ore_bodies")
 
 
+## The real site without its content records (A' step 8, D0388): these pins are on the SCATTER constants
+## WG-4 converted; the content passes add ore bodies of their own -- a metre-square nugget in every rift
+## wall, an eighty-cell vein wherever a column ran dry -- whose population is a different subject, measured
+## in `tests/test_shallow_clay_content.gd`.
+func _scatter_only_site() -> Dictionary:
+	return _site_without_content(StrataData.SHALLOW_CLAY)
+
+
 ## Connected components of `material` over the seeds, as {cells, bodies, median}.
 func _measure(material: StringName) -> Dictionary:
 	var sizes: Array[int] = []
 	var cells: int = 0
 	var world_width: int = 0
 	for seed_value: int in SEEDS:
-		var grid: TileGrid = ShaftGenerator.generate(StrataData.SHALLOW_CLAY, seed_value)
+		var grid: TileGrid = ShaftGenerator.generate(_scatter_only_site(), seed_value)
 		world_width = grid.width   ## read from the site, never assumed -- see the volume check below
 		var seen: Dictionary = {}
 		for col: int in grid.width:

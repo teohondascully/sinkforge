@@ -96,3 +96,98 @@ ruin:
   count: 1
   min_depth_m: 100
   radius_cells: 4
+
+# --- A' step 8: legacy's content, each record its own config-gated pass (D0382-D0387), switched on
+# together here (D0388). Values are legacy/src/core/layered_world_gen.gd's and heightmap_world_gen.gd's
+# in their own units (metres, radians, per-metre rates); each pass converts by the cells a metre.
+spawn_col_m: 32    # the tutorial start's spawn_col_m: the pad, the keepouts and the richness ramp measure from it
+
+relief:
+  # heightmap_world_gen.gd: BASE_PAD -9/+10 about SPAWN_COL, RELIEF_RAMP 16, the NEAR wave and the two FAR
+  # waves, SURFACE_ROW_MIN/MAX. Two of the three SCARP_COLS at half legacy's distances (this world is half
+  # as wide); the third fell beyond the edge.
+  pad_centre_m: 32
+  pad_half_m: 10
+  ramp_m: 16
+  waves:
+    - {amp_m: 0.85, freq_rad_per_m: 0.21, phase_rad: 0.5, ramp: near}
+    - {amp_m: 1.60, freq_rad_per_m: 0.30, phase_rad: 0.0, ramp: far}
+    - {amp_m: 0.90, freq_rad_per_m: 0.11, phase_rad: 1.7, ramp: far}
+  scarps:
+    - {at_m: 10, step_m: 5}
+    - {at_m: 52, step_m: 4}
+  scarp_span_m: 2
+  max_rise_m: 9
+  max_fall_m: 11
+
+vertical:
+  rift:      # RIFT_PER_COL .. RIFT_WALL_ORE_CHANCE; the width sine's pinch in radians a metre-row
+    per_col: 0.018
+    min_len_m: 34
+    max_len_m: 80
+    half_w_min_m: 0.8
+    half_w_max_m: 2.1
+    wander: 0.34
+    wander_nudge: 0.10
+    spawn_keepout_m: 10
+    top_min_m: 2
+    top_max_m: 10
+    pinch_min: 0.16
+    pinch_max: 0.30
+    wall_ore_chance: 0.11     # a metre of wall; each turn grows a nugget of wall_ore_size_m2 (D0388)
+    wall_ore_size_m2: 1
+  sinkhole:  # SINKHOLE_COUNT .. SINKHOLE_MIN_DROP; the flare pow(x, 2.2) is VerticalPasses.FLARE_MILLI
+    count: 3
+    mouth_half_m: 3.0
+    throat_half_m: 1.1
+    keepout_m: 12             # legacy 20 on a world twice this wide left 37% of it eligible and no mouth at the boot seed (D0388)
+    spacing_m: 15
+    wander: 0.22
+    wander_nudge: 0.08
+    min_drop_m: 14
+
+studding:
+  ledge: {per_col: 0.22, len_min_m: 2, len_max_m: 4, headroom_m: 2, thickness_m: 1}
+  spire: {chance: 0.075, floor_bias: 0.34, hang_min_m: 2, hang_max_m: 5, rise_min_m: 1, rise_max_m: 2}
+  rubble: {chance: 0.060, size_m: 1}
+  drought: {limit_m: 18, vug_chance: 0.28, vein_size_m2: 5, coal_bias: 0.38, back_min_m: 3, back_max_m: 14}
+
+aquifer:
+  # AQUIFER_PER_COL, AQUIFER_MIN_ROW = DEEPSLATE_ROW + 2 (two metres into the deep rock: stonereach_end + 2
+  # here), AQUIFER_RX/RY, AQUIFER_ORE_SIZE
+  per_col: 0.045
+  min_depth_m: 142
+  rx_min_m: 2
+  rx_max_m: 4
+  ry_min_m: 2
+  ry_max_m: 3
+  ore_size_min_m2: 5
+  ore_size_max_m2: 9
+
+lode:
+  # LODE_ATTEMPTS_PER_COL, LODE_SIZE_MIN/DEPTH_BONUS, LODE_AMOUNT_BASE/DEPTH_BONUS (per metre-cell; the pass
+  # divides by the sixteen cells of a metre square, D0353's rule), LODE_MIN_DEPTH
+  per_col: 0.35
+  size_min_m2: 6
+  size_depth_bonus_m2: 12
+  amount_base: 40
+  amount_depth_bonus: 170
+  min_depth_m: 14
+
+richness:
+  # HORIZONTAL_STRENGTH, HORIZONTAL_FREQ, FRONTIER_BIAS
+  strength: 0.55
+  freq_per_m: 0.045
+  frontier_bias: 0.5
+
+tree:
+  # TREE_CHANCE, TREE_GAP, trunk 2..3; the widths are this build's (legacy's trunk was a metre-cell wide and
+  # its canopy six cells in a T)
+  chance: 0.20
+  gap_m: 3
+  trunk_min_m: 2
+  trunk_max_m: 3
+  trunk_w_m: 0.5
+  canopy_w_m: 3.0
+  canopy_h_m: 2.5
+  keepout_m: 12

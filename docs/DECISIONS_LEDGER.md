@@ -16446,3 +16446,52 @@ shaft_generator 34, shaft_replay_determinism ALL PASS 21 with the golden matched
 of ground, so `chance` 1.0 is a quarter per column; the fixture now sets 4.0, which is every column. A
 bored tree yields the material id as its item (D0349's open ruling applies to `wood` and `leaves` as to
 every material). Saplings (`soil`) still grow nothing.
+
+## D0388 · 2026-09-03 · A′ step 8h: the switch-on — `shallow_clay` carries every content record; what the real world showed when it did (no mouth, ore specks, a hardness rule), and the golden re-pinned from CI Linux
+
+**Decided:** (1) `data/strata/shallow_clay.yaml` carries `spawn_col_m` and the seven content records —
+`relief`, `vertical`, `studding`, `aquifer`, `lode`, `richness`, `tree` — with legacy's numbers in
+legacy's units (each record's comment names the constants it came from), and the two departures already
+ruled: the scarps at half legacy's distances (D0382) and the widths of a tooth, a block, a trunk and a
+canopy at this build's cell (D0384, D0387). `aquifer.min_depth_m` 142 is legacy's `DEEPSLATE_ROW + 2`
+restated as two metres into the deep rock (`stonereach_end` + 2). (2) Three things the real world showed
+that no fixture had, each fixed at its cause: (a) no sinkhole mouth at the boot seed — legacy's 20 m
+keepout about spawn on a world twice this wide left 63% of the width eligible; here it left 37%, and all
+four rifts fell inside it. `sinkhole.keepout_m` is 12 (the pad is ±10 m): 63% eligible again, 20 mouth
+columns and 5 with a 14 m fall at the boot seed. (b) Rift-wall ore as single cells collapsed the ore-body
+pin (`test_ore_bodies`: copper's median body 2 cells against its pinned 550, 664 bodies): legacy turned a
+metre-cell, and a cell here is a four-pixel speck. `VerticalPasses.ore_rift_walls` now takes the chance
+per METRE of wall (divided by the cells a metre) and grows a nugget of `wall_ore_size_m2` (a metre square)
+per turn — the cell legacy turned. And `test_ore_bodies` measures the scatter it pins on the site WITHOUT
+its content records (`_site_without_content`, a `test_base` helper every content suite now compares
+against): its pins are the WG-4 scatter constants; the content world's own population is asserted in
+`tests/test_shallow_clay_content.gd` — the median copper body at least a metre square (80 cells over 128
+bodies). (c) CI's `test_mining` refused `wood` 1.8 and `leaves` 0.35: the mining phase converts hardness
+to ticks through whole halves. Authored 2.0 and 0.5, pushed to main as its own fix (8c16d31c) because
+main was red on it; the local run of the tree suite alone had not covered that rule. (3) The golden
+moved, as a world change must: two processes still bit-identical (first mismatch −1), the committed array
+mismatched from checkpoint 0, coverage `jumps=851 digs=396 corner_ok=6` from `858/360/6` — a different
+world is a different path through it. Re-pinned from CI Linux through a draft PR (the route of
+`golden-repin-via-draft-pr`), the re-pin its own commit; the local macOS run then made to assert against
+the CI array (recorded in that commit).
+
+**Why:** plan step 8's content half, complete: "the ~420 lines of legacy worldgen content ported on top
+of the deterministic generator, its four transcendental shapes as integer tables", and D0381's shape
+for it — every pass gated, one switch-on, one re-pin.
+
+**Evidence:** `tests/test_shallow_clay_content.gd` 17: every record present and the spawn named; the
+site's spawn column, the pad's centre and the tutorial's spawn one number (32); the pad's 10 m covering
+the tutorial's farthest fixture at 7 m; the tree keepout at least the pad and the mouth keepout past it;
+the pad at the datum with 143 columns beyond it shaped; 20 columns open at the surface and sky or a tree
+above every other; 23072 water, every wet cell at or below 142 m; 6695 lode cells; 96 wood and 450 leaves
+over the ground; 5 mouth columns falling 14 m or more; no column running 18 m of plain rock (longest 71
+cells); the median copper body 80 cells; the boot's own `Session.new_game` stamping the tutorial onto
+the shaped world. Every suite that generates or boots the real site re-run green: shaft_generator 34,
+world_seeder 36, interface_verbs 35, main_boot 36, seam_painter 39, save_game 45, carve_fraction 6,
+ore_bodies 15, mining 41; every content suite against the plain-site helper: relief 44, vertical_passes
+40, studding_passes 33, plane_passes 31, richness 17, tree_pass 21.
+
+**Gaps:** no eye has seen the shaped world — the look verdicts (hills, rifts, mouths, teeth, trees, the
+water) are the director's, queued in `docs/TASTE_QUEUE.md`. The boot generates more (the passes over
+256 × 1104 cells); unmeasured against D0326's 4 s. Ore BLOCK amounts (`pending_sim_economy`) remain step
+7's. Trees do not grow, saplings still root in nothing.

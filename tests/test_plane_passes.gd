@@ -194,7 +194,7 @@ func _test_a_lode_never_lies_in_water_or_over_another_lode() -> void:
 
 
 func _plane_site() -> Dictionary:
-	var site: Dictionary = StrataData.SHALLOW_CLAY.duplicate(true)
+	var site: Dictionary = _site_without_content(StrataData.SHALLOW_CLAY)
 	site["max_depth_m"] = 96
 	site["layer_thresholds_m"] = {"topsoil_shale_end": 30, "stonereach_end": 60}
 	site["aquifer"] = _aquifer_cfg()

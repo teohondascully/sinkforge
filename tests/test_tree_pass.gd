@@ -164,7 +164,7 @@ func _test_the_ground_and_the_wall_plane_are_untouched() -> void:
 
 
 func _test_the_generator_reads_the_record() -> void:
-	var site: Dictionary = StrataData.SHALLOW_CLAY.duplicate(true)
+	var site: Dictionary = _site_without_content(StrataData.SHALLOW_CLAY)
 	site["max_depth_m"] = 64
 	site["layer_thresholds_m"] = {"topsoil_shale_end": 20, "stonereach_end": 40}
 	var plain: TileGrid = ShaftGenerator.generate(site, 20260826)

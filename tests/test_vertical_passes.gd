@@ -35,7 +35,7 @@ func _rift_cfg() -> Dictionary:
 	return {
 		"per_col": 0.018, "min_len_m": 34, "max_len_m": 80, "half_w_min_m": 0.8, "half_w_max_m": 2.1,
 		"wander": 0.34, "wander_nudge": 0.10, "spawn_keepout_m": 10, "top_min_m": 2, "top_max_m": 10,
-		"pinch_min": 0.16, "pinch_max": 0.30, "wall_ore_chance": 0.11,
+		"pinch_min": 0.16, "pinch_max": 0.30, "wall_ore_chance": 0.11, "wall_ore_size_m2": 1.0,
 	}
 
 
@@ -191,11 +191,12 @@ func _test_wall_ore_lands_only_beside_carved_cells_and_by_depth() -> void:
 		grid.excavate(c)
 		slot.append(c)
 	var cfg: Dictionary = _rift_cfg()
-	cfg["wall_ore_chance"] = 1.0
+	cfg["wall_ore_chance"] = 4.0                 # the rate is a metre of wall: 4.0 is every cell asking
+	cfg["wall_ore_size_m2"] = 0.0625             # one cell, so each turned cell is countable
 	var deep_row: int = 250
-	var placed: int = VerticalPasses.ore_rift_walls(grid, _rng(1), cfg, slot, deep_row)
+	var placed: int = VerticalPasses.ore_rift_walls(grid, _rng(1), cfg, slot, deep_row, CPM)
 	# 100 rows x two side walls, plus the cell above the slot and the one below it.
-	_check(placed == 202, "every host-rock neighbour turned at chance 1.0 (%d of 202)" % placed)
+	_check(placed == 202, "every host-rock neighbour turned with every cell asking (%d of 202)" % placed)
 	_check(grid.get_material(Vector2i(59, 210)) == &"ore_copper" and grid.get_material(Vector2i(61, 210)) == &"ore_copper",
 		"copper above deep_row")
 	_check(grid.get_material(Vector2i(59, 290)) == &"ore_iron" and grid.get_material(Vector2i(61, 290)) == &"ore_iron",
@@ -204,7 +205,14 @@ func _test_wall_ore_lands_only_beside_carved_cells_and_by_depth() -> void:
 		"two cells out is untouched")
 	var none: TileGrid = _solid_world()
 	cfg["wall_ore_chance"] = 0.0
-	_check(VerticalPasses.ore_rift_walls(none, _rng(1), cfg, slot, deep_row) == 0, "CONTROL: chance 0 turns nothing")
+	_check(VerticalPasses.ore_rift_walls(none, _rng(1), cfg, slot, deep_row, CPM) == 0, "CONTROL: chance 0 turns nothing")
+	# At the real size each turned cell grows a metre-square nugget, so the wall carries far more than a
+	# cell of ore per turn -- a place you work, not a speck you pass (D0305, D0388).
+	var nuggets: TileGrid = _solid_world()
+	cfg["wall_ore_chance"] = 4.0
+	cfg["wall_ore_size_m2"] = 1.0
+	var grown: int = VerticalPasses.ore_rift_walls(nuggets, _rng(1), cfg, slot, deep_row, CPM)
+	_check(grown > 2 * 202, "at a metre square a turned wall grows %d ore cells, well over one a turn" % grown)
 
 
 ## A hand-cut slot, 3 wide, 45 m tall, its ceiling 10 m under the surface.
@@ -282,7 +290,7 @@ func _none_near(opened: Array[int], col: int) -> bool:
 ## The generator with the record: rifts and mouths exist in a real world. Spawn is put at the left edge
 ## so the keepouts leave most of the width eligible.
 func _vertical_site() -> Dictionary:
-	var site: Dictionary = StrataData.SHALLOW_CLAY.duplicate(true)
+	var site: Dictionary = _site_without_content(StrataData.SHALLOW_CLAY)
 	site["max_depth_m"] = 128
 	site["layer_thresholds_m"] = {"topsoil_shale_end": 30, "stonereach_end": 80}
 	site["spawn_col_m"] = 4

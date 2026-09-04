@@ -93,3 +93,42 @@ material rather than from a small bite. Second, **the dead time after a blow** �
 just cleared, so the cursor is over air until it moves. That was 504 of the director's 876 held ticks at
 radius 0; a larger radius shortens it but does not remove it, and the real fix (if it needs one) is a
 mechanic question, not a constant.
+
+---
+
+## A′ steps 6 and 8 (D0373–D0388) — the ported world, built and not yet seen
+
+Every item below is BUILT and PARKED: the plan's rule for step 6 ("look verdicts are the director's") and
+step 8's switch-on (D0388) both end at an eye, and no eye has been on this build since the boot landed.
+`godot --path .` shows all of it at once; each line is one question.
+
+**T005 · The hills are quarter-metre steps, legacy's were metre steps.** `Relief` evaluates the same three
+sines per terrain column, so the ground rolls smoothly where legacy's stepped in one-metre risers; the
+scarps still drop 5 m and 4 m over two metres. *Question: does the smooth roll read as ground, or does it
+want legacy's terraced steps back (a `step_m` on the record)?*
+
+**T006 · The sinkhole mouths at 12 m from spawn, legacy's at 20 m.** The keepout halved with the world's
+width so a mouth exists at the boot seed at all (D0388). *Question: is a mouth three pad-widths from the
+tutorial's ground a landmark or a hazard too close to home?*
+
+**T007 · Teeth a metre wide tapering to a cell, rubble a metre square, ledges a metre thick.** Legacy's
+were one metre-cell each; these widths are the port's own (D0384). *Question: at 16 px a metre, do the
+teeth read as stalactites or as fangs, and is the rubble a boulder or a crate?*
+
+**T008 · Trees: a half-metre trunk and a 3 × 2.5 m elliptical canopy.** Legacy's trunk was a metre wide
+with a six-cell T of leaves (D0387). *Question: tree, or lollipop? The record's four width fields are the
+dials.*
+
+**T009 · The richness band's texture.** Legacy's simplex became value noise on a 22 m lattice, smoothstepped
+(D0386); the frontier is measurably richer than spawn, but the band's grain is coarser than legacy's.
+*Question: can it be felt in play at all, or only in a heat-map?*
+
+**T010 · An aquifer is a sealed pocket full to the brim.** Dig into one and the water phase takes over
+(D0344). *Question: does the first breach read as a find or as a flood?*
+
+**T011 · Step 6's looks, in one sitting.** The machine painter and its status marks (6c), the payouts
+(6d), the falling items (6e), the synthesized beds (6f), the hotbar, inspector, objectives, hints and
+minimap (6g–6i), the settings page (6j), the lights (6k), the ore seams and the veil's sources (6l), the
+marks (6m), the ambience (6n), the surface tone (6o), the two shaders (6p). Each was ported from legacy
+with its numbers converted, none has been judged. *Question: which of these reads as legacy's, and which
+as programmer art in legacy's colours?*

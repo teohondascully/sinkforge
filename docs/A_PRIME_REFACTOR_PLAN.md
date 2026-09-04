@@ -540,7 +540,9 @@ the planes — DONE (D0385: `PlanePasses`, `ShaftGenerator.enrich` called by `Wo
 `ContentPasses` holding the order; 31 assertions; the golden unchanged). 8f the richness field — DONE
 (D0386: `Richness`, an integer band pulling the scatters and the lodes; 17 assertions; the golden
 unchanged). 8g trees — DONE (D0387: `TreePass`, `wood` and `leaves` records; 21 assertions; the golden
-unchanged). Next: 8h the switch-on for `shallow_clay` and the re-pin.
+unchanged). 8h the switch-on — DONE (D0388: `shallow_clay` carries every record; the mouth keepout, the
+wall nuggets and the hardness halves found by the real world; 17 assertions; the golden re-pinned from CI
+Linux). **Step 8 is complete.** Step 7 (the economy) is the director's to scope (§8).
 
 ---
 

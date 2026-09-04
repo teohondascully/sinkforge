@@ -243,3 +243,13 @@ func _rock_world(material: StringName, dug: Array[Vector2i], rock_top: int, grid
 	var iface: Interface = Interface.new(grid, body, Mining.new())
 	var view := Rect2(0.0, 0.0, float(grid_w * cell), float(grid_h * cell))
 	return [iface.observe(Interface.Envelope.covering(view, WorldView.WINDOW_MARGIN_CELLS)), MaterialLook.new()]
+
+
+## A site record without A' step 8's content records (D0388): the generator as it was before them -- the
+## plain world a content suite compares its own record against. `shallow_clay` carries every record now,
+## so a suite that wants "the same site without X" erases them all and sets X back.
+func _site_without_content(site: Dictionary) -> Dictionary:
+	var plain: Dictionary = site.duplicate(true)
+	for key: String in ["relief", "vertical", "studding", "aquifer", "lode", "richness", "tree"]:
+		plain.erase(key)
+	return plain
