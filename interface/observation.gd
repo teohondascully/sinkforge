@@ -211,6 +211,19 @@ var hub_tick: int = 0
 const WATER_MAX: int = WaterPlane.WATER_MAX
 const CELL_PX: int = Heightfield.TERRAIN_CELL_PX
 const LOGIC_PX: int = LogicGrid.TERRAIN_PER_LOGIC * Heightfield.TERRAIN_CELL_PX   # the machine cell, 16 px
+## The body's numbers the audio beds derive their levels from (A' step 6f, D0366), restated here for the
+## same layer reason: a walk is the rush bed's zero and terminal fall its one; the line's load is read
+## against gravity; a haul is a length delta per tick against the reel rate.
+const TICK_HZ: int = Body.TICK_HZ
+const RUN_SPEED_PX_S: int = Body.RUN_SPEED_PX_S
+const MAX_FALL_PX_S: int = Body.MAX_FALL_PX_S
+const GRAVITY_PX_S2: int = Body.GRAVITY_PX_S2
+const REEL_PX_S: int = (Grapple.REEL_PER_TICK * Body.TICK_HZ) / Fx.SCALE
+## The generator's surface datum in terrain rows. The cave bed measures depth against the GENERATED
+## ground, never against a scanned surface: legacy learned that a scan answers with the floor of your
+## own shaft the moment you dig, so the bed that exists to sell descent was loudest where descent had
+## happened (`legacy/scenes/main.gd:883-889`).
+const SKY_ROWS: int = ShaftGenerator.SKY_ROWS
 var water: PackedByteArray
 ## The wet terrain cells inside `window`, in `Ordering.cells` order: the sparse walk a per-frame painter
 ## takes instead of the whole window (A' step 6a, D0362).

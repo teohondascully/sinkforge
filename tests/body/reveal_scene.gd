@@ -76,7 +76,7 @@ var _score: Score = null
 var _particles: Particles = Particles.new()  ## D0216: chips on a break, a draught on a breach
 var _falling: FallingItems = FallingItems.new()  ## 6e, D0365: the cosmetic drops off the flow channel
 var _payouts: Payouts = Payouts.new()  ## 6d, D0365: the "+N" tick when the pack gains
-var _sfx: Sfx = null  ## D0296: the hollow ring and the breach -- the draught's audible half
+var _audio: RevealAudio = null  ## D0296 voices + the beds (6f, D0366); tests/body/reveal_audio.gd
 var _mine_down: bool = false  ## `--mine-down`: agent mode sinks a shaft instead of walking to glimmer
 var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the reticle from
 var _spawn_row: int = 0  ## the row the body started on -- `--mine-down`'s descent is measured against it
@@ -132,9 +132,9 @@ func _ready() -> void:
 	# Seeded here rather than in `particles.gd`, because the file is a verbatim lift and `randf` is where
 	# legacy put it. What was missing was not a different RNG; it was anyone deciding where it starts.
 	seed(hash(_seed_value))
-	_sfx = Sfx.new()
-	add_child(_sfx)
-	_sfx.setup(_seed_value)
+	_audio = RevealAudio.new()
+	add_child(_audio)
+	_audio.setup(_seed_value)
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
 
 
@@ -221,8 +221,8 @@ func _step_mining_feedback(delta: float) -> void:
 	var landings: Dictionary = _falling.take_landings()   # 6e, D0365: consumed once; one pop per landed cell
 	for cell: Vector2i in landings:
 		_particles.pop(landings[cell]["pos"], landings[cell]["color"])
-	if _sfx != null:
-		_sfx.note_frame(frame)
+	if _audio != null:
+		_audio.note_frame(frame, delta)
 
 
 ## Agent mode's own stopping condition. `--mine-down` runs until the body has actually DESCENDED the target

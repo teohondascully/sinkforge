@@ -389,6 +389,9 @@ jobs:
       #   test_machine_painter.gd                        test_machine_painter (the machine painter, structural: what counts as working, what a stall asks for, the ports, the aim and the gates, plates collapse runs and pack shelves, the construction flash, a real redraw over ten machines -- A' step 6c, D0364)
       #   test_falling_items.gd                          test_falling_items (the cosmetic drops off the consumed flow channel: the cap, landings merged by cell and consumed once, the arc's ends, the cull box holds the head, no random draw, a real redraw -- A' step 6e, D0365)
       #   test_payouts.gd                                test_payouts (the "+N" tick off the pack: gains are rises in item order, slots sum, nearby-soon merges, the cap and retirement, the first frame primes, a real redraw -- A' step 6d, D0365)
+      #   test_bed_bank.gd                               test_bed_bank (the ten looping beds: exact closed length, the seam blends tail into head and no bed steps at the wrap, the tonal beds carry their partials and the broadband ones do not, the rush is brighter than the wind, one seed one bed -- A' step 6f, D0366)
+      #   test_beds.gd                                   test_beds (the bed driver's static mix maps: silent at 0, the ceilings at 1, monotone, the hum's threshold layers, the winch snaps and the rope drags; the node builds ten players and the injected slider reaches volume_db -- A' step 6f, D0366)
+      #   test_bed_levels.gd                             test_bed_levels (eight levels off a posed observation: working machines within reach, depth against the generated datum, the rush from a run, a pour over an open unfull cell, working pumps, the haul as a length delta per tick, the load on a taut line -- A' step 6f, D0366)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -455,7 +458,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 91 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 94 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -488,6 +491,9 @@ jobs:
             res://tests/test_machine_painter.gd \
             res://tests/test_falling_items.gd \
             res://tests/test_payouts.gd \
+            res://tests/test_bed_bank.gd \
+            res://tests/test_beds.gd \
+            res://tests/test_bed_levels.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \

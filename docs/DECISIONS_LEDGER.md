@@ -15433,3 +15433,49 @@ runs, not by a suite.
 ANY pack rise, a hopper pickup included, where legacy tied it to the mining verb — accepted as the
 model: the reward reads wherever the pack grew. The tick's sound and the landing's sound wait for the
 sfx beds sub-step. `motes()` is built for the light pass (S2) and has no consumer yet.
+
+## D0366 · 2026-09-03 · A′ step 6f (i): the ten beds — legacy's loops on the split RNG, closed on whole cycles; the driver's mix maps static; the levels read off the observation against the generated datum; the scene's audio in its own rig
+
+**Decided:** (1) `view/audio/bed_bank.gd` is legacy `scenes/sfx.gd`'s ten looping generators (the
+factory in three layers, wind, cave air, rush, pour, pump, winch, creak) verbatim in their arithmetic,
+on the split RNG. EVERY raw buffer is padded by the seam fade so the closed loop is exactly its stated
+seconds and every sine partial in it lands on a whole number of cycles at the wrap; legacy padded only
+the three hum layers and let the crossfade smear the rest (38 × 3, 62 × 3, 88 × 2, 143 × 3 all close).
+The suite walks the `SECONDS` table, so a bed named there without a generator fails in the suite rather
+than playing as silence. (2) `view/audio/beds.gd` is the driver with its arithmetic SPLIT OUT AS STATIC
+MAPS (`hum_mix` … `line_mix`) that return numbers, for the reason `Sfx` states: a player cannot be read
+back, so a test against the setters could assert only that they did not crash, which is what a bed
+stuck at −60 dB does. The smoothing rates are named constants (the winch at 7.0 snaps with the key, the
+creak at 2.4 drags, speed 3.2, the factory 0.8, the weather 0.6, water 0.9) and the ambience slider is
+INJECTED as `ambience_db`, the one-line diff `Score` carries. (3) `view/audio/bed_levels.gd` is
+`legacy/scenes/main.gd:838-928`'s inline derivations as static rules off the OBSERVATION: `NEAR_CELLS =
+14` is legacy's own count (its 14 × 32 px cells are 14 of our 16 px logic cells under the unit regime);
+depth is measured against the GENERATED datum, `Observation.SKY_ROWS`, never a scanned surface —
+legacy's own lesson at `main.gd:883-889`, a scan answers with the floor of your shaft the moment you
+dig; a pour is a wet cell over an open unfull cell, the water drips' rule; the haul is the one stateful
+rule, a length delta per tick against the reel rate, paying out is not a haul, and the memory resets
+when the line is stowed. Six constants join the observation for the same layer reason as `WATER_MAX`
+(`TICK_HZ`, `RUN_SPEED_PX_S`, `MAX_FALL_PX_S`, `GRAVITY_PX_S2`, `REEL_PX_S`, `SKY_ROWS`). (4) The play
+scene's audio lives in `tests/body/reveal_audio.gd` (`RevealAudio`: the voice pool, the beds, the
+levels), the scene keeping only the call — D0276's split for the render stack, applied to sound; it is
+also what kept the scene at the 400-line cap. `note_frame` pushes every bed every frame including the
+zero frames, which is what lets a bed go quiet: legacy's `set_line` shipped with nothing calling it.
+(5) NOT in this commit, next under the same step: the one-shot voices (steps, catch, skid, pop, clunk,
+ding, ignite, vein, thump, drip, the grain banks) and the listener-space reverb bus with its occlusion.
+`boom` stays dead (the plan's row).
+
+**Why:** the beds are the sub-step the plan names, and legacy's reason for them stands — "a continuous
+verb with no continuous sound reads as a thing that is not happening".
+
+**Evidence:** `tests/test_bed_bank.gd` 44 assertions (exact closed length per bed, the seam blends
+tail into head on a ramp and no bed's wrap step exceeds its own largest neighbour step, the tonal
+partials 3× over an off-frequency control, the broadband beds under a quarter of the hum's 55 Hz, the
+rush's high-to-low band ratio twice the wind's, one seed one bed). One row was rewritten: the creak's
+fibre tone rides a ±9% wow by design, and the single bin at 143 Hz measured 0.0044 against a 0.0131
+rustle floor at 180 — the band claim (130–156 Hz over 170–196, twice) is the one that holds.
+`tests/test_beds.gd` 23; `tests/test_bed_levels.gd` 37, every rule posed directly on an observation.
+Two engine-name clashes were caught at parse and renamed (`_set` on `Node`, `load` the global).
+
+**Gaps:** no ear verdict on any bed. The thresholds are legacy's numbers carried under our unit regime,
+unlistened. The bed players are non-positional as legacy's were. The space bus and the one-shots wait
+for (ii).
