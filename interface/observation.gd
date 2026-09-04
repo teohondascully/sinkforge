@@ -210,6 +210,7 @@ var hub_tick: int = 0
 ## painter needs are restated HERE, because the view may not reach into `sim/` for them (layer lint).
 const WATER_MAX: int = WaterPlane.WATER_MAX
 const CELL_PX: int = Heightfield.TERRAIN_CELL_PX
+const LOGIC_PX: int = LogicGrid.TERRAIN_PER_LOGIC * Heightfield.TERRAIN_CELL_PX   # the machine cell, 16 px
 var water: PackedByteArray
 ## The wet terrain cells inside `window`, in `Ordering.cells` order: the sparse walk a per-frame painter
 ## takes instead of the whole window (A' step 6a, D0362).

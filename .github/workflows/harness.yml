@@ -386,6 +386,7 @@ jobs:
       #   test_rope_painter.gd                           test_rope_painter (the rope painter, structural: the sag bows down and is bounded, the hook bites past the anchor, the ghost is a stub, the carry look saturates, a real redraw with a live line -- A' step 5d, D0361)
       #   test_water_painter.gd                          test_water_painter (the water painter and the drips, structural: the surface rises with level, a step tapers, an interior cell is full, only the top cell ripples, depth runs out, the wet cells reach the observation sparsely, a real redraw over a pool -- A' step 6a, D0362)
       #   test_looks.gd                                  test_looks (the three look registries pinned against the data: every machine record has a style and a flat-footed profile, every status the sim returns has a colour and a mark with the fix rule, every carried item has a colour and a drawer, a real redraw of every glyph -- A' step 6b, D0363)
+      #   test_machine_painter.gd                        test_machine_painter (the machine painter, structural: what counts as working, what a stall asks for, the ports, the aim and the gates, plates collapse runs and pack shelves, the construction flash, a real redraw over ten machines -- A' step 6c, D0364)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -452,7 +453,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 88 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 89 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -482,6 +483,7 @@ jobs:
             res://tests/test_rope_painter.gd \
             res://tests/test_water_painter.gd \
             res://tests/test_looks.gd \
+            res://tests/test_machine_painter.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \

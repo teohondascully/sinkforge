@@ -15351,3 +15351,41 @@ what puts them on screen.
 not have is the drift the population pin exists to catch); a second colour table for the carried ground.
 
 **Reverse cost:** CHEAP; four view files, one suite, one record field.
+
+## D0364 · 2026-09-03 · A′ step 6c: the machine painter on the `Frame` contract — cell-sized casing and glyph, chrome at the fine-detail scale, the nameplates planned per frame, the construction flash from watching records appear
+
+**Decided:** (1) `view/visuals/machine_painter.gd` is legacy `scenes/machine_view.gd` (726 lines) on
+`Frame`, stateful (`add_stateful_painter`) for two reasons the file states: the construction flash
+outlives the frame that placed the machine, and the nameplate plan is laid out once per frame for every
+machine at once (`machine_labels.gd`: runs collapse into `HOPPER ×3`, shelf-packed, the aimed machine
+first). Its twenty-two reach-ins into legacy's renderer are the frame's aim, clock and zoom, the theme's
+fallback font, arithmetic, and one thing the frame does not carry: the construction clock, which the
+painter keeps by watching a record appear that was not there last frame — a loaded base primes the set
+without flashing. (2) THE VIEW READS THE RECORD, NEVER THE STATE. The observation's machine record grew
+`name` and `recipe` (with 6b's `source`), and the painter reads the recipe's inputs, outputs and timing
+off `RecipesRecords` (the data layer, which the view may see) for the ports, the need bubble and the
+progress bar; `MachineState` is never touched. (3) TWO SCALES, ONE NUMBER. The casing and the glyph are
+cell-sized (16 px against legacy's 32); the chrome — lamp, bubble, badge, plate, wedges, bar — is
+legacy's screen pixels at its 1.0 zoom drawn under a `CHROME_SCALE = 0.5` transform, so the fine-detail
+rule is one constant and the text is rendered by the font at legacy's sizes rather than at a rounded
+canvas size. The zoom gates map the same way (legacy's 0.65 at a 32 px cell is 1.3 here for the same
+screen size); the lamp's zoom compensation reads `2/zoom` for the same reason. (4) `label_visible` keeps
+legacy's rule verbatim — aimed, or near AND readable — with the nearness in METRES (6.4 m, legacy's
+reach ×2), which is the one unit that survives the cell change unchanged. (5) NOT PORTED, stated in the
+header: the load well (drawn for the rig's three capped bellies, all dead; the hopper's `feed_cap` is
+this build's one capped belly and a candidate), the objective guide's airspace rule (no objectives yet),
+the debug silhouette and bare-machine switches. The nameplate count is measured over the OBSERVATION's
+records, which are window-bounded; legacy measured over the factory, and a run straddling the window's
+margin would undercount — the margin makes it rare and the header says so. (6) `MACHINE_Z = −30` in the
+play scene: over the terrain, water and veil, under the marks, the rope and the body. (7)
+`tests/test_machine_painter.gd`, 35 assertions: what counts as working per behaviour, what a stall asks
+for, the ports' places and tints, the aim's terrain-to-logic floor, both gates at the play zoom and past
+it, the plates' collapse and shelves and the aimed-first rule, the flash's start and end and its removal
+with a picked-up machine, and a real redraw over ten machines placed through the door. CI 88 → 89. The
+machines are on screen in the play scene; the look is the director's verdict.
+
+**Alternative:** a stateless painter with the flash driven off a flow event (the events are the item
+channel, and a placement is not an item); chrome in world px at legacy's numbers (eleven-pixel plates on
+a sixteen-pixel machine).
+
+**Reverse cost:** CHEAP; two view files, two record fields, one suite.
