@@ -15932,3 +15932,51 @@ the neighbourhood.
 
 **Gaps:** no eye verdict — the 0.5-scaled strokes have not been photographed; a placed kind's
 placeability is the unoccupied-cell approximation of three verbs' preconditions.
+
+## D0377 · 2026-09-03 · A′ step 6n: the placed plane's clockwork — legacy's S6 tubes, beads, torches, saplings, piles, updrafts, guides and streaks as functions a test can fail on, on two canvases
+
+**Decided:** (1) `view/visuals/ambience_painter.gd` is legacy S6: `_draw_conduits` and `_conduit_level`,
+`_draw_power_pulses`, `_draw_torches`, `_draw_saplings`, `_draw_drop_paths` and `_guide_end_y`,
+`_draw_updrafts`, `_draw_ground`, `_draw_speed_streaks` — everything the factory leaves in the world and
+how it shows it is alive — with each rule split out as a static function returning data (`conduit_level`,
+`conduit_stubs`, `flow_links`, `bead_count`, `bead_alpha`, `guide_end_y`, `shaft_top_row`,
+`updraft_motes`, `pile_chips`, `sapling_pose`, `speed_px_s`, `streaks`) and two thin transcriptions.
+(2) TWO CANVASES: the drop-path guides go UNDER the machines (`paint_under` at `DROP_PATH_Z = -31`) and the
+rest OVER them (`paint` at `AMBIENCE_Z = -28`), because a guide is a line the casing must cover and a bead
+is a light the casing must not; legacy drew both from one `_draw` and ordered them by call. (3) Legacy's
+rules verbatim: a tube's level is its power over the record's `capacity_milli` (one reading for the copper
+channel, the beads and the veil's cut); stubs point at couplings and a lone tube keeps two nubs; power
+flows down when coupled below and along a lateral toward an equal-or-lower tube with ties going right,
+NEVER up ("the sim's locked hook made visible"); one to three beads with power, fading at both ends of the
+run, none under 0.08; a machine's guide ends at the next machine down its column inside the logic window
+or runs a 0.9-cell stub; the updraft's six motes climb from the lift to the first solid or machine above
+the column's centre cell; a pile shows at most four chips — in NAME order, where legacy took dictionary
+order, because a `StringName` sort is pointer order (`stringname-sort-is-pointer-order`) and a picture
+that reshuffles between runs is not a picture a capture can compare; the sapling is legacy's sprout by
+age over `SAPLING_GROW_TICKS = 2400` (its 20 Hz × 120 s; the hub ticks at 20 Hz here too); streaks appear
+only past 1.15× the run speed, five in a fan, longest through the middle, growing toward the swing's
+terminal at 2.8× the run (legacy `Player.SWING_MAX_SPEED`). (4) UNITS: legacy's pixels and pixel speeds
+at half (`S`), strokes floored at one pixel; velocities off the observation's per-tick fixed point through
+`TICK_HZ` and `Fx.SCALE`. NOT here: the seal's violet breath (no sealrock band), the sonar (dead), the
+splitter's lateral guide (§8 ruling 4); the rock's grain is `SeamPainter`, S6's one function already
+ported. FOUND, NOT FIXED: nothing in this build advances a sapling's age (`LogicGrid.sapling` is written
+at 0 on planting and never grown), so every sprout is a nub until the flora loop lands in step 7; the
+painter's growth rule is legacy's and waits for it.
+
+**Why:** the plan's last painter seam before the terrain remainder; the placed plane had NO renderer at
+all (torches, conduits, saplings and piles were placeable and invisible) and the machines' liveness cues
+— power flowing, a lift's updraft — were legacy's cheapest legibility.
+
+**Evidence:** `tests/test_ambience_painter.gd` 40: the capacity control, the level full/half/over/none,
+the lone tube's two nubs, stubs toward a machine below and a tube right, coupling by machine and not by
+air; down and downhill-right with the equal left tube and the tube above excluded, the tie taken right
+and not sent back; bead counts, the fade at both ends, brighter with power, the gate; the guide at the
+next machine or the stub; five chips shown as four in name order, one for one, none for none; the nub at
+3 px and 14 px grown, rooted at the floor, growth saturating, legacy's ticks; no streak at rest or at the
+run, five past it, longest through the middle, trailing, longer and brighter toward the terminal, the
+velocity round-tripping; on a real shaft the top row under a ceiling, six motes inside the shaft fading,
+none with rock directly above; both canvases redrawn on a real view over a burner, a lift, a torch, a
+tube and a pile. Neighbours green: machine_painter 35, world_view 28. A `x == [..] as Array[T]` in three
+rows cast the comparison rather than the literal (parse errors); parenthesised.
+
+**Gaps:** no eye verdict; the torch glyph's scale reuses the machine painter's, unphotographed.

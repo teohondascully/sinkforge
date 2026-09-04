@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -196,6 +196,10 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   outline); `interface/aim_planes.gd` answers placeability, the feed mouth, the hint and the rope and
   drill previews from the verbs' own predicates; the stars step aside for a ghost. 43 assertions. Not
   here: the objective chevron (no cells), dead-machine previews, the tier refusal.
+- **Step 6n — done (D0377).** `view/visuals/ambience_painter.gd`: legacy's S6 placed-plane clockwork
+  (tubes with power beads that never flow up, torches, saplings, piles capped at four in name order,
+  updrafts above lifts, guides under machines, speed streaks) as functions a test fails on, on two
+  canvases around the machines. 40 assertions. Saplings never grow yet (no sim rule; step 7's).
 
 ### Next action
 

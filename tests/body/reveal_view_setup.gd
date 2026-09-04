@@ -51,6 +51,8 @@ const GLINT_Z: int = -40
 ## readout the veil can dim is a readout that stops working in the exact place the game is played. Below
 ## the cracks and the body, which are the things doing the parting.
 const SEAM_Z: int = -35
+const DROP_PATH_Z: int = -31  ## the guides under the machines to where their output falls (6n, D0377)
+const AMBIENCE_Z: int = -28   ## the placed plane's clockwork over them: tubes and beads, torches, saplings, piles, updrafts, streaks (6n, D0377)
 const MACHINE_Z: int = -30  ## the factory: over the terrain, water and veil, under the marks, the rope and the body (6c, D0364)
 const MARKS_Z: int = -20    ## the cursor, the dig plan, the ghosts and previews: over the factory, under the rope and the body (6m, D0376)
 const FALLING_Z: int = -25  ## the cosmetic drops: over the machines they leave, under the rope and the body (6e, D0365)
@@ -185,7 +187,9 @@ static func _mount_over_veil(view: WorldView, glint: GlintPainter) -> void:
 	view.add_stateful_painter(glint, &"paint_frame").z_index = GLINT_Z
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
 	view.add_painter(CrackPainter.paint_frame)
+	view.add_painter(AmbiencePainter.paint_under).z_index = DROP_PATH_Z
 	view.add_stateful_painter(MachinePainter.new(), &"paint_frame").z_index = MACHINE_Z
+	view.add_painter(AmbiencePainter.paint).z_index = AMBIENCE_Z
 	view.add_painter(MarkPainter.paint).z_index = MARKS_Z
 
 
