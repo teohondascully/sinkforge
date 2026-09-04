@@ -92,19 +92,18 @@ static func _blur_axis(src: PackedFloat32Array, w: int, h: int, horizontal: bool
 	var n: int = w if horizontal else h
 	var lines: int = h if horizontal else w
 	var span: float = float(reach * 2 + 1)
+	# `_at` inlined as (base, stride): a horizontal line is `line * w + i`, a vertical one `i * w + line`.
+	var stride: int = 1 if horizontal else w
 	for line: int in range(lines):
+		var base: int = line * w if horizontal else line
 		var acc: float = 0.0
 		for d: int in range(-reach, reach + 1):
-			acc += src[_at(w, line, clampi(d, 0, n - 1), horizontal)]
+			acc += src[base + clampi(d, 0, n - 1) * stride]
 		for i: int in range(n):
-			out[_at(w, line, i, horizontal)] = acc / span
-			acc -= src[_at(w, line, clampi(i - reach, 0, n - 1), horizontal)]
-			acc += src[_at(w, line, clampi(i + reach + 1, 0, n - 1), horizontal)]
+			out[base + i * stride] = acc / span
+			acc -= src[base + clampi(i - reach, 0, n - 1) * stride]
+			acc += src[base + clampi(i + reach + 1, 0, n - 1) * stride]
 	return out
-
-
-static func _at(w: int, line: int, i: int, horizontal: bool) -> int:
-	return line * w + i if horizontal else i * w + line
 
 
 ## The light multiplier for one cell: 1.0 for open air, and for solid mass the burial term times the key.

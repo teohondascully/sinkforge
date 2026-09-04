@@ -53,8 +53,14 @@ static func _fill_deposits(o: RefCounted, world: World, w: Rect2i, cache: HubCac
 	if cache.lode_key != lode_key:
 		cache.rebuilds += 1
 		cache.lode_key = lode_key
+		if cache.lode_index_version != world.deposits.version:
+			cache.lode_index = HubCache.index_of(world.deposits.lode)
+			cache.lode_index_version = world.deposits.version
 		cache.lodes = {}
-		for terrain_cell: Vector2i in _inside(world.deposits.lode, w):
+		var hit: Dictionary = {}
+		for terrain_cell: Vector2i in HubCache.inside_indexed(cache.lode_index, w):
+			hit[terrain_cell] = true
+		for terrain_cell: Vector2i in Ordering.cells_native(hit):
 			cache.lodes[terrain_cell] = {"material": world.deposits.lode_at(terrain_cell),
 				"amount": world.deposits.ore_deposit_at(world.grid, terrain_cell),
 				"permille": world.deposits.lode_permille(terrain_cell)}
@@ -63,9 +69,12 @@ static func _fill_deposits(o: RefCounted, world: World, w: Rect2i, cache: HubCac
 	if cache.yield_key != yield_key:
 		cache.rebuilds += 1
 		cache.yield_key = yield_key
+		if cache.yield_index_version != world.deposits.version:
+			cache.yield_index = HubCache.index_of(world.deposits.deposits)
+			cache.yield_index_version = world.deposits.version
 		cache.ore_yield = {}
-		for terrain_cell: Vector2i in world.deposits.deposits:
-			if w.has_point(terrain_cell) and not cache.lodes.has(terrain_cell) and world.grid.is_solid(terrain_cell):
+		for terrain_cell: Vector2i in HubCache.inside_indexed(cache.yield_index, w):
+			if not cache.lodes.has(terrain_cell) and world.grid.is_solid(terrain_cell):
 				cache.ore_yield[terrain_cell] = int(world.deposits.deposits[terrain_cell])
 	o.ore_yield = cache.ore_yield
 	o.ore_like_legend = PackedByteArray()
