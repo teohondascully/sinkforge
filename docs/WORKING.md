@@ -268,6 +268,18 @@ per hub tick (two GDScript Callable sorts of 23K elements).
 - Remaining ceiling: the veil lightmap build (4.7ms/frame, ~4,250 texels of GDScript math). Legacy's
   base/scratch split would cut it to ~1ms but is a bigger port.
 
+### Instruments (post-A′)
+
+Three broken instruments fixed: `run_local_battery.sh` exited 0 on gate failures without `GATES_ONLY`;
+`flaky_test_detector.py` regex matched zero lines (wrong format vs `run_suites.sh` output); gate 27
+resolved by gitignoring `tests/body/recordings/`.
+
+### Visual catalogue (post-A′)
+
+`docs/VISUAL_QUEUE.md`: 30 entries across 10 captures, ranked P0-P3. Root cause: `VeilPainter`'s skylight
+scatter not wired to the per-column surface row, lamp bloom at 0.17 (legacy 0.32), the veil base/scratch
+split not ported. 15+ items are literally invisible until V01 (darkness drowning) is fixed.
+
 ### Next action
 
 **A′ is complete through step 8.** Step 7 (the economy, rig-as-consumer) is the director's to scope
