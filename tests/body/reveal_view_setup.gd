@@ -50,7 +50,9 @@ const GLINT_Z: int = -40
 ## the cracks and the body, which are the things doing the parting.
 const SEAM_Z: int = -35
 const MACHINE_Z: int = -30  ## the factory: over the terrain, water and veil, under the marks, the rope and the body (6c, D0364)
+const FALLING_Z: int = -25  ## the cosmetic drops: over the machines they leave, under the rope and the body (6e, D0365)
 const ROPE_Z: int = -10   ## the line and the placed ropes, under the body the scene draws at 0 (5d, D0361)
+const PAYOUT_Z: int = 30  ## the "+N" ticks: over the body they rise from and over the scene's own particles (6d, D0365)
 
 
 ## Builds the coordinator, attaches it to `scene`, and hangs every painter and the HUD off it.
@@ -58,7 +60,7 @@ const ROPE_Z: int = -10   ## the line and the placed ropes, under the body the s
 ## Returns the `WorldView` rather than storing it: the scene owns the reference, because the scene is
 ## what calls `refresh()` on the tick it decides to render.
 static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: Camera2D,
-		sky: bool) -> WorldView:
+		sky: bool, falling: FallingItems = null, payouts: Payouts = null) -> WorldView:
 	var view: WorldView = WorldView.new()
 	scene.add_child(view)
 	view.setup(iface, look, camera)
@@ -86,6 +88,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
 	view.add_painter(CrackPainter.paint_frame)
 	view.add_stateful_painter(MachinePainter.new(), &"paint_frame").z_index = MACHINE_Z
+	_mount_scene_layers(view, falling, payouts)
 	view.add_painter(RopePainter.paint).z_index = ROPE_Z
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
 	# rather than as a bound Callable. D0289: `add_painter(CrumblePainter.new().paint)` freed the painter
@@ -129,3 +132,12 @@ static func _mount_veil(view: WorldView) -> void:
 	# squares: the hardware sampler does the interpolation the old per-cell loop was paying for.
 	# `project.godot` sets NEAREST project-wide for pixel art, so this must be stated per layer.
 	veil.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+
+
+## The scene OWNS the falling-item layer (6e, D0365): it consumes the landings for its particle pops, so
+## the same instance has to be both painted here and read there. The payout layer rides along.
+static func _mount_scene_layers(view: WorldView, falling: FallingItems, payouts: Payouts) -> void:
+	if falling != null:
+		view.add_stateful_painter(falling, &"paint_frame").z_index = FALLING_Z
+	if payouts != null:
+		view.add_stateful_painter(payouts, &"paint_frame").z_index = PAYOUT_Z

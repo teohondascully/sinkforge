@@ -15389,3 +15389,47 @@ channel, and a placement is not an item); chrome in world px at legacy's numbers
 a sixteen-pixel machine).
 
 **Reverse cost:** CHEAP; two view files, two record fields, one suite.
+
+## D0365 · 2026-09-03 · A′ steps 6d and 6e: the payout tick read off the pack, the cosmetic drops off the consumed flow channel, both owned by the scene that consumes them
+
+**Decided:** (1) `view/fx/falling_items.gd` is legacy `scenes/falling_items.gd` on `Frame`, stateful,
+spawning from `frame.obs.flow_events` — the channel `observe` hands over exactly once and empties
+(D0356) — so legacy's one sim write here (`flow_events.clear()`) is gone and the layer holds no sim
+reference at all. Its sizes are legacy's px under the fine-detail transform (`SCALE = 16/32`, the same
+rule as 6a and 6c); the cull pad is DERIVED from the landing ring and the nugget rather than written,
+and the box is stable over the flight, so a drop cannot flicker at the screen edge (the suite walks 21
+points of four flights against it). Landings are merged BY CELL, keyed by the logic cell the drop fell
+to, carrying the deepest fall of the group, and `take_landings()` CONSUMES them: two readers cannot
+both fire the same landing. (2) THE SCENE OWNS THE LAYER. It is painted by the view and read by the
+scene (one `pop` per landed cell into the particle layer, as legacy's `MainView` did), so the one
+instance has to be in both hands: `RevealViewSetup.build` takes it as an argument and mounts it at
+`FALLING_Z = -25`, over the machines the drops leave and under the rope and the body. (3)
+`view/fx/payouts.gd` reads GAINS OFF THE PACK: a payout is a rise in an item's count between two
+observations, banked at `o.hand`. Legacy's `MainView` emitted gains from each verb; here nothing is
+wired and nothing can be missed, a spend is not a payout, and the first frame PRIMES rather than ticks
+so a loaded save does not fire a screen of numbers. The observation step (`observe_frame`) is separate
+from the draw so the pack diff is testable without a canvas; ticks of one item near a still-young tick
+merge into its count (+1, +2, +3) rather than stacking. Mounted at `PAYOUT_Z = 30`, over the body it
+rises from. (4) Both layers keep their own clock from `frame.anim_time`, clamped at 0.1 s a frame, so a
+stalled frame cannot dump a second of motion into one redraw.
+
+**Why:** the hybrid item model's visual half is what makes an abstract flow read as items moving (plan
+§3.2's view table); reading the payout off the pack keeps it an observation-only layer with no
+interface growth and no verb coupling to maintain as verbs are added.
+
+**Evidence:** `tests/test_falling_items.gd` 25 assertions (the scale and the derived pad, the cap, four
+drops onto two cells become two landings keyed by cell with the fall in world px, consumed once, the
+arc's ends and its bow, the cull box, two layers agree mote for mote with no random draw, a real redraw
+through `WorldView` with an event injected into the frame); `tests/test_payouts.gd` 21 assertions
+(rises in lexical item order, slots sum, nearby-soon merges and its three negatives, the cap and the
+retirement, prime-then-tick over five frames, a real redraw). Both suites first reported ALL PASS with
+the real-frame test UNAWAITED — `_finish` quit at the test's first `await`, its checks never ran, and
+the counts (23, 20) were the counts BEFORE it; the only tell was the engine's `27 resources still in
+use at exit`, which `run_gd_test.sh` treats as red. Corrected by `await`ing; the counts moved to 25 and
+21. The play scene's wiring is parse-checked; it is exercised by the headed-boot job and the reveal
+runs, not by a suite.
+
+**Gaps:** neither visual has an eye verdict (the director's, on the reveal capture). A payout fires for
+ANY pack rise, a hopper pickup included, where legacy tied it to the mining verb — accepted as the
+model: the reward reads wherever the pack grew. The tick's sound and the landing's sound wait for the
+sfx beds sub-step. `motes()` is built for the light pass (S2) and has no consumer yet.

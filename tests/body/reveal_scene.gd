@@ -74,6 +74,8 @@ var _mining: Mining = Mining.new()  ## D0195: the cursor-aim mining verb (Slice 
 ## `tools/run_gd_test.sh` reads as a bare ERROR.
 var _score: Score = null
 var _particles: Particles = Particles.new()  ## D0216: chips on a break, a draught on a breach
+var _falling: FallingItems = FallingItems.new()  ## 6e, D0365: the cosmetic drops off the flow channel
+var _payouts: Payouts = Payouts.new()  ## 6d, D0365: the "+N" tick when the pack gains
 var _sfx: Sfx = null  ## D0296: the hollow ring and the breach -- the draught's audible half
 var _mine_down: bool = false  ## `--mine-down`: agent mode sinks a shaft instead of walking to glimmer
 var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the reticle from
@@ -139,7 +141,8 @@ func _ready() -> void:
 ## The render stack lives in `tests/body/reveal_view_setup.gd` (D0276), which carries the painter order
 ## and why it is the picture. This scene keeps only the call, because WHEN to build it is scene work.
 func _build_view() -> void:
-	_sky_view = RevealViewSetup.build(self, Interface.new(_grid, _body, _mining), _look, _camera, _sky)
+	_sky_view = RevealViewSetup.build(self, Interface.new(_grid, _body, _mining), _look, _camera, _sky,
+		_falling, _payouts)
 
 
 ## Applies `RevealArgs.parse()` to this scene's fields, and returns the two the caller needs by name.
@@ -215,6 +218,9 @@ func _step_mining_feedback(delta: float) -> void:
 		frame.obs if frame != null else null, _look, CELL, delta)
 	if frame != null and _sky_view != null:
 		WaterDrips.spawn(frame.obs, _particles, _sky_view.view_world_rect(), delta)   # 6a, D0362
+	var landings: Dictionary = _falling.take_landings()   # 6e, D0365: consumed once; one pop per landed cell
+	for cell: Vector2i in landings:
+		_particles.pop(landings[cell]["pos"], landings[cell]["color"])
 	if _sfx != null:
 		_sfx.note_frame(frame)
 
