@@ -92,6 +92,15 @@ static func wall_color(look: MaterialLook, material: StringName, col: int, row: 
 		return COOL
 	if look.is_speck(material, col, row):
 		return look.speck_color(material, col, row)
+	return socket_color(look, material, col, row)
+
+
+## The wall's rock with no mark on it: what an OPENED LODE's cell is baked as, so the live pass can draw
+## the metal left in it on top (`OrePainter.paint_lode`, D0374) and let it thin as the lode drains. The
+## bake cannot see a drain -- only a dig rebakes a chunk -- so the metal is legacy's live pass again.
+static func socket_color(look: MaterialLook, material: StringName, col: int, row: int) -> Color:
+	if look == null:
+		return COOL
 	return look.matrix_color(material, col, row).darkened(RECESS).lerp(COOL, COOL_MIX)
 
 
@@ -152,7 +161,8 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 			if wall == &"":
 				continue
 			var box := Rect2(col * cell_px, row * cell_px, cell_px, cell_px)
-			ci.draw_rect(box, wall_color(frame.look, wall, col, row), true)
+			var tone: Color = socket_color(frame.look, wall, col, row) if frame.obs.lodes.has(c) else wall_color(frame.look, wall, col, row)
+			ci.draw_rect(box, tone, true)
 			var ao: float = ao_alpha(frame.obs, c)
 			if ao > 0.0:
 				ci.draw_rect(box, Color(0.0, 0.0, 0.0, ao), true)

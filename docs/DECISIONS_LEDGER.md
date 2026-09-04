@@ -15777,3 +15777,53 @@ One row of the draft contradicted the row after it (the one-rim rule) and was re
 
 **Gaps:** no eye verdict; the additive pass over the multiply veil has not been photographed together.
 `GlintPainter` keeps its own additive twinkle at `GLINT_Z`; the ore SEAM glow joins it under S4.
+
+## D0374 · 2026-09-03 · A′ step 6l (i): the ore seams and the lode's metal — legacy's S4 flood in metres, the seam glow from its own mineral hue on the light canvas, the lode's flecks as a live pass over a baked socket
+
+**Decided:** (1) `view/visuals/ore_painter.gd` is legacy `world_renderer.gd`'s S4 seam: `_exposed_ore_cells`,
+`_cluster_seams` (the spatial-hash greedy flood, absorption order preserved by re-sorting each pop's
+candidates), `_crystal_seams_cached`, `_seam_glow_color`, the seam glow and pips of `_paint_lights`, and
+`_draw_lode`'s draining prefix. (2) THE POPULATION IS THE GLINT'S: legacy's seam and glint predicates
+are the same four tests (solid, nuggets, glitters, an open neighbour), `GlintPainter.can_glint` already is
+that predicate and `glint_cells` already caches it, so the ore painter takes the glint painter and asks
+it rather than restating the rule; the view hoists one `GlintPainter` and hands it to both. (3) THE LINK
+IS IN METRES: legacy joins cells within 3 of its metre cells, so 12 of ours; the noise floor moved with
+the quantum from two legacy cells to one metre of face (four cells); the radius is legacy's
+`2.2 m + 0.55 × span` and is CAPPED at 7.6 m, the torch's reach, which legacy's own note asked for
+("nothing bounds it ... a drift gallery run along a vein reaches 16"). (4) The glow is the seam's own
+mineral hue, saturation pushed 0.20 and value held at 0.85 or above, cyan only as the fallback; drawn
+with `LightPainter.draw_glow` at 0.42 of the seam radius and `(0.11 + 0.07 × breath) × dark`, on a
+second ADD canvas at `LIGHT_Z` after the pools, `dark` being the glint's depth gate — the same
+substitution for legacy's skylight term, stated once. Pips on one face cell in four by the cell's stable
+grain (a legacy cell's worth of face), never on every 4-px cell, which would carpet the face.
+(5) THE LODE'S METAL IS A LIVE PASS: `WorldView` rebakes a chunk only on `mining_broke_cells`, and a rig
+working a vein breaks no cell, so a drain baked into the wall would never redraw. `WallPainter` paints an
+opened lode's cell as its SOCKET (the unmarked recessed rock, `socket_color`, which `wall_color` now
+calls for its non-speck branch) and `OrePainter.paint_lode` draws the speck over it per frame at
+`LODE_Z = -58` only while `Seams.grain(cell) % 1000 < permille`: monotone, so a fleck gone at 700 stays
+gone at 600 — legacy's prefix at the cell quantum, where D0299 made the cell the mark. NOT here: the
+seam's VEIL cut (legacy cuts the veil at each seam so "the vein's rock is revealed around it"; the veil
+takes no source but the lamp yet — machines, torches, conduits, motes and seams all owe it a cut, which is
+6l (ii) next, as `VeilSources` over `VeilPainter.light_at`).
+
+**Why:** the plan's next seam, and legacy's stated reason: coloured light "reads as a feature when it is
+big and cohesive and as confetti when it is scattered dots"; and the lode's thinning is the one visible
+progress a rig makes on a fat vein (`docs/DRIFT.md` in legacy: a 250-unit cell pixel-identical to a
+4-unit one).
+
+**Evidence:** `tests/test_ore_painter.gd` 43: the flood byte-identical to the obvious quadratic one on
+legacy's seven shaped cases scaled ×4 (empty, a speck, a vein across every bucket seam, two clumps
+arguing over a cell, a seam through the origin, a dense block, a scatter) and at n = 1200, order-blind,
+capped at six; a cell exactly LINK away joins and one further is dropped; three cells under the floor;
+the radius formula and the cap (a 15 m vein bound at 7.6 m, with a control that the cap was what bound
+it); iron's glow keeps iron's hue, saturates, stays bright; the cyan fallback for no cells and for clay;
+silent at the surface, full at 15 m; a pocket dug into iron clusters and every member is an exposed face,
+coal glows nowhere, the cache answers; the lode shows every fleck full, about half at half, none empty,
+monotone over 2,000 cells; the socket differs from the mark on a speck cell; both passes run on a real
+view over an opened lode with exposed faces. Neighbours still green: wall 31, glint 29, light 31, veil
+29. FOUND, NOT FIXED: past the window `solid_at` answers false as for air (D0238), so the world's edge
+columns and bottom row read as exposed faces in the glint's population too; the fixture reads the
+interior. A real world's edges are far off screen; recorded so the number is not mistaken for a seam.
+
+**Gaps:** no eye verdict; the pip density and the 1-in-4 pick are untested against a picture. The veil cut,
+above.

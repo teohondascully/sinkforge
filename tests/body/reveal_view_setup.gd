@@ -41,6 +41,7 @@ const TERRAIN_Z: int = -50
 ## POST-veil for a measured reason its own header records: drawn UNDER the veil, "every flare was scaled
 ## by `_dark`, the LightLayer with BLEND_MODE_MUL that makes rock dark", so the flare's own darkness
 ## compensation and the veil's attenuation were the same number and cancelled exactly.
+const LODE_Z: int = -58   ## the lode's live metal over the wall bake that leaves its socket bare (6l, D0374)
 const WATER_Z: int = -48  ## over the terrain, under the veil: deep water reads dark, daylit bright (6a, D0362)
 const VEIL_Z: int = -45
 const LIGHT_Z: int = -44  ## the additive pools, over the veil they punch through, under the glint (6k, D0373)
@@ -82,15 +83,12 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_baked_painter(WallPainter.paint)
 	view.add_baked_painter(TerrainPainter.paint)
 	view.bake_static(WALL_Z)
+	view.add_painter(OrePainter.paint_lode).z_index = LODE_Z
 	view.add_painter(WaterPainter.paint).z_index = WATER_Z
 	_mount_veil(view)
-	# STATEFUL for its sparse cache (D0337): the per-frame scan of every visible cell was 11.83 ms.
-	view.add_stateful_painter(GlintPainter.new(), &"paint_frame").z_index = GLINT_Z
-	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
-	view.add_painter(CrackPainter.paint_frame)
-	view.add_stateful_painter(MachinePainter.new(), &"paint_frame").z_index = MACHINE_Z
+	var glint: GlintPainter = _mount_over_veil(view)
 	_mount_scene_layers(view, falling, payouts)
-	_mount_light(view, falling)
+	_mount_light(view, falling, glint)
 	view.add_painter(RopePainter.paint).z_index = ROPE_Z
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
 	# rather than as a bound Callable. D0289: `add_painter(CrumblePainter.new().paint)` freed the painter
@@ -158,13 +156,34 @@ static func _mount_veil(view: WorldView) -> void:
 ## THE LIGHT PASS IS AN ADD OVER THE VEIL (6k, D0373): legacy's third blend, "the light pass is ADD". The
 ## blend belongs to the canvas, as the veil's does; the painter stays a function of (Frame, CanvasItem).
 ## It takes the scene's falling items for the motes, so it is mounted after the scene layers exist.
-static func _mount_light(view: WorldView, falling: FallingItems) -> void:
-	var light: PaintLayer = view.add_stateful_painter(LightPainter.new(falling), &"paint_frame")
-	light.z_index = LIGHT_Z
+static func _mount_light(view: WorldView, falling: FallingItems, glint: GlintPainter) -> void:
+	_mount_additive(view, LightPainter.new(falling))
+	# The ore seams glow on the same canvas, drawn after the pools; they share the glint's population
+	# cache rather than rescanning for it (6l, D0374).
+	_mount_additive(view, OrePainter.new(glint))
+
+
+## One ADD-blended, LINEAR-filtered canvas at LIGHT_Z for a stateful painter. Two painters get two
+## canvases at one z, drawn in mount order.
+static func _mount_additive(view: WorldView, painter: RefCounted) -> void:
+	var layer: PaintLayer = view.add_stateful_painter(painter, &"paint_frame")
+	layer.z_index = LIGHT_Z
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	light.material = mat
-	light.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	layer.material = mat
+	layer.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+
+
+## The readouts that sit over the veil because the veil must not dim them: the glint (STATEFUL for its
+## sparse cache, D0337: the per-frame scan of every visible cell was 11.83 ms), the rock's grain, the
+## cracks, the machines. Returns the glint painter so the ore seams can share its population.
+static func _mount_over_veil(view: WorldView) -> GlintPainter:
+	var glint: GlintPainter = GlintPainter.new()
+	view.add_stateful_painter(glint, &"paint_frame").z_index = GLINT_Z
+	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
+	view.add_painter(CrackPainter.paint_frame)
+	view.add_stateful_painter(MachinePainter.new(), &"paint_frame").z_index = MACHINE_Z
+	return glint
 
 
 ## The scene OWNS the falling-item layer (6e, D0365): it consumes the landings for its particle pops, so
