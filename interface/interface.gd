@@ -170,6 +170,7 @@ func observe(envelope: Envelope) -> Observation:
 	o.aim_cell = _hold.aim_cell
 	o.aim_in_reach = _hold.aim_cell != Vector2i(-1, -1) and Mining.in_reach(_body.pos_x, _body.pos_y, _hold.aim_cell)
 	o.aim_is_lode = _hold.aim_is_lode
+	AimPlanes.fill(o, _verbs, _world, _machines)
 	_fill_line(o)
 	o.flow_events = _events.duplicate(true)
 	_events.clear()   # the consumed channel: not sim state, and the one thing observe empties

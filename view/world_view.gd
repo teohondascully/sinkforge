@@ -384,7 +384,7 @@ func _build_frame() -> Frame:
 	if _tone == null:
 		_tone = RockTone.new(f.obs.world_seed)
 	f.tone = _tone
-	f.marks = PackedVector2Array()  ## empty in this build -- see Frame.marks
+	f.marks = MarkPainter.sky_marks(f.obs)  ## where a build ghost stands, so the stars step aside (6m, D0376)
 	return f
 
 

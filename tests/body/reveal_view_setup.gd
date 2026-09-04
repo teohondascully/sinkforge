@@ -52,6 +52,7 @@ const GLINT_Z: int = -40
 ## the cracks and the body, which are the things doing the parting.
 const SEAM_Z: int = -35
 const MACHINE_Z: int = -30  ## the factory: over the terrain, water and veil, under the marks, the rope and the body (6c, D0364)
+const MARKS_Z: int = -20    ## the cursor, the dig plan, the ghosts and previews: over the factory, under the rope and the body (6m, D0376)
 const FALLING_Z: int = -25  ## the cosmetic drops: over the machines they leave, under the rope and the body (6e, D0365)
 const ROPE_Z: int = -10   ## the line and the placed ropes, under the body the scene draws at 0 (5d, D0361)
 const PAYOUT_Z: int = 30  ## the "+N" ticks: over the body they rise from and over the scene's own particles (6d, D0365)
@@ -185,6 +186,7 @@ static func _mount_over_veil(view: WorldView, glint: GlintPainter) -> void:
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
 	view.add_painter(CrackPainter.paint_frame)
 	view.add_stateful_painter(MachinePainter.new(), &"paint_frame").z_index = MACHINE_Z
+	view.add_painter(MarkPainter.paint).z_index = MARKS_Z
 
 
 ## The scene OWNS the falling-item layer (6e, D0365): it consumes the landings for its particle pops, so

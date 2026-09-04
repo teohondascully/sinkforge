@@ -243,7 +243,7 @@ func _draw_machine(frame: Frame, ci: CanvasItem, rec: Dictionary, font: Font, ai
 		ci.draw_rect(Rect2(face.position.x, bar_y, face.size.x, bar_h), Color(0.0, 0.0, 0.0, 0.35))
 		ci.draw_rect(Rect2(face.position.x, bar_y, face.size.x * float(rec.get("progress_permille", 0)) / 1000.0, bar_h), Color(0.40, 0.90, 0.45))
 	for port: Dictionary in io_ports(rec, pos, face):
-		_matter_wedge(ci, port["base"], port["dir"], port["color"])
+		matter_wedge(ci, port["base"], port["dir"], port["color"])
 	_draw_status(frame, ci, rec, face, show_text)
 	if _construct.has(cell):
 		_draw_construct(ci, pos, clampf(float(_construct[cell]) / CONSTRUCT_DUR, 0.0, 1.0))
@@ -271,7 +271,8 @@ static func _draw_badge(ci: CanvasItem, font: Font, face: Rect2, n: int) -> void
 
 
 ## The matter wedge: a bare head sitting on the boundary it names, goods crossing rather than travelling.
-static func _matter_wedge(ci: CanvasItem, base: Vector2, dir: Vector2, color: Color) -> void:
+## Public: the drop-column arrow of a build preview wears the same head (`MarkPainter`, D0376).
+static func matter_wedge(ci: CanvasItem, base: Vector2, dir: Vector2, color: Color) -> void:
 	var perp := Vector2(dir.y, -dir.x) * WEDGE_HALF * CHROME_SCALE
 	var apex := base + dir * WEDGE_JUT * CHROME_SCALE
 	ci.draw_colored_polygon(PackedVector2Array([apex, base + perp, base - perp]), Color(color.r, color.g, color.b, 0.95))

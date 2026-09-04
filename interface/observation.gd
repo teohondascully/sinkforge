@@ -282,6 +282,15 @@ var map_cells: Vector2i = Vector2i.ZERO
 var map_version: int = 0
 var map_machines: Array[Vector2i] = []
 var aim_is_lode: bool = false
+## The aim's affordances (6m, D0376), from the verbs' own predicates (`AimPlanes.fill`): what is held,
+## whether the build press would land, which mouth a drop would feed, the nearest open cell while you
+## stand in your own way, how far a rope would unroll, what a drill would bore.
+var held_item: StringName = &""
+var aim_placeable: bool = false
+var feed_target: Vector2i = Vector2i(-1, -1)
+var place_hint: Vector2i = Vector2i(-1, -1)
+var rope_preview: int = 0
+var drill_preview: Dictionary = {}
 ## --- the line and the medium (A' step 5c, D0360): the body's rope, for the painter, and its footing ---
 var grapple_state: int = 0            # Grapple.State: 0 stowed, 1 flying, 2 anchored
 var grapple_live: bool = false        # not stowed; the painter reads these three, never the enum

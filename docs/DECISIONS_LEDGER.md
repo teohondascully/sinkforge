@@ -15875,3 +15875,60 @@ after moving the composition out (it reached 419). The duplication gate paired t
 
 **Gaps:** no eye verdict — the tinted veil under the additive pools is the picture legacy tuned and nobody
 here has looked at it. The lamp tint, above.
+
+## D0376 · 2026-09-03 · A′ step 6m: the mark grammar — legacy's cursor, corners, bar, dash, ghost, previews, feed lip and hint as a list a test can fail on; the aim's affordances answered at the door
+
+**Decided:** (1) `view/visuals/mark_painter.gd` owns legacy S5's SHAPES (`_mark_rect`, `_mark_wash`,
+`_cell_square`, `_cell_corners`, `_cell_refusal`, `_draw_dashed_rect`, `_out_arrow`, the rope ghost,
+CHROME shared with `MachinePainter`) and `view/visuals/mark_layout.gd` owns what is SAID this frame, as a
+list of `{kind, rect|a,b|cell, color, width}` marks that `MarkPainter.draw_mark` transcribes — the
+layout/paint split every HUD chip uses, applied to the world cursor, because "the wrong shape for this
+situation" is the half of a cursor that is wrong while the screen still shows something. Legacy's
+grammar is kept whole and its words are in the file: a square is where you point (chrome, never white,
+neither breathing nor growing), corners are what you would act on (the ONE growing outline, in the
+thing's own colour), a dash is a plan, a bar is a refusal heavier than the square it crosses. (2) UNITS:
+legacy's strokes and insets are its screen pixels at a 32 px cell, scaled by `S = 0.5` (WG-4) with a
+one-pixel floor; the cursor square covers the METRE when a machine is under the aim or a build is in hand
+(the press acts on the logic cell) and the BLOW's footprint otherwise (`mining_blow_px`, what the pick
+takes — legacy's metre cell was both). (3) The dig plan's per-cell corners became the plan REGION's
+outline: legacy's corners sat on metre cells, and a corner on a 4 px cell is a dot; every marked cell
+keeps the whisper of fill, the boundary edges take the thin breathing stroke — the same "later, not now"
+weight. (4) `interface/aim_planes.gd` answers the aim's affordances at the door from the verbs' OWN
+predicates, so the mark can never disagree with the press: `held_item` (`Verbs.selected_item`),
+`aim_placeable` (`Verbs.placeable`, plus `block_supported` for a block; a placed kind asks only for an
+unoccupied cell in bounds, as its verb does), `feed_target` (`reachable_eater`), `place_hint` (the
+nearest cell within two where the same press lands, only while `body_occupies` is the refusal),
+`rope_preview` (`place_rope`'s walk, read-only) and `drill_preview` (`Runners.drill_target`,
+`drill_blocked`, `drill_lode_target`). Legacy's controller pushed the same six answers into the renderer
+by hand. (5) `Frame.marks` is no longer empty: `MarkPainter.sky_marks` publishes the ghost's centre so
+the sky's stars step aside under it, legacy's rule with legacy's designed empty path everywhere else.
+`MachinePainter.matter_wedge` is public: the preview's out-arrow wears the spout's head ("the same claim
+about the same goods one cell further along"). Mounted at `MARKS_Z = -20`, over the factory and the
+falling items, under the rope and the body, post-veil — legacy drew the aim on its terrain canvas UNDER
+the veil and its marks layer over; a readout the veil can dim stops working where the game is played
+(D0308's rule for the grain), so both go over. NOT here, each with its reason in the painter's header:
+the objective chevron and tether (`Objectives` carries no cells; the chevron is guidance's alone), the
+Borer and Drift Rig previews (dead records), the tier refusal (no tier gate), the map pin, the sonar.
+
+**Why:** the plan's next seam, and the one the player looks THROUGH: the cursor is on screen every frame.
+Legacy's measured reason for the grammar — "the difference between a press that lands and a press that
+does nothing was a hue, which is no difference to a player who cannot use hue" — is why the refusal is a
+shape here too.
+
+**Evidence:** `tests/test_mark_painter.gd` 43: the constants derived (bar 1.5× the square, the wash
+inside the stroke, no stroke under a pixel, one chrome); rock in reach wears a chrome square at 0.85
+sized to the 20 px blow and iron's corners, out of reach 0.18 and no corners, open air with nothing in
+hand no mark; a held drill over open air in reach: the door says placeable, the glyph, the chrome square
+on the metre, no bar, the fifteen-metre column previewed with a blocked drop at the world's floor as a
+red-amber dash and arrow, the stars step aside; aiming the metre the body stands in: refusal bar at the
+bar's weight, one red square, a hint cell named and drawn once; a forge under the aim: corners in its
+colour lightened, no ghost, stars stay; coal in hand names the burner's mouth and lights one lip, a drill
+in hand lights none; a rope over one metre of air hangs one segment and draws it, the hang capped by what
+is carried; dragging the pick paints a plan whose every cell is washed and whose boundary, not every
+side, is stroked; paint runs on a real view. Neighbours green: interface 45, machine_painter 35,
+sky_painter 12, world_view 28, inspector 43, light_painter 31. FOUND: `Aim.effective` snaps the aim to
+the nearest workable surface cell, so a fixture asking for (34, 101) lands on (34, 100); the row asserts
+the neighbourhood.
+
+**Gaps:** no eye verdict — the 0.5-scaled strokes have not been photographed; a placed kind's
+placeability is the unoccupied-cell approximation of three verbs' preconditions.
