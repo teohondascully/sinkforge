@@ -409,6 +409,7 @@ jobs:
       #   test_veil_sources.gd                           test_veil_sources (every light but the lamp cuts the veil: the tint at 0.28 toward white, legacy's machine table with the burner dark unfuelled and the lift breathing with power, the torch's two cuts, the conduit's gate, the seam's breath shared with its glow, motes in cells, the cull, the per-channel composition that only ever adds light, a tinted texel in the map, a redraw over a lit base -- A' step 6l (ii), D0375)
       #   test_mark_painter.gd                           test_mark_painter (the mark grammar as a list: the square sized to the blow and faint out of reach, corners in a vein's or a machine's own colour, the build ghost with its glyph and the drill's column and drop, the refusal bar with the placement hint, the lit feed mouth, the rope's unroll, the dig plan's outline, the stars stepping aside for a ghost only, the door's affordances agreeing with the verbs -- A' step 6m, D0376)
       #   test_ambience_painter.gd                       test_ambience_painter (the placed plane's clockwork: the conduit level off capacity, stubs toward couplings, flow links down and downhill with ties right and never up, beads by power fading at both ends, the guide's end at the next machine or a stub, the shaft top and the updraft's motes, piles capped at four chips in name order, the sapling's pose by age, streaks only past 1.15x the run and longest through the middle, both canvases on a real view -- A' step 6n, D0377)
+      #   test_surface_tone.gd                           test_surface_tone (the ground is ground: humus darker under the cap and ramped in, the subsoil warming to ochre, the profile gone at ten metres and absent in a hole column, roots in a share of columns, moss on shallow exposed tops and none at twenty metres, tufts under lips, the walked surface read back and band-gated, clay's cap and hardrock's none, one in five roots and one in three blades, seed-determinism, the painter's cell fill taking the cap -- A' step 6o, D0378)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -475,7 +476,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 111 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 112 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -528,6 +529,7 @@ jobs:
             res://tests/test_veil_sources.gd \
             res://tests/test_mark_painter.gd \
             res://tests/test_ambience_painter.gd \
+            res://tests/test_surface_tone.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \

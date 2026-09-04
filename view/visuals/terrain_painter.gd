@@ -77,15 +77,51 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 	var solid: Callable = func(c: int, rw: int) -> bool:
 		return frame.obs.material_at(Vector2i(c, rw)) != &""
 	for col: int in range(r.position.x, r.end.x):
+		# THE COLUMN'S WALKED SURFACE, once per column (6o, D0378): the soil profile follows it and the cap
+		# sits on it. NONE for a hole column, and then neither applies.
+		var srow: int = SurfaceTone.column_surface_row(frame.obs, col) if frame.tone != null else SurfaceTone.NONE
 		for row: int in range(r.position.y, r.end.y):
 			var material: StringName = frame.obs.material_at(Vector2i(col, row))
 			if material == &"":
+				if row == srow - 1:
+					_paint_tuft(frame, ci, col, row, cell_px)
 				continue
-			var fill: Color = frame.look.cell_color(material, col, row)
-			# THE MOLDED SHADING, D0327. `null` is the pre-port picture -- a flat per-cell fill -- and is
-			# always correct, only flatter; a painter must not be the thing that turns a fixture without a
-			# tone into a crash. The mineral mark is toned along with the matrix here, unlike in the wall
-			# plane where legacy tones only the matrix (`world_renderer.gd:1204`, and D0299 carries why).
-			if frame.tone != null:
-				fill = frame.tone.shade(fill, col, row, frame.look.grammar_of(material), solid)
-			ci.draw_rect(Rect2(col * cell_px, row * cell_px, cell_px, cell_px), fill, true)
+			ci.draw_rect(Rect2(col * cell_px, row * cell_px, cell_px, cell_px), cell_fill(frame, material, col, row, srow, solid), true)
+
+
+## The colour one solid cell is filled with: the material's own, the molded shading, the surface terms, the
+## cap. THE MOLDED SHADING, D0327: `null` is the pre-port picture -- a flat per-cell fill -- and is always
+## correct, only flatter; a painter must not be the thing that turns a fixture without a tone into a crash.
+## The mineral mark is toned along with the matrix here, unlike in the wall plane where legacy tones only
+## the matrix (`world_renderer.gd:1204`, and D0299 carries why). THE CAP (6o, D0378): the walked surface
+## cell of a material with a cap colour IS the cap, one cell being under a quarter of a metre; one column
+## in five roots the cell below it half toward the cap's dark.
+static func cell_fill(frame: Frame, material: StringName, col: int, row: int, srow: int, solid: Callable) -> Color:
+	var fill: Color = frame.look.cell_color(material, col, row)
+	if frame.tone == null:
+		return fill
+	fill = frame.tone.shade(fill, col, row, frame.look.grammar_of(material), solid)
+	fill = frame.tone.surface.shade(fill, col, row, srow, solid)
+	if srow == SurfaceTone.NONE:
+		return fill
+	var cap: Color = SurfaceTone.cap_color(material)
+	if cap.a <= 0.0:
+		return fill
+	if row == srow:
+		return cap
+	if row == srow + 1 and SurfaceTone.root_here(col):
+		return fill.lerp(cap.darkened(SurfaceTone.CAP_ROOT_DARKEN), SurfaceTone.CAP_ROOT_MIX)
+	return fill
+
+
+## A blade overhanging the walked line into the air cell above it, one column in three, in the cap's own
+## colour: legacy's "what kills the razor edge". Two legacy pixels wide and four tall, at half.
+static func _paint_tuft(frame: Frame, ci: CanvasItem, col: int, row: int, cell_px: int) -> void:
+	if not SurfaceTone.tuft_here(col):
+		return
+	var cap: Color = SurfaceTone.cap_color(frame.obs.material_at(Vector2i(col, row + 1)))
+	if cap.a <= 0.0:
+		return
+	var s: float = float(Interface.Observation.LOGIC_PX) / 32.0
+	var x: float = float(col * cell_px) + float((Seams.grain(Vector2i(col, 0)) >> 9) % maxi(cell_px - 1, 1))
+	ci.draw_rect(Rect2(x, float((row + 1) * cell_px) - 4.0 * s, 2.0 * s, 4.0 * s), cap, true)

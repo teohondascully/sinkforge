@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -200,6 +200,11 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   (tubes with power beads that never flow up, torches, saplings, piles capped at four in name order,
   updrafts above lifts, guides under machines, speed streaks) as functions a test fails on, on two
   canvases around the machines. 40 assertions. Saplings never grow yet (no sim rule; step 7's).
+- **Step 6o — done (D0378).** The terrain remainder in this regime: legacy's coarse chamfers, fillets
+  and edge AO ruled not portable at the 4 px cell (sub-pixel; legacy ran them only where its fine layer
+  did not cover). `view/visuals/surface_tone.gd` (owned by `RockTone`): the soil profile below the
+  column's own surface, moss on shallow exposed tops, tufts under lips, and the cap on the band-gated
+  walked line with roots and blades; `TerrainPainter.cell_fill` applies it. 29 assertions.
 
 ### Next action
 

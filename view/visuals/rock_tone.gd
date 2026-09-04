@@ -134,6 +134,8 @@ var _stone: FastNoiseLite
 var _crack: FastNoiseLite
 var _huex: FastNoiseLite
 var _huey: FastNoiseLite
+## The surface-aware terms (soil profile, moss, tufts), seeded with the same world seed (6o, D0378).
+var surface: SurfaceTone
 
 
 ## `FastNoiseLite` IS LEGAL HERE and banned three metres away, which is worth stating so nobody 'fixes'
@@ -147,23 +149,24 @@ func _init(world_seed: int) -> void:
 	# FBM and each octave doubles the frequency, so a field whose base resolves on this grid still ships
 	# three or four octaves that do NOT, and those are white noise mixed straight into the result. Legacy
 	# names that default as "the systemic cause of 'the rock reads as static'".
-	_drift = _field(world_seed, 0, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, TONAL_FREQ, 3)
-	_grain = _field(world_seed, 0x27d4eb2f, FastNoiseLite.TYPE_SIMPLEX, GRAIN_FREQ)
-	_grain2 = _field(world_seed, 0x165667b1, FastNoiseLite.TYPE_VALUE, GRAIN_FREQ2)
-	_patch = _field(world_seed, 0x2545f491, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, PATCH_FREQ, 3)
+	_drift = field(world_seed, 0, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, TONAL_FREQ, 3)
+	_grain = field(world_seed, 0x27d4eb2f, FastNoiseLite.TYPE_SIMPLEX, GRAIN_FREQ)
+	_grain2 = field(world_seed, 0x165667b1, FastNoiseLite.TYPE_VALUE, GRAIN_FREQ2)
+	_patch = field(world_seed, 0x2545f491, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, PATCH_FREQ, 3)
 	# Both of the next two are THRESHOLDED downstream, so neither may carry an octave tail: doubling the
 	# frequency once puts detail at the grid's own scale, and a threshold on that prints the blob as
 	# scattered squares and the crack as dots. One octave each — the shape is the point, not its edge.
-	_stone = _field(world_seed, 0x1b873593, FastNoiseLite.TYPE_SIMPLEX, STONE_FREQ)
-	_crack = _field(world_seed, 0x85ebca77, FastNoiseLite.TYPE_SIMPLEX, CRACK_FREQ)
+	_stone = field(world_seed, 0x1b873593, FastNoiseLite.TYPE_SIMPLEX, STONE_FREQ)
+	_crack = field(world_seed, 0x85ebca77, FastNoiseLite.TYPE_SIMPLEX, CRACK_FREQ)
 	# Two independent low-frequency fields, so a region's hue pole is picked per broad region rather than
 	# every region landing on the same one.
-	_huex = _field(world_seed, 0xc2b2ae35, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, HUE_FREQ)
-	_huey = _field(world_seed, 0x27d4eb2f, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, HUE_FREQ)
+	_huex = field(world_seed, 0xc2b2ae35, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, HUE_FREQ)
+	_huey = field(world_seed, 0x27d4eb2f, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, HUE_FREQ)
+	surface = SurfaceTone.new(world_seed)
 
 
 ## Legacy `_field` `:494-503`, verbatim including its octave argument.
-static func _field(world_seed: int, salt: int, type: FastNoiseLite.NoiseType, freq: float,
+static func field(world_seed: int, salt: int, type: FastNoiseLite.NoiseType, freq: float,
 		octaves: int = 1) -> FastNoiseLite:
 	var n := FastNoiseLite.new()
 	n.seed = world_seed ^ salt

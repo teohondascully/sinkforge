@@ -15980,3 +15980,53 @@ tube and a pile. Neighbours green: machine_painter 35, world_view 28. A `x == [.
 rows cast the comparison rather than the literal (parse errors); parenthesised.
 
 **Gaps:** no eye verdict; the torch glyph's scale reuses the machine painter's, unphotographed.
+
+## D0378 · 2026-09-03 · A′ step 6o: the terrain remainder in this regime — the ground is ground: soil profile, moss, tufts and the cap; the chamfers, fillets and coarse AO ruled not portable at the cell
+
+**Decided:** (1) Legacy's coarse terrain passes (`terrain_painter.gd`: the 7 px silhouette chamfers, the
+concave fillets, the three-strip edge AO and its scoops, the 3-polygon crystal, the fissure line) do NOT
+come over, and this is a ruling, not a deferral: legacy itself ran them only on the walked surface band
+because its fine layer covered everything else, and this build's terrain cell IS legacy's fine cell
+(D0327) — a 7 px chamfer on a 32 px metre is 0.875 px here, the AO strips are 0.5 px, the fissure's
+placement band collapses to `h % 4` (Slice 0's finding, D0299's era: "not portable as written at this
+scale ... needing rework, not a rescale"). What legacy's coarse pass was FOR at the surface — a ground
+line that reads as ground — is carried instead by the fine layer's own surface terms, which `RockTone`'s
+header had listed as its follow-up. (2) `view/visuals/surface_tone.gd`, owned by `RockTone` (`surface`)
+and applied by `TerrainPainter.cell_fill` after the molded shading: the soil profile keyed to depth below
+the COLUMN'S OWN surface (humus ramped in and out under the cap, the warm subsoil, cobbles and clasts
+from the same inclusion field the rock reads at a lower threshold and both signs, roots by legacy's held
+gate with its coupled 3.0 kept as written), moss on exposed tops within three cells fading with depth in
+METRES (full to 2 m below the datum, dead at 14 m: legacy's world rows 22 and 34 against its surface row
+20), hanging tufts under lips, all by `RockTone.field` (made public: one field builder, one octave rule).
+Every row count is legacy's fine-row count unchanged; `SUBSOIL_ROWS` stays legacy's shipped 20 with its
+own note that the fade wakes at 23. (3) THE CAP: legacy laid 3–6 px of cap colour on a 32 px cell, under
+a quarter of a metre, so here the walked surface cell of a material with `cap_color` IS the cap; one
+column in five roots the cell below it halfway toward the cap's dark; one in three grows a blade
+overhanging into the air cell above (2×4 legacy px at half), by legacy's per-slice hash at one slice per
+cell (`Seams.grain` of the column). Only clay carries a cap today. (4) THE WALKED LINE IS BAND-GATED:
+`surface_y` names the first solid cell scanning down, so a shaft floor is a "surface"; legacy's
+`walked_surface` rejected rows below its generator's band. `CAP_BAND_M = 8`: a column surface deeper
+than eight metres below the datum is a hole floor — no cap, no profile — hills above the datum are
+walked. Legacy's `_soil` guarded only its NO_SURFACE sentinel and noted the near-surface hole that slips
+through; the band gate closes it. (5) `TerrainPainter.paint` hoists the column's surface row out of its
+row loop and splits `cell_fill` (testable, returns the colour) from the draw; the pre-port `tone == null`
+path is unchanged: the flat fill, cap and all left out.
+
+**Why:** the plan's "terrain painter remainder"; legacy's own measured reason ("a player looking down from
+spawn saw a brown rectangle rather than somewhere to dig") and the regime finding that made the coarse
+passes moot.
+
+**Evidence:** `tests/test_surface_tone.gd` 29: humus darker two cells under the cap and ramped in and out
+(means over 200 columns, because roots ride the same cells), the subsoil warming toward ochre, the profile
+gone at sixty cells and absent above the surface and in a hole column, roots in a share of columns; moss
+alive at 1 m, dead at 14 m, thinning at 8 m, exposed ledge tops tinting in patches, nothing ten cells in,
+nothing on a ledge at 20 m, tufts under lips sparsely, the air distance's reach; the surface read back to
+its row, hills and 8 m walked and 9 m not, a 12 m first-solid column NONE, clay's cap and hardrock's none,
+one in five roots and one in three blades over 1,000 columns; the same seed the same cell and another
+seed another picture, the rock tone owning a surface; the surface cell IS the cap, the cell under it earth,
+a rooting column pulled dark, no tone the flat fill. Neighbours green: rock_tone 24, terrain_painter 18,
+terrain_bake 24, wall_painter 31, world_view 28, glint 29. A first row read one column's root as the
+humus, and a paint row drew on a bare Node2D outside `_draw` (engine errors); both replaced.
+
+**Gaps:** no eye verdict — the cap band and the moss have not been photographed; the cap's 1-cell
+thickness against legacy's 3–6 px is a quantum decision a picture may overturn.
