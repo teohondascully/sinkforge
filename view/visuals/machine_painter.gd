@@ -99,10 +99,11 @@ static func active(rec: Dictionary) -> bool:
 
 
 static func held(rec: Dictionary) -> int:
-	return _total(rec.get("input", {})) + _total(rec.get("output", {}))
+	return total(rec.get("input", {})) + total(rec.get("output", {}))
 
 
-static func _total(buffer: Dictionary) -> int:
+## Items in a buffer. Public: the inspector counts the same buffers (6h, D0369).
+static func total(buffer: Dictionary) -> int:
 	var n: int = 0
 	for v: Variant in buffer.values():
 		n += int(v)

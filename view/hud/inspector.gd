@@ -63,13 +63,6 @@ static func _chips_of(counts: Dictionary) -> Array[Dictionary]:
 	return out
 
 
-static func _sum(counts: Dictionary) -> int:
-	var n: int = 0
-	for v: Variant in counts.values():
-		n += int(v)
-	return n
-
-
 ## The content: `{}` when there is nothing to say -- out of reach, or a bare cell with no hint.
 static func describe(o: Interface.Observation) -> Dictionary:
 	if o == null or not o.aim_in_reach or o.aim_cell == Vector2i(-1, -1):
@@ -80,57 +73,17 @@ static func describe(o: Interface.Observation) -> Dictionary:
 	var rec: Dictionary = o.machine_at(logic)
 	if rec.is_empty():
 		return _describe_terrain(o, aim, logic)
+	return _describe_machine(o, rec)
+
+
+static func _describe_machine(o: Interface.Observation, rec: Dictionary) -> Dictionary:
 	var info: Dictionary = {"name": String(rec.get("name", _cap(rec["id"])))}
 	var recipe: Dictionary = RecipesRecords.RECORDS.get(String(rec.get("recipe", &"")), {})
 	info["in"] = _chips_of(recipe.get("inputs", {}))
 	info["out"] = _chips_of(recipe.get("outputs", {}))
 	var status: StringName = rec.get("status", &"idle")
 	var input: Dictionary = rec.get("input", {})
-	var coal: int = int(input.get(&"coal", 0))
-	var fueled: bool = int(rec.get("fuel", 0)) > 0 or coal > 0
-	match rec.get("behavior", &""):
-		&"drill":
-			match status:
-				&"no_input": info["mode"] = "idle — no ore below it (stand it over a vein)"
-				&"no_fuel": info["mode"] = "OUT OF COAL — drop coal on it to run"
-				&"spent": info["mode"] = "the vein below is worked out"
-				&"blocked": info["mode"] = "belly FULL — dig a drain below it, or pick it up"
-				_: info["mode"] = "boring the vein below  ·  coal %d" % coal
-		&"generator":
-			info["mode"] = "burns coal → POWER" + ("  (running)" if fueled else "  (out of fuel)")
-		&"hopper":
-			var stock: int = _sum(input)
-			var filter: StringName = rec.get("filter", &"")
-			if filter == &"":
-				info["mode"] = "stockpiles %d — keeps the FIRST thing it tastes, passes the rest" % stock
-			elif status == &"blocked":
-				info["mode"] = "banks %s (%d) — BACKED UP, the machine below is full" % [_cap(filter), stock]
-			else:
-				info["mode"] = "banks %s (%d) — passes everything else" % [_cap(filter), stock]
-		&"lift":
-			info["mode"] = "lifts goods + you UP" + ("  (POWERED)" if int(rec.get("power_permille", 0)) > 50 else "  (unpowered baseline)")
-		&"pump":
-			info["mode"] = "drains the water under it" + ("" if status == &"working" else "  (nothing to drain)")
-		&"torch": info["mode"] = "light — the dark reads by it"
-		&"rope": info["mode"] = "a hung line — climb it"
-		&"conduit": info["mode"] = "carries power along the line"
-		&"winch_head":
-			match status:
-				&"spent": info["mode"] = "the vein is worked out — pick it up and move it"
-				&"blocked": info["mode"] = "the Station is full — collect from it"
-				&"no_input": info["mode"] = "nothing to bore — stand it on a vein"
-				_: info["mode"] = "bores the vein it stands on → the Station"
-		&"winch_station":
-			info["mode"] = "the Winch's drain — collect from it  (%d held)" % _sum(rec.get("output", {}))
-		_:
-			if recipe.is_empty():
-				info["mode"] = ""
-			elif (recipe.get("inputs", {}) as Dictionary).is_empty():
-				info["mode"] = "ore source"
-			else:
-				var outs: Array = (recipe.get("outputs", {}) as Dictionary).keys()
-				info["mode"] = "makes %s  (%.1fs a cycle)" % [_cap(StringName(outs[0])) if not outs.is_empty() else "?",
-					float(recipe.get("time_ticks", 0)) / float(Interface.Observation.TICK_HZ)]
+	info["mode"] = _mode_line(rec, recipe, status, input)
 	var mode_has_it: bool = rec.get("behavior", &"") in [&"drill", &"hopper", &"winch_head"] and status != &"no_power"
 	info["status"] = "" if mode_has_it else String(STATUS_LINE.get(status, ""))
 	var hold: Dictionary = {}
@@ -138,13 +91,62 @@ static func describe(o: Interface.Observation) -> Dictionary:
 		for it: Variant in buf:
 			hold[StringName(it)] = int(hold.get(StringName(it), 0)) + int(buf[it])
 	info["holding"] = _chips_of(hold)
-	var outs2: Array = (recipe.get("outputs", {}) as Dictionary).keys()
-	if not outs2.is_empty():
-		var item := StringName(outs2[0])
+	var outs: Array = (recipe.get("outputs", {}) as Dictionary).keys()
+	if not outs.is_empty():
+		var item := StringName(outs[0])
 		for r: Dictionary in o.rates:
 			if r.get("item", &"") == item and int(r.get("rate_centi", 0)) > 5:
 				info["rate"] = "factory makes %.1f %s/min" % [float(r["rate_centi"]) / 100.0, String(item)]
 	return info
+
+
+## The one line that says what the machine is doing, by behaviour and status.
+static func _mode_line(rec: Dictionary, recipe: Dictionary, status: StringName, input: Dictionary) -> String:
+	var coal: int = int(input.get(&"coal", 0))
+	var fueled: bool = int(rec.get("fuel", 0)) > 0 or coal > 0
+	match rec.get("behavior", &""):
+		&"drill":
+			match status:
+				&"no_input": return "idle — no ore below it (stand it over a vein)"
+				&"no_fuel": return "OUT OF COAL — drop coal on it to run"
+				&"spent": return "the vein below is worked out"
+				&"blocked": return "belly FULL — dig a drain below it, or pick it up"
+				_: return "boring the vein below  ·  coal %d" % coal
+		&"generator":
+			return "burns coal → POWER" + ("  (running)" if fueled else "  (out of fuel)")
+		&"hopper":
+			var stock: int = MachinePainter.total(input)
+			var filter: StringName = rec.get("filter", &"")
+			if filter == &"":
+				return "stockpiles %d — keeps the FIRST thing it tastes, passes the rest" % stock
+			elif status == &"blocked":
+				return "banks %s (%d) — BACKED UP, the machine below is full" % [_cap(filter), stock]
+			else:
+				return "banks %s (%d) — passes everything else" % [_cap(filter), stock]
+		&"lift":
+			return "lifts goods + you UP" + ("  (POWERED)" if int(rec.get("power_permille", 0)) > 50 else "  (unpowered baseline)")
+		&"pump":
+			return "drains the water under it" + ("" if status == &"working" else "  (nothing to drain)")
+		&"torch": return "light — the dark reads by it"
+		&"rope": return "a hung line — climb it"
+		&"conduit": return "carries power along the line"
+		&"winch_head":
+			match status:
+				&"spent": return "the vein is worked out — pick it up and move it"
+				&"blocked": return "the Station is full — collect from it"
+				&"no_input": return "nothing to bore — stand it on a vein"
+				_: return "bores the vein it stands on → the Station"
+		&"winch_station":
+			return "the Winch's drain — collect from it  (%d held)" % MachinePainter.total(rec.get("output", {}))
+		_:
+			if recipe.is_empty():
+				return ""
+			if (recipe.get("inputs", {}) as Dictionary).is_empty():
+				return "ore source"
+			var outs: Array = (recipe.get("outputs", {}) as Dictionary).keys()
+			return "makes %s  (%.1fs a cycle)" % [_cap(StringName(outs[0])) if not outs.is_empty() else "?",
+				float(recipe.get("time_ticks", 0)) / float(Interface.Observation.TICK_HZ)]
+	return ""
 
 
 static func _describe_terrain(o: Interface.Observation, aim: Vector2i, logic: Vector2i) -> Dictionary:
