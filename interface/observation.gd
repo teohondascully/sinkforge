@@ -261,6 +261,10 @@ var dig_marks: Array[Vector2i] = []
 var lode_target: Vector2i = Vector2i(-1, -1)
 var lode_progress: int = 0        # per mille toward the next unit off the face
 var aim_cell: Vector2i = Vector2i(-1, -1)
+## Whether the aimed cell is within the mining reach of the body (`Mining.in_reach`), the gate every
+## world verb uses. The inspector answers nothing out of reach (6h, D0369): a readout on a cell you
+## cannot act on is an invitation to walk into a wall.
+var aim_in_reach: bool = false
 var aim_is_lode: bool = false
 ## --- the line and the medium (A' step 5c, D0360): the body's rope, for the painter, and its footing ---
 var grapple_state: int = 0            # Grapple.State: 0 stowed, 1 flying, 2 anchored

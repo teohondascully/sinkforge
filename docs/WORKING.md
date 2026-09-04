@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio and 6g the hotbar done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar and 6h (i) the inspector done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -160,6 +160,11 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   chip on the layout/paint split, legacy's rules (a window that contains the selection, digits that
   stop with the keys) and geometry under `UiTheme.px`; 35 assertions. Mounted via `_mount_hud`. The
   selection verb is shell work; the inventory overlay is the bazaar's and stays dead. No eye verdict.
+- **Step 6h (i) — done (D0369).** `view/hud/inspector.gd`: legacy's readout and panel merged, every
+  content line re-authored for the machines here, `describe()` off the observation alone (new field
+  `aim_in_reach`; the rate line off the economy's list), the panel under legacy's width rules with the
+  ellipsis, standing down under a visible arrival plate; 43 assertions. Knobs and the tier line not
+  ported (verb / dead gate). No eye verdict.
 
 ### Next action
 

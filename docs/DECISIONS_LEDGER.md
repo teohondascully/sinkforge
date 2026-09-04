@@ -15563,3 +15563,47 @@ host carrying two items. Size gate green after the fold.
 
 **Gaps:** no eye verdict. The inventory OVERLAY (legacy's Bazaar counter, E) is not ported: it is the
 bazaar's page, dead by the plan. The selection verb and the number keys are shell work.
+
+## D0369 · 2026-09-03 · A′ step 6h (i): the inspector — legacy's readout merged with its panel, content re-authored against this build's machines, standing down under the plate
+
+**Decided:** (1) `view/hud/inspector.gd` merges legacy `scenes/hover_info.gd` (`describe`) and `hud.gd`'s
+`_draw_hover`, as the plan's row prescribes: the mechanism lifts whole, every content line is
+re-authored, because legacy's taught the Descent Engine, the splitter, the horizontal drill and the
+seal. The lines that exist here: the drill by status (idle over nothing, out of coal, spent, belly full,
+boring with its coal count), the generator running or out of fuel, the hopper stockpiling or banking
+its filter and backed up, the lift powered or baseline, the pump, the torch, the rope, the conduit, the
+winch head toward the Station and the Station counting what it holds, and every recipe machine naming
+its product and cycle FROM THE DATA (`RecipesRecords.time_ticks` over `TICK_HZ`). Terrain: an exposed
+lode with its amount and progress, a solid ore vein with its yield and the drill nudge, rope, torch,
+conduit, water in units; plain rock says nothing, as legacy's did. (2) `describe()` READS THE OBSERVATION
+AND NOTHING ELSE. Legacy's three pieces of controller context became: reach → a new observation field
+`aim_in_reach` filled from `Mining.in_reach` (the gate every verb uses); the drill rate → the economy's
+own rate list (`o.rates`, D0351) as "factory makes N item/min" for the machine's first output; the
+body's footing refusal → nothing, it is a verb's answer and shell work. The tool-tier "too hard" line is
+not ported: the tier gate is dead economy here (`dig_plan.gd`'s header). (3) A stall line, re-authored
+from legacy's `ALERT_REASON` for the statuses `MachineStatus` produces, is drawn in the warn ink only
+when the mode line has not already narrated it. (4) `layout()` keeps legacy's panel rules: the width of
+the widest line between the 218 floor and the 300 cap, past which a line is ellipsized rather than
+lost off the right edge; anchored top-right under the corner register; rows counted. (5) The chip
+STANDS DOWN under a visible arrival plate: legacy's tag table ranks the plate critical and this panel
+active, measured them printing over each other, and made visibility rather than lifetime the
+predicate. The chip is stateful only to hold the plate it consults; `_mount_hud` builds the plate first
+and mounts the inspector before it. (6) Legacy's clickable knobs are not drawn: a click is a verb.
+
+**Why:** the first of the plan's "inspector, objectives, hints" trio; the readout is what makes a
+stalled machine explain itself where the aim is, which is the whole of legacy's `ALERT_REASON` idea
+without the alert stack.
+
+**Evidence:** `tests/test_inspector.gd` 43 assertions: nothing out of reach, off the hint list, without
+an aim or an observation; the terrain branches (default and explicit yields, the lode's amount and 25%,
+rope, torch, water in units, plain clay silent); the drill's coal, chips, holdings and three stalls;
+the generator's two states; the hopper's three; the winch head's two and the Station's count; the
+lift powered; a recipe machine's product and cycle from the data with its chips, and the rate line at
+3.5/min and silent under 0.05; the panel's four rows for a working drill, three for an unpowered lift,
+the width between floor and cap, the anchor, the height, the ellipsis, the stand-down; a real redraw
+through the HUD host with a plate to consult. Two fixture faults found on the first run — a stale
+explicit yield leaking between cases, and a coal count that read one dictionary key under both string
+types and doubled — both corrected.
+
+**Gaps:** no eye verdict. The minimap that legacy stacked this panel under does not exist yet, so the
+panel sits at the FORGED slot's height; when the minimap lands the anchor moves with it.

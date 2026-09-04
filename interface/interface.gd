@@ -164,6 +164,7 @@ func observe(envelope: Envelope) -> Observation:
 	o.lode_target = _lode.target
 	o.lode_progress = _lode.progress_per_mille()
 	o.aim_cell = _hold.aim_cell
+	o.aim_in_reach = _hold.aim_cell != Vector2i(-1, -1) and Mining.in_reach(_body.pos_x, _body.pos_y, _hold.aim_cell)
 	o.aim_is_lode = _hold.aim_is_lode
 	_fill_line(o)
 	o.flow_events = _events.duplicate(true)
