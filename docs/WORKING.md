@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap and 6j the settings page done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page and 6k the lights done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -177,6 +177,10 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   shell snapshot, hits registered by the draw) + `settings_draw.gd` + `page_draw.gd` (legacy's page
   primitives) + eighteen theme tokens; mounted closed and last. 32 + 9 assertions. Opening key and the
   snapshot are shell work.
+- **Step 6k — done (D0373).** `view/visuals/light_painter.gd`: legacy's S2 additive pass on an ADD
+  canvas at `LIGHT_Z = -44` over the veil; the lamp bloom shares the veil's pool centre and depth scale;
+  machine pools by kind/status grouped by light at the brightest member; godrays per logic column;
+  torches, conduits, motes, the water skin's sheen. 31 assertions. No eye verdict yet.
 
 ### Next action
 

@@ -43,6 +43,7 @@ const TERRAIN_Z: int = -50
 ## compensation and the veil's attenuation were the same number and cancelled exactly.
 const WATER_Z: int = -48  ## over the terrain, under the veil: deep water reads dark, daylit bright (6a, D0362)
 const VEIL_Z: int = -45
+const LIGHT_Z: int = -44  ## the additive pools, over the veil they punch through, under the glint (6k, D0373)
 const GLINT_Z: int = -40
 ## THE GRAIN SITS ABOVE THE VEIL, for the same reason the glint does and one more (D0308). It is an AIM
 ## READOUT, not scenery: it answers "which way will this rock part" at the moment of the blow, and a
@@ -89,6 +90,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_painter(CrackPainter.paint_frame)
 	view.add_stateful_painter(MachinePainter.new(), &"paint_frame").z_index = MACHINE_Z
 	_mount_scene_layers(view, falling, payouts)
+	_mount_light(view, falling)
 	view.add_painter(RopePainter.paint).z_index = ROPE_Z
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
 	# rather than as a bound Callable. D0289: `add_painter(CrumblePainter.new().paint)` freed the painter
@@ -151,6 +153,18 @@ static func _mount_veil(view: WorldView) -> void:
 	# squares: the hardware sampler does the interpolation the old per-cell loop was paying for.
 	# `project.godot` sets NEAREST project-wide for pixel art, so this must be stated per layer.
 	veil.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+
+
+## THE LIGHT PASS IS AN ADD OVER THE VEIL (6k, D0373): legacy's third blend, "the light pass is ADD". The
+## blend belongs to the canvas, as the veil's does; the painter stays a function of (Frame, CanvasItem).
+## It takes the scene's falling items for the motes, so it is mounted after the scene layers exist.
+static func _mount_light(view: WorldView, falling: FallingItems) -> void:
+	var light: PaintLayer = view.add_stateful_painter(LightPainter.new(falling), &"paint_frame")
+	light.z_index = LIGHT_Z
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	light.material = mat
+	light.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 
 
 ## The scene OWNS the falling-item layer (6e, D0365): it consumes the landings for its particle pops, so

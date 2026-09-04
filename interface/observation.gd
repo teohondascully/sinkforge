@@ -224,6 +224,9 @@ const REEL_PX_S: int = (Grapple.REEL_PER_TICK * Body.TICK_HZ) / Fx.SCALE
 ## own shaft the moment you dig, so the bed that exists to sell descent was loudest where descent had
 ## happened (`legacy/scenes/main.gd:883-889`).
 const SKY_ROWS: int = ShaftGenerator.SKY_ROWS
+## The "no walkable floor in this column" sentinel `surface_height_at` answers with, restated so a
+## painter can compare against it without naming the sim class that owns it (A' step 6k, D0373).
+const NO_FLOOR: int = Heightfield.NO_FLOOR
 var water: PackedByteArray
 ## The wet terrain cells inside `window`, in `Ordering.cells` order: the sparse walk a per-frame painter
 ## takes instead of the whole window (A' step 6a, D0362).

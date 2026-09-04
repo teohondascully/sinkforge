@@ -15733,3 +15733,47 @@ own `sound`. `tests/test_page_draw.gd` 9. One parse slip (a discard statement) c
 
 **Gaps:** no eye verdict. No key opens the page and no snapshot is fed yet (shell). The zoom cycle's
 label comes from the snapshot; the reveal scene has no zoom levels to name.
+
+## D0373 · 2026-09-03 · A′ step 6k: the additive light pass — legacy's S2 pools over the veil, the lamp's bloom sharing the veil's centre, machine pools grouped by light, the third blend on its own canvas
+
+**Decided:** (1) `view/visuals/light_painter.gd` is legacy `world_renderer.gd`'s S2 seam — `_paint_lights`,
+`_paint_machine_pools`, `_paint_godrays`, `_draw_glow`, the torch and conduit glows, the water sheen,
+the motes — as one stateful painter on an ADD-blended canvas above the veil (`LIGHT_Z = -44`), legacy's
+third blend: "terrain passes are MIX, the darkness pass multiplies, the light pass is ADD". The blend
+belongs to the canvas, set in the mount as the veil's multiply is, so the painter stays a function of
+`(Frame, CanvasItem)`. (2) LIGHT REVEALS, IT DOES NOT PAINT: the veil's cut is what makes rock visible
+(D0336) and this is the bloom around a real lamp, held at legacy's 0.17 with its flicker, scaled by the
+VEIL'S OWN depth scale and centred on the VEIL'S OWN pool centre (`VeilPainter.lamp_head`,
+`lamp_scale`), so a bloom and a reveal cannot light two different points — legacy's warning about the
+expression copied a fifth time. (3) Machine pools follow the kind and the status: a working furnace's
+ember, a fuelled burner's glow that goes OUT when the coal runs dry (not dim: a burner with no coal is
+not idling), a lift's teal breathing with its power, every other machine its own casing colour; an idle
+machine keeps `IDLE_GLOW` so a dark base stays findable. Same-light neighbours within the link distance
+flood into ONE pool whose intensity is its brightest member (never the sum, never the mean), and a
+different colour or an idled neighbour does not join, because an idled pool would publish the working
+neighbour's state; the cores stay per burner. (4) Godrays per logic column off the observation's surface
+heights: a column beams when its surface drops two metres or more below the shallower rim neighbour,
+from the rim clamped at the veil's surface line, fading over the veil's sky reach; this build has no day
+clock, so they run at full day. (5) Torches from the placed plane at legacy's radius, conduits by the
+power field over the conduit record's capacity, motes from the scene's falling items, and the water
+sheen off the wet cells' SKIN only (a body's top and sides, never its middle), with the radius scaled
+to our quarter-metre water cell so neighbours still blend. The cull margin is derived from the largest
+pool. NOT here: the sonar echoes (dead), the ore seam glow (S4 next), legacy's lamp offset easing (the
+veil's centre is not eased either; both move together when one does).
+
+**Why:** the plan's next seam, and the one that makes a base read as a base in the dark: legacy's
+measurement that a working and a stopped Drill differed by 14 luma levels against a 7-level baseline
+until the pool was gated, while the gated Forge differed by 92.
+
+**Evidence:** `tests/test_light_painter.gd` 31: the gradient 128 square, shared, bright to transparent
+and monotone; the bloom at the datum a 0.30 floor and deep the full 0.17 within the two sines' reach;
+the furnace ember, the idle fraction, the unfuelled burner out, the fuelled burner burning, the lift's
+teal breathing with power, the drill's casing colour with no core; two adjacent furnaces one pool wider
+than one's with two cores, apart two pools, a drill beside a furnace two, an idled beside a working two,
+the group at the brightest member; the row inverse of the palette's depth; a six-metre shaft beaming
+and landing, a one-metre step not, one rim neighbour enough, a mouth below the sky's reach not, a very
+deep shaft's beam dying before its floor; a redraw on an ADD layer over a forge, a torch and a mote.
+One row of the draft contradicted the row after it (the one-rim rule) and was removed. `Interface.Observation.NO_FLOOR` restates the heightfield's sentinel so the painter passes the layer lint, as the other sim constants do.
+
+**Gaps:** no eye verdict; the additive pass over the multiply veil has not been photographed together.
+`GlintPainter` keeps its own additive twinkle at `GLINT_Z`; the ore SEAM glow joins it under S4.
