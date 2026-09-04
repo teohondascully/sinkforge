@@ -444,6 +444,15 @@ the door with the body's and the mining state's keys, `new_game` on the spawn; 3
 COMPLETE.** Next: step 5 (the `Fx` vector layer and the grapple; the resolver ruling gates its
 collision half).
 
+**Status (2026-09-03), step 5:** 5a — DONE (D0358: `Fx.normalize`/`dot`/`limit_length`, both divisions
+toward less energy; 17 assertions). 5b — DONE (D0359: `sim/body/grapple.gd`, the solver under `Fx`
+with exact one-cell probes, the wrapping polyline, projection and radial cancel through the raw delta;
+63 assertions; the coordinate gate's `fx` tag). 5c — DONE (D0360: `Surroundings`/`WorldSurroundings`,
+the swing coupled in `body_swing.gd` with the collision stand-in, the medium in `body_medium.gd` — rope
+climb, updraft, water — the coast, the step-down snap, machines block and wood passes on every side of
+the body, `place()`; the ramp glide left out pending the ruling; 69 assertions across two suites; the
+replay golden re-pinned from CI Linux). Next: 5d, `view/visuals/rope_painter.gd` and the carry look.
+
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 
 Files: `sim/world/tile_grid.gd` (planes per the ruling; each plane enters `state_signature()` and
@@ -652,8 +661,8 @@ Measured 2026-09-01 at the default framing: painters 4.01 ms (`veil 2.99 sky 0.9
 | Material id vs item id (D0349): a bored `ore_iron` block yields the item `ore_iron`; the recipes take `ore`, `iron`, `rich_ore` | the automated line end to end; step 7 | a `yields:` field on the material record, or recipes renamed to the material ids |
 | Pre-pivot (v2) saves (D0352, ADR 0010): refused by name, not migrated — §5.3 asked for a migration | nothing: no player holds one, the current build never saved | keep the refusal; a converter is a later migration branch if you want legacy worlds to open |
 | HARDNESS `earth` 0.28 s = 5.6 ticks | `sim/mining` | 6 ticks |
-| `sim.ramp_dir` authored ramps vs `Heightfield` | step 5 body mechanisms | superseded by the heightfield |
-| The resolver (P-28) | step 5's collision half | — |
+| `sim.ramp_dir` authored ramps vs `Heightfield` | nothing now: step 5c ported the other eight mechanisms and left the ramp glide out (D0360) | superseded by the heightfield; confirm, or the glide is a small lift onto `Heightfield` |
+| The resolver (P-28) | the swing's re-resolve: step 5c shipped a STAND-IN (D0360: a projected position whose box would overlap rock is refused and the line reads slack for the tick; same outcome at a flat wall, holds instead of sliding at a corner) | rule on the resolver, then the stand-in becomes legacy's re-resolve of both axes |
 | `tests/body/recordings/` 36 untracked logs | gate 27 | commit as corpus or gitignore |
 | `history/` cull to 12 | nothing | director-action |
 

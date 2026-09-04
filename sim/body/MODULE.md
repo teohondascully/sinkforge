@@ -21,7 +21,10 @@ module is green against that suite.
 
 ## Dependencies
 
-`core`, `world` (collision and depenetration query tile solidity), `invariants`
+`core`, `world` (collision and depenetration query tile solidity), `invariants`; the machines, the
+placed ropes, the water and the lifts' drafts reach the body ONLY through `surroundings.gd`'s four
+answers, whose world-backed subclass lives in `sim/run/world_surroundings.gd` (A' step 5c, D0360) --
+a body built without one runs on bare terrain, bit for bit as before. `invariants`
 (`vertical_resolve.gd::resolve_floor` reports a diagnostic-only floor-selection
 check to `Invariants.report_floor_selection` -- docs/adr/0005, D0043 -- never
 reads a result back, never changes behavior from it).
@@ -57,7 +60,11 @@ depend on `body` directly yet.
 polyline (`update_line`, `hitch_fx`, `free_length`); `constrain_position_fx` (never outside the circle,
 D0358), `resolve_velocity_fx`, `pump_fx` (one 21/20 ratio); `capture`/`restore`/`state_signature`. Pixel
 points are `Vector2i` pairs of `Fx` and name their space with the `fx` tag the coordinate gate accepts
-(D0359). Coupled into `Body.tick` in step 5c; the collision half waits on the resolver ruling (plan §8).
+(D0359). `body_swing.gd` couples it into `Body.tick` after both axes have collided (5c, D0360) and holds
+the coast above top speed; `body_medium.gd` is the water, the rope grip and climb, the updraft;
+`VerticalResolve.step_down` hugs a descending step; `Body.place` moves a body without pricing a fall.
+The swing's collision half waits on the resolver ruling (plan §8): until then a projected position
+whose box would overlap rock is refused and the line reads slack for the tick.
 
 ## Gotchas
 

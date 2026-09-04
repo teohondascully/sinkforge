@@ -155,6 +155,15 @@ func _solid_grid(material: StringName, size: int = 64) -> TileGrid:
 ## A hub rig for the machine and transport suites (A' step 3d/3e): a fresh world of `logic_w` x
 ## `logic_h` metres, all air, with an item service on it. `_hub_machines` makes the registry and attaches
 ## it, so `Items.deposit` and conservation see machine buffers the way the hub wires them.
+## One input frame with the move axis and the climb axis set (A' step 5c): the body-coupled suites all
+## drive the body this way, and two private copies is exactly what the duplication gate refuses.
+func _input(move: int = 0, climb: int = 0) -> InputFrame:
+	var f: InputFrame = InputFrame.new()
+	f.move_dir = move
+	f.climb_dir = climb
+	return f
+
+
 func _hub_items(logic_w: int = 16, logic_h: int = 16) -> Items:
 	return Items.new(World.new(TileGrid.new(logic_w * LogicGrid.TERRAIN_PER_LOGIC, logic_h * LogicGrid.TERRAIN_PER_LOGIC, 1)))
 

@@ -15195,3 +15195,55 @@ smallest feature is one cell); `Vector2i.INF`-style sentinel for "no catch" (non
 i32 minimum pair is the sentinel, and no world point is there).
 
 **Reverse cost:** CHEAP; one file, one suite, one public root.
+
+## D0360 · 2026-09-03 · A′ step 5c: the line on the body and the medium it moves through — `Surroundings`, the swing coupled with a collision stand-in, eight of the nine mechanisms, the ground plane sees a machine
+
+**Decided:** (1) THE BODY READS ITS SURROUNDINGS THROUGH FOUR ANSWERS. `sim/body/surroundings.gd` is a
+base whose answers are the body as it always was (solid terrain blocks; no rope, no water, no draft), so
+every body suite and the calibrated corpus run bit for bit unchanged — `test_body_acceptance`'s golden
+traverse held without a re-pin, and `test_hostile_chamber`'s 64 assertions. `sim/run/world_surroundings.gd`
+overrides them from the world and the machines, and `Interface` hands it to the body it owns; `sim/body`
+still depends on core, world and invariants only. (2) THE SWING IS A STATIC PASS (`body_swing.gd`), the
+shape the resolvers take, run once per tick after both axes have collided: fire or chain toward the
+recorded aim cell (a terrain cell on the move frame, never the pointer; plan §3.2), advance, reel on the
+climb axis, wrap, project, cancel the outward half, pump, winch drive (measured from the HITCH, where
+legacy read the anchor — a wrapped line pulls from its hitch), drag 11/3000 a tick, cap at 2.8× the run.
+The coast above top speed lives beside it, because it exists for the released swing. (3) THE COLLISION
+STAND-IN. Legacy re-resolves both axes after moving the body onto the circle; that re-resolve is the
+resolver's, which is parked (plan §8). Until it is ruled on, a projected position whose box would overlap
+rock is REFUSED and the line reads slack for the tick: the same observable outcome at a flat wall (the
+suite pins it: 240 ticks held into a wall, never inside rock, stopped at the face, slack 6 ticks), a
+different one at a corner, where legacy slides along the face and this holds. Stated in the file's header
+and in §8, not hidden. (4) A JUMP CUTS A LINE THAT WAS TAUT LAST TICK OR IS TAUT NOW. The probe showed
+why: a reel leaves the body closing on the hook at 418 px/s, so the tick after the reel stops it sits
+inside the circle and the line reads slack for exactly one tick; legacy read the previous frame's
+tautness and cut. The kick is legacy's formula verbatim — `(min(vy, 0) + JUMP) × 21/20`, the pump's own
+ratio — which stacks the winch's rise under the leap (the suite expects −806, not a bare −383). (5) THE
+MEDIUM (`body_medium.gd`): water wading with legacy's five multipliers as ratios (11/20, 3/5, 9/20, 7/10,
+220 px/s sink), rope grip and climb at 110 px/s with the 6 px top hold, the lift's draft at 120 px/s
+through `Flow.updraft_at`, the grip counting as grounded and a jump letting go. (6) THE GROUND PLANE
+SEES WHAT THE WALL SWEEP SEES. The first cut made a machine a wall but not a floor, and the body stepped
+onto it and fell through it, walking clean across (measured: right edge at 274 px past an 80 px face).
+`Heightfield._column_top_row`/`column_surface_y` take an optional `Surroundings`, the vertical resolver's
+row picks and deferred-floor scan use the body's own `_blocked`, and `Invariants.check_floor_selection`
+takes the same predicate as a `Callable` (or it reported the terrain under a machine as an ambiguous
+second floor, by `push_error`, which the runner counts as a crash). A lone machine is therefore a one-tile
+step the legs auto-climb — legacy's 1.3-cell step allowed the same — and two stacked are a wall; wood and
+leaves pass on every side. (7) THE STEP-DOWN SNAP lives in `VerticalResolve.step_down`, gated on walking
+(8 px/s) and one tile of drop, so bare terrain has it too; a resting body is never snapped and a two-tile
+drop is a fall. (8) `Body.place` moves a body, zeroes its velocity and stagger, prices no fall, and cuts
+the line. (9) NOT PORTED: the authored-ramp glide (`ramp_dir`), pending the §8 ruling — the heightfield
+is this build's ramp. Carry weight is representation and goes with the rope painter (5d). (10)
+`test_grapple_body.gd` (34) ports `check_grapple`'s floors and passes them with room: bite in 10 ticks
+(cap 12), the pumped swing at 419 px/s against 1.15× the run (172), 240 px of lift in 90 ticks against
+96, the 320 px chasm crossed (landed at col 194, far lip 170), 372 of 420 px/s kept 30 ticks after a
+hands-off release (floor 0.72). `test_body_medium.gd` (35). (11) The body signature gains `climbing` and
+the line's signature, so the shaft-replay golden moves at checkpoint 0 with its coverage summary
+IDENTICAL to the pinned one's (jumps 858, mantles 0, step-ups 0, digs 360, corner_ok 6): a re-pin, not a
+regression, harvested from CI's Linux build per the standing rule. CI 83 → 85.
+
+**Alternative:** threading `World`/`Machines` into `Body.tick` (a signature change through 24 callers and
+a dependency the body's contract forbids); a machine as a wall only (the body walks through it, measured);
+cutting only on this tick's tautness (a jump right after a reel is swallowed for a tick).
+
+**Reverse cost:** MODERATE; four new files, two suites, the resolver and heightfield predicate threading.

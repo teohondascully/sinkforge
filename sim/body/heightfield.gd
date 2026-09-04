@@ -44,18 +44,23 @@ const NO_FLOOR: int = 2147483647
 ## Row (`TileGrid` terrain-cell index, not px) of the topmost solid cell in `terrain_col`, scanning
 ## downward from `scan_from_row` for at most `max_rows`, or -1 if nothing solid is found in range.
 ## Bounded rather than scanning the whole grid: a caller (the body controller) always knows roughly
-## where it is and passes a small window around its own position.
-static func _column_top_row(grid: TileGrid, terrain_col: int, scan_from_row: int, max_rows: int) -> int:
+## where it is and passes a small window around its own position. `blocker` (A' step 5c, D0360) is the
+## body's `Surroundings`, so a machine's tile is ground and a trunk is not -- the same answer the wall
+## sweep gives; null reads bare terrain, as the view's surface query does.
+static func _column_top_row(grid: TileGrid, terrain_col: int, scan_from_row: int, max_rows: int,
+		blocker: Surroundings = null) -> int:
 	for row: int in range(scan_from_row, scan_from_row + max_rows):
-		if grid.is_solid(Vector2i(terrain_col, row)):
+		var c := Vector2i(terrain_col, row)
+		if (grid.is_solid(c) if blocker == null else blocker.blocks(grid, c)):
 			return row
 	return -1
 
 
 ## The world-y (`Fx`) of column `terrain_col`'s surface -- the top face of its topmost solid cell in
 ## range -- or `NO_FLOOR`.
-static func column_surface_y(grid: TileGrid, terrain_col: int, scan_from_row: int, max_rows: int) -> int:
-	var row: int = _column_top_row(grid, terrain_col, scan_from_row, max_rows)
+static func column_surface_y(grid: TileGrid, terrain_col: int, scan_from_row: int, max_rows: int,
+		blocker: Surroundings = null) -> int:
+	var row: int = _column_top_row(grid, terrain_col, scan_from_row, max_rows, blocker)
 	if row < 0:
 		return NO_FLOOR
 	return Fx.from_int(row * TERRAIN_CELL_PX)

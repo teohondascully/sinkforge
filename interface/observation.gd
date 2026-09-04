@@ -242,6 +242,21 @@ var lode_target: Vector2i = Vector2i(-1, -1)
 var lode_progress: int = 0        # per mille toward the next unit off the face
 var aim_cell: Vector2i = Vector2i(-1, -1)
 var aim_is_lode: bool = false
+## --- the line and the medium (A' step 5c, D0360): the body's rope, for the painter, and its footing ---
+var grapple_state: int = 0            # Grapple.State: 0 stowed, 1 flying, 2 anchored
+var grapple_tip: Vector2i = Vector2i.ZERO      # Fx px, the hook head
+var grapple_anchor: Vector2i = Vector2i.ZERO   # Fx px, where it bit (anchored)
+var grapple_hitch: Vector2i = Vector2i.ZERO    # Fx px, what the body swings from (the last pivot or the hook)
+var grapple_pivots: Array[Vector2i] = []       # Fx px, anchor-first
+var grapple_length: int = 0           # Fx px of line on the winch
+var grapple_taut: bool = false
+var grapple_slack: int = 0            # per mille, 0 bar-taut .. 1000 hanging
+var grapple_just_planted: bool = false
+var grapple_just_cut: bool = false
+var grapple_ghost: Dictionary = {}    # {hit, at, cell}: where a throw at the aim would land, while stowed
+var hand: Vector2i = Vector2i.ZERO    # Fx px, where the line leaves the body
+var climbing: bool = false
+var wet: bool = false
 
 
 func water_at(c: Vector2i) -> int:

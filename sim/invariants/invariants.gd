@@ -65,15 +65,17 @@ class FloorSelectionViolation:
 ## clearance (>= body_height_cells of open air) above it, wherever that clearance actually ends --
 ## the clearance check is not itself bounded by the window, only the second floor's boundary row is,
 ## matching what makes a shelf actually walkable rather than a random thin ledge glimpsed in passing.
+## `solid` (A' step 5c, D0360): the body's own blocking predicate over a terrain cell, so the check reads
+## the floor the way the resolver did (a machine's tile is ground, a trunk is not); invalid reads the grid.
 static func check_floor_selection(grid: TileGrid, column: int, scan_from_row: int, max_rows: int,
-		chosen_floor_row: int, body_height_cells: int) -> FloorSelectionViolation:
+		chosen_floor_row: int, body_height_cells: int, solid: Callable = Callable()) -> FloorSelectionViolation:
 	var window_end: int = scan_from_row + max_rows
 	var row: int = chosen_floor_row + 1
 	while row < window_end:
-		if grid.is_solid(Vector2i(column, row)):
+		if _solid_at(grid, Vector2i(column, row), solid):
 			var clearance: int = 0
 			var probe: int = row - 1
-			while probe >= 0 and not grid.is_solid(Vector2i(column, probe)):
+			while probe >= 0 and not _solid_at(grid, Vector2i(column, probe), solid):
 				clearance += 1
 				probe -= 1
 			if clearance >= body_height_cells:
@@ -89,10 +91,15 @@ static func check_floor_selection(grid: TileGrid, column: int, scan_from_row: in
 ## Runs `check_floor_selection`, and if it fires, logs it (position/seed included) per this file's
 ## "log always, never assert" policy above. Returns the violation (or null) so a caller/test can
 ## also count occurrences without re-deriving them from log output.
+static func _solid_at(grid: TileGrid, terrain_cell: Vector2i, solid: Callable) -> bool:
+	return bool(solid.call(terrain_cell)) if solid.is_valid() else grid.is_solid(terrain_cell)
+
+
 static func report_floor_selection(grid: TileGrid, column: int, scan_from_row: int, max_rows: int,
-		chosen_floor_row: int, body_height_cells: int, seed: int, pos_x: int, pos_y: int) -> FloorSelectionViolation:
+		chosen_floor_row: int, body_height_cells: int, seed: int, pos_x: int, pos_y: int,
+		solid: Callable = Callable()) -> FloorSelectionViolation:
 	var v: FloorSelectionViolation = check_floor_selection(
-		grid, column, scan_from_row, max_rows, chosen_floor_row, body_height_cells)
+		grid, column, scan_from_row, max_rows, chosen_floor_row, body_height_cells, solid)
 	if v != null:
 		v.seed = seed
 		v.pos_x = pos_x

@@ -35,3 +35,10 @@ var mine_held: bool = false
 var has_aim: bool = false
 var aim_col: int = 0
 var aim_row: int = 0
+
+## --- the line and the rope (A' step 5c, D0360) ---------------------------------------------------------
+## `grapple_pressed` is an edge like `jump_pressed`: the tick the throw key went down, the hook flies (or
+## chains) toward the aim cell above. `climb_dir` is the vertical axis (+1 up, -1 down), NOT an edge: it
+## reels the line in or pays it out every tick it is held, and rides a gripped rope the same way.
+var grapple_pressed: bool = false
+var climb_dir: int = 0

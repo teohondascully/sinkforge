@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–4 done; step 5, the grapple, next)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–4 done; step 5 in progress: 5a–5c done, 5d the rope painter next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -101,65 +101,32 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   compose the session's save with the body's and the mining state's keys (the body required, checked
   before the sim is touched); `Session.new_game` stands the body on the seeder's spawn. 34 assertions.
 
+- **Step 5a — done (D0358).** `Fx.normalize`/`dot`/`limit_length`: `Vector2i` pairs of `Fx`, a ceiling
+  root and truncated components so neither division can add energy; the i32 minimum clamped on entry.
+  17 assertions.
+
+- **Step 5b — done (D0359).** `sim/body/grapple.gd`, legacy's ninja rope under `Fx`: identical pixels
+  (480 px of line, 30 px/tick flight, 7 px/tick reel), the probe one terrain cell so the ghost and the
+  hook agree, the wrapping polyline, projection and radial cancel through the raw delta over a ceiling
+  root (a 16-bit unit vector fell a hundred units short at a 100 px radius), the pump as one 21/20 ratio.
+  63 assertions. The coordinate gate gained the `fx` tag for fixed-point pixel points (mutation-tested).
+
+- **Step 5c — done (D0360).** `Surroundings` (bare terrain) / `WorldSurroundings` (machines, ropes,
+  water, drafts) as the body's only window on the world beyond terrain; `body_swing.gd` couples the line
+  after both axes collide, with the COLLISION STAND-IN (a projected position into rock is refused, the
+  line reads slack for the tick) pending the resolver ruling; `body_medium.gd` is water, rope climb and
+  the lift's draft; the coast above top speed; the step-down snap in the resolver; a machine is ground and
+  wall alike (the heightfield and the floor diagnostic take the body's predicate); `place()`. The ramp
+  glide is NOT ported (§8 ruling). Legacy's rope floors pass with room (swing 419 px/s vs 172; lift 240 px
+  vs 96; the chasm crossed; 0.89 kept on release). 69 assertions in two suites. The body corpus held
+  without a re-pin; the shaft-replay golden moved at checkpoint 0 with identical coverage (a re-pin).
+
 ### Next action
 
-**Step 5, PRE-2 and the grapple** (plan §4): `core/fixed_point.gd` gains `normalize`, `dot`,
-`limit_length` (~40 lines, tests over hostile inputs, both roundings toward less energy);
-`sim/body/grapple.gd` from `legacy/scenes/grapple.gd` rewritten under `Fx` (`PUMP_CLAMP 1.05` stored as
-`21/20`; the two `delta` sites become per-tick integers; the aim is a recorded world cell); the swing
-coupling in `body.gd`; the nine missing body mechanisms from `player.gd` (rope climb, lift updraft,
-water wading, over-speed coast, step-down snap, machines-block, ramp glide (ruling), `place()`, carry
-weight); `view/visuals/rope_painter.gd`; `tests/test_grapple.gd` from legacy's rope checks. **Ruling
-gate:** the grapple's collision half touches the resolver (P-28); build the `Fx` layer and the solver
-first, the collision hookup waits. Golden re-pinned from CI Linux if body state changes. The plan's
-original text for step 4 follows, for the record: `Command` gains `mine_point`/`work` (the mine-hold loop:
-paint the plan, snap the aim, drain the plan, mine or work the lode, yield), `build`, `drop`, `collect`,
-`configure`, `link_winch`, `select`, `clear_plan`, with named rejection reasons; `Interface.capture()`
-/`restore()` add the body's and the mining state's keys over `SaveGame`; `Interface.new_game(site,
-seed, start)` builds a session from the seeder with the body at the spawn. Then step 5. The plan's
-original text for step 4 follows: `Interface` owns `World`, `Items`, `Machines`, `Mining`, `Verbs`, a
-`ProductionRate` and the `HubTick` cadence; `Command` gains the verb kinds (`build`, `drop`, `collect`,
-`configure`, `link_winch`, `select`, `paint_plan`, `work_lode`; the fixture primitives) with named
-rejection reasons; `Observation` gains the accessors legacy's renderer reads (deposits, lode per mille,
-machines and their status, water per cell, conduits and power, torches, piles, saplings, the pack, the
-plan, climbable); `observe()` stays pure against `state_signature()`; the save grows the body's and the
-mining state's keys (ADR 0010 §1); the golden re-pinned from CI Linux if the world's contents change
-(the seeder in the probe would; keep the probe as it is unless step 4 needs it). Then step 5 (the
-grapple; the resolver ruling gates its collision half), step 6 (views), step 7 (the economy, director-
-scoped), step 8 (cross-platform). Old text follows for the record: **the `main.gd` blocks** (legacy's
-seeded placement of lodes, deposits, water onto the generated shaft). Then the **`main.gd` state-logic
-blocks** the plan's §3 lists. Each sub-step merged green on `main`. `HubTick.step` is not called from
-`Interface.apply` until step 4 opens the door. Every lifted `sort` goes through `Ordering`; every lifted
-`call(name)` becomes a `match`; every per-cell constant is asked "per what?".
-
-### Waiting on the director
-
-- **Rulings the analysis surfaced** (plan §8): Splitter, Ore Vent, power gating (16 of legacy's 54 live
-  tests hinge on them); the Crusher/packing/seep chain (133 lines, not on GDD §9's list); the two
-  terminal-product recipes; `earth` hardness 5.6 → 6 ticks; authored ramps vs `Heightfield`; the
-  resolver (P-28) before the grapple's collision half.
-- **Gate 27 is red on this machine:** 36 untracked `tests/body/recordings/*.log`. Commit as corpus or
-  gitignore.
-- **Standing, unchanged:** `docs/NEEDS_DIRECTOR.md` P004, P015/P017, P026–P029; `TASTE_QUEUE.md`
-  T001–T004; the `history/` cull.
-
-### Two performance hypotheses to measure before any perf work (plan §7)
-
-1. D0335 widened the play site to 256 × 1,024 = 262,144 quarter-metre cells; the one-shot bake was
-   predicted to hitch near 289k and the progressive bake (`legacy/scenes/fine_terrain.gd:768-812`) is
-   not ported. 2. The widest zoom rung (9.2× area) is unmeasured since the veil lightmap (D0336). Run
-   `view/draw_cost.gd` at the framing the director plays, on a dig. Last measured frame at the default
-   framing: 5.6 ms against 8.33 (2026-09-01).
-
-### Known instrument defects, reported not fixed (analysis §9)
-
-`gate_status.py` mis-addresses the double-numbered gate 30 and its NO-CODE docstring is stale;
-`flaky_test_detector.py` can never parse `run_suites.sh`'s output; `run_local_battery.sh` exits 0 on
-failing gates unless `GATES_ONLY=1`; `view/fx/light_layer.gd:13`'s "NO CONSUMER" is stale;
-`view/visuals/erase.gdshader` is an uncited lift. `LEGACY_GAP.md`'s "15 call sites in five surfaces" is
-23 in 6; `PORT_ORDER.md`'s "18 of 36" tokens is 13.
-
-### The 120 Hz programme
-
-Paused where 2026-09-01 left it: painters 4.01 ms, tick 1.58 ms, observe cached (D0340). Its ranked
-plan is `docs/PERF_PLAN.md` (reference). It resumes inside A′ step 6 and §7 of the plan.
+**Step 5d, the rope painter and the carry look** (plan §4, §3.2): `view/visuals/rope_painter.gd` from
+`legacy/scenes/rope_view.gd` (274 lines: the placed ropes, the live cord with its slack bow, the hook, the
+aim ghost while stowed; its two reach-ins `_view_world_rect()`/`_anim_time` rebound to `Frame`), reading
+the observation's `grapple_*`, `hand`, `climbing` fields; the carry look (`1 - exp(-total/10)` of the
+pack, representation only) beside it. Then **step 5 is complete** and step 6 (views + the boot main
+scene in `shell/`) follows. **Open rulings from step 5 (plan §8):** the resolver (the swing's collision
+stand-in), the ramp glide (superseded by the heightfield?).

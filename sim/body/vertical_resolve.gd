@@ -128,7 +128,7 @@ static func grid_floor_backstop(body: Body, grid: TileGrid) -> bool:
 	var lo_col: int = Body._px_to_cell(body._left_x())
 	var hi_col: int = Body._px_to_cell(body._right_x() - 1)
 	var hi_row: int = Body._px_to_cell(body._bottom_y() - 1)
-	var top_row: int = _topmost_solid_row(grid, Body._px_to_cell(body._top_y()), hi_row, lo_col, hi_col)
+	var top_row: int = _topmost_solid_row(body, grid, Body._px_to_cell(body._top_y()), hi_row, lo_col, hi_col)
 	if _has_deferred_floor_below(body, grid, lo_col, hi_col, top_row):
 		return false
 	# D0206. This path snaps to the topmost solid row ANYWHERE in the box, which is right for the
@@ -152,11 +152,11 @@ static func grid_floor_backstop(body: Body, grid: TileGrid) -> bool:
 ## The topmost solid row across [lo_col, hi_col], scanning rows [row_start, hi_row]; `hi_row + 1`
 ## ("none found") if the whole scanned range is open. Extracted 2026-08-28 (`docs/DECISIONS_LEDGER.md`
 ## D0100) from `grid_floor_backstop`'s own first loop, a pure Extract Method -- no logic changed.
-static func _topmost_solid_row(grid: TileGrid, row_start: int, hi_row: int, lo_col: int, hi_col: int) -> int:
+static func _topmost_solid_row(body: Body, grid: TileGrid, row_start: int, hi_row: int, lo_col: int, hi_col: int) -> int:
 	var top_row: int = hi_row + 1
 	for row: int in range(row_start, hi_row + 1):
 		for col: int in range(lo_col, hi_col + 1):
-			if grid.is_solid(Vector2i(col, row)):
+			if body._blocked(grid, Vector2i(col, row)):
 				top_row = row
 				break
 		if top_row <= hi_row:
@@ -170,9 +170,9 @@ static func _topmost_solid_row(grid: TileGrid, row_start: int, hi_row: int, lo_c
 ## `grid_floor_backstop`'s own second loop, a pure Extract Method -- no logic changed.
 static func _has_deferred_floor_below(body: Body, grid: TileGrid, lo_col: int, hi_col: int, top_row: int) -> bool:
 	for col: int in range(lo_col, hi_col + 1):
-		if grid.is_solid(Vector2i(col, top_row)):
+		if body._blocked(grid, Vector2i(col, top_row)):
 			continue
-		var deeper: int = Heightfield.column_surface_y(grid, col, top_row, Body.FLOOR_SCAN_ROWS)
+		var deeper: int = Heightfield.column_surface_y(grid, col, top_row, Body.FLOOR_SCAN_ROWS, body.surroundings)
 		if deeper != Heightfield.NO_FLOOR and body._bottom_y() < deeper:
 			return true
 	return false
@@ -208,7 +208,7 @@ static func _has_deferred_floor_below(body: Body, grid: TileGrid, lo_col: int, h
 static func footprint_surface_y(body: Body, grid: TileGrid, scan_from: int) -> int:
 	var surface: int = Heightfield.NO_FLOOR
 	for col: int in range(Body._px_to_cell(body._left_x()), Body._px_to_cell(body._right_x() - 1) + 1):
-		surface = mini(surface, Heightfield.column_surface_y(grid, col, scan_from, Body.FLOOR_SCAN_ROWS))
+		surface = mini(surface, Heightfield.column_surface_y(grid, col, scan_from, Body.FLOOR_SCAN_ROWS, body.surroundings))
 	return surface
 
 
@@ -251,10 +251,12 @@ static func resolve_floor(body: Body, grid: TileGrid) -> bool:
 	# answer "did the query that just picked a floor also see another one," which is only a true answer
 	# if it's given the SAME window that query used.
 	var check_col: int = Body._px_to_cell(body.pos_x)
-	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS)
+	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS,
+		body.surroundings)
+	var solid: Callable = func(c: Vector2i) -> bool: return body._blocked(grid, c)
 	if chosen_row >= 0:
 		var violation: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
-			grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS, chosen_row, Body.HEIGHT_PX / Body.CELL_PX)
+			grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS, chosen_row, Body.HEIGHT_PX / Body.CELL_PX, solid)
 		# Rate-limited HERE, at the caller, not inside Invariants (D0052) -- sim/invariants stays
 		# stateless by design, and body.gd already tracks its own position every tick, so the memory
 		# for "have I already reported THIS (column, floor) pair" belongs where the context already is.
@@ -273,10 +275,36 @@ static func resolve_floor(body: Body, grid: TileGrid) -> bool:
 			body._last_violation_col = -1; body._last_violation_row = -1
 		elif violation.column != body._last_violation_col or violation.chosen_floor_row != body._last_violation_row:
 			Invariants.report_floor_selection(grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS,
-				chosen_row, Body.HEIGHT_PX / Body.CELL_PX, grid.seed, body.pos_x, body.pos_y)
+				chosen_row, Body.HEIGHT_PX / Body.CELL_PX, grid.seed, body.pos_x, body.pos_y, solid)
 			body._last_violation_col = check_col
 			body._last_violation_row = chosen_row
 	body.pos_y = surface - (Body.HEIGHT_PX * Fx.SCALE) / 2
 	body.vel_y = 0
 	body.on_floor = true; body.floor_source_this_tick = &"resolve_floor"
+	return true
+
+
+## Legacy `_snap_to_floor` (A' step 5c, D0360): hug a descending step. After a grounded horizontal move
+## has left the feet hanging over a lower floor no more than one tile down, snap them onto it, so walking
+## down stairs reads smooth instead of a fall seeded at `FALL_START` every step. Only while genuinely
+## walking (`SNAP_WALK_MIN`): a nearly stationary body losing its floor is the start of a fall and gravity
+## has to take over. A real drop finds no floor in range and falls. `footprint_surface_y` reports the
+## HIGHEST floor under the box, so a column still carrying the feet reports no drop and nothing snaps.
+const STEP_DOWN_PX: int = Body.STEP_UP_PX
+const SNAP_WALK_MIN: int = 8 * Fx.SCALE
+
+
+static func step_down(body: Body, grid: TileGrid) -> bool:
+	if absi(body.vel_x) < SNAP_WALK_MIN or body.vel_y < 0:
+		return false
+	var surface: int = footprint_surface_y(body, grid, Body._px_to_cell(body._bottom_y()))
+	if surface == Heightfield.NO_FLOOR:
+		return false
+	var drop: int = surface - body._bottom_y()
+	if drop <= 0 or drop > STEP_DOWN_PX * Fx.SCALE:
+		return false
+	body.pos_y += drop
+	body.vel_y = 0
+	body.on_floor = true; body.floor_source_this_tick = &"step_down"
+	body.stepped_down_this_tick = true
 	return true

@@ -116,6 +116,7 @@ func _init(grid: TileGrid, body: Body, mining: Mining, world: World = null, item
 	_machines = machines if machines != null else Machines.new()
 	_machines.attach_to(_items)
 	_body = body
+	_body.surroundings = WorldSurroundings.new(_world, _machines)   # machines, ropes, water, drafts (5c)
 	_mining = mining
 	_verbs = Verbs.new(_world, _items, _machines, _body)
 
@@ -164,6 +165,7 @@ func observe(envelope: Envelope) -> Observation:
 	o.lode_progress = _lode.progress_per_mille()
 	o.aim_cell = _hold.aim_cell
 	o.aim_is_lode = _hold.aim_is_lode
+	_fill_line(o)
 	o.flow_events = _events.duplicate(true)
 	_events.clear()   # the consumed channel: not sim state, and the one thing observe empties
 	return o
@@ -176,6 +178,29 @@ func observe(envelope: Envelope) -> Observation:
 ## `duplicate()` on the crack map and the broken-cell list, not a reference. Handing over the live
 ## containers would let a view clear the sim's crack bank by tidying up after itself, and the failure
 ## would surface as a determinism divergence hundreds of ticks later with nothing pointing back here.
+## The rope and the medium, copied for the painter. The ghost is a pure trace from the hand toward the
+## last aimed cell, only while the line is stowed: once you are on the rope the attention belongs on the arc.
+func _fill_line(o: Observation) -> void:
+	var g: Grapple = _body.grapple
+	o.grapple_state = int(g.state)
+	o.grapple_tip = g.tip
+	o.grapple_anchor = g.anchor
+	o.grapple_hitch = g.hitch_fx()
+	o.grapple_pivots = g.pivots.duplicate()
+	o.grapple_length = g.length
+	o.grapple_taut = g.taut
+	o.hand = BodySwing.hand_fx(_body)
+	o.grapple_slack = g.slack_permille(Vector2i(_body.pos_x, _body.pos_y))
+	o.grapple_just_planted = g.just_planted
+	o.grapple_just_cut = g.just_cut
+	if not g.live() and _hold.aim_cell != Vector2i(-1, -1):
+		var c: int = Body.CELL_PX * Fx.SCALE
+		var toward := Vector2i(_hold.aim_cell.x * c + c / 2, _hold.aim_cell.y * c + c / 2)
+		o.grapple_ghost = g.trace(_world.grid, o.hand, toward)
+	o.climbing = _body.climbing
+	o.wet = _body.wet
+
+
 func _fill_mining(o: Observation) -> void:
 	o.mining_charging_cell = _mining.charging_cell
 	o.mining_is_charging = _mining.charging_cell != Mining.NO_CELL
