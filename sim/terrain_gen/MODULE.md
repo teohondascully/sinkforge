@@ -50,6 +50,9 @@ per-tick phase order.
 - `Relief` (`relief.gd`) — legacy's surface: `.surface_rows(site, width, datum, cells_per_m)` is a row
   per column (the datum everywhere without a `relief` key), `.ground_row`, `.terrace`, `.on_scarp`; the
   sines come from `SIN_MILLI`, an integer table (A' 8b, D0382). Every pass measures from this array.
+- `VerticalPasses` (`vertical_passes.gd`) — rifts (`.carve_rifts`, returning the cells), their wall
+  ore, the sinkhole mouths over the deepest falls (`.open_sinkholes`); `FLARE_MILLI` is `pow(x, 2.2)` as a
+  table. Run by the generator when the site has a `vertical` record (A' 8c, D0383).
 - `ValueNoise` (`value_noise.gd`) — engine-free 2D noise, `.sample(x, y, seed) -> float` in roughly
   [-1, 1]. Real `float` arithmetic, one of the four D0183 sites on the generation path that depart from
   `docs/ARCHITECTURE.md`'s fixed-point rule. Measured bit-identical across macOS-arm64 and CI's

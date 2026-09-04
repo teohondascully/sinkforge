@@ -62,7 +62,8 @@ const SHELF_BIAS: float = 0.10
 ## reading `0`: a scatter picking `cy` in `[1, height)` would have put ore in the sky.
 const SKY_ROWS: int = 20 * TERRAIN_CELLS_PER_METER
 
-const _HOST_ROCK: Array[StringName] = [&"clay", &"hardrock", &"deepstone"]
+## The rock a vein or a rift wall may replace: never a carved cave, never another vein's cell.
+const HOST_ROCK: Array[StringName] = [&"clay", &"hardrock", &"deepstone"]
 
 
 static func generate(site: Dictionary, seed: int) -> TileGrid:
@@ -98,12 +99,36 @@ static func generate(site: Dictionary, seed: int) -> TileGrid:
 	_scatter_vein_material(grid, rng, site["ore"], &"ore_copper", surface)
 	_scatter_vein_material(grid, rng, site["coal"], &"coal", surface)
 	_scatter_iron(grid, rng, site["iron"], stonereach_end, SKY_ROWS)
+	# The vertical passes run after the ore, and the order is load-bearing both ways (legacy): a rift
+	# cut through finished rock slices veins, so its walls show ore. Config-gated (A' step 8c, D0383).
+	if site.has("vertical"):
+		_vertical(grid, rng, site, surface, stonereach_end)
 	_place_ruins(grid, rng, site["ruin"], SKY_ROWS)
 	# Optional (docs/GDD.md §12, claims/C004) -- absent from the real `shallow_clay` site on purpose, so
 	# this stays a test-only addition, not a commitment the real economy has to honor yet.
 	if site.has("reveal"):
 		_scatter_reveal_material(grid, rng, site["reveal"], topsoil_end, surface)
 	return grid
+
+
+## The spawn column in cells: the site's `spawn_col_m`, or the middle of the width without one.
+static func spawn_col(site: Dictionary, width: int) -> int:
+	return int(site.get("spawn_col_m", width / (2 * TERRAIN_CELLS_PER_METER))) * TERRAIN_CELLS_PER_METER
+
+
+## Rifts, their wall ore, then the mouths that make them reachable -- legacy's order, on the terrain
+## stream's own `vertical` split so adding them moves no vein or ruin draw (`SplitRng.split` is keyed off
+## the root seed, not the draw position).
+static func _vertical(grid: TileGrid, rng: SplitRng, site: Dictionary, surface: PackedInt32Array,
+		deep_row: int) -> void:
+	var v_rng: SplitRng = rng.split("vertical")
+	var cfg: Dictionary = site["vertical"]
+	var spawn: int = spawn_col(site, grid.width)
+	var cave_band: int = int(site["cave"]["min_depth_cells"])
+	var rifts: Array[Vector2i] = VerticalPasses.carve_rifts(grid, v_rng, cfg["rift"], surface, cave_band,
+		spawn, TERRAIN_CELLS_PER_METER)
+	VerticalPasses.ore_rift_walls(grid, v_rng, cfg["rift"], rifts, deep_row)
+	VerticalPasses.open_sinkholes(grid, v_rng, cfg["sinkhole"], rifts, surface, spawn, TERRAIN_CELLS_PER_METER)
 
 
 ## Rows above a column's surface are left with NO material and NO wall — that is the sky, and a cell with
@@ -260,7 +285,7 @@ static func _grow_vein(grid: TileGrid, rng: SplitRng, seed_cell: Vector2i, size:
 		frontier.remove_at(idx)
 		if filled.has(cell) or not grid.in_bounds(cell) or cell.y < min_row or cell.y >= max_row:
 			continue
-		if not _HOST_ROCK.has(grid.get_material(cell)):
+		if not HOST_ROCK.has(grid.get_material(cell)):
 			continue  # only replace host rock -- never a carved cave, never another vein's cell
 		grid.set_material(cell, material)
 		filled[cell] = true

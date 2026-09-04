@@ -16222,3 +16222,58 @@ per-column threading moved nothing in the flat world.
 **Gaps:** no site carries the key yet, so no body has walked these hills; the seeder validates a record's
 cells in bounds, not that the pad is flat under its footprint — that assertion lands with the switch-on.
 The relief is seed-independent, as legacy's was.
+
+## D0383 · 2026-09-03 · A′ step 8c: the vertical structure — rifts that pinch and open on the sine table, ore in their walls, and the sinkhole mouths that make them reachable, the flare a `pow` table
+
+**Decided:** (1) `sim/terrain_gen/vertical_passes.gd` (`VerticalPasses`) is legacy's `_carve_rifts`,
+`_mineralize` and the three sinkhole functions (`layered_world_gen.gd:440-585`), integer throughout:
+positions in thousandths of a cell as legacy carried them in floats, the width's sine from
+`Relief.SIN_MILLI` (a random phase in angle units, a random pinch in units per row), and the throat's
+`pow(up, 2.2)` from `FLARE_MILLI`, 65 entries linearly interpolated — the exponent is the shape, so it is
+the table and not a field. Rates, lengths and widths are the site's `vertical` record (`rift` and
+`sinkhole` sub-records) in legacy's own units, converted by the metre. The random-walk nudges
+(`wander_nudge`, legacy's ±0.10 and ±0.08 a metre-row) are divided by the cells a metre so the drift
+evolves per metre as legacy's did, while the slopes (`wander`) stay dimensionless. (2) `carve_rifts`
+returns every cell inside a rift in carve order, open before or not, exactly as legacy's list did, so
+the wall ore and the mouths can only touch a rift and never a cave beside one; only a SOLID cell is ever
+excavated, because `TileGrid.excavate` XORs the cell's term into the running signature and excavating
+air would move it (found reading `excavate`, not by a failure). (3) `ore_rift_walls`: plain host rock
+beside a carved cell becomes ore at `wall_ore_chance`, `ore_iron` from `stonereach_end` down and
+`ore_copper` above — legacy gated the material by its seal, this build by the depth threshold iron
+itself uses. Legacy's rich-ore upgrade (an AMOUNT, ×1.5) is not ported: per-cell deposit amounts are
+step 7's, director-scoped (D0025 stands). (4) `open_sinkholes` ranks the rift columns by the fall under
+the rift's ceiling, deepest first and ties leftmost, skips the spawn keepout, opens up to `count` at
+`spacing_m` apart over falls of at least `min_drop_m`, and `cut_throat` flares each from the throat
+half-width at the rift to the mouth half-width at the sky with the plumb column opened at every row.
+Legacy's `routes` marker (deliberate vertical structure vs undirected cave) has no plane here and is not
+carried. (5) The generator runs the three when the site has a `vertical` record, after iron and before
+the ruin — legacy's order, "a rift cut through finished rock slices veins, so its walls show ore" — on
+the terrain stream's `vertical` split. A new optional site field `spawn_col_m` (the middle of the width
+without it) is what the keepouts measure from; `HOST_ROCK` is public on `ShaftGenerator` so the passes
+share the one list. `shallow_clay` carries no record yet: the world and the golden are unchanged.
+
+**Why:** plan step 8's content half — rifts, sinkhole throats, and `layered:460-463` (the width sine)
+and `547-549` (the flare) as integer tables. Legacy's own reason for the mouths, kept in the file:
+without them "the connected open space reaches one row below the surface, and a forty-row chasm can sit
+in a sealed bottle".
+
+**Evidence:** `tests/test_vertical_passes.gd` 39: the flare table's ends, midpoint (218 = 0.5^2.2) and
+monotonicity, an entry read exactly and a point between two interpolated, a quarter of the way up under
+250 of 1000; rifts carve 4037 cells at seed 3 (3237 distinct, the open cells exactly the reported ones);
+no carved cell inside the cave band under its own column over 6491 cells, with 6388 of them under
+off-datum columns as the control; per-row runs from 8 cells (a squeeze) to 27 (two rifts cross at that
+seed); with no wander, none of 7798 cells within the keepout less a half-width of spawn; wall ore at
+chance 1.0 turns all 202 host neighbours of a hand-cut slot, copper above `deep_row` and iron below, two
+cells out untouched, chance 0 turns none; a lone slot gets one mouth over its leftmost column (ties go
+left), open 220 rows from the surface to the slot's floor, 26 cells wide at the sky against 11 at the
+throat; a 10 m drop opens no mouth; six slots pose the keepout, the spacing, the cap and the ranking
+(opened [169, 249, 99]: the deepest first, the keepout slot sealed, the 7.5 m neighbour refused, the
+fourth clear slot refused by the cap alone); on a generated world the record opens 21530 cells against
+15715 without it, six columns are open from the surface for 14 m or more, and 72 ore cells exist that the
+plain world lacks; same seed same cells, another seed elsewhere. Neighbours: shaft_generator 34, relief
+44, shaft_replay_determinism ALL PASS 21 with the golden matched — the record is absent from the real
+site.
+
+**Gaps:** the CONTROL for the per-column band first failed honestly (no rift under an off-datum column
+at that seed and relief) and the relief in that test was changed to vary everywhere off a small pad —
+the assertion did not change. The mouth count on the real site is unmeasured until the switch-on.

@@ -13,3 +13,9 @@ fields:
   # Legacy's surface (heightmap_world_gen.gd ground_row/terrace): a flat pad about the start's spawn
   # column, waves and scarps beyond it. Absent reads flat at the datum (A' step 8b, D0382).
   relief: {required: false, type: dict}
+  # The start's spawn column, which the relief pad, the rift keepout and the sinkhole keepout measure
+  # from (legacy SPAWN_COL). Absent reads the middle of the width.
+  spawn_col_m: {required: false, type: int}
+  # Legacy's vertical structure (layered_world_gen.gd _carve_rifts, _mineralize, the sinkhole passes):
+  # `rift` and `sinkhole` sub-records in legacy's units. Absent carves none (A' step 8c, D0383).
+  vertical: {required: false, type: dict}

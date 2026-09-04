@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps done)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths done)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -223,13 +223,16 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   scarps, the sines from `SIN_MILLI` (a 256-entry integer table), all integer; the generator's surface
   is a row per column through every pass (`CavePasses` take per-column floors). Config-gated on a site's
   `relief:` key — `shallow_clay` has none yet, so the golden is unchanged. 44 assertions.
+- **Step 8c — done (D0383).** `sim/terrain_gen/vertical_passes.gd` (`VerticalPasses`): rifts that pinch
+  and open on the sine table, ore in their walls by depth, the sinkhole mouths over the deepest falls
+  with the `pow(x, 2.2)` flare as a table. Gated on a site's `vertical:` record; `spawn_col_m` is the
+  new optional site field the keepouts measure from. 39 assertions; the golden unchanged.
 
 ### Next action
 
 **Step 8, the worldgen content** (plan §4 step 8, second half; D0381 set the shape): each pass
 config-gated on a site key, committed green with the world unchanged, then one switch-on commit for
-`shallow_clay` with one golden re-pin from CI Linux. Remaining: 8c rifts and sinkhole mouths (the width
-sine and the `pow` flare as integer tables), 8d ledges, spires, rubble and droughts, 8e aquifers and lodes
+`shallow_clay` with one golden re-pin from CI Linux. Remaining: 8d ledges, spires, rubble and droughts, 8e aquifers and lodes
 on the water and deposit planes (`ShaftGenerator.enrich(world, site, seed)` after `World.new`), 8f the
 richness field, 8g trees (two material records), 8h the switch-on and re-pin. Step 7 (economy) is
 director-scoped and stops at the director. **Open rulings from
