@@ -54,6 +54,11 @@ func _rng(seed: int, label: String) -> SplitRng:
 	return SplitRng.new(seed).split("planes").split(label)
 
 
+## A richness field of exactly one: the lodes as they were before the field (A' 8f).
+func _one() -> PackedInt32Array:
+	return Richness.field({}, W, 0, 1, CPM)
+
+
 func _test_depth_permille_is_zero_at_the_datum_and_full_at_the_floor() -> void:
 	_check(PlanePasses.depth_permille(DATUM, DATUM, H) == 0, "the datum is 0")
 	_check(PlanePasses.depth_permille(H - 1, DATUM, H) == 1000, "the last row is 1000")
@@ -125,7 +130,7 @@ func _test_an_aquifer_never_breaches_the_band_or_rises_above_its_floor() -> void
 
 func _test_lodes_sit_in_host_rock_below_their_depth_with_a_deposit_that_grows_with_depth() -> void:
 	var world: World = _solid_world()
-	var seeded: int = PlanePasses.seed_lodes(world, _rng(3, "lodes"), _lode_cfg(), _flat(), DATUM, DEEP, CPM)
+	var seeded: int = PlanePasses.seed_lodes(world, _rng(3, "lodes"), _lode_cfg(), _flat(), DATUM, DEEP, CPM, _one())
 	var cells: Array[Vector2i] = world.deposits.lode_terrain_cells()
 	_check(seeded > 0 and cells.size() == seeded, "lodes seeded %d cells (%d in the plane)" % [seeded, cells.size()])
 	var shallow: int = 0
@@ -170,7 +175,7 @@ func _test_a_lode_never_lies_in_water_or_over_another_lode() -> void:
 	PlanePasses.seed_aquifers(world, _rng(4, "aquifers"), a_cfg, _flat(), BAND, MIN_ROW, DEEP, CPM)
 	var l_cfg: Dictionary = _lode_cfg()
 	l_cfg["per_col"] = 3.0                                   # dense, so the two would collide if allowed
-	PlanePasses.seed_lodes(world, _rng(4, "lodes"), l_cfg, _flat(), DATUM, DEEP, CPM)
+	PlanePasses.seed_lodes(world, _rng(4, "lodes"), l_cfg, _flat(), DATUM, DEEP, CPM, _one())
 	var wet_lode: int = 0
 	for c: Vector2i in world.deposits.lode_terrain_cells():
 		if world.water.water_at(c) > 0 or not world.grid.is_solid(c):

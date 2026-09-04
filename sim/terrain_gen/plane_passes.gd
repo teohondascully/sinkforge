@@ -83,7 +83,7 @@ static func depth_permille(row: int, datum: int, height: int) -> int:
 
 ## The lodes. Returns the cells seeded.
 static func seed_lodes(world: World, rng: SplitRng, cfg: Dictionary, surface: PackedInt32Array, datum: int,
-		deep_row: int, cells_per_m: int) -> int:
+		deep_row: int, cells_per_m: int, hfield: PackedInt32Array) -> int:
 	var grid: TileGrid = world.grid
 	var attempts: int = CavePasses.count_for(grid.width, grid.height, float(cfg["per_col"]), cells_per_m)
 	var min_depth: int = int(cfg["min_depth_m"]) * cells_per_m
@@ -97,8 +97,9 @@ static func seed_lodes(world: World, rng: SplitRng, cfg: Dictionary, surface: Pa
 		var cy: int = rng.next_range(floor_row, grid.height - 1)
 		var df: int = depth_permille(cy, datum, grid.height)
 		var size: int = int(cfg["size_min_m2"]) * area + (df * int(cfg["size_depth_bonus_m2"]) * area + MILLI / 2) / MILLI
-		# Legacy's per-metre stock, divided over the cells of a metre square (D0353's rule), at least one.
-		var per_m: int = int(cfg["amount_base"]) * MILLI + df * int(cfg["amount_depth_bonus"])
+		# Legacy's per-metre stock, its depth bonus pulled by the richness field (A' 8f), divided over the
+		# cells of a metre square (D0353's rule), at least one.
+		var per_m: int = int(cfg["amount_base"]) * MILLI + df * int(cfg["amount_depth_bonus"]) * hfield[cx] / MILLI
 		var amount: int = maxi(1, (per_m + MILLI * area / 2) / (MILLI * area))
 		var material: StringName = &"ore_iron" if cy >= deep_row else &"ore_copper"
 		seeded += grow_lode(world, rng, Vector2i(cx, cy), size, amount, material, surface, min_depth)

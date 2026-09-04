@@ -28,3 +28,6 @@ fields:
   # Legacy's lodes (_seed_lodes, _grow_lode): ore behind the wall on the deposit plane, per-cell amounts
   # as legacy's per-metre stock over the cells of a metre square (D0353). Absent seeds none (A' 8e, D0385).
   lode: {required: false, type: dict}
+  # Legacy's per-column richness field (_horizontal_field): `strength`, `freq_per_m`, `frontier_bias`.
+  # Pulls the ore and coal scatters and the lodes' amounts. Absent reads one everywhere (A' 8f, D0386).
+  richness: {required: false, type: dict}

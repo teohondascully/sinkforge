@@ -95,9 +95,11 @@ static func generate(site: Dictionary, seed: int) -> TileGrid:
 	CavePasses.carve_big_caverns(grid, carve_rng, stonereach_end, cave_floor, TERRAIN_CELLS_PER_METER)
 	CavePasses.carve_tunnels(grid, carve_rng, cave_floor, TERRAIN_CELLS_PER_METER)
 	# Caves carved first: vein growth only ever replaces solid host rock, so an already-open cave cell
-	# is naturally skipped, same as legacy.
-	_scatter_vein_material(grid, rng, site["ore"], &"ore_copper", surface)
-	_scatter_vein_material(grid, rng, site["coal"], &"coal", surface)
+	# is naturally skipped, same as legacy. The richness field (A' 8f, D0386) is 1000 in every column
+	# without a `richness` record, and a consumer multiplying by exactly one is the consumer as it was.
+	var hfield: PackedInt32Array = Richness.field(site, width, spawn_col(site, width), seed, TERRAIN_CELLS_PER_METER)
+	_scatter_vein_material(grid, rng, site["ore"], &"ore_copper", surface, hfield)
+	_scatter_vein_material(grid, rng, site["coal"], &"coal", surface, hfield)
 	_scatter_iron(grid, rng, site["iron"], stonereach_end, SKY_ROWS)
 	# The vertical passes run after the ore, and the order is load-bearing both ways (legacy): a rift
 	# cut through finished rock slices veins, so its walls show ore. Config-gated (A' step 8c, D0383).
@@ -130,8 +132,10 @@ static func deep_row_of(site: Dictionary) -> int:
 ## without the records leaves the world exactly as `generate` made it.
 static func enrich(world: World, site: Dictionary, seed: int) -> void:
 	var rng: SplitRng = SplitRng.new(seed).split("terrain_gen").split("planes")
-	var surface: PackedInt32Array = Relief.surface_rows(site, world.grid.width, SKY_ROWS, TERRAIN_CELLS_PER_METER)
-	ContentPasses.planes(world, rng, site, surface, deep_row_of(site))
+	var width: int = world.grid.width
+	var surface: PackedInt32Array = Relief.surface_rows(site, width, SKY_ROWS, TERRAIN_CELLS_PER_METER)
+	var hfield: PackedInt32Array = Richness.field(site, width, spawn_col(site, width), seed, TERRAIN_CELLS_PER_METER)
+	ContentPasses.planes(world, rng, site, surface, deep_row_of(site), hfield)
 
 
 ## Rows above a column's surface are left with NO material and NO wall — that is the sky, and a cell with
@@ -228,7 +232,7 @@ static func _banded(depth_frac: float, floor_frac: float) -> float:
 ## only in their constants -- one function, two configs, per `docs/DECISIONS_LEDGER.md`'s port-the-
 ## algorithm-not-the-structure instruction.
 static func _scatter_vein_material(grid: TileGrid, rng: SplitRng, cfg: Dictionary, material: StringName,
-		surface: PackedInt32Array) -> void:
+		surface: PackedInt32Array, hfield: PackedInt32Array) -> void:
 	# Against the ROCK, not the grid: the sky is not volume ore can be in, and counting it would raise
 	# every density by the sky band's share of the world. Counted from the datum, not the hills, so the
 	# same site seeds the same number of veins whatever its relief.
@@ -238,10 +242,11 @@ static func _scatter_vein_material(grid: TileGrid, rng: SplitRng, cfg: Dictionar
 		var top: int = surface[cx]
 		var cy: int = rng.next_range(top + 1, grid.height - 1)
 		var depth_frac: float = float(cy - top) / float(maxi(1, grid.height - 1 - top))
-		var accept: float = _banded(depth_frac, cfg["shallow_floor"]) * float(cfg["chance_deep"])
+		var hmul: float = Richness.multiplier(hfield, cx)   # the same frontier pull for ore and coal
+		var accept: float = _banded(depth_frac, cfg["shallow_floor"]) * float(cfg["chance_deep"]) * hmul
 		if rng.next_float() > accept:
-			continue
-		var size: int = int(cfg["size_min"]) + int(round(depth_frac * float(cfg["size_depth_bonus"])))
+			continue                            # rejected; shallow seeds still mostly die here
+		var size: int = int(cfg["size_min"]) + int(round(depth_frac * float(cfg["size_depth_bonus"]) * hmul))
 		grow_vein(grid, rng, Vector2i(cx, cy), size, material)
 
 

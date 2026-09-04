@@ -41,11 +41,11 @@ static func studding(grid: TileGrid, rng: SplitRng, site: Dictionary, surface: P
 ## Aquifers, then lodes -- legacy's order: the lodes run dead last because every lode guard tests the
 ## final world and the aquifers carve rock away and flood it.
 static func planes(world: World, rng: SplitRng, site: Dictionary, surface: PackedInt32Array,
-		deep_row: int) -> void:
+		deep_row: int, hfield: PackedInt32Array) -> void:
 	var cpm: int = ShaftGenerator.TERRAIN_CELLS_PER_METER
 	var band: int = int(site["cave"]["min_depth_cells"])
 	if site.has("aquifer"):
 		var min_row: int = ShaftGenerator.SKY_ROWS + int(site["aquifer"]["min_depth_m"]) * cpm
 		PlanePasses.seed_aquifers(world, rng.split("aquifers"), site["aquifer"], surface, band, min_row, deep_row, cpm)
 	if site.has("lode"):
-		PlanePasses.seed_lodes(world, rng.split("lodes"), site["lode"], surface, ShaftGenerator.SKY_ROWS, deep_row, cpm)
+		PlanePasses.seed_lodes(world, rng.split("lodes"), site["lode"], surface, ShaftGenerator.SKY_ROWS, deep_row, cpm, hfield)

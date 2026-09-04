@@ -537,8 +537,9 @@ golden unchanged). 8c rifts, their wall ore, the sinkhole mouths — DONE (D0383
 width sine and the `pow` flare as tables; 39 assertions; the golden unchanged). 8d ledges, spires, rubble,
 droughts — DONE (D0384: `StuddingPasses`; 33 assertions; the golden unchanged). 8e aquifers and lodes on
 the planes — DONE (D0385: `PlanePasses`, `ShaftGenerator.enrich` called by `WorldSeeder.load_world`,
-`ContentPasses` holding the order; 31 assertions; the golden unchanged). Next: 8f the richness field, 8g
-trees, 8h the switch-on for `shallow_clay` and the re-pin.
+`ContentPasses` holding the order; 31 assertions; the golden unchanged). 8f the richness field — DONE
+(D0386: `Richness`, an integer band pulling the scatters and the lodes; 17 assertions; the golden
+unchanged). Next: 8g trees, 8h the switch-on for `shallow_clay` and the re-pin.
 
 ---
 

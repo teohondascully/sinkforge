@@ -16376,3 +16376,36 @@ PASS 21 with the golden matched.
 pockets did not pose (now every pocket poses it), and the lode metal judged by the cell's row when it is
 the seed's; none changed what the pass does. Water at generation is a sealed full pocket; what the tick's
 flow does to a pocket a dig opens is the water phase's, already ported (D0344).
+
+## D0386 · 2026-09-03 · A′ step 8f: the richness field — richer away from spawn, an integer band on a lattice from the stream's own split, pulling the ore and coal scatters and the lodes' amounts
+
+**Decided:** (1) `sim/terrain_gen/richness.gd` (`Richness`) is legacy's `_horizontal_field`
+(`layered_world_gen.gd:265-283`): a low-frequency band mixed with a distance-from-spawn ramp by the
+frontier bias, mapped onto `1 ± strength`, one multiplier per column — in thousandths, 1000 legacy's 1.0.
+Legacy sampled `FastNoiseLite` simplex along one row; here the band is one-dimensional value noise on a
+lattice `1 / freq_per_m` metres apart, each lattice value a draw from the terrain stream's `richness`
+split, smoothstepped between — no libm and no float past the record's own three numbers, which convert
+once. A site without the `richness` record reads 1000 in every column. (2) The three consumers legacy had:
+`_scatter_vein_material` multiplies its acceptance and its size by the column's multiplier (ore and coal,
+"the same frontier pull"), `PlanePasses.seed_lodes` pulls the depth bonus of its per-cell amount by it;
+iron, as in legacy, does not read it. The field is computed once in `generate` and once more in `enrich`
+(a pure function of site, width, spawn and seed). A field of exactly 1000 leaves every consumer as it
+was — asserted by signature, not assumed: `x * 1.0 == x` in IEEE, and the integer path is exact. (3)
+`shallow_clay` carries no record yet: the golden is unchanged.
+
+**Why:** plan step 8's content half, "the richness field"; legacy's reason kept in the record's comment:
+the frontier bias "tilts toward the frontier ramp" so the world is richer where it has not been walked.
+
+**Evidence:** `tests/test_richness.gd` 17: without the record 1000 everywhere and a float multiplier of
+exactly one; with legacy's constants every column within [450, 1550] (range 818..1353), mean 1094, the
+frontier's edges 1268 over spawn's 851, a spread of over 300 as the control; neighbours differ by at most
+10 thousandths; strength 0 is one everywhere, same seed same field, another seed another band, and with
+the bias all ramp the seed no longer matters; the same seed under a uniform 1.55 seeds 26907 copper cells
+against 5104 under 0.45 while a uniform 1000 reproduces the pass without a field by signature; the lodes
+land on the same cells under both and hold 73279 against 31168; on a generated world the record changes
+the world and the frontier's 96 columns carry 7978 copper cells against spawn's 6947. Neighbours:
+plane_passes 31, shaft_generator 34, ore_bodies 15, shaft_replay_determinism ALL PASS 21 with the golden
+matched.
+
+**Gaps:** the band's lattice is coarser than simplex (one value per 22 m, smoothstepped), which is the
+shape legacy's frequency implies but not its texture; a taste call for the switch-on's eye pass.
