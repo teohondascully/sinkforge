@@ -15529,3 +15529,37 @@ engine-name clashes were caught at parse this step (`_set` twice, `load` once) a
 **Gaps:** no ear verdict on any voice, and none of the pitch and level numbers has been listened to under
 our unit regime. Legacy's blow pitch carried a cadence term this build has no reading for. Occlusion's
 curve is a listening call. The cue layer fires a pop for ANY pack rise, as the payout does.
+
+## D0368 · 2026-09-03 · A′ step 6g: the hotbar and the PACK FULL chip on the layout/paint split, legacy's rules kept and its geometry carried through the theme's scale
+
+**Decided:** (1) `view/hud/hotbar.gd` is legacy `hud.gd`'s `_draw_inventory`, `_more_mark`,
+`_draw_item_tooltip`, `_item_label` and `_draw_pack_full` in `DepthChip`'s shape (D0290): `layout()`
+decides and returns data, `paint()` transcribes, and every number is legacy's authoring-canvas number
+carried through `UiTheme.px`/`pt` at the point of use. Legacy's rules are kept as it wrote them down —
+the bar shows only the slots you carry with a floor of one; the bar is a WINDOW onto the pack placed to
+contain the selection rather than assuming it does (legacy's own bug: eleven types drew ten wells and lit
+none); the keybind digit follows the pack index and stops when the keys do; the chevron is a mark and
+not a count. (2) The tooltip reads the pointer from the chip's viewport at paint time, but `layout` takes
+the pointer as an argument, so the capture and the clamp are posed in the suite and the human is
+outside the measurement (the aim-layer rule). (3) A machine item's name is its record's `display_name`
+from the data; a resource's is its id spaced and capitalised; legacy's `machine_icons` table is not
+needed. Icons are `ItemLook.draw` (D0363). (4) `pack_selected` is drawn as the observation carries it;
+no verb sets it yet, so the first slot is lit — the selection verb is shell work. (5) Mounted through a
+`_mount_hud` helper on the setup file so `build()` stays under the 50-line function limit, in draw
+order: depth, hotbar, PACK FULL, the arrival plate, the legend last. Legacy's `HELPER_TAGS` registry
+(`ambient` for the bar and the chip, `active` for the tooltip) is honoured in the header rather than
+in a table, because the `check_hud_layout` gate that asserted the table is not yet ported (plan §5).
+
+**Why:** the plan's next sub-step after the audio, and the first of the HUD rows that reads the pack —
+the observation has carried `pack`, `pack_selected`, `pack_slots`, `pack_bulk` and `pack_bulk_cap`
+since D0356 with nothing drawing them.
+
+**Evidence:** `tests/test_hotbar.gd` 35 assertions: labels off the data, the floor of one and no trailing
+empties, twelve items capped at ten with selection 11 sliding the window to 2 and lighting, the chevron
+on the hidden end only, the digit following the pack index and blank past the tenth, the tooltip
+captured by the pointer over the third well and clamped on-canvas, PACK FULL only without room and not
+for a zero cap, the backing centred at legacy's band under the scale, a real redraw through the HUD
+host carrying two items. Size gate green after the fold.
+
+**Gaps:** no eye verdict. The inventory OVERLAY (legacy's Bazaar counter, E) is not ported: it is the
+bazaar's page, dead by the plan. The selection verb and the number keys are shell work.

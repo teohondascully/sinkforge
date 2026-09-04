@@ -101,12 +101,19 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	# so the world is graded and the readouts stay crisp -- ordering enforced by the CanvasLayer indices,
 	# which `tests/test_post_fx.gd` asserts against each other rather than trusting this call order.
 	view.add_post_fx()
-	view.add_hud().add_chip(DepthChip.paint)
-	view.add_hud().add_stateful_chip(ArrivalPlate.new(), &"paint")
-	# The legend keeps state too -- which verbs the player has demonstrated -- and it is added LAST so a
-	# ceremony never draws under it. It removes itself from the picture entirely once it is done.
-	view.add_hud().add_stateful_chip(KeyLegend.new(), &"paint")
+	_mount_hud(view)
 	return view
+
+
+## The HUD, in draw order: the depth readout, the hotbar and the PACK FULL chip (6g, D0368), the arrival
+## plate over them, and the legend LAST so a ceremony never draws under it. The legend keeps state --
+## which verbs the player has demonstrated -- and removes itself from the picture once it is done.
+static func _mount_hud(view: WorldView) -> void:
+	view.add_hud().add_chip(DepthChip.paint)
+	view.add_hud().add_chip(Hotbar.paint)
+	view.add_hud().add_chip(Hotbar.paint_pack_full)
+	view.add_hud().add_stateful_chip(ArrivalPlate.new(), &"paint")
+	view.add_hud().add_stateful_chip(KeyLegend.new(), &"paint")
 
 
 ## THE VEIL IS A MULTIPLY PASS OVER A STRETCHED LIGHTMAP (D0336), which is two properties on its layer and

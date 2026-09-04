@@ -395,6 +395,7 @@ jobs:
       #   test_voice_bank.gd                             test_voice_bank (the eleven one-shots: stated lengths, pinned peaks on the normed voices, grains differ and share the peak, the vein's beat, the pop sweeps up, the drip's echo, the catch duller and longer than the crunch -- A' step 6f (ii), D0367)
       #   test_voice_cues.gd                             test_voice_cues (every one-shot as an edge over two posed observations: the blow's material voice and hardness pitch, break and vein, the line's three edges, landing vs step-off, the stride over the ground, machines clunk/pop/ignite once with a primed first frame, a pack gain pops, the drip gate -- A' step 6f (ii), D0367)
       #   test_sfx_space.gd                              test_sfx_space (the room off the observation: open air dry, a crawlway vs a hall, occlusion counts the rock between, the reverb map and the smoothing, the bus made once and released by its owner -- A' step 6f (ii), D0367)
+      #   test_hotbar.gd                                 test_hotbar (legacy's hotbar on the layout/paint split: the bar is the pack with a floor of one, the window contains the selection, keys stop where the keyboard does, the tooltip off the pointer clamped on-canvas, PACK FULL only without room, legacy's geometry under the scale, a redraw through the HUD host -- A' step 6g, D0368)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -461,7 +462,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 97 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 98 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -500,6 +501,7 @@ jobs:
             res://tests/test_voice_bank.gd \
             res://tests/test_voice_cues.gd \
             res://tests/test_sfx_space.gd \
+            res://tests/test_hotbar.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \
