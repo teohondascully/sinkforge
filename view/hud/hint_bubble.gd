@@ -90,13 +90,6 @@ static func layout(h: Hints, frame: Frame, font: Font) -> Dictionary:
 		"text_at": rect.position + Vector2(UiTheme.px(8.0), UiTheme.px(13.0))}
 
 
-static func _round_rect(ci: CanvasItem, rect: Rect2, radius: float, col: Color) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.set_corner_radius_all(int(radius))
-	sb.draw(ci.get_canvas_item(), rect)
-
-
 func paint(frame: Frame, ci: CanvasItem) -> void:
 	if frame == null or frame.obs == null:
 		return
@@ -109,8 +102,8 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 		return
 	var rect: Rect2 = l["rect"]
 	var a: float = l["alpha"]
-	_round_rect(ci, Rect2(rect.position + Vector2(0.0, UiTheme.px(1.5)), rect.size), UiTheme.px(4.0), Color(0.0, 0.0, 0.0, 0.38 * a))
-	_round_rect(ci, rect, UiTheme.px(4.0), Color(UiTheme.UI_BG.r, UiTheme.UI_BG.g, UiTheme.UI_BG.b, UiTheme.UI_BG.a * a))
+	PageDraw.round_rect(ci, Rect2(rect.position + Vector2(0.0, UiTheme.px(1.5)), rect.size), UiTheme.px(4.0), Color(0.0, 0.0, 0.0, 0.38 * a))
+	PageDraw.round_rect(ci, rect, UiTheme.px(4.0), Color(UiTheme.UI_BG.r, UiTheme.UI_BG.g, UiTheme.UI_BG.b, UiTheme.UI_BG.a * a))
 	ci.draw_rect(Rect2(rect.position + Vector2(0.0, UiTheme.px(3.0)), Vector2(UiTheme.px(1.5), rect.size.y - UiTheme.px(6.0))), Color(UiTheme.UI_EDGE_HI.r, UiTheme.UI_EDGE_HI.g, UiTheme.UI_EDGE_HI.b, a))
 	ci.draw_colored_polygon(l["tail"], Color(UiTheme.UI_BG.r, UiTheme.UI_BG.g, UiTheme.UI_BG.b, UiTheme.UI_BG.a * a))
 	ci.draw_multiline_string(font, l["text_at"], l["text"], HORIZONTAL_ALIGNMENT_LEFT, UiTheme.px(WRAP), UiTheme.pt(FS), -1, Color(INK, a))

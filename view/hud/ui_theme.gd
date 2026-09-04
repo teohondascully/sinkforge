@@ -125,3 +125,66 @@ static func panel(ci: CanvasItem, rect: Rect2, alpha: float = 1.0) -> void:
 		rect.position + Vector2(rect.size.x - 1.0, 1.0),
 		Color(UI_EDGE_HI, UI_EDGE_HI.a * alpha), 1.0)
 	ci.draw_rect(rect, Color(UI_EDGE, UI_EDGE.a * alpha), false, 1.0)
+
+
+## ---- THE PAGE TOKENS (A' step 6j, D0372) ----
+##
+## Legacy `scenes/ui_theme.gd`'s remaining declarations, lifted for the settings page: the gold under
+## more and less light, the modal rail and its lit tile, and the rail's slot arithmetic that the settings
+## rail and the counter's rail shared so the two could not drift. Every length is in the AUTHORED canvas
+## and is scaled at the point of use through `px`, like every other number in this file's callers.
+
+## The same gold seen under more light, written as a channel lift so moving the accent moves this with
+## it: hue 42.3 against the accent's 43.2, 0.67 of its saturation, 0.95 of its value. The derivation is
+## clean in HSV and not in RGB.
+const GOLD_PALE_LIFT := Color(0.149, 0.171, 0.249, 0.0)
+const GOLD_PALE := Color(UI_ACCENT.r + GOLD_PALE_LIFT.r, UI_ACCENT.g + GOLD_PALE_LIFT.g, UI_ACCENT.b + GOLD_PALE_LIFT.b)
+## The same gold in shadow: a uniform drop, so the hue is preserved exactly. The accent's subordinate
+## rung, 5.40:1 on the modal against `UI_TEXT_FAINT`'s 5.39.
+const GOLD_DIM_DROP := Color(0.14, 0.14, 0.14, 0.0)
+const GOLD_DIM := Color(UI_ACCENT.r - GOLD_DIM_DROP.r, UI_ACCENT.g - GOLD_DIM_DROP.g, UI_ACCENT.b - GOLD_DIM_DROP.b)
+
+## The tab rail and the plate's inner air, shared by every modal page.
+const BAZAAR_RAIL: float = 56.0       ## the vertical tab rail down the left edge
+const BAZAAR_PAD: float = 12.0
+
+## The lit tile is a per-channel lift off the rail, rising toward blue so it comes up slightly cooler
+## than its rail rather than just brighter, which keeps it from reading as the gold beside it.
+const RAIL_ON_LIFT := Color(0.047, 0.051, 0.060, 0.0)
+const RAIL_ON_FILL := Color(UI_RAIL.r + RAIL_ON_LIFT.r, UI_RAIL.g + RAIL_ON_LIFT.g, UI_RAIL.b + RAIL_ON_LIFT.b)
+
+## What a rail slot is made of: a tile with one line of type under it, and neither may print into the
+## slot below, so the pitch is a clearance and not a taste.
+const RAIL_ICON: float = 38.0         ## the tile at the top of every slot
+const RAIL_LABEL_FS: int = 7          ## and the type on the line under it
+const RAIL_LABEL_DY: float = 44.0     ## the word's baseline, below the tile
+const RAIL_TEXT_AIR: float = 2.0      ## tile to the top of the type under it
+const RAIL_SLOT_AIR: float = 7.0      ## a slot's last mark to the next slot's tile
+const RAIL_PITCH_MAX: float = 58.0    ## a tall rail spreads its tabs no further than this
+const RAIL_TOP: float = 62.0          ## where the first tile sits when the rail has the room
+const RAIL_TOP_FRAC: float = 0.18     ## ...and the share of a shorter rail it takes instead
+const RAIL_EDGE: float = 6.0          ## the margin no slot crosses at either end
+const RAIL_KEY_GAP: float = 3.0       ## cap to word, on a keyed rail
+
+
+## The word's baseline under a tile, for a font at the rail's type size. Authored px.
+static func rail_word_dy(font: Font) -> float:
+	return RAIL_ICON + font.get_ascent(RAIL_LABEL_FS) + RAIL_TEXT_AIR
+
+
+static func rail_word_slot_h(font: Font) -> float:
+	return RAIL_LABEL_DY + font.get_descent(RAIL_LABEL_FS)
+
+
+## The y of each of `n` slots down a rail (authored px), pitched between a floor and a cap. The floor is
+## not cosmetic: without one a short page drives the pitch down to the tile's own height and the tiles
+## meet. A floor above `RAIL_PITCH_MAX` wins over it, because the cap limits how far a tall rail may
+## spread while the floor is a clearance the drawing cannot do without.
+static func rail_slots(rail: Rect2, n: int, min_pitch: float, slot_h: float) -> Array:
+	var pitch: float = maxf(min_pitch, minf(RAIL_PITCH_MAX, (rail.size.y - 110.0) / maxf(float(n - 1), 1.0)))
+	var top: float = minf(minf(RAIL_TOP, rail.size.y * RAIL_TOP_FRAC), rail.size.y - RAIL_EDGE - (float(n - 1) * pitch + slot_h))
+	top = maxf(top, RAIL_EDGE)
+	var out: Array = []
+	for i: int in n:
+		out.append(rail.position.y + top + float(i) * pitch)
+	return out

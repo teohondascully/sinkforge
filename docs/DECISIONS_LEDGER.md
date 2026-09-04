@@ -15692,3 +15692,44 @@ unchanged.
 **Gaps:** no eye verdict. Legacy's aquifer, power, torch, bazaar, breach, ping and depth-band overlays
 are not here: the first three need whole-world planes the observation does not carry (water's would be
 the same shape as this one when wanted), the rest are dead. The M binding is shell work.
+
+## D0372 · 2026-09-03 · A′ step 6j: the settings page — legacy's split kept, the values as a snapshot from the shell, the page's tokens and primitives lifted, content on this build's four actions
+
+**Decided:** (1) `view/hud/settings_page.gd` keeps legacy's own split, stated in its header: the shell's
+`Settings` owns the values and their persistence, the page owns which rows exist, in which category,
+in what order, what sentence each carries and where the keyboard cursor goes next; above the drawing
+banner everything is data or a pure function of (category, row), reachable headless. `view/` may not
+reach `shell/`, so the values arrive as a SNAPSHOT (`state`: muted, levels, shake, auto-pickup, the
+zoom label, the binding labels, every action's event labels) the shell hands over, and the page returns
+the same payload for a click and for ENTER, so the shell's one mutation path serves both pointers.
+Content re-authored: legacy's twenty-three bindings are this build's four actions (`Controls.LEFT/
+RIGHT/JUMP/MINE`); the audio levels and feel toggles are the shell's own fields. (2)
+`view/hud/settings_draw.gd` is the drawing half, static over the page and a canvas; the page registers
+what was painted (`add_hit`, `set_slider_rect`) so a click is routed against the rectangles that were
+actually drawn and never a second copy of the layout. Legacy's rules kept: the mouse wins because it
+is the more deliberate pointer and the cursor speaks when nothing is hovered; hover lifts, selection
+fills gold, focus rings from outside and the three coexist; a clashing key wears the warn colour; the
+clash detection runs over EVERY action's every event label, so an off-page action's collision is still
+named on the row it hits. (3) `view/hud/page_draw.gd` is legacy's page primitives (`round_rect`,
+`round_rect_left`, `soft_shadow`, `panel_sheen`, `tracked`, `focus_ring`, `keycap`, `edge_vignette`)
+verbatim in arithmetic and static; the hint bubble's private rounded rect now routes through it.
+`UiTheme` gains the eighteen tokens the plan counted (the gold under more and less light as channel
+lifts off the accent, the modal rail and its lit tile, the rail's slot arithmetic with its floor that
+beats the cap). (4) Mounted LAST and CLOSED: it is a modal over everything; opening it and feeding it
+the snapshot is the shell's work, with the boot scene.
+
+**Why:** the plan's next view, and the one the plan measured the theme against ("the current theme
+carries 13 of 36 declarations; the settings page needs 15 of the missing 23").
+
+**Evidence:** `tests/test_settings_page.gd` 32 (four bindings two a column; labels; the focus counts;
+payloads clamp — RESET however far past, the last level however far past; the cursor steps, jumps only
+on the two-column face, clamps at RESET; switching to a shorter face clamps the cursor; no clash on four
+distinct keys, jump on A named on both rows, two unbound actions not in conflict, an off-page action's
+clash named; the short faces at the floor, CONTROLS the wide one; the rise from invisible to full and
+back; a real redraw painting three tabs, the mute and four sliders as hits, a click on the middle of the
+second level returning that slider at half, the CONTROLS face painting four bindings and RESET). Two
+rows corrected: legacy's audio table puts the label first and the id second, and the id is the shell's
+own `sound`. `tests/test_page_draw.gd` 9. One parse slip (a discard statement) caught by the check.
+
+**Gaps:** no eye verdict. No key opens the page and no snapshot is fed yet (shell). The zoom cycle's
+label comes from the snapshot; the reveal scene has no zoom levels to name.

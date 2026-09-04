@@ -107,7 +107,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 
 ## The HUD, in draw order: the depth readout, the hotbar and the PACK FULL chip (6g, D0368), the
 ## objective banner, the minimap and the inspector under it (6h/6i), the lesson bubble, the arrival plate
-## over them, and the legend LAST so a ceremony never draws under it. The legend keeps state --
+## over them, the legend, and the settings page (closed) over all of it so a ceremony never draws under it. The legend keeps state --
 ## which verbs the player has demonstrated -- and removes itself from the picture once it is done.
 static func _mount_hud(view: WorldView) -> void:
 	var plate: ArrivalPlate = ArrivalPlate.new()
@@ -123,6 +123,9 @@ static func _mount_hud(view: WorldView) -> void:
 	view.add_hud().add_stateful_chip(HintBubble.new(plate), &"paint")
 	view.add_hud().add_stateful_chip(plate, &"paint")
 	view.add_hud().add_stateful_chip(KeyLegend.new(), &"paint")
+	# The settings page is a modal over everything, the legend included, mounted CLOSED: opening it and
+	# feeding it the shell's snapshot is the shell's work (6j, D0372).
+	view.add_hud().add_stateful_chip(SettingsPage.new(), &"paint")
 
 
 ## THE VEIL IS A MULTIPLY PASS OVER A STRETCHED LIGHTMAP (D0336), which is two properties on its layer and
