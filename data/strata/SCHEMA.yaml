@@ -19,3 +19,6 @@ fields:
   # Legacy's vertical structure (layered_world_gen.gd _carve_rifts, _mineralize, the sinkhole passes):
   # `rift` and `sinkhole` sub-records in legacy's units. Absent carves none (A' step 8c, D0383).
   vertical: {required: false, type: dict}
+  # Legacy's studding (_stud_ledges, _stud_spires, _scatter_rubble) and drought (_seed_droughts) passes:
+  # `ledge`, `spire`, `rubble`, `drought` sub-records in legacy's units. Absent studs none (A' 8d, D0384).
+  studding: {required: false, type: dict}

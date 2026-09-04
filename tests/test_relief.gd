@@ -241,9 +241,9 @@ func _test_the_cave_band_is_protected_under_every_column_not_just_the_datum() ->
 	_check(rows[col] > DATUM + 8, "the probe column is a valley (%d cells below the datum)" % (rows[col] - DATUM))
 	var centre := Vector2i(col, DATUM + band + 6)
 	var scalar_grid: TileGrid = _solid_hills(rows, grid.height)
-	var opened_scalar: int = CavePasses._carve_disc(scalar_grid, centre, 4, Relief.flat(W, DATUM + band))
+	var opened_scalar: int = CavePasses.carve_disc(scalar_grid, centre, 4, Relief.flat(W, DATUM + band))
 	var column_grid: TileGrid = _solid_hills(rows, grid.height)
-	var opened_column: int = CavePasses._carve_disc(column_grid, centre, 4, Relief.offset(rows, band))
+	var opened_column: int = CavePasses.carve_disc(column_grid, centre, 4, Relief.offset(rows, band))
 	_check(opened_scalar > 0 and _breaches(scalar_grid, rows, band) > 0,
 		"CONTROL: the scalar floor opens %d cells and %d columns are breached inside their band"
 		% [opened_scalar, _breaches(scalar_grid, rows, band)])

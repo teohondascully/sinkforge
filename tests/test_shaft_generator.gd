@@ -124,13 +124,13 @@ func _test_grow_vein_respects_min_row_floor() -> void:
 			grid.set_material(Vector2i(col, row), &"hardrock")
 	var rng: SplitRng = SplitRng.new(3).split("terrain_gen")
 	var min_row: int = 10
-	ShaftGenerator._grow_vein(grid, rng, Vector2i(10, min_row), 60, &"ore_iron", min_row)
+	ShaftGenerator.grow_vein(grid, rng, Vector2i(10, min_row), 60, &"ore_iron", min_row)
 	var violations: int = 0
 	for col: int in grid.width:
 		for row: int in range(0, min_row):
 			if grid.get_material(Vector2i(col, row)) == &"ore_iron":
 				violations += 1
-	_check(violations == 0, "_grow_vein never plants above min_row even when forced to try (%d found)" % violations)
+	_check(violations == 0, "grow_vein never plants above min_row even when forced to try (%d found)" % violations)
 
 
 ## The other half of the host-rock check: a vein must never overwrite an already-open (carved-cave)
@@ -144,7 +144,7 @@ func _test_grow_vein_never_fills_a_carved_cave() -> void:
 	var cave_cell: Vector2i = Vector2i(5, 5)
 	grid.excavate(cave_cell)
 	var rng: SplitRng = SplitRng.new(9).split("terrain_gen")
-	ShaftGenerator._grow_vein(grid, rng, Vector2i(4, 5), 30, &"ore_copper")
+	ShaftGenerator.grow_vein(grid, rng, Vector2i(4, 5), 30, &"ore_copper")
 	_check(grid.get_material(cave_cell) == &"", "a carved cave cell stays open even when a vein grows past it")
 
 

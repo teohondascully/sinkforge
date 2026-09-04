@@ -147,7 +147,7 @@ static func carve_tunnels(grid: TileGrid, rng: SplitRng, floors: PackedInt32Arra
 		var heading: int = rng.next_range(0, DIRS.size() - 1)
 		var length: int = rng.next_range(TUNNEL_MIN_LEN_M, TUNNEL_MAX_LEN_M) * cells_per_m
 		for _s: int in length:
-			carved += _carve_disc(grid, Vector2i(x / DIR_SCALE, y / DIR_SCALE), radius, floors)
+			carved += carve_disc(grid, Vector2i(x / DIR_SCALE, y / DIR_SCALE), radius, floors)
 			heading = posmod(heading + rng.next_range(-WANDER_STEPS, WANDER_STEPS), DIRS.size())
 			var step: Vector2i = DIRS[heading]
 			x += step.x
@@ -159,13 +159,13 @@ static func carve_tunnels(grid: TileGrid, rng: SplitRng, floors: PackedInt32Arra
 
 ## A disc of open air, block erased and wall kept. Legacy's `_carve_disc`, including its `+ 1` slack on
 ## the radius test, which is what stops a small disc reading as a diamond.
-static func _carve_disc(grid: TileGrid, centre: Vector2i, radius: int, floors: PackedInt32Array) -> int:
+static func carve_disc(grid: TileGrid, terrain_centre: Vector2i, radius: int, floors: PackedInt32Array) -> int:
 	var carved: int = 0
 	for dy: int in range(-radius, radius + 1):
 		for dx: int in range(-radius, radius + 1):
 			if dx * dx + dy * dy > radius * radius + 1:
 				continue
-			carved += _open(grid, centre + Vector2i(dx, dy), floors)
+			carved += _open(grid, terrain_centre + Vector2i(dx, dy), floors)
 	return carved
 
 

@@ -103,6 +103,9 @@ static func generate(site: Dictionary, seed: int) -> TileGrid:
 	# cut through finished rock slices veins, so its walls show ore. Config-gated (A' step 8c, D0383).
 	if site.has("vertical"):
 		_vertical(grid, rng, site, surface, stonereach_end)
+	# Then rock put back so that open space has form, and the drought pass over what is left (8d, D0384).
+	if site.has("studding"):
+		_studding(grid, rng, site, surface, stonereach_end)
 	_place_ruins(grid, rng, site["ruin"], SKY_ROWS)
 	# Optional (docs/GDD.md §12, claims/C004) -- absent from the real `shallow_clay` site on purpose, so
 	# this stays a test-only addition, not a commitment the real economy has to honor yet.
@@ -129,6 +132,20 @@ static func _vertical(grid: TileGrid, rng: SplitRng, site: Dictionary, surface: 
 		spawn, TERRAIN_CELLS_PER_METER)
 	VerticalPasses.ore_rift_walls(grid, v_rng, cfg["rift"], rifts, deep_row)
 	VerticalPasses.open_sinkholes(grid, v_rng, cfg["sinkhole"], rifts, surface, spawn, TERRAIN_CELLS_PER_METER)
+
+
+## Ledges, spires, rubble, then the drought pass -- legacy's order, on the `studding` split. Each studding
+## pass samples a fresh snapshot of the open set, so the teeth see the ledges and the rubble sees both.
+static func _studding(grid: TileGrid, rng: SplitRng, site: Dictionary, surface: PackedInt32Array,
+		deep_row: int) -> void:
+	var s_rng: SplitRng = rng.split("studding")
+	var cfg: Dictionary = site["studding"]
+	var band: int = int(site["cave"]["min_depth_cells"])
+	var cpm: int = TERRAIN_CELLS_PER_METER
+	StuddingPasses.stud_ledges(grid, s_rng, cfg["ledge"], StuddingPasses.open_terrain_cells(grid, surface, band), cpm)
+	StuddingPasses.stud_spires(grid, s_rng, cfg["spire"], StuddingPasses.open_terrain_cells(grid, surface, band), cpm)
+	StuddingPasses.scatter_rubble(grid, s_rng, cfg["rubble"], StuddingPasses.open_terrain_cells(grid, surface, band), cpm)
+	StuddingPasses.seed_droughts(grid, s_rng, cfg["drought"], surface, band, deep_row, cpm)
 
 
 ## Rows above a column's surface are left with NO material and NO wall — that is the sky, and a cell with
@@ -239,7 +256,7 @@ static func _scatter_vein_material(grid: TileGrid, rng: SplitRng, cfg: Dictionar
 		if rng.next_float() > accept:
 			continue
 		var size: int = int(cfg["size_min"]) + int(round(depth_frac * float(cfg["size_depth_bonus"])))
-		_grow_vein(grid, rng, Vector2i(cx, cy), size, material)
+		grow_vein(grid, rng, Vector2i(cx, cy), size, material)
 
 
 ## Iron: no acceptance roll and no shallow floor (it doesn't exist above `stonereach_end` at all), size
@@ -255,7 +272,7 @@ static func _scatter_iron(grid: TileGrid, rng: SplitRng, cfg: Dictionary, stoner
 		var cy: int = rng.next_range(stonereach_end, grid.height - 1)
 		var depth_frac: float = float(cy - stonereach_end) / float(span)
 		var size: int = int(cfg["size_min"]) + int(round(depth_frac * float(cfg["size_depth_bonus"])))
-		_grow_vein(grid, rng, Vector2i(cx, cy), size, &"ore_iron", stonereach_end)
+		grow_vein(grid, rng, Vector2i(cx, cy), size, &"ore_iron", stonereach_end)
 
 
 ## Grow one vein as a compact accretion blob: repeatedly take a random frontier cell, keep it if it's
@@ -274,7 +291,7 @@ static func _scatter_iron(grid: TileGrid, rng: SplitRng, cfg: Dictionary, stoner
 ## `_test_glimmer_never_appears_at_or_below_topsoil_end` had been green on that coincidence. Two cells
 ## crossed on the first genuinely different field. The bug was always there; only one arrangement of the
 ## world made it visible, which is what makes a fixed-seed generation test a sample rather than a proof.
-static func _grow_vein(grid: TileGrid, rng: SplitRng, seed_cell: Vector2i, size: int, material: StringName,
+static func grow_vein(grid: TileGrid, rng: SplitRng, seed_cell: Vector2i, size: int, material: StringName,
 		min_row: int = 0, max_row: int = 0x7FFFFFFF) -> void:
 	var filled: Dictionary = {}
 	var frontier: Array[Vector2i] = [seed_cell]
@@ -315,7 +332,7 @@ static func _scatter_reveal_material(grid: TileGrid, rng: SplitRng, cfg: Diction
 			continue   # a valley floor below the band: nothing to seed in
 		var cy: int = rng.next_range(surface[cx], topsoil_end - 1)
 		# `topsoil_end` bounds the GROWTH, not just the seed -- see `_grow_vein` (D0254).
-		_grow_vein(grid, rng, Vector2i(cx, cy), int(cfg["size_min"]), &"glimmer", 0, topsoil_end)
+		grow_vein(grid, rng, Vector2i(cx, cy), int(cfg["size_min"]), &"glimmer", 0, topsoil_end)
 
 
 ## One guaranteed empty chamber per shaft (D0018): a carved disc, no earlier than `min_depth_m`. Nothing

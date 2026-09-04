@@ -53,6 +53,9 @@ per-tick phase order.
 - `VerticalPasses` (`vertical_passes.gd`) — rifts (`.carve_rifts`, returning the cells), their wall
   ore, the sinkhole mouths over the deepest falls (`.open_sinkholes`); `FLARE_MILLI` is `pow(x, 2.2)` as a
   table. Run by the generator when the site has a `vertical` record (A' 8c, D0383).
+- `StuddingPasses` (`studding_passes.gd`) — ledges, spires, rubble over a snapshot of the open set, and
+  the drought pass that plants a vein or a vug wherever a column runs too long through plain rock
+  (`studding` record; A' 8d, D0384).
 - `ValueNoise` (`value_noise.gd`) — engine-free 2D noise, `.sample(x, y, seed) -> float` in roughly
   [-1, 1]. Real `float` arithmetic, one of the four D0183 sites on the generation path that depart from
   `docs/ARCHITECTURE.md`'s fixed-point rule. Measured bit-identical across macOS-arm64 and CI's
@@ -63,10 +66,10 @@ per-tick phase order.
 
 ## Gotchas
 
-- **Port scope is a real subset of legacy, not all of it.** `docs/DECISIONS_LEDGER.md` D0017: strata
-  banding, cave carving, and ore/coal/iron scattering only. Big caverns, tunnels, rifts, sinkhole mouths,
-  ledges, spires, rubble, lodes, aquifers, aquifer treasure, surface trees, the bazaar ruin, and the
-  L1/L2 "seal" gate are NOT ported — most are artifacts of the pre-pivot progression-gated structure.
+- **Port scope grew in A' step 8 (D0381-D0384).** D0017 carried strata banding, cave carving and the
+  ore/coal/iron scatters; D0291 the caverns and tunnels; step 8 the rest of legacy's content as
+  config-gated passes (`relief`, `vertical`, `studding` records). Still not carried: the L1/L2 seal, the
+  bazaar ruin, `routes`, per-cell amounts (step 7).
 - **No per-cell richness/deposit amount.** `data/strata/*.yaml`'s `amount_base`, `rich_chance`, etc. are
   schema-validated but unread by `ShaftGenerator` — a vein cell is just its material id. Richness
   accounting is `sim/economy`/`sim/items` territory, neither of which exists yet.

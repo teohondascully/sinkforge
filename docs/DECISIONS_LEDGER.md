@@ -16277,3 +16277,49 @@ site.
 **Gaps:** the CONTROL for the per-column band first failed honestly (no rift under an off-datum column
 at that seed and relief) and the relief in that test was changed to vary everywhere off a small pad —
 the assertion did not change. The mouth count on the real site is unmeasured until the switch-on.
+
+## D0384 · 2026-09-03 · A′ step 8d: rock put back so that open space has form — ledges, spires and rubble over a snapshot of the open set, and the drought pass that lets no column run dry
+
+**Decided:** (1) `sim/terrain_gen/studding_passes.gd` (`StuddingPasses`) is legacy's `_stud_ledges`,
+`_stud_spires`, `_scatter_rubble`, `_structural_rock`, `_open_cells` and `_seed_droughts`
+(`layered_world_gen.gd:588-715`), run by the generator when the site has a `studding` record (`ledge`,
+`spire`, `rubble`, `drought` sub-records in legacy's units), after the vertical passes and before the
+ruin, on the terrain stream's `studding` split, each pass over a fresh snapshot of the open set so the
+teeth see the ledges and the rubble sees both. (2) The metre conversions: lengths, heights, headroom and
+the drought limit multiply by the cells a metre; a PER-CELL chance (a spire per eligible ceiling cell,
+rubble per floor cell) divides by it, because a metre of ceiling is four cells here and legacy's rate was
+per metre of ceiling; a ledge is a metre thick, a tooth a metre wide at its root tapering by the cell to a
+point (legacy's was one metre-cell wide throughout; a four-pixel needle would not read), a rubble block a
+metre square. (3) Rubble stands only over what holds it up: legacy checked the seed cell's floor and
+placed one cell; a metre block placed the same way hung a column over air where a block below it ended,
+so each column of the block is placed only where the cell under it is solid — found by the suite's
+"every column of rubble stands on the floor" row, which read 2 floating and 3 unsupported before the
+rule. (4) Structural rock is the rock grown from when that is host rock, else `hardrock` (legacy's
+`stone`): ore, coal and iron are rewards, not structure. (5) The drought pass counts plain rock — host
+rock; ore, coal and air reset the run — under the cave band per column, and at the limit plants back
+into the run: a vug (a metre disc through `CavePasses.carve_disc`, public now, with the per-column floor)
+or a vein through `ShaftGenerator.grow_vein` (public now): coal at the coal bias, else copper above
+`stonereach_end` and iron below. Legacy's per-cell vein richness is not carried (step 7). (6) `shallow_clay`
+carries no record yet: the golden is unchanged.
+
+**Why:** plan step 8's content half: ledges, spires, rubble, droughts. Legacy's own reason for the last,
+kept in the file: a world can average 7.5 encounters per hundred rows "and still hold a shaft running
+thirty-five rows of identical rock".
+
+**Evidence:** `tests/test_studding_passes.gd` 33: structural rock is the host or the mid rock; the
+snapshot is a chamber's 3600 cells and an opening inside the band is not a site; in an eight-wide
+corridor at a raised rate ledges grew 200 cells, every one inside the corridor touching rock sideways,
+the seeded row the wall's own rock, every ledge with room under it four cells thick, and a six-row
+corridor under an eight-row headroom grew none; a posed tooth tapers 4-3-2-1 over its run (30 cells);
+at chance 1.0 spires grew 850 cells with 38 roots in the ceiling row (clay) and 50 in the floor row
+(deepstone), floor bias 0 grew 43 hanging roots and no rising one, a one-cell slit grew nothing, chance 0
+nothing; rubble set 209 cells, every column standing on the floor in the floor's rock, chance 0 none; on
+solid rock every column began as one 136-cell run and after the pass none runs 72 (longest 65), 15 vugs
+and 30 veins planted, coal 1119 cells, copper 720 above the deep row and iron 560 below it, no vug inside
+the band; on a generated 96 m world the plain site has a column 171 cells dry and the studded one none
+(longest 71); same seed same world, another seed another. Neighbours: shaft_generator 34, relief 44,
+cave_passes 24, vertical_passes 39, shaft_replay_determinism ALL PASS 21 with the golden matched.
+
+**Gaps:** at chance 1.0 a tooth's tip seeds the next tooth and a block's top the next block (legacy's
+passes read the world they write); the suite checks the rock at the roots, where it is decided, rather
+than by row. The real rates on the real world are 8h's to measure and the director's to judge.
