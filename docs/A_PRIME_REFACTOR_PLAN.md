@@ -458,7 +458,9 @@ the boot main scene in `shell/`); open rulings from step 5 in §8 (the resolver,
 
 **Status (2026-09-03), step 6:** 6a — DONE (D0362: `view/visuals/water_painter.gd` with the layout split
 from the paint, `view/fx/water_drips.gd`, `Observation.wet_cells`; 33 assertions; the capture pair
-waits on a start record with water in frame). Next: 6b, the look registries (machine, item, status).
+waits on a start record with water in frame). 6b — DONE (D0363: `machine_look.gd`, `machine_glyphs.gd`,
+`status_look.gd`, `item_look.gd`, dead entries out, pinned against the data; 27 assertions). Next: 6c,
+the machine painter.
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

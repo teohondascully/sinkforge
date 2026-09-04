@@ -81,6 +81,8 @@ static func _machine_record(m: MachineState, world: World, machines: Machines) -
 	if m.def.recipe != null and m.def.recipe.time_ticks > 0:
 		progress = clampi(m.progress_ticks * 1000 / m.def.recipe.time_ticks, 0, 1000)
 	return {"cell": m.logic_cell, "id": m.def.id, "behavior": m.def.behavior,
+		"source": m.def.recipe != null and m.def.recipe.inputs.is_empty(),   # a no-input recipe: reads as a furnace (6b)
+		"name": m.def.display_name, "recipe": m.def.recipe.id if m.def.recipe != null else &"",   # the painter's nameplate and ports (6c)
 		"status": MachineStatus.of(m, world, machines), "power_permille": m.power_permille,
 		"progress_permille": progress, "facing": m.facing, "fuel": m.fuel, "filter": m.filter,
 		"input": m.input_buffer.duplicate(), "output": m.output_buffer.duplicate()}

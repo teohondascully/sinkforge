@@ -15318,3 +15318,36 @@ frame for a puddle); the drips as a stateful painter owning its own particle lay
 draw and seed).
 
 **Reverse cost:** CHEAP; two view files, one field, one suite.
+
+## D0363 · 2026-09-03 · A′ step 6b: the three look registries — machine style, casing and glyphs; status; item — pinned against the data
+
+**Decided:** (1) Legacy `scenes/visuals.gd` (1,850 lines) lifted as four view files: `machine_look.gd`
+(the style registry, the cold-iron rule, the profiles and the face, the casing with its lighting model
+and detail tier), `machine_glyphs.gd` (the drawers for the eleven kinds the registry names),
+`status_look.gd` (the status vocabulary, the marks, the fix glyphs), `item_look.gd` (colours, purposes,
+the item drawers). Dead entries are OUT rather than carried: seven machine styles (splitter, descent,
+h_drill, drift, crush, spur, ore_vent), five profiles, eight glyph drawers, the rig's three `blocked_*`
+statuses, and every tool, bit, scanner and rig material from the item catalogue — plan §3.2's counts.
+(2) THE VIEW NEVER SEES A `MachineDef`. The observation's machine record carries `id`, `behavior` and a
+new `source` flag (a recipe with no inputs), which is everything legacy's `machine_kind`/`machine_color`
+read off the def; the base Forge (`processor`) is a furnace by id, a no-input source a furnace, any other
+unstyled runner a gear. (3) THE GROUND'S COLOURS COME FROM THE DATA. A bored block yields its material
+id (D0349), so `ItemLook.color` reads `base_color` off `data/materials` for every material and keeps a
+table only for the recipe items and the placeables: one source for the terrain's colour and the
+carried block's. (4) `ITEM_PURPOSE` re-authored against what exists (no Bazaar, research, Engine or
+tool ladder), with the seven materials and the fifteen machines each given a line. (5) `no_power` stays
+in the status table because the winch reports it today; the diamond mark is legacy's. (6) The registries
+are pinned AGAINST THE DATA, not against a hand list: every machine record has a style (or is the Forge)
+and every style names a record; every registry kind has a drawer and its own silhouette; every status the
+sim returns has a look and two statuses calling for different fixes never share a mark; every carried id
+(materials ∪ recipe inputs ∪ outputs ∪ placeables ∪ coal) has a non-white colour and a purpose, and no
+purpose names a thing the build lacks; and every kind, status and item draws in a real redraw. (7) The
+suite found legacy's prose wrong about its own table: "every profile keeps a flat foot" — the conduit's
+is a bar mid-cell, correctly, so the rule that holds and is now stated is "every profile WITH A BODY".
+`tests/test_looks.gd`, 27 assertions. CI 87 → 88. The looks are unverdicted: the machine painter (6c) is
+what puts them on screen.
+
+**Alternative:** carrying the dead entries as "reference" (a registry that names machines the data does
+not have is the drift the population pin exists to catch); a second colour table for the carried ground.
+
+**Reverse cost:** CHEAP; four view files, one suite, one record field.
