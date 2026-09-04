@@ -48,14 +48,12 @@ per-tick phase order.
   `data/strata/*.yaml`. `.get_site(id)`, `.exists(id)`. Same mechanism as `sim/world/materials.gd` —
   `docs/adr/0004-data-codegen.md`.
 - `ValueNoise` (`value_noise.gd`) — engine-free 2D noise, `.sample(x, y, seed) -> float` in roughly
-  [-1, 1]. Deterministic WITHIN a platform (same seed, same build → same output); NOT yet proven
-  bit-identical ACROSS platforms — it uses real `float` arithmetic, one of MULTIPLE places on the
-  terrain-generation and RNG state path that depart from the fixed-point rule `docs/ARCHITECTURE.md`'s own
-  Determinism section states (corrected 2026-08-29, fix queue R5 — "the one place" undercounted the real
-  scope; `docs/DECISIONS_LEDGER.md` D0183 enumerates all four known sites), and IEEE 754 doesn't guarantee
-  identical results for the same expression across CPU architectures. Real, measured, diagnosed gap, not
-  fixed (`docs/DECISIONS_LEDGER.md` D0171/D0172 — converting to `Fx` is a real design cycle, not yet
-  scheduled). Not terrain_gen-specific in principle, but has no other consumer yet.
+  [-1, 1]. Real `float` arithmetic, one of the four D0183 sites on the generation path that depart from
+  `docs/ARCHITECTURE.md`'s fixed-point rule. Measured bit-identical across macOS-arm64 and CI's
+  Linux-x86_64 at every re-pin of gate 8's golden since 2026-08-31, and again 2026-09-03 (D0381: 200 of
+  200 checkpoints, a run that digs generated terrain) — the sites use only IEEE basic operations, no libm.
+  The rule the measurement rests on: nothing on this path may call `sin`/`cos`/`pow`/`exp`; a shape that
+  needs one ports as an integer table (`Relief.SIN_MILLI`).
 
 ## Gotchas
 

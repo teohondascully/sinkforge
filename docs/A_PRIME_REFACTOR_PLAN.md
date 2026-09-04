@@ -310,6 +310,8 @@ The probe: **48 of 48 rows identical**, macOS arm64 vs Linux x86_64 (emulated, n
 before quoting as settled). Legacy's `FastNoiseLite` generator does not diverge across that pair; the
 current build's divergence (gate 8 checkpoint 3) is therefore likely the libm transcendental sites
 (`cave_passes.gd:86-91`) and the `lerpf`/hash-to-float roundings, not noise as such — a step 8 hypothesis.
+**Retired 2026-09-03 (D0381): there is no current divergence to explain; the golden matches 200 of 200
+across the pair, and the sites named here contain no libm call.**
 
 ### Step 1 — the grid planes: RULED 2026-09-03 (D0345), nothing blocks step 4
 
@@ -524,7 +526,10 @@ Files: `sim/terrain_gen/value_noise.gd`, `shaft_generator.gd`, `cave_passes.gd`,
 content (§3.3) ported on top of the deterministic generator, its four transcendental shapes
 (`heightmap:129-135`, `layered:416-420, 460-463, 547-549`) as integer tables.
 Acceptance: gate 8's golden identical on macOS-arm64 and Linux-x86_64 for a run that walks generated
-terrain (today it diverges at checkpoint 3).
+terrain. **Measured met 2026-09-03 (D0381): ALL PASS 21, the CI-pinned golden matched at 200 of 200
+checkpoints by a local macOS run that digs 360 times; "diverges at checkpoint 3" was D0167's world. The
+four float sites stay (IEEE basic ops only). The content half is the remaining work: config-gated passes,
+one switch-on commit for `shallow_clay`, one re-pin.**
 
 ---
 
@@ -601,8 +606,9 @@ driven by `Interface.apply` per tick.
 Four sites, still present at HEAD, line numbers drifted from D0183: `sim/terrain_gen/value_noise.gd`
 `_corner_value` hash-to-float; `shaft_generator.gd` `depth_frac`/`lerpf` threshold (~157-158) and
 `_density_count` (~184-185); `core/split_rng.gd:58-60` `next_range` multiply. Plus
-`cave_passes.gd:86-91`. Within-platform exact; macOS-arm64 vs Linux-x86_64 diverges at checkpoint 3 of
-the golden. Every worldgen change until step 8 re-pins from CI Linux.
+`cave_passes.gd:86-91`. Within-platform exact; and, measured 2026-09-03 (D0381), macOS-arm64 == Linux-x86_64 at all
+200 checkpoints of the golden — the divergence this section recorded was D0167's world. Every worldgen
+change still re-pins from CI Linux: the rule, not a workaround.
 
 ---
 

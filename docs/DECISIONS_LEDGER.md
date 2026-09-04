@@ -16138,3 +16138,41 @@ headless: exit 0, `SINKFORGE_BOOT site=shallow_clay seed=20260826 start=tutorial
 **Gaps:** no eye verdict of the seat. The camera zoom is the settings' level with no
 zoom key; the minimap's small/large toggle exists, its hide does not; the settings page lists four of the
 fifteen actions.
+
+## D0381 · 2026-09-03 · A′ step 8a: the determinism half of step 8 closes on measurement — gate 8's golden is already identical on macOS-arm64 and CI's Linux-x86_64; the plan's "diverges at checkpoint 3" was D0167's world
+
+**Decided:** (1) Step 8's first half (the four D0183 float sites → `Fx` noise, an integer range draw, a
+re-derived calibration, re-tuned thresholds, every golden re-pinned) is NOT executed, because its
+acceptance is already met at HEAD and was measured today rather than inferred:
+`tests/test_shaft_replay_determinism.gd` run on this machine (macOS arm64, `/opt/homebrew/bin/godot`)
+against the golden array pinned from CI's Linux x86_64 build (last re-pin 9a4cc086, 2026-09-03) — ALL
+PASS 21; two processes bit-identical (first mismatch −1); the committed golden matched at all 200 of 200
+checkpoints (first mismatch −1); the seed+1 control diverged at checkpoint 0; coverage `jumps=858
+digs=360 corner_ok=6`, so the run walks and digs generated terrain. The suite's own re-capture notes
+record the same 200/200 agreement at every re-pin since 2026-08-31. (2) The four sites stay as they
+are: `value_noise.gd` `_corner_value` and its lerps, `shaft_generator.gd` `depth_frac`/`lerpf`/
+`_density_count`, `cave_passes.gd` `count_for`, `split_rng.gd` `next_float`/`next_range` use only
+IEEE 754 basic operations on doubles (add, multiply, divide, floor, round, compare), no libm
+transcendental; the GDScript VM does not contract to FMA; those operations are correctly rounded and so
+identical on arm64 and x86_64. The measurement is the evidence, the reasoning is why it was expected to
+hold. Converting them would re-pin every golden for no measured gain and re-derive
+`FASTNOISELITE_SD_CALIBRATION` against a field that is proven stable. (3) The plan's §5.5, its step 8
+acceptance sentence and its step 0 hypothesis are amended in place to the measurement;
+`sim/terrain_gen/MODULE.md`'s "NOT yet proven bit-identical ACROSS platforms" paragraph likewise.
+(4) Step 8's second half — the ~420 lines of legacy worldgen content — proceeds as config-gated passes
+(a site without the key runs exactly today's generator, the way `reveal` already does), each committed
+green with no world change, then one switch-on commit for `shallow_clay` with a single golden re-pin
+from CI Linux.
+
+**Why:** plan step 8's acceptance, verbatim: "gate 8's golden identical on macOS-arm64 and Linux-x86_64
+for a run that walks generated terrain". "Diverges at checkpoint 3" described D0167's world (2026-08-29:
+FastNoiseLite-tuned constants over a 16-bit-truncated seed hash); D0254 and D0258 replaced that field
+and every re-pin since has been verified against a local macOS run. A plan sentence is a claim with a
+date; the measurement today is the check.
+
+**Evidence:** the run above, 21.2 s wall for two 20,000-tick processes plus the control. Rule applied:
+the 200/200 comes from the suite's own PASS line, not from its notes.
+
+**Gaps:** one platform pair, one seed, one scenario. A libm call introduced into the generation path
+(sin, cos, pow, exp) would break this silently at the next re-pin — which is exactly why the content
+half ports its four transcendental shapes as integer tables.
