@@ -183,6 +183,9 @@ func observe(envelope: Envelope) -> Observation:
 func _fill_line(o: Observation) -> void:
 	var g: Grapple = _body.grapple
 	o.grapple_state = int(g.state)
+	o.grapple_live = g.live()
+	o.grapple_anchored = g.state == Grapple.State.ANCHORED
+	o.grapple_throwing = g.throwing()
 	o.grapple_tip = g.tip
 	o.grapple_anchor = g.anchor
 	o.grapple_hitch = g.hitch_fx()

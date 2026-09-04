@@ -451,7 +451,10 @@ with exact one-cell probes, the wrapping polyline, projection and radial cancel 
 the swing coupled in `body_swing.gd` with the collision stand-in, the medium in `body_medium.gd` — rope
 climb, updraft, water — the coast, the step-down snap, machines block and wood passes on every side of
 the body, `place()`; the ramp glide left out pending the ruling; 69 assertions across two suites; the
-replay golden re-pinned from CI Linux). Next: 5d, `view/visuals/rope_painter.gd` and the carry look.
+replay golden re-pinned from CI Linux). 5d — DONE (D0361: `view/visuals/rope_painter.gd` on the `Frame`
+contract — placed ropes, the bowed cord, the hook, the aim ghost from the door's own trace — and
+`carry_look.gd`; 20 assertions). **STEP 5 COMPLETE.** Next: step 6 (the views the systems unblock and
+the boot main scene in `shell/`); open rulings from step 5 in §8 (the resolver, the ramp glide).
 
 ### Step 4 — the grid planes, the door, the verbs (needs step 1's ruling)
 

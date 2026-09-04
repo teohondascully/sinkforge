@@ -15247,3 +15247,38 @@ a dependency the body's contract forbids); a machine as a wall only (the body wa
 cutting only on this tick's tautness (a jump right after a reel is swallowed for a tick).
 
 **Reverse cost:** MODERATE; four new files, two suites, the resolver and heightfield predicate threading.
+
+## D0361 · 2026-09-03 · A′ step 5d: the rope painter on the `Frame` contract and the carry look; step 5 complete
+
+**Decided:** (1) `view/visuals/rope_painter.gd` is legacy `scenes/rope_view.gd` lifted whole onto
+`Frame`: the placed climb-ropes (hemp line, rung knots, hitch loop, frayed tail, swaying on
+`frame.anim_time`), the live cord as a bowed polyline with legacy's `rope_sag` (a catenary's depth for a
+chord and a slack fraction, capped at 0.42 of the chord and floored at 2 px), the hook wedge oriented
+along the last span, the aim ghost as a dotted stub off the hand and one ring at the landing, drawn only
+while the line is stowed. Its two reach-ins (`_view_world_rect(2.0)`, `_anim_time`) are
+`frame.view_world_rect.grow(32)` and `frame.anim_time`; everything it read off the player and the sim it
+reads off the observation (`grapple_*`, `hand`, `placed`), and the ghost is the door's own trace, not a
+second one. (2) THE VIEW NEVER NAMES THE SIM'S ENUM: the observation carries `grapple_live`,
+`grapple_anchored`, `grapple_throwing` beside the raw state int, so the painter's branches are booleans
+and a renumbered `Grapple.State` cannot silently mis-draw. (3) UNITS: the cord widths, the hook wedge
+and the aim ring keep legacy's pixels, because they are read against the body and the body ported at
+identical pixels; the placed rope's knots are per CELL and the cell halved (32 → 16 px), so their
+spacing halves (§3.2's fine-detail rule). The one place both rules meet in one drawing, decided per
+element rather than per file. (4) `view/visuals/carry_look.gd`: legacy's `_carry_load`, `1 − exp(−n/10)`
+over the pack's total, representation only; `Observation.pack_total()` feeds it. The sim has no carry
+cap (T3.8), so it saturates on a count and nothing ever reads "full". (5) The painter sits at `ROPE_Z =
+−10` in the play scene, under the body the scene draws at 0. (6) `tests/test_rope_painter.gd`, 20
+assertions, structural: the sag bows DOWN, monotone in slack, bounded by the cap; the cord runs end to
+end and hangs by the sag at its middle; the hook's head bites past the anchor with its barbs trailing
+toward the body, upward when thrown up; the ghost's lead is a stub never over 74 px; the carry look
+saturates at 1.0; and a real redraw with a line anchored through the door and placed ropes in the
+window, through `WorldView`, per `test_sky_painter`'s rule that a direct `_draw()` is an engine ERROR
+the exit code hides. What the suite cannot do is say the rope LOOKS like rope — that is the director's
+eye at the play scene. CI 85 → 86. **Step 5 of A′ is complete**; its two open rulings (the resolver,
+the ramp glide) are in plan §8.
+
+**Alternative:** the ghost traced in the view from the pointer (a second trace that could disagree with
+the hook, the exact defect legacy's `check_aim` existed to catch); a `Grapple.State` reference from the
+view (the layer lint forbids it, and rightly).
+
+**Reverse cost:** CHEAP; two view files, one suite, three observation fields.

@@ -9,7 +9,7 @@ is in the ledger.
 **Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
-## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–4 done; step 5 in progress: 5a–5c done, 5d the rope painter next)
+## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, next)
 
 **The director approved `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation** (FINISH, amended to lift
 `FactorySim` whole; D0341). **The execution plan is `docs/A_PRIME_REFACTOR_PLAN.md`** and it is
@@ -121,12 +121,18 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   vs 96; the chasm crossed; 0.89 kept on release). 69 assertions in two suites. The body corpus held
   without a re-pin; the shaft-replay golden moved at checkpoint 0 with identical coverage (a re-pin).
 
+- **Step 5d — done (D0361). STEP 5 COMPLETE.** `view/visuals/rope_painter.gd` on the `Frame` contract:
+  placed ropes, the bowed cord (legacy's `rope_sag`), the hook wedge, the aim ghost from the door's own
+  trace, three observation booleans so the view never names the sim's enum; `carry_look.gd`. 20
+  structural assertions; the look itself is the director's call at the play scene (`ROPE_Z = -10`).
+
 ### Next action
 
-**Step 5d, the rope painter and the carry look** (plan §4, §3.2): `view/visuals/rope_painter.gd` from
-`legacy/scenes/rope_view.gd` (274 lines: the placed ropes, the live cord with its slack bow, the hook, the
-aim ghost while stowed; its two reach-ins `_view_world_rect()`/`_anim_time` rebound to `Frame`), reading
-the observation's `grapple_*`, `hand`, `climbing` fields; the carry look (`1 - exp(-total/10)` of the
-pack, representation only) beside it. Then **step 5 is complete** and step 6 (views + the boot main
-scene in `shell/`) follows. **Open rulings from step 5 (plan §8):** the resolver (the swing's collision
-stand-in), the ramp glide (superseded by the heightfield?).
+**Step 6, the views the systems unblock and the boot main scene** (plan §4 step 6, §3.2's view table in
+`PORT_ORDER.md`'s sequence): `water_painter.gd` (no water painter exists), the machine look/painter and
+the item/status looks, `payouts.gd`, `falling_items.gd` on the consumed flow-event channel, the sfx
+beds, the HUD split (hotbar, inspector, minimap, objective card, alerts), hints/hover/objectives with
+every content table re-authored, the settings page; and the boot main scene in `shell/` (no main scene
+exists; `--play` is a debug scene; the view never calls `apply`). Look verdicts are the director's. Then
+step 7 (economy, director-scoped rulings) and step 8 (cross-platform determinism). **Open rulings from
+step 5 (plan §8):** the resolver (the swing's collision stand-in), the ramp glide.

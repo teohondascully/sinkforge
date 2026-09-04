@@ -244,6 +244,9 @@ var aim_cell: Vector2i = Vector2i(-1, -1)
 var aim_is_lode: bool = false
 ## --- the line and the medium (A' step 5c, D0360): the body's rope, for the painter, and its footing ---
 var grapple_state: int = 0            # Grapple.State: 0 stowed, 1 flying, 2 anchored
+var grapple_live: bool = false        # not stowed; the painter reads these three, never the enum
+var grapple_anchored: bool = false
+var grapple_throwing: bool = false    # a hook in the air, on its own or chained from a live line
 var grapple_tip: Vector2i = Vector2i.ZERO      # Fx px, the hook head
 var grapple_anchor: Vector2i = Vector2i.ZERO   # Fx px, where it bit (anchored)
 var grapple_hitch: Vector2i = Vector2i.ZERO    # Fx px, what the body swings from (the last pivot or the hook)
@@ -286,6 +289,14 @@ func is_ore_like_at(c: Vector2i) -> bool:
 	if not in_window(c) or ore_like_legend.is_empty():
 		return false
 	return ore_like_legend[materials[_offset_of(c)]] != 0
+
+
+## Every item carried, for the carry look (`view/visuals/carry_look.gd`).
+func pack_total() -> int:
+	var total: int = 0
+	for slot: Dictionary in pack:
+		total += int(slot.get("count", 0))
+	return total
 
 
 func placed_at(logic_cell: Vector2i) -> StringName:

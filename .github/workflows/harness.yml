@@ -383,6 +383,7 @@ jobs:
       #   test_grapple.gd                                test_grapple (the grapple's solver alone: bite, miss, the ghost agrees with the hook around the compass, reel, projection never outside, tangent kept, pump, wrap, chain, round trip -- A' step 5b, D0359)
       #   test_grapple_body.gd                           test_grapple_body (the line on the body: it bites, swings faster than the legs, lifts, crosses the chasm, keeps its speed on release; the wall stand-in; consent -- A' step 5c, D0360)
       #   test_body_medium.gd                            test_body_medium (the medium: rope grip and climb, the updraft, water wading, machines block and wood passes, the step-down snap, place -- A' step 5c, D0360)
+      #   test_rope_painter.gd                           test_rope_painter (the rope painter, structural: the sag bows down and is bounded, the hook bites past the anchor, the ghost is a stub, the carry look saturates, a real redraw with a live line -- A' step 5d, D0361)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -449,7 +450,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 85 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 86 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -476,6 +477,7 @@ jobs:
             res://tests/test_grapple.gd \
             res://tests/test_grapple_body.gd \
             res://tests/test_body_medium.gd \
+            res://tests/test_rope_painter.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \

@@ -48,6 +48,7 @@ const GLINT_Z: int = -40
 ## readout the veil can dim is a readout that stops working in the exact place the game is played. Below
 ## the cracks and the body, which are the things doing the parting.
 const SEAM_Z: int = -35
+const ROPE_Z: int = -10   ## the line and the placed ropes, under the body the scene draws at 0 (5d, D0361)
 
 
 ## Builds the coordinator, attaches it to `scene`, and hangs every painter and the HUD off it.
@@ -81,6 +82,7 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	view.add_stateful_painter(GlintPainter.new(), &"paint_frame").z_index = GLINT_Z
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
 	view.add_painter(CrackPainter.paint_frame)
+	view.add_painter(RopePainter.paint).z_index = ROPE_Z
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
 	# rather than as a bound Callable. D0289: `add_painter(CrumblePainter.new().paint)` freed the painter
 	# at the end of that expression -- a Callable does not keep a RefCounted alive -- and this layer drew
