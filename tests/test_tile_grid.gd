@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_state_signature_sensitive_to_dig_extent()
 	_test_running_signature_agrees_with_a_from_scratch_rebuild()
 	_test_the_cell_hash_does_not_collide_where_the_string_form_could()
+	_test_the_coarse_plane_is_classed_at_the_centre_and_versioned()
 	_finish("tile_grid")
 
 
@@ -289,3 +290,38 @@ func _check_the_memo_is_populated_by_use() -> void:
 			% [before, StateHash._id_folds.size()])
 	_check(StateHash._id_folds.has(&"a_material_no_other_test_uses"),
 		"and it is keyed by the id itself")
+
+
+## D0371. The coarse plane: one class byte per logic cell, classed by the cell's CENTRE terrain cell,
+## maintained at the mutators, versioned only on a change.
+func _test_the_coarse_plane_is_classed_at_the_centre_and_versioned() -> void:
+	var g: TileGrid = TileGrid.new(9, 6, 1)
+	_check(g.coarse_width == 3 and g.coarse_height == 2 and g.coarse.size() == 6, "a 9x6 grid is a 3x2 coarse plane, the ragged edge rounded up (%dx%d)" % [g.coarse_width, g.coarse_height])
+	_check(g.coarse_at(Vector2i(1, 1)) == TileGrid.COARSE_VOID and g.coarse_version == 0, "empty: void everywhere, version 0")
+	g.set_material(Vector2i(4, 4), &"clay")      # not a centre: (4,4) is offset (0,0) of logic (1,1)
+	_check(g.coarse_at(Vector2i(1, 1)) == TileGrid.COARSE_VOID and g.coarse_version == 0, "a write off the centre changes no class and no version")
+	g.set_material(Vector2i(6, 6), &"clay")      # the centre of logic (1,1)
+	_check(g.coarse_at(Vector2i(1, 1)) == TileGrid.COARSE_ROCK and g.coarse_version == 1, "a write at the centre classes the cell rock and bumps the version once")
+	g.set_material(Vector2i(6, 6), &"clay")
+	_check(g.coarse_version == 1, "rewriting the same class does not bump")
+	g.set_material(Vector2i(6, 6), &"ore_iron")
+	_check(g.coarse_at(Vector2i(1, 1)) == TileGrid.COARSE_ORE and g.coarse_version == 2, "ore at the centre classes ore")
+	g.set_wall(Vector2i(6, 6), &"clay")
+	g.excavate(Vector2i(6, 6))
+	_check(g.coarse_at(Vector2i(1, 1)) == TileGrid.COARSE_WALL and g.coarse_version == 3, "dug with a wall behind classes wall (the wall write itself changed nothing under rock)")
+	g.set_wall(Vector2i(6, 6), &"")
+	_check(g.coarse_at(Vector2i(1, 1)) == TileGrid.COARSE_VOID, "wall cleared: void again")
+	_check(g.coarse_at(Vector2i(-1, 0)) == TileGrid.COARSE_VOID and g.coarse_at(Vector2i(3, 0)) == TileGrid.COARSE_VOID, "outside the plane reads void")
+	g.set_material(Vector2i(2, 2), &"hardrock")
+	var c: TileGrid = g.clone()
+	_check(c.coarse == g.coarse and c.coarse_version == g.coarse_version, "a clone carries the plane and its version")
+	c.set_material(Vector2i(2, 2), &"")
+	_check(g.coarse_at(Vector2i(0, 0)) == TileGrid.COARSE_ROCK and c.coarse_at(Vector2i(0, 0)) == TileGrid.COARSE_VOID, "and shares no state with the original")
+	# The plane is NOT in the signature: two grids holding the same cells hash the same however many
+	# coarse changes each went through to get there.
+	var a: TileGrid = TileGrid.new(9, 6, 1)
+	a.set_material(Vector2i(6, 6), &"clay")
+	a.set_material(Vector2i(6, 6), &"ore_iron")
+	var b: TileGrid = TileGrid.new(9, 6, 1)
+	b.set_material(Vector2i(6, 6), &"ore_iron")
+	_check(a.coarse_version == 2 and b.coarse_version == 1 and a.state_signature() == b.state_signature(), "two routes to one world: versions 2 and 1, one signature")

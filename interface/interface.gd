@@ -151,6 +151,10 @@ func observe(envelope: Envelope) -> Observation:
 	o.cell = Vector2i(Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y))
 	o.window = envelope.window
 	o.world_cells = Vector2i(_world.grid.width, _world.grid.height)
+	o.map = _world.grid.coarse
+	o.map_cells = Vector2i(_world.grid.coarse_width, _world.grid.coarse_height)
+	o.map_version = _world.grid.coarse_version
+	o.map_machines = _machines.machine_logic_cells() if _machines != null else []
 	o.world_seed = _world.grid.seed
 	o.cell_px = Heightfield.TERRAIN_CELL_PX
 	_fill_window(o, envelope)

@@ -15652,3 +15652,43 @@ ids sorted, restore drops unknown, resync re-arms); `tests/test_objective_line.g
 into it (the plan's BRK-L7-001 note: tick-sampled, shell work at the save's envelope). The rope lessons
 name verbs because the play scene binds no grapple key yet. Legacy's `HELPER_TAGS` registry and its
 `check_hud_layout` gate are still not ported; the order is honoured in `_mount_hud`'s comment.
+
+## D0371 · 2026-09-03 · A′ step 6i: the minimap — a coarse class plane maintained on the grid's write path, the image keyed on its version, the inspector stacked under the corner map
+
+**Decided:** (1) `TileGrid` gains a COARSE PLANE: one class byte per logic cell (void, dug-with-a-wall,
+rock, ore), each logic cell classed by its CENTRE terrain cell (offset 2,2 of its 4×4), maintained at
+the three mutators (`set_material`, `set_wall`, `excavate`) in O(1) and never rebuilt; a write anywhere
+but the centre costs nothing. `coarse_version` bumps only when a class actually changes. NOT part of
+the state signature, like `terrain_version` — derived bookkeeping; the grid suite proves two routes to
+one world hash the same with versions 2 and 1. `clone` carries the plane. (2) The observation carries
+the plane by value (`map`, a copy-on-write `PackedByteArray`, so the per-tick cost is nothing until
+someone writes), its size, its version, and every machine's logic cell whole-world (`map_machines`),
+since the machine records are window-only. (3) `view/hud/minimap.gd` is legacy's `minimap_frame`,
+`_fit`, `_draw_minimap` and `_rebuild_minimap` on the layout/paint split, with the plan's own
+correction applied: legacy keyed its cached image on `sim.solid.size()`, a count without membership,
+and this keys it on the version — the suite shows a changed byte under the same version is NOT seen,
+which is the contract, and a new version rebuilds. The image is one pixel per logic cell: rock in its
+band's colour off the palette, ore a bright fleck, a dug cell a dim backing, sky void. Overlays this
+build can answer: your machines, the visible window (the frame's view rect), you. `shown`/`large` are
+properties the shell flips (legacy's M); the corner form is the default and on. (4) The inspector stacks
+UNDER the corner map, as legacy stacked it under whatever occupied the column: it takes the map and
+computes its top from the map's frame; `layout` takes the top as an argument.
+
+**Why:** the plan's next view; and the plan's note about the count-keyed cache was written against
+this exact file. A whole-world plane at terrain resolution would be too large to copy per tick and too
+slow to rebuild per dig; at logic resolution, maintained incrementally, it is neither.
+
+**Evidence:** `tests/test_tile_grid.gd` grows to 49 (the ragged edge rounds up; a write off the centre
+changes nothing; rock, ore, wall, void at the centre with the version moving once per change; outside
+reads void; a clone shares nothing; two routes one signature). `tests/test_minimap.gd` 24 (fit by
+width and by height; the corner frame in its box, top-right, height-bound for a deep shaft; the large
+form centred; the texture built once, reused on the same version, blind to a byte change under it,
+rebuilt on a new version; ore and void pixels within an 8-bit step — the first row compared exactly and
+read 242/255 as a failure; a short plane refused; you at the centre, dots at their cells, the view a
+quarter wide; hidden and large; a real observation carrying the plane and every machine, its version
+moving on a centre write; a redraw through the host). `test_inspector` 43 and `test_interface_hub` 20
+unchanged.
+
+**Gaps:** no eye verdict. Legacy's aquifer, power, torch, bazaar, breach, ping and depth-band overlays
+are not here: the first three need whole-world planes the observation does not carry (water's would be
+the same shape as this one when wanted), the rest are dead. The M binding is shell work.

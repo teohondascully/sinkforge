@@ -36,6 +36,23 @@ var _walls: Dictionary = {}   # terrain_cell: Vector2i -> material: StringName
 var terrain_version: int = 0
 var _dig_extent: Dictionary = {}  # col: int -> Vector2i(min_row_ever_dug, max_row_ever_dug)
 
+## THE COARSE PLANE (A' step 6i, D0371): one CLASS byte per LOGIC cell, row-major over
+## `coarse_width x coarse_height`, for the minimap -- void, dug-with-a-wall-behind, rock, or ore. Each
+## logic cell is classed by its CENTRE terrain cell (offset 2,2 of its 4x4), so a write anywhere else in
+## the cell costs nothing and a write at the centre is O(1): the plane is maintained at the three
+## mutators, never rebuilt. `coarse_version` bumps only when a class actually changes, which is what
+## the minimap keys its cached image on -- the plan's own note: a version counter, never a size
+## comparison. NOT part of the state signature: derived bookkeeping, like `terrain_version`.
+const COARSE_VOID: int = 0
+const COARSE_WALL: int = 1
+const COARSE_ROCK: int = 2
+const COARSE_ORE: int = 3
+const COARSE_CENTRE: int = LogicGrid.TERRAIN_PER_LOGIC / 2
+var coarse: PackedByteArray = PackedByteArray()
+var coarse_width: int = 0
+var coarse_height: int = 0
+var coarse_version: int = 0
+
 ## D0261. Two 32-bit XOR lanes carrying `state_signature()` incrementally, so a checkpoint costs nothing
 ## instead of re-serialising the whole grid. MEASURED, not assumed: at 47,603 occupied cells one
 ## signature was a **1,148,776-character string taking 109.55 ms**, and `test_shaft_replay_determinism`
@@ -58,6 +75,37 @@ func _init(p_width: int, p_height: int, p_seed: int) -> void:
 	width = p_width
 	height = p_height
 	seed = p_seed
+	coarse_width = ceili(float(width) / float(LogicGrid.TERRAIN_PER_LOGIC))
+	coarse_height = ceili(float(height) / float(LogicGrid.TERRAIN_PER_LOGIC))
+	coarse.resize(coarse_width * coarse_height)
+
+
+## The class a terrain cell would give its logic cell: what the coarse plane holds at that cell's centre.
+func coarse_class_of(terrain_cell: Vector2i) -> int:
+	var m: StringName = get_material(terrain_cell)
+	if m != &"":
+		return COARSE_ORE if WorldMaterials.is_ore_like(m) else COARSE_ROCK
+	return COARSE_WALL if get_wall(terrain_cell) != &"" else COARSE_VOID
+
+
+func coarse_at(logic_cell: Vector2i) -> int:
+	if logic_cell.x < 0 or logic_cell.y < 0 or logic_cell.x >= coarse_width or logic_cell.y >= coarse_height:
+		return COARSE_VOID
+	return coarse[logic_cell.y * coarse_width + logic_cell.x]
+
+
+## After a write at `terrain_cell`: re-class its logic cell if the write was at the cell's centre.
+func _coarse_refresh(terrain_cell: Vector2i) -> void:
+	var n: int = LogicGrid.TERRAIN_PER_LOGIC
+	if posmod(terrain_cell.x, n) != COARSE_CENTRE or posmod(terrain_cell.y, n) != COARSE_CENTRE:
+		return
+	var i: int = (terrain_cell.y / n) * coarse_width + terrain_cell.x / n
+	if i < 0 or i >= coarse.size():
+		return
+	var cls: int = coarse_class_of(terrain_cell)
+	if coarse[i] != cls:
+		coarse[i] = cls
+		coarse_version += 1
 
 
 func in_bounds(terrain_cell: Vector2i) -> bool:
@@ -71,6 +119,7 @@ func get_material(terrain_cell: Vector2i) -> StringName:
 
 func set_material(terrain_cell: Vector2i, material_id: StringName) -> void:
 	_write_layer(_blocks, terrain_cell, material_id)
+	_coarse_refresh(terrain_cell)
 
 
 func get_wall(terrain_cell: Vector2i) -> StringName:
@@ -84,6 +133,7 @@ func get_wall(terrain_cell: Vector2i) -> StringName:
 ## recomputed one, which is exactly what `_recomputed_signature()` exists to catch.
 func set_wall(terrain_cell: Vector2i, material_id: StringName) -> void:
 	_write_layer(_walls, terrain_cell, material_id)
+	_coarse_refresh(terrain_cell)
 
 
 func is_solid(terrain_cell: Vector2i) -> bool:
@@ -95,6 +145,7 @@ func is_solid(terrain_cell: Vector2i) -> bool:
 func excavate(terrain_cell: Vector2i) -> void:
 	_xor_term(_cell_term(terrain_cell))
 	_blocks.erase(terrain_cell)
+	_coarse_refresh(terrain_cell)
 
 
 ## D0125: `_dig_extent`'s own high/low-water-mark update, per column, and its authority ("what should
@@ -217,6 +268,8 @@ func clone() -> TileGrid:
 	copy._dig_extent = _dig_extent.duplicate()
 	copy._sig_a = _sig_a
 	copy._sig_b = _sig_b
+	copy.coarse = coarse.duplicate()
+	copy.coarse_version = coarse_version
 	return copy
 
 

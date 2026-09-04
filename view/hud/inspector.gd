@@ -46,10 +46,20 @@ const STATUS_LINE: Dictionary = {
 }
 
 var _plate: ArrivalPlate = null
+var _minimap: Minimap = null
 
 
-func _init(plate: ArrivalPlate = null) -> void:
+func _init(plate: ArrivalPlate = null, minimap: Minimap = null) -> void:
 	_plate = plate
+	_minimap = minimap
+
+
+## Where the panel's top sits: under the corner minimap when it is shown, else at the corner register.
+## Legacy stacked this under whatever occupied the top-right column.
+func top_px(frame: Frame) -> float:
+	if _minimap != null and _minimap.shown and not _minimap.large and frame != null and frame.obs != null and frame.obs.map_cells.x > 0:
+		return Minimap.frame_rect(frame.obs.map_cells, false).end.y + UiTheme.px(10.0)
+	return UiTheme.px(TOP)
 
 
 static func _cap(id: StringName) -> String:
@@ -180,9 +190,11 @@ static func fit_text(font: Font, text: String, size: int, max_w: float) -> Strin
 
 
 ## Everything the panel decides. `plate_shown` is the stand-down.
-static func layout(frame: Frame, font: Font, plate_shown: bool = false) -> Dictionary:
+static func layout(frame: Frame, font: Font, plate_shown: bool = false, top: float = -1.0) -> Dictionary:
 	if frame == null or frame.obs == null or font == null or plate_shown:
 		return {}
+	if top < 0.0:
+		top = UiTheme.px(TOP)
 	var info: Dictionary = describe(frame.obs)
 	if info.is_empty():
 		return {}
@@ -203,7 +215,7 @@ static func layout(frame: Frame, font: Font, plate_shown: bool = false) -> Dicti
 		l["text"] = fit_text(font, l["text"], UiTheme.pt(LINE_SIZE), width - pad * 2.0)
 	var has_recipe: bool = not ins.is_empty() or not outs.is_empty()
 	var rows: int = 1 + int(has_recipe) + lines.size() + int(not holding.is_empty())
-	var origin := Vector2(UiTheme.CANVAS.x - width - UiTheme.px(12.0), UiTheme.px(TOP))
+	var origin := Vector2(UiTheme.CANVAS.x - width - UiTheme.px(12.0), top)
 	var rect := Rect2(origin, Vector2(width, UiTheme.px(10.0) + float(rows) * UiTheme.px(LINE_H) + UiTheme.px(4.0)))
 	return {"rect": rect, "name": name, "x0": origin.x + pad, "y0": origin.y + UiTheme.px(20.0),
 		"line_h": UiTheme.px(LINE_H), "in": ins, "out": outs, "has_recipe": has_recipe, "lines": lines,
@@ -212,7 +224,7 @@ static func layout(frame: Frame, font: Font, plate_shown: bool = false) -> Dicti
 
 func paint(frame: Frame, ci: CanvasItem) -> void:
 	var font: Font = ThemeDB.fallback_font
-	var l: Dictionary = layout(frame, font, _plate != null and _plate.on_screen(frame))
+	var l: Dictionary = layout(frame, font, _plate != null and _plate.on_screen(frame), top_px(frame))
 	if l.is_empty():
 		return
 	UiTheme.panel(ci, l["rect"])

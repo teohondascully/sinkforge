@@ -40,7 +40,7 @@ phases — not itself one of the fixed tick phases.
 
 ## Public API
 
-- `TileGrid` (`tile_grid.gd`) — the fine (4px) terrain/digging grid, sparse `Dictionary`-backed. Every
+- `TileGrid` (`tile_grid.gd`) — the fine (4px) terrain/digging grid, sparse `Dictionary`-backed, plus `coarse` (a class byte per logic cell, kept at the mutators for the minimap, D0371). Every
   coordinate is named `terrain_cell: Vector2i` (never a bare `cell`) — `docs/DECISIONS_LEDGER.md` D0020.
   `.get_material()`/`.set_material()`, `.get_wall()`/`.set_wall()` (the background layer, revealed by
   `.excavate()` rather than erased with it), `.is_solid()`, `.in_bounds()`, `.occupied_terrain_cells()`,

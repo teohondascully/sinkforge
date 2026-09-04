@@ -265,6 +265,19 @@ var aim_cell: Vector2i = Vector2i(-1, -1)
 ## world verb uses. The inspector answers nothing out of reach (6h, D0369): a readout on a cell you
 ## cannot act on is an invitation to walk into a wall.
 var aim_in_reach: bool = false
+## THE WHOLE WORLD, COARSELY (A' step 6i, D0371): one class byte per logic cell over `map_cells`, the
+## grid's own coarse plane (`TileGrid.COARSE_*`), copied by value like every other plane -- a
+## PackedByteArray copy is copy-on-write, so the copy costs nothing until someone writes. `map_version`
+## is what the minimap keys its cached image on. `map_machines` is every machine's logic cell, whole
+## world, since the machine records are window-only.
+const MAP_VOID: int = TileGrid.COARSE_VOID
+const MAP_WALL: int = TileGrid.COARSE_WALL
+const MAP_ROCK: int = TileGrid.COARSE_ROCK
+const MAP_ORE: int = TileGrid.COARSE_ORE
+var map: PackedByteArray = PackedByteArray()
+var map_cells: Vector2i = Vector2i.ZERO
+var map_version: int = 0
+var map_machines: Array[Vector2i] = []
 var aim_is_lode: bool = false
 ## --- the line and the medium (A' step 5c, D0360): the body's rope, for the painter, and its footing ---
 var grapple_state: int = 0            # Grapple.State: 0 stowed, 1 flying, 2 anchored

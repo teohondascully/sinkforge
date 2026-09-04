@@ -106,8 +106,8 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 
 
 ## The HUD, in draw order: the depth readout, the hotbar and the PACK FULL chip (6g, D0368), the
-## objective banner and the inspector (6h, D0369/D0370), the lesson bubble, the arrival plate over them,
-## and the legend LAST so a ceremony never draws under it. The legend keeps state --
+## objective banner, the minimap and the inspector under it (6h/6i), the lesson bubble, the arrival plate
+## over them, and the legend LAST so a ceremony never draws under it. The legend keeps state --
 ## which verbs the player has demonstrated -- and removes itself from the picture once it is done.
 static func _mount_hud(view: WorldView) -> void:
 	var plate: ArrivalPlate = ArrivalPlate.new()
@@ -115,8 +115,11 @@ static func _mount_hud(view: WorldView) -> void:
 	view.add_hud().add_chip(Hotbar.paint)
 	view.add_hud().add_chip(Hotbar.paint_pack_full)
 	view.add_hud().add_stateful_chip(ObjectiveLine.new(), &"paint")
-	# The inspector and the bubble consult the plate: both stand down while it is on screen (D0369, D0370).
-	view.add_hud().add_stateful_chip(Inspector.new(plate), &"paint")
+	var minimap: Minimap = Minimap.new()
+	view.add_hud().add_stateful_chip(minimap, &"paint")
+	# The inspector and the bubble consult the plate: both stand down while it is on screen (D0369, D0370);
+	# the inspector also stacks under the corner map (6i, D0371).
+	view.add_hud().add_stateful_chip(Inspector.new(plate, minimap), &"paint")
 	view.add_hud().add_stateful_chip(HintBubble.new(plate), &"paint")
 	view.add_hud().add_stateful_chip(plate, &"paint")
 	view.add_hud().add_stateful_chip(KeyLegend.new(), &"paint")
