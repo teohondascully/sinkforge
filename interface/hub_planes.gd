@@ -39,7 +39,7 @@ static func _fill_terrain_planes(o: RefCounted, world: World, w: Rect2i) -> void
 				"amount": world.deposits.ore_deposit_at(world.grid, terrain_cell),
 				"permille": world.deposits.lode_permille(terrain_cell)}
 	o.ore_yield = {}
-	for terrain_cell: Vector2i in Ordering.cells(world.deposits.deposits):
+	for terrain_cell: Vector2i in world.deposits.deposits:
 		if w.has_point(terrain_cell) and not o.lodes.has(terrain_cell) and world.grid.is_solid(terrain_cell):
 			o.ore_yield[terrain_cell] = int(world.deposits.deposits[terrain_cell])
 	o.ore_like_legend = PackedByteArray()
@@ -52,7 +52,7 @@ static func _fill_metre_planes(o: RefCounted, world: World, items: Items, machin
 	var lw: Rect2i = o.logic_window
 	o.placed = {}
 	o.conduit_tiers = {}
-	for cell: Vector2i in Ordering.cells(world.logic.placed):
+	for cell: Vector2i in world.logic.placed:
 		if lw.has_point(cell):
 			o.placed[cell] = world.logic.placed[cell]
 			if world.logic.has_conduit(cell):
@@ -67,7 +67,7 @@ static func _fill_metre_planes(o: RefCounted, world: World, items: Items, machin
 			records.append(_machine_record(m, world, machines))
 	o.machines = records
 	o.power = {}
-	for cell: Vector2i in Ordering.cells(machines.power):
+	for cell: Vector2i in machines.power:
 		if lw.has_point(cell):
 			o.power[cell] = machines.power[cell]
 	o.piles = {}

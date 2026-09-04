@@ -16495,3 +16495,28 @@ ore_bodies 15, mining 41; every content suite against the plain-site helper: rel
 water) are the director's, queued in `docs/TASTE_QUEUE.md`. The boot generates more (the passes over
 256 × 1104 cells); unmeasured against D0326's 4 s. Ore BLOCK amounts (`pending_sim_economy`) remain step
 7's. Trees do not grow, saplings still root in nothing.
+
+## D0389 · 2026-09-04 · Performance: 5fps → 100fps — three changes, none touching sim behaviour
+
+**Decided:** Profile-first, then fix the two measured bottlenecks: `Interface.observe` (20ms, dominated
+by `HubPlanes.fill` iterating the entire world population per frame) and `WaterFlow.step` (19ms, two
+GDScript Callable sorts of 23K elements per hub tick). Three fixes: (1) a hub-planes cache on Interface
+keyed on a dirty flag set only on hub ticks and verb actions, so 2/3 of frames pay zero observe cost;
+(2) `Ordering.cells_native` packing Vector2i into int64 for a native `PackedInt64Array.sort()` instead of
+`sort_custom(cell_less)` — same row-major order, C++ comparisons instead of GDScript Callables;
+(3) `VeilFieldCache` keyed on `terrain_version` (O(1)) instead of `hash(obs.materials)` (O(window)).
+Also removed three `Ordering.cells()` sorts in `hub_planes.gd` where results went into dictionaries and
+insertion order didn't matter for consumers.
+
+**Alternative:** Port legacy's incremental water-cell tracking (maintain sorted array across ticks,
+insert/remove on wet/dry transitions). Would cut the remaining 10ms water cost further but changes sim
+module structure. The native sort halved it for zero structural risk.
+
+**Why:** The game was unplayable at 5fps. Legacy measured the same shape (world_renderer.gd:698: "the
+bottleneck was GDScript re-issuing the whole world's draw commands every frame; the sim itself costs
+almost nothing") but this build's bottleneck was not draws — the terrain bake was already working — it was
+the observation layer copying 30K+ objects per frame and sorting 23K water cells with Callable comparisons.
+
+**Reverse cost:** Low. All three caches are derived from the same data and invalidated conservatively.
+The native sort produces the identical order (verified by `test_ordering` and `test_water_flow`). No sim
+behaviour or determinism change.

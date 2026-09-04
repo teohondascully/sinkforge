@@ -106,6 +106,9 @@ var _tick: int = 0
 ## per Interface, not per Observation, because an Observation is built and thrown away every frame and a
 ## cache that died with its consumer would never hit.
 var _cache: WindowCache = WindowCache.new()
+var _hub_dirty: bool = true
+var _hub_window: Rect2i = Rect2i()
+var _hub_snapshot: Dictionary = {}
 
 
 ## Constructed around a grid, a body and a mining verb the caller owns, as before; a full session hands
@@ -154,12 +157,13 @@ func observe(envelope: Envelope) -> Observation:
 	o.map = _world.grid.coarse
 	o.map_cells = Vector2i(_world.grid.coarse_width, _world.grid.coarse_height)
 	o.map_version = _world.grid.coarse_version
+	o.terrain_version = _world.grid.terrain_version
 	o.map_machines = _machines.machine_logic_cells() if _machines != null else []
 	o.world_seed = _world.grid.seed
 	o.cell_px = Heightfield.TERRAIN_CELL_PX
 	_fill_window(o, envelope)
 	_fill_mining(o)
-	HubPlanes.fill(o, _world, _items, _machines)
+	_fill_hub(o)
 	o.hub_tick = _tick / HubTick.HUB_TICK_DIVISOR
 	o.pack_selected = _verbs.selected
 	o.winch_armed = _verbs.pending_winch_head
@@ -173,7 +177,7 @@ func observe(envelope: Envelope) -> Observation:
 	AimPlanes.fill(o, _verbs, _world, _machines)
 	_fill_line(o)
 	o.flow_events = _events.duplicate(true)
-	_events.clear()   # the consumed channel: not sim state, and the one thing observe empties
+	_events.clear()
 	return o
 
 
@@ -260,6 +264,38 @@ func _surface_over(window: Rect2i) -> PackedInt32Array:
 	return out
 
 
+func _fill_hub(o: Observation) -> void:
+	if not _hub_dirty and o.window == _hub_window and not _hub_snapshot.is_empty():
+		_restore_hub(o)
+		return
+	HubPlanes.fill(o, _world, _items, _machines)
+	_store_hub(o)
+	_hub_dirty = false
+	_hub_window = o.window
+
+
+func _store_hub(o: Observation) -> void:
+	_hub_snapshot = {"logic_window": o.logic_window, "water": o.water, "wet_cells": o.wet_cells,
+		"lodes": o.lodes, "ore_yield": o.ore_yield, "ore_like_legend": o.ore_like_legend,
+		"placed": o.placed, "conduit_tiers": o.conduit_tiers, "saplings": o.saplings,
+		"machines": o.machines, "power": o.power, "piles": o.piles,
+		"ore_default": o.ore_default, "pack": o.pack, "pack_bulk": o.pack_bulk,
+		"pack_bulk_cap": o.pack_bulk_cap, "pack_slots": o.pack_slots,
+		"sink": o.sink, "winch_routes": o.winch_routes, "winch_transit": o.winch_transit}
+
+
+func _restore_hub(o: Observation) -> void:
+	var s: Dictionary = _hub_snapshot
+	o.logic_window = s["logic_window"]
+	o.water = s["water"]; o.wet_cells = s["wet_cells"]
+	o.lodes = s["lodes"]; o.ore_yield = s["ore_yield"]; o.ore_like_legend = s["ore_like_legend"]
+	o.placed = s["placed"]; o.conduit_tiers = s["conduit_tiers"]; o.saplings = s["saplings"]
+	o.machines = s["machines"]; o.power = s["power"]; o.piles = s["piles"]
+	o.ore_default = s["ore_default"]; o.pack = s["pack"]; o.pack_bulk = s["pack_bulk"]
+	o.pack_bulk_cap = s["pack_bulk_cap"]; o.pack_slots = s["pack_slots"]
+	o.sink = s["sink"]; o.winch_routes = s["winch_routes"]; o.winch_transit = s["winch_transit"]
+
+
 ## The only mutator. Every rejection is a named reason, and a rejected command changes nothing at all --
 ## no partial application, no tick advance.
 func apply(command: Command) -> Result:
@@ -270,20 +306,27 @@ func apply(command: Command) -> Result:
 			_verbs.tick()
 			var building: bool = _verbs.selected_machine_def() != null or _verbs.selected_build_material() != &""
 			_hold.step(command.input, _world, _items, _mining, _plan, _lode, _body, building)
-			HubTick.advance(_tick, _world, _items, _machines, _rates)   # every third body tick (D0345)
+			if HubTick.advance(_tick, _world, _items, _machines, _rates):
+				_hub_dirty = true
 			_drain_events()
 			return Result.accepted()
 		Command.Kind.MINE:
+			_hub_dirty = true
 			return _apply_mine(command.cell)
 		Command.Kind.BUILD:
+			_hub_dirty = true
 			return _outcome(_verbs.build(command.cell))
 		Command.Kind.DROP:
+			_hub_dirty = true
 			return _outcome(&"dropped" if _verbs.drop() > 0 else &"")
 		Command.Kind.COLLECT:
+			_hub_dirty = true
 			return _outcome(&"collected" if _verbs.collect() > 0 else &"")
 		Command.Kind.CONFIGURE:
+			_hub_dirty = true
 			return _outcome(StringName(_verbs.configure(command.cell)))
 		Command.Kind.LINK_WINCH:
+			_hub_dirty = true
 			return _outcome(_verbs.link_winch(command.cell))
 		Command.Kind.SELECT:
 			if command.index < 0 or command.index >= Pack.inventory_slots():
@@ -319,6 +362,7 @@ func services() -> Dictionary:
 func reset_transients() -> void:
 	_events.clear()
 	_hold = MineHold.new()
+	_hub_dirty = true
 
 
 ## Validation lives HERE rather than in `sim/mining`, per `sim/commands/MODULE.md` ("validation and

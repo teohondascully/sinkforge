@@ -26,11 +26,7 @@ static func step(water: WaterPlane, grid: TileGrid) -> void:
 		return
 	# --- 1. Gravity: a snapshot of the current levels, then every wet cell tries to fall. ---
 	var snap: Dictionary = water.levels.duplicate()
-	# Deterministic scan order over the wet cells (top-to-bottom, then left-to-right).
-	var wet: Array[Vector2i] = []
-	for cv: Variant in snap:
-		wet.append(cv)
-	wet.sort_custom(_cell_less)
+	var wet: Array[Vector2i] = Ordering.cells_native(snap)
 	for c: Vector2i in wet:
 		var level: int = water.water_at(c)                        # read live (a higher cell may have topped it up)
 		if level <= 0:
@@ -47,10 +43,7 @@ static func step(water: WaterPlane, grid: TileGrid) -> void:
 	# --- 2. Lateral settle: even-fill each maximal horizontal open run holding water. ---
 	# A snapshot of levels after gravity, then process runs left-to-right, top-to-bottom, each once.
 	snap = water.levels.duplicate()
-	wet.clear()
-	for cv2: Variant in snap:
-		wet.append(cv2)
-	wet.sort_custom(_cell_less)
+	wet = Ordering.cells_native(snap)
 	var done: Dictionary = {}                                 # cells already levelled as part of a run
 	for c: Vector2i in wet:
 		if done.has(c):

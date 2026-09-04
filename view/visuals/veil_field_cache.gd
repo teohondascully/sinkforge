@@ -27,18 +27,17 @@ extends RefCounted
 
 var _field: PackedFloat32Array = PackedFloat32Array()
 var _rect: Rect2i = Rect2i()
-var _hash: int = 0
+var _version: int = -1
 var _valid: bool = false
 
 
 ## The field for this observation's window, from the cache when nothing that feeds it has changed.
 ## `build` is called as `build.call(obs, rect) -> PackedFloat32Array` on a miss.
 func field_for(obs: Interface.Observation, build: Callable) -> PackedFloat32Array:
-	var h: int = hash(obs.materials)
-	if _valid and _rect == obs.window and _hash == h:
+	if _valid and _rect == obs.window and _version == obs.terrain_version:
 		return _field
 	_field = build.call(obs, obs.window)
 	_rect = obs.window
-	_hash = h
+	_version = obs.terrain_version
 	_valid = true
 	return _field

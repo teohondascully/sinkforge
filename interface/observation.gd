@@ -280,6 +280,7 @@ const MAP_ORE: int = TileGrid.COARSE_ORE
 var map: PackedByteArray = PackedByteArray()
 var map_cells: Vector2i = Vector2i.ZERO
 var map_version: int = 0
+var terrain_version: int = 0
 var map_machines: Array[Vector2i] = []
 var aim_is_lode: bool = false
 ## The aim's affordances (6m, D0376), from the verbs' own predicates (`AimPlanes.fill`): what is held,

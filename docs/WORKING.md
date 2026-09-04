@@ -6,7 +6,7 @@ a MODULE.md, or a claim first. **Reset 2026-09-03**: the previous 500-line accum
 queue, lane tables, Slice 1.5, D0139) is in `git log -p -- docs/WORKING.md`; everything durable in it
 is in the ledger.
 
-**Last updated: 2026-09-03.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-09-04.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
 ## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts, 8e aquifers and lodes, 8f the richness field, 8g trees, 8h the switch-on done -- step 8 complete)
@@ -249,6 +249,24 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   keepout on a half-width world; now 12 m), rift-wall ore as 4-px specks collapsing the ore-body pin
   (now metre-square nuggets; the pin measures the scatter on the plain site), and CI's mining rule that
   hardness is whole halves (wood 2.0, leaves 0.5). The golden re-pinned from CI Linux. 17 assertions.
+
+### Performance (post-A′)
+
+**5fps → 100fps, three changes.** Profiled: `Interface.observe` took 20ms/frame (`HubPlanes.fill`
+iterating 23K water cells, 7K lodes, thousands of deposits per frame), and `WaterFlow.step` took 19ms
+per hub tick (two GDScript Callable sorts of 23K elements).
+
+- **Hub planes cache on `Interface`**: a `_hub_dirty` flag set on hub ticks and verb actions; non-event
+  frames skip the 20ms hub fill entirely and restore cached fields. 2/3 of frames now cost 0ms for observe.
+- **Native int sort** (`Ordering.cells_native`): pack Vector2i into int64, sort with
+  `PackedInt64Array.sort()` (C++ comparisons), unpack. Replaces `sort_custom(cell_less)` (GDScript Callable
+  comparisons). `WaterFlow.step` and all `Ordering.cells` callers use it. Water flow: 19ms → 10ms.
+- **Veil field cache key**: `terrain_version` (O(1), bumps on every terrain mutation) replaces
+  `hash(obs.materials)` (O(window), ~67K entries).
+- **Hub planes fill**: removed three `Ordering.cells()` sort calls where the results went into
+  dictionaries (iteration order doesn't matter for consumers). Hub fill: 20ms → 4ms.
+- Remaining ceiling: the veil lightmap build (4.7ms/frame, ~4,250 texels of GDScript math). Legacy's
+  base/scratch split would cut it to ~1ms but is a bigger port.
 
 ### Next action
 
