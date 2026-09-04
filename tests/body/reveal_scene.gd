@@ -76,7 +76,7 @@ var _score: Score = null
 var _particles: Particles = Particles.new()  ## D0216: chips on a break, a draught on a breach
 var _falling: FallingItems = FallingItems.new()  ## 6e, D0365: the cosmetic drops off the flow channel
 var _payouts: Payouts = Payouts.new()  ## 6d, D0365: the "+N" tick when the pack gains
-var _audio: RevealAudio = null  ## D0296 voices + the beds (6f, D0366); tests/body/reveal_audio.gd
+var _audio: SceneAudio = null  ## D0296 voices + the beds (6f, D0366); view/audio/scene_audio.gd
 var _mine_down: bool = false  ## `--mine-down`: agent mode sinks a shaft instead of walking to glimmer
 var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the reticle from
 var _spawn_row: int = 0  ## the row the body started on -- `--mine-down`'s descent is measured against it
@@ -132,16 +132,16 @@ func _ready() -> void:
 	# Seeded here rather than in `particles.gd`, because the file is a verbatim lift and `randf` is where
 	# legacy put it. What was missing was not a different RNG; it was anyone deciding where it starts.
 	seed(hash(_seed_value))
-	_audio = RevealAudio.new()
+	_audio = SceneAudio.new()
 	add_child(_audio)
 	_audio.setup(_seed_value)
 	get_tree().root.title = "Sinkforge -- reveal (%s, %s mode)" % [site_id, "play" if _play_mode else "agent"]
 
 
-## The render stack lives in `tests/body/reveal_view_setup.gd` (D0276), which carries the painter order
+## The render stack lives in `view/view_stack.gd` (D0276), which carries the painter order
 ## and why it is the picture. This scene keeps only the call, because WHEN to build it is scene work.
 func _build_view() -> void:
-	_sky_view = RevealViewSetup.build(self, Interface.new(_grid, _body, _mining), _look, _camera, _sky,
+	_sky_view = ViewStack.build(self, Interface.new(_grid, _body, _mining), _look, _camera, _sky,
 		_falling, _payouts)
 
 
@@ -358,8 +358,8 @@ func _draw() -> void:
 	# The band-tinted backdrop moved to `view/visuals/backdrop_painter.gd` (D0276) -- it is the bottom of
 	# the painter stack now, not a fill in this node's own draw call. It covered the terrain painter the
 	# moment terrain moved, which is D0244's finding one layer down; the painter's header carries it.
-	RevealBodyDraw.draw(self, _body, _last_input, _tick_count,
-		_sky_view.current_frame() if _sky_view != null else null, COLOR_BODY, COLOR_BODY_GROUNDED)
+	MinerDraw.draw(self, _sky_view.current_frame() if _sky_view != null else null, _tick_count,
+		COLOR_BODY, COLOR_BODY_GROUNDED)
 	# Drawn last so the reach ring and reticle sit over the terrain and the body rather than under them.
 	MiningOverlay.draw(self, _grid, _mining, _body.pos_x, _body.pos_y,
 		_last_input.has_aim, Vector2i(_last_input.aim_col, _last_input.aim_row))

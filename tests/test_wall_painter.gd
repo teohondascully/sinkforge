@@ -266,10 +266,10 @@ func _test_an_incomplete_frame_paints_nothing() -> void:
 ## the sky. Getting it the other way round draws the whole world flat and passes every other row here,
 ## which is exactly how the empty-world bug got through 48 green suites.
 func _test_the_wall_sits_between_the_sky_and_the_terrain() -> void:
-	_check(RevealViewSetup.SKY_Z < RevealViewSetup.WALL_Z,
-		"the wall is in front of the sky (%d > %d)" % [RevealViewSetup.WALL_Z, RevealViewSetup.SKY_Z])
-	_check(RevealViewSetup.WALL_Z < RevealViewSetup.TERRAIN_Z,
+	_check(ViewStack.SKY_Z < ViewStack.WALL_Z,
+		"the wall is in front of the sky (%d > %d)" % [ViewStack.WALL_Z, ViewStack.SKY_Z])
+	_check(ViewStack.WALL_Z < ViewStack.TERRAIN_Z,
 		"and behind the terrain (%d < %d) -- a wall drawn over the rock is a hole in the world"
-		% [RevealViewSetup.WALL_Z, RevealViewSetup.TERRAIN_Z])
-	_check(RevealViewSetup.BACKDROP_Z < RevealViewSetup.WALL_Z,
-		"and the backdrop is still below both (%d)" % RevealViewSetup.BACKDROP_Z)
+		% [ViewStack.WALL_Z, ViewStack.TERRAIN_Z])
+	_check(ViewStack.BACKDROP_Z < ViewStack.WALL_Z,
+		"and the backdrop is still below both (%d)" % ViewStack.BACKDROP_Z)

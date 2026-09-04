@@ -1,4 +1,4 @@
-class_name RevealAudio
+class_name SceneAudio
 extends Node
 
 ## THE AUDIO RIG of the play scene (A' step 6f, D0366): the one-shot voice pool, the ten beds and the

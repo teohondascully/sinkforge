@@ -412,6 +412,7 @@ jobs:
       #   test_surface_tone.gd                           test_surface_tone (the ground is ground: humus darker under the cap and ramped in, the subsoil warming to ochre, the profile gone at ten metres and absent in a hole column, roots in a share of columns, moss on shallow exposed tops and none at twenty metres, tufts under lips, the walked surface read back and band-gated, clay's cap and hardrock's none, one in five roots and one in three blades, seed-determinism, the painter's cell fill taking the cap -- A' step 6o, D0378)
       #   test_haze_painter.gd                           test_haze_painter (the heat haze: only a working forge or burner convects, the plume's geometry and vertex-alpha mask, the shader on the deterministic clock and never TIME, the painter feeding the clock into its layer's material on a real view -- A' step 6p, D0379)
       #   test_gram_map.gd                               test_gram_map (the grammar map the rock tooth samples: a byte per cell at the world's size, fills writing each material's grammar and 0 for air, one texture updated in place through a refill after a dig, the tooth shader additive and direction-aware with the grammar sampler, add_tooth declining without a bake -- A' step 6p, D0379)
+      #   test_main_boot.gd                              test_main_boot (the game boots: the project names the shell's scene, it instantiates as Main, a headless boot builds the door and the view with its HUD handles on the tutorial start and ticks, a session captures the body and the hints' lessons and restores; the hands' edges and aim, the verbs on their edges at the aimed metre, a digit selecting once, the HUD bridge's snapshot and payloads -- A' step 6q, D0380)
       #   test_world_materials.gd                        test_world_materials
       #   test_value_noise.gd                            test_value_noise
       #   test_cave_passes.gd                            test_cave_passes (big caverns + tunnel worms, P021's unported passes — D0291)
@@ -478,7 +479,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 114 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 115 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -534,6 +535,7 @@ jobs:
             res://tests/test_surface_tone.gd \
             res://tests/test_haze_painter.gd \
             res://tests/test_gram_map.gd \
+            res://tests/test_main_boot.gd \
             res://tests/test_world_materials.gd \
             res://tests/test_value_noise.gd \
             res://tests/test_cave_passes.gd \

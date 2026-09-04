@@ -3,7 +3,7 @@ extends RefCounted
 
 ## THE SHUTTER. Lifted out of `tests/body/reveal_scene.gd` (D0296) when that file passed its 400-line cap
 ## for the second time — the fifth seam taken out of it, after `RevealArgs`, `RevealRecording`,
-## `RevealTerrainDraw` and `RevealViewSetup`, and taken for the same reason each time: the scene
+## `RevealTerrainDraw` and `ViewStack`, and taken for the same reason each time: the scene
 ## ORCHESTRATES, and this is one self-contained job it happened to be holding.
 ##
 ## `docs/QUALITY.md` §2 records what happens when a cap is met by trimming instead: `sim/body/body.gd`

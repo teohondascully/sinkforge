@@ -1,4 +1,4 @@
-class_name RevealViewSetup
+class_name ViewStack
 extends RefCounted
 
 ## THE RENDER STACK'S COMPOSITION, lifted out of `tests/body/reveal_scene.gd` (D0276). The fourth seam
@@ -62,13 +62,32 @@ const ROPE_Z: int = -10   ## the line and the placed ropes, under the body the s
 const PAYOUT_Z: int = 30  ## the "+N" ticks: over the body they rise from and over the scene's own particles (6d, D0365)
 
 
+## THE HANDLES A SHELL NEEDS (6q, D0380): the HUD chips that keep state or take input. A debug scene keeps
+## only the view; a real session feeds the settings page its snapshot, toggles the map, and saves the
+## lessons the hints have taught. Filled by `build_stack`; empty on a bare `ViewStack.new()`.
+var view: WorldView = null
+var settings: SettingsPage = null
+var minimap: Minimap = null
+var hints: Hints = null
+var objectives: Objectives = null
+var legend: KeyLegend = null
+
+
 ## Builds the coordinator, attaches it to `scene`, and hangs every painter and the HUD off it.
 ##
 ## Returns the `WorldView` rather than storing it: the scene owns the reference, because the scene is
 ## what calls `refresh()` on the tick it decides to render.
 static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: Camera2D,
 		sky: bool, falling: FallingItems = null, payouts: Payouts = null) -> WorldView:
+	return build_stack(scene, iface, look, camera, sky, falling, payouts).view
+
+
+## The same build, returning the stack with its handles.
+static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, camera: Camera2D,
+		sky: bool, falling: FallingItems = null, payouts: Payouts = null) -> ViewStack:
+	var stack: ViewStack = ViewStack.new()
 	var view: WorldView = WorldView.new()
+	stack.view = view
 	scene.add_child(view)
 	view.setup(iface, look, camera)
 	# `--sky` REPLACES the backdrop rather than layering over it (D0244): the fill is opaque and would
@@ -112,31 +131,40 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 	# so the world is graded and the readouts stay crisp -- ordering enforced by the CanvasLayer indices,
 	# which `tests/test_post_fx.gd` asserts against each other rather than trusting this call order.
 	view.add_post_fx()
-	_mount_hud(view)
-	return view
+	_mount_hud(view, stack)
+	return stack
 
 
 ## The HUD, in draw order: the depth readout, the hotbar and the PACK FULL chip (6g, D0368), the
 ## objective banner, the minimap and the inspector under it (6h/6i), the lesson bubble, the arrival plate
 ## over them, the legend, and the settings page (closed) over all of it so a ceremony never draws under it. The legend keeps state --
 ## which verbs the player has demonstrated -- and removes itself from the picture once it is done.
-static func _mount_hud(view: WorldView) -> void:
+static func _mount_hud(view: WorldView, stack: ViewStack) -> void:
 	var plate: ArrivalPlate = ArrivalPlate.new()
 	view.add_hud().add_chip(DepthChip.paint)
 	view.add_hud().add_chip(Hotbar.paint)
 	view.add_hud().add_chip(Hotbar.paint_pack_full)
-	view.add_hud().add_stateful_chip(ObjectiveLine.new(), &"paint")
+	var line: ObjectiveLine = ObjectiveLine.new()
+	view.add_hud().add_stateful_chip(line, &"paint")
 	var minimap: Minimap = Minimap.new()
 	view.add_hud().add_stateful_chip(minimap, &"paint")
 	# The inspector and the bubble consult the plate: both stand down while it is on screen (D0369, D0370);
 	# the inspector also stacks under the corner map (6i, D0371).
 	view.add_hud().add_stateful_chip(Inspector.new(plate, minimap), &"paint")
-	view.add_hud().add_stateful_chip(HintBubble.new(plate), &"paint")
+	var bubble: HintBubble = HintBubble.new(plate)
+	view.add_hud().add_stateful_chip(bubble, &"paint")
 	view.add_hud().add_stateful_chip(plate, &"paint")
-	view.add_hud().add_stateful_chip(KeyLegend.new(), &"paint")
+	var legend: KeyLegend = KeyLegend.new()
+	view.add_hud().add_stateful_chip(legend, &"paint")
 	# The settings page is a modal over everything, the legend included, mounted CLOSED: opening it and
-	# feeding it the shell's snapshot is the shell's work (6j, D0372).
-	view.add_hud().add_stateful_chip(SettingsPage.new(), &"paint")
+	# feeding it the shell's snapshot is the shell's work (6j, D0372; the shell does it since 6q, D0380).
+	var settings: SettingsPage = SettingsPage.new()
+	view.add_hud().add_stateful_chip(settings, &"paint")
+	stack.settings = settings
+	stack.minimap = minimap
+	stack.hints = bubble.hints
+	stack.objectives = line.objectives
+	stack.legend = legend
 
 
 ## THE VEIL IS A MULTIPLY PASS OVER A STRETCHED LIGHTMAP (D0336), which is two properties on its layer and

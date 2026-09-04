@@ -160,13 +160,13 @@ func _test_an_incomplete_frame_paints_nothing() -> void:
 ## above terrain — only the stack's own declared depths — but it pins the exact relationship that broke,
 ## and it fails loudly if someone raises the backdrop or lowers the terrain.
 func _test_the_backdrop_is_the_lowest_thing_drawn() -> void:
-	_check(RevealViewSetup.BACKDROP_Z < RevealViewSetup.SKY_Z,
-		"the backdrop sits below the sky (%d < %d)" % [RevealViewSetup.BACKDROP_Z, RevealViewSetup.SKY_Z])
-	_check(RevealViewSetup.SKY_Z < RevealViewSetup.TERRAIN_Z,
-		"the sky sits below the terrain (%d < %d)" % [RevealViewSetup.SKY_Z, RevealViewSetup.TERRAIN_Z])
-	_check(RevealViewSetup.TERRAIN_Z < 0,
+	_check(ViewStack.BACKDROP_Z < ViewStack.SKY_Z,
+		"the backdrop sits below the sky (%d < %d)" % [ViewStack.BACKDROP_Z, ViewStack.SKY_Z])
+	_check(ViewStack.SKY_Z < ViewStack.TERRAIN_Z,
+		"the sky sits below the terrain (%d < %d)" % [ViewStack.SKY_Z, ViewStack.TERRAIN_Z])
+	_check(ViewStack.TERRAIN_Z < 0,
 		"and the terrain sits below the scene's own draw at z 0 (%d) -- the body, the mining overlay and "
-		% RevealViewSetup.TERRAIN_Z + "the particles all draw there and must be in FRONT of the ground")
+		% ViewStack.TERRAIN_Z + "the particles all draw there and must be in FRONT of the ground")
 	# The tint is the part of the backdrop that can be silently wrong: a band lookup off by a row reads as
 	# a slightly different grey nobody would question. Asserted as a real lerp toward the band rather than
 	# as a literal colour, and against a control at a different depth.

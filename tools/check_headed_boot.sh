@@ -114,6 +114,20 @@ fi
 
 [ -s "$shot" ] || bad "--play headed run wrote no screenshot, so nothing shows a frame was ever drawn"
 
+# --- C. the game itself: `godot --path .` runs the shell's main scene (A' step 6q, D0380). No scene argument,
+# so this is exactly what a player's double-click does; `--quit-after` makes it terminate and say how far
+# it ticked, and a seat that never ticked (a boot that threw, a start that refused) does not say it.
+BOOT_LINE="SINKFORGE_BOOT"
+out_c="$("$GODOT_BIN" --path . -- --quit-after=30 2>&1)"
+rc_c=$?
+[ "$rc_c" -ne 0 ] && { bad "the main scene exited $rc_c"; printf '%s\n' "$out_c" | tail -15 >&2; }
+if printf '%s\n' "$out_c" | grep -qF "$BOOT_LINE ticked=30"; then
+	note "PASS  C: godot --path . boots the shell's seat and ticks thirty times"
+else
+	bad "the main scene never printed \"$BOOT_LINE ticked=30\" -- the game did not run to its thirtieth tick"
+	printf '%s\n' "$out_c" | tail -15 >&2
+fi
+
 colours="$(printf '%s\n' "$out_b" | sed -n 's/.*capture has \([0-9]*\) distinct colours.*/\1/p' | tail -1)"
 if [ -z "$colours" ]; then
 	bad "could not read a distinct-colour count out of the run -- the scene's own blankness instrument (D0189) is what this check rests on, and it did not report. Refusing to call the frame non-blank on the strength of the file merely existing."

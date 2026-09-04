@@ -23,11 +23,10 @@ config_version=5
 
 config/name="Sinkforge"
 config/description="A factory game with a persistent underground shaft and an idle game's progression curve. The player bores a shaft from a permanent surface rig, builds extraction and routing infrastructure inside it, and hauls refined material back up to satisfy demands waiting at the rig. There is no reset: the shaft is the same shaft, deeper and more built-out than it was an hour ago. (docs/GDD.md §1; corrected 2026-08-29, queue #3 Part M2 -- this string still described the retired run-based roguelite pivot.)"
-; No main_scene: the pre-pivot entry point (res://scenes/main.tscn) moved to legacy/scenes/main.tscn,
-; which is excluded from the build path on purpose (docs/ARCHITECTURE.md, docs/ONBOARDING.md Task 0.2) —
-; pointing this at legacy content would contradict that exclusion. There is no new entry point yet;
-; view/ and shell/ are empty skeletons until docs/ONBOARDING.md stage 11. Set this once shell/ exists.
-; The old game remains runnable by checking out the `pre-pivot` git tag.
+; The entry point is the shell's main scene (A' step 6q, D0380): `godot --path .` runs the game. The
+; pre-pivot entry point (res://scenes/main.tscn) moved to legacy/scenes/main.tscn, excluded from the
+; build path on purpose (docs/ARCHITECTURE.md); the old game remains runnable at the `pre-pivot` tag.
+run/main_scene="res://shell/main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 
 [display]

@@ -2,7 +2,7 @@ class_name RevealCamera
 extends RefCounted
 
 ## THE CAMERA AND ITS BOUNDS, lifted out of `tests/body/reveal_scene.gd` (D0333). The sixth seam taken out
-## of that file after `RevealArgs`, `RevealRecording`, `RevealTerrainDraw`, `RevealViewSetup` and
+## of that file after `RevealArgs`, `RevealRecording`, `RevealTerrainDraw`, `ViewStack` and
 ## `RevealShutter`, and taken for the same reason each time: the scene SEQUENCES a boot, while this
 ## decides one thing about framing. `_ready` had reached 53 lines against a 50 cap and the file 402
 ## against 400; `docs/QUALITY.md` §2 records what happens when that is met by trimming instead of

@@ -11366,7 +11366,7 @@ it from a different direction.
 
 **The remedy is structural, not a z-index nudge.** The backdrop became `view/visuals/backdrop_painter.gd`
 at the bottom of one ordered stack. "What is behind what" is now answerable by reading one list
-(`tests/body/reveal_view_setup.gd`) instead of by cross-referencing a painter's `z_index` against another
+(`view/view_stack.gd`) instead of by cross-referencing a painter's `z_index` against another
 node's draw call. And the ordering is now an ASSERTION — `BACKDROP_Z < SKY_Z < TERRAIN_Z < 0` — which
 would have failed on the broken commit. It cannot see a NEW opaque painter added above terrain; it pins
 the exact relationship that broke. That limit is stated in the test rather than left implied.
@@ -11378,7 +11378,7 @@ nothing. All three now reference the painter that draws it.
 
 **`reveal_scene.gd` hit exactly 400 and I split rather than trimmed.** `docs/QUALITY.md` §2 records what
 the alternative looks like: `sim/body/body.gd` sat at exactly 400 for three commits running because it was
-shaved to fit. `RevealViewSetup` is the fourth seam out of that file, and it is a real one — the scene
+shaved to fit. `ViewStack` is the fourth seam out of that file, and it is a real one — the scene
 orchestrates argv, ticks, recording and quitting; this decides which painters exist and in what order.
 389 lines now, with the painter order and its reasoning in the file that owns it.
 
@@ -12951,7 +12951,7 @@ READOUT, not scenery, and a readout the veil can dim is a readout that stops wor
 the game is played.
 
 **THREE STALE COMMENTS CORRECTED WHILE HERE, all of the same kind — prose shipped beside code that
-refutes it** (`[[superseded-draft-above-its-amendment]]`). `reveal_view_setup.gd` said *"There is no veil
+refutes it** (`[[superseded-draft-above-its-amendment]]`). `view_stack.gd` said *"There is no veil
 here yet (T1 #2)"* in a block that adds the veil, and said it twice in one paragraph, which is the tell.
 Its layer map omitted the veil, the glint and the seam. `material_look.gd` said *"This build has no veil,
 so the boost would not be compensating for anything — it comes back WITH the veil, not before it"* — the
@@ -15402,7 +15402,7 @@ points of four flights against it). Landings are merged BY CELL, keyed by the lo
 to, carrying the deepest fall of the group, and `take_landings()` CONSUMES them: two readers cannot
 both fire the same landing. (2) THE SCENE OWNS THE LAYER. It is painted by the view and read by the
 scene (one `pop` per landed cell into the particle layer, as legacy's `MainView` did), so the one
-instance has to be in both hands: `RevealViewSetup.build` takes it as an argument and mounts it at
+instance has to be in both hands: `ViewStack.build` takes it as an argument and mounts it at
 `FALLING_Z = -25`, over the machines the drops leave and under the rope and the body. (3)
 `view/fx/payouts.gd` reads GAINS OFF THE PACK: a payout is a rise in an item's count between two
 observations, banked at `o.hand`. Legacy's `MainView` emitted gains from each verb; here nothing is
@@ -15456,7 +15456,7 @@ dig; a pour is a wet cell over an open unfull cell, the water drips' rule; the h
 rule, a length delta per tick against the reel rate, paying out is not a haul, and the memory resets
 when the line is stowed. Six constants join the observation for the same layer reason as `WATER_MAX`
 (`TICK_HZ`, `RUN_SPEED_PX_S`, `MAX_FALL_PX_S`, `GRAVITY_PX_S2`, `REEL_PX_S`, `SKY_ROWS`). (4) The play
-scene's audio lives in `tests/body/reveal_audio.gd` (`RevealAudio`: the voice pool, the beds, the
+scene's audio lives in `view/audio/scene_audio.gd` (`SceneAudio`: the voice pool, the beds, the
 levels), the scene keeping only the call — D0276's split for the render stack, applied to sound; it is
 also what kept the scene at the 400-line cap. `note_frame` pushes every bed every frame including the
 zero frames, which is what lets a bed go quiet: legacy's `set_line` shipped with nothing calling it.
@@ -15508,7 +15508,7 @@ rather than legacy's id table. (5) THE FALLBACK IS `crunch`. D0313 stood it on `
 crunch existed; with the plain fracture in the library the port is legacy's own structure, the ring
 layered above the threshold by `voice_for_frame` (which now names `hollow`, the ring, and nothing
 else) and the material strike on every blow from the cues. `tests/test_sfx_driver.gd`'s two fallback
-rows moved with it and say why. (6) The rig (`RevealAudio.note_frame`) probes the room, plays the ring,
+rows moved with it and say why. (6) The rig (`SceneAudio.note_frame`) probes the room, plays the ring,
 drives the beds and plays every cue through the room.
 
 **Why:** the plan's row: the sfx port is ~1,030 of legacy's 1,125 lines, and everything left after (i)
@@ -16077,3 +16077,64 @@ COMMENT naming the wall clock as a use of it, and a uniform's default off the ma
 **Gaps:** no eye verdict — neither shader has been photographed on this build; the tooth's `tooth_add`
 and the haze's `strength_px` are legacy's numbers at a different pixel scale (the haze displaces in SCREEN
 pixels, which did not change; the tooth's sample cell is converted).
+
+## D0380 · 2026-09-03 · A′ step 6q: the boot — `godot --path .` runs the game; the shell's seat over the door, the view stack and the scene helpers moved into the view where the shell can build on them
+
+**Decided:** (1) `shell/main.tscn` is the project's main scene (`run/main_scene` set; the comment that said
+"set this once shell/ exists" retired) and `shell/main.gd` (`Main`) is the human's seat: the session
+(`Session.new_game` on the tutorial start over its own site `shallow_clay`, seed 20260826 — the start
+REFUSES any other site by name, which is how the first draft's `reveal_test_dense` was caught), the slot
+restored over it when a save exists, a 60 Hz tick (the hands read once, `Command.move` through the door,
+the one-shot verbs applied, the view refreshed, the scene effects stepped, the camera rig followed), and
+the save on the close box and on F5. `autoboot` is true in the scene file and false in a fixture, which
+calls `boot(false)` so a real save on the machine is never loaded into a test. (2) `shell/play_input.gd`
+turns "is this action down" into the body's frame with the edge latches a hold must not repeat through
+(D0188's dig edge, applied to jump, the grapple and every one-shot verb) and into commands — build/pick
+up, configure and link at the AIMED METRE, drop, clear plan, a hotbar digit selecting once per hold; the
+"pressed" is a Callable so a test poses a hand without hardware and the shell hands it `Controls.pressed`
+(the deafness switch, the posable pointer). `Controls` gains the shell's eleven actions (build RMB, drop Q,
+configure R, link L, clear plan C, grapple Shift/MMB, climb W/S, map M, settings K/Esc, save F5) in the
+same map with the same spec kinds; the settings page still remaps its four (a gap, not a defect).
+(3) `shell/hud_bridge.gd` is the one place `Settings` becomes the page's snapshot and a payload becomes a
+`Settings` change (mute, sliders, the zoom cycle through the rig's levels, the feel toggles, a capture
+finished by the next key or button through `SettingsBindings.rebind`, reset), so the page and the
+settings can only disagree here; the page's keys (arrows, Tab, Enter) drive its focus. While the page is
+open the hands are deaf and the body stands. (4) The three scene helpers the shell needed moved out of
+the debug scene's directory into the view, renamed: `tests/body/reveal_view_setup.gd` → `view/view_stack.gd`
+(`ViewStack`, now also an INSTANCE carrying the HUD handles a shell drives — the settings page, the map,
+the hints, the objectives, the legend — via `build_stack`; `build` still returns the view for the debug
+scene), `reveal_audio.gd` → `view/audio/scene_audio.gd` (`SceneAudio`), `reveal_body_draw.gd` →
+`view/visuals/miner_draw.gd` (`MinerDraw`), which became a reading of the OBSERVATION (the body's box,
+velocity, footing, facing and swing phase already cross the door) because the layer lint was right that
+a view file may hold neither `Body` nor `InputFrame`. The shell → tests edge is unpoliced by the lint, so
+this was a choice, not a fix: the shell builds on the view, not on a debug scene. (5) The hints' lessons
+ride the save as the shell's own key (`Main.KEY_HINTS`), captured from and restored into the view's
+`Hints` — the item `docs/WORKING.md` had carried as "shell work" since 6h. NOT here: the settings page's
+remap rows for the new actions; the debug scene's `MiningOverlay` reticle (the mark painter is the cursor
+now); a `--play`-style flag set (the seat has no flags; the debug scene keeps its own).
+
+**Why:** the plan's last step-6 item, verbatim: "the boot: a main scene in `shell/` so `godot --path .`
+runs the game (today nothing does; `project.godot` has no main scene)".
+
+**Evidence:** `tests/test_main_boot.gd` 36: the project names the shell's scene, the file exists, it
+instantiates as `Main` with `autoboot`, the `--quit-after` flag parses and is never negative; the hands (right and jump: moving and pressed once, then held with
+no second press; left and right cancel; the aim the terrain cell under the pointer and absent off the
+world; the grapple once per hold with W climbing; the pick a hold; the aimed metre or NONE); the verbs
+(build at the metre and drop on their edges, nothing while held, no build without an aim, the third digit
+selecting slot 2 once, the settings key on its edge); the HUD bridge (the snapshot's keys, the mute
+flipping, the zoom cycling, a slider click a quarter along at 0.25, a bind arming the capture, a key press
+a key spec, a release binding nothing, an empty payload nothing); a headless boot building the door and
+the view with the handles, the tutorial start's two processors in the registry, the seat ticking on its
+own, a captured session carrying the body and the hints, restoring over itself, refusing an empty
+envelope. Neighbours green after the moves: key_legend 29, terrain_painter 18, wall_painter 31,
+reveal_args 12, reveal_scene_dig_edge 9, save_game 45, settings_page 32, looks 27, hints 26. FOUND: a
+`Camera2D.make_current` before the node is in the tree errors (guarded), and a view rect read before the
+camera has settled covers nothing (the row reads the registry).
+
+`tools/check_headed_boot.sh` gained case C: `godot --path . -- --quit-after=30` must print the boot line
+with its thirtieth tick, which is exactly what a player's launch does plus a way to stop; run here
+headless: exit 0, `SINKFORGE_BOOT site=shallow_clay seed=20260826 start=tutorial`, `ticked=30`.
+
+**Gaps:** no eye verdict of the seat. The camera zoom is the settings' level with no
+zoom key; the minimap's small/large toggle exists, its hide does not; the settings page lists four of the
+fifteen actions.

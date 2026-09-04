@@ -20,6 +20,19 @@ const LEFT := &"sf_left"
 const RIGHT := &"sf_right"
 const JUMP := &"sf_jump"
 const MINE := &"sf_mine"
+## THE SHELL'S VERBS (A' step 6q, D0380): the actions a real session binds beyond the four the settings page
+## remaps. Same map, same spec kinds, so `SettingsBindings` can rebind them the day the page lists them.
+const BUILD := &"sf_build"          ## RMB: place what is held, or pick up what is there
+const DROP := &"sf_drop"            ## Q: drop the held stack -- into a mouth in reach, else at your feet
+const CONFIGURE := &"sf_configure"  ## R: the aimed machine's toggle
+const LINK := &"sf_link"            ## L: arm a winch head, then link its station
+const CLEAR_PLAN := &"sf_clear_plan"
+const GRAPPLE := &"sf_grapple"      ## Shift or MMB: throw or release the line
+const CLIMB_UP := &"sf_climb_up"    ## W / S on a rope
+const CLIMB_DOWN := &"sf_climb_down"
+const MAP := &"sf_map"              ## M: the corner map grows and shrinks
+const SETTINGS := &"sf_settings"    ## K: the settings page
+const SAVE := &"sf_save"            ## F5: write the slot now (the close box writes it too)
 
 
 ## Deafness: the one switch that disconnects live hardware from the running game.
@@ -57,6 +70,17 @@ static func defaults() -> Dictionary:
 		# Mouse only, deliberately not KEY_E: E is still `body.gd`'s own horizontal column dig through
 		# Slice 1, and one key driving two different mining verbs would make every recording ambiguous.
 		MINE: [{"button": MOUSE_BUTTON_LEFT}, {"axis": JOY_AXIS_TRIGGER_RIGHT, "dir": 1}],
+		BUILD: [{"button": MOUSE_BUTTON_RIGHT}, {"pad": JOY_BUTTON_X}],
+		DROP: [{"key": KEY_Q}, {"pad": JOY_BUTTON_B}],
+		CONFIGURE: [{"key": KEY_R}, {"pad": JOY_BUTTON_Y}],
+		LINK: [{"key": KEY_L}],
+		CLEAR_PLAN: [{"key": KEY_C}],
+		GRAPPLE: [{"key": KEY_SHIFT}, {"button": MOUSE_BUTTON_MIDDLE}, {"pad": JOY_BUTTON_RIGHT_SHOULDER}],
+		CLIMB_UP: [{"key": KEY_W}, {"key": KEY_UP}, {"axis": JOY_AXIS_LEFT_Y, "dir": -1}],
+		CLIMB_DOWN: [{"key": KEY_S}, {"key": KEY_DOWN}, {"axis": JOY_AXIS_LEFT_Y, "dir": 1}],
+		MAP: [{"key": KEY_M}],
+		SETTINGS: [{"key": KEY_K}, {"key": KEY_ESCAPE}, {"pad": JOY_BUTTON_START}],
+		SAVE: [{"key": KEY_F5}],
 	}
 
 
