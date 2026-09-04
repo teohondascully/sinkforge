@@ -1,9 +1,10 @@
 # The canopy of a surface tree (A' step 8g, D0387). Hardness on this build's scale, where `clay` is 1.0:
-# legacy `mining_rules.gd` HARDNESS leaves 0.10 s against earth's 0.28 -> 0.35.
+# legacy `mining_rules.gd` HARDNESS leaves 0.10 s against earth's 0.28 -> 0.35, authored as 0.5 because the
+# mining phase's integer conversion takes hardness in whole halves (tests/test_mining.gd).
 id: leaves
 layer: topsoil_shale
 kind: plant
-hardness: 0.35
+hardness: 0.5
 display_name: Leaves
 
 # --- appearance -----------------------------------------------------------------------------------

@@ -109,7 +109,7 @@ const RECORDS: Dictionary = {
 		"id": "leaves",
 		"layer": "topsoil_shale",
 		"kind": "plant",
-		"hardness": 0.35,
+		"hardness": 0.5,
 		"display_name": "Leaves",
 		"base_color": [
 			0.18,
@@ -168,7 +168,7 @@ const RECORDS: Dictionary = {
 		"id": "wood",
 		"layer": "topsoil_shale",
 		"kind": "plant",
-		"hardness": 1.8,
+		"hardness": 2.0,
 		"display_name": "Wood",
 		"base_color": [
 			0.42,

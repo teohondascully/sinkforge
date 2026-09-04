@@ -1,10 +1,11 @@
 # The trunk of a surface tree (A' step 8g, D0387). Legacy's `wood` was a block with no wall behind it:
 # dug, it leaves sky. Hardness on this build's scale, where `clay` (legacy's `earth`, 0.28 s) is 1.0:
-# legacy `mining_rules.gd` HARDNESS wood 0.50 s -> 1.8.
+# legacy `mining_rules.gd` HARDNESS wood 0.50 s -> 1.8, authored as 2.0 because the mining phase's integer
+# conversion takes hardness in whole halves (tests/test_mining.gd).
 id: wood
 layer: topsoil_shale
 kind: plant
-hardness: 1.8
+hardness: 2.0
 display_name: Wood
 
 # --- appearance -----------------------------------------------------------------------------------
