@@ -31,8 +31,9 @@ func _test_the_tables_and_the_labels() -> void:
 	_check(SettingsPage.REMAP_ROWS.size() == 4 and SettingsPage.remap_per_col() == 2, "four bindings, two a column (%d, %d)" % [SettingsPage.REMAP_ROWS.size(), SettingsPage.remap_per_col()])
 	_check(SettingsPage.action_label(Controls.MINE) == "mine (hold)" and SettingsPage.action_label(&"no_such") == "no_such", "an action's human name, or its id when it has none")
 	_check(SettingsPage.focus_count(SettingsPage.CAT_CONTROLS) == 5 and SettingsPage.focus_count(SettingsPage.CAT_AUDIO) == 5 and SettingsPage.focus_count(SettingsPage.CAT_FEEL) == 3, "the bindings plus RESET, the mute plus four levels, three toggles")
-	_check(SettingsPage.clamp_cat(-1) == 0 and SettingsPage.clamp_cat(9) == 2, "a category index that exists")
-	_check(SettingsPage.RAIL_ORDER == [SettingsPage.CAT_AUDIO, SettingsPage.CAT_FEEL, SettingsPage.CAT_CONTROLS], "CONTROLS sits third on the rail as a door")
+	_check(SettingsPage.clamp_cat(-1) == 0 and SettingsPage.clamp_cat(9) == SettingsPage.CAT_NAMES.size() - 1, "a category index that exists")
+	_check(SettingsPage.RAIL_ORDER == [SettingsPage.CAT_AUDIO, SettingsPage.CAT_FEEL, SettingsPage.CAT_GAME, SettingsPage.CAT_CONTROLS], "GAME sits third on the rail; CONTROLS last as a door")
+	_check(SettingsPage.focus_count(SettingsPage.CAT_GAME) == 2 and SettingsPage.wanted_h(SettingsPage.CAT_GAME) == SettingsPage.SET_MIN_H and SettingsPage.CAT_NAMES.size() == SettingsPage.CATEGORY_LINE.size(), "GAME: two rows at the floor height, and every category has its line")
 
 
 func _test_the_payloads_clamp() -> void:
@@ -120,7 +121,7 @@ func _test_a_click_lands_on_what_was_painted() -> void:
 	view.add_hud().refresh()
 	for _i: int in 3:
 		await process_frame
-	_check(int(ran[0]) > 0 and page.hit_count() == 3 + 1 + 4, "the AUDIO face painted three rail tabs, the mute and four sliders as hits (%d runs, %d hits)" % [int(ran[0]), page.hit_count()])
+	_check(int(ran[0]) > 0 and page.hit_count() == SettingsPage.RAIL_ORDER.size() + 1 + 4, "the AUDIO face painted every rail tab, the mute and four sliders as hits (%d runs, %d hits)" % [int(ran[0]), page.hit_count()])
 	var g: Dictionary = page.geometry()
 	var c: Rect2 = g["content"]
 	var bar_x: float = c.position.x + UiTheme.px(SettingsPage.SET_CTRL_DX)
@@ -133,5 +134,20 @@ func _test_a_click_lands_on_what_was_painted() -> void:
 	view.add_hud().refresh()
 	for _i: int in 2:
 		await process_frame
-	_check(page.hit_count() == 3 + 4 + 1, "the CONTROLS face painted the rail, four bindings and RESET (%d)" % page.hit_count())
+	_check(page.hit_count() == SettingsPage.RAIL_ORDER.size() + 4 + 1, "the CONTROLS face painted the rail, four bindings and RESET (%d)" % page.hit_count())
+	await _game_face_paints(page, view)
 	view.queue_free()
+
+
+## The GAME face (D0396): the rail and its two doors are hits, and the second door's chip is NEW GAME.
+func _game_face_paints(page: SettingsPage, view: WorldView) -> void:
+	page.set_cat(SettingsPage.CAT_GAME)
+	page.armed = "new"
+	view.refresh()
+	view.add_hud().refresh()
+	for _i: int in 2:
+		await process_frame
+	_check(page.hit_count() == SettingsPage.RAIL_ORDER.size() + 2, "the GAME face painted the rail and its two doors as hits (%d)" % page.hit_count())
+	var c2: Rect2 = page.geometry()["content"]
+	var chip_hit: Dictionary = page.click(Vector2(c2.position.x + UiTheme.px(SettingsPage.SET_CTRL_DX) + UiTheme.px(8.0), c2.position.y + UiTheme.px(14.0) + UiTheme.px(SettingsPage.SET_ROW)))
+	_check(chip_hit == {"game": "new"}, "the second door's chip is NEW GAME's payload (%s)" % str(chip_hit))

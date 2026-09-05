@@ -67,6 +67,8 @@ static func parse_quit_after(args: PackedStringArray) -> int:
 
 ## Build the session and the seat. Returns false when the start refuses.
 func boot(load_save: bool) -> bool:
+	var phases: Dictionary = {}
+	var t0: int = Time.get_ticks_msec()
 	Settings.persist = load_save
 	Controls.register()
 	Settings.load_settings()
@@ -74,6 +76,7 @@ func boot(load_save: bool) -> bool:
 	if door == null:
 		push_error("boot: the start refused: %s" % WorldSeeder.last_refusal)
 		return false
+	phases["new_game"] = Time.get_ticks_msec() - t0
 	camera = Camera2D.new()
 	add_child(camera)
 	if camera.is_inside_tree():
@@ -82,10 +85,17 @@ func boot(load_save: bool) -> bool:
 	if float(flags["zoom"]) > 0.0:
 		zoom = float(flags["zoom"])
 	camera.zoom = Vector2(zoom, zoom)
+	var t1: int = Time.get_ticks_msec()
 	stack = ViewStack.build_stack(self, door, look, camera, true, falling, payouts)
 	view = stack.view
+	phases["stack"] = Time.get_ticks_msec() - t1
 	if load_save and FileAccess.file_exists(save_path):
-		restore(SaveGame.read(save_path))
+		var t2: int = Time.get_ticks_msec()
+		var env: Dictionary = SaveGame.read(save_path)
+		phases["read"] = Time.get_ticks_msec() - t2
+		t2 = Time.get_ticks_msec()
+		restore(env)
+		phases["restore"] = Time.get_ticks_msec() - t2
 	var body: Body = door.services()["body"]
 	_warp(body)
 	# The camera may not show past the world (D0333's clamp; the reveal scene set it, the seat never did --
@@ -94,13 +104,17 @@ func boot(load_save: bool) -> bool:
 	rig.set_world_limits(Rect2(0.0, 0.0, float(grid.width * Interface.Observation.CELL_PX), float(grid.height * Interface.Observation.CELL_PX)))
 	rig.warp_to(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE))
 	camera.position = rig.step(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE), Vector2.ZERO, zoom, 1280.0, 0.0)
+	var t3: int = Time.get_ticks_msec()
 	audio = SceneAudio.new()
 	add_child(audio)
 	audio.setup(SEED)
+	phases["audio"] = Time.get_ticks_msec() - t3
+	phases["total"] = Time.get_ticks_msec() - t0
 	if is_inside_tree():
 		get_tree().root.title = "Sinkforge"
 	booted = true
 	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, SEED, START])
+	print("%s phases_ms %s" % [BOOT_LINE, phases])
 	return true
 
 
@@ -197,6 +211,8 @@ func _hud_keys_driven() -> void:
 	var keys: Dictionary = hands.hud_keys(_driven)
 	if bool(keys["settings"]) and stack.settings != null:
 		stack.settings.open = not stack.settings.open
+		if String(flags["act"]) == "game":
+			stack.settings.set_cat(SettingsPage.CAT_GAME)
 	if bool(keys["map"]) and stack.minimap != null:
 		stack.minimap.large = not stack.minimap.large
 	if stack.settings != null and stack.settings.open:
@@ -240,7 +256,7 @@ func _driven(action: StringName) -> bool:
 			return tick >= 20
 		if act == "map" and action == Controls.MAP:
 			return tick == 20
-		if act == "settings" and action == Controls.SETTINGS:
+		if (act == "settings" or act == "game") and action == Controls.SETTINGS:
 			return tick == 20
 		return false
 	if action == Controls.RIGHT:
@@ -297,13 +313,67 @@ func _unhandled_input(ev: InputEvent) -> void:
 		return
 	if ev is InputEventMouseButton and ev.pressed and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
 		var at: Vector2 = get_viewport().get_mouse_position()
-		HudBridge.apply(page.click(at), page, at.x)
+		_game_verb(HudBridge.apply(page.click(at), page, at.x))
 		get_viewport().set_input_as_handled()
 	elif ev is InputEventKey and ev.pressed and not ev.echo:
-		var payload: Dictionary = HudBridge.key(page, (ev as InputEventKey).keycode)
-		if not payload.is_empty():
-			HudBridge.apply(payload, page, -1.0)
+		if (ev as InputEventKey).keycode == KEY_ESCAPE:
+			page.open = false
+			page.armed = ""
+		else:
+			var payload: Dictionary = HudBridge.key(page, (ev as InputEventKey).keycode)
+			if not payload.is_empty():
+				_game_verb(HudBridge.apply(payload, page, -1.0))
 		get_viewport().set_input_as_handled()
+
+
+## The GAME face's two doors (D0396). RETURN TO SURFACE stands the body on the spawn with the line
+## stowed and the world kept: the same intervention `--warp` makes, for a player the shaft has. NEW
+## GAME moves the slot aside to `.bak` (the previous good save's own place, so one generation survives)
+## and reloads the scene, which boots a fresh world the way `--fresh` does.
+func _game_verb(verb: StringName) -> void:
+	if verb == &"surface":
+		return_to_surface()
+	elif verb == &"new_game":
+		new_game()
+
+
+## The spawn's own metre may have changed hands since the new game (a machine, a dig), so the body stands
+## on the nearest floor to it that fits, the way `--warp` does; the raw spawn only if nothing fits.
+func return_to_surface() -> void:
+	var body: Body = door.services()["body"]
+	var grid: TileGrid = (door.services()["world"] as World).grid
+	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS[String(START)])
+	var cell_px: int = Interface.Observation.CELL_PX
+	var n: int = LogicGrid.TERRAIN_PER_LOGIC
+	var feet: Vector2i = SeatFlags.stand_near(grid, Vector2i(spawn.x * n + n / 2, spawn.y * n + n - 1), (Body.HEIGHT_PX + cell_px - 1) / cell_px + 1)
+	body.grapple.cut()
+	if feet == SeatFlags.NO_WARP:
+		body.place(spawn.x * Aim.LOGIC_FX + Aim.LOGIC_FX / 2, (spawn.y + 1) * Aim.LOGIC_FX - Body.HEIGHT_PX * Fx.SCALE / 2)
+	else:
+		body.place((feet.x * cell_px + cell_px / 2) * Fx.SCALE, ((feet.y + 1) * cell_px - Body.HEIGHT_PX / 2) * Fx.SCALE)
+	body.vel_x = 0
+	body.vel_y = 0
+	rig.warp_to(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE))
+	if stack != null and stack.settings != null:
+		stack.settings.open = false
+	print("%s returned to surface: feet %s" % [BOOT_LINE, feet])
+
+
+func new_game() -> void:
+	retire_slot()
+	print("%s new game: the slot moved to %s, the scene reloads" % [BOOT_LINE, SaveGame.BAK_SUFFIX])
+	get_tree().reload_current_scene()
+
+
+## Move the slot aside rather than delete it: `.bak` is where `SaveGame.write` keeps the previous good
+## save, so a NEW GAME leaves one generation to recover by hand. Returns whether a slot was there.
+func retire_slot() -> bool:
+	if not (Settings.persist and FileAccess.file_exists(save_path)):
+		return false
+	var dir: DirAccess = DirAccess.open(save_path.get_base_dir())
+	if dir == null:
+		return false
+	return dir.rename(save_path, save_path + SaveGame.BAK_SUFFIX) == OK
 
 
 func _draw() -> void:

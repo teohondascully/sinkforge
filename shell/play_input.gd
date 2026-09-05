@@ -30,7 +30,11 @@ func read(pressed: Callable, pointer_world: Vector2, cell_px: int, in_bounds: Ca
 	_was_jump = jump
 	var up: bool = bool(pressed.call(Controls.CLIMB_UP))
 	var down: bool = bool(pressed.call(Controls.CLIMB_DOWN))
-	f.climb_dir = (-1 if up else 0) + (1 if down else 0)
+	# `InputFrame.climb_dir` is +1 UP (the contract in `sim/body/input_frame.gd`; `Grapple.reel` and
+	# `BodyMedium` both read it that way). This line had the sign flipped until 2026-09-05: W paid the line
+	# out and S reeled it in, so "reel in to climb" did nothing on a slack line and the director sat anchored
+	# at the bottom of a rift with a hint telling them the key that could not work (D0396).
+	f.climb_dir = (1 if up else 0) + (-1 if down else 0)
 	f.mantle_hold = up and f.move_dir != 0
 	var grapple: bool = bool(pressed.call(Controls.GRAPPLE))
 	f.grapple_pressed = grapple and not _was_grapple

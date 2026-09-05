@@ -16679,3 +16679,33 @@ entry is not edited; this is the correction, per the ledger's own rule.
 standing rule, missed in the same session that fixed an instrument for reporting green over a defect.
 
 **Reverse cost:** none.
+
+## D0396 · 2026-09-05 · The stranded director: an inverted climb axis in the seat's hand, a settings page with no way out, a rail nothing answered
+
+**Decided:** The director's own slot (`user://sinkforge.save`, written 22:09 on 2026-09-04) was read
+and driven headless through the seat's own hand before anything was changed. The body stood on a
+one-cell step at 67 m in an open rift four metres wide, the grapple ANCHORED 13.5 m above with a slack
+line. Walking worked. **W did nothing and S reeled the line in**: `PlayInput.read` built `climb_dir` as
+up = -1 while `InputFrame`'s contract, `Grapple.reel` and `BodyMedium` all read +1 as up. The hint on
+screen said "reel in to climb". `tests/test_main_boot.gd` had pinned the wrong sign and called it "W
+climbs up" -- the driver checked against itself (memory: driver failure reads as subject failure). Fixed
+in the hand; the pin now runs W's frame through `Grapple.reel` and asserts the line gets SHORTER. From
+the director's saved state after the fix: W reels the body 240 px up to the anchor, jump rises 44 px, a
+new throw chains and bites. (2) The settings page had AUDIO / CONTROLS / FEEL and no door out of a
+world. A GAME face: RETURN TO SURFACE (the body on the nearest standable floor to the spawn via
+`SeatFlags.stand_near`, the line cut, velocity zeroed -- the intervention `--warp` already makes, for a
+player instead of a capture) and NEW GAME (the slot moved to `.bak`, the scene reloaded, so a fresh
+world boots the way `--fresh` does; the second press acts, the first arms the chip and says so in its
+text). (3) The rail registered `{"cat": c}` hits since 6j and nothing handled them: the mouse could not
+change tabs. `HudBridge.apply` answers them now; digits 1-4 pick the slot their labels carry; ESC
+closes the page. `SET_MIN_H` 196 → 236 so four slots fit. Suites: main_boot 50, settings_page 35.
+
+**Not done:** a deliberate release key for a slack anchored line. Legacy's rule stands ("a jump cuts a
+taut line; deliberate release has no key"): with W honest the line reels in until taut and a jump then
+cuts it. RETURN TO SURFACE is priced at nothing for now; whether stranding should cost something is the
+director's.
+
+**Why:** the brief's F1. The stuck state was real and it was the driver's, not the terrain's or the
+sim's; `sim/` is untouched by this entry.
+
+**Reverse cost:** the sign is one line; the face is data plus a draw function; the rail answer is one branch.

@@ -5,7 +5,7 @@ extends "res://tests/test_base.gd"
 ## carries the hints' lessons; the hands turn presses into a frame with edges that fire once per hold and
 ## an aim that is absent off the world; the verbs fire on their edges at the aimed metre and a held digit
 ## selects once; the HUD bridge's snapshot has what the page reads, and its payloads change the settings
-## without touching disk when persistence is off.
+## without touching disk when persistence is off; the GAME face's two doors act on the seat (D0396).
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_main_boot.gd
 
@@ -50,7 +50,18 @@ func _test_the_hands() -> void:
 	_check(not hands.read(_hand({}), Vector2(-10.0, 0.0), 4, no).has_aim, "off the world there is no aim, not a clamp to the rim")
 	var g: InputFrame = hands.read(_hand({Controls.GRAPPLE: true, Controls.CLIMB_UP: true}), Vector2.ZERO, 4, yes)
 	var g2: InputFrame = hands.read(_hand({Controls.GRAPPLE: true, Controls.CLIMB_UP: true}), Vector2.ZERO, 4, yes)
-	_check(g.grapple_pressed and not g2.grapple_pressed and g.climb_dir == -1, "the grapple presses once per hold; W climbs up")
+	_check(g.grapple_pressed and not g2.grapple_pressed, "the grapple presses once per hold")
+	# THE SIGN IS THE CONSUMER'S, NOT THE HAND'S (D0396). This row used to pin `climb_dir == -1` and call it
+	# "W climbs up": the driver checked against itself. `InputFrame` says +1 is up, and the two readers agree
+	# -- so the pin goes through a reader: a line reeled with W's frame gets SHORTER.
+	var line: Grapple = Grapple.new()
+	line.restore({"state": Grapple.State.ANCHORED, "length": Grapple.MAX_RANGE, "anchor": [0, 0], "tip": [0, 0]})
+	var before: int = line.length
+	line.reel(g.climb_dir)
+	_check(g.climb_dir == 1 and line.length < before, "W is +1, the contract's up: the anchored line reels in under it (%d -> %d)" % [before, line.length])
+	var s_frame: InputFrame = hands.read(_hand({Controls.CLIMB_DOWN: true}), Vector2.ZERO, 4, yes)
+	line.reel(s_frame.climb_dir)
+	_check(s_frame.climb_dir == -1 and line.length > before - Grapple.REEL_PER_TICK, "S is -1, down: the same line pays out")
 	_check(hands.read(_hand({Controls.MINE: true}), Vector2.ZERO, 4, yes).mine_held, "the pick is a hold, not an edge")
 	_check(PlayInput.aim_logic_of(f) == Vector2i(3, 1) and PlayInput.aim_logic_of(hands.read(_hand({}), Vector2(-10.0, 0.0), 4, no)) == PlayInput.NONE, "the aimed metre, or NONE without an aim")
 
@@ -104,6 +115,18 @@ func _test_the_hud_bridge() -> void:
 	_check(HudBridge.spec_of(rel).is_empty() and not HudBridge.finish_capture(page, rel), "a release binds nothing and leaves the capture armed")
 	page.capture = &""
 	_check(HudBridge.apply({}, page, 0.0) == &"", "an empty payload changes nothing")
+	# The GAME face (D0396): the rail answers a click, a digit picks a slot, NEW GAME asks twice.
+	_check(HudBridge.apply({"cat": SettingsPage.CAT_GAME}, page, 0.0) == &"cat" and page.cat == SettingsPage.CAT_GAME, "the rail's own payload turns the category")
+	_check(HudBridge.key(page, KEY_1).is_empty() and page.cat == SettingsPage.RAIL_ORDER[0], "digit 1 is the first rail slot")
+	_check(HudBridge.key(page, KEY_4).is_empty() and page.cat == SettingsPage.RAIL_ORDER[3], "digit 4 the fourth")
+	_check(HudBridge.apply({"game": "new"}, page, 0.0) == &"armed" and page.armed == "new", "the first press of NEW GAME arms, nothing else")
+	_check(HudBridge.apply({"game": "surface"}, page, 0.0) == &"surface" and page.armed == "", "RETURN TO SURFACE acts at once and disarms")
+	HudBridge.apply({"game": "new"}, page, 0.0)
+	_check(HudBridge.apply({"game": "new"}, page, 0.0) == &"new_game" and page.armed == "", "the second press is the one that acts")
+	HudBridge.apply({"game": "new"}, page, 0.0)
+	page.set_cat(SettingsPage.CAT_AUDIO)
+	_check(page.armed == "", "turning the category disarms")
+	_check(SettingsPage.row_payload(SettingsPage.CAT_GAME, 0) == {"game": "surface"} and SettingsPage.row_payload(SettingsPage.CAT_GAME, 1) == {"game": "new"} and SettingsPage.row_payload(SettingsPage.CAT_GAME, 9) == {"game": "new"}, "the GAME rows' payloads, clamped past the end")
 
 
 func _test_a_headless_boot_ticks_and_saves() -> void:
@@ -123,4 +146,23 @@ func _test_a_headless_boot_ticks_and_saves() -> void:
 	_check(env.has(Session.KEY_BODY) and env.has(Main.KEY_HINTS), "a captured session carries the body and the hints' lessons")
 	_check(main.restore(env), "...and restores over itself")
 	_check(not main.restore({}), "an empty envelope is refused")
+	# The two doors of the GAME face (D0396), on this booted seat.
+	var body: Body = main.door.services()["body"]
+	var home := Vector2i(body.pos_x, body.pos_y)
+	body.place(body.pos_x, body.pos_y + 40 * Interface.Observation.CELL_PX * Fx.SCALE)   # forty cells down: in the rock, the way a stranded body might be
+	body.grapple.restore({"state": Grapple.State.ANCHORED, "length": Grapple.MAX_RANGE, "anchor": [0, 0], "tip": [0, 0]})
+	main.return_to_surface()
+	var back := Vector2i(body.pos_x, body.pos_y)
+	_check(absi(back.x - home.x) <= Interface.Observation.CELL_PX * Fx.SCALE * 4 and back.y <= home.y + Interface.Observation.CELL_PX * Fx.SCALE, "RETURN TO SURFACE stands the body at the spawn again (home %s, back %s)" % [home, back])
+	_check(body.grapple.state == Grapple.State.IDLE and body.vel_y == 0, "...with the line stowed and no velocity carried")
+	var scratch: String = "user://test_main_boot_slot.save"
+	main.save_path = scratch
+	Settings.persist = true
+	_check(not main.retire_slot(), "no slot on disk: nothing to retire")
+	var f: FileAccess = FileAccess.open(scratch, FileAccess.WRITE)
+	f.store_string("x")
+	f.close()
+	_check(main.retire_slot() and not FileAccess.file_exists(scratch) and FileAccess.file_exists(scratch + SaveGame.BAK_SUFFIX), "NEW GAME moves the slot to .bak rather than deleting it")
+	DirAccess.remove_absolute(scratch + SaveGame.BAK_SUFFIX)
+	Settings.persist = false
 	main.queue_free()

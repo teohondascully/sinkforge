@@ -46,8 +46,8 @@ static func overlay(page: SettingsPage, ci: CanvasItem, font: Font, mouse: Vecto
 	_head(page, ci, font, origin)
 	var told: String = _body(page, ci, font, g, mouse)
 	_detail(page, ci, font, g, told, mouse)
-	var legend: String = "arrows move   ENTER rebinds   1 2 K category   ESC closes" if page.cat == SettingsPage.CAT_CONTROLS \
-		else "arrows move and adjust   ENTER acts   1 2 K category   ESC closes"
+	var legend: String = "arrows move   ENTER rebinds   1-4 category   ESC closes" if page.cat == SettingsPage.CAT_CONTROLS \
+		else "arrows move and adjust   ENTER acts   1-4 category   ESC closes"
 	ci.draw_string(font, Vector2(origin.x + _px(UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD), origin.y + float(g["h"]) - _px(5.0)), legend, HORIZONTAL_ALIGNMENT_LEFT, -1, _pt(8), UiTheme.UI_TEXT_FAINT)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
@@ -67,13 +67,13 @@ static func _rail(page: SettingsPage, ci: CanvasItem, font: Font, origin: Vector
 			PageDraw.round_rect(ci, box, _px(6.0), UiTheme.RAIL_ON_FILL)
 			ci.draw_rect(Rect2(rail.position.x, y + _px(5.0), _px(2.5), _px(28.0)), UiTheme.UI_ACCENT)
 		_glyph(ci, box.get_center(), c, on, box.has_point(mouse))
-		var label: String = ("K KEYS · %d" % SettingsPage.REMAP_ROWS.size()) if c == SettingsPage.CAT_CONTROLS else "%d %s" % [slot + 1, SettingsPage.CAT_NAMES[c]]
+		var label: String = ("%d KEYS · %d" % [slot + 1, SettingsPage.REMAP_ROWS.size()]) if c == SettingsPage.CAT_CONTROLS else "%d %s" % [slot + 1, SettingsPage.CAT_NAMES[c]]
 		var lw: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, _pt(UiTheme.RAIL_LABEL_FS)).x
 		ci.draw_string(font, Vector2(box.get_center().x - lw * 0.5, y + _px(UiTheme.RAIL_LABEL_DY)), label, HORIZONTAL_ALIGNMENT_LEFT, -1, _pt(UiTheme.RAIL_LABEL_FS), UiTheme.UI_TEXT if on else UiTheme.UI_TEXT_FAINT)
 		page.add_hit(box.grow(_px(6.0)), {"cat": c})
 
 
-## Three category glyphs, drawn rather than lettered: a speaker cone, a key cap, three sliders. `hot`
+## Four category glyphs, drawn rather than lettered: a speaker cone, a key cap, three sliders, a shaft mouth. `hot`
 ## is separate from `on`: hover keeps a cue outside the gold family.
 static func _glyph(ci: CanvasItem, at: Vector2, kind: int, on: bool, hot: bool) -> void:
 	var col: Color = UiTheme.GOLD_PALE if on else (UiTheme.UI_TEXT_DIM if hot else Color(0.40, 0.43, 0.50))
@@ -84,6 +84,12 @@ static func _glyph(ci: CanvasItem, at: Vector2, kind: int, on: bool, hot: bool) 
 			ci.draw_colored_polygon(PackedVector2Array([at + Vector2(-4.0, -1.0) * s, at + Vector2(1.0, -7.0) * s, at + Vector2(1.0, 7.0) * s, at + Vector2(-4.0, 1.0) * s]), col)
 			ci.draw_arc(at + Vector2(1.0, 0.0) * s, 5.5 * s, -PI * 0.4, PI * 0.4, 8, col, 1.4 * s)
 			ci.draw_arc(at + Vector2(1.0, 0.0) * s, 8.5 * s, -PI * 0.4, PI * 0.4, 8, col, 1.4 * s)
+		SettingsPage.CAT_GAME:   # a shaft mouth with the ladder out of it
+			ci.draw_rect(Rect2(at + Vector2(-8.0, -7.0) * s, Vector2(16.0, 2.0) * s), col)
+			ci.draw_rect(Rect2(at + Vector2(-3.0, -7.0) * s, Vector2(1.6, 14.0) * s), Color(col, 0.8))
+			ci.draw_rect(Rect2(at + Vector2(1.4, -7.0) * s, Vector2(1.6, 14.0) * s), Color(col, 0.8))
+			for i: int in 3:
+				ci.draw_rect(Rect2(at + Vector2(-3.0, -3.0 + float(i) * 4.0) * s, Vector2(6.0, 1.4) * s), col)
 		SettingsPage.CAT_CONTROLS:
 			ci.draw_rect(Rect2(at + Vector2(-8.0, -6.0) * s, Vector2(16.0, 13.0) * s), Color(col, 0.35))
 			ci.draw_rect(Rect2(at + Vector2(-8.0, -6.0) * s, Vector2(16.0, 13.0) * s), col, false, 1.4 * s)
@@ -107,6 +113,7 @@ static func _body(page: SettingsPage, ci: CanvasItem, font: Font, g: Dictionary,
 	match page.cat:
 		SettingsPage.CAT_CONTROLS: return _controls(page, ci, font, g, c, mouse)
 		SettingsPage.CAT_FEEL: return _feel(page, ci, font, c, mouse)
+		SettingsPage.CAT_GAME: return _game(page, ci, font, c, mouse)
 		_: return _audio(page, ci, font, c, mouse)
 
 
@@ -146,6 +153,25 @@ static func _feel(page: SettingsPage, ci: CanvasItem, font: Font, c: Rect2, mous
 			text = "ON" if on else "OFF"
 		var focused: bool = page.row == i
 		if _chip(page, ci, font, c.position.x + _px(SettingsPage.SET_CTRL_DX), y, text, SettingsPage.row_payload(SettingsPage.CAT_FEEL, i), on, mouse, FS, false, focused) or (focused and said == ""):
+			said = String(r[2])
+		y += _px(SettingsPage.SET_ROW)
+	return said
+
+
+## The GAME face (D0396): a label, a chip, a sentence. NEW GAME paints warm and asks twice: the armed
+## chip says so in its own text, so the confirmation is on the control and not in a dialog.
+static func _game(page: SettingsPage, ci: CanvasItem, font: Font, c: Rect2, mouse: Vector2) -> String:
+	var said: String = ""
+	var y: float = c.position.y + _px(14.0)
+	for i: int in SettingsPage.GAME_ROWS.size():
+		var r: Array = SettingsPage.GAME_ROWS[i]
+		var id: String = String(r[1])
+		ci.draw_string(font, Vector2(c.position.x, y), String(r[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, _pt(FS), UiTheme.UI_TEXT)
+		var text: String = "RETURN TO SURFACE"
+		if id == "new":
+			text = "NEW GAME · SURE?" if page.armed == "new" else "NEW GAME"
+		var focused: bool = page.row == i
+		if _chip(page, ci, font, c.position.x + _px(SettingsPage.SET_CTRL_DX), y, text, SettingsPage.row_payload(SettingsPage.CAT_GAME, i), false, mouse, FS, id == "new", focused) or (focused and said == ""):
 			said = String(r[2])
 		y += _px(SettingsPage.SET_ROW)
 	return said

@@ -16,9 +16,10 @@ extends RefCounted
 const CAT_AUDIO: int = 0
 const CAT_CONTROLS: int = 1
 const CAT_FEEL: int = 2
-const CAT_NAMES: Array[String] = ["AUDIO", "CONTROLS", "FEEL"]
-## Rail display order: CONTROLS sits third on screen as a door opened by K, not as a third equal tab.
-const RAIL_ORDER: Array[int] = [CAT_AUDIO, CAT_FEEL, CAT_CONTROLS]
+const CAT_GAME: int = 3
+const CAT_NAMES: Array[String] = ["AUDIO", "CONTROLS", "FEEL", "GAME"]
+## Rail display order: CONTROLS sits last on screen as a door opened by K, not as an equal tab.
+const RAIL_ORDER: Array[int] = [CAT_AUDIO, CAT_FEEL, CAT_GAME, CAT_CONTROLS]
 
 ## The bindings, each with the sentence its key does not tell you; an empty sentence draws no plate.
 const REMAP_ROWS: Array[Array] = [
@@ -37,10 +38,17 @@ const FEEL_ROWS: Array[Array] = [
 	["zoom", "zoom", "how much of the shaft you can see at once"],
 	["auto-pickup", "auto_pickup", "walk over a dropped thing to take it"],
 ]
+## The GAME face (D0396): the two doors a stranded player needs. Each row is [label, id, sentence]; the
+## second press of NEW GAME is the one that acts, so a stray click cannot end a world.
+const GAME_ROWS: Array[Array] = [
+	["stranded", "surface", "back at the spawn, the line stowed; world and pack kept"],
+	["start over", "new", "a fresh world from the seed; this save is replaced (press twice)"],
+]
 const CATEGORY_LINE: Array[String] = [
 	"levels are remembered while muted",
 	"click a binding, then press its new key",
 	"how the game moves and what it does for you",
+	"when the shaft has you: a way out, and a way to begin again",
 ]
 
 ## The page's own measurements, in the authoring canvas.
@@ -50,7 +58,9 @@ const SET_HEAD: float = 40.0
 const SET_FOOT: float = 16.0
 const SET_DETAIL: float = 36.0
 const SET_ROW: float = 22.0
-const SET_MIN_H: float = 196.0
+## The floor: four rail slots at the rail's own minimum pitch (`UiTheme.rail_slots`: the top edge, three
+## pitches of tile + label + air, the last label, the edge) -- 196 fit three slots and clipped the fourth.
+const SET_MIN_H: float = 236.0
 const SET_CTRL_DX: float = 84.0
 const SET_BAR_W: float = 78.0
 const SET_VALUE_DX: float = 172.0     ## SET_CTRL_DX + SET_BAR_W + 10
@@ -63,6 +73,7 @@ var open: bool = false
 var cat: int = CAT_AUDIO
 var row: int = 0
 var capture: StringName = &""         ## the action awaiting its new key ("press a key…")
+var armed: String = ""                ## the GAME row whose first press was taken; the second acts
 ## The shell's snapshot: muted, levels {id: 0..1}, shake, auto_pickup, zoom_label, bindings {action:
 ## label}, event_labels {action: [labels]}, all_actions [action]. Empty until the shell fills it.
 var state: Dictionary = {}
@@ -89,6 +100,7 @@ static func focus_count(c: int) -> int:
 	match c:
 		CAT_CONTROLS: return REMAP_ROWS.size() + 1
 		CAT_FEEL: return FEEL_ROWS.size()
+		CAT_GAME: return GAME_ROWS.size()
 		_: return AUDIO_ROWS.size() + 1
 
 
@@ -105,6 +117,8 @@ static func row_payload(c: int, i: int) -> Dictionary:
 			var f: int = clampi(i, 0, FEEL_ROWS.size() - 1)
 			var fid: String = String(FEEL_ROWS[f][1])
 			return {"cycle": "zoom"} if fid == "zoom" else {"toggle": fid}
+		CAT_GAME:
+			return {"game": String(GAME_ROWS[clampi(i, 0, GAME_ROWS.size() - 1)][1])}
 		_:
 			if i <= 0:
 				return {"toggle": "mute"}
@@ -146,6 +160,7 @@ static func wanted_h(c: int) -> float:
 	match c:
 		CAT_CONTROLS: need = float(remap_per_col()) * REMAP_ROW_H + 8.0
 		CAT_FEEL: need = float(FEEL_ROWS.size()) * SET_ROW
+		CAT_GAME: need = float(GAME_ROWS.size()) * SET_ROW
 		_: need = float(AUDIO_ROWS.size() + 1) * SET_ROW
 	return maxf(SET_HEAD + need + 8.0 + SET_DETAIL + SET_FOOT, SET_MIN_H)
 
@@ -227,6 +242,7 @@ func visible() -> bool:
 func set_cat(c: int) -> void:
 	cat = clamp_cat(c)
 	row = clampi(row, 0, focus_count(cat) - 1)
+	armed = ""
 
 
 func move_row(keycode: int) -> void:

@@ -39,6 +39,27 @@ static func apply(payload: Dictionary, page: SettingsPage, canvas_x: float) -> S
 	if payload.has("reset"):
 		SettingsBindings.reset_bindings()
 		return &"reset"
+	if payload.has("game"):
+		return game_verb(String(payload["game"]), page)
+	if payload.has("cat"):   # the rail's own tabs: registered by the drawing since 6j, answered since D0396
+		page.set_cat(int(payload["cat"]))
+		return &"cat"
+	return &""
+
+
+## The GAME face's verdicts, for the seat to act on (D0396): `&"surface"` at once; `&"new_game"` only on
+## the second press of an armed row, since it replaces the save. Any other press disarms.
+static func game_verb(id: String, page: SettingsPage) -> StringName:
+	if id == "surface":
+		page.armed = ""
+		return &"surface"
+	if id == "new":
+		if page.armed == "new":
+			page.armed = ""
+			return &"new_game"
+		page.armed = "new"
+		return &"armed"
+	page.armed = ""
 	return &""
 
 
@@ -89,8 +110,8 @@ static func finish_capture(page: SettingsPage, ev: InputEvent) -> bool:
 	return true
 
 
-## A key on the open page: arrows move the focus, Enter or Space activates it, Tab turns the category.
-## Returns the payload activated, or {}.
+## A key on the open page: arrows move the focus, Enter or Space activates it, Tab turns the category,
+## a digit picks the rail slot its label carries (D0396). Returns the payload activated, or {}.
 static func key(page: SettingsPage, keycode: int) -> Dictionary:
 	match keycode:
 		KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT:
@@ -99,4 +120,7 @@ static func key(page: SettingsPage, keycode: int) -> Dictionary:
 			page.set_cat(SettingsPage.clamp_cat((page.cat + 1) % SettingsPage.CAT_NAMES.size()))
 		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 			return page.focus_payload()
+	var slot: int = keycode - KEY_1
+	if slot >= 0 and slot < SettingsPage.RAIL_ORDER.size():
+		page.set_cat(SettingsPage.RAIL_ORDER[slot])
 	return {}

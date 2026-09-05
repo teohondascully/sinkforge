@@ -14,8 +14,8 @@ extends RefCounted
 ##   --screenshot-tick=N     at tick N save the viewport to --screenshot-out, then quit unless
 ##   --screenshot-out=PATH   --quit-after says otherwise
 ##   --fresh                 a new game: the slot on disk is neither loaded nor written
-##   --act=mine|map|settings a scripted hand for a capture: hold MINE at the rock ahead from tick 20 with
-##                           the pointer posed, or press the map / settings key once at tick 20
+##   --act=mine|map|settings|game  a scripted hand for a capture: hold MINE at the rock ahead from tick 20 with
+##                           the pointer posed, or press the map / settings key once at tick 20 (game: the GAME face)
 
 const NO_WARP: Vector2i = Vector2i(-1, -1)
 
