@@ -7,6 +7,16 @@ class_name BandsRecords
 extends RefCounted
 
 const RECORDS: Dictionary = {
+	"deep_works": {
+		"id": "deep_works",
+		"display_name": "THE DEEP WORKS",
+		"from_m": 140,
+		"color": [
+			0.62,
+			0.48,
+			0.42,
+		],
+	},
 	"open_sky": {
 		"id": "open_sky",
 		"display_name": "OPEN SKY",
@@ -30,7 +40,7 @@ const RECORDS: Dictionary = {
 	"stonereach": {
 		"id": "stonereach",
 		"display_name": "STONEREACH",
-		"from_m": 66,
+		"from_m": 40,
 		"color": [
 			0.44,
 			0.62,
@@ -50,7 +60,7 @@ const RECORDS: Dictionary = {
 	"the_deepslate": {
 		"id": "the_deepslate",
 		"display_name": "THE DEEPSLATE",
-		"from_m": 56,
+		"from_m": 104,
 		"color": [
 			0.56,
 			0.5,
@@ -60,7 +70,7 @@ const RECORDS: Dictionary = {
 	"the_long_dark": {
 		"id": "the_long_dark",
 		"display_name": "THE LONG DARK",
-		"from_m": 40,
+		"from_m": 72,
 		"color": [
 			0.52,
 			0.52,
@@ -70,7 +80,7 @@ const RECORDS: Dictionary = {
 	"the_seal": {
 		"id": "the_seal",
 		"display_name": "THE SEAL",
-		"from_m": 64,
+		"from_m": 200,
 		"color": [
 			0.72,
 			0.44,

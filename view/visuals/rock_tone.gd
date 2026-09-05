@@ -46,9 +46,9 @@ const GRAIN_AMP: float = 0.10
 const PATCH_FREQ: float = 0.045       ## ~22 cells, the largest single variation term in the bake
 const PATCH_AMP: float = 0.22
 const STONE_FREQ: float = 0.10        ## embedded darker-stone blobs, ~10 cells across
-const STONE_THRESH: float = 0.34
+const STONE_THRESH: float = 0.42       ## was 0.34: fewer inclusions (D0398, the director's T017 ruling)
 const STONE_RAMP: float = 1.6
-const STONE_DARKEN: float = 0.17
+const STONE_DARKEN: float = 0.11       ## was 0.17: softer ones
 const CRACK_FREQ: float = 0.09
 const CRACK_BAND: float = 0.075       ## |noise| under this is seam; wider is a line, not a dotted one
 const CRACK_DARKEN: float = 0.15
@@ -77,11 +77,11 @@ const HUE_VIOLET := Color(0.24, 0.18, 0.30)
 ## — the same shape as the depth chip before D0271: the data was entirely present and the consumer was
 ## missing. `MaterialLook.grammar_of` is that consumer.
 enum { GRAM_CLASTIC = 0, GRAM_BEDDED = 1, GRAM_MASSIVE = 2 }
-const GRAM_GRAIN: Array[float] = [1.60, 0.85, 0.30]   ## soil granular, stone restrained
+const GRAM_GRAIN: Array[float] = [1.60, 0.60, 0.22]   ## soil granular, stone restrained (stone quieter since D0398: the static was grain)
 const GRAM_XSTR: Array[float] = [1.00, 0.35, 1.60]    ## <1 stretches features along the horizontal
 const GRAM_CLUMP: Array[float] = [1.45, 0.60, 0.25]   ## pebbles in soil, not in stone
-const GRAM_SEAM: Array[float] = [0.15, 1.20, 0.70]    ## fracture seam strength
-const GRAM_PATCH: Array[float] = [1.35, 1.00, 0.50]   ## broad mass is part of a material's language
+const GRAM_SEAM: Array[float] = [0.15, 1.00, 0.70]    ## fracture seam strength
+const GRAM_PATCH: Array[float] = [1.35, 0.80, 0.60]   ## broad mass is part of a material's language; massive is plates (D0398)
 
 ## SEAM DIRECTION, WHICH IS EASY TO WRITE BACKWARDS AND WAS. Legacy's own note: in
 ## `get_noise_2d(x * a, y * b)` a large multiplier makes the field vary FAST on that axis, so features are
@@ -97,6 +97,21 @@ const GRAM_PATCH: Array[float] = [1.35, 1.00, 0.50]   ## broad mass is part of a
 const GRAM_SEAM_X: Array[float] = [1.00, 0.35, 3.40]  ## bedded runs flat (small x), massive runs steep
 const GRAM_SEAM_Y: Array[float] = [1.00, 3.00, 0.40]
 const GRAM_SEAM_W: Array[float] = [1.00, 1.35, 1.70]  ## a plane's fracture is a line, not a fleck
+
+## THE LAMINAE (D0398, the director's T017 ruling: "more bedding, fewer inclusions"). Legacy's bedding is a
+## hue drift (`BeddingTone._strata`); a bedded rock also has PARTING PLANES -- thin dark lines where one
+## lamina ends and the next begins -- and those are what make a face read as layered stone at a glance
+## rather than as a tinted field. One line about a cell thick every `LAM_PERIOD_M`, on the SAME warped
+## bedding coordinate `_strata` uses so the lines dip and rise with the hue bands, fading in and out under
+## a slow field so they are partings and not a ruled page. Bedded rock only; the massive grammar's
+## identity is plates and steep fractures, the clastic's is aggregate. Scaled by `GRAM_LAMINA`.
+const LAM_PERIOD_M: float = 1.0
+const LAM_BAND: float = 0.24          ## the fraction of a period the parting darkens: ~1 cell of 4
+const LAM_DARKEN: float = 0.42        ## multiplicative, on the parting row
+const LAM_ADD: float = 0.045          ## and a little absolute, so the line survives the veil's multiply
+const LAM_FADE_FREQ: float = 0.03     ## the field that fades partings in and out, ~33 cells
+const LAM_FADE_FLOOR: float = 0.30    ## a parting is never fainter than this share of itself...
+const GRAM_LAMINA: Array[float] = [0.0, 1.0, 0.0]
 
 ## THE FLOOR UNDER THE MULTIPLIER, legacy `:1082`. Several independent darkeners stack — the grain, an
 ## embedded stone, a crack, and (when the neighbour terms arrive) the carved-edge AO and the form sink —
@@ -134,6 +149,7 @@ var _stone: FastNoiseLite
 var _crack: FastNoiseLite
 var _huex: FastNoiseLite
 var _huey: FastNoiseLite
+var _lam_fade: FastNoiseLite
 ## The surface-aware terms (soil profile, moss, tufts), seeded with the same world seed (6o, D0378).
 var surface: SurfaceTone
 
@@ -162,6 +178,7 @@ func _init(world_seed: int) -> void:
 	# every region landing on the same one.
 	_huex = field(world_seed, 0xc2b2ae35, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, HUE_FREQ)
 	_huey = field(world_seed, 0x27d4eb2f, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, HUE_FREQ)
+	_lam_fade = field(world_seed, 0x9e3779b9, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, LAM_FADE_FREQ, 2)
 	surface = SurfaceTone.new(world_seed)
 
 
@@ -223,7 +240,9 @@ func shade(base: Color, col: int, row: int, gram: int, solid_at: Callable = Call
 			var lip: float = 1.0 - float(top) / float(RIM_DEPTH)
 			rim = RIM_LIGHT * lip
 			rim_warm = RIM_WARM * lip
-	var vmul: float = maxf(VALUE_FLOOR, 1.0 - AO_PER_NEIGHBOUR * ao + grain + form)
+	var lam: float = lamina(x, y) * GRAM_LAMINA[g]
+	var vmul: float = maxf(VALUE_FLOOR, 1.0 - AO_PER_NEIGHBOUR * ao + grain + form) * (1.0 - LAM_DARKEN * lam)
+	drift -= LAM_ADD * lam
 	# CLAMPED, exactly where legacy clamps. Legacy's `_paint_fine` writes bytes -- `clampf(out.r, 0, 1)`
 	# at `:1105` -- so the clamp is structural there rather than a choice, and leaving it out here let the
 	# additive drift carry a channel NEGATIVE on dark rock: 3,013 of 36,000 sampled cells, worst luma
@@ -257,6 +276,32 @@ func _micro_texture(x: float, y: float, g: int) -> float:
 	if crackv < band:
 		grain -= CRACK_DARKEN * GRAM_SEAM[g] * smoothstep(0.0, 1.0, 1.0 - crackv / band)
 	return grain
+
+
+## The parting-plane weight at a cell, 0 off a parting and up to 1 on one. The whole band is the line (the
+## band is a quarter-metre, one cell, so a row either is the parting or is not). BEDS ARE NOT ONE
+## THICKNESS: the slow fade field picks the facies -- thick beds two metres apart where it runs low, the
+## metre beds through the middle, fine laminations every half metre where it runs high, at a lighter
+## weight -- so a face changes its rhythm laterally the way real bedding does, and the same field fades
+## each parting but never below `LAM_FADE_FLOOR` of itself. Public for the suite: the periods are asserted
+## in metres, the way every other feature size here is.
+func lamina(x: float, y: float) -> float:
+	var n: float = _lam_fade.get_noise_2d(x, y)
+	var period: float = lamina_period_m(n)
+	var f: float = BeddingTone.bedding_metres(x, y) / period
+	if f - floor(f) >= LAM_BAND * LAM_PERIOD_M / period:
+		return 0.0
+	var weight: float = 0.55 if period < LAM_PERIOD_M else 1.0
+	return weight * clampf(0.7 + 0.5 * n, LAM_FADE_FLOOR, 1.0)
+
+
+## The bed thickness the fade field picks at a value: 2 m, 1 m or 0.5 m.
+static func lamina_period_m(n: float) -> float:
+	if n < -0.25:
+		return LAM_PERIOD_M * 2.0
+	if n > 0.45:
+		return LAM_PERIOD_M * 0.5
+	return LAM_PERIOD_M
 
 ## Legacy `_air_weight` `:1235`. Open air among the four orthogonal and four diagonal neighbours,
 ## orthogonals weighted 1.0 and diagonals 0.5, so a lone nub reads round and an exposed face reads deeply

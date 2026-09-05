@@ -6,7 +6,11 @@
 # row 86 == SEAL_TOP + SEAL_ROWS (84 + 2). The last band: everything below
 # belongs to it, which matters because this world runs to 256m where legacy's ladder stopped at 66m.
 
+# RE-PLACED 2026-09-05 (D0398): legacy's ladder stopped at 66 m in a 128 m world; this world runs to 256 m
+# and its RULE layers turn at 40 m (Stonereach) and 140 m (the Deep Works, docs/GDD.md §11). The chip said
+# THE LONG DARK at 45 m and STONEREACH at 206 m. The names keep their order and sit inside the layers now.
+
 id: stonereach
 display_name: STONEREACH
-from_m: 66
+from_m: 40
 color: [0.44, 0.62, 0.96]

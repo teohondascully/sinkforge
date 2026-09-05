@@ -16753,3 +16753,34 @@ per-cell writers and are what a fresh world still costs; a flat-plane save forma
 restore from 486 ms to ~150 and the slot from 14 MB to under 1, and is an ADR, not a load fix.
 
 **Why:** the brief's F2. **Reverse cost:** each change is one function with its pin; the per-cell paths all stand.
+
+## D0398 · 2026-09-05 · The rock reads as geology: hardrock is bedded with parting planes, the tooth was the static, the ladder sits on the layers, the lamp eases to 0.38
+
+**Decided:** (1) **The "television static" was the tooth pass, not the tone.** `rock_tooth.gdshader`
+kept legacy's 1/32 m hash cell (D0379), which at the player's zoom of 2 is ONE screen pixel, adding up to
+0.06 absolute over rock the veil takes to a mean near 0.05: a per-pixel doubling. Legacy's fine cell was
+8 px over that 1 px tooth; ours is 4 px, so the same tooth is twice as loud against it. Now 1/8 m (4
+screen px, a quarter of a terrain cell), `tooth_add` 0.060 → 0.030, the mottle broader and stronger
+(0.006 → 0.012 at two cells). With it quiet, the bake's structure is visible for the first time. (2)
+**Hardrock is `bedded`** (`data/materials/hardrock.yaml`; the bedded grammar had no material) and bedded
+rock has PARTING PLANES: `RockTone.lamina`, a one-cell dark line on the same warped coordinate as the hue
+bands (`MaterialLook.bedding_metres`, shared so the lines sit ON the beds), multiplicative 0.42 plus an
+absolute 0.045 so it survives the veil's multiply, its bed thickness picked by a slow field (2 m, 1 m,
+0.5 m at lighter weight) so a face changes rhythm laterally. Deepstone stays massive: plates
+(`GRAM_PATCH` 0.5 → 0.6) and legacy's fractures. Stone grain quieter (`GRAM_GRAIN` bedded/massive 0.85/0.30
+→ 0.60/0.22), inclusions fewer and softer (`STONE_THRESH` 0.34 → 0.42, `STONE_DARKEN` 0.17 → 0.11), bedding
+hue stronger (`STRATA_AMOUNT` 0.17 → 0.22) and scaled by grammar (`GRAM_BEDDING` 0.9/1.4/0.45). The suite
+pins the partings' periods in metres, that they darken every parting row, and that massive rock shows no
+such rule (chance-level control). (3) **The depth ladder sat on legacy's 66 m world**: THE LONG DARK at
+45 m, STONEREACH at 206 m, while the RULE layers turn at 40 and 140 m (GDD §11). Re-placed: STONEREACH
+40, THE LONG DARK 72, THE DEEPSLATE 104, THE DEEP WORKS 140 (new record), THE SEAL 200 as the last. (4)
+**T012 ruled**: `VeilLight.LAMP_TINT` 0.45 → 0.38, warm kept.
+
+**Alternative:** more grain amplitude for "character". Rejected: amplitude at the cell is what read as
+static; character is STRUCTURE (partings, plates), which legacy's own note about the grammar says.
+
+**Why:** the director's T017 and T012 rulings and the "varied living geology" mandate. Every capture the
+first attempt made was compared by pixel count: 61.6% of pixels moved and 30 by more than 0.2 -- the
+laminae were real and invisible under the tooth, which is how the tooth was found.
+
+**Reverse cost:** every change is a constant or a data field; `lamina` is one function behind `GRAM_LAMINA`.

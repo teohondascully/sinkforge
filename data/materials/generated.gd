@@ -101,7 +101,7 @@ const RECORDS: Dictionary = {
 			0.335,
 		],
 		"grain": true,
-		"grammar": "massive",
+		"grammar": "bedded",
 		"depth_darken": 0.3,
 		"glitters": true,
 	},

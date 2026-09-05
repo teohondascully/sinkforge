@@ -45,8 +45,9 @@ static func under_rock(row: float, surf: float) -> float:
 ## How far the lamp's reveal leans toward `LAMP_COLOR`. Legacy's `LIGHT_TINT` (0.28) gave (1.0, 0.95,
 ## 0.86), which on this build's cooler deep read as white (2026-09-04 capture at 67 m); 0.45 is the taste
 ## call queued in `docs/TASTE_QUEUE.md` -- an amber pool against a blue-grey dark is the warm-against-cool
-## the frame had none of.
-const LAMP_TINT: float = 0.45
+## the frame had none of. THE DIRECTOR RULED (T012, 2026-09-05): keep it warm, and if it reads more
+## campfire than headlamp ease it toward 0.38 -- so 0.38 it is, and the warmth stays the point.
+const LAMP_TINT: float = 0.38
 
 
 ## The colour the lamp reveals rock in: legacy `_light_tint(LAMP_COLOR)` at this build's own lean.

@@ -179,7 +179,7 @@ func _test_the_band_ladder_is_ordered_and_total() -> void:
 	_check(String(look.band_at(0)["display_name"]) == "OPEN SKY",
 		"and row 0, twenty metres above it, reads as OPEN SKY (got %s) -- the band above the datum was unreachable before P017"
 		% look.band_at(0)["display_name"])
-	_check(String(look.band_at(MAX_ROW)["display_name"]) == "STONEREACH",
+	_check(String(look.band_at(MAX_ROW)["display_name"]) == "THE SEAL",
 		"the deepest row in the world still has a band, the last one (got %s)"
 		% look.band_at(MAX_ROW)["display_name"])
 	_check(String(look.band_at(-40)["display_name"]) == "OPEN SKY",
@@ -280,8 +280,8 @@ func _tone_spread(look: MaterialLook, material: StringName, row: int) -> float:
 
 func _test_the_depth_boost_keeps_bedding_legible_under_the_veil() -> void:
 	var look: MaterialLook = MaterialLook.new()
-	var surface: float = MaterialLook.tone_depth_boost(MaterialLook.SURFACE_ROW)
-	var deep: float = MaterialLook.tone_depth_boost(DEEP_ROW)
+	var surface: float = BeddingTone.tone_depth_boost(MaterialLook.SURFACE_ROW)
+	var deep: float = BeddingTone.tone_depth_boost(DEEP_ROW)
 	print("  [OBSERVED] tone boost %.3f at the surface, %.3f at stonereach_end (140 m)" % [surface, deep])
 	_check(is_equal_approx(surface, 1.0),
 		"the boost is EXACTLY 1.0 at the surface row (%.4f) -- nothing is veiled up here, so nothing may "

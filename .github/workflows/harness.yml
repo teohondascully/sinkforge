@@ -458,6 +458,7 @@ jobs:
       #   test_veil_map.gd                               test_veil_map (the lightmap that replaced 14,080 draw calls — D0336)
       #   test_terrain_bake.gd                           test_terrain_bake (the static terrain baked once, not per frame — D0326, PORT_ORDER V1)
       #   test_rock_tone.gd                              test_rock_tone (legacy's molded-rock shading + the texture grammar — D0327, PORT_ORDER V2)
+      #   test_rock_laminae.gd                           test_rock_laminae (bedded rock's parting planes on the shared bedding coordinate — D0398)
       #   test_post_fx.gd                                test_post_fx (the lens + palette grade, and its deterministic grain clock — D0328, PORT_ORDER V3)
       #   test_rock_grit.gd                              test_rock_grit (the sub-cell tooth + the baked quad's NEAREST sampling — D0331)
       #   test_arrival_plate.gd                          test_arrival_plate (the stratum arrival ceremony — D0288, LEGACY_GAP T1 #8)
@@ -488,7 +489,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 124 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 125 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -593,6 +594,7 @@ jobs:
             res://tests/test_veil_map.gd \
             res://tests/test_terrain_bake.gd \
             res://tests/test_rock_tone.gd \
+            res://tests/test_rock_laminae.gd \
             res://tests/test_post_fx.gd \
             res://tests/test_rock_grit.gd \
             res://tests/test_arrival_plate.gd \

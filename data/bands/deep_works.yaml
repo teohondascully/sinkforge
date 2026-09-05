@@ -1,0 +1,9 @@
+# The third rule layer's own band (docs/GDD.md §11: "Engineered, not natural. Someone built here. Heat and
+# pressure."), authored 2026-09-05 (D0398) so the chip announces the layer where the rules change. Legacy had
+# no band here: its world ended before this depth. The colour is the deepstone's own, warmed a step toward
+# the heat the layer promises.
+
+id: deep_works
+display_name: THE DEEP WORKS
+from_m: 140
+color: [0.62, 0.48, 0.42]

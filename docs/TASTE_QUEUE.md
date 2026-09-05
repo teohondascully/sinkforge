@@ -139,11 +139,11 @@ Captured from `godot --path . -- --fresh --warp=col,row --zoom=2.0 --screenshot-
 v2 has the method and the before/after list). Each of these was TAKEN here so the frame could be judged
 as a whole; each is one constant.
 
-**T012 · The lamp leans amber at 0.45, legacy at 0.28.** `VeilLight.LAMP_TINT`. At legacy's 0.28 the
+**T012 · RULED 2026-09-05: keep it warm; eased to 0.38 (D0398).** The lamp leans amber at 0.45, legacy at 0.28. `VeilLight.LAMP_TINT`. At legacy's 0.28 the
 pool read white against this build's blue-grey deep. *Question: is 0.45 a lamp or a campfire? The deep's
 `AMBIENT_LIGHT` (0.34, 0.35, 0.42) is legacy's exactly and is the other half of the contrast.*
 
-**T013 · The miner is lit by his own lamp and wears a shadow rim, not legacy's cyan halo.** `MinerLook.
+**T013 · RULED 2026-09-05: under the veil, keep it.** The miner is lit by his own lamp and wears a shadow rim, not legacy's cyan halo. `MinerLook.
 RIM_COLOR`, `ViewStack.BODY_Z`. Legacy drew him above the light "so he stays crisp". *Question: does he
 now belong, or did he lose his read against dark rock? The sprite's own black outline and saturated
 palette (helmet, visor) are the next question, and a redraw is yours.*
@@ -161,7 +161,7 @@ the player has SEEN (which needs a fog plane the observation does not carry)?*
 22% above and 18% below (`cave:` per-layer density). *Question: which, if any, and in what order? Each is
 a data diff plus the CI re-pin flow.*
 
-**T017 · The rock's texture is legacy's at legacy's granularity.** `RockTone.GRAIN_AMP`/`STONE_DARKEN`,
+**T017 · RULED 2026-09-05: more bedding, fewer inclusions -- executed in D0398 (hardrock bedded with parting planes, the tooth's cell 1/8 m).** The rock's texture is legacy's at legacy's granularity. `RockTone.GRAIN_AMP`/`STONE_DARKEN`,
 `MaterialLook.STRATA_AMOUNT`. Under the new light it reads as lit stone rather than static; the bedding
 is faint. *Question: more bedding (STRATA_AMOUNT up), fewer inclusions (STONE_DARKEN down), or leave it
 for the art pass?*

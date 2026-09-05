@@ -11,10 +11,12 @@ display_name: Hardrock
 # no retuning. `.tres` is a binary-ish resource format; gate 22 requires data/ be human-diffable
 # text, so the values move but the format does not.
 #
-# Legacy `stone`. Massive grammar: restrained speckle cut by steeply-dipping fracture seams.
+# Legacy `stone`, which ran the massive grammar. BEDDED here (D0398, T017): Stonereach is the layered
+# stone the shaft cuts through -- flat laminae, seams that run with the beds -- and deepstone below it is
+# the massive one, so the two rocks are told apart by their structure and not by their hue alone.
 
 base_color: [0.355, 0.35, 0.335]
 grain: true
-grammar: massive
+grammar: bedded
 depth_darken: 0.3
 glitters: true
