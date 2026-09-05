@@ -19,6 +19,7 @@ const WIDE: Rect2 = Rect2(-1000.0, -1000.0, 4000.0, 4000.0)
 func _initialize() -> void:
 	_test_the_tint()
 	_test_the_machine_table()
+	_test_the_status_beacon()
 	_test_the_placed_sources_and_the_cull()
 	_test_the_seams_and_the_motes()
 	_test_the_composition_only_adds_light()
@@ -56,6 +57,33 @@ func _test_the_machine_table() -> void:
 	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"lift", Vector2i(5, 3), &"working", {"power_permille": 1000})), 0.9), "a powered lift cuts 0.35 + 0.55")
 	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"lift", Vector2i(5, 3), &"working", {"power_permille": 0})), 0.35), "...an unpowered one its 0.35 base")
 	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"drill", Vector2i(6, 3))), 0.6), "any other machine the cool 0.6")
+
+
+## D0401 (T014): a machine that wants something cuts the veil a second time in its status colour, and it
+## breathes; a working one cuts once. Asserted on the cuts a starved and a working drill produce.
+func _test_the_status_beacon() -> void:
+	var starved: Interface.Observation = _obs_with([_rec(&"drill", Vector2i(2, 2), &"no_input")], {}, {})
+	var working: Interface.Observation = _obs_with([_rec(&"drill", Vector2i(2, 2), &"working")], {}, {})
+	var s_cuts: Array[Dictionary] = VeilSources.cuts(starved, [], [], 0.0, WIDE)
+	var w_cuts: Array[Dictionary] = VeilSources.cuts(working, [], [], 0.0, WIDE)
+	_check(w_cuts.size() == 1 and s_cuts.size() == 2, "a working drill cuts once, a starved one twice (%d, %d)" % [w_cuts.size(), s_cuts.size()])
+	var amber: Color = VeilSources.light_tint(StatusLook.of(&"no_input")["color"])
+	var beacon: Dictionary = {}
+	for c: Dictionary in s_cuts:
+		if c["tint"] == amber:
+			beacon = c
+	_check(not beacon.is_empty() and is_equal_approx(float(beacon["radius"]), VeilSources.BEACON_R_M * VeilSources.PER_M), "the second cut wears no_input's amber at the beacon radius")
+	var rec: Dictionary = _rec(&"drill", Vector2i(2, 2), &"no_input")
+	var lo: float = 2.0
+	var hi: float = -1.0
+	for i: int in 40:
+		var b: Dictionary = VeilSources.beacon_cut(rec, Vector2.ZERO, float(i) / 40.0 / VeilSources.BEACON_HZ)
+		lo = minf(lo, float(b["strength"]))
+		hi = maxf(hi, float(b["strength"]))
+	_check(is_equal_approx(lo, VeilSources.BEACON_S_LOW) and is_equal_approx(hi, VeilSources.BEACON_S_HIGH), "it breathes over one period between its two strengths (%.2f..%.2f)" % [lo, hi])
+	_check(VeilSources.beacon_cut(_rec(&"drill", Vector2i(2, 2), &"idle"), Vector2.ZERO, 0.3).is_empty() and VeilSources.beacon_cut(_rec(&"drill", Vector2i(2, 2), &"spent"), Vector2.ZERO, 0.3).is_empty() == false, "idle wants nothing and has no beacon; spent wants a relocate and has one")
+	var red: Color = VeilSources.light_tint(StatusLook.of(&"no_fuel")["color"])
+	_check(VeilSources.beacon_cut(_rec(&"generator", Vector2i(4, 3), &"no_fuel"), Vector2.ZERO, 0.0)["tint"] == red and red != amber, "a burner out of coal pulses red, not amber: the colour is the status's")
 
 
 func _test_the_placed_sources_and_the_cull() -> void:

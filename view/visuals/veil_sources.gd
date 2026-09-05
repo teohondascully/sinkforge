@@ -41,6 +41,15 @@ const SEAM_S_BASE: float = 0.62
 const SEAM_S_BREATH: float = 0.26
 const MOTE_R_M: float = 1.4
 const MOTE_S: float = 0.5
+## THE STATUS BEACON (D0401, the director's T014 ruling: a starved machine must read from ten metres in
+## the dark). A machine that needs something -- fuel, input, power, a clear, a link (`StatusLook`'s `fix`)
+## -- cuts the veil a second time in its STATUS colour, a small pool that breathes at `BEACON_HZ`, so the
+## dark carries a red or amber pulse where the working glow is a steady cool one. The mark on the face
+## still says WHICH fix; the beacon says WHERE, from further than the face can be read.
+const BEACON_R_M: float = 1.7
+const BEACON_S_LOW: float = 0.30
+const BEACON_S_HIGH: float = 0.75
+const BEACON_HZ: float = 0.9
 ## The cull margin, in metres: no source is dropped while its pool can still reach the drawn rect.
 const CULL_M: float = TORCH_GLOW_R_M
 const PER_M: float = float(MaterialLook.CELLS_PER_METRE)
@@ -80,9 +89,14 @@ static func cuts(obs: Interface.Observation, seams: Array[Dictionary], motes: Ar
 		return out
 	for rec: Dictionary in obs.machines:
 		var at: Vector2 = _logic_centre_cells(rec["cell"])
+		if not cull.has_point(at):
+			continue
 		var s: float = machine_strength(rec)
-		if s > 0.0 and cull.has_point(at):
+		if s > 0.0:
 			out.append(_cut(at, MACHINE_R_M, s, light_tint(MachineLook.color(rec.get("behavior", &""), rec.get("id", &""), bool(rec.get("source", false))))))
+		var beacon: Dictionary = beacon_cut(rec, at, t)
+		if not beacon.is_empty():
+			out.append(beacon)
 	for cell: Vector2i in obs.placed:
 		var at: Vector2 = _logic_centre_cells(cell)
 		if not cull.has_point(at):
@@ -103,6 +117,17 @@ static func cuts(obs: Interface.Observation, seams: Array[Dictionary], motes: Ar
 		if cull.has_point(at):
 			out.append(_cut(at, MOTE_R_M, MOTE_S))
 	return out
+
+
+## The status beacon for one machine record, or {} for a machine that wants nothing done. Breathes between
+## `BEACON_S_LOW` and `BEACON_S_HIGH` on `t`; the colour is the status's own from `StatusLook`, tinted the
+## way every source is so it composes with the rest.
+static func beacon_cut(rec: Dictionary, at: Vector2, t: float) -> Dictionary:
+	var look: Dictionary = StatusLook.of(StringName(rec.get("status", &"idle")))
+	if StringName(look["fix"]) == &"none":
+		return {}
+	var breath: float = 0.5 + 0.5 * sin(t * TAU * BEACON_HZ)
+	return _cut(at, BEACON_R_M, lerpf(BEACON_S_LOW, BEACON_S_HIGH, breath), light_tint(look["color"]))
 
 
 ## A seam's cut breathes with the same breath its glow does, so the reveal and the pool never disagree.

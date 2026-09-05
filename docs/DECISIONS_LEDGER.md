@@ -16831,3 +16831,18 @@ bands still read as bands, the map reads as a map.
 undiscovered-ore-on-map would remove the reason to explore" -- the director, verbatim.
 
 **Reverse cost:** one plane behind one observation field; the save key is optional on the way in.
+
+## D0401 · 2026-09-05 · The status beacon: a machine that wants something cuts the veil in its status colour (T014)
+
+**Decided:** The director's T014 ruling -- under the veil, AND a starved machine legible from ten metres
+in the dark. `VeilSources.beacon_cut`: every machine record whose `StatusLook` fix is not `none` (no fuel,
+no input, no power, blocked, unlinked, spent) adds a second cut of 1.7 m in the STATUS colour, breathing
+between 0.30 and 0.75 at 0.9 Hz, beside the steady cool working glow every machine already cuts. The red
+or amber pulse is what carries at distance in the dark; the mark on the face still names the fix once
+you arrive. Pinned: one cut for a working drill, two for a starved one, the beacon's radius and tint,
+its breath between the two strengths over one period, red for no fuel against amber for no input.
+
+**Not captured in the dark:** no start record places a machine underground, so the beacon's frame is the
+director's to see in play; on the surface the sky has already opened the veil where the forge stands.
+
+**Why:** the ruling. **Reverse cost:** one function behind one table lookup.
