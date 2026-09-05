@@ -257,7 +257,27 @@ as the cave wall. **Where:** V01's rim will separate them; re-judge after.
 
 ## What this session executed
 
-Filled in as each lands, with the commit and the before/after capture pair. See `docs/WORKING.md`.
+Before captures: `scratchpad/captures/real/`; after: `scratchpad/captures/after/` (same `--warp` and zoom;
+the seat flags reproduce every one). Commits on main, 2026-09-04:
+
+| Entry | What landed | Commit |
+|---|---|---|
+| V05 world edge | `Main` calls `CameraRig.set_world_limits` (D0333's clamp, never wired in the seat) | 1c44e1cb |
+| V03 flat deep, V04 grey light, V17 wall depth | `veil.gdshader` + `VeilLight`: legacy's `AMBIENT_LIGHT` dark, skylight scatter under each column's `sky_floor`, `VOID_FLOOR`, amber lamp (lean 0.45) | 1c44e1cb |
+| V06 miner pasted on, V07 halo | the body under the veil at `BODY_Z`; the cyan rim is a dark shadow rim | 1c44e1cb |
+| V25 machines unlit | the factory under the veil (D0393) | 11cea8dc |
+| V09 weather-map | ore unmarked, chart palette, the large form modal | a465cd25 |
+| V15 horizon line | the sky rect overlaps the gradient by 2 px | a465cd25 |
+| V22 banner | 13/10 → 11/9 | a465cd25 |
+| V23 boot plate | the plate primes for one second | a465cd25 |
+| V01 rock vs void | reads through the light now (void floor + ambient tint); the rim/AO/form terms were already in the bake | 1c44e1cb |
+
+Re-judged after the light: V13 (the pool reads), V16 (brown → grey → blue with depth), V31 (cracks and
+the ring are there; small), V40 (ledges separate). Not executed, with the reason: V02 (legacy's texture
+at legacy's granularity -- knobs `RockTone.GRAIN_AMP`, `STONE_DARKEN`, `MaterialLook.STRATA_AMOUNT`; the
+director's art pass), V08 water (P2 now; a surface skin line is the next cheap step), V10-V12 generation
+(golden re-pin; the director's), V14 glint density (ore rate; generation), V19-V21 (texture pass),
+V24-V30 HUD polish, V32-V55.
 
 ## Taste forks for the director (`docs/TASTE_QUEUE.md`)
 

@@ -132,3 +132,36 @@ minimap (6g–6i), the settings page (6j), the lights (6k), the ore seams and th
 marks (6m), the ambience (6n), the surface tone (6o), the two shaders (6p). Each was ported from legacy
 with its numbers converted, none has been judged. *Question: which of these reads as legacy's, and which
 as programmer art in legacy's colours?*
+
+## The look pass (D0391–D0393) — calls made from the real seat's captures, each reversible
+
+Captured from `godot --path . -- --fresh --warp=col,row --zoom=2.0 --screenshot-*` (`docs/VISUAL_QUEUE.md`
+v2 has the method and the before/after list). Each of these was TAKEN here so the frame could be judged
+as a whole; each is one constant.
+
+**T012 · The lamp leans amber at 0.45, legacy at 0.28.** `VeilLight.LAMP_TINT`. At legacy's 0.28 the
+pool read white against this build's blue-grey deep. *Question: is 0.45 a lamp or a campfire? The deep's
+`AMBIENT_LIGHT` (0.34, 0.35, 0.42) is legacy's exactly and is the other half of the contrast.*
+
+**T013 · The miner is lit by his own lamp and wears a shadow rim, not legacy's cyan halo.** `MinerLook.
+RIM_COLOR`, `ViewStack.BODY_Z`. Legacy drew him above the light "so he stays crisp". *Question: does he
+now belong, or did he lose his read against dark rock? The sprite's own black outline and saturated
+palette (helmet, visor) are the next question, and a redraw is yours.*
+
+**T014 · The factory is under the veil.** `ViewStack.MACHINE_Z` (D0393, reversing D0364). Lit by the
+scene and its own pools. *Question: can a starved machine still be read from ten metres in the dark, or
+does it want its status lamp brighter?*
+
+**T015 · The map does not mark ore.** `Minimap.class_color` (D0392). A design call as much as a look:
+the survey upgrades sell what the fleck gave away. *Question: agreed, or should the corner map show ore
+the player has SEEN (which needs a fog plane the observation does not carry)?*
+
+**T016 · The three generation forks, each moves the golden.** V10 the 24 m ruler-flat pad
+(`relief.pad_m`); V11 no water above 140 m (`aquifer:` depth range); V12 Stonereach at 8% air against
+22% above and 18% below (`cave:` per-layer density). *Question: which, if any, and in what order? Each is
+a data diff plus the CI re-pin flow.*
+
+**T017 · The rock's texture is legacy's at legacy's granularity.** `RockTone.GRAIN_AMP`/`STONE_DARKEN`,
+`MaterialLook.STRATA_AMOUNT`. Under the new light it reads as lit stone rather than static; the bedding
+is faint. *Question: more bedding (STRATA_AMOUNT up), fewer inclusions (STONE_DARKEN down), or leave it
+for the art pass?*

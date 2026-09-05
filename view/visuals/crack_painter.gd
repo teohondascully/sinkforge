@@ -122,9 +122,20 @@ static func paint(cracks: Dictionary, ci: CanvasItem, cell_px: int, blow_px: flo
 ## point rather than an implementation detail: driving this from the sim objects directly would draw the
 ## same picture while proving none of the L2 contract that D0274 opened.
 static func paint_frame(frame: Frame, ci: CanvasItem) -> void:
-	if frame == null or frame.obs == null:
+	var p: Dictionary = plan(frame)
+	if p.is_empty():
 		return
+	paint(p["cracks"], ci, p["cell_px"], p["blow"])
+
+
+## What `paint_frame` would draw from, or `{}` when the frame cannot be drawn from: no frame, no
+## observation, a zero-radius bite, an observation that carries no scale. The layout half of the
+## layout/paint split every painter here has, so "an incomplete frame paints nothing" is a value a test
+## can read rather than a call that did not crash (D0394).
+static func plan(frame: Frame) -> Dictionary:
+	if frame == null or frame.obs == null:
+		return {}
 	var blow: float = float(frame.obs.mining_blow_px)
 	if blow <= 0.0 or frame.obs.cell_px <= 0:
-		return   ## a zero-radius bite, or an observation that carries no scale: nothing to size against
-	paint(frame.obs.mining_cracks, ci, frame.obs.cell_px, blow)
+		return {}
+	return {"cracks": frame.obs.mining_cracks, "cell_px": frame.obs.cell_px, "blow": blow}

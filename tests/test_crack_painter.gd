@@ -137,8 +137,15 @@ func _test_the_frame_form_refuses_a_frame_that_carries_no_scale() -> void:
 	var no_blow := Frame.new(); no_blow.obs = Interface.Observation.new(); no_blow.obs.cell_px = CELL
 	var no_cell := Frame.new(); no_cell.obs = Interface.Observation.new(); no_cell.obs.mining_blow_px = int(BLOW)
 	var no_obs := Frame.new()
-	for f: Frame in [no_blow, no_cell, no_obs]:
+	var empty: int = 0
+	for f: Frame in [no_blow, no_cell, no_obs, null]:
 		CrackPainter.paint_frame(f, canvas)
-	CrackPainter.paint_frame(null, canvas)
-	_check(true, "every incomplete frame -- no blow, no cell size, no observation, no frame -- paints nothing")
+		if CrackPainter.plan(f).is_empty():
+			empty += 1
+	_check(empty == 4, "every incomplete frame -- no blow, no cell size, no observation, no frame -- plans nothing (%d of 4)" % empty)
+	var whole := Frame.new()
+	whole.obs = Interface.Observation.new()
+	whole.obs.cell_px = CELL
+	whole.obs.mining_blow_px = int(BLOW)
+	_check(not CrackPainter.plan(whole).is_empty() and CrackPainter.plan(whole)["cell_px"] == CELL, "CONTROL: a frame with a blow and a scale plans a draw")
 	canvas.free()

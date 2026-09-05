@@ -16632,3 +16632,36 @@ stay above the veil: aim readouts and light sources.
 **Why:** one light, one set of rules for everything standing in it.
 
 **Reverse cost:** Three constants.
+
+## D0394 · 2026-09-04 · A+ pass: the colliding gate number, gate_status's silent minutes, one vacuous green, fifty dead legacy files
+
+**Decided:** (1) `docs/QUALITY.md` carried two gates numbered 30 -- CORRECTIONS freshness (D0175) and
+CI-not-shrunk (D0266) -- so `tools/gate_status.py`'s contiguity check FATALed and the instrument had
+been unrunnable since D0266. The later one is renumbered to the next free address, 36, in the doc, the
+workflow step name and the two tool docstrings; D0266/D0284 keep the number they were written with
+(gate numbers are addresses; the ledger is append-only). (2) `gate_status.py` was not hanging: it
+re-runs every non-engine gate step locally with a 120 s cap each and takes 2 m 19 s in total, in silence.
+A progress line per step now goes to stderr, and the docstring says how long it takes. (3)
+`tests/test_crack_painter.gd`'s "every incomplete frame paints nothing" was `_check(true)` after four
+calls that did not crash -- QUALITY §2's "a check cannot pass merely because it ran without crashing",
+verbatim. `CrackPainter.plan(frame)` is the layout half now and the test reads it, with a positive
+control. The hunt found no other instance: the `_check(true)` calls in the two crash-probe fixtures ARE
+the mechanism under test, and every `!= null` in a `_check` is on an Object, not a container. (4) The
+fifty files `docs/A_PRIME_REFACTOR_PLAN.md` §3.4 lists as DEAD -- nine `legacy/scenes/bazaar*.gd`, two
+`legacy/src/data/` rule files, forty `legacy/tools/` scripts (dead subject or superseded by a named
+current suite) -- are removed. Verified first: no file outside `legacy/` names any of them (docs excluded;
+their prose citations are history), and inside `legacy/` only legacy's own `run_harness.sh`,
+`check_base.gd` and `assert_floors.txt` do, none of which anything runs. The tag `pre-pivot` and the
+history hold every byte.
+
+**NOT done, and why:** the plan's in-file dead RANGES (`factory_sim.gd`'s 21 ranges, `main.gd`'s 373
+lines) stay. Hundreds of provenance citations in live code point at `legacy/<file>:<line>`; excising
+ranges shifts every line below them and turns each citation into a lie. Legacy is read-only for that
+reason, and a dead range inside a read-only reference costs nothing.
+
+**Alternative:** Renumber CORRECTIONS freshness instead. Rejected: it was first, and gate 30 is cited for
+it in QUALITY §5's own text.
+
+**Why:** the brief's A+ list; each item is a gate or an instrument that reported green over a defect.
+
+**Reverse cost:** Trivial for (1)-(3). (4) is `git checkout pre-pivot -- <path>`.

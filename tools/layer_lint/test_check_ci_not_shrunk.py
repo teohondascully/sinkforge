@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation tests for check_ci_not_shrunk.py, QUALITY gate 30 (D0266/D0284).
+"""Mutation tests for check_ci_not_shrunk.py, QUALITY gate 36 (numbered 30 until D0394; D0266/D0284).
 
     python3 tools/layer_lint/test_check_ci_not_shrunk.py
 

@@ -29,7 +29,7 @@ never copied -- is what turns "29 declared gates" into "18 with code, 11 without
 ways, weakest evidence last:
 
 1. **Explicit citation.** A CI step's own `name:` contains "(QUALITY gate N)" or "(QUALITY gates N-M)" --
-   unambiguous; 15 of 29 gates are cited this way.
+   unambiguous; 15 of the 29 gates that existed at D0143 were cited this way (the live count is parsed).
 2. **Path cross-reference.** `docs/QUALITY.md`'s OWN prose for a gate sometimes names its enforcing file
    directly in backticks (gate 1: "Custom check in `tools/layer_lint`"; gate 28: "`tools/run_gd_test.sh`
    wraps every suite invocation"). Every backtick span in a gate's own body text is extracted and checked
@@ -40,7 +40,7 @@ ways, weakest evidence last:
 Anything unlinked after both tiers is reported NO-CODE. A third tier (keyword overlap between a gate's own
 title and step text) was tried and removed: it linked gates 17 and 20 on nothing stronger than one shared
 word ("claim", "adr") and both links disagreed with an independent audit's own hand-read of this tree.
-Tiers 1+2 alone reproduce that audit's exact split -- 18 of 29 gates with linked code, 11 without (gates 5,
+Tiers 1+2 alone reproduce that audit's exact split at D0143 -- 18 of its 29 gates with linked code, 11 without (gates 5,
 6, 9, 10, 12, 14, 17, 18, 19, 20, 21) -- which is why the weaker tier was cut rather than tuned: a
 heuristic this tool cannot make precise is worse than an honest NO-CODE, which is the whole property this
 tool exists to protect. That agreement is evidence this two-tier design works, not a promise it always
@@ -61,6 +61,9 @@ would still be missed, and closing that gap further is a separate, later task, n
   repository had exactly that at the time this tool was built: two gates were failing locally only because
   an unrelated, deliberately-uncommitted investigation was sitting in the tree), and reporting that as a
   plain FAIL would misattribute local, uncommitted state to CI itself.
+
+RUNTIME: two to three minutes. Every non-engine `run:` step of harness.yml is re-executed locally, each
+capped at 120 s, and a progress line per step goes to stderr so the wait is visibly work, not a hang.
 - Multiple candidate steps for one gate (real when Tier 2 evidence is ambiguous, e.g. gate 1's directory-
   only citation matches every script under `tools/layer_lint/`): every candidate's status is shown; the
   gate's own row is FAIL if any candidate failed, PASS only if every candidate passed. A gate is never
@@ -243,6 +246,9 @@ def classify_step(s: dict, ci_steps: dict[str, str]) -> tuple[str, str]:
     ci_conclusion = ci_steps.get(s["name"])
     local = None
     if not NEEDS_ENGINE_RE.search(s["run"]) and s["run"]:
+        # Progress on stderr: the whole report re-runs every non-engine step (each capped at 120 s) and
+        # takes two to three minutes in total, which read as a hang to anyone watching stdout (D0394).
+        print("gate_status: running locally: %s" % s["name"][:70], file=sys.stderr)
         local = run_locally(s["run"])
 
     if ci_conclusion in ("skipped", "cancelled"):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The CI check set may not SHRINK without saying so. `docs/QUALITY.md` gate 30, `docs/DECISIONS_LEDGER.md` D0266/D0284.
+"""The CI check set may not SHRINK without saying so. `docs/QUALITY.md` gate 36 (numbered 30 until D0394), `docs/DECISIONS_LEDGER.md` D0266/D0284.
 
 **Why this gate exists, precisely.** A line-range edit to `.github/workflows/harness.yml` deleted the
 `headed_boot` and `fuzz_nightly` jobs (D0265). CI then reported **all green** and the pull request
