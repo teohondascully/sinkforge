@@ -16595,3 +16595,22 @@ it were in the file the port cited.
 the signature (the golden is unchanged, ALL PASS 21); the mount and the rim colour are one line each.
 Machines still draw ABOVE the veil (`MACHINE_Z = -30`, the plan's choice), so the miner passes behind a
 machine he walks past -- noted, not decided here.
+
+## D0392 · 2026-09-04 · The map stops marking ore; the large form is a modal; the plate primes for a second
+
+**Decided:** `Minimap.class_color` paints an ore-centred metre cell as the rock it sits in. With
+Stonereach's ore rate legacy's gold fleck painted half the deep gold (a chart of ore, not of ground), and
+a boot-time map of every ore cell is the survey upgrade `docs/GDD.md` §5 sells ("ore ping, strata map")
+handed over free, and §12's Reveal question answered before it is asked. Rock is the band colour darkened
+for a chart (0.35), wall darker still, void near-black. The large form sets its chip above the others
+and dims the canvas behind it. `ArrivalPlate` primes for its first second: the body's first frame stands
+a row lower than where it settles, and the settle announced "ENTERING OPEN SKY" on every boot. The
+objective banner's type drops a step (13/10 → 11/9). The sky's horizon rect overlaps the gradient quad
+by two pixels instead of butting it: the sub-pixel gap read as a hard dark horizon line.
+
+**Alternative:** Keep the ore fleck as legacy drew it (legacy's map was a debug view of a world with
+far less ore). Rejected for the design reason above, not the look.
+
+**Why:** VISUAL_QUEUE v2 V09, V15, V22, V23.
+
+**Reverse cost:** Trivial: one match arm, two constants, a rect edge, a time guard.

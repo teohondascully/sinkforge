@@ -57,8 +57,8 @@ func _test_the_texture_rebuilds_only_on_a_new_version() -> void:
 	_check(m.ensure_texture(o, look) != t1 and m.rebuilds == 2, "a new version rebuilds")
 	var img: Image = m.ensure_texture(o, look).get_image()
 	# An 8-bit texture reads back quantised (0.95 is 242/255), so the comparison is within a step, not exact.
-	_check(_close(img.get_pixel(1, 0), Minimap.ORE_COLOR) and _close(img.get_pixel(5, 5), Minimap.VOID_COLOR), "ore is the fleck, void the void (%s, %s)" % [str(img.get_pixel(1, 0)), str(img.get_pixel(5, 5))])
-	_check(img.get_pixel(0, 0) != Minimap.VOID_COLOR and img.get_pixel(0, 0) != Minimap.ORE_COLOR, "rock is the band's colour, neither")
+	_check(_close(img.get_pixel(1, 0), img.get_pixel(0, 0)) and _close(img.get_pixel(5, 5), Minimap.VOID_COLOR), "ore paints as its rock (the map does not give the survey away, D0392), void the void (%s, %s)" % [str(img.get_pixel(1, 0)), str(img.get_pixel(5, 5))])
+	_check(img.get_pixel(0, 0) != Minimap.VOID_COLOR and img.get_pixel(0, 0) != Minimap.ORE_COLOR, "rock is the band's colour darkened for a chart, neither void nor the fleck")
 	var short: Interface.Observation = _obs()
 	short.map = PackedByteArray([1, 2, 3])
 	_check(m.ensure_texture(short, look) == null, "a plane shorter than its cells is refused")

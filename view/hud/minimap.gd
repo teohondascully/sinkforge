@@ -12,13 +12,22 @@ extends RefCounted
 ## `shown` and `large` are properties the shell flips (legacy's M); the corner form is the default.
 ## Legacy's aquifer, power, torch, bazaar, breach and ping overlays are not here: the first three need
 ## whole-world planes the observation does not carry, the rest are dead.
+##
+## ORE IS NOT MARKED (D0392). With Stonereach's ore rate an ore-centred metre cell is common enough that
+## legacy's gold fleck painted half the deep gold (VISUAL_QUEUE v2 V09), and a map that shows every ore
+## cell for free is the survey upgrade `docs/GDD.md` §5 sells ("ore ping, strata map") given away at
+## boot -- and the Reveal layer's question ("what's behind this wall", §12) answered before it is asked.
+## An ore cell paints as the rock it sits in. `ORE_COLOR` stays for the machine dots' family.
 
 const MINI_W: float = 150.0
 const MINI_H: float = 116.0
 const MINI_TOP: float = 34.0
 const MARGIN_RIGHT: float = 12.0
 const LARGE_BOX := Vector2(360.0, 272.0)
-const VOID_COLOR := Color(0.09, 0.11, 0.16)
+const VOID_COLOR := Color(0.05, 0.06, 0.09)
+const ROCK_DARKEN: float = 0.35     ## the band colour is authored for lit rock; a chart of it reads darker
+const WALL_DARKEN: float = 0.62
+const LARGE_DIM := Color(0.02, 0.02, 0.04, 0.55)   ## the world defocused behind the large form
 const ORE_COLOR := Color(0.95, 0.80, 0.40)
 const YOU_COLOR := Color(0.97, 0.86, 0.36)
 const VIEW_COLOR := Color(1.0, 1.0, 1.0, 0.55)
@@ -53,10 +62,10 @@ static func frame_rect(map_cells: Vector2i, is_large: bool) -> Rect2:
 ## The colour of one coarse class at one logic row, off the palette's band ladder.
 static func class_color(cls: int, logic_row: int, look: MaterialLook) -> Color:
 	var n: int = Interface.Observation.LOGIC_PX / Interface.Observation.CELL_PX
+	var band: Color = look.band_color(logic_row * n + n / 2) if look != null else Color(0.4, 0.4, 0.45)
 	match cls:
-		Interface.Observation.MAP_ROCK: return look.band_color(logic_row * n + n / 2) if look != null else Color(0.4, 0.4, 0.45)
-		Interface.Observation.MAP_ORE: return ORE_COLOR
-		Interface.Observation.MAP_WALL: return (look.band_color(logic_row * n + n / 2) if look != null else Color(0.4, 0.4, 0.45)).darkened(0.5)
+		Interface.Observation.MAP_ROCK, Interface.Observation.MAP_ORE: return band.darkened(ROCK_DARKEN)
+		Interface.Observation.MAP_WALL: return band.darkened(WALL_DARKEN)
 	return VOID_COLOR
 
 
@@ -103,6 +112,10 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	if l.is_empty():
 		return
 	var rect: Rect2 = l["rect"]
+	# The large form is a modal: above every other chip, the world dimmed behind it.
+	ci.z_index = 1 if bool(l["large"]) else 0
+	if bool(l["large"]):
+		ci.draw_rect(Rect2(Vector2.ZERO, UiTheme.CANVAS), LARGE_DIM)
 	UiTheme.panel(ci, rect.grow(UiTheme.px(3.0)))
 	var tex: ImageTexture = ensure_texture(frame.obs, frame.look)
 	if tex != null:

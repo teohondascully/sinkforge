@@ -92,12 +92,16 @@ func _test_the_ceremony_expires() -> void:
 		return
 	var p := ArrivalPlate.new()
 	p.note_frame(_frame(rows[0], 0.0))
-	p.note_frame(_frame(rows[1], 0.0))
-	_check(p.on_screen(_frame(rows[1], ArrivalPlate.HOLD * 0.5)),
+	_check(not p.note_frame(_frame(rows[1], ArrivalPlate.PRIME_SECONDS * 0.5)),
+		"a band change inside the first second primes without a ceremony (the spawn settles onto the pad)")
+	p.note_frame(_frame(rows[0], ArrivalPlate.PRIME_SECONDS))
+	var t0: float = ArrivalPlate.PRIME_SECONDS + 0.1
+	_check(p.note_frame(_frame(rows[1], t0)), "the same change after the first second fires")
+	_check(p.on_screen(_frame(rows[1], t0 + ArrivalPlate.HOLD * 0.5)),
 		"halfway through its life the plate is still up")
-	_check(not p.on_screen(_frame(rows[1], ArrivalPlate.HOLD + 0.01)),
+	_check(not p.on_screen(_frame(rows[1], t0 + ArrivalPlate.HOLD + 0.01)),
 		"and past its hold it is gone")
-	_check(not p.on_screen(_frame(rows[1], ArrivalPlate.HOLD * 40.0)),
+	_check(not p.on_screen(_frame(rows[1], t0 + ArrivalPlate.HOLD * 40.0)),
 		"and stays gone rather than reappearing on a clock that wrapped")
 
 
@@ -159,9 +163,9 @@ func _test_the_words_are_tracked_apart_and_the_plate_is_centred_on_them() -> voi
 	if rows.size() != 2:
 		return
 	var p := ArrivalPlate.new()
-	p.note_frame(_frame(rows[0], 0.0))
-	p.note_frame(_frame(rows[1], 0.0))
-	var l: Dictionary = p.layout(_frame(rows[1], 0.4), font)
+	p.note_frame(_frame(rows[0], ArrivalPlate.PRIME_SECONDS))
+	p.note_frame(_frame(rows[1], ArrivalPlate.PRIME_SECONDS + 0.1))
+	var l: Dictionary = p.layout(_frame(rows[1], ArrivalPlate.PRIME_SECONDS + 0.5), font)
 	_check(not l.is_empty(), "sanity: there is a plate laid out to measure")
 	var mid: float = UiTheme.CANVAS.x * 0.5
 	var w: float = ArrivalPlate.tracked_width(font, l["text"], ArrivalPlate.SIZE, ArrivalPlate.TRACK)
@@ -192,7 +196,7 @@ func _test_an_incomplete_frame_decides_nothing() -> void:
 	# on a plate that ignores everything it is given.
 	var rows: Array[int] = _two_bands()
 	if rows.size() == 2:
-		p.note_frame(_frame(rows[0], 0.0))
-		_check(p.note_frame(_frame(rows[1], 0.0)),
+		p.note_frame(_frame(rows[0], ArrivalPlate.PRIME_SECONDS))
+		_check(p.note_frame(_frame(rows[1], ArrivalPlate.PRIME_SECONDS + 0.1)),
 			"CONTROL: a complete frame crossing a boundary still fires")
 	canvas.free()

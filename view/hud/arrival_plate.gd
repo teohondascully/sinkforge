@@ -74,6 +74,10 @@ const KICKER: String = "ENTERING"
 
 ## Nothing has been announced yet. Not a band row and not -1, which is a real row above the datum.
 const NO_BAND: String = ""
+## The first second primes without a ceremony: the body's first frame stands a row or two lower than
+## where it settles (the spawn drops it onto the pad), and announcing that settle read as "ENTERING OPEN
+## SKY" on every boot (VISUAL_QUEUE v2 V23).
+const PRIME_SECONDS: float = 1.0
 
 var _announced: String = NO_BAND   ## the band whose ceremony has already fired
 var _fired_at: float = 0.0
@@ -115,7 +119,7 @@ func note_frame(frame: Frame) -> bool:
 	var name: String = String(band.get("display_name", ""))
 	if name.is_empty() or name == _announced:
 		return false
-	var first: bool = _announced == NO_BAND
+	var first: bool = _announced == NO_BAND or frame.anim_time < PRIME_SECONDS
 	_announced = name
 	if first:
 		return false

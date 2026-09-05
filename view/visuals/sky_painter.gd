@@ -104,9 +104,12 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 	var quad := PackedVector2Array([Vector2(view.position.x, grad_top), Vector2(view.end.x, grad_top),
 		Vector2(view.end.x, HORIZON_Y), Vector2(view.position.x, HORIZON_Y)])
 	ci.draw_polygon(quad, PackedColorArray([top_c, top_c, hor_c, hor_c]))
+	# OVERLAPPED BY TWO PIXELS, not butted: a polygon edge and a rect edge on the same y leave a sub-pixel
+	# gap the rasteriser fills with the backdrop, and it read as a hard dark horizon line from every
+	# surface capture (VISUAL_QUEUE v2 V15).
 	if view.end.y > HORIZON_Y:
-		ci.draw_rect(Rect2(Vector2(view.position.x, HORIZON_Y),
-			Vector2(view.size.x, view.end.y - HORIZON_Y)), hor_c)
+		ci.draw_rect(Rect2(Vector2(view.position.x, HORIZON_Y - 2.0),
+			Vector2(view.size.x, view.end.y - HORIZON_Y + 2.0)), hor_c)
 	if dl < 0.85:
 		_stars(frame, ci, view, cam, grad_top, dl)
 	# Sun and moon: each rides a low arc across the view during its half of the cycle, pinned to the
