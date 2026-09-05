@@ -59,7 +59,7 @@ func _ready() -> void:
 		meter = FrameMeter.new()
 	drive = flags["drive"]
 	if autoboot:
-		boot(true)
+		boot(not bool(flags["fresh"]))
 
 
 ## Kept as the smoke's own entry point; `SeatFlags.parse` is the parser.
@@ -168,7 +168,7 @@ func _physics_process(delta: float) -> void:
 	if not page_open:
 		for c: Command in hands.verbs(Controls.pressed, _digit_down, PlayInput.aim_logic_of(frame_in)):
 			door.apply(c)
-	_hud_keys(page_open)
+	_hud_keys(page_open) if String(flags["act"]) == "" else _hud_keys_driven()
 	last_input = frame_in
 	view.refresh()
 	_effects(delta)
@@ -188,6 +188,17 @@ func _physics_process(delta: float) -> void:
 	camera.position = rig.step(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE),
 		Vector2(float(body.vel_x), float(body.vel_y)) / float(Fx.SCALE), zoom, float(get_viewport().get_visible_rect().size.x), delta)
 	queue_redraw()
+
+
+## `--act=map|settings`: the HUD key as the scripted hand presses it.
+func _hud_keys_driven() -> void:
+	var keys: Dictionary = hands.hud_keys(_driven)
+	if bool(keys["settings"]) and stack.settings != null:
+		stack.settings.open = not stack.settings.open
+	if bool(keys["map"]) and stack.minimap != null:
+		stack.minimap.large = not stack.minimap.large
+	if stack.settings != null and stack.settings.open:
+		stack.settings.state = HudBridge.snapshot()
 
 
 ## The meter's physics sample, split by whether this tick ran the hub; a report every 300 ticks.
@@ -210,13 +221,26 @@ func _read_hands(page_open: bool) -> InputFrame:
 		return hands.read(func(_a: StringName) -> bool: return false, Vector2.ZERO, cell_px, func(_c: Vector2i) -> bool: return false)
 	var grid: TileGrid = (door.services()["world"] as World).grid
 	var grid_ok: Callable = func(c: Vector2i) -> bool: return grid.in_bounds(c)
-	if drive:
+	if drive or String(flags["act"]) != "":
+		if String(flags["act"]) == "mine":   # aim a metre ahead and a metre below the feet: into the ground
+			var body: Body = door.services()["body"]
+			Controls.pose_pointer(Vector2(float(body.pos_x) / float(Fx.SCALE) + 16.0 * float(body.facing),
+				float(body.pos_y) / float(Fx.SCALE) + float(Body.HEIGHT_PX) / 2.0 + 12.0))
 		return hands.read(_driven, Controls.pointer_world(self), cell_px, grid_ok)
 	return hands.read(Controls.pressed, Controls.pointer_world(self), cell_px, grid_ok)
 
 
-## The scripted hand for `--perf-drive`, a pure function of the tick.
+## The scripted hand for `--perf-drive` and `--act=`, a pure function of the tick.
 func _driven(action: StringName) -> bool:
+	var act: String = flags["act"]
+	if act != "":
+		if act == "mine" and action == Controls.MINE:
+			return tick >= 20
+		if act == "map" and action == Controls.MAP:
+			return tick == 20
+		if act == "settings" and action == Controls.SETTINGS:
+			return tick == 20
+		return false
 	if action == Controls.RIGHT:
 		return tick % 480 < 240
 	if action == Controls.LEFT:

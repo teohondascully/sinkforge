@@ -13,13 +13,16 @@ extends RefCounted
 ##   --zoom=Z                the camera zoom, overriding the saved setting
 ##   --screenshot-tick=N     at tick N save the viewport to --screenshot-out, then quit unless
 ##   --screenshot-out=PATH   --quit-after says otherwise
+##   --fresh                 a new game: the slot on disk is neither loaded nor written
+##   --act=mine|map|settings a scripted hand for a capture: hold MINE at the rock ahead from tick 20 with
+##                           the pointer posed, or press the map / settings key once at tick 20
 
 const NO_WARP: Vector2i = Vector2i(-1, -1)
 
 
 static func parse(args: PackedStringArray) -> Dictionary:
 	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
-		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": ""}
+		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false}
 	for a: String in args:
 		if a.begins_with("--quit-after="):
 			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
@@ -38,13 +41,17 @@ static func parse(args: PackedStringArray) -> Dictionary:
 			f["screenshot_tick"] = int(a.substr("--screenshot-tick=".length()))
 		elif a.begins_with("--screenshot-out="):
 			f["screenshot_out"] = a.substr("--screenshot-out=".length())
+		elif a.begins_with("--act="):
+			f["act"] = a.substr("--act=".length())
+		elif a == "--fresh":
+			f["fresh"] = true
 	return f
 
 
 ## The nearest cell to `near` where a body can stand: air for the body's height above a solid floor,
 ## searched in growing rings so the warp lands in the cave the caller pointed at, not inside its wall.
 ## `NO_WARP` when nothing within `reach` cells qualifies.
-static func stand_near(grid: TileGrid, near: Vector2i, body_cells_tall: int, reach: int = 48) -> Vector2i:
+static func stand_near(grid: TileGrid, near: Vector2i, body_cells_tall: int, reach: int = 96) -> Vector2i:
 	for r: int in range(0, reach + 1):
 		for dy: int in range(r, -r - 1, -1):          # below first: a floor is found by falling
 			for dx_abs: int in range(0, r + 1):       # then the column closest to the one asked for
@@ -57,12 +64,17 @@ static func stand_near(grid: TileGrid, near: Vector2i, body_cells_tall: int, rea
 	return NO_WARP
 
 
-## `c` is the cell the feet stand in: solid below it, air from it up through the body's height.
+## `c` is the cell the feet's left half stands in: solid under both feet cells, and air across the body's
+## four-cell width (the body is a tile wide, `Body.WIDTH_PX`) from the feet up through its height. A
+## one-cell slot passes a one-column test and then ejects the body sideways or up (2026-09-04, seen).
 static func _standable(grid: TileGrid, c: Vector2i, tall: int) -> bool:
-	if not grid.in_bounds(c) or not grid.in_bounds(c + Vector2i(0, 1)) or not grid.is_solid(c + Vector2i(0, 1)):
-		return false
-	for i: int in range(0, tall):
-		var up: Vector2i = c - Vector2i(0, i)
-		if not grid.in_bounds(up) or grid.is_solid(up):
+	for fx: int in range(0, 2):
+		var under: Vector2i = c + Vector2i(fx, 1)
+		if not grid.in_bounds(under) or not grid.is_solid(under):
 			return false
+	for dx: int in range(-1, 3):
+		for i: int in range(0, tall):
+			var cell: Vector2i = c + Vector2i(dx, -i)
+			if not grid.in_bounds(cell) or grid.is_solid(cell):
+				return false
 	return true
