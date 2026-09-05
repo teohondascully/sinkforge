@@ -458,6 +458,18 @@ corrected claim: gate 14's declaration is still open, and D0322 said plainly tha
 does not satisfy it. Nothing further back needed correcting, so per this page's own rule, nothing
 further back is traced.
 
+## D0395 corrects D0394 — a file count written from the plan's list, not from the deletion
+
+**What D0394 claimed** (2026-09-04): fifty dead legacy files removed, "nine `legacy/scenes/bazaar*.gd`,
+two `legacy/src/data/` rule files, forty `legacy/tools/` scripts."
+
+**What is wrong with it.** The deletion (`git show --diff-filter=D --name-only f3f39a59`) lists eight
+bazaar scenes, not nine. The total of fifty source files stands (8 + 2 + 40; 48 `.gd` and 2 `.sh`), and
+the commit removed sixty paths because ten of those scripts carried tracked `.uid` sidecars. The "nine"
+was transcribed from `docs/A_PRIME_REFACTOR_PLAN.md` §3.4 rather than read off the tool's output, in the
+same session that fixed an instrument for reporting green over a defect. There is no deeper origin: the
+plan's list was a plan, not a claim about the tree.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,
