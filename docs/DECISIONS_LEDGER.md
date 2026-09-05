@@ -16846,3 +16846,25 @@ its breath between the two strengths over one period, red for no fuel against am
 director's to see in play; on the surface the sky has already opened the veil where the forge stands.
 
 **Why:** the ruling. **Reverse cost:** one function behind one table lookup.
+
+## D0402 · 2026-09-05 · The three generation forks (T016): the pad halved, Stonereach opened on legacy's profile, aquifers from mid-Stonereach
+
+**Decided:** The director's T016 ruling -- address all three, ordered by visible impact -- as one data
+change and one optional field, so one golden re-pin carries them. (V10) `relief.pad_half_m` 10 → 8 and
+`ramp_m` 16 → 8: legacy's -9/+10 pad was a seventh of its 128 m world and the same pad here was a 24 m
+ruler-flat third of 64; the tutorial start's fixtures reach -3..+7 m of the spawn, so 8 keeps every one on
+level ground and the hills arrive 8 m past the edge. (V12) `cave.deep_at_m` 140, a new optional site
+field: legacy ran the threshold ramp from `threshold_top` to `threshold_deep` over its whole world; over
+256 m the same ramp held Stonereach (40-140 m) at legacy's SHALLOW values -- 8% air against 22% above and
+18% below. The deep threshold is reached at the Deep Works boundary and holds below it; absent, the ramp
+runs to the bottom as before, so every other site and fixture is unchanged. Measured on the boot world:
+64-128 m goes from ~8% to 11-14% air. (V11) `aquifer.min_depth_m` 142 → 48: GDD §11 puts flooding in
+Stonereach ("Flooding is a real threat"); legacy's `DEEPSLATE_ROW + 2` had translated to two metres into
+the Deep Works. Water now stands from 76 m on the boot world.
+
+**Determinism:** gate 8's golden moves at checkpoint 0, as a world change must, and is re-pinned from CI
+Linux by the draft-PR route (D0388's), never from this machine; every other generator suite is green
+unchanged, since each measures the plain site or its own records.
+
+**Why:** the ruling. **Reverse cost:** three data values and one optional field; the previous golden is
+one commit back.

@@ -34,6 +34,10 @@ cave:
   threshold_deep: 0.31
   min_depth_cells: 24
   x_stretch: 2.1
+  # The ramp from threshold_top to threshold_deep reaches deep here rather than at the world's bottom
+  # (D0402, the director's T016 ruling on V12): legacy ran it over 128 m; over 256 m the same ramp held
+  # Stonereach at 8% air. Deep is reached at the Deep Works threshold and holds below it.
+  deep_at_m: 140
 
 strata_shelf:
   # legacy STRATA_BAND_H / STRATA_SHELF_EVERY / STRATA_SHELF_RESIST -- see that file's comment for why
@@ -107,8 +111,11 @@ relief:
   # waves, SURFACE_ROW_MIN/MAX. Two of the three SCARP_COLS at half legacy's distances (this world is half
   # as wide); the third fell beyond the edge.
   pad_centre_m: 32
-  pad_half_m: 10
-  ramp_m: 16
+  # The pad and its ramp, halved (D0402, T016/V10): legacy's -9/+10 pad on a 128 m world was a seventh of
+  # it; the same pad here was a 24 m ruler-flat third. The tutorial start's fixtures reach -3..+7 m of the
+  # spawn, so a half-width of 8 keeps every one on level ground and the hills arrive 8 m past the edge.
+  pad_half_m: 8
+  ramp_m: 8
   waves:
     - {amp_m: 0.85, freq_rad_per_m: 0.21, phase_rad: 0.5, ramp: near}
     - {amp_m: 1.60, freq_rad_per_m: 0.30, phase_rad: 0.0, ramp: far}
@@ -156,7 +163,10 @@ aquifer:
   # AQUIFER_PER_COL, AQUIFER_MIN_ROW = DEEPSLATE_ROW + 2 (two metres into the deep rock: stonereach_end + 2
   # here), AQUIFER_RX/RY, AQUIFER_ORE_SIZE
   per_col: 0.045
-  min_depth_m: 142
+  # Aquifers from mid-Stonereach (D0402, T016/V11), where docs/GDD.md §11 puts them: "Flooding is a real
+  # threat". Legacy's DEEPSLATE_ROW + 2 put them two metres into its deep rock; here that was 142 m and no
+  # water existed above 140 m in a 256 m world.
+  min_depth_m: 48
   rx_min_m: 2
   rx_max_m: 4
   ry_min_m: 2

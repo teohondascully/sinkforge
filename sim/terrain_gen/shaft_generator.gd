@@ -205,16 +205,23 @@ static func _carve_caves(grid: TileGrid, cave_cfg: Dictionary, shelf_cfg: Dictio
 	# of a 4.7 s world. `tests/test_value_noise.gd` pins the equality with `==` on the floats.
 	var field: ValueNoise.FbmField = ValueNoise.FbmField.new(seed, frequency, grid.height)
 	var shelf_shift: PackedFloat64Array = _shelf_shift(grid.height, band_height, shelf_every, shelf_resist)
+	# Where the threshold reaches `threshold_deep` (D0402, T016/V12): legacy ran the ramp over its whole
+	# 128 m world; over this world's 256 m the same ramp left Stonereach at legacy's SHALLOW values (8% air
+	# against 22% above and 18% below). A site may name the depth the deep threshold is reached at, in
+	# metres below the datum; below it the threshold holds. Absent, the ramp runs to the bottom as before.
+	var deep_row: int = grid.height
+	if cave_cfg.has("deep_at_m"):
+		deep_row = SKY_ROWS + int(cave_cfg["deep_at_m"]) * TERRAIN_CELLS_PER_METER
 	for col: int in grid.width:
 		var min_depth: int = surface[col] + min_depth_cells
-		var carve_span: int = maxi(1, grid.height - min_depth)
+		var carve_span: int = maxi(1, deep_row - min_depth)
 		var noise_x: float = float(col) / x_stretch * frequency
 		var column: PackedFloat64Array = field.column(noise_x, min_depth, grid.height)
 		for row: int in range(min_depth, grid.height):
 			var cell: Vector2i = Vector2i(col, row)
 			if not grid.is_solid(cell):
 				continue
-			var depth_frac: float = float(row - min_depth) / float(carve_span)
+			var depth_frac: float = minf(float(row - min_depth) / float(carve_span), 1.0)
 			# The shelf band resists; THE OVERHANG BIAS (P021, `layered_world_gen.gd:360-364`), the third of
 			# the three passes D0017 left behind and the only one that lands here rather than in
 			# `CavePasses`, is asymmetric on purpose, and legacy says why in one line: "easier just under a

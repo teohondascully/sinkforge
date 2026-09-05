@@ -153,6 +153,7 @@ const RECORDS: Dictionary = {
 			"threshold_deep": 0.31,
 			"min_depth_cells": 24,
 			"x_stretch": 2.1,
+			"deep_at_m": 140,
 		},
 		"strata_shelf": {
 			"band_height_cells": 16,
@@ -202,8 +203,8 @@ const RECORDS: Dictionary = {
 		"spawn_col_m": 32,
 		"relief": {
 			"pad_centre_m": 32,
-			"pad_half_m": 10,
-			"ramp_m": 16,
+			"pad_half_m": 8,
+			"ramp_m": 8,
 			"waves": [
 				{
 					"amp_m": 0.85,
@@ -297,7 +298,7 @@ const RECORDS: Dictionary = {
 		},
 		"aquifer": {
 			"per_col": 0.045,
-			"min_depth_m": 142,
+			"min_depth_m": 48,
 			"rx_min_m": 2,
 			"rx_max_m": 4,
 			"ry_min_m": 2,
