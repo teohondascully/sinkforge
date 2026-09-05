@@ -16665,3 +16665,17 @@ it in QUALITY §5's own text.
 **Why:** the brief's A+ list; each item is a gate or an instrument that reported green over a defect.
 
 **Reverse cost:** Trivial for (1)-(3). (4) is `git checkout pre-pivot -- <path>`.
+
+## D0395 · 2026-09-04 · Correction to D0394's count: eight bazaar scenes, not nine; sixty paths, fifty of them source
+
+**Decided:** D0394 and f3f39a59's message say "nine `legacy/scenes/bazaar*.gd`". `git show
+--diff-filter=D --name-only f3f39a59` lists eight (`bazaar_bench`, `_catalogue`, `_costs`, `_pack`,
+`_page`, `_surface`, `_works`, `bazaars`). The fifty-file total stands: 8 + 2 + 40 = 50 source files
+(48 `.gd`, 2 `.sh`), and the commit removed 60 paths because ten of those scripts had tracked `.uid`
+sidecars under `legacy/scenes/` and `legacy/src/data/` (legacy/tools' sidecars are gitignored). The
+entry is not edited; this is the correction, per the ledger's own rule.
+
+**Why:** the "nine" was written from the plan's list, not from the tool's output -- CLAUDE.md's
+standing rule, missed in the same session that fixed an instrument for reporting green over a defect.
+
+**Reverse cost:** none.
