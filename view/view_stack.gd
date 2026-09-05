@@ -43,6 +43,7 @@ const TERRAIN_Z: int = -50
 ## compensation and the veil's attenuation were the same number and cancelled exactly.
 const LODE_Z: int = -58   ## the lode's live metal over the wall bake that leaves its socket bare (6l, D0374)
 const WATER_Z: int = -48  ## over the terrain, under the veil: deep water reads dark, daylit bright (6a, D0362)
+const BODY_Z: int = -46  ## the miner, UNDER the veil: lit by his own lamp like everything else (D0391); legacy drew him at 60, over it, with a halo instead
 const VEIL_Z: int = -45
 const TOOTH_Z: int = -44  ## the rock tooth: absolute levels added over the veil so deep rock keeps its grain (6p, D0379)
 const HAZE_Z: int = -43   ## the heat haze: bends the rock and the tooth, not the light (6p, D0379)
@@ -104,16 +105,12 @@ static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, cam
 	#
 	# `bake_static` falls back to mounting both as ordinary layers when no render target is available
 	# (headless), so this call site is correct on both paths and the picture is the same either way.
-	view.add_baked_painter(WallPainter.paint)
-	view.add_baked_painter(TerrainPainter.paint)
-	view.bake_static(WALL_Z)
-	ToothLayer.mount(view, TOOTH_Z)
-	view.add_painter(OrePainter.paint_lode).z_index = LODE_Z
-	view.add_painter(WaterPainter.paint).z_index = WATER_Z
+	_mount_ground(view)
 	# One glint painter and one ore painter, shared: the veil's seam cuts, the seam glow and the glint all
 	# read the same population (6l, D0374/D0375).
 	var glint: GlintPainter = GlintPainter.new()
 	var ore: OrePainter = OrePainter.new(glint)
+	_mount_body(view)
 	_mount_veil(view, ore, falling)
 	_mount_haze(view)
 	_mount_over_veil(view, glint)
@@ -180,6 +177,23 @@ static func _mount_hud(view: WorldView, stack: ViewStack) -> void:
 ## Set here rather than inside the painter because the blend belongs to the CANVAS: a painter that reached
 ## out to configure its own layer would be the coordinator contract (`docs/COORDINATOR_CONTRACT.md` §2a)
 ## inverted, and the painter would stop being a pure function of `(Frame, CanvasItem)`.
+## The ground: the two baked painters as one quad, the tooth over it, the lode's live metal, the water.
+static func _mount_ground(view: WorldView) -> void:
+	view.add_baked_painter(WallPainter.paint)
+	view.add_baked_painter(TerrainPainter.paint)
+	view.bake_static(WALL_Z)
+	ToothLayer.mount(view, TOOTH_Z)
+	view.add_painter(OrePainter.paint_lode).z_index = LODE_Z
+	view.add_painter(WaterPainter.paint).z_index = WATER_Z
+
+
+## The miner, as a painter on the frame like every other thing in the world; `MinerDraw` reads the pose
+## off the observation and the clock off the frame.
+static func _mount_body(view: WorldView) -> void:
+	var body: PaintLayer = view.add_painter(MinerDraw.paint)
+	body.z_index = BODY_Z
+
+
 static func _mount_veil(view: WorldView, ore: OrePainter = null, falling: FallingItems = null) -> void:
 	# THE GPU VEIL (D0390): `VeilLayer` feeds `veil.gdshader`, which multiplies (`render_mode blend_mul`)
 	# and evaluates `VeilPainter`'s expression per pixel; the layer sets its own material on first draw.

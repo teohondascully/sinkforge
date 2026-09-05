@@ -73,3 +73,24 @@ static func of_plane(window: Rect2i, plane: PackedByteArray, world: Vector2i) ->
 		out.append_array(plane.slice(row * world.x + x0, row * world.x + x1))
 		out.append_array(right)
 	return out
+
+
+## One value per window column cut from a world-wide per-column plane, `outside` where the window hangs
+## past the world's columns.
+static func columns_of(window: Rect2i, plane: PackedInt32Array, outside: int) -> PackedInt32Array:
+	var out: PackedInt32Array = PackedInt32Array()
+	var x0: int = maxi(window.position.x, 0)
+	var x1: int = mini(window.end.x, plane.size())
+	if x1 <= x0:
+		out.resize(maxi(window.size.x, 0))
+		out.fill(outside)
+		return out
+	var pad: PackedInt32Array = PackedInt32Array()
+	pad.resize(x0 - window.position.x)
+	pad.fill(outside)
+	out.append_array(pad)
+	out.append_array(plane.slice(x0, x1))
+	pad.resize(window.end.x - x1)
+	pad.fill(outside)
+	out.append_array(pad)
+	return out

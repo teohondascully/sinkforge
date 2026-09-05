@@ -41,6 +41,7 @@ var _walls_window: Rect2i = Rect2i()
 var materials: PackedByteArray = PackedByteArray()
 var legend: PackedStringArray = PackedStringArray()
 var surface_y: PackedInt32Array = PackedInt32Array()
+var sky_floor: PackedInt32Array = PackedInt32Array()
 var walls: PackedByteArray = PackedByteArray()
 var wall_legend: PackedStringArray = PackedStringArray()
 
@@ -60,6 +61,7 @@ func refresh(window: Rect2i, version: int, want_walls: bool, grid: TileGrid, sur
 		materials = WindowPlanes.of_plane(window, grid.block_index, world)
 		legend = grid.legend
 		surface_y = surface_of.call(window)
+		sky_floor = WindowPlanes.columns_of(window, grid.sky_floor, grid.height)
 		_window = window
 		_version = version
 		builds += 1

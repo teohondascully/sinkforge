@@ -129,14 +129,17 @@ static func dest_rect(tex: Texture2D, body_height_px: int) -> Rect2:
 
 ## Legacy's rim halo, ported with its reasoning intact because the reasoning is the finding.
 ##
-## COOL AND BRIGHT ON PURPOSE: the miner's art is warm leather and amber, the same family as the dirt and
-## the UI, so a warm outline deepens that collision. A cool bright edge is the one thing in this
-## warm-brown world nothing else wears.
+## THE RIM IS A SHADOW NOW, NOT A HALO (D0391). Legacy's cool bright edge (`Color(0.80, 0.93, 1.0, 0.85)`)
+## existed because legacy drew the miner ABOVE its veil, unlit, and he vanished against dark rock without
+## one. This build draws him UNDER the veil (`ViewStack.BODY_Z`), at the centre of his own lamp pool: the
+## pool is what separates him from the rock, the way it separates everything else, and the pale cyan ring
+## was the single loudest "pasted on" cue in the frame (VISUAL_QUEUE v2 V06/V07). What remains is a
+## soft dark edge that seats the sprite on the ground like every other lit thing.
 ##
 ## ONE RING, NOT TWO: the authored pixel art already carries its own one-pixel near-black outline, so a
 ## second inner ring at 1.4px in eight directions printed up to two solid pixels of black around every
 ## limb -- legacy's own comment records that the legs came out as black boxes with boots inside them.
-const RIM_COLOR: Color = Color(0.80, 0.93, 1.0, 0.85)
+const RIM_COLOR: Color = Color(0.06, 0.05, 0.07, 0.45)
 const RIM_WIDTH: float = 1.5  ## about 1.5 art pixels: read, but not seen
 
 const RIM_OFFSETS: Array[Vector2] = [

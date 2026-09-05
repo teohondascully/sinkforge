@@ -18,8 +18,6 @@ const SITE: StringName = &"shallow_clay"   ## the site the tutorial start is aut
 const START: StringName = &"tutorial"
 const SEED: int = 20260826
 const KEY_HINTS: String = "hints"
-const COLOR_BODY := Color(0.85, 0.25, 0.25)
-const COLOR_BODY_GROUNDED := Color(0.95, 0.75, 0.15)
 const BOOT_LINE: String = "SINKFORGE_BOOT"
 
 var autoboot: bool = true
@@ -90,6 +88,10 @@ func boot(load_save: bool) -> bool:
 		restore(SaveGame.read(save_path))
 	var body: Body = door.services()["body"]
 	_warp(body)
+	# The camera may not show past the world (D0333's clamp; the reveal scene set it, the seat never did --
+	# VISUAL_QUEUE v2 V05: a quarter of the frame was void from most of a 64 m world).
+	var grid: TileGrid = (door.services()["world"] as World).grid
+	rig.set_world_limits(Rect2(0.0, 0.0, float(grid.width * Interface.Observation.CELL_PX), float(grid.height * Interface.Observation.CELL_PX)))
 	rig.warp_to(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE))
 	camera.position = rig.step(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE), Vector2.ZERO, zoom, 1280.0, 0.0)
 	audio = SceneAudio.new()
@@ -307,8 +309,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 func _draw() -> void:
 	if not booted:
 		return
-	MinerDraw.draw(self, view.current_frame(), tick, COLOR_BODY, COLOR_BODY_GROUNDED)
-	particles.draw(self)
+	particles.draw(self)   # the miner is a layer of the stack now (`ViewStack.BODY_Z`), under the veil
 
 
 func _notification(what: int) -> void:

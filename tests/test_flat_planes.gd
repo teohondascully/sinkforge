@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_test_openness_metres_is_open_in_air_buried_in_rock_and_graded_between()
 	_test_the_layer_packs_the_lamp_and_the_cuts_as_the_shader_reads_them()
 	_test_seat_flags_parse_and_a_warp_finds_a_floor()
+	_test_the_sky_floor_follows_every_mutator_and_the_light_terms_pin()
 	_finish("flat_planes")
 
 
@@ -139,3 +140,41 @@ func _test_seat_flags_parse_and_a_warp_finds_a_floor() -> void:
 	var pocket: Vector2i = SeatFlags.stand_near(g, Vector2i(11, 25), 3)
 	_check(pocket.y == 27 and pocket.x >= 10 and pocket.x <= 13, "pointed into a pocket, the warp lands on the pocket's floor, not on the surface (%s)" % pocket)
 	_check(SeatFlags.stand_near(g, Vector2i(20, 29), 3, 1) == SeatFlags.NO_WARP, "buried with no floor in reach: no warp")
+
+
+## `TileGrid.sky_floor` is the first solid row per column under the open sky, maintained at the mutators
+## and equal to a from-scratch scan after fuzzing; `WindowPlanes.columns_of` pads past the world; and
+## `VeilLight`'s terms pin legacy's numbers: the deep is `AMBIENT_LIGHT`, the scatter under a column's
+## surface reaches the ambient over `SKY_FADE_M`, open air above the surface is lit by depth alone.
+func _test_the_sky_floor_follows_every_mutator_and_the_light_terms_pin() -> void:
+	var g: TileGrid = _fuzzed(123)
+	var bad: int = 0
+	for col: int in g.width:
+		var first: int = g.height
+		for row: int in g.height:
+			if g.is_solid(Vector2i(col, row)):
+				first = row
+				break
+		if g.sky_floor[col] != first:
+			bad += 1
+	_check(bad == 0, "after fuzzed writes every column's sky floor equals a from-scratch scan (%d wrong)" % bad)
+	var g2: TileGrid = TileGrid.new(4, 10, 1)
+	_check(g2.sky_floor[1] == 10, "an all-air column's floor is the height")
+	g2.set_material(Vector2i(1, 6), &"clay")
+	g2.set_material(Vector2i(1, 8), &"clay")
+	_check(g2.sky_floor[1] == 6, "the first solid from the sky is the floor (6)")
+	g2.excavate(Vector2i(1, 6))
+	_check(g2.sky_floor[1] == 8, "digging the floor hands it to the next solid below (8)")
+	g2.set_material(Vector2i(1, 8), &"")
+	_check(g2.sky_floor[1] == 10, "clearing the last solid returns the column to all-air")
+	var cols: PackedInt32Array = WindowPlanes.columns_of(Rect2i(-2, 0, 8, 1), g2.sky_floor, 99)
+	_check(cols.size() == 8 and cols[0] == 99 and cols[1] == 99 and cols[3] == 10 and cols[7] == 99, "a column window pads past the world with the sentinel on both sides")
+	var deep: Color = VeilLight.level_rgb(1.0 - VeilPainter.AMBIENT_DARK)
+	_check(deep.is_equal_approx(VeilLight.AMBIENT_LIGHT), "at the ambient the light level is legacy's AMBIENT_LIGHT, a colour")
+	_check(VeilLight.level_rgb(1.0).is_equal_approx(Color.WHITE) and VeilLight.level_rgb(0.17).b > VeilLight.level_rgb(0.17).r, "full light is white; below the ambient the hue stays cool")
+	var datum: float = float(MaterialLook.SURFACE_ROW)
+	_check(is_equal_approx(VeilLight.sky_light(datum - 20.0, datum), 1.0), "open air above the datum is fully lit")
+	var open_deep: float = VeilLight.sky_light(datum + 40.0, datum + 200.0)   # 10 m down an open shaft
+	var under_rock: float = VeilLight.sky_light(datum + 40.0, datum)          # 10 m under the surface rock
+	_check(open_deep > under_rock and under_rock < 0.5, "the same depth is brighter down an open shaft than under rock (%.2f vs %.2f)" % [open_deep, under_rock])
+	_check(is_equal_approx(VeilLight.sky_light(datum + 400.0, datum), 1.0 - VeilPainter.AMBIENT_DARK), "deep under rock the light is the ambient")

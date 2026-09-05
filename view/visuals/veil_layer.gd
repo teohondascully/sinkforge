@@ -24,6 +24,10 @@ var material: ShaderMaterial = null
 var _cells_img: Image = null
 var _cells_tex: ImageTexture = null
 var _cells_key: Array = []
+var _walls_img: Image = null
+var _walls_tex: ImageTexture = null
+var _sky_img: Image = null
+var _sky_tex: ImageTexture = null
 var _field_img: Image = null
 var _field_tex: ImageTexture = null
 var _field_key: Array = []
@@ -53,6 +57,11 @@ func _init(ore: OrePainter = null, falling: FallingItems = null) -> void:
 		material.set_shader_parameter(&"surface_line_m", VeilPainter.SURFACE_LINE_M)
 		material.set_shader_parameter(&"lamp_grain", VeilPainter.LAMP_GRAIN)
 		material.set_shader_parameter(&"lamp_window_gain", VeilPainter.LAMP_WINDOW_GAIN)
+		material.set_shader_parameter(&"sky_fade_m", VeilLight.SKY_FADE_M)
+		material.set_shader_parameter(&"ambient_light", Vector3(VeilLight.AMBIENT_LIGHT.r, VeilLight.AMBIENT_LIGHT.g, VeilLight.AMBIENT_LIGHT.b))
+		material.set_shader_parameter(&"void_floor", VeilLight.VOID_FLOOR)
+		var tint: Color = VeilLight.lamp_tint()
+		material.set_shader_parameter(&"lamp_tint", Vector3(tint.r, tint.g, tint.b))
 
 
 ## The blurred openness at ONE SAMPLE PER METRE off the observation's coarse map (`Observation.map`, the
@@ -154,6 +163,29 @@ func _upload_cells(obs: Interface.Observation, w: Rect2i) -> void:
 	material.set_shader_parameter(&"cells_tex", _cells_tex)
 	material.set_shader_parameter(&"cells_origin_px", Vector2(w.position) * px)
 	material.set_shader_parameter(&"cells_size_px", Vector2(w.size) * px)
+	# The wall plane, when the envelope asked for it, and the sky floor per column (both share the key).
+	var walls_ok: bool = obs.has_walls and obs.walls.size() >= w.size.x * w.size.y
+	material.set_shader_parameter(&"has_walls", walls_ok)
+	if walls_ok:
+		if _walls_img == null or _walls_img.get_width() != w.size.x or _walls_img.get_height() != w.size.y:
+			_walls_img = Image.create_from_data(w.size.x, w.size.y, false, Image.FORMAT_R8, obs.walls)
+			_walls_tex = ImageTexture.create_from_image(_walls_img)
+		else:
+			_walls_img.set_data(w.size.x, w.size.y, false, Image.FORMAT_R8, obs.walls)
+			_walls_tex.update(_walls_img)
+		material.set_shader_parameter(&"walls_tex", _walls_tex)
+	var floors: PackedFloat32Array = PackedFloat32Array()
+	floors.resize(w.size.x)
+	for i: int in w.size.x:
+		floors[i] = float(obs.sky_floor[i]) if i < obs.sky_floor.size() else 1.0e9
+	var sky_bytes: PackedByteArray = floors.to_byte_array()
+	if _sky_img == null or _sky_img.get_width() != w.size.x:
+		_sky_img = Image.create_from_data(w.size.x, 1, false, Image.FORMAT_RF, sky_bytes)
+		_sky_tex = ImageTexture.create_from_image(_sky_img)
+	else:
+		_sky_img.set_data(w.size.x, 1, false, Image.FORMAT_RF, sky_bytes)
+		_sky_tex.update(_sky_img)
+	material.set_shader_parameter(&"sky_tex", _sky_tex)
 
 
 func _upload_field(obs: Interface.Observation, w: Rect2i) -> void:

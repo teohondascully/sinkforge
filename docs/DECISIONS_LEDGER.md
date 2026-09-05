@@ -16566,3 +16566,32 @@ walking has something O(window) on the camera path, and here there were five.
 are still the truth. (4) is a mount swap in `ViewStack._mount_veil` — the CPU painter is still there and
 tested. Remaining known cost: the window-change tick still filters ~17K plane entries (2-3 ms) and rebuilds
 the metre field (~1.5 ms), so a snap frame can still drop one 120 Hz frame; no bucket index yet.
+
+## D0391 · 2026-09-04 · The light is a colour again: legacy's veil composition ported, the camera clamped, the miner under the veil
+
+**Decided:** Four things legacy's `world_renderer.gd` did that the 6l/6q ports dropped, restored in
+`veil.gdshader` with `view/visuals/veil_light.gd` as the pinned arithmetic: (1) `_light_level` -- the dark
+end is `AMBIENT_LIGHT` (0.34, 0.35, 0.42), a cool blue-grey, not black; (2) `_skylight_alpha(row, surf)` --
+the skylight scatters `SKY_FADE` under each column's own first solid, which needs `TileGrid.sky_floor`,
+a per-column derived plane maintained at the mutators like `coarse` (a solid above the floor lowers it in
+O(1); a dig at the floor rescans down), carried per window column on the observation; (3) `VOID_FLOOR` --
+air with no wall behind it, under the scatter band, is the darkest thing down here; (4) `_light_tint` --
+the lamp lifts toward its own amber, not toward white. The lean is 0.45 rather than legacy's 0.28 (at
+0.28 the pool read white on this build's cooler deep) -- a taste call, queued. Also: the shell now calls
+`CameraRig.set_world_limits` (D0333's clamp existed; only the reveal scene set it), and the miner moves
+from `Main._draw` (z 0, unlit) to a `ViewStack` layer at `BODY_Z = -46`, under the veil, with legacy's
+cyan rim halo replaced by a dark shadow rim -- he stands at the centre of his own lamp pool, so the light
+separates him from the rock the way it separates everything else.
+
+**Alternative:** Legacy's own placement of the miner (z 60, above the light layers, "so he stays crisp")
+with the halo. Rejected: it is the single loudest pasted-on cue in the frame, and the pool centre is
+never dark.
+
+**Why:** VISUAL_QUEUE v2's four root causes, three of them light. Every underground capture was one flat
+grey with a grey pool in it; legacy's identity was warm pools in a cool dark, and the constants that made
+it were in the file the port cited.
+
+**Reverse cost:** Low. Each term is a uniform with a pinned default; `sky_floor` is derived and outside
+the signature (the golden is unchanged, ALL PASS 21); the mount and the rim colour are one line each.
+Machines still draw ABOVE the veil (`MACHINE_Z = -30`, the plan's choice), so the miner passes behind a
+machine he walks past -- noted, not decided here.

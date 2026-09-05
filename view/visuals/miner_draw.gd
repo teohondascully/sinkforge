@@ -12,6 +12,20 @@ extends RefCounted
 ##
 ## `frame` may be null (the coordinator has not built one yet), and then nothing is drawn: there is no
 ## truthful pose without an observation.
+## The fallback rectangle's colours when no sprite resolves (a fixture without the art): red in the air,
+## amber on the ground -- the shell's own debug colours, moved here with the draw (D0391).
+const COLOR_BODY := Color(0.85, 0.25, 0.25)
+const COLOR_BODY_GROUNDED := Color(0.95, 0.75, 0.15)
+
+
+## The painter form on the `(frame, canvas)` contract, for `ViewStack._mount_body`: the clock is the
+## frame's own deterministic one, in ticks.
+static func paint(frame: Frame, canvas: CanvasItem) -> void:
+	if frame == null:
+		return
+	draw(canvas, frame, int(round(frame.anim_time * 60.0)), COLOR_BODY, COLOR_BODY_GROUNDED)
+
+
 static func draw(canvas: CanvasItem, frame: Frame, tick_count: int, color_body: Color, color_grounded: Color) -> void:
 	if frame == null or frame.obs == null:
 		return

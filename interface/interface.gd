@@ -254,6 +254,7 @@ func _fill_window(o: Observation, envelope: Envelope) -> void:
 	o.materials = _cache.materials
 	o.legend = _cache.legend
 	o.surface_y = _cache.surface_y
+	o.sky_floor = _cache.sky_floor
 	o.has_walls = envelope.walls
 	if envelope.walls:
 		o.walls = _cache.walls

@@ -15,6 +15,9 @@ render_mode blend_mul;
 
 uniform sampler2D cells_tex : filter_nearest, repeat_disable;
 uniform sampler2D field_tex : filter_linear, repeat_disable;
+uniform sampler2D walls_tex : filter_nearest, repeat_disable;   // the wall plane's ordinals; 0 = no wall
+uniform sampler2D sky_tex : filter_nearest, repeat_disable;     // per window column: the first solid row under the sky
+uniform bool has_walls = false;
 uniform vec2 cells_origin_px;   // world px of the cells plane's top-left
 uniform vec2 cells_size_px;
 uniform vec2 field_origin_px;   // world px of the field's top-left (metre-aligned)
@@ -29,10 +32,15 @@ uniform float mass_shade = 0.55;
 uniform float key_strength = 0.30;
 uniform float key_gain = 3.0;
 uniform float openness_saturate = 2.2;
-// `skylight_ceiling`
+// `skylight_ceiling` and legacy's `_skylight_alpha(row, surf)` (VeilLight.sky_light)
 uniform float ambient_dark = 0.66;
 uniform float sky_reach_m = 12.0;
 uniform float surface_line_m = 2.0;
+uniform float sky_fade_m = 16.0;
+// legacy's colour of the dark (VeilLight): the deep's own tint, the void floor, the lamp's tint
+uniform vec3 ambient_light = vec3(0.34, 0.35, 0.42);
+uniform float void_floor = 0.35;
+uniform vec3 lamp_tint = vec3(1.0, 0.95, 0.86);
 // `cut_lift`
 uniform float lamp_grain = 0.13;
 uniform float lamp_window_gain = 2.2;
@@ -69,9 +77,17 @@ void fragment() {
 	vec2 cuv = (world_px - cells_origin_px) / cells_size_px;
 	bool inside = cuv.x >= 0.0 && cuv.x < 1.0 && cuv.y >= 0.0 && cuv.y < 1.0;
 	bool solid = inside && texture(cells_tex, cuv).r > 0.001;
-	// `skylight_ceiling`
+	// `VeilLight.sky_light`: darkness by depth, then the scatter under this column's own surface
 	float depth_m = (at_cells.y - surface_row) / cells_per_metre;
-	float sky = 1.0 - ambient_dark * clamp((depth_m - surface_line_m) / sky_reach_m, 0.0, 1.0);
+	float d = ambient_dark * clamp((depth_m - surface_line_m) / sky_reach_m, 0.0, 1.0);
+	float surf = inside ? texture(sky_tex, vec2(cuv.x, 0.5)).r : 1.0e9;
+	float under = clamp((at_cells.y - surf) / (sky_fade_m * cells_per_metre), 0.0, 1.0);
+	if (at_cells.y > surf) {
+		d = mix(d, ambient_dark, under);
+	}
+	float sky = 1.0 - d;
+	// legacy's VOID_FLOOR: air with no wall behind it, under the scatter band, is the darkest thing down here
+	bool void_here = inside && !solid && (!has_walls || texture(walls_tex, cuv).r < 0.001);
 	// `shade_at`
 	float shade = 1.0;
 	if (solid) {
@@ -85,14 +101,20 @@ void fragment() {
 		shade = mass * (1.0 + key_strength * key);
 	}
 	float s = shade * sky;
-	// `lamp_lift`: each cut lifts what the previous left
+	if (void_here) {
+		s *= mix(1.0, void_floor, under);
+	}
+	// `VeilLight.level_rgb`: the dark is a colour -- white at full light, `ambient_light` at the ambient
+	float lit_s = clamp(s, 0.0, 1.0);
+	vec3 cool = ambient_light * (lit_s / (1.0 - ambient_dark));
+	vec3 rgb = mix(vec3(lit_s), cool, clamp((1.0 - lit_s) / ambient_dark, 0.0, 1.0));
+	// `lamp_lift`: each cut lifts what the previous left; the lamp lifts toward ITS colour (legacy `_light_tint`)
 	float lit = 0.0;
 	for (int i = 0; i < 3; i++) {
 		lit += (1.0 - lit) * cut_lift(lamp_cuts[i], at_cells, cell);
 	}
-	s = s + (1.0 - s) * clamp(lit, 0.0, 1.0);
+	rgb += max(lamp_tint - rgb, vec3(0.0)) * clamp(lit, 0.0, 1.0);
 	// `VeilSources.compose`: a cut only ever adds, per channel, toward its tint
-	vec3 rgb = vec3(clamp(s, 0.0, 1.0));
 	for (int i = 0; i < MAX_CUTS; i++) {
 		if (i >= cut_count) {
 			break;

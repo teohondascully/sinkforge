@@ -44,6 +44,9 @@ var world_seed: int = 0
 ## material, so `solid_at` is a byte comparison and not a string one.
 var materials: PackedByteArray
 var legend: PackedStringArray
+## Per window column, the row of the first solid cell under the open sky (`TileGrid.sky_floor`), or the
+## world's height when the column is all air; the veil's skylight scatters under it (D0391).
+var sky_floor: PackedInt32Array = PackedInt32Array()
 ## THE BACKGROUND WALL PLANE, same shape and same encoding as `materials`/`legend` (D0238). This is
 ## the layer `TileGrid.get_wall()` holds -- what `excavate()` REVEALS rather than erases, and where
 ## the lode migration put ore. A renderer needs it to draw a mined-out room as a recessed back wall

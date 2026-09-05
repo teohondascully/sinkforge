@@ -69,6 +69,11 @@ var legend: PackedStringArray = PackedStringArray([""])
 var _ordinal: Dictionary = {&"": 0}
 var block_index: PackedByteArray = PackedByteArray()
 var wall_index: PackedByteArray = PackedByteArray()
+## THE SKY FLOOR (D0391): per column, the row of the first solid cell under the open sky, `height` when
+## the column is all air. Legacy's `sim.surface_row(col)`, which its skylight measured from (light scatters
+## `SKY_FADE` under the first rock and no further). Maintained at the mutators like the planes above: a
+## solid write above the floor lowers it in O(1); a dig AT the floor rescans down to the next solid.
+var sky_floor: PackedInt32Array = PackedInt32Array()
 
 ## D0261's two 32-bit XOR lanes (`_sig_a`, `_sig_b`) and `_xor_term` are inherited from `SignedPlane`
 ## since D0390 -- this file was the pattern's origin and carried a private copy until the duplication gate
@@ -88,6 +93,8 @@ func _init(p_width: int, p_height: int, p_seed: int) -> void:
 	coarse.resize(coarse_width * coarse_height)
 	block_index.resize(width * height)
 	wall_index.resize(width * height)
+	sky_floor.resize(width)
+	sky_floor.fill(height)
 
 
 ## The class a terrain cell would give its logic cell: what the coarse plane holds at that cell's centre.
@@ -152,6 +159,7 @@ func _stamp(terrain_cell: Vector2i, material_id: StringName, block: bool) -> voi
 		var i: int = terrain_cell.y * width + terrain_cell.x
 		if block:
 			block_index[i] = ordinal_of(material_id)
+			_sky_note(terrain_cell, material_id != &"")
 		else:
 			wall_index[i] = ordinal_of(material_id)
 	_coarse_refresh(terrain_cell)
@@ -168,7 +176,22 @@ func excavate(terrain_cell: Vector2i) -> void:
 	_blocks.erase(terrain_cell)
 	if in_bounds(terrain_cell):
 		block_index[terrain_cell.y * width + terrain_cell.x] = 0
+		_sky_note(terrain_cell, false)
 	_coarse_refresh(terrain_cell)
+
+
+## After a block write: the column's sky floor. A solid above the floor is the new floor; air at the
+## floor hands it to the next solid below (or `height`).
+func _sky_note(terrain_cell: Vector2i, solid: bool) -> void:
+	var top: int = sky_floor[terrain_cell.x]
+	if solid:
+		if terrain_cell.y < top:
+			sky_floor[terrain_cell.x] = terrain_cell.y
+	elif terrain_cell.y == top:
+		var r: int = terrain_cell.y + 1
+		while r < height and not is_solid(Vector2i(terrain_cell.x, r)):
+			r += 1
+		sky_floor[terrain_cell.x] = r
 
 
 ## The byte `legend` gives a material id; a first-seen id joins the legend. A grid holds at most 255 ids,
@@ -302,6 +325,7 @@ func clone() -> TileGrid:
 	copy._ordinal = _ordinal.duplicate()
 	copy.block_index = block_index.duplicate()
 	copy.wall_index = wall_index.duplicate()
+	copy.sky_floor = sky_floor.duplicate()
 	return copy
 
 
