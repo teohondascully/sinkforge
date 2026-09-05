@@ -15,7 +15,41 @@ func _initialize() -> void:
 	_test_running_signature_agrees_with_a_from_scratch_rebuild()
 	_test_the_cell_hash_does_not_collide_where_the_string_form_could()
 	_test_the_coarse_plane_is_classed_at_the_centre_and_versioned()
+	_test_load_cells_equals_the_per_cell_writers()
 	_finish("tile_grid")
+
+
+## D0397: the bulk loader a restore uses must be the per-cell writers' equal in every plane, including
+## the running signature -- and the signature is checked against its own rebuild, so a loader that folded
+## a term wrong could not agree with both. Cells out of bounds ride along (the writers accept them too);
+## walls behind air are in the dictionary and not in the signature, as ever.
+func _test_load_cells_equals_the_per_cell_writers() -> void:
+	var rng: SplitRng = SplitRng.new(99)
+	var blocks: Dictionary = {}
+	var walls: Dictionary = {}
+	var ids: Array[StringName] = [&"clay", &"hardrock", &"ore_copper", &"coal"]
+	for _i: int in 900:
+		var cell := Vector2i(rng.next_range(-1, 24), rng.next_range(-1, 40))
+		if rng.next_range(0, 3) > 0:
+			blocks[cell] = ids[rng.next_range(0, 3)]
+		if rng.next_range(0, 2) > 0:
+			walls[cell] = ids[rng.next_range(0, 3)]
+	var slow: TileGrid = TileGrid.new(24, 40, 5)
+	for cell: Vector2i in blocks:
+		slow.set_material(cell, blocks[cell])
+	for cell: Vector2i in walls:
+		slow.set_wall(cell, walls[cell])
+	var fast: TileGrid = TileGrid.new(24, 40, 5)
+	_check(fast.load_cells(blocks, walls), "an empty grid takes the bulk load")
+	_check(fast.state_signature() == slow.state_signature() and fast.state_signature() == fast.recomputed_signature(), "the same signature as the per-cell writers, and it agrees with its own rebuild (%s vs %s)" % [fast.state_signature(), slow.state_signature()])
+	_check(fast.block_index == slow.block_index and fast.wall_index == slow.wall_index and fast.legend == slow.legend, "the same index planes and the same legend order")
+	_check(fast.sky_floor == slow.sky_floor and fast.coarse == slow.coarse, "the same sky floor and the same coarse plane")
+	_check(fast.occupied_terrain_cells() == slow.occupied_terrain_cells() and fast.wall_terrain_cells() == slow.wall_terrain_cells(), "the same cells enumerate")
+	_check(not fast.load_cells(blocks, walls) and fast.state_signature() == slow.state_signature(), "a second load onto a holding grid is refused and changes nothing")
+	blocks.erase(blocks.keys()[0])
+	var fewer: TileGrid = TileGrid.new(24, 40, 5)
+	fewer.load_cells(blocks, walls)
+	_check(fewer.state_signature() != slow.state_signature() and fewer.state_signature() == fewer.recomputed_signature(), "control: one cell fewer is another signature, still agreeing with its rebuild")
 
 
 func _test_in_bounds() -> void:

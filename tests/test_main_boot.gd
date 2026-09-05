@@ -146,6 +146,12 @@ func _test_a_headless_boot_ticks_and_saves() -> void:
 	_check(env.has(Session.KEY_BODY) and env.has(Main.KEY_HINTS), "a captured session carries the body and the hints' lessons")
 	_check(main.restore(env), "...and restores over itself")
 	_check(not main.restore({}), "an empty envelope is refused")
+	# D0397: a session built from the envelope alone, no shaft generated under it, is the same session.
+	var direct: Interface = Session.from_save(env)
+	_check(direct != null and direct.state_signature() == main.door.state_signature(), "Session.from_save builds the restored session without generating: same signature")
+	var no_dims: Dictionary = env.duplicate()
+	no_dims.erase("width")
+	_check(Session.from_save(no_dims) == null and SaveGame.last_invalid.begins_with("missing key"), "...and refuses an envelope without the world's dimensions, naming the key")
 	# The two doors of the GAME face (D0396), on this booted seat.
 	var body: Body = main.door.services()["body"]
 	var home := Vector2i(body.pos_x, body.pos_y)

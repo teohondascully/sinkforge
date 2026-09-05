@@ -89,22 +89,40 @@ static func voice_for_hollow(hollow_per_mille: int, full: int) -> Dictionary:
 
 
 ## Builds the pool and generates every voice. The seed is explicit so two runs sound identical, which is
-## what `tests/test_sfx_bank.gd`'s spectral assertions rest on.
+## what `tests/test_sfx_bank.gd`'s spectral assertions rest on. Two halves since D0397: `synthesize` is
+## pure over the seed and touches no node, so the seat runs it on a worker thread while the first frames
+## draw; `attach` takes its result on the main thread. This is the synchronous composition of the two.
 func setup(seed_value: int = 20260901) -> void:
+	attach(synthesize(seed_value), seed_value)
+
+
+## Every voice and every grain bank from the seed: {"streams": {voice: AudioStreamWAV}, "bank": {voice:
+## Array[AudioStreamWAV]}}. Static and node-free, so it may run off the main thread.
+static func synthesize(seed_value: int) -> Dictionary:
 	var rng: SplitRng = SplitRng.new(seed_value).split("sfx")
-	_rng = rng.split("grains")
-	_streams[&"hollow"] = SfxBank.to_stream(SfxBank.hollow(rng))
-	_streams[&"breach"] = SfxBank.to_stream(SfxBank.breach(rng))
+	var streams: Dictionary = {}
+	var bank: Dictionary = {}
+	streams[&"hollow"] = SfxBank.to_stream(SfxBank.hollow(rng))
+	streams[&"breach"] = SfxBank.to_stream(SfxBank.breach(rng))
 	# Built from the BANK's own table rather than from `STRIKE`'s values, so the two dictionaries have to
 	# agree and a material mapped to a voice that does not exist is a refusal from `play` rather than a
 	# silent miss. `tests/test_sfx_driver.gd` asserts the agreement directly.
 	for voice: StringName in SfxBank.STRIKES:
-		_streams[voice] = SfxBank.to_stream(SfxBank.strike(rng, voice))
-		_grains(voice, func(r: SplitRng) -> PackedFloat32Array: return SfxBank.strike(r, voice), rng)
+		streams[voice] = SfxBank.to_stream(SfxBank.strike(rng, voice))
+		_grains(streams, bank, voice, func(r: SplitRng) -> PackedFloat32Array: return SfxBank.strike(r, voice), rng)
 	for name: StringName in Ordering.ids(VoiceBank.SECONDS.keys()):
-		_streams[name] = SfxBank.to_stream(VoiceBank.generate(name, rng.split(String(name))))
+		streams[name] = SfxBank.to_stream(VoiceBank.generate(name, rng.split(String(name))))
 	for name: StringName in VoiceBank.GRAINED:
-		_grains(name, func(r: SplitRng) -> PackedFloat32Array: return VoiceBank.generate(name, r), rng)
+		_grains(streams, bank, name, func(r: SplitRng) -> PackedFloat32Array: return VoiceBank.generate(name, r), rng)
+	return {"streams": streams, "bank": bank}
+
+
+## Take a `synthesize` result and build the players. The grain picker's stream is keyed off the root
+## seed (`SplitRng.split` is keyed, not sequential), so it needs nothing from the synthesis's draws.
+func attach(voices: Dictionary, seed_value: int) -> void:
+	_rng = SplitRng.new(seed_value).split("sfx").split("grains")
+	_streams = voices.get("streams", {})
+	_bank = voices.get("bank", {})
 	if not _muted:
 		space.ensure_bus()
 	for _i: int in VOICES:
@@ -119,15 +137,21 @@ func setup(seed_value: int = 20260901) -> void:
 	add_child(_ui)
 
 
+## True once `attach` has run: before that every `play` is a refusal, which the seat accepts for the
+## half-second the synthesis takes off-thread.
+func ready() -> bool:
+	return not _streams.is_empty()
+
+
 ## Fill a voice's grain bank: `GRAINS` takes of one recipe, each off a fresh stretch of the noise stream.
 ## The canonical take goes in first, so the render measured offline is also one a player actually hears.
-func _grains(name: StringName, gen: Callable, rng: SplitRng) -> void:
+static func _grains(streams: Dictionary, bank: Dictionary, name: StringName, gen: Callable, rng: SplitRng) -> void:
 	var takes: Array[AudioStreamWAV] = []
-	if _streams.has(name):
-		takes.append(_streams[name])
+	if streams.has(name):
+		takes.append(streams[name])
 	while takes.size() < GRAINS:
 		takes.append(SfxBank.to_stream(gen.call(rng)))
-	_bank[name] = takes
+	bank[name] = takes
 
 
 ## Draw a grain of `voice`, never the same one twice running. Falls back to the canonical stream for

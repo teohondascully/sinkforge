@@ -149,7 +149,12 @@ static func enrich(world: World, site: Dictionary, seed: int) -> void:
 
 ## Rows above a column's surface are left with NO material and NO wall — that is the sky, and a cell with
 ## no wall behind it is what `WallPainter` leaves transparent so the backdrop shows through (P017, D0292).
+## The base fill goes through `TileGrid.load_cells` (D0397): the same cells in the same scan order as the
+## per-cell writers, which the loader is pinned equal to, at a third of the cost -- this was 1.3 s of a
+## 4.7 s world through `set_material` + `set_wall` per cell. The loader only takes an EMPTY grid; the
+## base fill is the first write, and the per-cell path stands in if it is ever not.
 static func _fill_base(grid: TileGrid, surface: PackedInt32Array, topsoil_end: int, stonereach_end: int) -> void:
+	var blocks: Dictionary = {}
 	for col: int in grid.width:
 		for row: int in range(surface[col], grid.height):
 			var material: StringName
@@ -159,11 +164,13 @@ static func _fill_base(grid: TileGrid, surface: PackedInt32Array, topsoil_end: i
 				material = &"hardrock"
 			else:
 				material = &"deepstone"
-			var cell: Vector2i = Vector2i(col, row)
-			grid.set_material(cell, material)
-			# Wall mirrors the block's own material. Legacy gave walls a distinct "_wall"-suffixed
-			# material purely for render variety (a view-layer concern); nothing here needs that yet.
-			grid.set_wall(cell, material)
+			blocks[Vector2i(col, row)] = material
+	# Wall mirrors the block's own material. Legacy gave walls a distinct "_wall"-suffixed material
+	# purely for render variety (a view-layer concern); nothing here needs that yet.
+	if not grid.load_cells(blocks, blocks):
+		for cell: Vector2i in blocks:
+			grid.set_material(cell, blocks[cell])
+			grid.set_wall(cell, blocks[cell])
 
 
 ## One in `strata_shelf.shelf_every` bands is cave-resistant, which of them fixed by a hash of the
@@ -193,38 +200,54 @@ static func _carve_caves(grid: TileGrid, cave_cfg: Dictionary, shelf_cfg: Dictio
 	var band_height: int = int(shelf_cfg["band_height_cells"])
 	var shelf_every: int = int(shelf_cfg["shelf_every"])
 	var shelf_resist: float = shelf_cfg["shelf_resist"]
+	# The field a column at a time (D0397): `FbmField.column` is `sample_fbm` bit for bit, with the lattice
+	# shared between the cells of a column and between neighbouring columns; the per-sample call was 2.4 s
+	# of a 4.7 s world. `tests/test_value_noise.gd` pins the equality with `==` on the floats.
+	var field: ValueNoise.FbmField = ValueNoise.FbmField.new(seed, frequency, grid.height)
+	var shelf_shift: PackedFloat64Array = _shelf_shift(grid.height, band_height, shelf_every, shelf_resist)
 	for col: int in grid.width:
 		var min_depth: int = surface[col] + min_depth_cells
 		var carve_span: int = maxi(1, grid.height - min_depth)
+		var noise_x: float = float(col) / x_stretch * frequency
+		var column: PackedFloat64Array = field.column(noise_x, min_depth, grid.height)
 		for row: int in range(min_depth, grid.height):
 			var cell: Vector2i = Vector2i(col, row)
 			if not grid.is_solid(cell):
 				continue
 			var depth_frac: float = float(row - min_depth) / float(carve_span)
-			var threshold: float = lerpf(threshold_top, threshold_deep, depth_frac)
-			if _is_shelf_band(row, band_height, shelf_every):
-				threshold += shelf_resist
-			# THE OVERHANG BIAS (P021, `layered_world_gen.gd:360-364`), the third of the three passes
-			# D0017 left behind and the only one that lands here rather than in `CavePasses`. Asymmetric
-			# on purpose, and legacy says why in one line: "easier just under a shelf (undercut), harder
-			# just above one (roof pools)". It is what turns a hard band from a stripe of resistant rock
-			# into a LEDGE with space under it -- the shelf survives, and the cave hangs beneath it.
-			#
-			# Dimensionless, so it needs no conversion: it moves a noise threshold, not a distance.
-			elif _is_shelf_band(row - 1, band_height, shelf_every):
-				threshold -= SHELF_BIAS
-			elif _is_shelf_band(row + 1, band_height, shelf_every):
-				threshold += SHELF_BIAS
-			var noise_x: float = float(col) / x_stretch * frequency
-			var noise_y: float = float(row) * frequency
+			# The shelf band resists; THE OVERHANG BIAS (P021, `layered_world_gen.gd:360-364`), the third of
+			# the three passes D0017 left behind and the only one that lands here rather than in
+			# `CavePasses`, is asymmetric on purpose, and legacy says why in one line: "easier just under a
+			# shelf (undercut), harder just above one (roof pools)". It is what turns a hard band from a
+			# stripe of resistant rock into a LEDGE with space under it -- the shelf survives, and the cave
+			# hangs beneath it. Dimensionless: it moves a noise threshold, not a distance. The table above
+			# holds the three cases in the order the tests fell: band, the row under one, the row over one.
+			var threshold: float = lerpf(threshold_top, threshold_deep, depth_frac) + shelf_shift[row]
 			# threshold_top/threshold_deep are ported directly from legacy's FastNoiseLite-tuned
 			# constants (data/strata/*.yaml's own header) -- calibrated here, not left raw, or
 			# ValueNoise's wider real distribution (D0045) carves at a different rate than the ported
 			# thresholds were tuned to produce, silently, since both a raw and a mismatched-calibration
 			# sample look equally plausible without measuring the actual carve density either way.
-			var noise: float = ValueNoise.sample_fbm(noise_x, noise_y, seed) * ValueNoise.FASTNOISELITE_SD_CALIBRATION
+			var noise: float = column[row - min_depth] * ValueNoise.FASTNOISELITE_SD_CALIBRATION
 			if noise > threshold:
 				grid.excavate(cell)  # block erased, wall kept -- a carved room, not a void
+
+
+## The shelf's threshold shift by row -- it depends on the row alone, so one table replaces three band
+## tests a cell: the band resists, the row under it is easier, the row over it harder (the overhang bias).
+static func _shelf_shift(height: int, band_height: int, shelf_every: int, shelf_resist: float) -> PackedFloat64Array:
+	var out: PackedFloat64Array = PackedFloat64Array()
+	out.resize(height)
+	for row: int in height:
+		if _is_shelf_band(row, band_height, shelf_every):
+			out[row] = shelf_resist
+		elif _is_shelf_band(row - 1, band_height, shelf_every):
+			out[row] = -SHELF_BIAS
+		elif _is_shelf_band(row + 1, band_height, shelf_every):
+			out[row] = SHELF_BIAS
+		else:
+			out[row] = 0.0
+	return out
 
 
 static func _density_count(width: int, height: int, per_col: float) -> int:

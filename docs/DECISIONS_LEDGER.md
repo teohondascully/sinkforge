@@ -16709,3 +16709,47 @@ director's.
 sim's; `sim/` is untouched by this entry.
 
 **Reverse cost:** the sign is one line; the face is data plus a draw function; the rail answer is one branch.
+
+## D0397 · 2026-09-05 · Load time: the world the load threw away, the restore that stamped a cell at a time, the audio synthesized before the first frame, the noise that hashed its seed twenty times a cell
+
+**Decided:** `Main.boot` now prints `SINKFORGE_BOOT phases_ms {...}`, and the first reading (headless,
+the director's 14 MB slot) was new_game 4760, restore 1371, audio 572, read 61: 6.8 s in `boot()` and
+7.6 s of process. Four changes, biggest first, each measured and each pinned identical to what it replaces:
+
+1. **A save builds the session directly.** `SaveGame.restore` stages a whole world from the envelope
+   and swaps it in, so `Session.new_game` under it was 4.7 s of generation discarded on every load.
+   `Session.from_save(env)` builds the door over an empty grid of the save's dimensions and restores;
+   `Main.boot` takes it when the slot reads, falls back to `new_game` when it is refused. The session
+   signature equals the old path's (`tests/test_main_boot.gd`).
+2. **`TileGrid.load_cells`.** A restore wrote 219K blocks and 262K walls through `set_material`/`set_wall`,
+   each folding the term twice and re-deriving the sky floor and coarse class: 1.2 s. The loader takes an
+   empty grid, writes both layers in one pass each, folds the term once per occupied cell and rebuilds
+   the derived planes once. Pinned equal to the per-cell writers in every plane and in the signature,
+   with the signature checked against its own rebuild (`tests/test_tile_grid.gd`). Restore 1371 → 486 ms.
+   The base fill of the generator goes through it too (1309 → 464 ms).
+3. **Audio on a worker thread.** `Sfx` and `Beds` split into `synthesize` (pure over the seed, node-free)
+   and `attach`; `SceneAudio.setup_async` runs the synthesis on `WorkerThreadPool` and attaches on the
+   first settled frame. A one-shot before that is refused and a bed silent, during the second the plate
+   is priming anyway. Byte-identical across paths (`tests/test_beds.gd`). 572 → 0 ms on the boot path.
+4. **`ValueNoise.FbmField`.** The cave carve sampled the fBm per cell: five octaves, four lattice hashes
+   each, the seed avalanche inside every one -- 2.4 s. The field samples a column at a time with the
+   x-lattice fixed per octave and the corner columns memoised across neighbouring columns; the
+   arithmetic is `sample_fbm`'s in its order and the suite asserts `==` on the doubles over 10,922
+   samples (`tests/test_value_noise.gd`). Carve 2362 → ~500 ms. The shelf's three band tests a cell became
+   one table per row.
+
+| headless, whole process | before | after |
+|---|---|---|
+| boot with the director's slot | 7.56 s | 1.78 s |
+| boot to a fresh world | 6.42 s | 3.11 s |
+| `boot()` alone, slot / fresh | 6.8 / 5.3 s | 0.55 / 1.9 s |
+
+**Determinism:** gate 8's golden matched at every checkpoint after each change (`test_shaft_replay_
+determinism` ALL PASS 21, the pinned arrays untouched); the from-save session signature equals the
+generate-then-restore path's on the director's own slot.
+
+**Not done:** the veins (0.55 s) and the content passes (0.36 s) are RNG-ordered accretion through the
+per-cell writers and are what a fresh world still costs; a flat-plane save format (v4) would take the
+restore from 486 ms to ~150 and the slot from 14 MB to under 1, and is an ADR, not a load fix.
+
+**Why:** the brief's F2. **Reverse cost:** each change is one function with its pin; the per-cell paths all stand.

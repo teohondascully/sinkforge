@@ -194,6 +194,12 @@ func _sky_note(terrain_cell: Vector2i, solid: bool) -> void:
 		sky_floor[terrain_cell.x] = r
 
 
+## Both layers at once, onto an EMPTY grid: `GridLoad.load_cells` (D0397), the per-cell writers' equal
+## at a fifth of their cost. False, having touched nothing, on a grid that already holds cells.
+func load_cells(blocks: Dictionary, walls: Dictionary) -> bool:
+	return GridLoad.load_cells(self, blocks, walls)
+
+
 ## The byte `legend` gives a material id; a first-seen id joins the legend. A grid holds at most 255 ids,
 ## which is an error worth hearing about rather than a wrapped byte.
 func ordinal_of(material_id: StringName) -> int:

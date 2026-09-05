@@ -44,6 +44,23 @@ static func restore(door: Interface, data: Dictionary) -> bool:
 	return true
 
 
+## A session from a saved envelope, WITHOUT generating the shaft first (D0397): the save carries every
+## plane and the body, and `SaveGame.restore` stages a whole world from it and swaps that in -- so a
+## generated world under it was 4.7 s of work thrown away on every load. The door is built over an empty
+## grid of the save's own dimensions and seed, then restored over; null when the envelope is refused
+## (`SaveGame.last_invalid` says why), and the caller falls back to `new_game`.
+static func from_save(env: Dictionary) -> Interface:
+	if not (env.get("width") is int or env.get("width") is float) or not env.has("height") or not env.has("world_seed"):
+		SaveGame.last_invalid = "missing key: width/height/world_seed (no default: its absence would change the world's future)"
+		return null
+	var grid: TileGrid = TileGrid.new(int(env["width"]), int(env["height"]), int(env["world_seed"]))
+	var body: Body = Body.new(0, 0)
+	var door: Interface = Interface.new(grid, body, Mining.new())
+	if not restore(door, env):
+		return null
+	return door
+
+
 ## A new game: the shaft generated, the start stamped, the body standing on the spawn. Null when the
 ## start refuses (`WorldSeeder.last_refusal` says why).
 static func new_game(site: Dictionary, seed: int, start_id: StringName) -> Interface:

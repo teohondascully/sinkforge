@@ -194,3 +194,75 @@ static func sample(x: float, y: float, seed: int) -> float:
 	var top: float = lerpf(v00, v10, sx)
 	var bottom: float = lerpf(v01, v11, sx)
 	return lerpf(top, bottom, sy)
+
+
+## `sample_fbm` down whole columns, bit-identical and a fraction of the cost (D0397). A carve evaluates
+## the field at (x(col), row * step) for every cell of every column: 280K samples, five octaves each, four
+## lattice hashes an octave -- and the seed avalanche inside every hash -- 2.4 s of a 4.7 s world. Two
+## things repeat that the per-sample call cannot see. Within a column, the x-lattice (`x0`, `sx`) is fixed
+## per octave, so the lerp across a lattice row's two corners is one value per lattice row shared by every
+## cell between it and the next. Across columns, consecutive columns share their `x0` at every octave (the
+## field moves 0.03 lattice units a column at the first), so each lattice column's corner values are
+## computed once here and read by every column that lands on it.
+##
+## The arithmetic is `sample_fbm`'s own, in its order: `top = lerpf(v00, v10, sx)`, `bottom =
+## lerpf(v01, v11, sx)`, `lerpf(top, bottom, sy)`, summed octave by octave from `_fractal_bounding()`
+## with the seed advanced per octave, and `fy` doubled per octave exactly as the loop there doubles it.
+## `tests/test_value_noise.gd` asserts `==` on the floats against the per-sample call, not `is_equal_approx`.
+class FbmField:
+	extends RefCounted
+
+	var _seed: int
+	var _step: float
+	var _corners: Array[Dictionary] = []   ## per octave: x0 -> PackedFloat64Array of corner values by lattice row
+	var _jmax: Array[int] = []             ## per octave: the last lattice row any cell of the field can touch
+
+	## A field over rows [0, rows) sampled at `row * step`, for one seed.
+	func _init(seed: int, step: float, rows: int) -> void:
+		_seed = seed
+		_step = step
+		var fy_top: float = float(maxi(rows - 1, 0)) * step
+		for _i: int in ValueNoise.FBM_OCTAVES:
+			_corners.append({})
+			_jmax.append(int(floor(fy_top)) + 1)
+			fy_top *= ValueNoise.FBM_LACUNARITY
+
+	## The corner values of lattice column `x0` at octave `i`, rows 0..jmax, computed once.
+	func _column_corners(i: int, x0: int) -> PackedFloat64Array:
+		var have: Variant = _corners[i].get(x0)
+		if have != null:
+			return have
+		var out := PackedFloat64Array()
+		out.resize(_jmax[i] + 1)
+		for j: int in _jmax[i] + 1:
+			out[j] = ValueNoise._corner_value(x0, j, _seed + i)
+		_corners[i][x0] = out
+		return out
+
+	## `sample_fbm(x, row * step, seed)` for every row in [row0, row1), in row order.
+	func column(x: float, row0: int, row1: int) -> PackedFloat64Array:
+		var n: int = maxi(row1 - row0, 0)
+		var out := PackedFloat64Array()
+		out.resize(n)
+		out.fill(0.0)
+		var amp: float = ValueNoise._fractal_bounding()
+		var fx: float = x
+		var scale: float = 1.0   # LACUNARITY^i by repeated multiply: the doubling `sample_fbm` applies to fy, exactly
+		for i: int in ValueNoise.FBM_OCTAVES:
+			var x0: int = int(floor(fx))
+			var sx: float = ValueNoise._smooth(fx - float(x0))
+			var left: PackedFloat64Array = _column_corners(i, x0)
+			var right: PackedFloat64Array = _column_corners(i, x0 + 1)
+			for r: int in n:
+				# `float(row) * step` rounds once, as the per-sample caller's `float(row) * frequency` does;
+				# the power-of-two scale after it is exact, so this equals the loop's fy after i doublings.
+				var fy: float = (float(row0 + r) * _step) * scale
+				var y0: int = int(floor(fy))
+				var sy: float = ValueNoise._smooth(fy - float(y0))
+				var top: float = lerpf(left[y0], right[y0], sx)
+				var bottom: float = lerpf(left[y0 + 1], right[y0 + 1], sx)
+				out[r] += lerpf(top, bottom, sy) * amp
+			fx *= ValueNoise.FBM_LACUNARITY
+			scale *= ValueNoise.FBM_LACUNARITY
+			amp *= ValueNoise.FBM_GAIN
+		return out

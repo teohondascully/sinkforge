@@ -12,7 +12,34 @@ func _initialize() -> void:
 	_test_high_seed_bits_reach_the_field()
 	_test_calibrated_distribution_matches_fastnoiselite()
 	_test_calibrated_tail_matches_fastnoiselite()
+	_test_the_column_field_is_sample_fbm_bit_for_bit()
 	_finish("value_noise")
+
+
+## D0397: `FbmField.column` replaces the per-sample `sample_fbm` in the cave carve. It is not allowed to
+## be approximately equal: a world is a golden, and a last-bit difference in one sample at a threshold
+## moves a cell. Asserted with `==` on the doubles, over columns that share lattice columns (so the
+## memoised corners are exercised), over a partial row range, and across two fields of different seeds.
+func _test_the_column_field_is_sample_fbm_bit_for_bit() -> void:
+	var step: float = float(StrataData.SHALLOW_CLAY["cave"]["frequency"])
+	var rows: int = 300
+	for seed: int in [20260826, 7]:
+		var field: ValueNoise.FbmField = ValueNoise.FbmField.new(seed, step, rows)
+		var same: int = 0
+		var total: int = 0
+		for col: int in range(0, 60, 3):
+			var x: float = float(col) / 2.1 * step
+			var row0: int = 24 + (col % 7)
+			var got: PackedFloat64Array = field.column(x, row0, rows)
+			for r: int in got.size():
+				total += 1
+				if got[r] == ValueNoise.sample_fbm(x, float(row0 + r) * step, seed):
+					same += 1
+		_check(total > 5000 and same == total, "seed %d: %d of %d column samples equal the per-sample call exactly" % [seed, same, total])
+	var a: PackedFloat64Array = ValueNoise.FbmField.new(1, step, rows).column(0.3, 0, rows)
+	var b: PackedFloat64Array = ValueNoise.FbmField.new(2, step, rows).column(0.3, 0, rows)
+	_check(a != b and a.size() == rows, "control: two seeds are two columns")
+	_check(ValueNoise.FbmField.new(1, step, rows).column(0.3, 10, 10).is_empty(), "an empty row range is an empty column")
 
 
 func _test_corner_hashes_match_reference() -> void:

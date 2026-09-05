@@ -147,16 +147,15 @@ static func _stage(data: Dictionary) -> Dictionary:
 
 static func _stage_world(env: Dictionary) -> World:
 	var grid: TileGrid = TileGrid.new(int(env["width"]), int(env["height"]), int(env["world_seed"]))
-	for terrain_cell: Variant in (env["blocks"] as Dictionary):
-		if not (terrain_cell is Vector2i):
-			last_invalid = "blocks: a key is not a cell"
-			return null
-		grid.set_material(terrain_cell, StringName(str((env["blocks"] as Dictionary)[terrain_cell])))
-	for terrain_cell: Variant in (env["walls"] as Dictionary):
-		if not (terrain_cell is Vector2i):
-			last_invalid = "walls: a key is not a cell"
-			return null
-		grid.set_wall(terrain_cell, StringName(str((env["walls"] as Dictionary)[terrain_cell])))
+	# Validated as a whole, then loaded as a whole (D0397): `TileGrid.load_cells` is the per-cell writers'
+	# equal at a fifth of their cost, and it runs only over cells already known to be cells.
+	var blocks: Dictionary = _cells_typed(env["blocks"], "blocks")
+	if blocks.is_empty() and not (env["blocks"] as Dictionary).is_empty():
+		return null
+	var walls: Dictionary = _cells_typed(env["walls"], "walls")
+	if walls.is_empty() and not (env["walls"] as Dictionary).is_empty():
+		return null
+	grid.load_cells(blocks, walls)
 	for col: Variant in (env.get("dig_extent", {}) as Dictionary):
 		var span: Vector2i = (env["dig_extent"] as Dictionary)[col]
 		grid.extend_terrain_dig_extent(int(col), span.x, span.y)
@@ -180,6 +179,25 @@ static func _stage_world(env: Dictionary) -> World:
 	for terrain_cell: Variant in deposits:
 		world.deposits.set_deposit(terrain_cell, int(deposits[terrain_cell]))
 	return world
+
+
+## One cell layer of the envelope with every key checked to be a cell and every value a `StringName`;
+## {} (with `last_invalid` set) on the first key that is not. A layer that arrives already typed is
+## returned as it is rather than copied.
+static func _cells_typed(layer: Dictionary, name: String) -> Dictionary:
+	var retype: bool = false
+	for terrain_cell: Variant in layer:
+		if not (terrain_cell is Vector2i):
+			last_invalid = "%s: a key is not a cell" % name
+			return {}
+		if not (layer[terrain_cell] is StringName):
+			retype = true
+	if not retype:
+		return layer
+	var out: Dictionary = {}
+	for terrain_cell: Vector2i in layer:
+		out[terrain_cell] = StringName(str(layer[terrain_cell]))
+	return out
 
 
 static func _stage_machines(env: Dictionary, world: World) -> Machines:

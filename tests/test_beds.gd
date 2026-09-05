@@ -13,7 +13,30 @@ func _initialize() -> void:
 	_test_the_hum_gains_colour_by_threshold()
 	_test_the_winch_snaps_and_the_rope_drags()
 	_test_the_node_builds_ten_beds_and_smooths_toward_a_level()
+	await _test_the_synthesis_is_the_same_off_thread()
 	_finish("beds")
+
+
+## D0397: the seat synthesizes on a worker thread and attaches later. The content may not depend on the
+## path: the bytes of every bed from `synthesize` equal the synchronous `setup`'s, and the rig settles.
+func _test_the_synthesis_is_the_same_off_thread() -> void:
+	var sync: Dictionary = Beds.synthesize(7)
+	var again: Dictionary = Beds.synthesize(7)
+	var same: bool = sync.size() == 10
+	for name: StringName in sync:
+		same = same and (sync[name] as AudioStreamWAV).data == (again[name] as AudioStreamWAV).data
+	_check(same, "ten beds, byte-identical across two syntheses of one seed")
+	_check((sync[&"hum"] as AudioStreamWAV).data != (Beds.synthesize(8)[&"hum"] as AudioStreamWAV).data, "control: another seed is another hum")
+	var rig: SceneAudio = SceneAudio.new()
+	root.add_child(rig)
+	rig.setup_async(7)
+	_check(not rig.beds.ready() and not rig.sfx.ready(), "before the thread finishes, no player exists and every voice is refused")
+	var frames: int = 0
+	while not rig.settle() and frames < 600:
+		await process_frame
+		frames += 1
+	_check(rig.settle() and rig.beds.ready() and rig.sfx.ready() and rig.beds.get_child_count() == 10, "the rig settles with its ten beds and its voices (%d frames)" % frames)
+	rig.queue_free()
 
 
 func _test_the_maps_are_silent_at_zero_and_at_their_ceilings_at_one() -> void:

@@ -87,16 +87,34 @@ static func line_mix(haul: float, load: float) -> Dictionary:
 
 ## Build every bed from the bank, silent, and start the loops. The seed is explicit so two boots agree.
 func setup(seed_value: int = 20260901) -> void:
+	attach(synthesize(seed_value))
+
+
+## Every bed from the seed, {name: AudioStreamWAV}; static and node-free so the seat may run it on a
+## worker thread (D0397). Each bed splits its own stream off the root, so the order here moves nothing.
+static func synthesize(seed_value: int) -> Dictionary:
 	var rng: SplitRng = SplitRng.new(seed_value).split("beds")
+	var out: Dictionary = {}
 	for name: StringName in Ordering.ids(BedBank.SECONDS.keys()):
+		out[name] = BedBank.to_loop_stream(BedBank.generate(name, rng.split(String(name))))
+	return out
+
+
+## Build a silent player per bed and start the loops; `drive` on a bed with no player yet is a no-op.
+func attach(streams: Dictionary) -> void:
+	for name: StringName in Ordering.ids(streams.keys()):
 		var p := AudioStreamPlayer.new()
-		p.stream = BedBank.to_loop_stream(BedBank.generate(name, rng.split(String(name))))
+		p.stream = streams[name]
 		p.volume_db = SILENT_DB
 		add_child(p)
 		_players[name] = p
 		_level[name] = 0.0
 		if not _muted:
 			p.play()
+
+
+func ready() -> bool:
+	return not _players.is_empty()
 
 
 func _exit_tree() -> void:

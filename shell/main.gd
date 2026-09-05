@@ -72,11 +72,10 @@ func boot(load_save: bool) -> bool:
 	Settings.persist = load_save
 	Controls.register()
 	Settings.load_settings()
-	door = Session.new_game(StrataData.get_site(SITE), SEED, START)
+	var env: Dictionary = _open_session(load_save, phases)
 	if door == null:
 		push_error("boot: the start refused: %s" % WorldSeeder.last_refusal)
 		return false
-	phases["new_game"] = Time.get_ticks_msec() - t0
 	camera = Camera2D.new()
 	add_child(camera)
 	if camera.is_inside_tree():
@@ -89,13 +88,8 @@ func boot(load_save: bool) -> bool:
 	stack = ViewStack.build_stack(self, door, look, camera, true, falling, payouts)
 	view = stack.view
 	phases["stack"] = Time.get_ticks_msec() - t1
-	if load_save and FileAccess.file_exists(save_path):
-		var t2: int = Time.get_ticks_msec()
-		var env: Dictionary = SaveGame.read(save_path)
-		phases["read"] = Time.get_ticks_msec() - t2
-		t2 = Time.get_ticks_msec()
-		restore(env)
-		phases["restore"] = Time.get_ticks_msec() - t2
+	if not env.is_empty() and stack.hints != null and env.get(KEY_HINTS) is Array:
+		stack.hints.restore_taught(env[KEY_HINTS])   # the shell's own key, once the HUD exists to take it
 	var body: Body = door.services()["body"]
 	_warp(body)
 	# The camera may not show past the world (D0333's clamp; the reveal scene set it, the seat never did --
@@ -107,7 +101,7 @@ func boot(load_save: bool) -> bool:
 	var t3: int = Time.get_ticks_msec()
 	audio = SceneAudio.new()
 	add_child(audio)
-	audio.setup(SEED)
+	audio.setup_async(SEED)   # the synthesis on a worker thread; the players attach on the first settled frame (D0397)
 	phases["audio"] = Time.get_ticks_msec() - t3
 	phases["total"] = Time.get_ticks_msec() - t0
 	if is_inside_tree():
@@ -116,6 +110,28 @@ func boot(load_save: bool) -> bool:
 	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, SEED, START])
 	print("%s phases_ms %s" % [BOOT_LINE, phases])
 	return true
+
+
+## The session: from the slot when it reads (D0397 -- generating a shaft only to swap it out was most of
+## the load), else a new game, the way a missing slot always was. Returns the envelope read, {} for none;
+## `door` is null when both refuse. `phases` takes each step's milliseconds for the boot line.
+func _open_session(load_save: bool, phases: Dictionary) -> Dictionary:
+	var env: Dictionary = {}
+	var t: int = Time.get_ticks_msec()
+	if load_save and FileAccess.file_exists(save_path):
+		env = SaveGame.read(save_path)
+		phases["read"] = Time.get_ticks_msec() - t
+	if not env.is_empty():
+		t = Time.get_ticks_msec()
+		door = Session.from_save(env)
+		phases["restore"] = Time.get_ticks_msec() - t
+		if door == null:
+			push_warning("boot: the slot was refused (%s); a new game instead" % SaveGame.last_invalid)
+	if door == null:
+		t = Time.get_ticks_msec()
+		door = Session.new_game(StrataData.get_site(SITE), SEED, START)
+		phases["new_game"] = Time.get_ticks_msec() - t
+	return env
 
 
 ## `--warp=col,row`: stand the body on the nearest floor to the cell, for a capture of the game at depth.
@@ -190,7 +206,7 @@ func _physics_process(delta: float) -> void:
 	_effects(delta)
 	tick += 1
 	if meter != null:
-		_meter_tick(began)
+		SeatDrive.meter_tick(self, began)
 	if tick == int(flags["screenshot_tick"]) and String(flags["screenshot_out"]) != "":
 		_shutter()
 	if quit_after >= 0 and tick >= quit_after:
@@ -219,19 +235,6 @@ func _hud_keys_driven() -> void:
 		stack.settings.state = HudBridge.snapshot()
 
 
-## The meter's physics sample, split by whether this tick ran the hub; a report every 300 ticks.
-func _meter_tick(began: int) -> void:
-	var frame: Frame = view.current_frame()
-	var hub: bool = frame != null and frame.obs != null and frame.obs.tick % HubTick.HUB_TICK_DIVISOR == 0
-	meter.note_physics(Time.get_ticks_usec() - began, hub)
-	if tick % 300 == 0:
-		print(meter.report())
-		print(view.draw_cost_report())
-		for line: String in meter.slow:
-			print(line)
-		meter.reset()
-
-
 ## The hands, deaf while the settings page is open: a modal takes the keys, and the body stands still.
 func _read_hands(page_open: bool) -> InputFrame:
 	var cell_px: int = Interface.Observation.CELL_PX
@@ -248,24 +251,9 @@ func _read_hands(page_open: bool) -> InputFrame:
 	return hands.read(Controls.pressed, Controls.pointer_world(self), cell_px, grid_ok)
 
 
-## The scripted hand for `--perf-drive` and `--act=`, a pure function of the tick.
+## The scripted hand (`shell/seat_drive.gd`), bound here so a Callable can be handed to the hands.
 func _driven(action: StringName) -> bool:
-	var act: String = flags["act"]
-	if act != "":
-		if act == "mine" and action == Controls.MINE:
-			return tick >= 20
-		if act == "map" and action == Controls.MAP:
-			return tick == 20
-		if (act == "settings" or act == "game") and action == Controls.SETTINGS:
-			return tick == 20
-		return false
-	if action == Controls.RIGHT:
-		return tick % 480 < 240
-	if action == Controls.LEFT:
-		return tick % 480 >= 240
-	if action == Controls.JUMP:
-		return tick % 90 < 4
-	return false
+	return SeatDrive.driven(flags, tick, action)
 
 
 static func _digit_down(i: int) -> bool:

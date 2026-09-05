@@ -40,8 +40,7 @@ phases — not itself one of the fixed tick phases.
 
 ## Public API
 
-- `TileGrid` (`tile_grid.gd`) — the fine (4px) terrain/digging grid, sparse `Dictionary`-backed, plus `coarse` (a class byte per logic cell, kept at the mutators for the minimap, D0371). Every
-  coordinate is named `terrain_cell: Vector2i` (never a bare `cell`) — `docs/DECISIONS_LEDGER.md` D0020.
+- `TileGrid` (`tile_grid.gd`) — the fine (4px) terrain/digging grid, sparse `Dictionary`-backed, plus `coarse` (a class byte per logic cell, kept at the mutators for the minimap, D0371). Every coordinate is named `terrain_cell: Vector2i` (never a bare `cell`) — `docs/DECISIONS_LEDGER.md` D0020.
   `.get_material()`/`.set_material()`, `.get_wall()`/`.set_wall()` (the background layer, revealed by
   `.excavate()` rather than erased with it), `.is_solid()`, `.in_bounds()`, `.occupied_terrain_cells()`,
   `.wall_terrain_cells()` and `.dig_extents()` (the save's reads, ADR 0010),
@@ -52,6 +51,7 @@ phases — not itself one of the fixed tick phases.
   this touch into column `col`'s own historical [min,max] dug extent and returns the merged range, which
   the caller (`Body._handle_dig`) excavates in full. Column-scoped: two adjacent columns disagreeing is
   legal geometry, only a gap strictly within one column was the illegal shape this closes.
+- `GridLoad` (`grid_load.gd`) — the bulk path onto an EMPTY grid via `TileGrid.load_cells()` (D0397).
 - `WorldMaterials` (`materials.gd`) — hardness by material id. `.hardness()`, `.exists()`, `.is_soil()`.
   Reads `data/materials/generated.gd`, codegen'd from `data/materials/*.yaml` — see Gotchas.
 - `LogicGrid` (`logic_grid.gd`, A′ step 3b, ADR 0009) — the 16 px metre-cell planes, every coordinate a
