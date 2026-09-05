@@ -296,27 +296,36 @@ found one `_check(true)` outside the crash probes (the crack painter) and it now
 dead legacy files are gone; the in-file dead ranges stay for the line citations. Four files sit at
 exactly 400 lines (the cap, not over it). Local gate battery on f3f39a59: 28 PASS, 0 FAIL.
 
-### The two-phase round (2026-09-05; D0396–D0400, in progress)
+### The two-phase round (2026-09-05; D0396–D0404, on main)
 
-**Phase 1 (done, on main).** F1: the director's slot, driven headless through the seat's hand, showed
-the stuck state was the seat's: `PlayInput` built `climb_dir` with up = -1 against the +1 contract, so W
-paid the line out and S reeled in (D0396). Fixed; the settings page gained a GAME face (RETURN TO SURFACE,
-NEW GAME on a second press), the rail answers a click, digits pick a slot, ESC closes. F2: boot 7.6 → 1.8 s
-with a save, 6.4 → 3.1 s fresh (D0397): `Session.from_save` skips the generation the restore discarded,
+**Phase 1 (done).** F1: the director's slot, driven headless through the seat's hand, showed the stuck
+state was the seat's: `PlayInput` built `climb_dir` with up = -1 against the +1 contract, so W paid the
+line out and S reeled in (D0396). Fixed; the settings page gained a GAME face (RETURN TO SURFACE, NEW GAME
+on a second press), the rail answers a click, digits pick a slot, ESC closes. F2: boot 7.6 → 1.8 s with a
+save, 6.4 → 3.1 s fresh (D0397): `Session.from_save` skips the generation the restore discarded,
 `TileGrid.load_cells` bulk-loads the planes, audio synthesizes on a worker thread, `ValueNoise.FbmField`
 samples the cave noise a column at a time; the golden matched at every checkpoint after each.
 
-**Phase 2 (in progress).** Done: T012 (lamp 0.38), T013 kept, T017 (hardrock bedded with parting planes,
-the tooth's cell 1/8 m -- it was the static; D0398), the depth ladder on the GDD's layers, the character
-smaller with a three-beat stroke, a breathing idle and the rope poses (D0399), T015 seen ore on the map
-(D0400). Next: T014 (a starved machine legible at ten metres), T016 (the three generation forks, one
-re-pin), V08 (the water's skin), the P3 tail. Captures: `tests/body/recordings/phase2_2026-09-05/`.
+**Phase 2 (done).** The six rulings: T012 lamp 0.38; T013 kept; T014 the status beacon (D0401); T015 seen
+ore on the map, `SeenPlane` saved and outside every signature (D0400); T016 the three generation forks in
+one data change, the golden re-pinned from CI Linux by the draft-PR route (D0402, PR #51); T017 hardrock
+bedded with parting planes, deepstone's plates, the tooth's cell 1/8 m -- it was the static (D0398). The
+depth ladder sits on the GDD's layers (THE DEEP WORKS at 140 m). The character: drawn at 0.85, a
+three-beat stroke, a breathing idle, the rope poses wired (D0399). Feel: the lamp breathes, blows chip,
+breaks throw debris, landings raise dust, the water's skin is a pixel (D0403). The round's perf check found
+its own regression (the map rebuilding on every step of seeing) and fixed it (D0404): the 15 s walk reads
+p50 8.1 / p99 21-22 / max 28 ms, 15-20 frames over 16.7 ms per 5 s, as before the round. Catalogue v3:
+73 entries acknowledged, 17 executed this round, 14 recognised (`docs/VISUAL_QUEUE.md`); forks T018–T023.
+Captures: `tests/body/recordings/phase2_2026-09-05/`.
+
+**Known, named:** the first five seconds after a fresh boot run 13 ms hub ticks while the new aquifers pour
+(V65: `WaterFlow.step` while water moves); a sealed pocket has no surface to skin (V62); the deep's pool at
+200 m (V63, T020); the wall specks' starfield (V64).
 
 ### Next action
 
-**A′ is complete through step 8; the look pass and the A+ round are on main.** The director's calls:
-the look verdict on the executed set from the real seat (`godot --path .`, then T012–T017), the three
-generation forks (T016), and step 7's scope (plan §8: the splitter, the Ore Vent, power gating, the
-crusher, the terminal products, material id vs item id, the resolver, the ramp glide, the history cull).
-Cheap next steps that need no ruling: the lode plane's window build on a snap (the last dropped frame),
-the sky painter's 1 ms, a water surface skin line (V08).
+**A′ is complete through step 8; the look pass, the A+ round and the two-phase round are on main.** The
+director's calls: play it (`godot --path .`: the slot loads in under two seconds, W reels the line, the GAME
+face is in settings), the six new forks T018–T023, the design rows V60 and V73, and step 7's scope (plan
+§8). Cheap next steps that need no ruling: `WaterFlow.step`'s cost while water moves (V65), the hint
+bubble's anchor (V70), the lode plane's window build on a snap, the sky painter's 1 ms.

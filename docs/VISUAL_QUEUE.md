@@ -1,4 +1,4 @@
-# Visual Queue (v2, 2026-09-04)
+# Visual Queue (v3, 2026-09-05; v2 2026-09-04)
 
 **Re-derived from the REAL seat.** v1 (fa8be271) was catalogued from `tests/body/reveal_scene.gd` with its
 `--camera` flag teleporting the camera 70 m from the miner's lamp -- its "deep is black" frames were a
@@ -285,3 +285,85 @@ V24-V30 HUD polish, V32-V55.
   language is the director's call.
 - V10/V11/V12 generation: each moves the golden and needs the CI re-pin; the calls are the director's.
 - V04 the deep's cool tint: chosen here (a blue-grey dark, amber lamp); the hue is a taste knob.
+
+
+---
+
+## The two-phase round (2026-09-05, D0396–D0404): executed, re-judged, recognised
+
+Baseline and after captures of the same ten warps: `tests/body/recordings/phase2_2026-09-05/{before,after}/`,
+with the texture, character, map and generation pairs beside them. The director's six rulings (T012–T017)
+were applied first; the rest is the mandate's "keep recognising and executing".
+
+### Executed this round
+
+| Entry | What landed | Ledger |
+|---|---|---|
+| V02 rock texture (T017) | hardrock bedded with parting planes at bed thickness; deepstone's plates; inclusions fewer and softer; bedding hue stronger by grammar | D0398 |
+| V58 the tooth was the static (new) | `rock_tooth.gdshader`'s 1/32 m cell was one screen pixel; now 1/8 m at half the weight | D0398 |
+| V56 the depth ladder disagreed with the layers (new) | STONEREACH at 40 m, THE DEEP WORKS at 140, THE SEAL last | D0398 |
+| V04 lamp warmth (T012) | `LAMP_TINT` 0.45 → 0.38, warm kept | D0398 |
+| V06/V07 the miner (T013) | kept under the veil; drawn at 0.85; a three-beat stroke; a breathing idle; swing/hang/climb poses | D0399 |
+| V55 the pick was static while mining | the stroke is wind-up / level / struck, phase-locked | D0399 |
+| V09 the map (T015) | ore paints only where the player has been; the chart's bands 55% toward grey | D0400, D0404 |
+| V57 the map shouted its bands (new) | desaturated on the chart | D0400 |
+| V25 machines in the dark (T014) | the status beacon: a breathing cut in the status colour for any machine that wants something | D0401 |
+| V10 the flat pad (T016) | `pad_half_m` 10 → 8, `ramp_m` 16 → 8 | D0402 |
+| V12 Stonereach at 8% air (T016) | `cave.deep_at_m` 140: 11-14% air through 64-128 m | D0402 |
+| V11 no water above 140 m (T016) | `aquifer.min_depth_m` 142 → 48: pools from 76 m | D0402 |
+| V08 water's skin | the line a world pixel at 0.95 alpha (a sealed pocket has no surface to skin, V62) | D0403 |
+| V31 no mining feedback | debris + dust on a break, a chip per blow | D0403 |
+| V37 landing has no weight | dust at the feet on a hard landing | D0403 |
+| V38 no motion on standing rock | the lamp breathes within 3.5% | D0403 |
+| V59 the settings rail could not be clicked (new) | the rail's payload answered; digits; ESC | D0396 |
+
+### Re-judged
+
+V28 (the legend never fades): it retires each row as the verb is demonstrated; the fresh-boot capture
+showed it before anything had been. V13 (the pool does not lead): the beam cut leads the way the miner
+faces; at 200 m the pool is small by the depth scale, which is V63 below. V16 (bands indistinguishable):
+the bedding hue is stronger and grammar-scaled; the ladder's bands now sit where the rock changes.
+
+### Recognised this round, not executed
+
+### V60 · The grapple's slack anchored line has no release key
+**What:** legacy's rule ("a jump cuts a taut line; deliberate release has no key") leaves a slack anchored
+line drawn until it goes taut. With W honest (D0396) the way out is reel-then-jump. **Where:**
+`sim/body/grapple.gd`, `body.gd:_handle_jump`. A design call: the director's.
+### V61 · The seat's mine drive aimed where it could not mine
+**What:** `--act=mine` aimed a metre ahead and three cells down and was refused at the spawn. Fixed: the
+cell under the feet (D0399). A tool row, kept so the catalogue's own instrument is on record.
+### V62 · A sealed aquifer has no surface to skin
+**What:** every generated pool is full to its ceiling; the skin line (V08) shows only on a breached or
+draining pool. **Where:** `plane_passes.gd` (a pocket with headroom is a generation choice).
+### V63 · The deep's lamp pool drowns the frame at 200 m
+**What:** `VeilPainter.lamp_scale` shrinks the pool with depth; at 206 m the lit disc is a few metres and
+the frame is speckle around it. **Where:** `veil_painter.gd`. Fork T020.
+### V64 · Wall-plane ore specks read as a starfield in the dark
+**What:** at 140 m the wall plane's nugget specks scatter as bright dots across the dark; without the
+rock face lit they read as stars, not ore behind air. **Where:** `wall_painter.gd`, `MaterialLook.is_speck`.
+### V65 · Water pouring after a fresh boot costs 13 ms hub ticks for five seconds
+**What:** aquifers from 48 m (D0402) pour into the caves they touch until they rest; `WaterFlow.step` over
+every wet cell while water moves. Returns on any breach. **Where:** `sim/fluid/water_flow.gd`. Perf, D0404.
+### V66 · The stroke's chips were three flecks
+**What:** executed (D0403): debris and dust on a break, a chip per blow.
+### V67 · The miner's idle was a still
+**What:** executed (D0399): two frames, a pixel of bob, the lamp flickers a step.
+### V68 · A starved machine had no signal at distance
+**What:** executed (D0401): the status beacon.
+### V69 · The stroke had two stills
+**What:** executed (D0399): the level mid-swing frame.
+### V70 · The hint bubble sits over the miner's head
+**What:** "GRAPPLE — fire the winch..." covers the rock above the miner, where the winch would be aimed.
+**Where:** `view/hud/hint_bubble.gd` (anchor beside, not above).
+### V71 · The parting lines are ruled where the fade field runs flat
+**What:** the laminae's bed thickness varies by facies, but inside one facies the lines are a metre apart
+on a straight warp; a face can read as ruled paper. **Where:** `RockTone.lamina`. Fork T018.
+### V72 · The strata chart on the map shows no water
+**What:** the coarse plane has rock, wall, ore and void; a flooded pocket paints as void. **Where:**
+`TileGrid.coarse`, `Minimap.class_color`.
+### V73 · The GAME face's NEW GAME has no world-seed control
+**What:** a new game is the same seed; a player who wants another world has no knob. **Where:**
+`shell/main.gd:new_game`, `Main.SEED`. Design: the director's.
+
+Acknowledged across both catalogues: 73 entries; executed in this round 17, re-judged 3, recognised 14.

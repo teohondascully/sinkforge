@@ -148,15 +148,15 @@ RIM_COLOR`, `ViewStack.BODY_Z`. Legacy drew him above the light "so he stays cri
 now belong, or did he lose his read against dark rock? The sprite's own black outline and saturated
 palette (helmet, visor) are the next question, and a redraw is yours.*
 
-**T014 · The factory is under the veil.** `ViewStack.MACHINE_Z` (D0393, reversing D0364). Lit by the
+**T014 · RULED 2026-09-05: under the veil AND legible starved -- the status beacon (D0401).** The factory is under the veil. `ViewStack.MACHINE_Z` (D0393, reversing D0364). Lit by the
 scene and its own pools. *Question: can a starved machine still be read from ten metres in the dark, or
 does it want its status lamp brighter?*
 
-**T015 · The map does not mark ore.** `Minimap.class_color` (D0392). A design call as much as a look:
+**T015 · RULED 2026-09-05: ore the player has SEEN -- SeenPlane (D0400).** The map does not mark ore. `Minimap.class_color` (D0392). A design call as much as a look:
 the survey upgrades sell what the fleck gave away. *Question: agreed, or should the corner map show ore
 the player has SEEN (which needs a fog plane the observation does not carry)?*
 
-**T016 · The three generation forks, each moves the golden.** V10 the 24 m ruler-flat pad
+**T016 · RULED 2026-09-05: all three, by impact -- executed and re-pinned (D0402).** The three generation forks, each moves the golden. V10 the 24 m ruler-flat pad
 (`relief.pad_m`); V11 no water above 140 m (`aquifer:` depth range); V12 Stonereach at 8% air against
 22% above and 18% below (`cave:` per-layer density). *Question: which, if any, and in what order? Each is
 a data diff plus the CI re-pin flow.*
@@ -165,3 +165,29 @@ a data diff plus the CI re-pin flow.*
 `MaterialLook.STRATA_AMOUNT`. Under the new light it reads as lit stone rather than static; the bedding
 is faint. *Question: more bedding (STRATA_AMOUNT up), fewer inclusions (STONE_DARKEN down), or leave it
 for the art pass?*
+
+
+## The two-phase round (D0396–D0404) — the calls made here, each one constant
+
+**T018 · The parting planes' weight and rhythm.** `RockTone.LAM_DARKEN` 0.42 + `LAM_ADD` 0.045, bed thickness
+2 / 1 / 0.5 m by the fade field. Under the lamp the face reads as layered stone; where the field runs flat
+the lines rule a metre apart (VISUAL_QUEUE V71). *Question: fainter and fewer, or this, or a second
+warp so the beds fold?*
+
+**T019 · The map is a strata chart.** The band colours at 55% toward grey (`Minimap.MAP_DESATURATE`); the
+ladder still reads as bands down the map. *Question: keep the chart, or plain rock with the chip alone
+naming the band?*
+
+**T020 · The deep's lamp.** `VeilPainter.lamp_scale` shrinks the pool with depth; at 200 m the lit disc is
+a few metres (V63). The dark is the design; the drowning was the complaint. *Question: a floor under the
+depth scale, or a wider pool that the deep earns with a better lamp?*
+
+**T021 · RETURN TO SURFACE is priced at nothing.** A stranded player stands at the spawn again with the
+world and the pack kept (D0396). *Question: should being stranded cost something -- the pack, the line,
+a walk -- or is a free way out the right price for a game about not getting stuck?*
+
+**T022 · "Seen" is an eight-metre disc on a hub tick.** It counts ore behind a metre of rock whose face
+the lamp lit (D0400). *Question: is that the survey's meaning of seen, or does the map want a sight line?*
+
+**T023 · The status beacon breathes at 0.9 Hz between 0.30 and 0.75 in the status colour.** *Question:
+is a pulse the right call for "wants something", or a steady colour with the working glow off?*
