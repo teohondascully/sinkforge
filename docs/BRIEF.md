@@ -4,148 +4,115 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-03, twelfth round. A′: steps 0–5 done (the eleventh round's brief is in
-`git log -p -- docs/BRIEF.md`; D0343–D0361). THIS ROUND: STEP 6, THE VIEWS AND THE BOOT, IS COMPLETE
-(6a–6q, D0362–D0380), AND STEP 8, THE WORLDGEN CONTENT, IS COMPLETE (8a–8h, D0381–D0388). Step 7, the
-economy, is the director's to scope (plan §8). `godot --path .` runs the game on the ported stack over a
-world that now has legacy's hills, rifts, sinkhole mouths, teeth, rubble, ledges, aquifers, lodes, a
-richness gradient and trees.** No eye has seen any of it: eleven look verdicts are queued (T005–T011).
+**Last updated: 2026-09-04, thirteenth round: the three passes (the twelfth round's brief is in
+`git log -p -- docs/BRIEF.md`; A′ steps 6 and 8, D0362–D0388). THIS ROUND: the game that felt like
+20 fps runs at 120 with one dropped frame a second (D0390); the light is a colour again and the miner,
+the factory and the map read as one world (D0391–D0393); the A+ list is closed to the extent it could be
+without a ruling (D0394).** The director's eye has still not judged the executed look; the pairs are on
+disk and the forks are T012–T017.
 
-**Headline: the whole of legacy's world and view are on the deterministic substrate, and the plan's one
-stated determinism crack was a stale sentence.** Gate 8's golden, pinned from CI Linux, matched a local
-macOS run at 200 of 200 checkpoints on a dig through generated terrain before a line of step 8 was
-written (D0381); the four float sites use only IEEE basic operations and stay. The content then came
-over as seven config-gated passes, each committed with the golden unchanged, and one switch-on moved it
-once. The switch-on is also where the real world spoke: no sinkhole mouth at the boot seed (legacy's
-20 m keepout is most of a half-width world), rift-wall ore as four-pixel specks that collapsed the
-ore-body pin (a metre-cell turned is a metre-square nugget here), and a CI-only rule that hardness is
-whole halves. Every one was fixed at its cause and has a row that fails without it.
+**Headline: the instrument was the defect.** `Engine.get_frames_per_second()` averages, so a 30 ms
+stall every hub tick and a 100 ms stall every camera move read as "100 fps" (D0389) while the director
+felt 20. A wall-clock meter over `_process` spacing found both in a minute. Every one of the six causes
+was a full-plane walk done per frame or per tick that a version key or a flat plane made free; none of
+them was rendering. The sim's determinism did not move: the shaft-replay golden matched at all 200
+checkpoints after every commit.
 
 ---
 
 ## What landed
 
-- **Step 6 (D0362–D0380), the views and the boot.** Water painter and drips (6a); the three look
-  registries pinned against the data (6b); the machine painter with nameplates planned per frame (6c);
-  payouts and falling items on the consumed flow channel (6d, 6e); ten synthesized beds and the one-shot
-  voices as edges over two observations (6f); the hotbar and PACK FULL chip (6g); the inspector,
-  objectives and hints with every content row re-authored (6h); the minimap on a coarse class plane the
-  grid maintains (6i); the settings page as a snapshot from the shell (6j); the additive light pass over
-  the veil (6k); the ore seams and every light cutting the veil (6l); the mark grammar as a list a test
-  can fail on (6m); the placed plane's clockwork (6n); the surface tone (6o); the heat haze and rock
-  tooth shaders on the deterministic clock (6p); and the boot: `shell/main.tscn` is the main scene,
-  `Main` the seat over the door, `PlayInput` and `HudBridge` its hands and its HUD, `ViewStack`,
-  `SceneAudio` and `MinerDraw` moved into `view/` (6q). CI 86 → 115 suites.
-- **Step 8a (D0381).** Measured, not built: the golden already identical across the pair. Plan §5.5 and
-  step 8's acceptance amended to the measurement.
-- **Step 8b (D0382).** `Relief`: legacy's pad, three waves and scarps, the sines an integer table; the
-  generator's surface a row per column through every pass; `CavePasses` take per-column floors.
-- **Step 8c (D0383).** `VerticalPasses`: rifts breathing on the sine table, ore in their walls, sinkhole
-  mouths over the deepest falls with the `pow(x, 2.2)` flare as a table; `spawn_col_m` on the site.
-- **Step 8d (D0384).** `StuddingPasses`: ledges a metre thick, teeth tapering from a metre to a cell,
-  rubble only over what holds it, the drought pass planting a vug or a vein at 18 m of plain rock.
-- **Step 8e (D0385).** `PlanePasses` through `ShaftGenerator.enrich(world, site, seed)`, called by
-  `WorldSeeder.load_world`: aquifers flooded on the water plane with a vein off the rim, lodes on the
-  deposit plane with per-cell amounts by the start record's rule (3 a cell shallow, 13 deep).
-  `ContentPasses` holds the order and the splits.
-- **Step 8f (D0386).** `Richness`: the frontier gradient as an integer band on a lattice from the
-  stream's own split; the ore and coal scatters and the lodes read it.
-- **Step 8g (D0387).** `TreePass`; `wood` and `leaves` as material records with legacy's colours.
-- **Step 8h (D0388).** `shallow_clay` carries every record; `tests/test_shallow_clay_content.gd` (17)
-  asserts the records agree with the tutorial start and the world carries what they promise; the golden
-  re-pinned from CI Linux (PR #50, the draft harvest route). CI 115 → 122 suites.
+- **Pass 1, performance (D0390).** `shell/frame_meter.gd` (p50/p99/max, frames over 8.3 and 16.7 ms,
+  hub-tick physics split) and `--perf-drive` (a scripted walk; the standstill number is not the game).
+  The water phase skips when nothing changed since a no-change step; `HubCache` keys each hub plane on
+  its own version, bucket-indexed; `TileGrid` extends `SignedPlane` and keeps flat index planes so a
+  window is row slices; the veil composes on the GPU (`veil.gdshader`, `VeilLayer`), the CPU painter
+  the pinned reference; the glint and seam caches key on the terrain version. Moving-camera frame p99
+  93 → 21 ms; painters 6 → 2 ms a frame.
+- **Pass 2, the look (D0391–D0393; `docs/VISUAL_QUEUE.md` v2, 55 entries from 22 captures of the real
+  seat).** Legacy's light composition lifted whole: an ambient dark that is a colour, skylight
+  scattered under each column's own surface, a void floor, an amber lamp; the camera clamped to the
+  world; the miner and the factory drawn UNDER the veil so the scene lights them; the halo a shadow rim;
+  the map no longer a weather chart of ore, modal when large; the plate primes for a second; banner and
+  horizon seam. Before/after: `tests/body/recordings/look_pass_2026-09-04/`.
+- **Pass 3, A+ (D0394).** Gate 36 (the second gate 30), `gate_status.py` runs again and says what it
+  is doing; the battery's exit code, the flaky detector's regex, gate 27 (earlier this round); one
+  `_check(true)` made a real assertion with a control; fifty dead legacy files removed after the
+  reference check. CI 122 → 124 suites (`test_water_rest`, `test_flat_planes`).
 
 ---
 
 ## What was learned
 
-1. **A plan sentence is a claim with a date.** "Diverges at checkpoint 3" described D0167's world; the
-   golden had matched across the pair at every re-pin since. Measured before building the fix, and the
-   fix was not built (D0381). The rule that keeps it true: nothing on the generation path calls
-   `sin`/`cos`/`pow`/`exp`; a shape that needs one is an integer table (`Relief.SIN_MILLI`, `FLARE_MILLI`).
-2. **`SplitRng.split` is keyed off the root seed, so a pass can be added without moving any other's
-   draws.** The whole gating design — seven passes, each committed with the golden unchanged — rests on
-   that one property, checked in the file before relying on it.
-3. **`TileGrid.excavate` on air moves the running signature.** It XORs the cell's term; excavating an
-   already-open cell corrupts the signature against the recomputed one. Every pass excavates only a
-   solid cell. Found by reading `excavate`, not by a failure — the failure would have been a
-   determinism red with no visible cause.
-4. **A control that fails harder: the same disc, two floors.** Under a valley column the scalar floor
-   opened 57 cells and breached 9 columns' bands; the per-column floor opened none (D0382). The first
-   control ("some valley exists") had failed honestly on a seed with none — an expected null carries no
-   conclusion.
-5. **Fixtures at chance 1.0 chain.** A tooth's tip seeds the next tooth, a block's top is the next
-   block's floor, a rift crossing another reports its cells twice (a one-cell "run"). Judge the rock at
-   the roots, dedupe before a run analysis, and pose "every cell asks" as the rate times the cells a
-   metre (4.0, not 1.0) — the rate is per metre of ground (D0384, D0387).
-6. **Legacy's constants carry legacy's world size.** The sinkhole keepout of 20 m about spawn left 63% of
-   legacy's 128 m world eligible and 37% of ours; all four rifts fell inside it and the boot seed had no
-   mouth. Halved, like the scarp distances. A port keeps the ratio where the constant is a fraction of
-   the world (D0388).
-7. **A metre-cell turned is a four-pixel speck here.** Rift-wall ore as single cells took copper's median
-   body from 550 cells to 2 and the ore-body pin went red. Each turn grows a metre-square nugget — the
-   cell legacy turned — and the pin measures the scatter on the site WITHOUT its records, while the
-   content world gets its own row (the median body at least a metre square) (D0388).
-8. **A data change's neighbours are every suite that enumerates the records.** CI's `test_mining` refused
-   `wood` 1.8 and `leaves` 0.35 (hardness converts through whole halves); the local run covered the tree
-   suite, the palette and the looks, not mining. Main was red for one commit (8c16d31c).
-9. **The depth fraction measures from the datum, not row zero.** Legacy divided the absolute row by the
-   world's rows with its 20-row sky inside; this build's 80 rows of sky would have pushed every lode
-   toward "deep". Attempt counts are taken from the datum too, so relief never changes how many veins a
-   site seeds (D0382, D0385).
-10. **The ore-body pin found the port's scale error and the content's population change at once, and
-    they needed different answers.** One was a defect (the speck), the other a different subject (the
-    content world). Splitting the population — plain site for the pin, content site for its own row — is
-    what let both be stated (D0388).
-11. **Step 6's mechanical rules, kept for the next porter:** a view file may not name a sim class
-    (`Interface.Observation` restates the constants); `get_image()` reads nothing headless (byte
-    accessors); a bare `Node2D` cannot be drawn on outside `_draw`; the duplication gate includes tests
-    (shared fixtures live in `test_base`); `x == ([..] as Array[T])` needs the parentheses; every
-    `_test_*` that awaits must be awaited; `Camera2D.make_current` before the node is in the tree errors.
-12. **Verify a subagent-free session the same way.** Every count in this brief was read off a PASS line
-    or a tool's output after the change, never from the plan's estimate; the two that were not (the
-    "diverges at checkpoint 3" sentence, the sinkhole keepout's fit) were the two that were wrong.
+1. **An averaged frame counter cannot register a stall.** The Engine's fps was 100 with 44 frames over
+   16.7 ms every five seconds. Measure frame SPACING and report the tail (p99, max, count over budget),
+   never the mean; and measure MOVING, since every stall here was keyed to the window re-centring.
+2. **"Nothing changed" is a version key, not a flag.** The outer `_hub_dirty` flag missed every write
+   that did not go through the door; a per-plane version compared at the consumer catches all of them
+   and costs nothing. The water rest marker is the same idea on a pure step: `(version, terrain_version,
+   grid id)` unchanged since a no-change step means the step is a no-op.
+3. **A per-cell Dictionary is a full-plane walk every time it is windowed.** 17K lode entries filtered
+   per snap was 2-3 ms; a bucket index or a flat byte plane with row slices is what makes a window free.
+   The observation was designed as copies; copies of a WORLD-sized plane per frame were the bill.
+4. **The veil's cost was the CPU composing per texel what a shader does in one pass.** The port kept
+   legacy's CPU painter and drew the same picture; keeping it as the pinned reference and moving the
+   composition to the GPU cost 200 lines and returned most of the 4 ms the painters gave back. The pin (`test_flat_planes`) reads
+   the same constants on both sides.
+5. **Legacy's light was the missing thing, not more contrast.** V01–V04 (rock reads as void, the deep
+   is flat, the light is grey) were one root cause: the veil was a grey multiply with no ambient colour,
+   no skylight scatter and no void floor. Legacy had all three in `world_renderer.gd`, and lifting them
+   moved eight catalogue entries at once (V01, V03, V04, V17 executed; V13, V16, V31, V40 re-judged). Fix
+   the light before judging the texture.
+6. **The miner "pasted on" was a z-order.** Legacy drew him above the light so he stayed crisp; under
+   this build's darker veil that read as a sticker. Under the veil he belongs, and his own lamp lifts
+   him. The same call for the factory (D0393 reverses D0364). Coherence is where in the stack, not how it
+   is drawn.
+7. **A perceived band is a pixel sample away from a real one.** The sky's horizon "band" was blamed on
+   the veil; sampling the pixels with and without the veil gave identical values (the sky painter's
+   gradient). No change was made there. Sample before attributing.
+8. **The seat needs flags to be captured.** `--fresh --warp --zoom --screenshot-tick --screenshot-out
+   --act` reproduce any frame of the real game headless; the first captures loaded the director's save
+   and warped into a one-cell slot. Standable means solid under both feet and air four columns wide.
+9. **The contiguity check was the instrument's own trip-wire.** Two gates numbered 30 made `gate_status`
+   FATAL since D0266, and it was called "hanging" because it also ran two silent
+   minutes. A progress line per step is the cheapest cure for a tool being believed dead.
+10. **Dead ranges inside a read-only reference are free; dead FILES are not.** Live code cites
+    `legacy/<file>:<line>` hundreds of times, so excising in-file ranges lies to every citation. Fifty
+    whole files, cited by nothing outside `legacy/`, were the safe half of the plan's §3.4.
 
 ---
 
 ## The decisions this round is waiting on
 
-**Step 7, the economy.** The plan says the director scopes it (§8): the splitter, the Ore Vent, power
-gating, the crusher chain, `press_plate`/`mill_gear`, the material-id/item-id map (D0349 — and now
-`wood` and `leaves` bore as their own ids too), ore BLOCK amounts (`pending_sim_economy`, unread), the
-resolver, the ramp glide, the 36 untracked recordings, the `history/` cull.
+**The eye, on the real seat.** `godot --path .` and the pairs under `tests/body/recordings/look_pass_
+2026-09-04/`. T012 the lamp's lean (0.45 amber against legacy's 0.28), T013 the miner under the veil with a
+shadow rim, T014 the factory under the veil, T015 the map without ore, T017 the rock's texture knobs.
+**T016, the three generation forks:** the 24 m ruler-flat pad, no water above 140 m, Stonereach at 8% air.
+Each is a data diff plus the CI re-pin. **Step 7's scope** (plan §8) and the `history/` cull are unchanged
+from the twelfth brief.
 
-**The eye.** T005–T011: the shaped surface, the mouths at 12 m, the teeth and rubble at this scale, the
-trees, the richness band's texture, an aquifer breached, and every step-6 look in one sitting.
-
-**CI:** 6k, 6l, 6o, 6p, 6q green on all four jobs (6m, 6n superseded by the next push); 8a–8d green;
-8e superseded; 8f's first run hit a connection reset downloading Godot and its re-run was superseded;
-8g red on `test_mining` (the hardness halves), fixed on main as 8c16d31c (green on all four jobs); 8h
-harvested on draft PR #50 (every suite green there but the golden's array match, as a world change must
-be), then pushed to main as 8c1c2695 with the re-pin e47dfaa4 on top; PR closed, branch deleted. The
-head's run (e47dfaa4) is the one to read.
+**CI:** every commit of this round is unpushed at the time of writing (e60d43b4 → f3f39a59 on top of
+origin/main 2b50c5ab); the push and its run follow this brief. `gate_status.py` on f3f39a59: 36 gates,
+26 with enforcing code, FAIL [], ADVISORY [14, 33]; local battery 28 PASS.
 
 ---
 
 ## Anything that felt wrong even though it passed
 
-**No eye, anywhere.** Twenty-seven commits of visual and world content and not one screenshot judged.
-The plan says look verdicts are the director's; the queue is the whole of it.
-
-**The widths are mine.** A tooth a metre wide, a trunk half a metre, a canopy 3 × 2.5 m, rubble a metre
-square: legacy's were one metre-cell each and a four-pixel cell would not read. Each is a record field.
-
-**Aquifers are full sealed pockets.** Legacy's were too; what the water phase does when a dig breaches
-one is D0344's algorithm, unwatched on this world.
-
-**Boot time is unmeasured.** The passes run over 256 × 1104 cells; D0326 measured 4 s before them.
+**One dropped frame a second, walking.** The lode plane's window build, the metre field and the glint
+scan all rebuild on the snap (3-4 ms together). Under 8.3 ms each, over it together, once a second.
+**The sky painter is 1 ms every frame** for a gradient and a moon.
+**The taste calls are mine.** The lamp's lean, the deep's blue-grey, the miner's rim, the map's palette:
+each one constant, each reversible, none seen by the director.
+**V02, the texture, was not touched.** Under the new light it reads as lit stone rather than static; the
+knobs are named in T017 and the art pass is the director's.
 
 ---
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks the next step; the next step is the director's.
+Nothing blocks; the next step is the director's eye.
 
 ## Taste queue
 
-**11 open.** T001–T004 unchanged; T005–T011 new this round (`docs/TASTE_QUEUE.md`).
+**17 open.** T001–T011 unchanged; T012–T017 new this round (`docs/TASTE_QUEUE.md`).

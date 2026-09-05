@@ -250,42 +250,57 @@ self-contained: a session executing A′ needs only that file, the analysis, and
   (now metre-square nuggets; the pin measures the scatter on the plain site), and CI's mining rule that
   hardness is whole halves (wood 2.0, leaves 0.5). The golden re-pinned from CI Linux. 17 assertions.
 
-### Performance (post-A′)
+### Performance (the three-pass round, 2026-09-04; D0390)
 
 **D0389's "100fps" was the Engine counter and was wrong; the director felt "20fps" and was right.** The
-wall-clock meter (`godot --path . -- --perf` still, `--perf-drive` on a scripted walk; `shell/frame_meter.gd`)
-found one 30 ms stall per hub tick at standstill and 60-110 ms stalls on every camera move. D0390 removed
-them at the cause: the water rest marker (hub tick 15 → 0.4 ms), per-plane `HubCache` keys, `TileGrid`'s
-flat index planes (a window is row slices), the veil on the GPU (`veil.gdshader` + `VeilLayer`, the CPU
-`VeilPainter` kept as the reference), and the glint/seam caches keyed on the terrain version.
+wall-clock meter (`godot --path . -- --perf` at standstill, `--perf-drive` on a scripted walk;
+`shell/frame_meter.gd`) found one 30 ms stall per hub tick at standstill and 60-110 ms stalls on every
+camera move. D0390 removed them at the cause: the water rest marker (hub tick 15 → 0.4 ms), per-plane
+`HubCache` keys, `TileGrid`'s flat index planes (a window is row slices), the veil on the GPU
+(`veil.gdshader` + `VeilLayer`, the CPU `VeilPainter` kept as the reference), and the glint/seam caches
+keyed on the terrain version.
 
 | moving camera (15 s) | before | after |
 |---|---|---|
 | frame p50 / p99 / max | 8.9 / 93 / 112 ms | 5.6-7.4 / 21 / 24 ms |
 | frames over 16.7 ms per 5 s | 44 | 14-19 |
+| physics p99 | 12.7 ms | ~5 ms |
 | painters per frame | 6.0 ms | 2.0 ms |
 
-Standstill: zero frames over 16.7 ms. **Remaining:** a window-snap tick still filters ~17K plane entries
-(2-3 ms) and rebuilds the metre field (1.5 ms), so one 120 Hz frame can drop per snap; the sky painter is
-1 ms every frame. Captures of the REAL seat: `godot --path . -- --warp=col,row --zoom=Z --screenshot-tick=40
---screenshot-out=PATH` (`shell/seat_flags.gd`).
+Standstill: zero frames over 16.7 ms. **The honest ceiling:** 120 fps sustained, with one 120 Hz frame
+dropped on each observation-window re-centre (about once a second walking): the lode plane's record build
+(~1.5 ms), the metre field (~0.7 ms) and the glint scan (~1.2 ms) all rebuild on the snap; the sky painter
+costs 1 ms every frame. Determinism untouched: `test_shaft_replay_determinism` ALL PASS 21 after every
+change, the golden unmoved. Captures of the REAL seat: `godot --path . -- --fresh --warp=col,row --zoom=Z
+--screenshot-tick=40 --screenshot-out=PATH [--act=mine|map|settings]` (`shell/seat_flags.gd`).
 
-### Instruments (post-A′)
+### The look pass (D0391–D0393)
 
-Three broken instruments fixed: `run_local_battery.sh` exited 0 on gate failures without `GATES_ONLY`;
-`flaky_test_detector.py` regex matched zero lines (wrong format vs `run_suites.sh` output); gate 27
-resolved by gitignoring `tests/body/recordings/`.
+`docs/VISUAL_QUEUE.md` v2: 55 entries from 22 captures of the real seat, four root causes (rock and void
+at one value; a per-cell static with no form; a grey light; an unclamped camera). Executed here, each
+one constant and reversible: legacy's light composition on the GPU veil (ambient dark, skylight scatter
+under each column's `sky_floor`, the void floor, the amber lamp), the camera clamp wired, the miner and
+the factory under the veil with the halo gone, the map unmarked of ore and modal when large, the arrival
+plate primed for a second, the banner a step smaller, the horizon seam closed. **Before/after pairs are on
+disk at `tests/body/recordings/look_pass_2026-09-04/{before,after}/`** (ignored, not shipped; the
+director selects what moves into `history/`). Six taste forks queued, T012–T017; the three generation
+forks (the pad, aquifer depth, Stonereach density) each move the golden and wait on the director.
 
-### Visual catalogue (post-A′)
+### A+ state (D0394)
 
-`docs/VISUAL_QUEUE.md`: 30 entries across 10 captures, ranked P0-P3. Root cause: `VeilPainter`'s skylight
-scatter not wired to the per-column surface row, lamp bloom at 0.17 (legacy 0.32), the veil base/scratch
-split not ported. 15+ items are literally invisible until V01 (darkness drowning) is fixed.
+Instruments: `run_local_battery.sh` exits non-zero on a gate failure; `flaky_test_detector.py` parses
+`run_suites.sh`'s real format; gate 27 green (recordings ignored); the second gate 30 is gate 36 and
+`gate_status.py` runs end to end again (2 m 19 s, progress on stderr: 36 gates, 26 with enforcing code,
+10 NO-CODE prose gates [5, 6, 10, 11, 12, 17-21], FAIL [], ADVISORY [14, 33]). The vacuous-green hunt
+found one `_check(true)` outside the crash probes (the crack painter) and it now asserts a plan. Fifty
+dead legacy files are gone; the in-file dead ranges stay for the line citations. Four files sit at
+exactly 400 lines (the cap, not over it). Local gate battery on f3f39a59: 28 PASS, 0 FAIL.
 
 ### Next action
 
-**A′ is complete through step 8.** Step 7 (the economy, rig-as-consumer) is the director's to scope
-(plan §8's rulings: the splitter, the Ore Vent, power gating, the crusher, the terminal products, material
-id vs item id, the resolver, the ramp glide, the recordings, the history cull). The shaped world has not
-been seen by an eye: the look verdicts are queued in `docs/TASTE_QUEUE.md`. **Open rulings from
-step 5 (plan §8):** the resolver (the swing's collision stand-in), the ramp glide.
+**A′ is complete through step 8; the look pass and the A+ round are on main.** The director's calls:
+the look verdict on the executed set from the real seat (`godot --path .`, then T012–T017), the three
+generation forks (T016), and step 7's scope (plan §8: the splitter, the Ore Vent, power gating, the
+crusher, the terminal products, material id vs item id, the resolver, the ramp glide, the history cull).
+Cheap next steps that need no ruling: the lode plane's window build on a snap (the last dropped frame),
+the sky painter's 1 ms, a water surface skin line (V08).
