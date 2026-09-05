@@ -111,7 +111,16 @@ func _test_the_layer_packs_the_lamp_and_the_cuts_as_the_shader_reads_them() -> v
 	var m: float = float(MaterialLook.CELLS_PER_METRE)
 	_check(lamp.size() == 3 and is_equal_approx(lamp[0].z, VeilPainter.LAMP_BEAM_M * m) and is_equal_approx(lamp[2].z, VeilPainter.LAMP_BODY_M * m), "three lamp cuts with legacy's radii in cells")
 	_check(is_equal_approx(lamp[2].x, 40.5) and lamp[0].x > lamp[2].x, "the body cut sits on the miner and the beam leads the way the miner faces")
-	_check(is_equal_approx(lamp[2].w, VeilPainter.LAMP_BODY_STRENGTH * VeilPainter.lamp_scale(200)), "strengths carry the depth scale")
+	_check(is_equal_approx(lamp[2].w, VeilPainter.LAMP_BODY_STRENGTH * VeilPainter.lamp_scale(200)), "strengths carry the depth scale (and at t = 0 the flicker is exactly 1)")
+	# D0403: the lamp breathes on the frame's clock, within LAMP_FLICKER of itself, never above it.
+	var lo: float = 2.0
+	var hi: float = 0.0
+	for i: int in 200:
+		var f: float = VeilLayer.lamp_flicker(float(i) * 0.05)
+		lo = minf(lo, f)
+		hi = maxf(hi, f)
+	_check(is_equal_approx(hi, 1.0) and lo >= 1.0 - VeilLayer.LAMP_FLICKER - 1e-6 and lo < 1.0 - VeilLayer.LAMP_FLICKER * 0.5, "the flicker stays within its band and reaches most of it over ten seconds (%.4f..%.4f)" % [lo, hi])
+	_check(VeilLayer.lamp_cuts(o, 1.7)[2].w < lamp[2].w, "...and a later frame's pool is fainter than the unflickered one")
 	var cuts: Array[Dictionary] = []
 	for i: int in 70:
 		cuts.append({"centre": Vector2(float(i), 2.0), "radius": 8.0, "strength": 0.5, "tint": Color(1.0, 0.5, 0.25)})

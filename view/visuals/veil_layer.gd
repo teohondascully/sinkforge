@@ -99,9 +99,20 @@ static func metre_rect_of(window: Rect2i) -> Rect2i:
 
 ## The lamp's three cuts as the shader takes them: xy centre and z radius in cells, w strength scaled
 ## by depth -- `VeilPainter.lamp_lift`'s own table, in its own order.
-static func lamp_cuts(obs: Interface.Observation) -> PackedVector4Array:
+## THE LAMP BREATHES (D0403, V38 "no motion on standing rock"): a carbide flame is never quite steady. Two
+## incommensurable sines on the frame's own clock move the pool's strength within `LAMP_FLICKER` of itself
+## -- a few percent, felt at the pool's edge rather than seen at its centre. On `anim_time`, so a replay
+## flickers identically and a fixture at t = 0 reads the unflickered strengths.
+const LAMP_FLICKER: float = 0.035
+
+
+static func lamp_flicker(t: float) -> float:
+	return 1.0 - LAMP_FLICKER * 0.5 * ((1.0 - cos(t * 7.3)) * 0.6 + (1.0 - cos(t * 11.9)) * 0.4)
+
+
+static func lamp_cuts(obs: Interface.Observation, t: float = 0.0) -> PackedVector4Array:
 	var m: float = float(PER_M)
-	var scale: float = VeilPainter.lamp_scale(obs.cell.y)
+	var scale: float = VeilPainter.lamp_scale(obs.cell.y) * lamp_flicker(t)
 	var head: Vector2 = VeilPainter.lamp_head(obs)
 	var body: Vector2 = Vector2(obs.cell) + Vector2(0.5, 0.5)
 	var throat: Vector2 = body.lerp(head, 0.45)
@@ -136,7 +147,7 @@ func paint_frame(frame: Frame, ci: CanvasItem) -> void:
 		return
 	_upload_cells(obs, w)
 	_upload_field(obs, w)
-	material.set_shader_parameter(&"lamp_cuts", lamp_cuts(obs))
+	material.set_shader_parameter(&"lamp_cuts", lamp_cuts(obs, frame.anim_time))
 	var drawn: Rect2i = TerrainPainter.visit_rect(obs, frame.view_world_rect, obs.cell_px).intersection(w)
 	var packed: Array = pack_cuts(VeilSources.cuts_for(frame, drawn, _ore, _falling))
 	material.set_shader_parameter(&"cuts", packed[0])

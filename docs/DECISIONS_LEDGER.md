@@ -16868,3 +16868,20 @@ unchanged, since each measures the plain site or its own records.
 
 **Why:** the ruling. **Reverse cost:** three data values and one optional field; the previous golden is
 one commit back.
+
+## D0403 · 2026-09-05 · Feel: the lamp breathes, a blow chips and a break throws debris, a hard landing raises dust, the water's skin is a pixel
+
+**Decided:** Four of the catalogue's feel rows, each one small and pinned. (V38) `VeilLayer.lamp_flicker`:
+the lamp's three cuts scale by two incommensurable cosines on `anim_time`, within 3.5% of themselves and
+exactly 1 at t = 0, so a fixture reads the unflickered strengths and a replay flickers identically. (V31)
+A break throws `debris` along the swing's direction and a settling `dust` puff in the material's colour;
+a blow that does not break the cell chips it once, off the aimed cell. (V37) The on-floor edge after a
+fall faster than 120 px/s raises dust at the feet in the floor's colour, more for a harder fall. (V08)
+The water's skin line is a world pixel at 0.95 alpha (was 0.75 px at 0.8: a hairline the veil ate);
+a sealed aquifer has no free surface to skin, so the line is judged on a breached pool. The re-pin of
+D0402's golden (PR #51, run 33953607297) rides this commit too, with `test_carve_fraction` re-pinned to
+the new measured density (0.0561 → 0.0781 non-shelf, toward the ~15% its own note names).
+
+**Why:** the brief's "mining feedback juice", "no motion on standing rock" and V08.
+
+**Reverse cost:** constants and two emitters; the flicker is one function with a t = 0 pin.

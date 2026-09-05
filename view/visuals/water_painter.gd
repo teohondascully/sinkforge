@@ -33,6 +33,8 @@ const WATER_RIPPLE_AMP: float = 0.75                  ## legacy 1.5 px
 const WATER_RIPPLE_LEN: float = 23.0                  ## legacy 46 px between crests
 const WATER_RIPPLE_SPEED: float = 1.7                 ## crests per second
 const WATER_MENISCUS: float = 1.5                     ## legacy 3 px of soft edge under the bright line
+const WATER_LINE: float = 1.0                         ## the skin line, a world pixel (was 0.75: a hairline the veil ate; D0403, V08)
+const WATER_LINE_ALPHA: float = 0.95                  ## ...and nearly opaque, so the surface reads in the dark
 const WATER_CAUSTIC_LEN: float = 39.0                 ## legacy 78 px between caustic bands
 const WATER_CAUSTIC_SPEED: float = 0.55
 const WATER_CAUSTIC: float = 0.15                     ## how much a band lifts the fill
@@ -56,7 +58,7 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 		ci.draw_colored_polygon(shape["fill"], shape["color"])
 		if shape["open_above"]:
 			ci.draw_colored_polygon(shape["meniscus"], Color(WATER_SURFACE, 0.22))
-			ci.draw_colored_polygon(shape["line"], Color(WATER_SURFACE, minf(1.0, WATER_ALPHA + 0.22)))
+			ci.draw_colored_polygon(shape["line"], Color(WATER_SURFACE, WATER_LINE_ALPHA))
 
 
 ## The surface y (top of the water) a cell draws for a level, anchored at the cell bottom; level 0 is
@@ -114,8 +116,8 @@ static func cell_shape(o: Interface.Observation, c: Vector2i, t: float) -> Dicti
 		# own would drift off the fill it is supposed to cap.
 		"meniscus": PackedVector2Array([tl, tm, tr, Vector2(tr.x, right_y + WATER_MENISCUS),
 			Vector2(tm.x, mid_top + WATER_MENISCUS), Vector2(tl.x, left_y + WATER_MENISCUS)]),
-		"line": PackedVector2Array([tl, tm, tr, Vector2(tr.x, right_y + 0.75),
-			Vector2(tm.x, mid_top + 0.75), Vector2(tl.x, left_y + 0.75)]),
+		"line": PackedVector2Array([tl, tm, tr, Vector2(tr.x, right_y + WATER_LINE),
+			Vector2(tm.x, mid_top + WATER_LINE), Vector2(tl.x, left_y + WATER_LINE)]),
 	}
 
 

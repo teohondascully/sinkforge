@@ -104,10 +104,14 @@ func _check_carve_ratchets(shelf_frac: float, open_frac: float, total_frac: floa
 	# both what carves and which rows count as shelf, so the populations behind these two fractions are
 	# not the ones the previous numbers were measured over. A band widened to swallow both would be
 	# measuring nothing.
-	_check(absf(open_frac - 0.0561) < 0.0060,
-		"non-shelf carve fraction %.4f stays near its measured 0.0561 (+/-0.0060)" % open_frac)
-	_check(absf(total_frac - 0.0381) < 0.0060,
-		"overall carve fraction %.4f stays near its measured 0.0381 (+/-0.0060). NOTE: legacy's own " % total_frac
+	# RE-PINNED 2026-09-05 for D0402 (the director's T016 ruling on V12), the same way: `cave.deep_at_m`
+	# 140 ends the threshold ramp at the Deep Works boundary instead of the world's bottom, so the middle
+	# third of the shaft carves at legacy's mid-world rate rather than its shallow one. Non-shelf 0.0561 ->
+	# 0.0781, overall 0.0381 -> 0.0532 -- toward, still under, the ~15% the NOTE below has always named.
+	_check(absf(open_frac - 0.0781) < 0.0060,
+		"non-shelf carve fraction %.4f stays near its measured 0.0781 (+/-0.0060)" % open_frac)
+	_check(absf(total_frac - 0.0532) < 0.0060,
+		"overall carve fraction %.4f stays near its measured 0.0532 (+/-0.0060). NOTE: legacy's own " % total_frac
 		+ "stated target is ~15%%, and neither the octave port nor WG-4 closed it on THIS measure -- "
 		+ "0.0358 -> 0.0329 -> 0.0381. What P021 closed was the missing carve PASSES (D0291), which this "
 		+ "fraction does not see: it measures `_carve_caves` alone. `tools/measure_void_fraction.gd` is "

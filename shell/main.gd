@@ -48,6 +48,10 @@ var meter: FrameMeter = null
 ## `--perf-drive`: with the meter, a scripted hand -- 240 ticks right, 240 left, a jump every 90 -- so
 ## the meter measures a MOVING camera. Standstill numbers flatter every window-keyed cache (2026-09-04).
 var drive: bool = false
+## The landing's own memory: the on-floor edge and the speed the fall carried into it (D0403).
+var _was_on_floor: bool = true
+var _fall_speed: int = 0
+const LAND_DUST_SPEED: int = 120   ## px/s of fall below which a landing raises no dust
 
 
 func _ready() -> void:
@@ -279,8 +283,24 @@ func _effects(delta: float) -> void:
 	if frame != null and frame.obs != null:
 		var o: Interface.Observation = frame.obs
 		if o.mining_broke:
+			# A break is debris AND a settling puff, not three flecks (D0403, V31): the cell vanished and
+			# nothing said so at play zoom. The colour is the broken material's own.
 			for cell: Vector2i in o.mining_broke_cells:
-				particles.chip((Vector2(cell) + Vector2(0.5, 0.5)) * float(o.cell_px), look.cell_color(o.mining_broke_material, cell.x, cell.y), randf_range(-PI, PI))
+				var at: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(o.cell_px)
+				var col: Color = look.cell_color(o.mining_broke_material, cell.x, cell.y)
+				particles.debris(at, col, atan2(float(o.mining_swing_dir.y), float(o.mining_swing_dir.x)) + PI)
+				particles.dust(at, col, 5)
+		elif o.mining_swing and o.aim_cell != Vector2i(-1, -1) and o.solid_at(o.aim_cell):
+			# A blow that did not break the cell still chips it: a fleck per swing off the struck face.
+			var struck: Vector2 = (Vector2(o.aim_cell) + Vector2(0.5, 0.5)) * float(o.cell_px)
+			particles.chip(struck, look.cell_color(o.material_at(o.aim_cell), o.aim_cell.x, o.aim_cell.y), atan2(float(o.mining_swing_dir.y), float(o.mining_swing_dir.x)) + PI)
+		# A hard landing raises the floor's dust at the feet (D0403, V37): the on-floor edge after a fall.
+		if o.on_floor and not _was_on_floor and _fall_speed > LAND_DUST_SPEED:
+			var feet: Vector2 = Vector2(float(o.left_x + o.right_x) * 0.5, float(o.bottom_y)) / float(Fx.SCALE)
+			var ground: Vector2i = Vector2i(floori(feet.x / float(o.cell_px)), floori(feet.y / float(o.cell_px)))
+			particles.dust(feet, look.cell_color(o.material_at(ground), ground.x, ground.y), mini(14, 6 + _fall_speed / 40))
+		_was_on_floor = o.on_floor
+		_fall_speed = o.vel_y / Fx.SCALE if not o.on_floor else 0
 		WaterDrips.spawn(o, particles, view.view_world_rect(), delta)
 	var landings: Dictionary = falling.take_landings()
 	for cell: Vector2i in landings:
