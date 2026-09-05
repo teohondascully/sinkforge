@@ -76,7 +76,10 @@ func _test_the_tooth_shader() -> void:
 	var massive: Vector2 = _default_vec2(code, "cell_massive")
 	var clastic: Vector2 = _default_vec2(code, "cell_clastic")
 	_check(bedded.x > bedded.y and massive.y > massive.x and is_equal_approx(clastic.x, clastic.y), "direction-aware: bedded runs flat, massive steep, soil square (%s %s %s)" % [str(bedded), str(massive), str(clastic)])
-	_check("TOOTH_SAMPLES_PER_WORLD_PX = 2.0" in code, "legacy's 1/32-metre tooth cell kept at our 16 px metre")
+	# D0398: legacy's 1/32 m cell was one screen pixel at the player's zoom and read as static; the tooth
+	# samples every 2 world px now (an eighth of a metre), at half the weight. Pinned as the cell in metres.
+	_check("TOOTH_SAMPLES_PER_WORLD_PX = 0.5" in code, "the tooth cell is an eighth of a metre: two world px a sample (D0398)")
+	_check("tooth_add : hint_range(0.0, 0.12) = 0.030" in code, "...at half legacy's weight, so it grits the bake rather than covering it")
 
 
 func _test_add_tooth_declines_without_a_bake() -> void:
