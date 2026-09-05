@@ -35,7 +35,9 @@ static func draw(canvas: CanvasItem, frame: Frame, tick_count: int, color_body: 
 	var top: float = float(o.top_y) / scale
 	var w: float = float(o.right_x - o.left_x) / scale
 	var h: float = float(o.bottom_y - o.top_y) / scale
-	var key: String = MinerLook.sprite_key(o.mining_is_charging or o.mining_swing, o.on_floor, o.vel_x, o.vel_y, tick_count, o.mining_swing_phase)
+	# On a rope the body travels at the climb axis's speed (`BodyMedium`), so the axis is the velocity's sign.
+	var line: Dictionary = {"climbing": o.climbing, "climb_dir": -signi(o.vel_y) if o.climbing else 0, "taut": o.grapple_taut, "anchored": o.grapple_anchored}
+	var key: String = MinerLook.sprite_key(o.mining_is_charging or o.mining_swing, o.on_floor, o.vel_x, o.vel_y, tick_count, o.mining_swing_phase, line)
 	var tex: Texture2D = MinerLook.resolve(key)
 	if tex == null:
 		canvas.draw_rect(Rect2(left, top, w, h), color_grounded if o.on_floor else color_body, true)

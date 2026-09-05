@@ -16784,3 +16784,28 @@ first attempt made was compared by pixel count: 61.6% of pixels moved and 30 by 
 laminae were real and invisible under the tooth, which is how the tooth was found.
 
 **Reverse cost:** every change is a constant or a data field; `lamina` is one function behind `GRAM_LAMINA`.
+
+## D0399 · 2026-09-05 · The character: smaller on the stage, a three-beat stroke, a breathing idle, the rope poses back
+
+**Decided:** The director's ruling: slightly smaller, more frame detail, under the veil (T013 kept).
+`MinerLook.DRAW_SCALE` 0.85 draws the 32x48 art at 27x41 on the 40 px box, feet on the AABB bottom;
+legacy's 1:1 was a 48 px figure over a 40 px box and read as a sticker's overhang. The baker
+(`legacy/tools/bake_miner.gd`, ASCII frames over a palette) is lifted to `tools/bake_miner.gd` verbatim and
+extended: a `dig_mid` arm block (the pick level ahead at chest height) so the stroke is three beats --
+`miner_dig_0` wind-up, `miner_dig_1` mid-swing, `miner_dig_2` struck on `brace` legs with the body dropped a
+pixel -- phase-locked to `Mining.swing_phase_per_mille` (struck to 300, wind-up to 680, mid to the next
+blow), with the clockless fallback now the SAME table run on a clock of the at-rest period, so the two
+agree with no half-period offset; `miner_idle_1` (a pixel of bob, the lamp core stepped down a shade) at
+36 ticks a frame so the idle breathes; and the rope poses legacy authored -- `miner_swing` on a taut
+line in the air, `miner_hang` on a slack anchored one, `miner_climb_0/1` gripping a placed rope -- wired
+from the observation's own booleans (`MinerLook`'s header said the build had no grapple; it has had one
+since D0359). `miner_land` stays out: it needs a landing hold this table has no clock for. Suite: 51.
+
+**Found on the way:** `--act=mine` had aimed a metre ahead and three cells under the feet and was refused
+at the spawn; it aims half a metre ahead and the cell under the feet now, which breaks clay in one blow
+at tick 21 -- so a capture of the stroke is taken inside ticks 21-36, not at 70.
+
+**Why:** the brief's character change. The stroke read as a twitch with two stills; the figure read as
+pasted at 48 px over a 40 px box even under the veil.
+
+**Reverse cost:** a constant, a frame table and three PNGs the baker regenerates.

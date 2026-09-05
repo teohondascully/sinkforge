@@ -26,9 +26,25 @@ const SPRITE_FALLBACKS: Dictionary = {
 	"miner_fall": "miner_jump", "miner_jump": "miner_idle",
 	"miner_walk_0": "miner_idle", "miner_walk_1": "miner_idle",
 	"miner_walk_2": "miner_idle", "miner_walk_3": "miner_idle",
-	"miner_dig_0": "miner_idle", "miner_dig_1": "miner_idle",
+	"miner_dig_0": "miner_idle", "miner_dig_1": "miner_idle", "miner_dig_2": "miner_dig_1",
+	"miner_idle_1": "miner_idle",
+	"miner_swing": "miner_fall", "miner_hang": "miner_idle", "miner_haul": "miner_hang",
+	"miner_climb_0": "miner_idle", "miner_climb_1": "miner_climb_0",
 	"miner_idle": "miner",
 }
+
+## THE ROPE POSES ARE BACK (D0399). The header above says the build had no grapple and no rope; it has both
+## since A' step 5 (D0359, D0360), so the branches legacy selected by `grapple.taut`, its state and
+## `climbing` are wired again from the observation's own booleans. `miner_land` stays out: it needs a
+## landing hold this frame table has no clock for.
+const CLIMB_TICKS_PER_FRAME: int = 8
+
+## The drawn scale of the art over the body (D0399, the director's "slightly smaller character"): 32x48 art
+## drawn at 0.85 stands 41 px on a 40 px box, feet still on the AABB bottom, so he reads as a small figure
+## in a big world rather than overhanging it. Legacy's 1:1 was a 48 px figure on a 40 px box.
+const DRAW_SCALE: float = 0.85
+## The breathing idle: two frames, a pixel of bob and a step of lamp flicker, about a second a cycle.
+const IDLE_TICKS_PER_FRAME: int = 36
 
 ## Legacy's own thresholds, converted to this build's units rather than re-tuned. Legacy compared a
 ## float `velocity.x` in px/s against 10.0; `Body.vel_x` is `Fx` fixed-point px/s, so the same physical
@@ -46,9 +62,11 @@ const WALK_TICKS_PER_FRAME: int = 6
 ## is a REAL phase (the tick a blow lands) and the two must not be the same value.
 const SWING_PHASE_NONE: int = -1
 
-## Which half of the stroke shows the struck frame. Half, as legacy's alternation is, so the cadence
-## reads as a steady chop rather than a twitch.
-const DIG_STRUCK_UNTIL: int = 500
+## The stroke in three beats (D0399): the blow lands at phase 0 and the STRUCK pose holds through the
+## follow-through, the WIND-UP lifts the pick over the shoulder, and the MID-SWING carries it through
+## level -- the frame the eye reads as motion; with two stills the stroke read as a twitch.
+const DIG_STRUCK_UNTIL: int = 300
+const DIG_WINDUP_UNTIL: int = 680
 
 
 ## `digging` MUST come from the player's INPUT, not from `Body.dig_event_this_tick`. The event is true
@@ -64,16 +82,26 @@ const DIG_STRUCK_UNTIL: int = 500
 ## idle. A pure function of its arguments -- no `Body`, no textures, no clock -- so
 ## `tests/test_miner_look.gd` can assert the whole table without building a world.
 static func sprite_key(digging: bool, on_floor: bool, vel_x: int, vel_y: int, anim_ticks: int,
-		swing_phase: int = SWING_PHASE_NONE) -> String:
+		swing_phase: int = SWING_PHASE_NONE, line: Dictionary = {}) -> String:
 	if digging:
 		return dig_key(swing_phase, anim_ticks)
+	# The rope, in legacy's priority: gripping a placed rope climbs; a taut line in the air swings; an
+	# anchored line with the feet off the ground hangs (`line`: climbing, climb_dir, taut, anchored).
+	if bool(line.get("climbing", false)):
+		if int(line.get("climb_dir", 0)) == 0:
+			return "miner_climb_0"
+		return "miner_climb_%d" % ((anim_ticks / CLIMB_TICKS_PER_FRAME) % 2)
+	if not on_floor and bool(line.get("taut", false)):
+		return "miner_swing"
+	if not on_floor and bool(line.get("anchored", false)):
+		return "miner_hang"
 	if not on_floor:
 		# Up and down are different beats: the rise is a tuck, the drop streams the legs out behind.
 		# `vel_y > 0` is DOWNWARD here, as it is in legacy -- y grows toward the world's bottom.
 		return "miner_fall" if vel_y > 0 else "miner_jump"
 	if absi(vel_x) > WALK_SPEED_MIN:
 		return "miner_walk_%d" % ((anim_ticks / WALK_TICKS_PER_FRAME) % 4)
-	return "miner_idle"
+	return "miner_idle" if (anim_ticks / IDLE_TICKS_PER_FRAME) % 2 == 0 else "miner_idle_1"
 
 
 ## WHICH DIG FRAME, AND WHY IT IS NOT A CLOCK. Legacy alternates on `int(_anim_time * 8.0) % 2` — a
@@ -84,15 +112,19 @@ static func sprite_key(digging: bool, on_floor: bool, vel_x: int, vel_y: int, an
 ## `Mining.swing_phase_per_mille()` reports where in the stroke the arms are, so the frame is a function
 ## of the swing rather than of a clock that resembles it.
 ##
-## `miner_dig_1` is the STRUCK pose (`legacy/tools/bake_miner.gd:449`, arms `dig_down`) and it shows from
-## phase 0 — the tick the rock takes damage — through the follow-through; `miner_dig_0` (`dig_up`) covers
-## the wind-up and ends at the next impact. That the two agree at rest is a check, not a coincidence:
-## `DIG_TICKS_PER_FRAME` is 8 and the at-rest period is 16, so the fallback below and the phase-locked
-## path draw the same cadence when rhythm is zero. `tests/test_miner_look.gd` asserts exactly that.
+## `miner_dig_2` is the STRUCK pose (`tools/bake_miner.gd`, arms `dig_down`, the brace legs) and it shows from
+## phase 0 — the tick the rock takes damage — through the follow-through; `miner_dig_0` (`dig_up`) is the
+## wind-up and `miner_dig_1` (`dig_mid`) the level mid-swing that ends at the next impact (D0399). The
+## clockless fallback cycles the three at `DIG_TICKS_PER_FRAME`. `tests/test_miner_look.gd` pins the table.
 static func dig_key(swing_phase: int, anim_ticks: int) -> String:
 	if swing_phase == SWING_PHASE_NONE:
-		return "miner_dig_0" if (anim_ticks / DIG_TICKS_PER_FRAME) % 2 == 0 else "miner_dig_1"
-	return "miner_dig_1" if swing_phase < DIG_STRUCK_UNTIL else "miner_dig_0"
+		# The clockless fallback is the phase-locked path run on a clock of the at-rest period, so the two
+		# agree tick for tick at rest by construction rather than by two tables happening to match.
+		var period: int = DIG_TICKS_PER_FRAME * 2
+		return dig_key(((anim_ticks % period) * 1000) / period, 0)
+	if swing_phase < DIG_STRUCK_UNTIL:
+		return "miner_dig_2"
+	return "miner_dig_0" if swing_phase < DIG_WINDUP_UNTIL else "miner_dig_1"
 
 
 ## The best drawn texture for a key: walk the fallback chain until something resolves. Returns null when
@@ -122,8 +154,8 @@ static func resolve(key: String) -> Texture2D:
 ## `docs/LEGACY_GAP.md` records the eventual 48 -> 56 re-bake for this build's 40px body; until that
 ## happens 1:1 is the honest placement and reads slightly squat, which the gap doc also says.
 static func dest_rect(tex: Texture2D, body_height_px: int) -> Rect2:
-	var w: float = float(tex.get_width())
-	var h: float = float(tex.get_height())
+	var w: float = float(tex.get_width()) * DRAW_SCALE
+	var h: float = float(tex.get_height()) * DRAW_SCALE
 	return Rect2(-w * 0.5, (float(body_height_px) * 0.5) - h, w, h)
 
 

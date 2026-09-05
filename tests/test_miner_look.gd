@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_test_the_free_running_fallback_is_the_at_rest_swing_by_construction()
 	_test_a_shorter_swing_makes_the_pick_swing_faster()
 	_test_turning_around_mirrors_the_miner_without_moving_it()
+	_test_the_rope_poses_and_the_breathing_idle()
 	_finish("miner_look")
 
 
@@ -54,28 +55,30 @@ func _test_turning_around_mirrors_the_miner_without_moving_it() -> void:
 		% left.size.x + "pass on code that mirrored unconditionally, which never turns around either")
 	# The interval is the body's, centred. Stated against the CENTRE rather than against literals so a
 	# re-baked sprite of a different width still has to be centred rather than merely consistent.
-	var w: float = float(tex.get_width())
+	var w: float = float(tex.get_width()) * MinerLook.DRAW_SCALE
 	_check(is_equal_approx(span_l.x, centre.x - w * 0.5) and is_equal_approx(span_l.y, centre.x + w * 0.5),
-		"and that interval is centred on the body: %.1f..%.1f against a %.0f-wide sprite at x %.1f"
+		"and that interval is centred on the body: %.1f..%.1f against a %.1f-wide drawn sprite at x %.1f"
 		% [span_l.x, span_l.y, w, centre.x])
 
 
-## D0287. The pick's two frames are `dig_up` and `dig_down` (`legacy/tools/bake_miner.gd:448-449`), and
-## the whole point of phase-locking them is that `dig_down` is on screen on the tick the rock actually
-## takes damage. Phase 0 IS that tick — `Mining` zeroes its swing counter as it fires.
+## D0287, three beats since D0399. The stroke's frames are `dig_up` (wind-up), `dig_mid` (level) and
+## `dig_down` (struck, `tools/bake_miner.gd`), and the whole point of phase-locking them is that the struck
+## pose is on screen on the tick the rock actually takes damage. Phase 0 IS that tick — `Mining` zeroes
+## its swing counter as it fires.
 func _test_the_struck_frame_shows_on_the_tick_the_rock_takes_damage() -> void:
-	_check(MinerLook.dig_key(0, 0) == "miner_dig_1",
+	_check(MinerLook.dig_key(0, 0) == "miner_dig_2",
 		"at phase 0, the tick the blow lands, the pick is DOWN (got %s)" % MinerLook.dig_key(0, 0))
-	_check(MinerLook.dig_key(999, 0) == "miner_dig_0",
-		"and at the top of the wind-up it is UP (got %s)" % MinerLook.dig_key(999, 0))
-	# Both frames over the whole range, and each covering half of it. A mapping that returned one frame
-	# everywhere would satisfy either row above on its own.
-	var struck: int = 0
+	_check(MinerLook.dig_key(500, 0) == "miner_dig_0",
+		"at the top of the wind-up it is UP (got %s)" % MinerLook.dig_key(500, 0))
+	_check(MinerLook.dig_key(999, 0) == "miner_dig_1",
+		"and coming down to the next blow it is LEVEL (got %s)" % MinerLook.dig_key(999, 0))
+	# All three frames over the whole range, each covering its own beat. A mapping that returned one frame
+	# everywhere would satisfy any row above on its own.
+	var beats: Dictionary = {"miner_dig_0": 0, "miner_dig_1": 0, "miner_dig_2": 0}
 	for p: int in range(0, 1001):
-		if MinerLook.dig_key(p, 0) == "miner_dig_1":
-			struck += 1
-	_check_over(1001, absi(struck - 500) <= 1,
-		"and the stroke is split evenly -- %d of 1001 phases show the struck frame" % struck)
+		beats[MinerLook.dig_key(p, 0)] = int(beats.get(MinerLook.dig_key(p, 0), 0)) + 1
+	_check_over(1001, beats["miner_dig_2"] == MinerLook.DIG_STRUCK_UNTIL and beats["miner_dig_0"] == MinerLook.DIG_WINDUP_UNTIL - MinerLook.DIG_STRUCK_UNTIL and beats["miner_dig_1"] == 1001 - MinerLook.DIG_WINDUP_UNTIL,
+		"and the stroke's three beats each cover their own span of phases: %s" % str(beats))
 	# The sentinel is not a phase. Passing it must reach legacy's clock, not be read as "just struck".
 	_check(MinerLook.dig_key(MinerLook.SWING_PHASE_NONE, 0)
 			!= MinerLook.dig_key(MinerLook.SWING_PHASE_NONE, MinerLook.DIG_TICKS_PER_FRAME),
@@ -97,11 +100,9 @@ func _test_the_free_running_fallback_is_the_at_rest_swing_by_construction() -> v
 	var disagreements: int = 0
 	for t: int in at_rest * 4:
 		var phase: int = ((t % at_rest) * 1000) / at_rest
-		# The clock's cycle starts on the UP frame and the swing's starts on the DOWN one -- the blow
-		# lands at phase 0 -- so the clock is compared half a period out of step, which is what the two
-		# being the same cadence means.
-		if MinerLook.dig_key(phase, 0) != MinerLook.dig_key(MinerLook.SWING_PHASE_NONE,
-				t + MinerLook.DIG_TICKS_PER_FRAME):
+		# The fallback IS the phase-locked path on a clock of the at-rest period (D0399), so the two agree
+		# with no offset: the clock's tick 0 is the blow, as the swing's phase 0 is.
+		if MinerLook.dig_key(phase, 0) != MinerLook.dig_key(MinerLook.SWING_PHASE_NONE, t):
 			disagreements += 1
 	_check_over(at_rest * 4, disagreements == 0,
 		"and the phase-locked and free-running frames match tick for tick at rest (%d differ)"
@@ -142,7 +143,7 @@ func _test_the_state_table_matches_legacys_priority_order() -> void:
 	var fast: int = MinerLook.WALK_SPEED_MIN * 4
 	var cases: Array = [
 		# digging outranks everything, including being airborne AND moving fast
-		{"dig": true, "floor": false, "vx": fast, "vy": 500, "t": 0, "want": "miner_dig_0"},
+		{"dig": true, "floor": false, "vx": fast, "vy": 500, "t": 0, "want": "miner_dig_2"},   # the clock's tick 0 is the blow (D0399)
 		# airborne outranks walking: moving fast horizontally while falling is still a fall
 		{"dig": false, "floor": false, "vx": fast, "vy": 500, "t": 0, "want": "miner_fall"},
 		{"dig": false, "floor": false, "vx": fast, "vy": -500, "t": 0, "want": "miner_jump"},
@@ -170,8 +171,8 @@ func _test_dig_and_walk_cycle_through_their_frames() -> void:
 	for t: int in ticks:
 		dig_seen[MinerLook.sprite_key(true, true, 0, 0, t)] = true
 		walk_seen[MinerLook.sprite_key(false, true, MinerLook.WALK_SPEED_MIN * 4, 0, t)] = true
-	_check_over(ticks, dig_seen.size() == 2,
-		"the dig cycle emits both of its frames over %d ticks (got %d distinct: %s)"
+	_check_over(ticks, dig_seen.size() == 3,
+		"the dig cycle emits all three of its frames over %d ticks (got %d distinct: %s)"
 		% [ticks, dig_seen.size(), dig_seen.keys()])
 	_check_over(ticks, walk_seen.size() == 4,
 		"the walk cycle emits all four of its frames over %d ticks (got %d distinct: %s)"
@@ -259,3 +260,23 @@ func _test_dug_headroom_covers_the_sprites_overhang() -> void:
 		"a dug tunnel clears the sprite's overhang: %d cells x %dpx = %dpx carved, against %dpx of art "
 		% [Heightfield.DIG_HEADROOM_CELLS, Heightfield.TERRAIN_CELL_PX, carved_px, overhang_px]
 		+ "above the collision box")
+
+
+## D0399: the rope poses legacy authored, wired to the observation's own booleans (the header's "this
+## build has no grapple" is history), and the idle that breathes on two frames.
+func _test_the_rope_poses_and_the_breathing_idle() -> void:
+	_check(MinerLook.sprite_key(false, false, 0, 500, 0, MinerLook.SWING_PHASE_NONE, {"taut": true}) == "miner_swing", "airborne on a taut line swings")
+	_check(MinerLook.sprite_key(false, false, 0, 500, 0, MinerLook.SWING_PHASE_NONE, {"anchored": true}) == "miner_hang", "airborne on a slack anchored line hangs")
+	_check(MinerLook.sprite_key(false, true, 0, 0, 0, MinerLook.SWING_PHASE_NONE, {"anchored": true, "taut": true}) == "miner_idle", "on the floor the line changes nothing: he stands")
+	_check(MinerLook.sprite_key(false, false, 0, 0, 0, MinerLook.SWING_PHASE_NONE, {"climbing": true}) == "miner_climb_0", "gripping a rope and still is the grip frame")
+	var seen: Dictionary = {}
+	for t: int in MinerLook.CLIMB_TICKS_PER_FRAME * 4:
+		seen[MinerLook.sprite_key(false, false, 0, -100, t, MinerLook.SWING_PHASE_NONE, {"climbing": true, "climb_dir": 1})] = true
+	_check(seen.size() == 2 and seen.has("miner_climb_0") and seen.has("miner_climb_1"), "climbing cycles its two frames (%s)" % str(seen.keys()))
+	_check(MinerLook.sprite_key(true, false, 0, 0, 0, MinerLook.SWING_PHASE_NONE, {"taut": true}).begins_with("miner_dig"), "digging still outranks the rope")
+	var idle: Dictionary = {}
+	for t: int in MinerLook.IDLE_TICKS_PER_FRAME * 4:
+		idle[MinerLook.sprite_key(false, true, 0, 0, t)] = true
+	_check(idle.size() == 2 and idle.has("miner_idle") and idle.has("miner_idle_1"), "the idle breathes on two frames (%s)" % str(idle.keys()))
+	for key: String in ["miner_swing", "miner_hang", "miner_haul", "miner_climb_0", "miner_climb_1", "miner_idle_1", "miner_dig_2"]:
+		_check(MinerLook.resolve(key) != null, "%s resolves to a baked texture" % key)
