@@ -33,7 +33,7 @@ extends RefCounted
 const BACKDROP_Z: int = -200
 const SKY_Z: int = -100
 const WALL_Z: int = -60
-const TERRAIN_Z: int = -50
+const TERRAIN_Z: int = -52  ## was -50; two rungs made for the factory under the veil (D0393)
 ## THE VEIL LANDED 2026-09-01 (D0302, lamp D0306); this paragraph used to say it had not, and said so
 ## twice in one block. The ordering it argued for is the ordering that shipped, so only the tense is
 ## corrected: the veil sits ABOVE the terrain and the wall and BELOW the glint. It is a light layer, so
@@ -42,7 +42,7 @@ const TERRAIN_Z: int = -50
 ## by `_dark`, the LightLayer with BLEND_MODE_MUL that makes rock dark", so the flare's own darkness
 ## compensation and the veil's attenuation were the same number and cancelled exactly.
 const LODE_Z: int = -58   ## the lode's live metal over the wall bake that leaves its socket bare (6l, D0374)
-const WATER_Z: int = -48  ## over the terrain, under the veil: deep water reads dark, daylit bright (6a, D0362)
+const WATER_Z: int = -51  ## over the terrain, under the veil: deep water reads dark, daylit bright (6a, D0362)
 const BODY_Z: int = -46  ## the miner, UNDER the veil: lit by his own lamp like everything else (D0391); legacy drew him at 60, over it, with a halo instead
 const VEIL_Z: int = -45
 const TOOTH_Z: int = -44  ## the rock tooth: absolute levels added over the veil so deep rock keeps its grain (6p, D0379)
@@ -54,9 +54,14 @@ const GLINT_Z: int = -40
 ## readout the veil can dim is a readout that stops working in the exact place the game is played. Below
 ## the cracks and the body, which are the things doing the parting.
 const SEAM_Z: int = -35
-const DROP_PATH_Z: int = -31  ## the guides under the machines to where their output falls (6n, D0377)
-const AMBIENCE_Z: int = -28   ## the placed plane's clockwork over them: tubes and beads, torches, saplings, piles, updrafts, streaks (6n, D0377)
-const MACHINE_Z: int = -30  ## the factory: over the terrain, water and veil, under the marks, the rope and the body (6c, D0364)
+## THE FACTORY IS UNDER THE VEIL (D0393, reversing D0364's placement over it). Legacy drew its machines
+## below the light layers and lit them by their own pools (`LightPainter`'s machine pools, torches and
+## conduit glows are that half, ported in 6k); with the miner under the veil since D0391 a full-bright
+## forge beside a lamp-lit miner was the last unlit thing in the frame. What stays above: the marks and
+## the seam grain (aim readouts), the falling items (their motes cut the veil), the rope, the glint.
+const DROP_PATH_Z: int = -50  ## the guides under the machines to where their output falls (6n, D0377)
+const MACHINE_Z: int = -49  ## the factory: over the terrain and water, under the veil, the body and the marks (6c, D0364; D0393)
+const AMBIENCE_Z: int = -48   ## the placed plane's clockwork over them: tubes and beads, torches, saplings, piles, updrafts, streaks (6n, D0377)
 const MARKS_Z: int = -20    ## the cursor, the dig plan, the ghosts and previews: over the factory, under the rope and the body (6m, D0376)
 const FALLING_Z: int = -25  ## the cosmetic drops: over the machines they leave, under the rope and the body (6e, D0365)
 const ROPE_Z: int = -10   ## the line and the placed ropes, under the body the scene draws at 0 (5d, D0361)

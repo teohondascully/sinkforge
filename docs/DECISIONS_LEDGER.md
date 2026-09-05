@@ -16614,3 +16614,21 @@ far less ore). Rejected for the design reason above, not the look.
 **Why:** VISUAL_QUEUE v2 V09, V15, V22, V23.
 
 **Reverse cost:** Trivial: one match arm, two constants, a rect edge, a time guard.
+
+## D0393 · 2026-09-04 · The factory goes under the veil
+
+**Decided:** `MACHINE_Z`, `AMBIENCE_Z` and `DROP_PATH_Z` move below `VEIL_Z` (-49/-48/-50; `TERRAIN_Z`
+and `WATER_Z` shift to -52/-51 to make the rungs), reversing D0364's placement of the machines OVER the
+veil. Legacy drew its machines below the light layers and lit them by their own pools -- the half 6k
+ported as `LightPainter`'s machine pools, torch and conduit glows. With the miner under the veil since
+D0391, a full-bright forge beside a lamp-lit miner was the last unlit thing in the frame, and it is what
+made the machine casings read as black boxes in daylight (VISUAL_QUEUE v2 V25) too: they were never
+receiving the scene's light at all. The marks, the seam grain, the falling items, the rope and the glint
+stay above the veil: aim readouts and light sources.
+
+**Alternative:** D0364's reading of the GDD ("a blocked machine is legible from ten metres") as
+"unveiled". Rejected: legibility in the dark is the pools' job, which is why legacy built them.
+
+**Why:** one light, one set of rules for everything standing in it.
+
+**Reverse cost:** Three constants.
