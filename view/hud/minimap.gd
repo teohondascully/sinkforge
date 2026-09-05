@@ -13,11 +13,12 @@ extends RefCounted
 ## Legacy's aquifer, power, torch, bazaar, breach and ping overlays are not here: the first three need
 ## whole-world planes the observation does not carry, the rest are dead.
 ##
-## ORE IS NOT MARKED (D0392). With Stonereach's ore rate an ore-centred metre cell is common enough that
-## legacy's gold fleck painted half the deep gold (VISUAL_QUEUE v2 V09), and a map that shows every ore
-## cell for free is the survey upgrade `docs/GDD.md` §5 sells ("ore ping, strata map") given away at
-## boot -- and the Reveal layer's question ("what's behind this wall", §12) answered before it is asked.
-## An ore cell paints as the rock it sits in. `ORE_COLOR` stays for the machine dots' family.
+## ORE IS MARKED ONLY WHERE SEEN (D0392, then D0400). With Stonereach's ore rate an ore-centred metre cell
+## is common enough that legacy's gold fleck painted half the deep gold (VISUAL_QUEUE v2 V09), and a map
+## that shows every ore cell for free is the survey upgrade `docs/GDD.md` §5 sells ("ore ping, strata
+## map") given away at boot -- and the Reveal layer's question ("what's behind this wall", §12) answered
+## before it is asked. The director's ruling (T015): ore the player has already been near shows, ore they
+## have not paints as the rock it sits in. `Observation.map_seen` is that memory (`SeenPlane`).
 
 const MINI_W: float = 150.0
 const MINI_H: float = 116.0
@@ -29,6 +30,8 @@ const ROCK_DARKEN: float = 0.35     ## the band colour is authored for lit rock;
 const WALL_DARKEN: float = 0.62
 const LARGE_DIM := Color(0.02, 0.02, 0.04, 0.55)   ## the world defocused behind the large form
 const ORE_COLOR := Color(0.95, 0.80, 0.40)
+const SEEN_ORE_DARKEN: float = 0.30   ## a seen ore cell on the map: the ore family's colour, toned to the chart
+const MAP_DESATURATE: float = 0.55    ## how far the ladder's band colours pull toward grey on the chart
 const YOU_COLOR := Color(0.97, 0.86, 0.36)
 const VIEW_COLOR := Color(1.0, 1.0, 1.0, 0.55)
 
@@ -37,6 +40,7 @@ var large: bool = false
 var rebuilds: int = 0
 var _tex: ImageTexture = null
 var _tex_version: int = -1
+var _tex_seen_version: int = -1
 var _tex_cells: Vector2i = Vector2i.ZERO
 
 
@@ -59,12 +63,22 @@ static func frame_rect(map_cells: Vector2i, is_large: bool) -> Rect2:
 	return Rect2(Vector2(UiTheme.CANVAS.x - small.x - UiTheme.px(MARGIN_RIGHT), UiTheme.px(MINI_TOP)), small)
 
 
-## The colour of one coarse class at one logic row, off the palette's band ladder.
-static func class_color(cls: int, logic_row: int, look: MaterialLook) -> Color:
+## The colour of one coarse class at one logic row, off the palette's band ladder. ORE PAINTS ONLY WHEN
+## SEEN (D0400, the director's T015 ruling): a cell the player has been near shows its ore in the ore
+## family's colour, toned to the map; one they have not is the rock it sits in, so the map rewards memory
+## and leaves the reason to explore where it was.
+static func class_color(cls: int, logic_row: int, look: MaterialLook, seen: bool = false) -> Color:
 	var n: int = Interface.Observation.LOGIC_PX / Interface.Observation.CELL_PX
 	var band: Color = look.band_color(logic_row * n + n / 2) if look != null else Color(0.4, 0.4, 0.45)
+	# The ladder's colours are the chip's announcement colours, saturated for type; on a chart they shout
+	# (D0400: the re-placed ladder put the seal's violet on a third of the map). Pulled most of the way
+	# to their own grey, so the bands still read as bands and the map reads as a map.
+	var grey: float = band.get_luminance()
+	band = band.lerp(Color(grey, grey, grey), MAP_DESATURATE)
 	match cls:
-		Interface.Observation.MAP_ROCK, Interface.Observation.MAP_ORE: return band.darkened(ROCK_DARKEN)
+		Interface.Observation.MAP_ORE:
+			return ORE_COLOR.darkened(SEEN_ORE_DARKEN) if seen else band.darkened(ROCK_DARKEN)
+		Interface.Observation.MAP_ROCK: return band.darkened(ROCK_DARKEN)
 		Interface.Observation.MAP_WALL: return band.darkened(WALL_DARKEN)
 	return VOID_COLOR
 
@@ -73,14 +87,17 @@ static func class_color(cls: int, logic_row: int, look: MaterialLook) -> Color:
 func ensure_texture(o: Interface.Observation, look: MaterialLook) -> ImageTexture:
 	if o.map_cells.x <= 0 or o.map_cells.y <= 0 or o.map.size() < o.map_cells.x * o.map_cells.y:
 		return null
-	if _tex != null and _tex_version == o.map_version and _tex_cells == o.map_cells:
+	if _tex != null and _tex_version == o.map_version and _tex_seen_version == o.map_seen_version and _tex_cells == o.map_cells:
 		return _tex
 	var img := Image.create(o.map_cells.x, o.map_cells.y, false, Image.FORMAT_RGBA8)
+	var has_seen: bool = o.map_seen.size() >= o.map_cells.x * o.map_cells.y
 	for y: int in o.map_cells.y:
 		for x: int in o.map_cells.x:
-			img.set_pixel(x, y, class_color(o.map[y * o.map_cells.x + x], y, look))
+			var i: int = y * o.map_cells.x + x
+			img.set_pixel(x, y, class_color(o.map[i], y, look, has_seen and o.map_seen[i] != 0))
 	_tex = ImageTexture.create_from_image(img)
 	_tex_version = o.map_version
+	_tex_seen_version = o.map_seen_version
 	_tex_cells = o.map_cells
 	rebuilds += 1
 	return _tex

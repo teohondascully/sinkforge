@@ -16809,3 +16809,25 @@ at tick 21 -- so a capture of the stroke is taken inside ticks 21-36, not at 70.
 pasted at 48 px over a 40 px box even under the veil.
 
 **Reverse cost:** a constant, a frame table and three PNGs the baker regenerates.
+
+## D0400 · 2026-09-05 · The map remembers: ore paints only where the player has been (T015), and the chart's bands go quiet
+
+**Decided:** The director's T015 ruling -- seen ore on the corner map, unseen ore never -- needs a memory
+the observation did not carry. `interface/seen_plane.gd` (`SeenPlane`): one byte per logic cell, a disc
+of `RADIUS_M` 8 (a lamp's reach) marked about the body's logic cell on every hub tick by `Interface.apply`
+(MOVE), so it is a deterministic function of the replay; carried on the observation as `map_seen` with its
+own version; saved by `Session` under `seen` (a pre-D0400 save has none: nothing seen, honestly); and
+OUTSIDE every signature, since it changes nothing the sim decides -- the suite asserts the signature is
+unmoved by marking. `Minimap.class_color` paints `MAP_ORE` in the ore family's colour when seen and as the
+rock it sits in when not; the texture keys on both versions. "Seen" is "was within eight metres on a hub
+tick", which counts ore behind a metre of rock the lamp lit the face of; a fog that traced sight lines
+would be a plane the observation does not carry and a cost the map does not earn.
+
+**Also:** the re-placed ladder (D0398) put the seal's violet across a third of the large map and the deep
+works' brown across another. The chart pulls every band 55% toward its own grey (`MAP_DESATURATE`): the
+bands still read as bands, the map reads as a map.
+
+**Why:** "discovered-ore-on-map rewards memory and lets the survey upgrade sell what the fleck gave away;
+undiscovered-ore-on-map would remove the reason to explore" -- the director, verbatim.
+
+**Reverse cost:** one plane behind one observation field; the save key is optional on the way in.

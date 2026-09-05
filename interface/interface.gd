@@ -100,6 +100,7 @@ var _lode: LodeWork = LodeWork.new()
 var _verbs: Verbs
 var _rates: ProductionRate = ProductionRate.new()
 var _hold: MineHold = MineHold.new()
+var _seen: SeenPlane                 ## what the map admits to: the cells the body has been near (D0400)
 var _events: Array[Dictionary] = []   # flow events since the last observe: the consumed channel
 var _tick: int = 0
 ## The derived window planes, refreshed on terrain or window change rather than per tick (D0340). Held
@@ -117,6 +118,7 @@ var _hub_cache: HubCache = HubCache.new()
 ## its world, items and registry too (`world.grid` must be `grid`), else fresh ones wrap the grid.
 func _init(grid: TileGrid, body: Body, mining: Mining, world: World = null, items: Items = null, machines: Machines = null) -> void:
 	_world = world if world != null else World.new(grid)
+	_seen = SeenPlane.new(Vector2i(_world.grid.coarse_width, _world.grid.coarse_height))
 	_items = items if items != null else Items.new(_world)
 	_machines = machines if machines != null else Machines.new()
 	_machines.attach_to(_items)
@@ -165,6 +167,8 @@ func observe(envelope: Envelope) -> Observation:
 	o.map = _world.grid.coarse
 	o.map_cells = Vector2i(_world.grid.coarse_width, _world.grid.coarse_height)
 	o.map_version = _world.grid.coarse_version
+	o.map_seen = _seen.seen
+	o.map_seen_version = _seen.version
 	o.terrain_version = _world.grid.terrain_version
 	o.map_machines = _machines.machine_logic_cells() if _machines != null else []
 	o.world_seed = _world.grid.seed
@@ -283,6 +287,8 @@ func apply(command: Command) -> Result:
 			var building: bool = _verbs.selected_machine_def() != null or _verbs.selected_build_material() != &""
 			_hold.step(command.input, _world, _items, _mining, _plan, _lode, _body, building)
 			HubTick.advance(_tick, _world, _items, _machines, _rates)
+			if _tick % HubTick.HUB_TICK_DIVISOR == 0:   # the map's memory, at the hub's cadence (D0400)
+				_seen.mark(WorldSurroundings.logic_of(Vector2i(Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y))))
 			_drain_events()
 			return Result.accepted()
 		Command.Kind.MINE:
@@ -324,7 +330,7 @@ func _outcome(detail: StringName) -> Result:
 ## exterior, and the shell writing it is what the door exists to keep everything else from doing.
 func services() -> Dictionary:
 	return {"world": _world, "items": _items, "machines": _machines, "body": _body, "mining": _mining,
-		"plan": _plan, "lode": _lode}
+		"plan": _plan, "lode": _lode, "seen": _seen}
 
 
 ## After a load: the consumed channel and the hold start clean, as a fresh process would have them.

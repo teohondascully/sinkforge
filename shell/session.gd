@@ -12,6 +12,7 @@ const KEY_BODY: String = "body"
 const KEY_MINING: String = "mining"
 const KEY_PLAN: String = "plan"
 const KEY_LODE: String = "lode_work"
+const KEY_SEEN: String = "seen"        ## the map's memory (D0400); absent in a save from before it: nothing seen
 
 
 ## The whole session as one envelope: `SaveGame`'s keys plus the body's, the mining state's, the plan's
@@ -23,6 +24,7 @@ static func capture(door: Interface) -> Dictionary:
 	env[KEY_MINING] = (s["mining"] as Mining).capture()
 	env[KEY_PLAN] = (s["plan"] as DigPlan).capture()
 	env[KEY_LODE] = (s["lode"] as LodeWork).capture()
+	env[KEY_SEEN] = (s["seen"] as SeenPlane).capture()
 	return env
 
 
@@ -40,6 +42,8 @@ static func restore(door: Interface, data: Dictionary) -> bool:
 	(s["mining"] as Mining).restore(data.get(KEY_MINING, {}))
 	(s["plan"] as DigPlan).restore(data.get(KEY_PLAN, []))
 	(s["lode"] as LodeWork).restore(data.get(KEY_LODE, {}))
+	if data.get(KEY_SEEN) is Dictionary:
+		(s["seen"] as SeenPlane).restore(data[KEY_SEEN])
 	door.reset_transients()
 	return true
 

@@ -6,7 +6,7 @@ a MODULE.md, or a claim first. **Reset 2026-09-03**: the previous 500-line accum
 queue, lane tables, Slice 1.5, D0139) is in `git log -p -- docs/WORKING.md`; everything durable in it
 is in the ledger.
 
-**Last updated: 2026-09-04.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-09-05.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
 ## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts, 8e aquifers and lodes, 8f the richness field, 8g trees, 8h the switch-on done -- step 8 complete)
@@ -295,6 +295,22 @@ Instruments: `run_local_battery.sh` exits non-zero on a gate failure; `flaky_tes
 found one `_check(true)` outside the crash probes (the crack painter) and it now asserts a plan. Fifty
 dead legacy files are gone; the in-file dead ranges stay for the line citations. Four files sit at
 exactly 400 lines (the cap, not over it). Local gate battery on f3f39a59: 28 PASS, 0 FAIL.
+
+### The two-phase round (2026-09-05; D0396–D0400, in progress)
+
+**Phase 1 (done, on main).** F1: the director's slot, driven headless through the seat's hand, showed
+the stuck state was the seat's: `PlayInput` built `climb_dir` with up = -1 against the +1 contract, so W
+paid the line out and S reeled in (D0396). Fixed; the settings page gained a GAME face (RETURN TO SURFACE,
+NEW GAME on a second press), the rail answers a click, digits pick a slot, ESC closes. F2: boot 7.6 → 1.8 s
+with a save, 6.4 → 3.1 s fresh (D0397): `Session.from_save` skips the generation the restore discarded,
+`TileGrid.load_cells` bulk-loads the planes, audio synthesizes on a worker thread, `ValueNoise.FbmField`
+samples the cave noise a column at a time; the golden matched at every checkpoint after each.
+
+**Phase 2 (in progress).** Done: T012 (lamp 0.38), T013 kept, T017 (hardrock bedded with parting planes,
+the tooth's cell 1/8 m -- it was the static; D0398), the depth ladder on the GDD's layers, the character
+smaller with a three-beat stroke, a breathing idle and the rope poses (D0399), T015 seen ore on the map
+(D0400). Next: T014 (a starved machine legible at ten metres), T016 (the three generation forks, one
+re-pin), V08 (the water's skin), the P3 tail. Captures: `tests/body/recordings/phase2_2026-09-05/`.
 
 ### Next action
 
