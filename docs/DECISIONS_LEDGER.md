@@ -16885,3 +16885,24 @@ the new measured density (0.0561 → 0.0781 non-shelf, toward the ~15% its own n
 **Why:** the brief's "mining feedback juice", "no motion on standing rock" and V08.
 
 **Reverse cost:** constants and two emitters; the flicker is one function with a t = 0 pin.
+
+## D0404 · 2026-09-05 · The round's perf check found its own regression: the map rebuilt on every step of seeing
+
+**Decided:** The brief's "fps still 120" was measured, not assumed: `--perf --perf-drive` over 15 s after
+the round's changes read frame p99 46 ms with clusters of 40-55 ms frames on hub ticks, against the
+pre-round 21 ms. The painters were still 2 ms; the cause was D0400's map: `map_seen_version` moves on every
+hub tick while the body walks, and the minimap answered each move with a full image rebuild in script
+(17.7K `set_pixel`, ~40 ms). `SeenPlane.recent` now names the cells the last mark turned; the observation
+carries it; the minimap repaints only those into the image it keeps and `ImageTexture.update`s -- a few
+dozen pixels a step -- and rebuilds only when the terrain moved, a version was skipped or a restore
+emptied the list. Re-measured: p50 8.1 ms, p99 21-22 ms, max 28 ms, 15-20 frames over 16.7 ms per 5 s,
+fps_wall 118 -- the pre-round profile.
+
+**Left, named:** the first five seconds after a fresh boot run 13 ms hub ticks (p99 18) while the new
+aquifers (D0402, from 48 m) pour into the caves they touch; once the water rests the hub tick is 1.8 ms.
+That is `WaterFlow.step`'s cost while water MOVES -- legacy's algorithm over every wet cell -- and it
+returns whenever a dig breaches a pool. The next perf item, not this round's.
+
+**Why:** a feel change that costs frames is a regression whatever it looks like; the meter is what caught it.
+
+**Reverse cost:** one list on the plane, one branch in the map.

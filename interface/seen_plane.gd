@@ -14,6 +14,10 @@ var width: int
 var height: int
 var seen: PackedByteArray = PackedByteArray()
 var version: int = 0
+## The cell indices the LAST `mark` turned, so a consumer holding the previous version can update in place
+## rather than rebuild: the minimap rebuilt its whole image on every hub tick while the body walked (D0403:
+## 40-55 ms a frame, the round's one perf regression), where the disc turns a few dozen cells at a time.
+var recent: PackedInt32Array = PackedInt32Array()
 
 
 func _init(cells: Vector2i) -> void:
@@ -32,6 +36,7 @@ func is_seen(logic_cell: Vector2i) -> bool:
 func mark(logic_cell: Vector2i, radius: int = RADIUS_M) -> void:
 	var changed: bool = false
 	var r2: int = radius * radius
+	var turned: PackedInt32Array = PackedInt32Array()
 	for dy: int in range(-radius, radius + 1):
 		var y: int = logic_cell.y + dy
 		if y < 0 or y >= height:
@@ -43,9 +48,11 @@ func mark(logic_cell: Vector2i, radius: int = RADIUS_M) -> void:
 			var i: int = y * width + x
 			if seen[i] == 0:
 				seen[i] = 1
+				turned.append(i)
 				changed = true
 	if changed:
 		version += 1
+		recent = turned
 
 
 func count() -> int:
@@ -66,4 +73,5 @@ func restore(d: Dictionary) -> bool:
 		return false
 	seen = bytes.duplicate()
 	version += 1
+	recent = PackedInt32Array()   # a restore is not a step: consumers rebuild
 	return true

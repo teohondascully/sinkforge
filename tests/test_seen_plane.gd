@@ -70,3 +70,35 @@ func _test_the_map_paints_ore_only_where_seen() -> void:
 	_check(ore_unseen == rock, "unseen ore is the rock it sits in")
 	_check(ore_seen != rock and ore_seen.r > rock.r and ore_seen.g > rock.g, "seen ore is the ore family's colour, warmer and brighter than the rock")
 	_check(Minimap.class_color(Interface.Observation.MAP_ROCK, 100, look, true) == rock, "control: seeing rock does not colour it")
+	# D0403: one step of seeing updates the map's image in place; the plane names the cells it turned.
+	var plane: SeenPlane = SeenPlane.new(Vector2i(20, 20))
+	plane.mark(Vector2i(5, 5), 1)
+	_check(plane.recent.size() == 5 and plane.recent.has(5 * 20 + 5), "the last mark's turned cells are listed (%d)" % plane.recent.size())
+	plane.mark(Vector2i(5, 5), 1)
+	_check(plane.recent.size() == 5, "a mark that turns nothing leaves the list as it was, with the version")
+	var map: Minimap = Minimap.new()
+	var o := Interface.Observation.new()
+	o.map_cells = Vector2i(20, 20)
+	o.map = PackedByteArray()
+	o.map.resize(400)
+	o.map.fill(Interface.Observation.MAP_ROCK)
+	o.map[6 * 20 + 5] = Interface.Observation.MAP_ORE
+	o.map_version = 1
+	o.map_seen = plane.seen
+	o.map_seen_version = plane.version
+	o.map_seen_recent = plane.recent
+	var tex: Texture2D = map.ensure_texture(o, look)
+	var first: int = map.rebuilds
+	plane.mark(Vector2i(6, 6), 1)
+	o.map_seen = plane.seen
+	o.map_seen_version = plane.version
+	o.map_seen_recent = plane.recent
+	var tex2: Texture2D = map.ensure_texture(o, look)
+	# The kept image is read, not the texture: `get_image()` reads nothing headless (step 6's rule).
+	var want: Color = Minimap.class_color(Interface.Observation.MAP_ORE, 6, look, true)
+	var got: Color = map._img.get_pixel(5, 6)
+	var close: bool = absf(got.r - want.r) < 1.5 / 255.0 and absf(got.g - want.g) < 1.5 / 255.0 and absf(got.b - want.b) < 1.5 / 255.0
+	_check(tex2 == tex and map.rebuilds == first and close, "one step of seeing paints the turned ore cell into the same texture without a rebuild (%s vs %s, 8-bit)" % [str(got), str(want)])
+	o.map_seen_version += 3
+	map.ensure_texture(o, look)
+	_check(map.rebuilds == first + 1, "control: a skipped version rebuilds")

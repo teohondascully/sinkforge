@@ -41,6 +41,7 @@ var rebuilds: int = 0
 var _tex: ImageTexture = null
 var _tex_version: int = -1
 var _tex_seen_version: int = -1
+var _img: Image = null   ## the image behind `_tex`, kept so a step of seeing updates it in place
 var _tex_cells: Vector2i = Vector2i.ZERO
 
 
@@ -89,13 +90,23 @@ func ensure_texture(o: Interface.Observation, look: MaterialLook) -> ImageTextur
 		return null
 	if _tex != null and _tex_version == o.map_version and _tex_seen_version == o.map_seen_version and _tex_cells == o.map_cells:
 		return _tex
-	var img := Image.create(o.map_cells.x, o.map_cells.y, false, Image.FORMAT_RGBA8)
 	var has_seen: bool = o.map_seen.size() >= o.map_cells.x * o.map_cells.y
+	# ONE STEP OF SEEING IS AN UPDATE IN PLACE (D0403): the terrain unchanged and the memory one version on
+	# from the image's, so only the cells that version turned are repainted -- a few dozen, not 17K. Any
+	# other change (the terrain, a skipped version, a restore) rebuilds.
+	if _tex != null and _img != null and _tex_version == o.map_version and _tex_cells == o.map_cells and _tex_seen_version == o.map_seen_version - 1 and not o.map_seen_recent.is_empty():
+		for i: int in o.map_seen_recent:
+			if o.map[i] == Interface.Observation.MAP_ORE:
+				_img.set_pixel(i % o.map_cells.x, i / o.map_cells.x, class_color(o.map[i], i / o.map_cells.x, look, true))
+		_tex.update(_img)
+		_tex_seen_version = o.map_seen_version
+		return _tex
+	_img = Image.create(o.map_cells.x, o.map_cells.y, false, Image.FORMAT_RGBA8)
 	for y: int in o.map_cells.y:
 		for x: int in o.map_cells.x:
 			var i: int = y * o.map_cells.x + x
-			img.set_pixel(x, y, class_color(o.map[i], y, look, has_seen and o.map_seen[i] != 0))
-	_tex = ImageTexture.create_from_image(img)
+			_img.set_pixel(x, y, class_color(o.map[i], y, look, has_seen and o.map_seen[i] != 0))
+	_tex = ImageTexture.create_from_image(_img)
 	_tex_version = o.map_version
 	_tex_seen_version = o.map_seen_version
 	_tex_cells = o.map_cells

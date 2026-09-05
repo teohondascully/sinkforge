@@ -285,6 +285,7 @@ var map_cells: Vector2i = Vector2i.ZERO
 var map_version: int = 0
 var map_seen: PackedByteArray = PackedByteArray()   # one byte per logic cell: the player has been near it (D0400)
 var map_seen_version: int = 0
+var map_seen_recent: PackedInt32Array = PackedInt32Array()   # the indices the last version turned (D0403)
 var terrain_version: int = 0
 var map_machines: Array[Vector2i] = []
 var aim_is_lode: bool = false

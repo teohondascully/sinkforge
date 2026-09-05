@@ -169,6 +169,7 @@ func observe(envelope: Envelope) -> Observation:
 	o.map_version = _world.grid.coarse_version
 	o.map_seen = _seen.seen
 	o.map_seen_version = _seen.version
+	o.map_seen_recent = _seen.recent
 	o.terrain_version = _world.grid.terrain_version
 	o.map_machines = _machines.machine_logic_cells() if _machines != null else []
 	o.world_seed = _world.grid.seed
