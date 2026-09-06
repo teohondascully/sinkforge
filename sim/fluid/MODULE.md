@@ -60,10 +60,17 @@ naming, see the open question noted under Purpose above).
   `.total_water()` (the conservation probe), `.wet_terrain_cells()` (sorted in the flow's scan order),
   `.set_level()` (THE one write; levels above `WATER_MAX` are legal transiently, see `WaterFlow`),
   `.state_signature()` / `.recomputed_signature()` (running two-lane XOR, `TileGrid`'s pattern, D0261),
-  `.clone()`.
+  `.clone()`, `.wet_terrain_cells_in(rect)` (the wet cells of a window off the plane's row index, D0405). Derived and
+  outside the signature: `touched` (the cells written since the last step, the active set's seed),
+  `wake_all`, the row index.
 - `WaterFlow` (`water_flow.gd`) — the algorithm, stateless. `WaterFlow.step(water, grid)` once per
-  `fluid` phase: gravity over a snapshot, then lateral even-fill of each maximal open run with the
-  remainder biased left. Both passes iterate the WET cells only (the active set the must-not demands).
+  `fluid` phase, over THE ACTIVE SET (D0405): the cells written last tick, the cell above each, the four
+  neighbours of every cell the grid's solidity log names (`TileGrid.take_solidity_changes`), then the runs
+  the gravity pass touched -- gravity in scan order, then lateral even-fill of each such maximal open run
+  with the remainder biased left. `WaterFlow.step_full` is the algorithm as lifted, every wet cell every
+  tick, the oracle `step` is pinned equal to (`tests/test_water_active.gd`, `tests/test_water_rest.gd`);
+  nothing else calls it. `WaterFlow.settle(water, grid, max_ticks)` runs a plane to rest: `WorldSeeder.load_world`
+  hands the player a world whose aquifers have already poured (the boot pour was generation's artifact, V65).
 
 ## Invariants
 

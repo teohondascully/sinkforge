@@ -58,6 +58,15 @@ var coarse: PackedByteArray = PackedByteArray()
 var coarse_width: int = 0
 var coarse_height: int = 0
 var coarse_version: int = 0
+
+## RECENT SOLIDITY CHANGES, derived bookkeeping outside the signature and the save (D0405): every cell whose
+## block layer was written since the last `take_solidity_changes`, so a consumer keyed on solidity -- the
+## water's active set -- can wake a dig's neighbourhood instead of the world. Past `SOLIDITY_LOG_CAP` the
+## log stops naming cells and reports `all` (generation excavates a hundred thousand cells; a bulk load
+## and a fresh grid report `all` too), which the consumer answers with one full pass.
+const SOLIDITY_LOG_CAP: int = 4096
+var _solidity_log: Array[Vector2i] = []
+var _solidity_all: bool = true
 ## THE FLAT INDEX PLANES (D0390): one byte per terrain cell, row-major over `width x height`, holding the
 ## ordinal in `legend` of the cell's block (`block_index`) or wall (`wall_index`); 0 is air. Maintained at
 ## the same three mutators as `coarse`, never rebuilt, outside the signature. They exist so a window of the
@@ -160,6 +169,7 @@ func _stamp(terrain_cell: Vector2i, material_id: StringName, block: bool) -> voi
 		if block:
 			block_index[i] = ordinal_of(material_id)
 			_sky_note(terrain_cell, material_id != &"")
+			_note_solidity(terrain_cell)
 		else:
 			wall_index[i] = ordinal_of(material_id)
 	_coarse_refresh(terrain_cell)
@@ -177,6 +187,7 @@ func excavate(terrain_cell: Vector2i) -> void:
 	if in_bounds(terrain_cell):
 		block_index[terrain_cell.y * width + terrain_cell.x] = 0
 		_sky_note(terrain_cell, false)
+		_note_solidity(terrain_cell)
 	_coarse_refresh(terrain_cell)
 
 
@@ -192,6 +203,26 @@ func _sky_note(terrain_cell: Vector2i, solid: bool) -> void:
 		while r < height and not is_solid(Vector2i(terrain_cell.x, r)):
 			r += 1
 		sky_floor[terrain_cell.x] = r
+
+
+func _note_solidity(terrain_cell: Vector2i) -> void:
+	if _solidity_all:
+		return
+	if _solidity_log.size() >= SOLIDITY_LOG_CAP:
+		_solidity_all = true
+		_solidity_log.clear()
+	else:
+		_solidity_log.append(terrain_cell)
+
+
+## The block-layer writes since the last call, then forgotten: `{"all": bool, "cells": Array[Vector2i]}`.
+## `all` true means the log gave up on names (a fresh or bulk-loaded grid, or more than the cap of writes)
+## and the caller should treat every cell as changed; `cells` is empty then.
+func take_solidity_changes() -> Dictionary:
+	var out: Dictionary = {"all": _solidity_all, "cells": _solidity_log}
+	_solidity_all = false
+	_solidity_log = []
+	return out
 
 
 ## Both layers at once, onto an EMPTY grid: `GridLoad.load_cells` (D0397), the per-cell writers' equal

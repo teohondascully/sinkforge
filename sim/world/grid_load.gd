@@ -34,6 +34,7 @@ static func load_cells(grid: TileGrid, blocks: Dictionary, walls: Dictionary) ->
 		if grid.in_bounds(cell):
 			grid.wall_index[cell.y * w + cell.x] = grid.ordinal_of(grid._walls[cell])
 	grid._xor_term(Vector2i(a, b))
+	grid._solidity_all = true   # a whole grid arrived: the solidity log names nothing, it says `all`
 	rebuild_sky_floor(grid)
 	rebuild_coarse(grid)
 	return true

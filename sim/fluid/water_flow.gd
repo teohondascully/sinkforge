@@ -11,17 +11,112 @@ extends RefCounted
 ## plane's running signature moves with it, `sim.solid.has(c)` is `grid.is_solid(c)`, and the cell is the
 ## 4 px terrain cell rather than legacy's metre (`docs/ARCHITECTURE.md` §9). Runs in the `fluid` phase.
 ##
-## `sim/fluid/MODULE.md`'s must-not -- never tick every cell -- is met by construction: both passes iterate
-## the WET cells (the plane's own dictionary), which is the active-cell set, never the world.
+## `sim/fluid/MODULE.md`'s must-not -- never tick every cell -- is met by `step`'s ACTIVE SET (D0405): the
+## cells written last tick, the cells above them and the neighbourhood of every dig, and the runs those sit
+## in. `step_full` is the algorithm as lifted, every wet cell every tick, kept as the oracle the active step
+## is pinned equal to (`tests/test_water_rest.gd`, `tests/test_water_active.gd`).
+##
+## WHY THE ACTIVE SET IS EXACT. A wet cell's fall depends on its own level, the level below it and the
+## solidity below it, at the moment the top-to-bottom pass reaches it. A cell nobody wrote last tick, whose
+## cell below nobody wrote, over terrain nobody dug, was reached last tick with these same values and did
+## not move -- so it does not move this tick either, whatever falls into it from above (the room below is
+## still zero). A run's even-fill is idempotent, so a run none of whose cells moved is already level. The
+## passes therefore visit only cells whose inputs changed, in the same order, and write the same values.
 
-## The flow step, run every tick. Two rules over a snapshot of the levels, so no cell is read after
-## another has moved into or out of it this pass:
+## The flow step, run every tick, over the active set. Two rules:
 ##   1. Down: water falls into the open, non-full cell below it, as much as fits.
 ##   2. Lateral settle: whatever cannot fall even-fills its maximal horizontal run of open cells
 ##      (contiguous non-solid cells in that row, bounded by walls or the world edge), with the
 ##      remainder biased left as a fixed tie-break. Flat by construction from the snapshot, so it
 ##      cannot oscillate; excess above WATER_MAX stays and falls next tick under rule 1.
 static func step(water: WaterPlane, grid: TileGrid) -> void:
+	var changes: Dictionary = grid.take_solidity_changes()   # drained every tick, wet or dry
+	if water.is_empty():
+		water.touched.clear()
+		return
+	if water.at_rest(grid):
+		return
+	var version_before: int = water.version
+	var active: Dictionary = _wake(water, changes)
+	# Only cells wet as the pass BEGINS fall this tick, as in `step_full`: a dry cell topped up mid-pass
+	# waits for the next one.
+	var wet: Dictionary = {}
+	for c: Vector2i in active:
+		if water.levels.has(c):
+			wet[c] = true
+	_gravity(water, grid, Ordering.cells_native(wet))
+	# The runs the gravity pass wrote into or out of join the runs already woken. The live levels ARE the
+	# post-gravity snapshot: runs are disjoint and `_settle_run` sums a run before it writes it. A woken
+	# cell that is rock or off the grid (a displaced cell, the row above the world) seeds no run.
+	for c: Vector2i in water.touched:
+		active[c] = true
+	var done: Dictionary = {}
+	for c: Vector2i in Ordering.cells_native(active):
+		if done.has(c) or not _open(grid, c):
+			continue
+		_settle_run(water, grid, water.levels, done, c)
+	water.note_rest(version_before, grid)
+
+
+## Run the plane to rest, or for `max_ticks`, whichever comes first; returns the ticks stepped. A fresh
+## world's aquifers are seeded full against caves carved before them, so a world handed to the player
+## un-settled pours for its first seconds -- generation's artifact, not play (V65, D0405). Deterministic:
+## `step` is a pure function of the levels and the grid, and draws nothing.
+static func settle(water: WaterPlane, grid: TileGrid, max_ticks: int) -> int:
+	var ticks: int = 0
+	while ticks < max_ticks:
+		step(water, grid)
+		ticks += 1
+		if water.at_rest(grid) or water.is_empty():
+			break
+	return ticks
+
+
+## This tick's active set from the plane's seed and the grid's solidity log, which are then cleared: the
+## written cells and the cell above each (its floor changed), the dug or filled cells and their four
+## neighbours (a new floor, a merged or split run). `all` -- a fresh plane, a clone, a restore, a bulk
+## load, a log past its cap -- is every wet cell, which is `step_full`'s population exactly.
+static func _wake(water: WaterPlane, changes: Dictionary) -> Dictionary:
+	var active: Dictionary = {}
+	if water.wake_all or bool(changes["all"]):
+		water.wake_all = false
+		for c: Vector2i in water.levels:
+			active[c] = true
+	else:
+		for c: Vector2i in water.touched:
+			active[c] = true
+			active[c + Vector2i(0, -1)] = true
+		for c: Vector2i in changes["cells"]:
+			active[c] = true
+			active[c + Vector2i(0, -1)] = true
+			active[c + Vector2i(0, 1)] = true
+			active[c + Vector2i(-1, 0)] = true
+			active[c + Vector2i(1, 0)] = true
+	water.touched.clear()
+	return active
+
+
+## Rule 1 over `cells`, in scan order, reading live: a higher cell may have topped a lower one up.
+static func _gravity(water: WaterPlane, grid: TileGrid, cells: Array[Vector2i]) -> void:
+	for c: Vector2i in cells:
+		var level: int = water.water_at(c)
+		if level <= 0:
+			continue
+		var below: Vector2i = c + Vector2i(0, 1)
+		if not grid.in_bounds(below) or grid.is_solid(below):
+			continue
+		var room: int = WaterPlane.WATER_MAX - water.water_at(below)
+		if room <= 0:
+			continue
+		var moved: int = mini(level, room)
+		water.set_level(below, water.water_at(below) + moved)
+		water.set_level(c, level - moved)                         # a remainder of 0 erases the cell
+
+
+## THE ALGORITHM AS LIFTED, every wet cell every tick, over a snapshot: the oracle `step` is pinned equal
+## to, and nothing else calls it. Two rules over a snapshot of the levels, so no cell is read after
+## another has moved into or out of it this pass.
+static func step_full(water: WaterPlane, grid: TileGrid) -> void:
 	if water.is_empty():
 		return
 	# A plane at rest over unchanged terrain would settle to itself again: skip it (`WaterPlane.at_rest`).

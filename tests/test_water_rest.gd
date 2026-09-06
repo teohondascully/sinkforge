@@ -1,6 +1,6 @@
 extends "res://tests/test_base.gd"
 
-## THE REST MARKER (2026-09-04): `WaterFlow.step` skips a plane that a previous step left unchanged, as long
+## THE REST MARKER (2026-09-04) AND THE ACTIVE SET (D0405, whose oracle is `WaterFlow.step_full`): `WaterFlow.step` skips a plane that a previous step left unchanged, as long
 ## as neither the plane nor the grid's solidity has moved since. The skip is exact by construction -- the
 ## step is a pure function of (levels, solidity) -- and this suite is the mechanism check that construction
 ## needs: a settled plane IS skipped, a dig or a pour DOES wake it, a same-value write moves nothing, and a
@@ -109,13 +109,21 @@ func _test_skipping_plane_matches_a_control_stepped_in_full() -> void:
 	var stepped: int = 0
 	var agreed: int = 0
 	var first_bad: String = ""
+	var filled: int = 0
 	for t: int in FUZZ_TICKS:
 		var roll: int = rng.next_range(0, 99)
 		if roll < 3:
 			var c := Vector2i(rng.next_range(0, 23), rng.next_range(0, 23))
 			if grid.is_solid(c):
 				grid.excavate(c)
-		elif roll < 5:
+		elif roll < 4:
+			var c3 := Vector2i(rng.next_range(0, 23), rng.next_range(0, 23))
+			if not grid.is_solid(c3):
+				_rock(grid, c3)                       # rock arrives: both planes displace, as `World.set_solid` does
+				water.displace(c3)
+				control.displace(c3)
+				filled += 1
+		elif roll < 6:
 			var c2 := Vector2i(rng.next_range(0, 23), rng.next_range(0, 23))
 			var amount: int = rng.next_range(1, 8)
 			water.add_water(grid, c2, amount)
@@ -126,13 +134,13 @@ func _test_skipping_plane_matches_a_control_stepped_in_full() -> void:
 			stepped += 1
 		WaterFlow.step(water, grid)
 		control.rest_version = -1   # the control never skips
-		WaterFlow.step(control, grid)
+		WaterFlow.step_full(control, grid)   # and never narrows: the algorithm as lifted, the oracle (D0405)
 		if water.levels == control.levels and water.state_signature() == control.state_signature():
 			agreed += 1
 		elif first_bad.is_empty():
 			first_bad = " first disagreement at tick %d: %d vs %d cells" % [t, water.levels.size(), control.levels.size()]
 	_check_over(FUZZ_TICKS, agreed == FUZZ_TICKS, "the skipping plane matched the full-step control on every one of %d ticks%s" % [FUZZ_TICKS, first_bad])
-	_check(skipped > 0 and stepped > 0, "both populations were exercised: skipped=%d stepped=%d" % [skipped, stepped])
+	_check(skipped > 0 and stepped > 0 and filled > 0, "every population was exercised: skipped=%d stepped=%d rock placed=%d" % [skipped, stepped, filled])
 	_check(skipped > FUZZ_TICKS / 4, "the skip is worth having: %d of %d ticks skipped on a mostly-resting plane" % [skipped, FUZZ_TICKS])
 	_check(water.state_signature() == water.recomputed_signature(), "the running signature still matches the rebuild at the end")
 
@@ -151,5 +159,5 @@ func _test_forged_rest_marker_is_registered_by_the_comparison() -> void:
 	water.rest_grid = grid.get_instance_id()
 	_check(water.at_rest(grid), "fixture: the marker is forged on a plane with water in the air")
 	WaterFlow.step(water, grid)
-	WaterFlow.step(control, grid)
+	WaterFlow.step_full(control, grid)
 	_check(water.levels != control.levels, "positive control: a wrong skip is visible as a levels disagreement (%d vs %d)" % [water.water_at(Vector2i(5, 1)), control.water_at(Vector2i(5, 1))])

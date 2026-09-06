@@ -21,11 +21,18 @@ const KINDS: Array[String] = ["solid", "open", "lode", "machine", "pack"]
 static var last_refusal: String = ""
 
 
+## The most ticks `load_world` spends settling the aquifers: 20 s of the hub's 20 Hz, four times the boot
+## world's own pour (88 ticks, `tests/test_water_active.gd`). A world still moving past this starts moving.
+const SETTLE_TICKS: int = 400
+## What the last `load_world` spent settling, for the boot's phase print and the suite that pins it.
+static var settled_ticks: int = 0
+
 ## A fresh world from a site record and a seed. Legacy's `load_world`, minus the ingestion the generator
 ## no longer needs a middleman for.
 static func load_world(site: Dictionary, seed: int) -> World:
 	var world: World = World.new(ShaftGenerator.generate(site, seed))
 	ShaftGenerator.enrich(world, site, seed)   # the planes: aquifers and lodes (A' step 8e, D0385)
+	settled_ticks = WaterFlow.settle(world.water, world.grid, SETTLE_TICKS)   # the aquifers at rest (D0405)
 	return world
 
 

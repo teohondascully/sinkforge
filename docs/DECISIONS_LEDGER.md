@@ -16906,3 +16906,39 @@ returns whenever a dig breaches a pool. The next perf item, not this round's.
 **Why:** a feel change that costs frames is a regression whatever it looks like; the meter is what caught it.
 
 **Reverse cost:** one list on the plane, one branch in the map.
+
+## D0405 · 2026-09-06 · The fresh-boot stutter: the water's active set, the row index, and the aquifers settled at generation
+
+**Decided:** V65 (D0404's "left, named") is closed at three causes, none of them the algorithm. (1)
+`WaterFlow.step` visits an ACTIVE SET: the cells `set_level` wrote last tick (`WaterPlane.touched`), the
+cell above each, the four neighbours of every cell the grid's new solidity log names
+(`TileGrid.take_solidity_changes`: block-layer writes since the last call, or `all` past a 4096 cap, after
+a bulk load, on a fresh or cloned grid), then the runs the gravity pass touched. The algorithm as lifted
+stays as `WaterFlow.step_full`, every wet cell every tick over a snapshot, and is the oracle: the active
+step is pinned equal to it, levels and lanes, on every one of 300 ticks of the boot world's own pour and
+on 3,000 fuzzed ticks with digs, pours and rock (`tests/test_water_active.gd`, `tests/test_water_rest.gd`).
+The exactness argument is in `water_flow.gd`'s header; two holes it closed on the way: only cells wet as
+the pass BEGINS fall (a dry cell topped up mid-pass waits, as in the full pass), and a woken cell that is
+rock or off the grid seeds no run. (2) `WaterPlane` keeps a row index and `wet_terrain_cells_in(rect)` reads a window off
+it; `HubPlanes._fill_water` scanned every wet cell of the world with `Rect2i.has_point` on every moving
+tick. (3) `WorldSeeder.load_world` runs `WaterFlow.settle` after `enrich`, to rest or 400 ticks: the
+aquifers are seeded full against caves carved before them, so the un-settled world poured for 88 ticks
+after every fresh boot -- generation's artifact, not play. `set_level` also writes its own sandwich (the
+two levels already in hand; SignedPlane's second sanctioned form): 1.8 → 1.25 us a write.
+
+**Measured** (headless probe over the boot world, 2,976 wet cells / 23,808 units): the pour is 88 moving
+ticks; gravity 6-7 ms and settle 3.2 ms a tick at its peak; the active set visits 137K cells against the
+full pass's 262K over the pour (52%: a mass pour moves most of its water) and, at rest, five cells for a
+far dig against 2,976. The generation settle costs 490 ms on a fresh boot (`new_game` phase 1.9 → ~2.5 s)
+and nothing on a slot load. The seat's own hub-tick numbers before/after are in the round's report.
+
+**Not done, named:** `is_solid` still reads the block dictionary (`block_index` would be faster but is not
+maintained for out-of-bounds writes, and `is_solid` is under the golden); the generation could run on a
+worker thread so the settle costs the player nothing (F2's next step); `tests/test_plane_passes.gd`'s
+"full to the brim" pin holds because it drives the seeding pass directly, not `load_world`.
+
+**Why:** the golden hashes body and grid only, so an identical-result step and a settle that writes no
+terrain move nothing; the pour at boot was the one thing the player saw that no rule of play produced.
+
+**Reverse cost:** `step_full` is one rename away from being `step` again; the settle is one line.
+

@@ -62,7 +62,7 @@ phases — not itself one of the fixed tick phases.
   `.plant()`/`.set_sapling_age()`/`.unplant()`, `.logic_rope_anchor()`/`.rope_length()`,
   `.placed_logic_cells(kind)`/`.sapling_logic_cells()` (scan order), running `.state_signature()` +
   `.recomputed_signature()`, `.clone()`.
-- `WaterPlane` (`water_plane.gd`, D0344, here since D0347) — integer water per terrain cell; API in `sim/fluid/MODULE.md`.
+- `WaterPlane` (`water_plane.gd`, D0344, here since D0347) — integer water per terrain cell; API in `sim/fluid/MODULE.md`. `TileGrid.take_solidity_changes()` (D0405) is the block-layer change log the water's active set wakes from: named cells, or `all` past its cap or after a bulk load.
 - `World` (`world.gd`, ADR 0009) — THE OWNER: `grid`, `logic`, `water`, `deposits`. The metre-cell derivations `.logic_in_bounds()`, `.terrain_cells_of()`, `.terrain_face_cells(cell, dir)`,
   `.logic_solid()` (all sixteen rock), `.logic_air()` (all sixteen air), `.logic_open()` (air, in bounds,
   nothing placed), `.cell_occupied()` (any rock or anything placed), `.wall_backs()`, `.face_solid(cell,

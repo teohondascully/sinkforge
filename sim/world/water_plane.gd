@@ -39,6 +39,19 @@ var rest_version: int = -1
 var rest_terrain: int = -1
 var rest_grid: int = 0
 
+## THE ACTIVE SET'S SEED (D0405), derived bookkeeping outside the signature and the save: every cell
+## `set_level` actually wrote since `WaterFlow.step` last drained it. A cell nobody wrote, whose cell below
+## nobody wrote, over terrain nobody dug, stopped where it is for a reason that still holds, so the step
+## visits the written cells, the cells above them and the runs they sit in, and nothing else. `wake_all`
+## asks for one full pass first: a new plane, a clone, a restore.
+var touched: Dictionary = {}
+var wake_all: bool = true
+
+## THE ROW INDEX, derived: the wet cells of each row, so a window can be read without a scan of the world
+## (`wet_terrain_cells_in`; 23K aquifer cells filtered by rectangle on every moving tick was the observation's half of
+## the fresh-boot stutter, D0405). Maintained by `set_level`, rebuilt by `clone`.
+var _rows: Dictionary = {}   # row: int -> {terrain_cell: true}
+
 
 func water_at(terrain_cell: Vector2i) -> int:
 	return int(levels.get(terrain_cell, 0))
@@ -100,10 +113,53 @@ func wet_terrain_cells() -> Array[Vector2i]:
 ## it would delete water (legacy `water_flow.gd`, the `cap_total` branch). A write that stores what is
 ## already there returns before the sandwich: xor-out then xor-in of one term is the identity, so the
 ## signature is untouched either way, and the settle pass rewrites every cell of every level run.
+##
+## The sandwich is written out here rather than through `_write_int` (SignedPlane's other sanctioned form,
+## `LogicGrid`'s): the old and new levels are already in hand, so the two terms cost no lookups of their
+## own. A pour is two of these per moving cell per tick; D0405 measured the write at 1.8 us before this.
 func set_level(terrain_cell: Vector2i, level: int) -> void:
-	if maxi(level, 0) == water_at(terrain_cell):
+	var here: int = int(levels.get(terrain_cell, 0))
+	var next: int = maxi(level, 0)
+	if next == here:
 		return
-	_write_int(levels, terrain_cell, level)
+	_xor_term(_level_term(terrain_cell, here))
+	if next == 0:
+		levels.erase(terrain_cell)
+		_row_forget(terrain_cell)
+	else:
+		levels[terrain_cell] = next
+		if here == 0:
+			_row_note(terrain_cell)
+	_xor_term(_level_term(terrain_cell, next))
+	touched[terrain_cell] = true
+
+
+func _row_note(terrain_cell: Vector2i) -> void:
+	if not _rows.has(terrain_cell.y):
+		_rows[terrain_cell.y] = {}
+	_rows[terrain_cell.y][terrain_cell] = true
+
+
+func _row_forget(terrain_cell: Vector2i) -> void:
+	var row: Dictionary = _rows.get(terrain_cell.y, {})
+	row.erase(terrain_cell)
+	if row.is_empty():
+		_rows.erase(terrain_cell.y)
+
+
+## The wet cells inside `rect`, in scan order, read row by row off the index rather than by filtering the
+## world. Equal to filtering `levels` by `rect.has_point` (pinned in `tests/test_water_active.gd`).
+func wet_terrain_cells_in(rect: Rect2i) -> Array[Vector2i]:
+	var hit: Dictionary = {}
+	var x0: int = rect.position.x
+	var x1: int = rect.end.x
+	for y: int in range(rect.position.y, rect.end.y):
+		if not _rows.has(y):
+			continue
+		for terrain_cell: Vector2i in _rows[y]:
+			if terrain_cell.x >= x0 and terrain_cell.x < x1:
+				hit[terrain_cell] = true
+	return Ordering.cells_native(hit)
 
 
 ## True when a `WaterFlow.step` measured at this exact (version, terrain_version, grid) changed nothing,
@@ -134,12 +190,18 @@ func recomputed_signature() -> String:
 func clone() -> WaterPlane:
 	var copy: WaterPlane = WaterPlane.new()
 	_clone_into(copy, [&"levels"])
+	for terrain_cell: Vector2i in copy.levels:
+		copy._row_note(terrain_cell)
 	return copy
 
 
 func _term_of(key: Variant) -> Vector2i:
 	var terrain_cell: Vector2i = key
-	var level: int = water_at(terrain_cell)
+	return _level_term(terrain_cell, water_at(terrain_cell))
+
+
+## The term of `terrain_cell` holding `level`: ZERO when dry, so an erased cell contributes nothing.
+func _level_term(terrain_cell: Vector2i, level: int) -> Vector2i:
 	if level <= 0:
 		return Vector2i.ZERO
 	return StateHash.term(terrain_cell.x, terrain_cell.y, Vector2i(level, level), Vector2i.ONE)

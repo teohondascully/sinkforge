@@ -25,15 +25,6 @@ static func fill(o: RefCounted, world: World, items: Items, machines: Machines, 
 	o.winch_transit = machines.winch_transit.duplicate(true)
 
 
-## The keys of `keyed` inside `w`, in scan order: filter first, then sort the few that are in the window.
-static func _inside(keyed: Dictionary, w: Rect2i) -> Array[Vector2i]:
-	var hit: Dictionary = {}
-	for terrain_cell: Vector2i in keyed:
-		if w.has_point(terrain_cell):
-			hit[terrain_cell] = true
-	return Ordering.cells_native(hit)
-
-
 static func _fill_water(o: RefCounted, world: World, w: Rect2i, cache: HubCache) -> void:
 	var key: Array = [world.water.version, w]
 	if cache.water_key != key:
@@ -41,7 +32,7 @@ static func _fill_water(o: RefCounted, world: World, w: Rect2i, cache: HubCache)
 		cache.water_key = key
 		cache.water = PackedByteArray()
 		cache.water.resize(w.size.x * w.size.y)
-		cache.wet_cells = _inside(world.water.levels, w)
+		cache.wet_cells = world.water.wet_terrain_cells_in(w)   # off the plane's row index, not a scan of the world (D0405)
 		for terrain_cell: Vector2i in cache.wet_cells:
 			cache.water[(terrain_cell.y - w.position.y) * w.size.x + (terrain_cell.x - w.position.x)] = world.water.water_at(terrain_cell)
 	o.water = cache.water
