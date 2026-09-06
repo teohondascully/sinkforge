@@ -30,6 +30,7 @@ const WATER_ALPHA: float = 0.58                       ## translucent (mid of the
 const WATER_ALPHA_DEEP: float = 0.66
 const WATER_DEPTH_CELLS: int = 28                     ## legacy 7 cells of 32 px: 7 m
 const WATER_RIPPLE_AMP: float = 0.75                  ## legacy 1.5 px
+const WATER_FILM: float = 0.125                       ## the least height a wet cell's fill keeps above its floor (D0408)
 const WATER_RIPPLE_LEN: float = 23.0                  ## legacy 46 px between crests
 const WATER_RIPPLE_SPEED: float = 1.7                 ## crests per second
 const WATER_MENISCUS: float = 1.5                     ## legacy 3 px of soft edge under the bright line
@@ -102,9 +103,13 @@ static func cell_shape(o: Interface.Observation, c: Vector2i, t: float) -> Dicti
 		right_y = base.y
 		mid_top = base.y
 	else:
-		left_y += _ripple(base.x, t)
-		mid_top += _ripple(base.x + CELL * 0.5, t)
-		right_y += _ripple(base.x + CELL, t)
+		# A ripple no taller than half the water under it (D0408): a level is half a pixel and the ripple's
+		# amplitude three quarters, so a rippled film's top edge crossed its own floor and the fill was a
+		# bow-tie -- `draw_colored_polygon` refused it, 249 times in three seconds at a 206 m pool.
+		var amp: float = clampf((floor_y - mid_y) / (2.0 * WATER_RIPPLE_AMP), 0.0, 1.0)
+		left_y = minf(left_y + _ripple(base.x, t) * amp, floor_y - WATER_FILM)
+		mid_top = minf(mid_top + _ripple(base.x + CELL * 0.5, t) * amp, floor_y - WATER_FILM)
+		right_y = minf(right_y + _ripple(base.x + CELL, t) * amp, floor_y - WATER_FILM)
 	var tl := Vector2(base.x, left_y)
 	var tm := Vector2(base.x + CELL * 0.5, mid_top)
 	var tr := Vector2(base.x + CELL, right_y)

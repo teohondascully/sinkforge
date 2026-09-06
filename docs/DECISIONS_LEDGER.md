@@ -16998,3 +16998,24 @@ in D0394 and re-confirmed; the veil's CPU twin is a live oracle, not dead code.
 it is the witness, and the record that made the capture possible is a fixture the next round can reuse.
 
 **Reverse cost:** the record is data; the flag is nine lines; the probe is a tool.
+
+## D0408 · 2026-09-06 · The water's bow-tie: a ripple no taller than half the water under it (Astra rank 5)
+
+**Decided:** the new-player review's 169 engine errors at a 205 m pool reproduced at 249 in three seconds
+of standing in the 206 m pool (`--fresh --warp=128,904`): "Invalid polygon data, triangulation failed".
+The arithmetic: a terrain cell is 4 px and holds 8 levels, so a level of water is half a pixel tall, and
+the surface ripple swings +/-0.75 px -- in a shallow open cell the rippled top edge fell below the cell's
+floor and the five-point fill crossed itself. `WaterPainter.cell_shape` now scales the ripple by the water's
+height over twice the amplitude (a film ripples less; a full cell ripples as before) and keeps every top
+point at least `WATER_FILM` (an eighth of a pixel) above the floor. Legacy's sky painter had the same clamp
+for the same reason (`legacy/scenes/sky_painter.gd:94-96`); the water never got it.
+
+**Pinned** (`tests/test_water_painter.gd`): every level 1..8 beside every neighbour level 0..8 over a whole
+ripple period in 24 steps -- 1,728 fills and lines -- triangulates, the top edge never nearer the floor
+than 0.25 px; the pre-fix arithmetic fails 67 of them (mutation-tested); a hand-built bow-tie is the
+positive control. The seat at the 206 m pool: 0 error lines after, 249 before.
+
+**Why:** an error printed 80 times a second is a renderer failing, whatever the frame looks like; and the
+suite's every level was 4 or 8 -- the shallow case the defect lived in was the one it never posed.
+
+**Reverse cost:** two constants and three `minf`s.

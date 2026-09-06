@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_the_surface_rises_with_level()
 	_test_a_level_step_tapers_and_an_interior_cell_is_full()
 	_test_only_the_top_cell_ripples()
+	_test_every_fill_is_a_simple_polygon_at_every_level_and_phase()
 	_test_depth_runs_out()
 	_test_the_wet_cells_reach_the_observation_sparsely()
 	_test_the_drips_pour_only_where_there_is_room_below()
@@ -93,6 +94,36 @@ func _test_only_the_top_cell_ripples() -> void:
 	_check(i0["color"] != i1["color"], "...but its caustics drift")
 	_check(t0["meniscus"].size() == 6 and t0["line"].size() == 6, "the meniscus and the bright line hang off the same three top points")
 	_check(t0["meniscus"][0] == t0["fill"][0] and t0["line"][2] == t0["fill"][2], "...literally the same points")
+
+
+## D0408 (the review's 169 engine errors at a 205 m pool, reproduced at 249 in three seconds): a level is
+## half a pixel and the ripple three quarters, so a shallow film's rippled top edge crossed its own floor
+## and `draw_colored_polygon` refused the bow-tie. Every level 1..8, beside every neighbour level 0..8,
+## over a whole ripple period: the fill's top stays above its floor and the polygon triangulates. The
+## positive control is the pre-fix arithmetic: a top edge carried below the floor does NOT triangulate,
+## so the check can register the failure it guards against.
+func _test_every_fill_is_a_simple_polygon_at_every_level_and_phase() -> void:
+	var bad: int = 0
+	var checked: int = 0
+	var worst_margin: float = 1e9
+	for level: int in range(1, WaterPainter.WATER_MAX + 1):
+		for left: int in range(0, WaterPainter.WATER_MAX + 1):
+			var p: Pool = _pool({Vector2i(10, 29): level, Vector2i(9, 29): left, Vector2i(11, 29): 3})
+			var o: Interface.Observation = _obs(p)
+			for i: int in 24:
+				var t: float = i / (24.0 * WaterPainter.WATER_RIPPLE_SPEED)   # one ripple period in 24 steps
+				var shape: Dictionary = WaterPainter.cell_shape(o, Vector2i(10, 29), t)
+				var fill: PackedVector2Array = shape["fill"]
+				var floor_y: float = 30.0 * CELL
+				for k: int in 3:
+					worst_margin = minf(worst_margin, floor_y - fill[k].y)
+				checked += 1
+				if Geometry2D.triangulate_polygon(fill).is_empty() or Geometry2D.triangulate_polygon(shape["line"]).is_empty():
+					bad += 1
+	_check_over(checked, bad == 0 and checked == 8 * 9 * 24, "every fill and line polygon triangulates: %d of %d, the top edge never nearer the floor than %.3f px" % [checked - bad, checked, worst_margin])
+	_check(worst_margin >= WaterPainter.WATER_FILM - 0.001, "the film under the ripple holds at %.3f px (floor %.3f)" % [worst_margin, WaterPainter.WATER_FILM])
+	var crossed := PackedVector2Array([Vector2(40, 119.9), Vector2(42, 120.6), Vector2(44, 119.9), Vector2(44, 120), Vector2(40, 120)])
+	_check(Geometry2D.triangulate_polygon(crossed).is_empty(), "positive control: a top edge carried 0.6 px below the floor, the pre-fix level-1 case, does not triangulate")
 
 
 func _test_depth_runs_out() -> void:
