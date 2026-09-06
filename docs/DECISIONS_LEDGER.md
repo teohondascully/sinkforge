@@ -17184,3 +17184,58 @@ review did not name it and a hover tooltip that is not at the pointer is a diffe
 the objective line for the top of the screen when its job is a glance.
 
 **Reverse cost:** the dock is one rect function; the chip is nine constants and one draw call.
+
+## D0414 · 2026-09-06 · Performance on a walk: the surface read off the sky floor, the target ring searched once per cell, the meter given a draw phase (Astra rank 8, first slice)
+
+**Measured first** (`--perf-drive`, the scripted walk, fresh boot, 1920x1080, this machine): 120 fps wall
+with 4-14 dropped frames (over 16.7 ms) per five seconds, p99 15-22 ms; standstill 0-4, so the cost
+follows the camera. Every slow frame the meter kept had `painters total` under 3.5 ms, so the cost was
+somewhere the painters could not see. Three instrument gaps closed before any fix: the slow-frame
+threshold was 25 ms and kept only the boot's shader compiles (now 16.7 ms, a dropped frame at 60 Hz);
+the HUD chips reported as `?` (now labelled like world painters); and the frame had no draw-phase
+clock (now `RenderingServer.frame_pre_draw/post_draw` through the seat node, plus draw calls and
+primitives). With those: the draw phase in every slow frame was one 120 Hz period -- the vsync wait
+after the frame's CPU work overran the 8.33 ms budget -- and the overrun had two named causes.
+
+**(1) The observation's plane rebuild: 9.3 ms -> 0.66 ms.** `Interface._surface_over` scanned every
+window column down from the window's top (`Heightfield.column_surface_y`, 288 x 192 cells in
+GDScript): 7.85 ms of a 9-11 ms cold observe; the plane copy itself was 0.05 ms. Both consumers (the
+skylight's godrays, the walked surface tone) mean the ground under the open sky, which
+`TileGrid.sky_floor` already holds per column in O(1) and the envelope already hands over (D0391). The
+scan was also WRONG for an underground window: a top row of rock answered "the window's top row", and
+a cave mouth at that row read as a shaft open to the sky. A sky floor at or below the window's bottom
+edge stays `NO_FLOOR` (the D0340 envelope pin holds). Pinned in `tests/test_interface.gd` (the
+underground window answers the sky floor; the old scan fails it at the top row -- the mutant).
+
+**(2) The target ring: 3.0 ms every frame -> 0.04 ms.** `TargetGuide` (D0411) scanned 81x81 cells
+through a Callable on every rendered frame -- forty per cent of the budget, the largest HUD cost. Now a
+ring walk that stops once no farther ring can beat the hit (225 visits for the tutorial vein, brute
+force finds the same cell), cached on (rung, body cell, terrain version, pile and machine counts), and
+a miss held for a metre of walking. Pinned in `tests/test_tutorial_teaching.gd`.
+
+**Result** (A/B, three runs each, committed tree vs this): the quiet-tick p99 on the walk 6.4 -> 2.6 ms
+and 5.4 -> 3.1 ms across the two windows; the hub-tick p99 4.7-5.0 -> 2.9-4.1 ms. With vsync off, frames
+over 8.3 ms per five seconds 150-158 -> 101-108 and 107-109 -> 94-98. The dropped-frame count under
+vsync is NOT claimed: it ranged 4-23 run to run on a shared machine and the A/B spread swallowed the
+treatment. Not a full fix: with vsync off the frames still over budget carry a draw phase of 4-12 ms at
+a constant 230 draw calls and 2.5 ms of painters, which is the CPU waiting on the GPU. The GPU cannot be
+timed under Metal from script (`rgpu` reads 0.0); the next instrument is the Metal HUD or Xcode, and
+the work is the shader pass (Part B). The boot's first frame (73-85 ms, shader compiles) is named, not
+fixed.
+
+**Also fixed on the way:** the meter's first draft connected two lambdas of a RefCounted to the
+`RenderingServer` signals; that Callable outlived the script language at exit and every perf run ended
+in "Godot quit unexpectedly" (four crash reports 15:12-15:14, `Callable::~Callable ->
+GDScriptInstance::~GDScriptInstance`). The seat node's own methods forward the signals now and are
+dropped with the node; zero new reports since.
+
+**Named, not done:** `Performance.TIME_PROCESS/TIME_PHYSICS_PROCESS` refresh once a second and were
+dropped from the context after reading identically across forty slow frames. The tutorial's authored
+opening cavity (D0353's `open` fixture, a metre of crust over four metres of pocket) trips the
+ambiguous-floor invariant on every walk across it; the resolver chose the crust correctly.
+
+**Why:** rank 8 asked for the window-change spikes and the dropped frames; the two CPU causes are at
+cause and measured; the GPU remainder is scoped to the pass that owns the shaders.
+
+**Reverse cost:** `_surface_over` is nine lines; the ring walk and cache are one file; the meter's
+context is a string.

@@ -51,6 +51,7 @@ func setup(view: WorldView) -> void:
 func add_chip(paint: Callable) -> PaintLayer:
 	var canvas := PaintLayer.new()
 	canvas.bind_to(_view, paint)
+	canvas.label = DrawCost.label_for(paint)   # named in the cost report like a world painter (D0414: a 3 ms chip read as "?")
 	add_child(canvas)
 	_layers.append(canvas)
 	return canvas

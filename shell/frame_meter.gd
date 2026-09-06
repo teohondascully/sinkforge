@@ -19,9 +19,13 @@ var _quiet: PackedInt64Array = PackedInt64Array()
 var _last_process_usec: int = -1
 ## The worst frames' context lines, appended by `note_slow` from the shell when a frame ran long.
 var slow: PackedStringArray = PackedStringArray()
-const SLOW_USEC: int = 25000
-const SLOW_KEEP: int = 4
+## A dropped frame at 60 Hz is what the hand feels, so that is the line (was 25 ms, which kept only the
+## boot's shader compiles and missed every steady-state hitch -- D0414).
+const SLOW_USEC: int = 16667
+const SLOW_KEEP: int = 8
 var last_frame_usec: int = 0
+## The viewport whose render time is measured, when the shell hands one over (`measure_render`).
+var _vp: RID = RID()
 
 
 func note_process() -> void:
@@ -39,7 +43,48 @@ func last_was_slow() -> bool:
 
 func note_slow(context: String) -> void:
 	if slow.size() < SLOW_KEEP:
-		slow.append("SLOW %.1fms %s" % [_ms(last_frame_usec), context])
+		slow.append("SLOW %.1fms %s %s" % [_ms(last_frame_usec), engine_split(), context])
+
+
+## Ask the renderer to time this viewport's frames, CPU and GPU, so a slow frame can be attributed to the
+## script (process/physics) or to the draw (D0414: the painters' own total was under 2 ms in every slow
+## frame the meter caught, so the cost was somewhere the painters could not see).
+func measure_render(vp: RID) -> void:
+	_vp = vp
+	if _vp.is_valid():
+		RenderingServer.viewport_set_measure_render_time(_vp, true)
+
+
+var _pre_draw_usec: int = 0
+## Wall time from the renderer's pre-draw to post-draw signal: the draw submit, and under vsync the wait
+## for the display, which is the one phase neither the painters' clocks nor the physics clock can see.
+## THE SEAT NODE forwards the two `RenderingServer` signals here (`Main._on_pre_draw/_on_post_draw`) --
+## never a lambda of this RefCounted connected to the singleton: that Callable outlived the script
+## language at exit and every perf run ended in "Godot quit unexpectedly" (four crash reports, 2026-09-06
+## 15:12-15:14, `Callable::~Callable -> GDScriptInstance::~GDScriptInstance` on a dead mutex). A Node's
+## own connections are dropped when the tree frees it.
+var last_draw_usec: int = 0
+
+
+func note_pre_draw() -> void:
+	_pre_draw_usec = Time.get_ticks_usec()
+
+
+func note_post_draw() -> void:
+	last_draw_usec = Time.get_ticks_usec() - _pre_draw_usec
+
+
+## The draw phase and what the renderer was handed: the pre-draw to post-draw wall time, the viewport's
+## measured render CPU/GPU ms (GPU reads 0.0 under Metal: unsupported, not free), and the frame's draw
+## calls and primitives. `Performance.TIME_PROCESS`/`TIME_PHYSICS_PROCESS` were tried and dropped: they
+## refresh once a second and read the same value across forty consecutive slow frames.
+func engine_split() -> String:
+	var line: String = "draw=%.1f" % _ms(last_draw_usec)
+	if _vp.is_valid():
+		line += " rcpu=%.1f rgpu=%.1f" % [RenderingServer.viewport_get_measured_render_time_cpu(_vp), RenderingServer.viewport_get_measured_render_time_gpu(_vp)]
+	line += " calls=%d prims=%d" % [RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)]
+	return line
 
 
 func note_physics(usec: int, hub: bool) -> void:

@@ -57,6 +57,9 @@ func _ready() -> void:
 	quit_after = flags["quit_after"]
 	if flags["perf"]:
 		meter = FrameMeter.new()
+		meter.measure_render(get_viewport().get_viewport_rid())
+		RenderingServer.frame_pre_draw.connect(_on_pre_draw)     # the seat's own methods: dropped with the node
+		RenderingServer.frame_post_draw.connect(_on_post_draw)
 	drive = flags["drive"]
 	if autoboot:
 		boot(not bool(flags["fresh"]))
@@ -183,11 +186,21 @@ func save() -> bool:
 	return SaveGame.write(save_path, capture_session())
 
 
+func _on_pre_draw() -> void:
+	if meter != null:
+		meter.note_pre_draw()
+
+
+func _on_post_draw() -> void:
+	if meter != null:
+		meter.note_post_draw()
+
+
 func _process(_delta: float) -> void:
 	if meter != null:
 		meter.note_process()
 		if meter.last_was_slow() and booted:
-			meter.note_slow("tick=%d %s" % [tick, view.draw_cost_report().left(160)])
+			meter.note_slow("tick=%d %s" % [tick, view.draw_cost_report()])
 
 
 func _physics_process(delta: float) -> void:

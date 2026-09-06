@@ -206,13 +206,17 @@ func _test_the_wall_plane_is_its_own_plane() -> void:
 		"a wall outside the window reads &\"\", the same conflation material_at makes on purpose")
 
 
-## The surface is an `Fx` world-y and it is scanned inside the window only.
+## The surface is an `Fx` world-y, the ground under the open sky (the grid's sky floor, D0414), and it
+## is answered only for a window that reaches it.
 ##
-## Two assertions carry this. The first pins the UNIT: a row index would read 20, an unscaled pixel
+## Three assertions carry this. The first pins the UNIT: a row index would read 20, an unscaled pixel
 ## height 80, and the correct answer is 80 << 16 -- three values a laxer check would not separate.
 ## The second poses the envelope: a window sitting entirely ABOVE the floor must report NO_FLOOR, not
 ## the floor it could have found by scanning past its own edge, because a column the observer was not
-## given cells for is a column it cannot answer about.
+## given cells for is a column it cannot answer about. The third is the underground window: before
+## D0414 the surface was SCANNED from the window's top, so a window starting inside rock answered its
+## own top row and a cave mouth there read as a shaft open to the sky; it now answers the sky floor,
+## which the envelope already hands over per column.
 func _test_the_surface_answers_in_fx_and_only_from_inside_the_window() -> void:
 	var parts: Array = _build()
 	var grid: TileGrid = parts[0]
@@ -232,6 +236,12 @@ func _test_the_surface_answers_in_fx_and_only_from_inside_the_window() -> void:
 		% above.surface_y_at_terrain_col(col))
 	_check(o.surface_y_at_terrain_col(GRID_W + 5) == Heightfield.NO_FLOOR,
 		"and a column outside the window entirely is NO_FLOOR, not an out-of-range index")
+	var below: Interface.Observation = iface.observe(
+		Interface.Envelope.new(Rect2i(0, FLOOR_ROW + 2, GRID_W, GRID_H - FLOOR_ROW - 2)))
+	_check(grid.is_solid(Vector2i(col, FLOOR_ROW + 2)), "control: the underground window's top row is rock")
+	_check(below.surface_y_at_terrain_col(col) == want,
+		"a window starting inside the rock answers the sky floor above it, not its own top row (got %d, the top row would be %d)"
+		% [below.surface_y_at_terrain_col(col), Fx.from_int((FLOOR_ROW + 2) * Heightfield.TERRAIN_CELL_PX)])
 
 
 ## PRE-3 (`docs/LEGACY_GAP.md`): `observe()` read `_grid` and `_body` and never touched `_mining`, so

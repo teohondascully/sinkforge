@@ -92,8 +92,32 @@ func _test_the_ring_finds_the_real_targets() -> void:
 	var body: Body = door.services()["body"]
 	var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
 	var body_px: Vector2 = Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE)
+	TargetGuide.scan_visits = 0
 	var vein: Vector2 = TargetGuide.target(&"mine", o)
+	var visits: int = TargetGuide.scan_visits
 	_check(vein != TargetGuide.NONE and vein.x < body_px.x and body_px.distance_to(vein) < 3.0 * 16.0, "MINE rings the vein two metres to the body's left (%.1f m off)" % (body_px.distance_to(vein) / 16.0))
+	# D0414: the ring walk stops once no farther ring can beat the hit -- a vein two metres off costs a
+	# few hundred visits, never the 6561 of the full window -- and it finds the same cell brute force does.
+	var full: int = (2 * TargetGuide.SEARCH_CELLS + 1) * (2 * TargetGuide.SEARCH_CELLS + 1)
+	_check(visits > 0 and visits < full / 8, "the ring search visited %d cells for a vein %.1f m off (the full window is %d)" % [visits, body_px.distance_to(vein) / 16.0, full])
+	var brute: Vector2 = TargetGuide.NONE
+	var brute_d: float = 1.0e18
+	var centre := Vector2i(floori(body_px.x / 4.0), floori(body_px.y / 4.0))
+	for dy: int in range(-TargetGuide.SEARCH_CELLS, TargetGuide.SEARCH_CELLS + 1):
+		for dx: int in range(-TargetGuide.SEARCH_CELLS, TargetGuide.SEARCH_CELLS + 1):
+			var c: Vector2i = centre + Vector2i(dx, dy)
+			if o.window.has_point(c) and o.is_ore_like_at(c) and o.material_at(c) != &"coal":
+				var at: Vector2 = (Vector2(c) + Vector2(0.5, 0.5)) * 4.0
+				if at.distance_squared_to(body_px) < brute_d:
+					brute_d = at.distance_squared_to(body_px)
+					brute = at
+	_check(vein == brute, "...and it is the cell brute force finds (%s vs %s)" % [vein, brute])
+	var guide: TargetGuide = TargetGuide.new(Objectives.new())
+	TargetGuide.scan_visits = 0
+	var first: Vector2 = guide._cached_target(&"mine", o)
+	var after_first: int = TargetGuide.scan_visits
+	var second: Vector2 = guide._cached_target(&"mine", o)
+	_check(first == vein and second == first and TargetGuide.scan_visits == after_first and after_first > 0, "the chip searches once per (rung, cell, terrain) and reuses it: %d visits, then none" % after_first)
 	var forge: Vector2 = TargetGuide.target(&"smelt", o)
 	_check(forge != TargetGuide.NONE and forge.x < body_px.x and body_px.distance_to(forge) < 4.0 * 16.0, "SMELT rings the forge three metres left (%.1f m off)" % (body_px.distance_to(forge) / 16.0))
 	var drill: Vector2 = TargetGuide.target(&"build", o)

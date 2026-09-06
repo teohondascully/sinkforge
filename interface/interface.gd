@@ -268,12 +268,25 @@ func _fill_window(o: Observation, envelope: Envelope) -> void:
 
 ## One `Fx` surface height per window column, as a value rather than written onto an Observation, so the
 ## cache can hold it beside the planes it is refreshed with.
+##
+## READ OFF THE GRID'S SKY FLOOR, NOT SCANNED (D0414). The first cut scanned every window column down
+## from the window's top through `Heightfield.column_surface_y`: 288 columns x 192 rows in GDScript,
+## 7.85 ms of the 9-11 ms a plane rebuild cost, and the whole of the dropped frame the meter saw once
+## a second on a walk. Both consumers (the skylight's godrays, the walked surface tone) mean the
+## surface under the open sky, which `TileGrid.sky_floor` already holds per column in O(1) and the
+## envelope already hands over (`Observation.sky_floor`, D0391). The scan was also WRONG underground:
+## a window whose top row was rock answered "the window's top row", and a cave mouth at that row read
+## as a shaft open to the sky. A sky floor at or below the window's bottom edge is `NO_FLOOR`, as before:
+## a window above the ground still cannot see the ground.
 func _surface_over(window: Rect2i) -> PackedInt32Array:
 	var out: PackedInt32Array = PackedInt32Array()
 	out.resize(window.size.x)
+	var floors: PackedInt32Array = _world.grid.sky_floor
+	var height: int = _world.grid.height
 	for i: int in range(window.size.x):
-		out[i] = Heightfield.column_surface_y(_world.grid, window.position.x + i, window.position.y,
-			window.size.y)
+		var col: int = window.position.x + i
+		var row: int = floors[col] if col >= 0 and col < floors.size() else height
+		out[i] = Fx.from_int(row * Heightfield.TERRAIN_CELL_PX) if row < height and row < window.end.y else Heightfield.NO_FLOOR
 	return out
 
 
