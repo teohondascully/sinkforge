@@ -17,6 +17,7 @@ func _initialize() -> void:
 	_test_dev_kit_stocks_the_pack_and_conserves()
 	_test_refusals_leave_the_world_untouched()
 	_test_twins_sign_the_same_and_the_real_site_takes_it()
+	_test_a_room_fixture_opens_a_rectangle_and_floors_it()
 	_finish("world_seeder")
 
 
@@ -109,3 +110,30 @@ func _test_twins_sign_the_same_and_the_real_site_takes_it() -> void:
 	_check(WorldSeeder.stamp(real, real_items, real_machines, &"tutorial", &"shallow_clay"), "the generated shallow_clay world takes the tutorial start")
 	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS["tutorial"])
 	_check(real.logic_air(spawn) and real.logic_solid(spawn + Vector2i(0, 1)) and real_machines.count() == 2, "on the real world too: the body spawns on solid ground, both forges placed")
+
+
+## D0407: a `room` is a w x h rectangle of open metres from (dx, dy); with `floor` the row under it is
+## solid in that material -- the fixture a scenario record needs where the tutorial listed cells one by one.
+func _test_a_room_fixture_opens_a_rectangle_and_floors_it() -> void:
+	_flat()
+	var anchor := Vector2i(32, WorldSeeder.SURFACE_ROW_M)
+	var floored: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "room", "dx": 2, "dy": 4, "w": 5, "h": 3, "floor": "clay"}]}
+	_check(WorldSeeder.stamp_record(world, items, machines, floored), "a floored room stamps (%s)" % WorldSeeder.last_refusal)
+	var open_cells: int = 0
+	var floor_cells: int = 0
+	for dx: int in 5:
+		for dy: int in 3:
+			if world.logic_open(anchor + Vector2i(2 + dx, 4 + dy)):
+				open_cells += 1
+		if world.grid.get_material(world.terrain_cells_of(anchor + Vector2i(2 + dx, 7))[0]) == &"clay":
+			floor_cells += 1
+	_check(open_cells == 15 and floor_cells == 5, "5 x 3 metres open (%d) over a clay floor row (%d)" % [open_cells, floor_cells])
+	_check(not world.logic_open(anchor + Vector2i(1, 4)) and not world.logic_open(anchor + Vector2i(7, 4)) and not world.logic_open(anchor + Vector2i(2, 3)),
+		"and nothing beside or above it moved")
+	var bare: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "room", "dx": 10, "dy": 4, "w": 2, "h": 2}]}
+	_check(WorldSeeder.stamp_record(world, items, machines, bare) and world.logic_open(anchor + Vector2i(10, 5)) and world.grid.get_material(world.terrain_cells_of(anchor + Vector2i(10, 6))[0]) == ROCK,
+		"a room without a floor opens its rows and leaves the rock under it as it was")
+	var bad: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "room", "dx": 0, "dy": 4, "w": 0, "h": 2}]}
+	_check(not WorldSeeder.stamp_record(world, items, machines, bad) and WorldSeeder.last_refusal.begins_with("room fixture needs"), "a room with no width is refused by name")
+	var bad_floor: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "room", "dx": 0, "dy": 4, "w": 2, "h": 2, "floor": "ore"}]}
+	_check(not WorldSeeder.stamp_record(world, items, machines, bad_floor), "and an unknown floor material")

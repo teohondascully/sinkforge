@@ -7,6 +7,27 @@ class_name StartsRecords
 extends RefCounted
 
 const RECORDS: Dictionary = {
+	"beacon_probe": {
+		"id": "beacon_probe",
+		"site": "shallow_clay",
+		"spawn_col_m": 32,
+		"fixtures": [
+			{
+				"kind": "room",
+				"dx": 0,
+				"dy": 60,
+				"w": 15,
+				"h": 3,
+				"floor": "hardrock",
+			},
+			{
+				"kind": "machine",
+				"id": "processor",
+				"dx": 14,
+				"dy": 62,
+			},
+		],
+	},
 	"dev_kit": {
 		"id": "dev_kit",
 		"fixtures": [

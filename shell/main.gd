@@ -111,7 +111,7 @@ func boot(load_save: bool) -> bool:
 	if is_inside_tree():
 		get_tree().root.title = "Sinkforge"
 	booted = true
-	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, SEED, START])
+	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, SEED, SeatFlags.start_id(flags, START)])
 	print("%s phases_ms %s" % [BOOT_LINE, phases])
 	return true
 
@@ -133,7 +133,7 @@ func _open_session(load_save: bool, phases: Dictionary) -> Dictionary:
 			push_warning("boot: the slot was refused (%s); a new game instead" % SaveGame.last_invalid)
 	if door == null:
 		t = Time.get_ticks_msec()
-		door = Session.new_game(StrataData.get_site(SITE), SEED, START)
+		door = Session.new_game(StrataData.get_site(SITE), SEED, SeatFlags.start_id(flags, START))
 		phases["new_game"] = Time.get_ticks_msec() - t
 	return env
 
@@ -350,7 +350,7 @@ func _game_verb(verb: StringName) -> void:
 func return_to_surface() -> void:
 	var body: Body = door.services()["body"]
 	var grid: TileGrid = (door.services()["world"] as World).grid
-	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS[String(START)])
+	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS[String(SeatFlags.start_id(flags, START))])
 	var cell_px: int = Interface.Observation.CELL_PX
 	var n: int = LogicGrid.TERRAIN_PER_LOGIC
 	var feet: Vector2i = SeatFlags.stand_near(grid, Vector2i(spawn.x * n + n / 2, spawn.y * n + n - 1), (Body.HEIGHT_PX + cell_px - 1) / cell_px + 1)

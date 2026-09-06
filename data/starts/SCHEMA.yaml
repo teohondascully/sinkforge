@@ -9,6 +9,8 @@ fields:
   # every cell is `dx`/`dy` in METRES from (spawn_col_m, the surface row), dy positive DOWN.
   #   solid   dx dy material deposit   -- a metre of `material`; `deposit` per 4 px cell (16 to the metre)
   #   open    cells: [[dx, dy], ...]   -- excavate whole metres (walls stay: the hole reveals them)
+  #   room    dx dy w h [floor]        -- a w x h rectangle of open metres from (dx, dy), and when `floor`
+  #                                      names a material, the row under it solid in that material (D0407)
   #   lode    dx dy material amount    -- a lode in the metre's wall, `amount` per 4 px cell
   #   machine id dx dy                 -- a machine placed there (the cell must be open by then)
   #   pack    item count               -- items in the pack, counted as produced (conservation holds)

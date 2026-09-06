@@ -4,7 +4,7 @@ extends "res://tests/test_base.gd"
 ## cannot judge whether the rope LOOKS like rope; that is the director's eye at the play scene. What it
 ## guards is the failure the painter would fail silently -- a sag that bows the wrong way or not at all, a
 ## hook wedge pointing away from the rock, a ghost lead that inks the whole throw, a paint pass that
-## trips on a member the observation no longer has -- and the carry look's shape.
+## trips on a member the observation no longer has -- (the carry look that stood here left with D0407: nothing consumed it).
 
 const S: int = Fx.SCALE
 
@@ -13,7 +13,6 @@ func _initialize() -> void:
 	_test_the_sag_bows_down_bounded_and_monotone()
 	_test_the_cord_and_the_hook()
 	_test_the_ghost_is_a_stub()
-	_test_the_carry_look_saturates()
 	await _test_paint_runs_against_a_real_frame_with_a_live_line()
 	_finish("rope_painter")
 
@@ -52,13 +51,6 @@ func _test_the_ghost_is_a_stub() -> void:
 	_check(absf(RopePainter.stub_fraction(100.0) - RopePainter.AIM_STUB) < 0.001, "a short throw's lead is AIM_STUB of it")
 	_check(RopePainter.stub_fraction(1000.0) * 1000.0 <= RopePainter.AIM_STUB_MAX + 0.001, "a long throw's lead never exceeds AIM_STUB_MAX px")
 	_check(RopePainter.stub_fraction(0.0) == 0.0, "no throw, no lead")
-
-
-func _test_the_carry_look_saturates() -> void:
-	_check(CarryLook.load(0) == 0.0 and CarryLook.load(-3) == 0.0, "an empty pack reads empty")
-	_check(CarryLook.load(1) > 0.0 and CarryLook.load(1) < 0.2, "one item reads light (%.2f)" % CarryLook.load(1))
-	_check(CarryLook.load(10) > CarryLook.load(3) and CarryLook.load(10) < 1.0, "more reads heavier, never full")
-	_check(CarryLook.load(1000) <= 1.0 and CarryLook.load(1000) > 0.99, "a thousand items saturate at 1.0, never above")
 
 
 ## IT MUST GO THROUGH A REAL REDRAW (`tests/test_sky_painter.gd` has the reason): a direct `_draw()` is

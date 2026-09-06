@@ -16965,3 +16965,36 @@ faintness the change is for.
 **Why:** the director's ruling for T017 was "rock as geology"; geology is a succession of unequal beds.
 
 **Reverse cost:** `RockTone.lamina` is one call; the old period is in D0398's commit.
+
+## D0407 · 2026-09-06 · The beacon witnessed in the dark: a scenario start record, the seat's `--start=`, a probe over the capture
+
+**Decided:** T014's status beacon (D0401) had only ever been pinned on synthetic records: no start of play
+puts a machine underground, so its real context -- a starved machine ten metres off in the dark -- had never
+been seen (the vacuous-population class). `data/starts/beacon_probe.yaml` is a scenario record, not a
+start of play: a corridor fifteen metres long and three tall, sixty metres down, floored in hardrock, a
+processor with nothing to process at its far end. `SeatFlags.start_id` reads a new `--start=<id>` (a known
+`data/starts/` record, else the seat's own start), so `--fresh --start=beacon_probe --warp=144,328` stands
+the body 10.4 m from the machine with the lamp's 9 m beam short of it. `tools/capture_probe.gd` reads a
+seat capture and reports mean luminance and colour in a disc or annulus at metre offsets from the body,
+with the control -- the mirrored point ten metres to the body's LEFT, same corridor, same distance from the
+lamp, no machine -- travelling inside the capture.
+
+**Measured** (`tests/body/recordings/round15_2026-09-06/beacon/`, zoom 2): the annulus 0.75–1.7 m about the
+machine, sprite excluded, reads luminance 0.105 at the breath's trough (ticks 40, 52) and 0.126 at its peak
+(tick 83) against the control's 0.045: 2.3–2.8x, with a warm cast (r - b +0.01) where the control is blue
+(-0.02). The machine's own face reads 0.128–0.147 with amber +0.06–0.08 against 0.039. It reads: a lit thing
+over there, breathing, in the status colour. Whether it should read LOUDER is T023's (the pulse), which stays
+with the director; the constants are D0401's, unmoved.
+
+**Pinned** (`tests/test_beacon_probe.gd`): the record stamps; the processor stands at the record's cell and
+reads `no_input`; the warp finds the corridor's floor; the observation from there carries the machine; the
+veil's sources emit its 1.7 m cut in amber; the same processor FED reads `working` and gets no beacon.
+
+**Also:** the record schema gains a `room` fixture (`dx dy w h [floor]`: a rectangle of open metres, its floor row solid when asked), because forty-five listed cells put the generated starts file over the 400-line cap -- a scenario needs a room, not a cell list. `view/visuals/carry_look.gd` removed -- A′ step 5d lifted "how full the pack reads" and nothing
+ever consumed it (its only reference was its own test). The three instruments the brief named were fixed
+in D0394 and re-confirmed; the veil's CPU twin is a live oracle, not dead code.
+
+**Why:** a feature only ever seen by its own unit test has not been seen; a capture with its control inside
+it is the witness, and the record that made the capture possible is a fixture the next round can reuse.
+
+**Reverse cost:** the record is data; the flag is nine lines; the probe is a tool.

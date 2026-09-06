@@ -1,0 +1,13 @@
+# THE BEACON PROBE (D0407): a scenario record, not a start of play. The tutorial puts every machine at
+# the surface, so the status beacon (T014, D0401) -- a machine that wants something cutting the veil in
+# its status colour -- had never been seen in the dark it was built for. This record opens a corridor
+# fifteen metres long and three tall, sixty metres down, floors it in hardrock, and stands a processor
+# with nothing to process at its far end: `no_input`, the amber beacon. The seat reaches it with
+# `--start=beacon_probe --warp=144,328`, the body ten metres from the machine and the lamp's nine-metre
+# beam short of it, so whatever the capture shows at the machine is the beacon's own light.
+id: beacon_probe
+site: shallow_clay
+spawn_col_m: 32
+fixtures:
+  - {kind: room, dx: 0, dy: 60, w: 15, h: 3, floor: hardrock}
+  - {kind: machine, id: processor, dx: 14, dy: 62}

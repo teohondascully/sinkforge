@@ -16,7 +16,7 @@ extends RefCounted
 ## The surface row is the generator's datum, `ShaftGenerator.SKY_ROWS`, in metres.
 
 const SURFACE_ROW_M: int = ShaftGenerator.SKY_ROWS / LogicGrid.TERRAIN_PER_LOGIC
-const KINDS: Array[String] = ["solid", "open", "lode", "machine", "pack"]
+const KINDS: Array[String] = ["solid", "open", "room", "lode", "machine", "pack"]
 
 static var last_refusal: String = ""
 
@@ -75,6 +75,11 @@ static func _cells_of(f: Dictionary, anchor: Vector2i) -> Array[Vector2i]:
 	if str(f.get("kind", "")) == "open":
 		for pair: Array in f.get("cells", []):
 			out.append(anchor + Vector2i(int(pair[0]), int(pair[1])))
+	elif str(f.get("kind", "")) == "room":
+		var rows: int = int(f.get("h", 0)) + (1 if f.has("floor") else 0)   # the floor row is the room's too
+		for dy: int in rows:
+			for dx: int in int(f.get("w", 0)):
+				out.append(anchor + Vector2i(int(f.get("dx", 0)) + dx, int(f.get("dy", 0)) + dy))
 	elif f.has("dx"):
 		out.append(anchor + Vector2i(int(f["dx"]), int(f["dy"])))
 	return out
@@ -91,6 +96,10 @@ static func _valid(world: World, fixtures: Array, anchor: Vector2i) -> bool:
 			return false
 		if kind in ["solid", "lode"] and not WorldMaterials.exists(StringName(str(f.get("material", "")))):
 			last_refusal = "unknown material: %s" % str(f.get("material", ""))
+			return false
+		if kind == "room" and (int(f.get("w", 0)) <= 0 or int(f.get("h", 0)) <= 0
+				or (f.has("floor") and not WorldMaterials.exists(StringName(str(f["floor"]))))):
+			last_refusal = "room fixture needs w and h in metres and a known floor: %s" % [f]
 			return false
 		if kind == "machine" and not MachineDef.exists(StringName(str(f.get("id", "")))):
 			last_refusal = "unknown machine: %s" % str(f.get("id", ""))
@@ -118,6 +127,12 @@ static func _stamp_one(world: World, items: Items, machines: Machines, f: Dictio
 		"open":
 			for cell: Vector2i in cells:
 				world.set_solid(cell, &"")
+		"room":
+			for cell: Vector2i in cells:
+				if cell.y == anchor.y + int(f["dy"]) + int(f["h"]):
+					world.set_solid(cell, StringName(str(f["floor"])))   # the floor row, when asked for
+				else:
+					world.set_solid(cell, &"")
 		"lode":
 			for terrain_cell: Vector2i in world.terrain_cells_of(cells[0]):
 				world.deposits.seed_lode(terrain_cell, StringName(str(f["material"])), int(f.get("amount", 0)))

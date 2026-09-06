@@ -22,7 +22,7 @@ const NO_WARP: Vector2i = Vector2i(-1, -1)
 
 static func parse(args: PackedStringArray) -> Dictionary:
 	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
-		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false}
+		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false, "start": ""}
 	for a: String in args:
 		if a.begins_with("--quit-after="):
 			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
@@ -45,7 +45,19 @@ static func parse(args: PackedStringArray) -> Dictionary:
 			f["act"] = a.substr("--act=".length())
 		elif a == "--fresh":
 			f["fresh"] = true
+		elif a.begins_with("--start="):
+			f["start"] = a.substr("--start=".length())
 	return f
+
+
+## The start record a fresh game stamps: `--start=<id>` when it names a record in `data/starts/`, else
+## `fallback` (the seat's authored start). A scenario record -- `beacon_probe`, a machine 60 m down in the
+## dark -- is how a capture witnesses a state no start of play produces (D0407).
+static func start_id(flags: Dictionary, fallback: StringName) -> StringName:
+	var named: String = String(flags.get("start", ""))
+	if named != "" and StartsRecords.RECORDS.has(named):
+		return StringName(named)
+	return fallback
 
 
 ## The nearest cell to `near` where a body can stand: air for the body's height above a solid floor,
