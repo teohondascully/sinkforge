@@ -6,7 +6,7 @@ a MODULE.md, or a claim first. **Reset 2026-09-03**: the previous 500-line accum
 queue, lane tables, Slice 1.5, D0139) is in `git log -p -- docs/WORKING.md`; everything durable in it
 is in the ledger.
 
-**Last updated: 2026-09-05.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-09-06.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
 ## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts, 8e aquifers and lodes, 8f the richness field, 8g trees, 8h the switch-on done -- step 8 complete)
@@ -321,6 +321,16 @@ Captures: `tests/body/recordings/phase2_2026-09-05/`.
 **Known, named:** the first five seconds after a fresh boot run 13 ms hub ticks while the new aquifers pour
 (V65: `WaterFlow.step` while water moves); a sealed pocket has no surface to skin (V62); the deep's pool at
 200 m (V63, T020); the wall specks' starfield (V64).
+
+### The A+ / signature-look round (2026-09-06; D0405–, in progress, on main)
+
+**Part A.** A1: the three instruments named by the brief were already fixed in D0394 and re-confirmed
+(`gate_status.py` end to end, FAIL []); the `!= null` asserts are all on object types; `CarryLook` is the
+one dead game file (removed this round); the veil's CPU twin (`VeilPainter`, `VeilMap`, `VeilFieldCache`)
+is a live test oracle, not dead code. A2: **V65 closed (D0405)** -- the water's active set with the lifted
+pass kept as `step_full` the oracle, the plane's row index, the aquifers settled in `load_world`; seat
+first 5 s hub p50 13.3 → 1.25 ms, frames over 16.7 ms 88 → 12, generation +490 ms. **The ruled beds
+closed (D0406)** -- `BedSequence`, a seeded succession. **The beacon in the dark:** next.
 
 ### Next action
 
