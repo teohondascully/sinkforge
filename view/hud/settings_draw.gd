@@ -46,9 +46,14 @@ static func overlay(page: SettingsPage, ci: CanvasItem, font: Font, mouse: Vecto
 	_head(page, ci, font, origin)
 	var told: String = _body(page, ci, font, g, mouse)
 	_detail(page, ci, font, g, told, mouse)
-	var legend: String = "arrows move   ENTER rebinds   1-4 category   ESC closes" if page.cat == SettingsPage.CAT_CONTROLS \
-		else "arrows move and adjust   ENTER acts   1-4 category   ESC closes"
-	ci.draw_string(font, Vector2(origin.x + _px(UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD), origin.y + float(g["h"]) - _px(5.0)), legend, HORIZONTAL_ALIGNMENT_LEFT, -1, _pt(8), UiTheme.UI_TEXT_FAINT)
+	# Fitted to the plate it sits on (D0410): the compact faces are 592 px wide and the old 63-character
+	# line overran their right edge by up to 100 px; drawn with the plate's own width as its limit so no
+	# face can ever push it past the edge again, and a step higher so descenders clear the rounded foot.
+	var legend: String = "arrows move   ENTER rebinds   1-4 tab   ESC closes" if page.cat == SettingsPage.CAT_CONTROLS \
+		else "up/down row  left/right adjust  ENTER  1-4 tab  ESC"
+	var legend_x: float = origin.x + _px(UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD)
+	var legend_w: float = origin.x + float(g["w"]) - _px(UiTheme.BAZAAR_PAD) - legend_x
+	ci.draw_string(font, Vector2(legend_x, origin.y + float(g["h"]) - _px(9.0)), legend, HORIZONTAL_ALIGNMENT_LEFT, legend_w, _pt(8), UiTheme.UI_TEXT_FAINT)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

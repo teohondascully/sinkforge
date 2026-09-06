@@ -7,6 +7,7 @@ extends RefCounted
 ## page and the settings can only disagree here. Legacy's `Hud` did both inside its 2,189 lines.
 
 const LEVEL_IDS: Array[String] = ["master", "sound", "ambience", "music"]
+const LEVEL_STEP: float = 0.05   ## one arrow press on a slider (D0410)
 
 
 ## What the page shows: the levels, the mute, the feel toggles, the zoom's label, every binding's label.
@@ -114,7 +115,16 @@ static func finish_capture(page: SettingsPage, ev: InputEvent) -> bool:
 ## a digit picks the rail slot its label carries (D0396). Returns the payload activated, or {}.
 static func key(page: SettingsPage, keycode: int) -> Dictionary:
 	match keycode:
-		KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT:
+		KEY_LEFT, KEY_RIGHT:
+			# On a slider, the arrows ADJUST (D0410): the legend always said so, and nothing did it -- off the
+			# two-column face `next_row` stepped by zero, so there was no keyboard path to any level.
+			var focus: Dictionary = page.focus_payload()
+			if focus.has("slider"):
+				var id: String = String(focus["slider"])
+				set_level(id, Settings.level(id) + (LEVEL_STEP if keycode == KEY_RIGHT else -LEVEL_STEP))
+			else:
+				page.move_row(keycode)
+		KEY_UP, KEY_DOWN:
 			page.move_row(keycode)
 		KEY_TAB:
 			page.set_cat(SettingsPage.clamp_cat((page.cat + 1) % SettingsPage.CAT_NAMES.size()))

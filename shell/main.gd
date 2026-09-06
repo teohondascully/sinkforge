@@ -49,9 +49,7 @@ var meter: FrameMeter = null
 ## the meter measures a MOVING camera. Standstill numbers flatter every window-keyed cache (2026-09-04).
 var drive: bool = false
 ## The landing's own memory: the on-floor edge and the speed the fall carried into it (D0403).
-var _was_on_floor: bool = true
-var _fall_speed: int = 0
-const LAND_DUST_SPEED: int = 120   ## px/s of fall below which a landing raises no dust
+var effects: SeatEffects = SeatEffects.new()   ## the per-tick particles, the shake (D0410)
 
 
 func _ready() -> void:
@@ -199,9 +197,10 @@ func _physics_process(delta: float) -> void:
 		return
 	var began: int = Time.get_ticks_usec()
 	var page_open: bool = stack.settings != null and stack.settings.open
-	var frame_in: InputFrame = _read_hands(page_open)
+	var map_open: bool = stack.minimap != null and stack.minimap.large   # the large map is a modal too (D0410)
+	var frame_in: InputFrame = _read_hands(page_open or map_open)
 	door.apply(Command.move(frame_in))
-	if not page_open:
+	if not (page_open or map_open):
 		for c: Command in hands.verbs(Controls.pressed, _digit_down, PlayInput.aim_logic_of(frame_in), Settings.auto_pickup):
 			door.apply(c)
 	_hud_keys(page_open) if String(flags["act"]) == "" else _hud_keys_driven()
@@ -221,6 +220,7 @@ func _physics_process(delta: float) -> void:
 		get_tree().quit(0)
 		return
 	var body: Body = door.services()["body"]
+	rig.kick(effects.shake_px)   # a break or a hard landing knocks the camera, when the FEEL page says so (D0410)
 	camera.position = rig.step(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE),
 		Vector2(float(body.vel_x), float(body.vel_y)) / float(Fx.SCALE), zoom, float(get_viewport().get_visible_rect().size.x), delta)
 	queue_redraw()
@@ -279,39 +279,19 @@ func _hud_keys(page_open: bool) -> void:
 
 func _effects(delta: float) -> void:
 	var frame: Frame = view.current_frame()
-	particles.advance(delta)
-	if frame != null and frame.obs != null:
-		var o: Interface.Observation = frame.obs
-		if o.mining_broke:
-			# A break is debris AND a settling puff, not three flecks (D0403, V31): the cell vanished and
-			# nothing said so at play zoom. The colour is the broken material's own.
-			for cell: Vector2i in o.mining_broke_cells:
-				var at: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(o.cell_px)
-				var col: Color = look.cell_color(o.mining_broke_material, cell.x, cell.y)
-				particles.debris(at, col, atan2(float(o.mining_swing_dir.y), float(o.mining_swing_dir.x)) + PI)
-				particles.dust(at, col, 5)
-		elif o.mining_swing and o.aim_cell != Vector2i(-1, -1) and o.solid_at(o.aim_cell):
-			# A blow that did not break the cell still chips it: a fleck per swing off the struck face.
-			var struck: Vector2 = (Vector2(o.aim_cell) + Vector2(0.5, 0.5)) * float(o.cell_px)
-			particles.chip(struck, look.cell_color(o.material_at(o.aim_cell), o.aim_cell.x, o.aim_cell.y), atan2(float(o.mining_swing_dir.y), float(o.mining_swing_dir.x)) + PI)
-		# A hard landing raises the floor's dust at the feet (D0403, V37): the on-floor edge after a fall.
-		if o.on_floor and not _was_on_floor and _fall_speed > LAND_DUST_SPEED:
-			var feet: Vector2 = Vector2(float(o.left_x + o.right_x) * 0.5, float(o.bottom_y)) / float(Fx.SCALE)
-			var ground: Vector2i = Vector2i(floori(feet.x / float(o.cell_px)), floori(feet.y / float(o.cell_px)))
-			particles.dust(feet, look.cell_color(o.material_at(ground), ground.x, ground.y), mini(14, 6 + _fall_speed / 40))
-		_was_on_floor = o.on_floor
-		_fall_speed = o.vel_y / Fx.SCALE if not o.on_floor else 0
-		WaterDrips.spawn(o, particles, view.view_world_rect(), delta)
-	var landings: Dictionary = falling.take_landings()
-	for cell: Vector2i in landings:
-		particles.pop(landings[cell]["pos"], landings[cell]["color"])
+	effects.tick(frame, particles, look, falling, view.view_world_rect(), delta, Settings.screen_shake)
 	if audio != null:
 		audio.note_frame(frame, delta)
+		audio.set_levels(Settings.sound_db(), Settings.ambience_db(), Settings.music_db())   # every slider, live (D0410)
 
 
 ## The settings page's own input: a capture takes the next key, a click lands on a control, the arrows
 ## and Enter drive the focus.
 func _unhandled_input(ev: InputEvent) -> void:
+	if booted and stack.minimap != null and stack.minimap.large and ev is InputEventKey and ev.pressed and (ev as InputEventKey).keycode == KEY_ESCAPE:
+		stack.minimap.large = false   # a modal closes on ESC, the map like the page (D0410)
+		get_viewport().set_input_as_handled()
+		return
 	if not booted or stack.settings == null or not stack.settings.open:
 		return
 	var page: SettingsPage = stack.settings
@@ -343,6 +323,8 @@ func _game_verb(verb: StringName) -> void:
 		return_to_surface()
 	elif verb == &"new_game":
 		new_game()
+	elif verb == &"zoom":   # the FEEL page's zoom, live: the rig reads `zoom` every tick (D0410)
+		zoom = CameraRig.ZOOM_LEVELS[clampi(Settings.zoom_idx, 0, CameraRig.ZOOM_LEVELS.size() - 1)]
 
 
 ## The spawn's own metre may have changed hands since the new game (a machine, a dig), so the body stands

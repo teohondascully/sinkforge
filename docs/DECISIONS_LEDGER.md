@@ -17054,3 +17054,40 @@ world never produced; only a hand that plays can find that. And the GDD's rule -
 free and dug, not purchased" -- decides how the drill arrives.
 
 **Reverse cost:** `yields` is one line of data; the collect is one argument; the fixtures are data.
+
+## D0410 · 2026-09-06 · Every setting has a consumer: the sliders live, the score mounted, the shake real, the zoom immediate, the map a modal, every binding listed (Astra rank 2)
+
+**Decided:** the settings page stored eight things and four of them were read by nothing. Fixed in place,
+each with the consumer it lacked. THE AUDIO SLIDERS: `Sfx.sound_db`, `Beds.ambience_db` and
+`Score.music_db` were the injection points every lift out of legacy left for the shell, and the shell never
+wrote them; `SceneAudio.set_levels` writes all three and `Main._effects` hands it the settings' dB every
+frame, so a drag is heard on the next frame with no event to miss. THE SCORE (`view/audio/score.gd`, lifted
+in D0215) was never mounted -- there was no music -- and is now a node of `SceneAudio` beside the effects
+and the beds, driven by `depth_fraction` (the body's depth over the world's); its synthesis in `_ready`
+costs 50 ms of the audio phase at boot, accepted and named. THE SHAKE had a toggle and no code: `SeatEffects`
+(the per-tick particles, split from `shell/main.gd` at the file cap) asks for 1.6 px on a broken cell and up
+to 2.4 px on a hard landing, `CameraRig.kick` takes the larger of what is asked and what still rings, decays
+it at 12 px/s and adds a random offset AFTER the clamp and the snap -- presentation only, never in `_pos`,
+legacy's rule with the trigger legacy was waiting for. THE ZOOM was read once at boot; the FEEL page's
+cycle now sets the seat's `zoom`, which the rig reads every tick. THE MAP dimmed the world and gated
+nothing; the large map now deafens the hands exactly as the settings page does and closes on ESC. THE KEYS
+face listed four of the fifteen actions the hand reads; it lists all fifteen, and the page's suite asserts
+no bound action is left off it. The arrows now ADJUST a slider (five per cent a press): the legend always
+said so, and off the two-column face the row step was zero, so there had been no keyboard path to any
+level. The legend is drawn with the plate's width as its limit and shortened to fit the compact faces
+(it overran them by up to 100 px), and the foot band grew 16 → 22 so it clears the detail box.
+
+**Pinned** (`tests/test_settings_live.gd`, the suite the review said was missing -- one that asserts the
+consumer moved, not the field): the three levels land on the three layers; the score is mounted; a hard
+landing asks for a shake and the toggle off asks for none; a kicked rig offsets by at most the kick and
+returns to exactly its still position; a zoom cycle changes the seat's zoom at once; a held RIGHT walks the
+body with the map closed and moves it nothing with the map open.
+
+**Left, named:** the hotbar digits are polled as physical keys, not InputMap actions, so they cannot be
+rebound or listed; `Settings.level()` is now used (the arrows); the shake's randomness means a capture
+taken within a fifth of a second of a break can differ by up to 2 px run to run.
+
+**Why:** "every visible setting should have an immediate, observable effect" is the whole of the
+review's second finding, and it was right; a page that stores is a facade.
+
+**Reverse cost:** each consumer is a few lines at a named site.

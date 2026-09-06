@@ -22,10 +22,24 @@ const CAT_NAMES: Array[String] = ["AUDIO", "CONTROLS", "FEEL", "GAME"]
 const RAIL_ORDER: Array[int] = [CAT_AUDIO, CAT_FEEL, CAT_GAME, CAT_CONTROLS]
 
 ## The bindings, each with the sentence its key does not tell you; an empty sentence draws no plate.
+## EVERY action the hand reads, not four of fifteen (D0410; the new-player review: "KEYS · 4" exposed only
+## movement, jump and mining while grapple, reel, build and drop went unlisted). The hotbar digits are
+## polled as physical keys, not actions, so they are not here -- a known gap, not an omission.
 const REMAP_ROWS: Array[Array] = [
 	[Controls.LEFT, "move left", ""], [Controls.RIGHT, "move right", ""],
 	[Controls.JUMP, "jump", ""],
 	[Controls.MINE, "mine (hold)", "hold on rock; the pick decides what breaks"],
+	[Controls.GRAPPLE, "grapple", "throw the line at rock above; again to let go"],
+	[Controls.CLIMB_UP, "reel in / climb", "shorten the line, or climb a rope"],
+	[Controls.CLIMB_DOWN, "pay out / descend", "lengthen the line, or slide down a rope"],
+	[Controls.BUILD, "build / pick up", "place what is selected at the aim, or take a machine back"],
+	[Controls.DROP, "drop", "drop the selected stack: into a mouth in reach, else forward"],
+	[Controls.CONFIGURE, "configure", "the aimed machine's own toggle"],
+	[Controls.LINK, "link winch", "arm a winch head, then its station"],
+	[Controls.CLEAR_PLAN, "clear plan", ""],
+	[Controls.MAP, "map", "the corner map grows and shrinks"],
+	[Controls.SETTINGS, "settings", ""],
+	[Controls.SAVE, "save", "write the slot now"],
 ]
 const AUDIO_ROWS: Array[Array] = [
 	["master", "master", "everything, including the ambience bed"],
@@ -55,7 +69,7 @@ const CATEGORY_LINE: Array[String] = [
 const SET_W: float = 432.0            ## CONTROLS: the one face wide enough for the two-column table
 const SET_W_COMPACT: float = 296.0    ## AUDIO and FEEL
 const SET_HEAD: float = 40.0
-const SET_FOOT: float = 16.0
+const SET_FOOT: float = 22.0   # 16 -> 22 (D0410): the legend cleared the detail box by nothing
 const SET_DETAIL: float = 36.0
 const SET_ROW: float = 22.0
 ## The floor: four rail slots at the rail's own minimum pitch (`UiTheme.rail_slots`: the top edge, three

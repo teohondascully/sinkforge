@@ -51,6 +51,7 @@ const LEAD_TIME: float = 0.34        ## seconds of travel the camera leads by
 const LEAD_MAX: float = 170.0        ## px cap, so a terminal-velocity fall cannot shove the body off-frame
 const LEAD_VERTICAL: float = 0.55    ## vertical space is scarcer on a 16:9 frame; lead into it gently
 const LEAD_EASE: float = 5.0         ## per-second easing on the lead itself (a lurch reads as a bug)
+const SHAKE_DECAY_PX_S: float = 12.0 ## a 2.4 px knock is gone in a fifth of a second (D0410)
 const FOLLOW_SPEED: float = 8.0      ## soft follow, matching legacy's old position_smoothing_speed
 
 ## Past this fraction of a screen width from the target, the camera CUTS instead of panning. A spawn, a
@@ -140,6 +141,7 @@ var _limits: Rect2 = Rect2()
 var _pos: Vector2 = Vector2.ZERO      ## the eased position, kept at FULL precision -- see the header
 var _lead: Vector2 = Vector2.ZERO
 var _started: bool = false
+var _shake: float = 0.0             ## world px of shake still ringing (D0410)
 
 
 ## Places the camera exactly, with no easing, and clears the accumulated lead. For a spawn, a debug
@@ -166,6 +168,7 @@ func warp_to(world_pos: Vector2) -> void:
 func step(body_pos: Vector2, body_vel: Vector2, zoom: float, screen_width: float, delta: float) -> Vector2:
 	if not _started:
 		warp_to(body_pos)
+	_shake = maxf(_shake - SHAKE_DECAY_PX_S * delta, 0.0)
 	var lead: Vector2 = body_vel * LEAD_TIME
 	lead.y *= LEAD_VERTICAL
 	# Eased with `1 - exp(-k*dt)` rather than a raw `lerp(a, b, k*dt)`: the exponential form is
@@ -177,7 +180,21 @@ func step(body_pos: Vector2, body_vel: Vector2, zoom: float, screen_width: float
 		_pos = target
 	else:
 		_pos = _pos.lerp(target, 1.0 - exp(-FOLLOW_SPEED * delta))
-	return snap_to_pixel(clamp_to_limits(_pos, zoom, screen_width), zoom)
+	return snap_to_pixel(clamp_to_limits(_pos, zoom, screen_width), zoom) + shake_offset()
+
+
+## THE SHAKE (D0410, legacy's `_shake` come back with its trigger): a knock of up to `px` world px that
+## decays at `SHAKE_DECAY_PX_S`. `kick` takes the larger of what is asked and what is still ringing, so
+## two breaks in a frame do not stack into a quake; the offset is random each frame, as legacy's was,
+## and is PRESENTATION ONLY -- it is added after the clamp and the snap and never enters `_pos`.
+func kick(px: float) -> void:
+	_shake = maxf(_shake, maxf(px, 0.0))
+
+
+func shake_offset() -> Vector2:
+	if _shake <= 0.0:
+		return Vector2.ZERO
+	return Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
 
 
 ## Sets the world rect the view may not leave. Call once with the world's pixel bounds; pass an empty

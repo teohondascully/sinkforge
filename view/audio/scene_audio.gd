@@ -8,6 +8,7 @@ extends Node
 
 var sfx: Sfx = null
 var beds: Beds = null
+var score: Score = null
 var _levels: BedLevels = BedLevels.new()
 var _cues: VoiceCues = null
 var _seed: int = 0
@@ -37,7 +38,19 @@ func _nodes(seed_value: int) -> void:
 	add_child(sfx)
 	beds = Beds.new()
 	add_child(beds)
+	score = Score.new()   # lifted in D0215 and never mounted until D0410: the music slider had no music
+	add_child(score)
 	_cues = VoiceCues.new(seed_value)
+
+
+## THE SLIDERS, LIVE (D0410): the shell reads its settings and hands the three levels in every frame, so a
+## drag on the settings page is heard on the next frame with no event to miss. Each layer carries its own
+## injected dB (`Sfx.sound_db`, `Beds.ambience_db`, `Score.music_db`), the shape every lift out of legacy
+## took; this is the one place they are written.
+func set_levels(sound_db: float, ambience_db: float, music_db: float) -> void:
+	sfx.sound_db = sound_db
+	beds.ambience_db = ambience_db
+	score.music_db = music_db
 
 
 func _synthesize() -> void:
@@ -75,6 +88,7 @@ func note_frame(frame: Frame, delta: float) -> void:
 	sfx.space.update(o, listener, delta)
 	sfx.note_frame(frame)
 	beds.drive(_levels.levels(o), delta)
+	score.set_depth(depth_fraction(o), delta)
 	# Every one-shot the frame calls for, through the room: the rock between a source and the ear
 	# takes off up to OCCLUSION_DB_MAX on top of the player's own distance falloff.
 	for c: Dictionary in _cues.cues(o, delta, beds.level(&"cave")):
@@ -83,3 +97,11 @@ func note_frame(frame: Frame, delta: float) -> void:
 		else:
 			var occluded: float = SfxSpace.occlusion(o, c["at"], listener) * SfxSpace.OCCLUSION_DB_MAX
 			sfx.play(c["voice"], c["at"], float(c["pitch"]), float(c["db"]), occluded)
+
+
+## How far down the body is, 0 at the generated surface and 1 at the world's floor: the score's one input.
+static func depth_fraction(o: Interface.Observation) -> float:
+	var total_m: float = float(o.map_cells.y) - float(Interface.Observation.SKY_ROWS) / float(MaterialLook.CELLS_PER_METRE)
+	if total_m <= 0.0:
+		return 0.0
+	return clampf(float(MaterialLook.depth_m(o.cell.y)) / total_m, 0.0, 1.0)

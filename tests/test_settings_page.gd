@@ -28,9 +28,19 @@ func _state() -> Dictionary:
 
 
 func _test_the_tables_and_the_labels() -> void:
-	_check(SettingsPage.REMAP_ROWS.size() == 4 and SettingsPage.remap_per_col() == 2, "four bindings, two a column (%d, %d)" % [SettingsPage.REMAP_ROWS.size(), SettingsPage.remap_per_col()])
+	var n: int = SettingsPage.REMAP_ROWS.size()
+	var per: int = SettingsPage.remap_per_col()
+	_check(n == 15 and per == 8, "every action the hand reads, eight a column (%d, %d) -- D0410, not four of fifteen" % [n, per])
+	var listed: Dictionary = {}
+	for row: Array in SettingsPage.REMAP_ROWS:
+		listed[row[0]] = true
+	var missing: Array = []
+	for action: StringName in Controls.defaults():
+		if not listed.has(action):
+			missing.append(action)
+	_check(missing.is_empty(), "no bound action is left off the page: %s" % [missing])
 	_check(SettingsPage.action_label(Controls.MINE) == "mine (hold)" and SettingsPage.action_label(&"no_such") == "no_such", "an action's human name, or its id when it has none")
-	_check(SettingsPage.focus_count(SettingsPage.CAT_CONTROLS) == 5 and SettingsPage.focus_count(SettingsPage.CAT_AUDIO) == 5 and SettingsPage.focus_count(SettingsPage.CAT_FEEL) == 3, "the bindings plus RESET, the mute plus four levels, three toggles")
+	_check(SettingsPage.focus_count(SettingsPage.CAT_CONTROLS) == SettingsPage.REMAP_ROWS.size() + 1 and SettingsPage.focus_count(SettingsPage.CAT_AUDIO) == 5 and SettingsPage.focus_count(SettingsPage.CAT_FEEL) == 3, "the bindings plus RESET, the mute plus four levels, three toggles")
 	_check(SettingsPage.clamp_cat(-1) == 0 and SettingsPage.clamp_cat(9) == SettingsPage.CAT_NAMES.size() - 1, "a category index that exists")
 	_check(SettingsPage.RAIL_ORDER == [SettingsPage.CAT_AUDIO, SettingsPage.CAT_FEEL, SettingsPage.CAT_GAME, SettingsPage.CAT_CONTROLS], "GAME sits third on the rail; CONTROLS last as a door")
 	_check(SettingsPage.focus_count(SettingsPage.CAT_GAME) == 2 and SettingsPage.wanted_h(SettingsPage.CAT_GAME) == SettingsPage.SET_MIN_H and SettingsPage.CAT_NAMES.size() == SettingsPage.CATEGORY_LINE.size(), "GAME: two rows at the floor height, and every category has its line")
@@ -38,7 +48,7 @@ func _test_the_tables_and_the_labels() -> void:
 
 func _test_the_payloads_clamp() -> void:
 	_check(SettingsPage.row_payload(SettingsPage.CAT_CONTROLS, 3) == {"bind": String(Controls.MINE)}, "the fourth binding row binds MINE")
-	_check(SettingsPage.row_payload(SettingsPage.CAT_CONTROLS, 4) == {"reset": true} and SettingsPage.row_payload(SettingsPage.CAT_CONTROLS, 99) == {"reset": true}, "past the bindings is RESET, however far past")
+	_check(SettingsPage.row_payload(SettingsPage.CAT_CONTROLS, SettingsPage.REMAP_ROWS.size()) == {"reset": true} and SettingsPage.row_payload(SettingsPage.CAT_CONTROLS, 99) == {"reset": true}, "past the bindings is RESET, however far past")
 	_check(SettingsPage.row_payload(SettingsPage.CAT_AUDIO, 0) == {"toggle": "mute"} and SettingsPage.row_payload(SettingsPage.CAT_AUDIO, 2) == {"slider": "sound"}, "audio: the mute, then the levels offset by one -- the table's second column is the shell's id, its first the label")
 	_check(SettingsPage.row_payload(SettingsPage.CAT_AUDIO, 40) == {"slider": "music"}, "an audio row past the end clamps to the last level")
 	_check(SettingsPage.row_payload(SettingsPage.CAT_FEEL, 1) == {"cycle": "zoom"} and SettingsPage.row_payload(SettingsPage.CAT_FEEL, 0) == {"toggle": "shake"}, "feel: zoom cycles, the rest toggle")
@@ -46,10 +56,11 @@ func _test_the_payloads_clamp() -> void:
 
 func _test_the_cursor_steps_and_jumps() -> void:
 	_check(SettingsPage.next_row(SettingsPage.CAT_CONTROLS, 0, KEY_DOWN) == 1 and SettingsPage.next_row(SettingsPage.CAT_CONTROLS, 0, KEY_UP) == 0, "down steps, up at the top clamps")
-	_check(SettingsPage.next_row(SettingsPage.CAT_CONTROLS, 0, KEY_RIGHT) == 2 and SettingsPage.next_row(SettingsPage.CAT_CONTROLS, 3, KEY_LEFT) == 1, "right and left jump a column on the two-column face")
-	_check(SettingsPage.next_row(SettingsPage.CAT_CONTROLS, 4, KEY_DOWN) == 4, "down off RESET stays: clamped, never wrapped")
+	_check(SettingsPage.next_row(SettingsPage.CAT_CONTROLS, 0, KEY_RIGHT) == SettingsPage.remap_per_col() and SettingsPage.next_row(SettingsPage.CAT_CONTROLS, SettingsPage.remap_per_col() + 1, KEY_LEFT) == 1, "right and left jump a column on the two-column face")
+	var reset_row: int = SettingsPage.REMAP_ROWS.size()
+	_check(SettingsPage.next_row(SettingsPage.CAT_CONTROLS, reset_row, KEY_DOWN) == reset_row, "down off RESET stays: clamped, never wrapped")
 	_check(SettingsPage.next_row(SettingsPage.CAT_AUDIO, 2, KEY_RIGHT) == 2 and SettingsPage.next_row(SettingsPage.CAT_FEEL, 1, KEY_LEFT) == 1, "on the single-column faces the column jump is 0")
-	_check(SettingsPage.row_action(SettingsPage.CAT_CONTROLS, 2) == Controls.JUMP and SettingsPage.row_action(SettingsPage.CAT_CONTROLS, 4) == &"" and SettingsPage.row_action(SettingsPage.CAT_AUDIO, 1) == &"", "the action under the cursor, none on RESET or off the face")
+	_check(SettingsPage.row_action(SettingsPage.CAT_CONTROLS, 2) == Controls.JUMP and SettingsPage.row_action(SettingsPage.CAT_CONTROLS, SettingsPage.REMAP_ROWS.size()) == &"" and SettingsPage.row_action(SettingsPage.CAT_AUDIO, 1) == &"", "the action under the cursor, none on RESET or off the face")
 	var p: SettingsPage = SettingsPage.new()
 	p.set_cat(SettingsPage.CAT_CONTROLS)
 	p.row = 4
@@ -134,7 +145,7 @@ func _test_a_click_lands_on_what_was_painted() -> void:
 	view.add_hud().refresh()
 	for _i: int in 2:
 		await process_frame
-	_check(page.hit_count() == SettingsPage.RAIL_ORDER.size() + 4 + 1, "the CONTROLS face painted the rail, four bindings and RESET (%d)" % page.hit_count())
+	_check(page.hit_count() == SettingsPage.RAIL_ORDER.size() + SettingsPage.REMAP_ROWS.size() + 1, "the CONTROLS face painted the rail, every binding and RESET (%d)" % page.hit_count())
 	await _game_face_paints(page, view)
 	view.queue_free()
 
