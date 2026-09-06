@@ -191,3 +191,26 @@ the lamp lit (D0400). *Question: is that the survey's meaning of seen, or does t
 
 **T023 · The status beacon breathes at 0.9 Hz between 0.30 and 0.75 in the status colour.** *Question:
 is a pulse the right call for "wants something", or a steady colour with the working glow off?*
+
+## The integration pass (D0409–D0414) — the calls made from a stranger's first ten minutes
+
+**T024 · The lessons dock lower left; nothing anchored to the body reads.** D0413 read the review's
+"short pointer only" as: what stays near the miner points and does not read (the rung's ring, the aim
+marks). *Question: does a lesson want a second, tiny cue at the body -- a pip that says "look down-left"
+-- or is one stable place enough once the player has met it?*
+
+**T025 · The inspector's hover tooltip still draws at the pointer, which IS the aim.** Rank 6 named the
+action area round the miner and the aim; the tooltip was not named and was left. *Question: a tooltip
+that docks beside the lesson, or a tooltip that yields while MINE is held?*
+
+**T026 · The hotbar's ten digits are physical keys, not actions.** The remap page lists fifteen actions
+and none of them is a slot (D0412). *Question: ten more rows on the remap page, or a single "hotbar
+keys" row that cycles layouts?*
+
+**T027 · The tutorial's opening cavity is a metre of crust over four metres of pocket.** D0353's `open`
+fixture, legacy's shape; the body walks it fine and the ambiguous-floor invariant logs on every crossing
+(D0414). *Question: is the thin crust the intended tease of what lies under, or should the pocket be a
+step down the stranger can see?*
+
+**T028 · The score costs 50 ms of boot and is silent until the body is deep.** Mounted so the MUSIC slider
+has a consumer (D0410). *Question: worth its boot cost before any music is authored, or a stub until it is?*

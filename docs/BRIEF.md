@@ -4,124 +4,129 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-05, fourteenth round: the two phases (the thirteenth round's brief is in `git log
--p -- docs/BRIEF.md`; D0390–D0395). THIS ROUND: Phase 1 -- the director's stuck state was the seat's
-inverted climb axis, fixed, with a GAME face for the way out and the way over (D0396); boot 7.6 → 1.8 s
-with a save (D0397). Phase 2 -- the six rulings applied (D0398–D0402, the golden re-pinned from CI Linux),
-the character smaller with a three-beat stroke (D0399), four feel rows (D0403), and the round's own perf
-regression found and fixed by the meter (D0404).** Captures before and after every change are on disk
-under `tests/body/recordings/phase2_2026-09-05/`.
+**Last updated: 2026-09-06, fifteenth round: Part A of the A+ brief, then the integration pass (the
+fourteenth round's brief is in `git log -p -- docs/BRIEF.md`; D0396–D0404). THIS ROUND: Part A -- the
+fresh-boot stutter closed at cause (D0405), the ruled beds (D0406), the beacon witnessed in the dark
+(D0407), the water's ripple bound (D0408). Then the director's next brief re-ranked everything under
+Astra's new-player review, "don't polish the look of an uncompleteable game": ranks 1-6 fixed with a
+playthrough test (D0409–D0413), rank 8's first slice measured and fixed (D0414). Part B, the signature
+look, is deferred and not started.** Captures before and after are under
+`tests/body/recordings/round15_2026-09-06/{beds,beacon,settings,tutorial,hud}/`.
 
-**Headline: the two things the director could not do were the seat's, not the sim's or the world's.** The
-slot they left at 22:09 was read and driven through the seat's own hand before anything was changed: the
-body stood on a step in an open rift with the line anchored above, and W paid the line OUT because the
-hand built the climb axis with the wrong sign against a contract three readers agreed on -- and the test
-had pinned the wrong sign, checking the driver against itself. The load was 4.7 s of generation thrown away
-on every start because the restore stages a whole world and swaps it in. Neither needed a line in `sim/`.
+**Headline: a stranger can now finish the opening.** Before D0409 the first rung could not be completed --
+the tutorial's ore yielded an item no recipe took, the forge stood a step beyond the scoop's reach, the
+hopper was scooped through rock, and the cache sat off the pad. `tests/test_tutorial_playthrough.gd`
+drives a fresh start through rungs 1-6 with the door's own verbs in 48 s of play; a build without the
+`yields` contract fails it at rung 1. Every sentence the tutorial speaks now names the key it is bound to,
+the thing it means is ringed in the world, and the lesson text lives at one place on the screen instead
+of over the rock the lesson is about.
 
 ---
 
 ## What landed
 
-- **F1 (D0396).** `PlayInput.read`: `climb_dir` +1 is up. Settings: a GAME face -- RETURN TO SURFACE (the
-  nearest floor to the spawn, the line cut) and NEW GAME (armed on the first press, the slot moved to `.bak`
-  and the scene reloaded on the second); the rail's tabs answer a click; digits 1-4; ESC closes.
-- **F2 (D0397).** `Session.from_save` (no generation under a restore); `TileGrid.load_cells` via `GridLoad`
-  (both layers in one pass each, the term folded once a cell, pinned equal to the per-cell writers and to
-  the grid's own rebuild); `Sfx`/`Beds` `synthesize`/`attach` with `SceneAudio.setup_async` on a worker
-  thread, byte-identical; `ValueNoise.FbmField`, the fBm a column at a time with the lattice memoised across
-  columns, `==` on the doubles over 10,922 samples. Headless whole-process: 7.56 → 1.78 s with the slot, 6.42
-  → 3.11 s fresh. `Main.boot` prints its phases.
-- **T017 + the static (D0398).** The "television static" was `rock_tooth.gdshader`'s 1/32 m cell: one
-  screen pixel at zoom 2 adding 0.06 over rock at 0.05. Now 1/8 m at half the weight. Hardrock is `bedded`
-  and bedded rock has parting planes (`RockTone.lamina`) on the hue bands' own warped coordinate, bed
-  thickness by facies; deepstone's plates; inclusions fewer and softer. The depth ladder on the GDD's
-  layers (THE DEEP WORKS at 140 m). T012: `LAMP_TINT` 0.38.
-- **The character (D0399).** `DRAW_SCALE` 0.85; the baker lifted into `tools/` with `dig_mid`; the stroke
-  wind-up / level / struck on braced legs, phase-locked, the clockless fallback the same table; the idle
-  breathes; swing, hang and climb poses from the observation's booleans.
-- **T015 (D0400, D0404).** `SeenPlane`: a lamp's-reach disc about the body on every hub tick, saved, outside
-  every signature; the map paints ore only where seen, updating in place per step. The chart's bands 55%
-  toward grey.
-- **T014 (D0401).** The status beacon: a breathing cut in the status colour for any machine that wants
-  something.
-- **T016 (D0402).** `pad_half_m` 8 / `ramp_m` 8; `cave.deep_at_m` 140 (Stonereach 8% → 11-14% air);
-  `aquifer.min_depth_m` 48 (water from 76 m). Golden re-pinned from CI Linux (PR #51, run 33953607297),
-  the CI array equal to the local dump elementwise, `test_carve_fraction` re-pinned to the measured density.
-- **Feel (D0403).** The lamp breathes within 3.5% (exactly 1 at t = 0); debris and dust on a break, a chip
-  per blow; landing dust; the water's skin a world pixel.
-- CI 124 → 126 suites (`test_rock_laminae`, `test_seen_plane`); `tests/fixture_shaft_golden.gd` holds the
-  array.
+**Part A (D0405–D0408).** The water's active set with the lifted pass kept as the oracle, the aquifers
+settled at generation (hub p50 first 5 s 13.3 → 1.25 ms; water errors at the 206 m warp 249 → 0);
+`BedSequence`, a seeded succession for the laminae; the `beacon_probe` start record and the `room`
+fixture, the amber ring 2.3-2.8x its control's luminance from ten metres in the dark; the ripple's tops
+held under the film.
+
+**Rank 1 (D0409), the opening loop.** `yields` on the material record (`WorldMaterials.yield_of`), one
+reach for the scoop and the pick (3.2 m), a standing collect verb, the `pile` fixture, the cache moved onto
+the pad. The playthrough suite, 20 assertions, is the proof.
+
+**Rank 2 (D0410), the settings agree with reality.** Every row has a consumer, pinned live: the three
+audio layers' injected levels, the score mounted (+50 ms boot, named), the shake kicked and decayed by the
+rig, the zoom immediate, the large map a modal that deafens the hands, fifteen bindings listed, the
+footer's legend fitting and LEFT/RIGHT adjusting a slider.
+
+**Rank 3 (D0411), the tutorial teaches.** `[MINE]` fills with the CURRENT binding from a table the shell
+writes; the goal carries its count; every rung shows its how-to the moment it opens and again on a stall
+(legacy's forty-second silence reversed); a finished rung is acknowledged first; `TargetGuide` rings the
+vein, the forge, the trunk, the drill, the seam; the ladder rides the save.
+
+**Rank 4 (D0412), the hotbar.** The selection follows its item when the pack compacts; the tenth digit
+reaches slot 10; an empty pack draws no bar.
+
+**Rank 6 (D0413), the HUD's composition.** `LessonDock` replaces the head-anchored bubble: one place, lower
+left above the hotbar band, its rect a function of the text alone and pinned 38 px clear of the action
+area round the miner at the closest zoom under the largest lead a visible lesson can have (a 260 wrap
+fails at -67: the mutant). The depth chip: an edgeless plate, 11/8 pt, dimmed. Rank 5 (the water
+errors) landed inside D0405.
+
+**Rank 8, first slice (D0414).** Measured on the scripted walk with a meter that could finally see the
+frame: three instrument gaps closed (a 16.7 ms threshold, HUD chips named, a draw-phase clock). Two CPU
+causes at cause: the observation's plane rebuild 9.3 → 0.66 ms (the surface read off the sky floor; the
+old scan was also wrong underground), the target ring 3.0 → 0.04 ms a frame. Quiet-tick p99 on the walk
+6.4 → 2.6 ms. The remainder is the CPU waiting on the GPU at a constant 230 draw calls.
 
 ---
 
 ## What was learned
 
-1. **Drive the player's own state through the player's own hand before touching anything.** The slot
-   said where the body was; the hand said what each key did there. Walking worked, W did nothing, S reeled
-   in: the defect named itself in one table. The terrain was never the problem.
-2. **A test that checks the driver against itself pins the bug.** `climb_dir == -1, "W climbs up"` was
-   green for a round. The pin now runs W's frame through `Grapple.reel` and asserts the line SHORTENS: the
-   consumer decides the sign.
-3. **The load's biggest cost was work the next step discarded.** Generation under a restore; the fix is a
-   second constructor, not a faster generator. The faster generator came second and was measured
-   bit-exact: a memoised field is only a speed-up if `==` holds on every double.
-4. **Identical arithmetic in identical order is bit-exact; a reordered sum is not.** `FbmField` sums
-   octaves per row in the per-sample order and doubles `fy` the way the loop did; the first draft used a
-   `_scale(i)` helper per row and would have been slow, not wrong -- but the same care is what made the
-   sanity check `mismatches 0` instead of a tolerance.
-5. **The static was a pass, not a tone.** Every knob on the rock tone moved 61.6% of pixels by under 0.2 in
-   total: the laminae were real and invisible. Cropping at 2x showed features smaller than a cell, which no
-   cell-level tone can make. Name the layer a feature's SIZE belongs to before tuning the layer you meant.
-6. **A grammar with no material is a grammar with no look.** Bedded existed; nothing was bedded. The
-   world's "varied geology" was one data field away before any constant moved.
-7. **The band ladder's numbers were legacy's world.** THE LONG DARK at 45 m, STONEREACH at 206 m: the
-   ladder stopped at 66 m in a 128 m world. Legacy's constants carry legacy's world size (again).
-8. **Two frames read as a twitch; three read as a stroke.** The level mid-swing is the frame the eye reads
-   as motion. And the clockless fallback should BE the phase-locked table on a clock of the period, so the
-   two never drift.
-9. **A feel change that costs frames is a regression whatever it looks like.** The seen plane's version
-   moved every hub tick and the map rebuilt 17K pixels each time: p99 21 → 46 ms, found only because the
-   brief said "fps still 120" and the meter was run. Update in place when a step turns a few dozen cells.
-10. **A re-pin's tuple moving is the world changing; the same tuple on CI and local is the check.** PR #51:
-    833/345/5 from 858/360/6, identical on both platforms, 200 of 200 equal elementwise. And a ratchet
-    beside the golden (`test_carve_fraction`) is a neighbour to run BEFORE the PR, not after.
-11. **A vacuous check writes itself when a test is going well.** Twice this round a control compared a call
-    to itself or ended in `or true`; both caught on reading back. The hunt is never finished.
-12. **A sealed pocket has no surface.** The water's skin line cannot be judged on a generated aquifer; a
-    breach makes the surface. State what a capture CAN show before claiming it shows a fix.
+1. **A stranger's blocker is a contract nobody wrote down.** Ore yielded "ore_iron", the forge took "ore";
+   both sides were right and the game could not be finished. The material record now SAYS what it yields,
+   and the playthrough is the only test that would have caught it.
+2. **Reach is one number or it is a trap.** The scoop at 2.5 m and the pick at 3.2 m put a machine in
+   the pick's reach and out of the hand's. One constant, referenced twice.
+3. **A reversed rule has a suite pinning the old one.** D0411 reversed legacy's silence; three pins in
+   `test_objective_line` encoded the silence and I ran every suite but that one. CI caught it, one push
+   later. Grep the CLASS across `tests/` when a rule flips, and run every hit.
+4. **A lambda on an engine singleton outlives the script language.** Two lambdas of a RefCounted on the
+   `RenderingServer` signals crashed Godot at exit on every perf run ("Godot quit unexpectedly", four
+   reports). A Node's own methods are dropped with the node. The crash reports were the instrument.
+5. **The painters' total was never the frame.** Every slow frame had painters under 3.5 ms; the frame
+   was 17-23. The missing phase was the draw's vsync wait after the CPU overran, and the overrun was an
+   observation scan (7.85 ms) and a HUD chip (3 ms) the report showed as `?`. Name the chips; clock the
+   phase; only then fix.
+6. **A cache keyed right is not a cache that hits.** The window snaps every eight metres, as designed --
+   and each hit of the miss cost 9 ms because one field inside it was scanned instead of read. Measure
+   the cost of a miss, not just the rate.
+7. **The scan was wrong as well as slow.** Scanning the surface from the window's top made rock at the
+   top row "the surface" and a cave mouth there a shaft to the sky. The cheap answer (the sky floor) was
+   also the true one.
+8. **The engine's TIME monitors refresh once a second.** Forty consecutive slow frames read identical
+   `proc`/`phys` values. An instrument that repeats itself is not measuring the frame.
+9. **The drop count under vsync is not a treatment metric on a shared machine.** 4-23 run to run; the
+   A/B spread swallowed the treatment. The quiet-tick p99 and a vsync-off count moved cleanly and are
+   what the ledger quotes.
+10. **"Short pointer only" is a design sentence, not a spec.** Read as: what stays near the miner points
+    and does not read. Written into the ledger as a reading so the director can overrule a reading, not
+    a mystery.
+11. **The action area is a testable rect.** Mining reach plus half the body, the camera's lead at the
+    busy threshold, the closest zoom, the TALLEST lesson: 38 px clear, and the pin fails a wider wrap.
 
 ---
 
 ## The decisions this round is waiting on
 
-**Play it.** `godot --path .`: the slot loads in under two seconds, W reels the line in, settings has the
-GAME face. **The six new forks, T018–T023** (`docs/TASTE_QUEUE.md`): the parting planes' weight and rhythm,
-the map as a strata chart, the deep's lamp at 200 m, RETURN TO SURFACE priced at nothing, "seen" as an
-eight-metre disc, the beacon's pulse. **Two design rows:** V60 (no release key for a slack line, legacy's
-rule) and V73 (NEW GAME has no seed control). **Step 7's scope** as before.
+**Play the opening.** `godot --path .`: rungs 1-6 complete from a fresh start; the lessons dock lower
+left; every settings row does something. **Part B:** the signature look was deferred for the integration
+pass; the game now completes end to end, and the walk's remaining frame drops are GPU-side, which is the
+same work. **The new forks T024–T028** (`docs/TASTE_QUEUE.md`): the dock without a body cue, the
+inspector's tooltip at the aim, the unbindable digits, the tutorial's thin-crust cavity, the score's
+boot cost. **Ranks 7, 9-13** were not reached: ore legibility (V32), the map's corner view, the
+Tiny-Glade lighting prototype, feel, audio, world identity.
 
-**CI:** every commit of this round is on main; `f77b6acb` is the head to read. One red run on the way
-(e62f91ab: `test_gram_map` pinned the old tooth cell, fixed next commit), one cancelled by a following
-push, one WORKING.md freshness gate (fixed in the commit after). The draft PR #51 shows MERGED because
-main took its commit.
+**CI:** every commit is on main; `5c36864c` is the head to read. One red run (83072b0d, the objective
+line's stale pins, fixed in bbe37387 which is green), two cancelled by following pushes.
 
 ---
 
 ## Anything that felt wrong even though it passed
 
-**The laminae are mine.** Under the lamp the rock reads as layered stone; where the fade field runs flat
-it reads as ruled paper (V71, T018). **The status beacon was never seen in the dark:** no start record
-places a machine underground; the suite pins its cuts and colours. **The first five seconds after a fresh
-boot stutter** while the new aquifers pour (13 ms hub ticks; V65). **RETURN TO SURFACE is free** (T021).
-**The "seen" rule counts ore behind a lit rock face** (T022).
+**The walk still drops frames.** ~100 of 1500 frames over 8.3 ms with vsync off, at a constant 230 draw
+calls and 2.5 ms of painters: the GPU, which the script cannot time under Metal. **The boot's first frame
+is 73-85 ms** (shader compiles), named, not fixed. **The tutorial's opening cavity logs the ambiguous-floor
+invariant on every crossing** (T027). **The target ring's miss is a 3 ms scan** once per metre walked
+where no ore is within ten. **The inspector's tooltip sits at the aim** (T025).
 
 ---
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks; the next step is the director's hands on it.
+Nothing blocks; the next step is the director's hands on the opening.
 
 ## Taste queue
 
-**17 open.** T001–T011 unchanged; T012–T017 ruled and executed, closed; T018–T023 new this round.
+**22 open.** T001–T011 unchanged; T012–T017 closed; T018–T023 open from the last round; T024–T028 new.

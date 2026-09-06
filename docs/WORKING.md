@@ -322,20 +322,47 @@ Captures: `tests/body/recordings/phase2_2026-09-05/`.
 (V65: `WaterFlow.step` while water moves); a sealed pocket has no surface to skin (V62); the deep's pool at
 200 m (V63, T020); the wall specks' starfield (V64).
 
-### The A+ / signature-look round (2026-09-06; D0405–, in progress, on main)
+### The A+ / signature-look round, then the integration pass (2026-09-06; D0405–D0414, on main)
 
-**Part A.** A1: the three instruments named by the brief were already fixed in D0394 and re-confirmed
-(`gate_status.py` end to end, FAIL []); the `!= null` asserts are all on object types; `CarryLook` is the
-one dead game file (removed this round); the veil's CPU twin (`VeilPainter`, `VeilMap`, `VeilFieldCache`)
-is a live test oracle, not dead code. A2: **V65 closed (D0405)** -- the water's active set with the lifted
-pass kept as `step_full` the oracle, the plane's row index, the aquifers settled in `load_world`; seat
-first 5 s hub p50 13.3 → 1.25 ms, frames over 16.7 ms 88 → 12, generation +490 ms. **The ruled beds
-closed (D0406)** -- `BedSequence`, a seeded succession. **The beacon in the dark:** next.
+**Part A of the A+ brief.** A1: the three instruments named by the brief were already fixed in D0394 and
+re-confirmed (`gate_status.py` end to end, FAIL []); the `!= null` asserts are all on object types;
+`CarryLook` was the one dead game file (removed). A2: **V65 closed (D0405)** -- the water's active set with
+the lifted pass kept as `step_full` the oracle, the plane's row index, the aquifers settled in `load_world`;
+seat first 5 s hub p50 13.3 → 1.25 ms, generation +490 ms. **The ruled beds closed (D0406)** -- `BedSequence`,
+a seeded succession. **The beacon witnessed in the dark (D0407)** -- the `beacon_probe` start record, a
+`room` fixture, the ring 2.3-2.8x the control's luminance at 10 m. **The water's ripple bound (D0408).**
+**Part B (the signature look) was DEFERRED by the director's next brief and is not started.**
+
+**The integration pass (Astra's review, ranks in order).** Rank 1 **(D0409)**: the opening loop had four
+breaks (ore that yielded nothing, a scoop that reached 2.5 m where the forge stood at 3.2, the hopper
+scooped through rock, the cache 10 m off the pad); `yields` on the material record, one reach, the `pile`
+fixture; `tests/test_tutorial_playthrough.gd` drives a stranger through rungs 1-6 in 48 s of play through
+the door's own verbs. Rank 2 **(D0410)**: every settings row has a consumer -- the three audio layers'
+levels, the score mounted, the shake kicked and decayed, the zoom immediate, the large map a modal, fifteen
+bindings listed, the footer's legend fitting. Rank 3 **(D0411)**: the tutorial teaches actionably -- the
+bound key in every sentence (`BindingLabels`), the count on the goal, the how-to the moment a rung opens
+and again on a stall (legacy's silence reversed), a finished rung acknowledged, the ring on the real
+target (`TargetGuide`), the ladder in the save. Rank 4 **(D0412)**: the hotbar selection follows its item,
+the tenth digit reaches slot 10, an empty pack draws no bar. Rank 5 landed inside D0405 (water errors 249
+→ 0 at the 206 m warp). Rank 6 **(D0413)**: the lessons dock at one place, lower left above the hotbar
+band, pinned clear of the action area round the miner at the closest zoom under the largest lead a
+visible lesson can have; the depth chip quiet. Rank 8, first slice **(D0414)**: the observation's plane
+rebuild 9.3 → 0.66 ms (the surface off the sky floor, and the old scan was wrong underground), the target
+ring 3.0 → 0.04 ms a frame, the meter given a draw phase and named HUD chips; quiet-tick p99 on the walk
+6.4 → 2.6 ms. **Ranks 7, 9-13 not reached.** The remaining frame drops on a walk are the CPU waiting on
+the GPU at a constant 230 draw calls: Part B's territory, needing a GPU timer (Metal HUD / Xcode).
+
+**Two quiet reds this round, both mine, both fixed:** CI red on `test_objective_line` after D0411 -- three
+pins encoded legacy's silence, and I never ran the suite that enumerated the rule I reversed (bbe37387);
+and the meter's lambdas on the `RenderingServer` signals crashed Godot at exit on every perf run until the
+seat node forwarded them (in D0414).
 
 ### Next action
 
-**A′ is complete through step 8; the look pass, the A+ round and the two-phase round are on main.** The
-director's calls: play it (`godot --path .`: the slot loads in under two seconds, W reels the line, the GAME
-face is in settings), the six new forks T018–T023, the design rows V60 and V73, and step 7's scope (plan
-§8). Cheap next steps that need no ruling: `WaterFlow.step`'s cost while water moves (V65), the hint
-bubble's anchor (V70), the lode plane's window build on a snap, the sky painter's 1 ms.
+**A′ is complete through step 8; the look pass, the two-phase round, Part A of the A+ round and ranks 1-6
+and 8 of the integration pass are on main.** The director's calls: play the opening (`godot --path .`:
+rungs 1-6 complete from a fresh start, the lessons dock lower left, the settings rows all live), the
+forks T018-T026, and whether Part B (the signature look) resumes now that the game completes end to end.
+Cheap next steps that need no ruling: rank 7 (ore legibility, V32), rank 9 (the map's corner view), a
+GPU timer for the walk's remaining drops, the boot's first-frame shader compile (73-85 ms), the sky
+painter's 1 ms.
