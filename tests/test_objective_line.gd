@@ -1,8 +1,11 @@
 extends "res://tests/test_base.gd"
-## D0370. `view/hud/objective_line.gd`: legacy's banner rules as data. The opening lesson keeps its
-## plate and its how-to fades over HINT_HOLD + HINT_FADE; nothing is offered after the first lesson
-## until you have stalled past HINT_STUCK; the banner clamps to the span the corner chips leave free;
-## a finished ladder says so without a bullet and clears after its linger.
+## D0370, the reveal rule REVERSED by D0411. `view/hud/objective_line.gd`: the banner rules as data.
+## EVERY rung keeps its plate and shows its how-to the moment it opens; the how-to fades over
+## HINT_HOLD + HINT_FADE and returns once you have stalled past HINT_STUCK (legacy offered a later rung
+## nothing until the stall, and the new-player review found the player standing under an empty sky); a
+## just-finished rung is acknowledged before the next takes the plate; the goal carries its count; the
+## banner clamps to the span the corner chips leave free; a finished ladder says so without a bullet and
+## clears after its linger.
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_objective_line.gd
 const S: int = Fx.SCALE
@@ -25,9 +28,11 @@ func _test_the_alphas() -> void:
 	a = ObjectiveLine.alphas(0, ObjectiveLine.HINT_STUCK + ObjectiveLine.GOAL_FADE, false)
 	_check(is_equal_approx(float(a["hint"]), 1.0), "stalled past HINT_STUCK the how-to returns in full")
 	a = ObjectiveLine.alphas(1, 5.0, false)
-	_check(float(a["goal"]) == 0.0 and float(a["hint"]) == 0.0, "a later step offers nothing at 5 s")
+	_check(float(a["goal"]) == 1.0 and float(a["hint"]) == 1.0, "a later step at 5 s: plate AND how-to, the same rule as the first (D0411 reversed legacy's silence)")
+	a = ObjectiveLine.alphas(1, 20.0, false)
+	_check(float(a["goal"]) == 1.0 and float(a["hint"]) == 0.0, "at 20 s its how-to has faded and the plate stays")
 	a = ObjectiveLine.alphas(1, ObjectiveLine.HINT_STUCK + ObjectiveLine.GOAL_FADE, false)
-	_check(float(a["goal"]) == 1.0 and float(a["hint"]) == 1.0, "and everything once stalled")
+	_check(float(a["goal"]) == 1.0 and float(a["hint"]) == 1.0, "and the how-to is back once stalled")
 	a = ObjectiveLine.alphas(3, 0.0, true)
 	_check(float(a["goal"]) == 1.0 and float(a["hint"]) == 0.0, "done: the plate, no how-to")
 
@@ -37,7 +42,7 @@ func _test_the_layout() -> void:
 	var obj: Objectives = Objectives.new()
 	obj.refresh(Interface.Observation.new(), 0.0)
 	var l: Dictionary = ObjectiveLine.layout(obj, font, UiTheme.px(96.0))
-	_check(not l.is_empty() and String(l["text"]) == "Mine 4 ore" and String(l["howto"]) != "", "a fresh ladder: the first goal with its how-to (%s)" % str(l.get("text", "")))
+	_check(not l.is_empty() and String(l["text"]).begins_with("Mine 4 ore") and String(l["text"]).ends_with("0/4") and String(l["howto"]) != "", "a fresh ladder: the first goal, its count and its how-to (%s)" % str(l.get("text", "")))
 	var rect: Rect2 = l["rect"]
 	_check(is_equal_approx(rect.size.y, UiTheme.px(24.0 + 13.0)) and is_equal_approx(rect.position.y, UiTheme.px(ObjectiveLine.TOP)), "two lines tall at legacy's top (%s)" % str(rect))
 	_check(is_equal_approx(rect.get_center().x, UiTheme.CANVAS.x * 0.5), "centred")
@@ -54,8 +59,11 @@ func _test_the_layout() -> void:
 	var o: Interface.Observation = Interface.Observation.new()
 	o.pack = [{"item": &"ore", "count": 4}]
 	later.refresh(o, 0.016)
+	var ack: Dictionary = ObjectiveLine.layout(later, font, 0.0)
+	_check(String(ack["text"]).begins_with("✓") and String(ack["text"]).find("Mine 4 ore") >= 0, "rung 1 just latched: the plate acknowledges it first (%s)" % ack["text"])
 	later.refresh(o, 5.0)
-	_check(ObjectiveLine.layout(later, font, 0.0).is_empty(), "the second step at 5 s says nothing: leave the sky alone")
+	var second: Dictionary = ObjectiveLine.layout(later, font, 0.0)
+	_check(not second.is_empty() and String(second["text"]).begins_with("Forge 2 ingots") and String(second["howto"]) != "", "the second step at 5 s: its goal and its how-to, not an empty sky (%s)" % second.get("text", ""))
 	_check(ObjectiveLine.layout(null, font, 0.0).is_empty(), "no ladder, no banner")
 
 
