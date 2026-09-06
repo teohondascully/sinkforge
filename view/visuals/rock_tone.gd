@@ -98,19 +98,17 @@ const GRAM_SEAM_X: Array[float] = [1.00, 0.35, 3.40]  ## bedded runs flat (small
 const GRAM_SEAM_Y: Array[float] = [1.00, 3.00, 0.40]
 const GRAM_SEAM_W: Array[float] = [1.00, 1.35, 1.70]  ## a plane's fracture is a line, not a fleck
 
-## THE LAMINAE (D0398, the director's T017 ruling: "more bedding, fewer inclusions"). Legacy's bedding is a
-## hue drift (`BeddingTone._strata`); a bedded rock also has PARTING PLANES -- thin dark lines where one
-## lamina ends and the next begins -- and those are what make a face read as layered stone at a glance
-## rather than as a tinted field. One line about a cell thick every `LAM_PERIOD_M`, on the SAME warped
-## bedding coordinate `_strata` uses so the lines dip and rise with the hue bands, fading in and out under
-## a slow field so they are partings and not a ruled page. Bedded rock only; the massive grammar's
-## identity is plates and steep fractures, the clastic's is aggregate. Scaled by `GRAM_LAMINA`.
-const LAM_PERIOD_M: float = 1.0
-const LAM_BAND: float = 0.24          ## the fraction of a period the parting darkens: ~1 cell of 4
+## THE LAMINAE (D0398, the director's T017 ruling: "more bedding, fewer inclusions"; D0406 the succession).
+## Legacy's bedding is a hue drift (`BeddingTone._strata`); a bedded rock also has PARTING PLANES -- thin
+## dark lines where one lamina ends and the next begins -- and those are what make a face read as layered
+## stone at a glance rather than as a tinted field. The partings sit on the SAME warped bedding coordinate
+## `_strata` uses, so they dip and rise with the hue bands; WHICH metres part, where exactly, how thick and
+## how dark is `BedSequence`'s, a seeded succession rather than a period, so a face is beds and not a ruled
+## page (V71). Bedded rock only; the massive grammar's identity is plates and steep fractures, the clastic's
+## is aggregate. Scaled by `GRAM_LAMINA`.
 const LAM_DARKEN: float = 0.42        ## multiplicative, on the parting row
 const LAM_ADD: float = 0.045          ## and a little absolute, so the line survives the veil's multiply
-const LAM_FADE_FREQ: float = 0.03     ## the field that fades partings in and out, ~33 cells
-const LAM_FADE_FLOOR: float = 0.30    ## a parting is never fainter than this share of itself...
+const LAM_FADE_FREQ: float = 0.03     ## the field that fades partings in and out and picks the facies, ~33 cells
 const GRAM_LAMINA: Array[float] = [0.0, 1.0, 0.0]
 
 ## THE FLOOR UNDER THE MULTIPLIER, legacy `:1082`. Several independent darkeners stack — the grain, an
@@ -150,6 +148,7 @@ var _crack: FastNoiseLite
 var _huex: FastNoiseLite
 var _huey: FastNoiseLite
 var _lam_fade: FastNoiseLite
+var _beds: BedSequence
 ## The surface-aware terms (soil profile, moss, tufts), seeded with the same world seed (6o, D0378).
 var surface: SurfaceTone
 
@@ -179,6 +178,7 @@ func _init(world_seed: int) -> void:
 	_huex = field(world_seed, 0xc2b2ae35, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, HUE_FREQ)
 	_huey = field(world_seed, 0x27d4eb2f, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, HUE_FREQ)
 	_lam_fade = field(world_seed, 0x9e3779b9, FastNoiseLite.TYPE_SIMPLEX_SMOOTH, LAM_FADE_FREQ, 2)
+	_beds = BedSequence.new(world_seed)
 	surface = SurfaceTone.new(world_seed)
 
 
@@ -241,7 +241,7 @@ func shade(base: Color, col: int, row: int, gram: int, solid_at: Callable = Call
 			rim = RIM_LIGHT * lip
 			rim_warm = RIM_WARM * lip
 	var lam: float = lamina(x, y) * GRAM_LAMINA[g]
-	var vmul: float = maxf(VALUE_FLOOR, 1.0 - AO_PER_NEIGHBOUR * ao + grain + form) * (1.0 - LAM_DARKEN * lam)
+	var vmul: float = _value(ao, grain, form, lam)
 	drift -= LAM_ADD * lam
 	# CLAMPED, exactly where legacy clamps. Legacy's `_paint_fine` writes bytes -- `clampf(out.r, 0, 1)`
 	# at `:1105` -- so the clamp is structural there rather than a choice, and leaving it out here let the
@@ -278,30 +278,21 @@ func _micro_texture(x: float, y: float, g: int) -> float:
 	return grain
 
 
-## The parting-plane weight at a cell, 0 off a parting and up to 1 on one. The whole band is the line (the
-## band is a quarter-metre, one cell, so a row either is the parting or is not). BEDS ARE NOT ONE
-## THICKNESS: the slow fade field picks the facies -- thick beds two metres apart where it runs low, the
-## metre beds through the middle, fine laminations every half metre where it runs high, at a lighter
-## weight -- so a face changes its rhythm laterally the way real bedding does, and the same field fades
-## each parting but never below `LAM_FADE_FLOOR` of itself. Public for the suite: the periods are asserted
-## in metres, the way every other feature size here is.
+## The parting-plane weight at a cell, 0 off a parting and up to 1 on one, from the bed succession at the
+## cell's warped depth, its column and the fade field's value there (the facies: thick beds where the field
+## runs low, fine laminations where it runs high, blended between). Public for the suite, which asserts the
+## succession IS one -- unequal gaps, unequal strengths -- and its shading rule.
 func lamina(x: float, y: float) -> float:
 	var n: float = _lam_fade.get_noise_2d(x, y)
-	var period: float = lamina_period_m(n)
-	var f: float = BeddingTone.bedding_metres(x, y) / period
-	if f - floor(f) >= LAM_BAND * LAM_PERIOD_M / period:
-		return 0.0
-	var weight: float = 0.55 if period < LAM_PERIOD_M else 1.0
-	return weight * clampf(0.7 + 0.5 * n, LAM_FADE_FLOOR, 1.0)
+	return _beds.weight(BeddingTone.bedding_metres(x, y), x / float(MaterialLook.CELLS_PER_METRE), n)
 
 
-## The bed thickness the fade field picks at a value: 2 m, 1 m or 0.5 m.
-static func lamina_period_m(n: float) -> float:
-	if n < -0.25:
-		return LAM_PERIOD_M * 2.0
-	if n > 0.45:
-		return LAM_PERIOD_M * 0.5
-	return LAM_PERIOD_M
+## The value multiplier: the floor under the stacked darkeners, the grain and the form, then the parting.
+## A parting is a smooth seam: the grain gives way on it in proportion (D0406), so even the faintest
+## parting reads as a line and never as one more speckle that happened to land light.
+func _value(ao: float, grain: float, form: float, lam: float) -> float:
+	return maxf(VALUE_FLOOR, 1.0 - AO_PER_NEIGHBOUR * ao + grain * (1.0 - lam) + form) * (1.0 - LAM_DARKEN * lam)
+
 
 ## Legacy `_air_weight` `:1235`. Open air among the four orthogonal and four diagonal neighbours,
 ## orthogonals weighted 1.0 and diagonals 0.5, so a lone nub reads round and an exposed face reads deeply

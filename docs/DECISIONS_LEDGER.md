@@ -16942,3 +16942,26 @@ terrain move nothing; the pour at boot was the one thing the player saw that no 
 
 **Reverse cost:** `step_full` is one rename away from being `step` again; the settle is one line.
 
+
+## D0406 · 2026-09-06 · The beds as a succession, not a period: `BedSequence`
+
+**Decided:** D0398's partings sat at every integer of the warped bedding coordinate, one cell thick, one
+strength, one rhythm per facies switched at a field value -- V71/T018's "ruled paper" where the fade field
+ran flat. `view/visuals/bed_sequence.gd` replaces the period with a seeded succession: every metre
+boundary is a candidate parting with its own presence (three in ten absent, so beds merge), position
+(+/-0.3 m, plus a sub-cell wobble along the bed), thickness (one cell, one in five two) and strength
+(0.45..1.0), constant along the bed so each line is one continuous surface. The facies are still the fade
+field's -- the odd metre boundaries fade out as it falls through [-0.35, -0.15], half-metre laminations
+fade in as it rises through [0.35, 0.55] -- blended, so a facies border is a change of rhythm and never a
+line that starts mid-air. On a parting the grain gives way in proportion (a seam is smooth).
+
+**Pinned** (`tests/test_rock_laminae.gd`): down one column the gaps between partings take 17 distinct
+values and the strengths 39; 0.35 partings a metre where the field runs low, 0.69 mid, 1.03 high; the same
+seed beds the same and another seed differently. The D0398 shading rule is now two-part: every parting at
+or above a quarter strength shades darker than the bed row under it (239 of 239), the whole population at
+95% or better (262 of 267) -- a faint parting can meet a dark speck in the bed below, and that is the
+faintness the change is for.
+
+**Why:** the director's ruling for T017 was "rock as geology"; geology is a succession of unequal beds.
+
+**Reverse cost:** `RockTone.lamina` is one call; the old period is in D0398's commit.
