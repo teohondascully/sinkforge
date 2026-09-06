@@ -17,7 +17,7 @@ extends Node2D
 const SITE: StringName = &"shallow_clay"   ## the site the tutorial start is authored for
 const START: StringName = &"tutorial"
 const SEED: int = 20260826
-const KEY_HINTS: String = "hints"
+const KEY_HINTS: String = SeatHud.KEY_HINTS   ## kept for the suites that name it; the key itself is SeatHud's (D0411)
 const BOOT_LINE: String = "SINKFORGE_BOOT"
 
 var autoboot: bool = true
@@ -90,8 +90,8 @@ func boot(load_save: bool) -> bool:
 	stack = ViewStack.build_stack(self, door, look, camera, true, falling, payouts)
 	view = stack.view
 	phases["stack"] = Time.get_ticks_msec() - t1
-	if not env.is_empty() and stack.hints != null and env.get(KEY_HINTS) is Array:
-		stack.hints.restore_taught(env[KEY_HINTS])   # the shell's own key, once the HUD exists to take it
+	SeatHud.restore(stack, env)   # the shell's own keys, once the HUD exists to take them (D0411)
+	SeatHud.push_bindings()
 	var body: Body = door.services()["body"]
 	_warp(body)
 	# The camera may not show past the world (D0333's clamp; the reveal scene set it, the seat never did --
@@ -168,16 +168,14 @@ func _shutter() -> void:
 ## The session with the shell's own key: the lessons the hints have taught.
 func capture_session() -> Dictionary:
 	var env: Dictionary = Session.capture(door)
-	if stack != null and stack.hints != null:
-		env[KEY_HINTS] = stack.hints.taught_ids()
+	SeatHud.capture(stack, env)
 	return env
 
 
 func restore(env: Dictionary) -> bool:
 	if env.is_empty() or not Session.restore(door, env):
 		return false
-	if stack != null and stack.hints != null and env.get(KEY_HINTS) is Array:
-		stack.hints.restore_taught(env[KEY_HINTS])
+	SeatHud.restore(stack, env)
 	return true
 
 
@@ -237,6 +235,7 @@ func _hud_keys_driven() -> void:
 		stack.minimap.large = not stack.minimap.large
 	if stack.settings != null and stack.settings.open:
 		stack.settings.state = HudBridge.snapshot()
+		SeatHud.push_bindings()   # a rebinding rewrites every lesson's key on the next frame (D0411)
 
 
 ## The hands, deaf while the settings page is open: a modal takes the keys, and the body stands still.
@@ -275,6 +274,7 @@ func _hud_keys(page_open: bool) -> void:
 		save()
 	if stack.settings != null and stack.settings.open:
 		stack.settings.state = HudBridge.snapshot()
+		SeatHud.push_bindings()   # a rebinding rewrites every lesson's key on the next frame (D0411)
 
 
 func _effects(delta: float) -> void:

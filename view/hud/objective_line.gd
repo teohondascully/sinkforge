@@ -7,16 +7,19 @@ extends RefCounted
 ## number through `UiTheme.px`/`pt`. The chip owns the ladder and steps it from the frame, so the banner
 ## and the world are one tick.
 ##
-## Legacy's rules, kept: the opening lesson keeps the plate and its how-to fades; nothing is OFFERED after
-## the first lesson -- a later step's how-to is reactive guidance that arrives only once you have stalled
-## (`HINT_STUCK`); the banner is centred between the two corner chips and clamps to the free span, the
-## how-to being the part that gives; a finished ladder lingers and then clears the screen for veterans.
+## Legacy's rule -- nothing OFFERED after the first lesson, a later step's how-to arriving only once you had
+## stalled forty seconds -- is REVERSED (D0411, the review's rank 3: "guidance disappears at the wrong point
+## in learning"). Every rung now keeps its goal chip, shows its how-to for `HINT_HOLD` seconds the moment it
+## opens, fades it, and brings it back once you have stalled (`HINT_STUCK`); a rung just finished is
+## acknowledged with a tick for `ACK_HOLD` seconds before the next goal takes the plate. The banner is
+## centred between the two corner chips and clamps to the free span, the how-to being the part that gives;
+## a finished ladder lingers and then clears the screen for veterans.
 
 const HINT_HOLD: float = 9.0
 const HINT_FADE: float = 1.5
 const HINT_STUCK: float = 40.0
 const GOAL_FADE: float = 1.2          ## how long reactive guidance takes to arrive once you have stalled
-const GOAL_PERSISTS_THROUGH: int = 1  ## the opening lesson keeps its plate; later steps only when stalled
+const ACK_HOLD: float = 1.6           ## seconds a just-finished rung shows its tick before the next goal
 const GOAL_SIZE: int = 11   ## legacy 13: the banner was the largest thing in the frame (VISUAL_QUEUE v2 V22)
 const HOWTO_SIZE: int = 9   ## legacy 10
 const PAD: float = 12.0
@@ -29,21 +32,15 @@ var _last_time: float = 0.0
 
 
 ## The goal's and the how-to's alphas for a step of `age` at `index`, legacy's arithmetic.
-static func alphas(index: int, age: float, done: bool) -> Dictionary:
+static func alphas(_index: int, age: float, done: bool) -> Dictionary:
 	if done:
 		return {"goal": 1.0, "hint": 0.0}
-	var stalled: float = clampf((age - HINT_STUCK) / GOAL_FADE, 0.0, 1.0)
 	var hint_a: float = 0.0
-	var goal_a: float = 1.0
-	if index < GOAL_PERSISTS_THROUGH:
-		if age < HINT_HOLD + HINT_FADE:
-			hint_a = clampf((HINT_HOLD + HINT_FADE - age) / HINT_FADE, 0.0, 1.0)
-		elif age > HINT_STUCK:
-			hint_a = stalled
-	else:
-		goal_a = stalled
-		hint_a = stalled
-	return {"goal": goal_a, "hint": hint_a}
+	if age < HINT_HOLD + HINT_FADE:
+		hint_a = clampf((HINT_HOLD + HINT_FADE - age) / HINT_FADE, 0.0, 1.0)
+	elif age > HINT_STUCK:
+		hint_a = clampf((age - HINT_STUCK) / GOAL_FADE, 0.0, 1.0)
+	return {"goal": 1.0, "hint": hint_a}
 
 
 ## Everything the banner decides; `{}` when there is nothing to say. `corner_w` is the wider of the two
@@ -62,13 +59,21 @@ static func layout(obj: Objectives, font: Font, corner_w: float) -> Dictionary:
 		text = "✓  All set — keep digging deeper."
 		ink = DONE_INK
 		a = alphas(0, 0.0, true)
+	elif obj.current_index() > 0 and obj.step_age < ACK_HOLD:
+		# The rung just finished, acknowledged: its goal with a tick, before the next takes the plate.
+		text = "✓  " + String(Objectives.STEPS[obj.current_index() - 1]["goal"])
+		ink = DONE_INK
+		a = alphas(0, 0.0, true)
 	else:
 		var step: Dictionary = Objectives.STEPS[obj.current_index()]
 		text = String(step["goal"])
+		var progress: String = obj.progress(step["id"])
+		if progress != "":
+			text += "   " + progress
 		ink = GOAL_INK
 		a = alphas(obj.current_index(), obj.step_age, false)
 		if float(a["hint"]) > 0.0:
-			howto = String(step["label"])
+			howto = BindingLabels.fill(String(step["label"]))
 	if float(a["goal"]) <= 0.0 and float(a["hint"]) <= 0.0:
 		return {}
 	var pad: float = UiTheme.px(PAD)

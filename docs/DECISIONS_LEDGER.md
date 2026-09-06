@@ -17091,3 +17091,30 @@ taken within a fifth of a second of a break can differ by up to 2 px run to run.
 review's second finding, and it was right; a page that stores is a facade.
 
 **Reverse cost:** each consumer is a few lines at a named site.
+
+## D0411 · 2026-09-06 · The tutorial teaches actionably: the bound key, the target, the count, the how-to at once, the ladder in the save (Astra rank 3)
+
+**Decided:** every rung's sentence is one actionable line: the verb's CURRENT binding in brackets
+(`[MINE]`, filled by `BindingLabels` from a table the shell writes at boot and after every settings
+interaction, so a rebinding rewrites every lesson; an unwritten token falls back to the verb's name, never
+an empty bracket), the target from where a stranger stands ("two steps to your LEFT"), and the count the
+goal chip appends (`Objectives.progress`: "0/4"). The hints speak the same way, and the grapple lesson
+names the grapple and never the winch, which is a machine. Legacy's reveal rule -- nothing offered after
+the first lesson, a later rung's how-to arriving only after forty seconds of stalling -- is REVERSED:
+every rung keeps its goal chip, shows its how-to for nine seconds the moment it opens, fades it, and
+brings it back on a stall; a rung just finished is acknowledged with its tick for 1.6 s before the next
+goal takes the plate. `TargetGuide` draws a breathing ring in the world on the thing the rung means --
+the nearest ore cell, the forge, a trunk, the crew's drill, the coal seam, the cache -- at the how-to's own
+alpha, searched inside the observation's window so it never points off screen. The ladder's latched rungs
+ride the save beside the hints (`SeatHud`, the shell's keys on the HUD, split from `shell/main.gd`): a
+returning player with forty ore in the pack is no longer put back on "Mine 4 ore".
+
+**Pinned** (`tests/test_tutorial_teaching.gd`): tokens fill and never leave a bracket across every rung;
+the progress string; the reversed reveal (goal and how-to at age 2, how-to gone at 20, back at 45); the
+acknowledgement then the next goal with its count; the round trip through the session; the ring on the
+real tutorial door -- the vein 1.5 m left, the forge 3.5 m left, the drill below-right, the coal right.
+
+**Why:** the review's three questions -- which button, which rock, what is "spawn" -- are each a field the
+game already knew; the sentence just never carried them.
+
+**Reverse cost:** the sentences are data in one table; the rule is one function.

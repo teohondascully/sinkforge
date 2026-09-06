@@ -147,6 +147,7 @@ static func _mount_hud(view: WorldView, stack: ViewStack) -> void:
 	view.add_hud().add_chip(Hotbar.paint)
 	view.add_hud().add_chip(Hotbar.paint_pack_full)
 	var line: ObjectiveLine = ObjectiveLine.new()
+	view.add_hud().add_stateful_chip(TargetGuide.new(line.objectives), &"paint")   # the ring on the rung's target (D0411)
 	view.add_hud().add_stateful_chip(line, &"paint")
 	var minimap: Minimap = Minimap.new()
 	view.add_hud().add_stateful_chip(minimap, &"paint")

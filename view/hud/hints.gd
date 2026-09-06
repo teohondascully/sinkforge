@@ -35,12 +35,12 @@ const LAND_HARD_PX_S: float = VoiceCues.LAND_HARD_PX_S
 const DEFS: Array[Dictionary] = [
 	{"id": &"rope", "item": &"rope", "text": "ROPE — set it above a drop. Climb it up and down; leap off."},
 	{"id": &"torch", "item": &"torch", "text": "TORCH — set it on a wall-backed cell. Its light stays."},
-	{"id": &"generator", "item": &"generator", "text": "GENERATOR — set it down, drop COAL on it. It powers what is near."},
+	{"id": &"generator", "item": &"generator", "text": "GENERATOR — set it down with [BUILD], stand by it and press [DROP] with coal selected. It powers what is near."},
 	{"id": &"conduit", "item": &"conduit", "text": "CONDUIT — lays a power line. Power flows down and sideways, never up."},
 	{"id": &"hopper", "item": &"hopper", "text": "HOPPER — banks what falls in, meters it down. Its filter is the first thing it tastes."},
 	{"id": &"lift", "item": &"lift", "text": "LIFT — hauls goods and YOU up its column."},
 	{"id": &"pump", "item": &"pump", "text": "PUMP — set it in the wet. Powered, it drains the water under it."},
-	{"id": &"winch_head", "item": &"winch_head", "text": "WINCH HEAD — stand it on a lode and link it to a Station. The vein climbs on its own."},
+	{"id": &"winch_head", "item": &"winch_head", "text": "WINCH HEAD — the machine, not your line. Stand it on a lode with [BUILD], then [LINK] it to a Station. The vein climbs on its own."},
 	{"id": &"winch_station", "item": &"winch_station", "text": "WINCH STATION — the head's drain. Collect from it."},
 ]
 
@@ -48,9 +48,9 @@ const DEFS: Array[Dictionary] = [
 ## swing techniques so a player who is wading is told about the pump before being told how to swing.
 const MOMENTS: Array[Dictionary] = [
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
-	{"id": &"deep_enough", "text": "GRAPPLE — fire the winch at rock above. Reel in to climb, leap off to fly."},
-	{"id": &"pump", "text": "PUMP IT — reel in at the bottom of the arc, pay out at the top."},
-	{"id": &"chain", "text": "CHAIN IT — fire again in mid-air to plant the next line, and the speed you left with is the speed you keep."},
+	{"id": &"deep_enough", "text": "GRAPPLE — press [GRAPPLE] to throw your line at rock above. Hold [REEL] to climb it, press [GRAPPLE] again to let go and fly."},
+	{"id": &"pump", "text": "PUMP IT — hold [REEL] at the bottom of the arc, [LOWER] at the top."},
+	{"id": &"chain", "text": "CHAIN IT — press [GRAPPLE] again in mid-air to plant the next line, and the speed you left with is the speed you keep."},
 	{"id": &"wrapped", "text": "THE LINE CAUGHT — it bent around the rock instead of through it. A short line whips you round harder."},
 	{"id": &"hard_landing", "text": "HARD LANDING — a long drop costs your footing. A line fired on the way DOWN takes the fall instead of your legs."},
 ]

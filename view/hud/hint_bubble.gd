@@ -69,7 +69,7 @@ static func hint_rect(font: Font, text: String, anchor: Vector2, avoid: Array[Ve
 static func layout(h: Hints, frame: Frame, font: Font) -> Dictionary:
 	if h == null or frame == null or frame.obs == null or font == null:
 		return {}
-	var text: String = h.active_text()
+	var text: String = BindingLabels.fill(h.active_text())   # the verb's CURRENT key, never its name (D0411)
 	var a: float = h.active_alpha()
 	if text == "" or a <= 0.01:
 		return {}

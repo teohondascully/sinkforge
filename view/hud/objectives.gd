@@ -18,16 +18,19 @@ extends RefCounted
 const LINGER_DONE: float = 5.0
 
 ## The ladder. Order is the tutorial path: each step must be doable from where the previous leaves you.
+## Each label is ONE actionable sentence (D0411, the review's rank 3): the binding in brackets, filled by
+## `BindingLabels` with whatever the verb is bound to now; the target where a stranger stands; the progress
+## the chip appends from `progress()`. "Grapple" is the line the body throws; "winch" is the machine.
 const STEPS: Array[Dictionary] = [
-	{"id": &"mine", "label": "Dig ore — hold MINE on the metal-flecked rock by spawn", "goal": "Mine 4 ore"},
-	{"id": &"smelt", "label": "Drop ore into the forge below spawn, then collect the ingots it makes", "goal": "Forge 2 ingots"},
-	{"id": &"wood", "label": "Fell a tree — hold MINE on a trunk for wood", "goal": "Get wood"},
-	{"id": &"build", "label": "Set the Drill down in the shaft just ABOVE the ore vein — it bores down into it", "goal": "Build the line"},
-	{"id": &"fuel", "label": "The Drill burns COAL — dig the coal seam by the shaft, then drop coal on the Drill", "goal": "Fuel the Drill"},
-	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore into the forge. First automation!", "goal": "First automation"},
-	{"id": &"hopper", "label": "Coal by hand runs dry — set a HOPPER above the Drill and drop coal in its top", "goal": "Automate the coal feed"},
-	{"id": &"power", "label": "Set a GENERATOR down and drop coal on it — the deep needs power", "goal": "Burn coal for power"},
-	{"id": &"winch", "label": "Stand a WINCH HEAD on a lode and link it to a Station — the vein climbs on its own", "goal": "Raise the winch"},
+	{"id": &"mine", "label": "Hold [MINE] on the silver-flecked rock two steps to your LEFT", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
+	{"id": &"smelt", "label": "Walk LEFT to the forge in its pit, press [DROP] to feed it the ore, then stand near: the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
+	{"id": &"wood", "label": "Hold [MINE] on a tree trunk — sixteen cuts make a block", "goal": "Get wood", "count": &"wood", "need": 1},
+	{"id": &"build", "label": "The crew's drill lies under the ground RIGHT of spawn — dig down to it, walk over it, then select it and press [BUILD] over the shaft mouth", "goal": "Build the line"},
+	{"id": &"fuel", "label": "Hold [MINE] on the black coal seam by the shaft, select the coal, stand by the Drill and press [DROP]", "goal": "Fuel the Drill"},
+	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore into the forge below. First automation!", "goal": "First automation"},
+	{"id": &"hopper", "label": "The crew's cache lies under the spawn, three metres below the adit floor — dig to it. Set the HOPPER above the Drill with [BUILD] and drop coal in its top", "goal": "Automate the coal feed"},
+	{"id": &"power", "label": "Set the GENERATOR from the cache down with [BUILD] and press [DROP] to feed it coal — the deep needs power", "goal": "Burn coal for power"},
+	{"id": &"winch", "label": "Stand the WINCH HEAD on a lode with [BUILD], then press [LINK] on it and on its Station — the vein climbs on its own", "goal": "Raise the winch"},
 ]
 
 const INGOTS: Array[StringName] = [&"ingot", &"iron_ingot"]
@@ -95,6 +98,32 @@ func done_for() -> float:
 
 func gained(item: StringName) -> int:
 	return int(_gained.get(item, 0))
+
+
+## "2/4" for a counted rung, "" for the rest: what the goal chip appends (D0411).
+func progress(id: StringName) -> String:
+	for step: Dictionary in STEPS:
+		if step["id"] == id and step.has("count"):
+			return "%d/%d" % [mini(gained(step["count"]), int(step["need"])), int(step["need"])]
+	return ""
+
+
+## The ladder's latched rungs, for the save (D0411): objectives lived only in the HUD and restarted on
+## every load, a returning player put back on "Mine 4 ore" with forty ore in the pack.
+func done_ids() -> Array:
+	var out: Array = []
+	for step: Dictionary in STEPS:
+		if _done.has(step["id"]):
+			out.append(String(step["id"]))
+	return out
+
+
+func restore_done(ids: Array) -> void:
+	for step: Dictionary in STEPS:
+		if ids.has(String(step["id"])):
+			_done[step["id"]] = true
+	if _done.has(&"build"):
+		_drill_seen = true   # the line existed once, so a rate after a load still counts (rung 6)
 
 
 func _gained_any(items: Array[StringName]) -> int:
