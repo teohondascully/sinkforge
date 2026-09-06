@@ -17277,3 +17277,23 @@ increasingly inhabited industrial shaft within expressive geology.
 test did not play. Both are the class this ledger exists to catch, and the reviewer caught them.
 
 **Reverse cost:** prose.
+
+## D0417 · 2026-09-06 · The water fills under renewed flow: the generated pool breached and drained, every moving shape triangulates (Astra's audit, item 2)
+
+**Decided:** D0405/D0408 closed the 206 m warp's 249 triangulation errors, and the audit asked whether the
+fix was avoided (pre-settling removed the trigger) rather than repaired (a stranger's pick makes shallow
+moving water again). `tests/test_water_painter.gd` now takes the generated tutorial world, finds the
+widest wet row (49 cells at row 1037, the pool's belly), digs a ten-metre shaft under its middle and a
+six-metre gallery through its left wall, then steps the water 240 ticks and, every eight ticks, checks
+every wet cell's fill and line polygon at six ripple phases. Controls inside the measurement: the floor
+and the wall are rock before the pick; the wet set CHANGES on 17 of 30 samples (the first cut, a six-cell
+shaft, moved on 2 and was rejected); the water is conserved (23808 -> 23808). Result: 574,248 of 574,248
+shapes triangulate. Mutant: the pre-fix ripple (amplitude unclamped, no film) fails 8,918 of them.
+
+**Not exercised, named:** pumping. No pump is placed; a powered pump draining a pool is the same
+`WaterPlane.set_level` path the pour takes, but the states differ (a pump empties from below a still
+surface) and the claim stays open for it.
+
+**Why:** "not avoided" is a claim about states the fix did not pose; the test poses two of the three.
+
+**Reverse cost:** one test.

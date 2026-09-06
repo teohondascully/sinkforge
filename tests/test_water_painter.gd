@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_test_a_level_step_tapers_and_an_interior_cell_is_full()
 	_test_only_the_top_cell_ripples()
 	_test_every_fill_is_a_simple_polygon_at_every_level_and_phase()
+	_test_the_fills_hold_under_renewed_flow()
 	_test_depth_runs_out()
 	_test_the_wet_cells_reach_the_observation_sparsely()
 	_test_the_drips_pour_only_where_there_is_room_below()
@@ -195,3 +196,75 @@ func _test_paint_runs_against_a_real_frame_with_a_pool() -> void:
 		await process_frame
 	_check(int(ran[0]) > 0, "paint() ran to completion inside a real draw pass over a forty-cell pool (%d)" % int(ran[0]))
 	view.queue_free()
+
+
+## RENEWED FLOW (Astra's audit of D0405/D0408, 2026-09-06): pre-settling the aquifers at generation removed
+## the trigger the 206 m warp had, and a stranger with a pick can make shallow moving water again. This
+## takes the real generated world, finds its deepest pool, BREACHES its wall and DRAINS its floor, and while
+## the water actually moves (the wet set must change: the control) checks every wet cell's fill and line
+## polygon at six ripple phases every eight ticks for four seconds. Not a fixture pool: the generator's.
+func _test_the_fills_hold_under_renewed_flow() -> void:
+	var door: Interface = Session.new_game(StrataData.SHALLOW_CLAY, 20260826, &"tutorial")
+	if door == null:
+		_check(false, "the tutorial world builds")
+		return
+	var world: World = door.services()["world"]
+	var grid: TileGrid = world.grid
+	var everywhere := Rect2i(0, 0, grid.width, grid.height)
+	var wet: Array[Vector2i] = world.water.wet_terrain_cells_in(everywhere)
+	if wet.is_empty():
+		_check(false, "control: the generated world has water to breach")
+		return
+	# The widest wet row is a real pool's belly; drain it from under its middle and breach its left wall.
+	var per_row: Dictionary = {}
+	for c: Vector2i in wet:
+		per_row[c.y] = int(per_row.get(c.y, 0)) + 1
+	var row: int = wet[0].y
+	for r: int in per_row:
+		if int(per_row[r]) > int(per_row[row]):
+			row = r
+	var xs: Array[int] = []
+	for c: Vector2i in wet:
+		if c.y == row:
+			xs.append(c.x)
+	xs.sort()
+	var middle := Vector2i(xs[xs.size() / 2], row)
+	var leftmost := Vector2i(xs[0], row)
+	var drain: Vector2i = middle + Vector2i(0, 1)
+	while drain.y < grid.height and not grid.is_solid(drain):   # down to the pool's floor under the middle
+		drain.y += 1
+	var breach: Vector2i = leftmost + Vector2i(-1, 0)
+	_check(grid.is_solid(drain) and grid.is_solid(breach), "control: the pool's floor and its wall are rock before the pick (%s, %s; the belly row has %d wet cells)" % [drain, breach, xs.size()])
+	var before: int = wet.size()
+	var total0: int = world.water.total_water()
+	for down: int in range(0, 40):     # a ten-metre shaft under the drain: the pour has somewhere to go
+		if drain.y + down < grid.height:
+			grid.excavate(drain + Vector2i(0, down))
+	for left: int in range(0, 24):     # a six-metre gallery through the wall: the pool spreads sideways
+		if breach.x - left >= 0:
+			grid.excavate(breach + Vector2i(-left, 0))
+	var checked: int = 0
+	var bad: int = 0
+	var moved_ticks: int = 0
+	var last_wet: Array[Vector2i] = wet
+	for tick: int in 240:
+		WaterFlow.step(world.water, grid)
+		if tick % 8 != 7:
+			continue
+		var now: Array[Vector2i] = world.water.wet_terrain_cells_in(everywhere)
+		if now != last_wet:
+			moved_ticks += 1
+		last_wet = now
+		var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(grid))
+		for c: Vector2i in now:
+			for i: int in 6:
+				var t: float = i / (6.0 * WaterPainter.WATER_RIPPLE_SPEED)
+				var shape: Dictionary = WaterPainter.cell_shape(o, c, t)
+				if shape.is_empty():
+					continue
+				checked += 1
+				if Geometry2D.triangulate_polygon(shape["fill"]).is_empty() or Geometry2D.triangulate_polygon(shape["line"]).is_empty():
+					bad += 1
+	_check(moved_ticks >= 10, "control: the water MOVED after the breach and the drain -- the wet set changed on %d of 30 samples (was %d cells)" % [moved_ticks, before])
+	_check(world.water.total_water() == total0, "the water is conserved through the pour (%d -> %d)" % [total0, world.water.total_water()])
+	_check_over(checked, bad == 0 and checked > 1000, "every fill and line of moving water triangulates: %d of %d shapes over 30 samples x 6 phases" % [checked - bad, checked])
