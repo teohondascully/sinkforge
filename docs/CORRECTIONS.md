@@ -470,6 +470,16 @@ was transcribed from `docs/A_PRIME_REFACTOR_PLAN.md` §3.4 rather than read off 
 same session that fixed an instrument for reporting green over a defect. There is no deeper origin: the
 plan's list was a plan, not a claim about the tree.
 
+## D0415 corrects D0412 — a pin count written from a sense of the suite, not from the tool
+
+**What D0412 claimed** (2026-09-06): "`tests/test_hotbar.gd` -- an empty pack lays out nothing; the sixteen
+carried-pack pins unchanged."
+
+**What is wrong with it.** The suite asserts 34 in total across eight tests, and the commit's diff of the
+file touches three `_check` lines (one rewritten, two removed). No partition of it yields sixteen. The
+number was not read off any output; the standing rule against exactly this was in the same session's
+brief. What stands: one pin changed, 33 unchanged and green (`ALL PASS (hotbar) -- 34 asserted`).
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,

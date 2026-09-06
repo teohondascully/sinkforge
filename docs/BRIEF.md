@@ -9,15 +9,16 @@ fourteenth round's brief is in `git log -p -- docs/BRIEF.md`; D0396–D0404). TH
 fresh-boot stutter closed at cause (D0405), the ruled beds (D0406), the beacon witnessed in the dark
 (D0407), the water's ripple bound (D0408). Then the director's next brief re-ranked everything under
 Astra's new-player review, "don't polish the look of an uncompleteable game": ranks 1-6 fixed with a
-playthrough test (D0409–D0413), rank 8's first slice measured and fixed (D0414). Part B, the signature
+playthrough test (D0409–D0413), rank 8's first slice measured and fixed (D0414), one correction to my own count (D0415). Part B, the signature
 look, is deferred and not started.** Captures before and after are under
 `tests/body/recordings/round15_2026-09-06/{beds,beacon,settings,tutorial,hud}/`.
 
-**Headline: a stranger can now finish the opening.** Before D0409 the first rung could not be completed --
+**Headline: the opening completes through first automation.** Before D0409 the first rung could not be completed --
 the tutorial's ore yielded an item no recipe took, the forge stood a step beyond the scoop's reach, the
 hopper was scooped through rock, and the cache sat off the pad. `tests/test_tutorial_playthrough.gd`
 drives a fresh start through rungs 1-6 with the door's own verbs in 48 s of play; a build without the
-`yields` contract fails it at rung 1. Every sentence the tutorial speaks now names the key it is bound to,
+`yields` contract fails it at rung 1. That is feasibility, not discoverability: it says nothing about the
+rest of the tutorial, long-term progression, or whether a stranger UNDERSTANDS the opening (Astra's audit). Every sentence the tutorial speaks now names the key it is bound to,
 the thing it means is ringed in the world, and the lesson text lives at one place on the screen instead
 of over the rock the lesson is about.
 
@@ -58,7 +59,8 @@ errors) landed inside D0405.
 frame: three instrument gaps closed (a 16.7 ms threshold, HUD chips named, a draw-phase clock). Two CPU
 causes at cause: the observation's plane rebuild 9.3 → 0.66 ms (the surface read off the sky floor; the
 old scan was also wrong underground), the target ring 3.0 → 0.04 ms a frame. Quiet-tick p99 on the walk
-6.4 → 2.6 ms. The remainder is the CPU waiting on the GPU at a constant 230 draw calls.
+6.4 → 2.6 ms. The remainder -- a draw phase of 4-12 ms at a constant 230 draw calls -- is consistent with
+a rendering-side wait and is a WORKING HYPOTHESIS until a GPU pass is named by a profile.
 
 ---
 
@@ -98,12 +100,24 @@ old scan was also wrong underground), the target ring 3.0 → 0.04 ms a frame. Q
 
 ---
 
+## Astra's audit of this report (2026-09-06), applied
+
+Three conclusions tightened: "the game completes end to end" → the opening completes through first
+automation (rungs 1-6 scripted; not the remaining tutorial, not progression, not a stranger's
+understanding); "what remains is the GPU" → a rendering-side wait is a working hypothesis until a pass is
+profiled; the water fix at the 206 m warp may be AVOIDED rather than repaired -- pre-settling removes the
+trigger, and excavation or pumping can make shallow moving water again, so the triangulation issue is not
+closed generally until those states are exercised across ripple phases. Astra's next order: an unscripted
+stranger observed (the director's, not a script's), water under renewed flow, rank 7, a real profile of
+the drops, then a bounded lighting experiment in one cave. The lesson dock's next test: readable beside
+the legend and a populated hotbar, and noticed without losing the action.
+
 ## The decisions this round is waiting on
 
 **Play the opening.** `godot --path .`: rungs 1-6 complete from a fresh start; the lessons dock lower
 left; every settings row does something. **Part B:** the signature look was deferred for the integration
-pass; the game now completes end to end, and the walk's remaining frame drops are GPU-side, which is the
-same work. **The new forks T024–T028** (`docs/TASTE_QUEUE.md`): the dock without a body cue, the
+pass; the opening completes through first automation, and the walk's remaining frame drops read as
+rendering-side, unprofiled. **The new forks T024–T028** (`docs/TASTE_QUEUE.md`): the dock without a body cue, the
 inspector's tooltip at the aim, the unbindable digits, the tutorial's thin-crust cavity, the score's
 boot cost. **Ranks 7, 9-13** were not reached: ore legibility (V32), the map's corner view, the
 Tiny-Glade lighting prototype, feel, audio, world identity.

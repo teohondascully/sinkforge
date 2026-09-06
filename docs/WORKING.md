@@ -349,8 +349,8 @@ band, pinned clear of the action area round the miner at the closest zoom under 
 visible lesson can have; the depth chip quiet. Rank 8, first slice **(D0414)**: the observation's plane
 rebuild 9.3 → 0.66 ms (the surface off the sky floor, and the old scan was wrong underground), the target
 ring 3.0 → 0.04 ms a frame, the meter given a draw phase and named HUD chips; quiet-tick p99 on the walk
-6.4 → 2.6 ms. **Ranks 7, 9-13 not reached.** The remaining frame drops on a walk are the CPU waiting on
-the GPU at a constant 230 draw calls: Part B's territory, needing a GPU timer (Metal HUD / Xcode).
+6.4 → 2.6 ms. **Ranks 7, 9-13 not reached.** The remaining frame drops on a walk carry a 4-12 ms draw phase at a
+constant 230 draw calls: a rendering-side wait is the working hypothesis, unprofiled (Astra's audit).
 
 **Two quiet reds this round, both mine, both fixed:** CI red on `test_objective_line` after D0411 -- three
 pins encoded legacy's silence, and I never ran the suite that enumerated the rule I reversed (bbe37387);
@@ -360,8 +360,10 @@ seat node forwarded them (in D0414).
 ### Next action
 
 **A′ is complete through step 8; the look pass, the two-phase round, Part A of the A+ round and ranks 1-6
-and 8 of the integration pass are on main.** The director's calls: play the opening (`godot --path .`:
-rungs 1-6 complete from a fresh start, the lessons dock lower left, the settings rows all live), the
+and 8 of the integration pass are on main.** The director's calls: watch an unfamiliar player take the opening
+without coaching, recording the first mined ore, the first ingot, the first automation and every
+hesitation (Astra's first recommendation; the script proved feasibility, not discoverability); play it
+(`godot --path .`: rungs 1-6 complete from a fresh start, the lessons dock lower left, the settings rows all live), the
 forks T018-T026, and whether Part B (the signature look) resumes now that the game completes end to end.
 Cheap next steps that need no ruling: rank 7 (ore legibility, V32), rank 9 (the map's corner view), a
 GPU timer for the walk's remaining drops, the boot's first-frame shader compile (73-85 ms), the sky

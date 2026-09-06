@@ -17239,3 +17239,41 @@ cause and measured; the GPU remainder is scoped to the pass that owns the shader
 
 **Reverse cost:** `_surface_over` is nine lines; the ring walk and cache are one file; the meter's
 context is a string.
+
+## D0415 · 2026-09-06 · Correction to D0412's pin count: "the sixteen carried-pack pins" was not read off anything
+
+**What D0412 claimed:** "`tests/test_hotbar.gd` -- an empty pack lays out nothing; the sixteen
+carried-pack pins unchanged."
+
+**What is wrong with it:** the suite asserts 34 in total across eight tests (`grep -c _check` = 34; the
+run line reads "34 asserted"), and the commit's diff of that file (`git diff 5578ba23 83072b0d --
+tests/test_hotbar.gd`) touches three `_check` lines: one rewritten for the empty pack, two removed. No
+partition of the suite yields sixteen; the number was written from a sense of the suite's size, not
+from the tool's output, in the same session whose standing rule is "verify a numeric claim against
+actual tool output before writing it". The claim that stands: one pin changed, the other 33 unchanged
+and green. The page is `docs/CORRECTIONS.md`.
+
+## D0416 · 2026-09-06 · Astra's audit of the round's report: three conclusions tightened, the next order taken
+
+**Decided:** the report's wording is withdrawn where it overstated the evidence, and the withdrawal is
+applied to the brief, the working state and the report page in the same commit. (1) "The game completes
+end to end" → "the opening completes through first automation": rungs 1-6 in 48 s is a scripted
+feasibility, not the remaining tutorial, not progression, not a stranger's understanding. (2) "What
+remains is the GPU" (D0414) → a rendering-side wait is a WORKING HYPOTHESIS: the reduced CPU costs are
+supported, the longer draw phase is consistent with a GPU wait, and no expensive pass has been named;
+profile before attributing the remainder to the shaders. (3) The water finding at the 206 m warp (D0405)
+may be avoided rather than repaired: pre-settling removes the original trigger, and excavation or
+pumping can create shallow moving water again; the triangulation issue is not closed generally until
+those states are exercised across ripple phases.
+
+**The order taken from the audit:** an unfamiliar player observed without coaching (the director's; the
+seat cannot supply a stranger); water under renewed flow (keep the warp case, then drain or breach the
+pool); rank 7 (competing grain and sparkle, solid vs background vs air, identical frames at play zoom); a
+profile of the remaining drops before any lighting work; then one bounded lighting experiment in a
+representative cave with a moving-camera comparison and a measured cost. Part B stays narrow: a warm,
+increasingly inhabited industrial shaft within expressive geology.
+
+**Why:** D0414's sentence named a cause the instrument could not see; D0409's headline named a game the
+test did not play. Both are the class this ledger exists to catch, and the reviewer caught them.
+
+**Reverse cost:** prose.
