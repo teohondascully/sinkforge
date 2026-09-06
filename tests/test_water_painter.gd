@@ -215,7 +215,24 @@ func _test_the_fills_hold_under_renewed_flow() -> void:
 	if wet.is_empty():
 		_check(false, "control: the generated world has water to breach")
 		return
-	# The widest wet row is a real pool's belly; drain it from under its middle and breach its left wall.
+	var total0: int = world.water.total_water()
+	var sites: Array[Vector2i] = _belly_sites(grid, wet)   # [drain, breach]
+	_check(grid.is_solid(sites[0]) and grid.is_solid(sites[1]), "control: the pool's floor and its wall are rock before the pick (%s, %s)" % [sites[0], sites[1]])
+	for down: int in range(0, 40):     # a ten-metre shaft under the drain: the pour has somewhere to go
+		if sites[0].y + down < grid.height:
+			grid.excavate(sites[0] + Vector2i(0, down))
+	for left: int in range(0, 24):     # a six-metre gallery through the wall: the pool spreads sideways
+		if sites[1].x - left >= 0:
+			grid.excavate(sites[1] + Vector2i(-left, 0))
+	var tally: Dictionary = _sweep_moving_water(door, world, everywhere, wet)
+	_check(int(tally["moved"]) >= 10, "control: the water MOVED after the breach and the drain -- the wet set changed on %d of 30 samples (was %d cells)" % [tally["moved"], wet.size()])
+	_check(world.water.total_water() == total0, "the water is conserved through the pour (%d -> %d)" % [total0, world.water.total_water()])
+	_check_over(int(tally["checked"]), int(tally["bad"]) == 0 and int(tally["checked"]) > 1000, "every fill and line of moving water triangulates: %d of %d shapes over 30 samples x 6 phases" % [int(tally["checked"]) - int(tally["bad"]), tally["checked"]])
+
+
+## The widest wet row is a real pool's belly: the drain is the first rock under its middle, the breach the
+## rock beyond its leftmost cell.
+static func _belly_sites(grid: TileGrid, wet: Array[Vector2i]) -> Array[Vector2i]:
 	var per_row: Dictionary = {}
 	for c: Vector2i in wet:
 		per_row[c.y] = int(per_row.get(c.y, 0)) + 1
@@ -228,43 +245,33 @@ func _test_the_fills_hold_under_renewed_flow() -> void:
 		if c.y == row:
 			xs.append(c.x)
 	xs.sort()
-	var middle := Vector2i(xs[xs.size() / 2], row)
-	var leftmost := Vector2i(xs[0], row)
-	var drain: Vector2i = middle + Vector2i(0, 1)
-	while drain.y < grid.height and not grid.is_solid(drain):   # down to the pool's floor under the middle
+	var drain := Vector2i(xs[xs.size() / 2], row + 1)
+	while drain.y < grid.height and not grid.is_solid(drain):
 		drain.y += 1
-	var breach: Vector2i = leftmost + Vector2i(-1, 0)
-	_check(grid.is_solid(drain) and grid.is_solid(breach), "control: the pool's floor and its wall are rock before the pick (%s, %s; the belly row has %d wet cells)" % [drain, breach, xs.size()])
-	var before: int = wet.size()
-	var total0: int = world.water.total_water()
-	for down: int in range(0, 40):     # a ten-metre shaft under the drain: the pour has somewhere to go
-		if drain.y + down < grid.height:
-			grid.excavate(drain + Vector2i(0, down))
-	for left: int in range(0, 24):     # a six-metre gallery through the wall: the pool spreads sideways
-		if breach.x - left >= 0:
-			grid.excavate(breach + Vector2i(-left, 0))
-	var checked: int = 0
-	var bad: int = 0
-	var moved_ticks: int = 0
+	return [drain, Vector2i(xs[0] - 1, row)]
+
+
+## 240 ticks of flow; every eighth, every wet cell's fill and line at six ripple phases. Returns
+## {moved, checked, bad}: the samples on which the wet set changed, the shapes checked, the ones that
+## did not triangulate.
+static func _sweep_moving_water(door: Interface, world: World, everywhere: Rect2i, wet: Array[Vector2i]) -> Dictionary:
+	var out: Dictionary = {"moved": 0, "checked": 0, "bad": 0}
 	var last_wet: Array[Vector2i] = wet
 	for tick: int in 240:
-		WaterFlow.step(world.water, grid)
+		WaterFlow.step(world.water, world.grid)
 		if tick % 8 != 7:
 			continue
 		var now: Array[Vector2i] = world.water.wet_terrain_cells_in(everywhere)
 		if now != last_wet:
-			moved_ticks += 1
+			out["moved"] = int(out["moved"]) + 1
 		last_wet = now
-		var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(grid))
+		var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
 		for c: Vector2i in now:
 			for i: int in 6:
-				var t: float = i / (6.0 * WaterPainter.WATER_RIPPLE_SPEED)
-				var shape: Dictionary = WaterPainter.cell_shape(o, c, t)
+				var shape: Dictionary = WaterPainter.cell_shape(o, c, i / (6.0 * WaterPainter.WATER_RIPPLE_SPEED))
 				if shape.is_empty():
 					continue
-				checked += 1
+				out["checked"] = int(out["checked"]) + 1
 				if Geometry2D.triangulate_polygon(shape["fill"]).is_empty() or Geometry2D.triangulate_polygon(shape["line"]).is_empty():
-					bad += 1
-	_check(moved_ticks >= 10, "control: the water MOVED after the breach and the drain -- the wet set changed on %d of 30 samples (was %d cells)" % [moved_ticks, before])
-	_check(world.water.total_water() == total0, "the water is conserved through the pour (%d -> %d)" % [total0, world.water.total_water()])
-	_check_over(checked, bad == 0 and checked > 1000, "every fill and line of moving water triangulates: %d of %d shapes over 30 samples x 6 phases" % [checked - bad, checked])
+					out["bad"] = int(out["bad"]) + 1
+	return out

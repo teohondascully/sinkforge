@@ -8,8 +8,15 @@ shader_type canvas_item;
 // one shared grade. Runs on a full-screen ColorRect on a CanvasLayer below the HUD, so the world
 // gets the lens treatment and the UI stays crisp.
 
-uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
-uniform float defocus : hint_range(0.0, 6.0) = 0.0;             // mip level the world is sampled at
+// NO MIPMAPS ON THE SCREEN TEXTURE (D0418). `filter_linear_mipmap` made the engine build a full mip chain
+// of the 1920x1080 frame EVERY frame so `defocus` could sample a lower level -- and nothing sets
+// `defocus` (legacy's Bazaar did; GDD S9 kills it). The ablation profile on the scripted walk found the
+// lens the one pass whose removal moved the frame: frames over 8.3 ms per 5 s ~95 -> ~57, p99 13 -> 10.5
+// ms, in both runs and both windows, while every other full-screen layer sat inside the noise. With the
+// chain gone the lens is three samples and arithmetic. A modal that wants the rack-focus back brings the
+// mipmap hint back WITH a measurement, not before.
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
+uniform float defocus : hint_range(0.0, 6.0) = 0.0;             // >0 desaturates and dims (the blur needs the mip chain, see above)
 uniform float vignette_strength : hint_range(0.0, 1.0) = 0.32;  // darker corners focus the light-pools-in-black
 uniform float vignette_inner : hint_range(0.0, 1.0) = 0.48;     // radius where darkening starts
 uniform float vignette_outer : hint_range(0.0, 1.5) = 0.98;     // radius of full darkening
@@ -47,14 +54,15 @@ void fragment() {
 	// Chromatic aberration: split the channels outward, growing with distance from centre.
 	vec2 shift = c * aberration;
 	vec3 col;
-	col.r = textureLod(screen_tex, uv + shift, defocus).r;
-	col.g = textureLod(screen_tex, uv, defocus).g;
-	col.b = textureLod(screen_tex, uv - shift, defocus).b;
+	col.r = texture(screen_tex, uv + shift).r;
+	col.g = texture(screen_tex, uv).g;
+	col.b = texture(screen_tex, uv - shift).b;
 	// Defocus: while the Bazaar counter is open the world racks out of focus behind it and loses a
 	// little of its colour, the way a camera racks focus onto the thing you are looking at. That is what
 	// stops a panel reading as pasted onto a screenshot: dimming the world 38% and leaving it perfectly
 	// sharp said nothing about the panel being in front of anything. The HUD draws on a layer above
-	// this pass, so the counter itself stays crisp. It is a mip level, not a kernel, so it costs one sample.
+	// this pass, so the counter itself stays crisp. The mip-level blur is gone with the chain (D0418); the
+	// desaturation and dimming remain the branch's whole effect until a modal earns the chain back.
 	if (defocus > 0.001) {
 		float g = dot(col, vec3(0.299, 0.587, 0.114));
 		col = mix(col, vec3(g), clamp(defocus * 0.13, 0.0, 0.34)) * (1.0 - clamp(defocus * 0.05, 0.0, 0.18));

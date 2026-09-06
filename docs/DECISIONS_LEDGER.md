@@ -17297,3 +17297,31 @@ surface) and the claim stays open for it.
 **Why:** "not avoided" is a claim about states the fix did not pose; the test poses two of the three.
 
 **Reverse cost:** one test.
+
+## D0418 · 2026-09-06 · The ablation switch, and a profile that could not resolve its subject on this machine (Astra's audit, item 4)
+
+**Decided:** `--mute=<stems>` hides every world layer whose cost-report label starts with a stem (and
+`post` for the lens), printing what the run was without; `WorldView.mute` is the switch. It is the only
+GPU profile the seat can run: `viewport_get_measured_render_time_gpu` reads 0.0 under Metal. One change
+kept from it: `post_fx.gdshader` declared the screen texture `filter_linear_mipmap`, so the engine built a
+full mip chain of the 1920x1080 frame every frame for a `defocus` that nothing sets (legacy's Bazaar did;
+GDD S9 kills it). The sampler is `filter_linear` now and the three reads are `texture`, not `textureLod`;
+the defocus branch keeps its desaturation and dimming and loses the blur until a modal earns the chain
+back with a measurement.
+
+**What the profile found, and what it could not.** Single runs (vsync off, the scripted walk, frames over
+8.3 ms per five seconds) put the lens muted at 56-60 against 88-102 unmuted, twice, both windows, with
+every other layer inside the noise. Five-run batches and then four interleaved rounds (mip lens, linear
+lens, lens muted, in turn) showed every configuration flipping between two regimes -- ~95 frames over
+budget, or ~300 of 600 with a 6 ms p50 -- with the machine's other load, not the configuration, deciding
+which (round 2: mip 93, round 3: linear 297). The lens's cost is NOT resolved on this machine; the mip
+chain's removal is kept because a chain built every frame for an unused feature is wrong on its own
+terms, not because the frame was shown to move. Twenty-three perf runs were spent learning that the
+instrument's noise floor on a shared machine is the size of the effect; the director asked what I was
+doing, and the answer was "running the same test", which is when to stop. A resolved profile needs a
+GPU timer (Xcode's Metal frame capture or the Metal HUD) on a machine doing nothing else.
+
+**Why:** the audit asked for a pass to be named before the remainder is attributed to shaders; the
+honest result is a candidate and an instrument limit, not a name.
+
+**Reverse cost:** the flag and the switch are twenty lines; the shader change is one hint and three calls.

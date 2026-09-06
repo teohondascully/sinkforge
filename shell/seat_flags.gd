@@ -14,6 +14,8 @@ extends RefCounted
 ##   --screenshot-tick=N     at tick N save the viewport to --screenshot-out, then quit unless
 ##   --screenshot-out=PATH   --quit-after says otherwise
 ##   --fresh                 a new game: the slot on disk is neither loaded nor written
+##   --mute=a,b,...          hide every world layer whose cost-report label starts with a listed stem, and
+##                           `post` for the lens: the ablation profile for a frame the script cannot time (D0418)
 ##   --act=mine|map|settings|game  a scripted hand for a capture: hold MINE at the rock ahead from tick 20 with
 ##                           the pointer posed, or press the map / settings key once at tick 20 (game: the GAME face)
 
@@ -22,7 +24,8 @@ const NO_WARP: Vector2i = Vector2i(-1, -1)
 
 static func parse(args: PackedStringArray) -> Dictionary:
 	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
-		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false, "start": ""}
+		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false, "start": "",
+		"mute": PackedStringArray()}
 	for a: String in args:
 		if a.begins_with("--quit-after="):
 			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
@@ -41,6 +44,8 @@ static func parse(args: PackedStringArray) -> Dictionary:
 			f["screenshot_tick"] = int(a.substr("--screenshot-tick=".length()))
 		elif a.begins_with("--screenshot-out="):
 			f["screenshot_out"] = a.substr("--screenshot-out=".length())
+		elif a.begins_with("--mute="):
+			f["mute"] = a.substr("--mute=".length()).split(",", false)
 		elif a.begins_with("--act="):
 			f["act"] = a.substr("--act=".length())
 		elif a == "--fresh":

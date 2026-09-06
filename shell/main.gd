@@ -113,6 +113,9 @@ func boot(load_save: bool) -> bool:
 		get_tree().root.title = "Sinkforge"
 	booted = true
 	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, SEED, SeatFlags.start_id(flags, START)])
+	var mute: PackedStringArray = flags["mute"]
+	if not mute.is_empty():
+		print("%s muted=%s" % [BOOT_LINE, ",".join(DrawCost.mute(view, mute))])   # the ablation profile's run label (D0418)
 	print("%s phases_ms %s" % [BOOT_LINE, phases])
 	return true
 

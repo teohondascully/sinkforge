@@ -78,3 +78,25 @@ static func label_for(paint: Callable) -> StringName:
 	if stem == "":
 		stem = obj.get_class() if obj != null else "lambda"
 	return StringName(stem if method == "" else "%s.%s" % [stem, method])
+
+
+## THE ABLATION SWITCH (D0418): hide every layer whose cost-report label starts with one of `stems`, and
+## `post` for the lens. Returns the labels it hid, so the seat can print what the run was WITHOUT. The
+## frame meter can clock the draw phase but not the GPU; removing one full-screen pass at a time and
+## reading the frame is the only profile the seat can run.
+## Reads the view's own children: every world painter is a `PaintLayer` mounted directly on the view
+## (the HUD's chips hang off the HUD layer and are not reached), and the lens is its `PostFxLayer`.
+static func mute(view: Node, stems: PackedStringArray) -> PackedStringArray:
+	var hid: PackedStringArray = PackedStringArray()
+	for child: Node in view.get_children():
+		var layer: PaintLayer = child as PaintLayer
+		if layer != null:
+			for stem: String in stems:
+				if String(layer.label).begins_with(stem):
+					layer.visible = false
+					hid.append(String(layer.label))
+					break
+		elif child is PostFxLayer and stems.has("post"):
+			(child as CanvasLayer).visible = false   # the lens is a CanvasLayer, not a CanvasItem
+			hid.append("post")
+	return hid
