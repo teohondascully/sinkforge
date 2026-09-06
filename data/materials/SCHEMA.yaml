@@ -7,6 +7,11 @@ fields:
   # A sapling roots in this material (ADR 0009 §3; legacy `SAPLING_SOILS = [&"earth"]`, and `clay` is
   # legacy's earth). Optional; absent reads as false.
   soil: {required: false, type: bool}
+  # THE MATERIAL-TO-ITEM CONTRACT (D0409): the item id mining a cell of this material puts in the pack and
+  # a drill bores out of it. Absent, the material IS the item (coal, wood, clay). Set where the terrain's
+  # geological name is not the economy's item name: `ore_iron` yields `ore`, the id every recipe, the
+  # objective ladder and the pickup label speak. The one place the two vocabularies meet.
+  yields: {required: false, type: str}
 
   # Appearance, lifted from legacy/src/data/material_def.gd (D0189). Every field is OPTIONAL: a material
   # with no appearance block still validates and falls back in tests/body/material_look.gd (Slice 0; moves to view/ at Slice 3), so adding a

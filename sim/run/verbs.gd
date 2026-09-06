@@ -15,9 +15,12 @@ extends RefCounted
 ##
 ## Every cell here is a METRE (`logic_cell`); the body's box is `sim/body`'s.
 
-## Scoop reach, 2.5 m: stand at your line and its output comes to you (legacy COLLECT_REACH_CELLS).
-const COLLECT_REACH_NUM: int = 5
-const COLLECT_REACH_DEN: int = 2
+## Scoop reach: ONE ARM'S LENGTH, the same 3.2 m the hand digs and builds at (`Mining.REACH_NUM/DEN`).
+## Legacy's COLLECT_REACH_CELLS was 2.5 at its metre-tall body; this body's centre stands 1.25 m over its
+## feet, so the tutorial forge's ingots -- two metres down the next column -- lay 2.9 m off and the rung
+## "collect the ingots it makes" could not be done from where a player stands (D0409). One reach, everywhere.
+const COLLECT_REACH_NUM: int = Mining.REACH_NUM
+const COLLECT_REACH_DEN: int = Mining.REACH_DEN
 const DROP_GRACE_TICKS: int = 78   # legacy DROP_GRACE_S 1.3 s at 60 Hz
 const NONE: Vector2i = Vector2i(-1, -1)
 

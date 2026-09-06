@@ -148,6 +148,7 @@ const RECORDS: Dictionary = {
 		"kind": "ore",
 		"hardness": 3.5,
 		"display_name": "Iron ore",
+		"yields": "ore",
 		"base_color": [
 			0.21,
 			0.24,

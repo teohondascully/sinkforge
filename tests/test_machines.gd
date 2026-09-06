@@ -7,7 +7,8 @@ extends "res://tests/test_base.gd"
 ## the metre cell over a 4 px grid. Outputs flow on the same tick (`Flow`, 3e): they are read where they land.
 
 const ROCK: StringName = &"hardrock"
-const ORE: StringName = &"ore_iron"
+const ORE_ROCK: StringName = &"ore_iron"   # the vein's material...
+const ORE: StringName = &"ore"            # ...and the item it yields (D0409)
 
 var world: World
 var items: Items
@@ -248,8 +249,8 @@ func _test_hopper_latches_filters_meters_and_holds_under_back_pressure() -> void
 ## legacy `_test_finite_deposit_and_drill` + the undermine half of `_test_coal_and_fuel`.
 func _test_drill_bores_the_deepest_ore_bottom_up_burns_coal_and_pours_down() -> void:
 	_rig()
-	world.set_solid(Vector2i(5, 5), ORE)
-	world.set_solid(Vector2i(5, 6), ORE)
+	world.set_solid(Vector2i(5, 5), ORE_ROCK)
+	world.set_solid(Vector2i(5, 6), ORE_ROCK)
 	world.set_solid(Vector2i(5, 10), ROCK)
 	var drill: MachineState = _put(&"drill", Vector2i(5, 3))
 	_check(Runners.drill_target(world, machines, Vector2i(5, 3)) == Vector2i(5, 6), "the target is the DEEPEST ore metre of the body, through the air gap")
@@ -276,20 +277,20 @@ func _test_drill_bores_the_deepest_ore_bottom_up_burns_coal_and_pours_down() -> 
 	var burnt: int = int(items.total_consumed[&"coal"])
 	_check(burnt == 11 and drill.fuel == 0, "660 running ticks over 60-tick coals: exactly 11 coals, the last spent on the last cycle")
 	_rig()
-	world.set_solid(Vector2i(5, 5), ORE)
+	world.set_solid(Vector2i(5, 5), ORE_ROCK)
 	world.set_solid(Vector2i(5, 9), ROCK)
 	_put(&"drill", Vector2i(5, 3))
 	var forge: MachineState = _put(&"processor", Vector2i(5, 7))
 	_feed(Vector2i(5, 3), &"coal", 1)
 	_steps(20)
-	_check(items.piles.count_at(Vector2i(5, 8), ORE) == 1 and forge.output_buffer.is_empty(), "a machine below collects the bored unit; not its recipe, so it passed through and fell on to the floor (the line's first link)")
+	_check(int(forge.input_buffer.get(ORE, 0)) == 1 and items.piles.count_at(Vector2i(5, 8), ORE) == 0, "a machine below collects the bored unit INTO ITS RECIPE: the vein yields `ore`, the forge's input, so the line's first link holds (D0409; before it, `ore_iron` fell through to the floor)")
 	world.grid.set_material(Vector2i(20, 22), ROCK)   # one stone cell inside ore metre (5, 5)
 	_check(Runners.drill_target(world, machines, Vector2i(5, 3)) == Runners.NONE and _status(Vector2i(5, 3)) == &"no_input", "a single stone cell inside the metre caps the column: the bit only takes ore")
 
 
 func _test_drill_gates_blocked_no_fuel_and_a_head_on_a_lode() -> void:
 	_rig()
-	world.set_solid(Vector2i(5, 5), ORE)
+	world.set_solid(Vector2i(5, 5), ORE_ROCK)
 	world.set_solid(Vector2i(5, 6), ROCK)
 	var drill: MachineState = _put(&"drill", Vector2i(5, 3))
 	_feed(Vector2i(5, 3), &"coal", 1)
@@ -300,7 +301,7 @@ func _test_drill_gates_blocked_no_fuel_and_a_head_on_a_lode() -> void:
 	_put(&"hopper", Vector2i(5, 6))
 	_check(not Runners.drill_blocked(world, machines, Vector2i(5, 5)) and _status(Vector2i(5, 3)) == &"working", "a machine directly below is a drain")
 	_rig()
-	world.set_solid(Vector2i(5, 15), ORE)
+	world.set_solid(Vector2i(5, 15), ORE_ROCK)
 	_put(&"drill", Vector2i(5, 3))
 	_check(_status(Vector2i(5, 3)) == &"blocked", "ore on the world floor has nowhere to drop")
 	_rig()

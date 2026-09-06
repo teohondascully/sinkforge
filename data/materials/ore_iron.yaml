@@ -5,6 +5,7 @@ layer: stonereach
 kind: ore
 hardness: 3.5
 display_name: Iron ore
+yields: ore   # the vein is iron ore; what you carry and smelt is `ore` (D0409, the recipes' word)
 
 # --- appearance (Slice 0) ---------------------------------------------------------------
 # Appearance lifted from `legacy/src/data/materials/iron.tres` via `legacy/src/data/material_def.gd`'s

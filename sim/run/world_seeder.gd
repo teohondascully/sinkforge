@@ -16,7 +16,7 @@ extends RefCounted
 ## The surface row is the generator's datum, `ShaftGenerator.SKY_ROWS`, in metres.
 
 const SURFACE_ROW_M: int = ShaftGenerator.SKY_ROWS / LogicGrid.TERRAIN_PER_LOGIC
-const KINDS: Array[String] = ["solid", "open", "room", "lode", "machine", "pack"]
+const KINDS: Array[String] = ["solid", "open", "room", "lode", "machine", "pack", "pile"]
 
 static var last_refusal: String = ""
 
@@ -104,8 +104,8 @@ static func _valid(world: World, fixtures: Array, anchor: Vector2i) -> bool:
 		if kind == "machine" and not MachineDef.exists(StringName(str(f.get("id", "")))):
 			last_refusal = "unknown machine: %s" % str(f.get("id", ""))
 			return false
-		if kind == "pack" and int(f.get("count", 0)) <= 0:
-			last_refusal = "pack fixture with no count: %s" % str(f.get("item", ""))
+		if kind in ["pack", "pile"] and int(f.get("count", 0)) <= 0:
+			last_refusal = "%s fixture with no count: %s" % [kind, str(f.get("item", ""))]
 			return false
 		for cell: Vector2i in _cells_of(f, anchor):
 			if not world.logic_in_bounds(cell):
@@ -144,4 +144,11 @@ static func _stamp_one(world: World, items: Items, machines: Machines, f: Dictio
 			var item: StringName = StringName(str(f["item"]))
 			items.pack.add(item, int(f["count"]))
 			items.produced(item, int(f["count"]))
+		"pile":
+			# Left lying in the world for the player to walk over (D0409): the crew's drill in the adit, the
+			# way the GDD's forge is found "cold and ancient" -- not bought, not crafted, found.
+			var left: StringName = StringName(str(f["item"]))
+			var pile: Dictionary = items.piles.pile(cells[0])
+			pile[left] = int(pile.get(left, 0)) + int(f["count"])
+			items.produced(left, int(f["count"]))
 	return true

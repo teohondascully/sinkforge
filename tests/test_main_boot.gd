@@ -69,17 +69,24 @@ func _test_the_hands() -> void:
 func _test_the_verbs() -> void:
 	var hands: PlayInput = PlayInput.new()
 	var none_digit: Callable = func(_i: int) -> bool: return false
-	var cmds: Array[Command] = hands.verbs(_hand({Controls.BUILD: true, Controls.DROP: true}), none_digit, Vector2i(4, 9))
+	var cmds: Array[Command] = hands.verbs(_hand({Controls.BUILD: true, Controls.DROP: true}), none_digit, Vector2i(4, 9), false)
 	var kinds: Array = []
 	for c: Command in cmds:
 		kinds.append(c.kind)
 	_check(kinds.has(Command.Kind.BUILD) and kinds.has(Command.Kind.DROP) and cmds.size() == 2, "build at the aimed metre and drop, on their press edges (%d commands)" % cmds.size())
-	_check(hands.verbs(_hand({Controls.BUILD: true, Controls.DROP: true}), none_digit, Vector2i(4, 9)).is_empty(), "...and nothing while they stay held")
-	_check(hands.verbs(_hand({Controls.BUILD: true}), none_digit, PlayInput.NONE).is_empty(), "a build with no aim is nothing")
+	_check(hands.verbs(_hand({Controls.BUILD: true, Controls.DROP: true}), none_digit, Vector2i(4, 9), false).is_empty(), "...and nothing while they stay held")
+	_check(hands.verbs(_hand({Controls.BUILD: true}), none_digit, PlayInput.NONE, false).is_empty(), "a build with no aim is nothing")
 	var two: Callable = func(i: int) -> bool: return i == 2
-	var sel: Array[Command] = hands.verbs(_hand({}), two, PlayInput.NONE)
+	var sel: Array[Command] = hands.verbs(_hand({}), two, PlayInput.NONE, false)
 	_check(sel.size() == 1 and sel[0].kind == Command.Kind.SELECT and sel[0].index == 2, "the third digit selects slot 2")
-	_check(hands.verbs(_hand({}), two, PlayInput.NONE).is_empty(), "...once per hold")
+	_check(hands.verbs(_hand({}), two, PlayInput.NONE, false).is_empty(), "...once per hold")
+	# D0409: with auto-pickup on, the hand collects EVERY tick with no key -- legacy's frame-rate pickup;
+	# with it off, never. The walk-over pickup is what makes "collect the ingots" a thing a player can do.
+	var quiet: Array[Command] = hands.verbs(_hand({}), none_digit, PlayInput.NONE, true)
+	_check(quiet.size() == 1 and quiet[0].kind == Command.Kind.COLLECT, "auto-pickup on: a collect every tick, even with no key down")
+	var again: Array[Command] = hands.verbs(_hand({}), none_digit, PlayInput.NONE, true)
+	_check(again.size() == 1 and again[0].kind == Command.Kind.COLLECT, "...and again the next tick: not an edge, a standing verb")
+	_check(hands.verbs(_hand({}), none_digit, PlayInput.NONE, false).is_empty(), "auto-pickup off: nothing")
 	var keys: Dictionary = hands.hud_keys(_hand({Controls.SETTINGS: true}))
 	_check(bool(keys["settings"]) and not bool(keys["map"]) and not bool(keys["save"]), "the settings key on its edge, the others quiet")
 	_check(not bool(hands.hud_keys(_hand({Controls.SETTINGS: true}))["settings"]), "...and not again while held")

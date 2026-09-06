@@ -178,7 +178,7 @@ func bore_one(logic_cell: Vector2i) -> StringName:
 		var left: int = deposits.ore_deposit_at(grid, terrain_cell)
 		if left <= 0 or not grid.is_solid(terrain_cell):
 			continue
-		var item: StringName = grid.get_material(terrain_cell)
+		var item: StringName = WorldMaterials.yield_of(grid.get_material(terrain_cell))   # D0409
 		if left > 1:
 			deposits.set_deposit(terrain_cell, left - 1)
 		else:

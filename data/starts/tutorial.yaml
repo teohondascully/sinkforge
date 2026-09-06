@@ -18,6 +18,10 @@ fixtures:
   - {kind: lode, dx: 5, dy: 2, material: ore_iron, amount: 3}
   - {kind: lode, dx: 5, dy: 3, material: ore_iron, amount: 3}
   - {kind: lode, dx: 5, dy: 4, material: ore_iron, amount: 3}
+  # THE CREW'S DRILL (D0409): legacy sold the drill at the Bazaar, which this game refuses (D0346); the
+  # GDD's answer for the forge -- found in the world, cold and ancient -- is the answer for the drill too.
+  # It lies on the adit floor where the face is, a pile the player walks over, then places in the shaft.
+  - {kind: pile, item: drill, count: 1, dx: 4, dy: 3}
   # The same vein continues behind rock, straight down off the bottom of the face (ADIT_DEEP_AMOUNT 120).
   - {kind: lode, dx: 5, dy: 5, material: ore_iron, amount: 8}
   - {kind: lode, dx: 5, dy: 6, material: ore_iron, amount: 8}
@@ -34,3 +38,11 @@ fixtures:
   - {kind: open, cells: [[7, 3], [7, 4]]}
   - {kind: solid, dx: 7, dy: 5, material: clay, deposit: 0}
   - {kind: machine, id: processor, dx: 7, dy: 3}
+  # THE CREW'S CACHE (D0409): the ladder's later rungs ask for a hopper, a generator and a winch pair that
+  # nothing supplied. They lie in a floored pocket under the spawn, three metres below the adit's floor --
+  # inside the pad, out of the scoop's reach from the adit, found by digging on.
+  - {kind: room, dx: 1, dy: 7, w: 3, h: 1, floor: clay}
+  - {kind: pile, item: hopper, count: 1, dx: 1, dy: 7}
+  - {kind: pile, item: generator, count: 1, dx: 2, dy: 7}
+  - {kind: pile, item: winch_head, count: 1, dx: 3, dy: 7}
+  - {kind: pile, item: winch_station, count: 1, dx: 3, dy: 7}

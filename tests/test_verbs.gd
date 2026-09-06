@@ -126,12 +126,12 @@ func _test_collect_reach_and_configure() -> void:
 	_rig()
 	_carry(&"ingot", 4)
 	items.drop_item(Vector2i(7, 2), &"ingot", 2)
-	items.drop_item(Vector2i(8, 2), &"ingot", 2)
-	_check(items.piles.count_at(Vector2i(7, 9), &"ingot") == 2 and items.piles.count_at(Vector2i(8, 9), &"ingot") == 2, "two piles on the floor, two and three metres over")
+	items.drop_item(Vector2i(9, 2), &"ingot", 2)
+	_check(items.piles.count_at(Vector2i(7, 9), &"ingot") == 2 and items.piles.count_at(Vector2i(9, 9), &"ingot") == 2, "two piles on the floor, two and four metres over")
 	verbs.auto_pickup = false
 	_check(verbs.collect() == 0, "auto-pickup off: nothing")
 	verbs.auto_pickup = true
-	_check(verbs.collect() == 2 and items.pack.count(&"ingot") == 2 and items.piles.count_at(Vector2i(8, 9), &"ingot") == 2, "the pile 2 m over is scooped (within 2.5 m); the one 3 m over is not")
+	_check(verbs.collect() == 2 and items.pack.count(&"ingot") == 2 and items.piles.count_at(Vector2i(9, 9), &"ingot") == 2, "the pile 2 m over is scooped (within the arm's 3.2 m, D0409); the one 4 m over is not")
 	machines.place(world, MachineDef.of(&"hopper"), Vector2i(6, 9))
 	_check(verbs.configure(Vector2i(6, 9)).begins_with("hopper") and verbs.configure(Vector2i(14, 9)) == "" and verbs.configure(Vector2i(7, 9)) == "", "configure reaches the hopper; not out of reach, not an empty cell")
 

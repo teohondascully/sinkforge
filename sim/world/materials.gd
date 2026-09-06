@@ -34,3 +34,14 @@ static func is_ore_like(material_id: StringName) -> bool:
 	var record: Dictionary = MaterialsRecords.RECORDS.get(material_id, {})
 	var kind: String = String(record.get("kind", ""))
 	return kind == "ore" or kind == "fuel"
+
+
+## THE MATERIAL-TO-ITEM CONTRACT (D0409): the item a cell of `material_id` puts in the pack when mined or
+## bored -- the record's `yields`, else the material itself. Legacy never needed this because its vein WAS
+## `ore`; the port named the vein `ore_iron` and lifted legacy's recipes verbatim, so what the player mined
+## satisfied no recipe and no objective (the new-player review's first finding). Every yield site reads
+## this one function: `Items._yield_ore`, `World.bore_one`.
+static func yield_of(material_id: StringName) -> StringName:
+	var record: Dictionary = MaterialsRecords.RECORDS.get(material_id, {})
+	var named: String = String(record.get("yields", ""))
+	return StringName(named) if named != "" else material_id

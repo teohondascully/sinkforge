@@ -17019,3 +17019,38 @@ positive control. The seat at the 206 m pool: 0 error lines after, 249 before.
 suite's every level was 4 or 8 -- the shallow case the defect lived in was the one it never posed.
 
 **Reverse cost:** two constants and three `minf`s.
+
+## D0409 · 2026-09-06 · The opening loop closes: the material-to-item contract, the standing collect, the crew's drill, and a stranger's playthrough (Astra rank 1)
+
+**Decided:** the new-player review's first finding -- the tutorial could not be completed -- was four
+independent breaks, fixed in place, no rewrite. (1) THE CONTRACT: the port named the vein `ore_iron` and
+lifted legacy's recipes verbatim, whose word is `ore` (legacy's vein WAS `ore`, so it never needed a
+mapping); what the player mined satisfied no recipe and no rung. `data/materials/SCHEMA.yaml` gains
+`yields`, the item a cell of the material puts in the pack, read at every yield site through ONE function
+(`WorldMaterials.yield_of`: `Items._yield_ore`, `Items.take_lode`, `World.bore_one`); `ore_iron` yields
+`ore`; a material with no `yields` is its own item. The lode in the wall keeps its geological name; the
+hand takes its item. (2) COLLECT: no human path ever issued `Command.collect`; legacy scooped every frame
+from its main loop under `Settings.auto_pickup` with no key. `PlayInput.verbs` now takes the setting and
+issues a collect every tick while it holds -- walking over a pile is the pickup. The scoop reaches one
+arm's length, 3.2 m, the same as digging and building (`Mining.REACH`), where legacy's 2.5 m at its
+metre-tall body left the tutorial forge's ingots -- two metres down the next column -- 2.9 m from this
+body's centre and uncollectable from where a player stands. (3) THE DRILL: the ladder's rung 4 asks the
+player to build a drill that nothing supplied; legacy sold it at the Bazaar, which D0346 keeps dead. The
+GDD's own answer for the forge -- found in the world, cold and ancient -- is the drill's: a new `pile`
+fixture kind lays items on a metre's floor, and `tutorial.yaml` lays the crew's drill on the adit floor
+where the face is, and a hopper, generator and winch pair in a floored cache beside the ingot cell for
+rungs 7-9 (under the spawn, three metres below the adit floor: inside the pad the content suite pins, out of the scoop's reach until dug for). Found, walked over, placed. (4) THE PLAYTHROUGH: `tests/test_tutorial_playthrough.gd` is a
+stranger's hand -- the tutorial start the boot starts, driven through the seat's own commands (`move`
+with an aimed held MINE, the standing `collect`, `select`, `drop`, `build`), nothing stocked, nothing
+warped, the body walking -- with `Objectives`, the HUD's ladder, watching the observations it would watch.
+Rungs 1-6 latch in 2,888 ticks (48 s of play). Rungs 7-9's machines are asserted present in the world;
+their completion is the human's. Mutation-tested: without `yields: ore` the run fails at rung 1.
+
+**Also found:** the scoop reaches through rock (legacy's rule too): the hand in the drill shaft took the
+cache's hopper through a metre of wall. Left as legacy has it; catalogued.
+
+**Why:** a ladder proved on hand-built observations (`tests/test_objectives.gd`) was proved against ids the
+world never produced; only a hand that plays can find that. And the GDD's rule -- "the first automation is
+free and dug, not purchased" -- decides how the drill arrives.
+
+**Reverse cost:** `yields` is one line of data; the collect is one argument; the fixtures are data.

@@ -202,7 +202,7 @@ func _physics_process(delta: float) -> void:
 	var frame_in: InputFrame = _read_hands(page_open)
 	door.apply(Command.move(frame_in))
 	if not page_open:
-		for c: Command in hands.verbs(Controls.pressed, _digit_down, PlayInput.aim_logic_of(frame_in)):
+		for c: Command in hands.verbs(Controls.pressed, _digit_down, PlayInput.aim_logic_of(frame_in), Settings.auto_pickup):
 			door.apply(c)
 	_hud_keys(page_open) if String(flags["act"]) == "" else _hud_keys_driven()
 	last_input = frame_in

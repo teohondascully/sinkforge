@@ -183,8 +183,8 @@ func _test_break_yield_bursts_once_and_opens_the_rest_as_lode() -> void:
 	_check(took > 0 and mining.broke_cells.size() == 12 and mining.broke_materials.size() == 12 and mining.broke_materials[0] == &"ore_iron", "a blow at the default bite clears 12 cells here (the disc's top cell is the air metre above) and records what each was")
 	_check(mining.broke_materials.count(&"ore_iron") == 11 and mining.broke_materials.count(ROCK) == 1, "eleven of them ore, one the rock metre beside")
 	items.yield_break(mining.broke_cells, mining.broke_materials)
-	var burst: int = items.pack.count(&"ore_iron")
-	_check(burst >= 3 and burst <= 6 and int(items.total_produced[&"ore_iron"]) == burst, "one 3..6 burst per BLOW into the pack, counted as produced")
+	var burst: int = items.pack.count(&"ore")   # the vein is ore_iron; the pack holds `ore` (D0409)
+	_check(burst >= 3 and burst <= 6 and int(items.total_produced[&"ore"]) == burst, "one 3..6 burst per BLOW into the pack, counted as produced")
 	_check(world.deposits.lode_at(target) == &"ore_iron" and world.deposits.ore_deposit_at(world.grid, target) == 16 - burst, "the struck cell opened as a lode holding what the burst left of its 16")
 	var lode_total: int = 0
 	var opened: int = 0

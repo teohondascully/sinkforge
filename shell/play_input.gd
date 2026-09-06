@@ -50,9 +50,15 @@ func read(pressed: Callable, pointer_world: Vector2, cell_px: int, in_bounds: Ca
 
 
 ## The one-shot verbs this tick, as commands, each on its press edge: build or pick up at the aimed metre,
-## drop, configure, link a winch, clear the plan, and a hotbar digit.
-func verbs(pressed: Callable, digit_down: Callable, aim_logic: Vector2i) -> Array[Command]:
+## drop, configure, link a winch, clear the plan, and a hotbar digit. And, every tick while `auto_pickup`
+## holds, COLLECT: legacy ran `_collect_ground_under_player()` from its main loop every frame with no key
+## (`legacy/scenes/main.gd:677`, guarded by `Settings.auto_pickup`); this hand never issued the verb at all,
+## so nothing a forge made could be picked up (D0409, the new-player review's second break). Walking over a
+## pile is the pickup; the seat passes the setting in so the hand stays a function of its arguments.
+func verbs(pressed: Callable, digit_down: Callable, aim_logic: Vector2i, auto_pickup: bool) -> Array[Command]:
 	var out: Array[Command] = []
+	if auto_pickup:
+		out.append(Command.collect())
 	if _edge(pressed, Controls.BUILD) and aim_logic != NONE:
 		out.append(Command.build(aim_logic))
 	if _edge(pressed, Controls.DROP):

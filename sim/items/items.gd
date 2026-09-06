@@ -176,8 +176,9 @@ func _yield_ore(terrain_cell: Vector2i, material: StringName, burst_left: int) -
 	var latent: int = int(world.deposits.deposits.get(terrain_cell, DepositPlane.DEFAULT_ORE_DEPOSIT))
 	var taken: int = clampi(burst_left, 0, latent)
 	if taken > 0:
-		take_into_pack(material, taken, Vector2i(terrain_cell.x / World.N, terrain_cell.y / World.N))
-		produced(material, taken)
+		var item: StringName = WorldMaterials.yield_of(material)   # the vein's item, not its geological name (D0409)
+		take_into_pack(item, taken, Vector2i(terrain_cell.x / World.N, terrain_cell.y / World.N))
+		produced(item, taken)
 	var left: int = latent - taken
 	if left > 0:
 		world.deposits.seed_lode(terrain_cell, material, left)
@@ -203,10 +204,10 @@ func _yield_rubble(terrain_cell: Vector2i, material: StringName) -> void:
 func take_lode(terrain_cell: Vector2i) -> StringName:
 	if not world.deposits.lode_workable(world.grid, terrain_cell):
 		return &""
-	var item: StringName = world.deposits.lode_at(terrain_cell)
+	var item: StringName = WorldMaterials.yield_of(world.deposits.lode_at(terrain_cell))   # the lode is geology; the hand takes its item (D0409)
 	if not pack.can_carry(item, 1):
 		return &""
-	var taken: StringName = world.deposits.take_one(world.grid, terrain_cell)
+	var taken: StringName = WorldMaterials.yield_of(world.deposits.take_one(world.grid, terrain_cell))
 	pack.add(taken, 1)
 	produced(taken, 1)
 	return taken

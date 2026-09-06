@@ -14,4 +14,5 @@ fields:
   #   lode    dx dy material amount    -- a lode in the metre's wall, `amount` per 4 px cell
   #   machine id dx dy                 -- a machine placed there (the cell must be open by then)
   #   pack    item count               -- items in the pack, counted as produced (conservation holds)
+  #   pile    item count dx dy         -- items lying on the floor of that metre, to be walked over (D0409)
   fixtures: {required: true, type: list}
