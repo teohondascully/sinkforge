@@ -17118,3 +17118,31 @@ real tutorial door -- the vein 1.5 m left, the forge 3.5 m left, the drill below
 game already knew; the sentence just never carried them.
 
 **Reverse cost:** the sentences are data in one table; the rule is one function.
+
+## D0412 · 2026-09-06 · The hotbar: the selection follows its item, the tenth digit reaches slot 10, an empty pack draws no bar (Astra rank 4)
+
+**Decided:** three defects in one surface, each fixed at its cause. (1) The pack compacts when a stack
+drains, so a bare index re-pointed BUILD and DROP at whatever slid into the numbered position -- the
+review's "selection doesn't track the item". `Verbs.select(index)` now remembers the item the index
+held (`followed`) and `tick()` re-resolves the index to that item's current slot while it is carried;
+when the followed item is gone the index stays where it was, so the next thing there is what is selected.
+`followed` is session state like `selected`, in the verbs signature, and never in the save (the selection
+never was). (2) Ten wells were drawn and labelled 1-0 but the shell polled nine digits: slot 10 could be
+seen and never chosen. `PlayInput` polls ten and `Main._digit_down` maps the tenth to the 0 key. (3) An
+empty pack drew one lit empty well, which the review read as missing content; `Hotbar.layout` returns
+nothing for an empty pack and the bar appears with the first item.
+
+**Pinned:** `tests/test_verbs.gd` -- coal selected in slot 3, the ore stack removed, the selection is on
+coal in slot 2; coal removed, the index stays and wood is selected; coal carried again, followed again; a
+digit past the pack follows nothing and the signature carries it. `tests/test_main_boot.gd` -- the tenth
+digit yields `Command.select(9)`. `tests/test_hotbar.gd` -- an empty pack lays out nothing; the sixteen
+carried-pack pins unchanged.
+
+**Not done, named:** the digits stay unbindable (the remap page lists fifteen actions; the hotbar's ten
+keys are read as physical keys). The review did not ask for it and a rebinding surface for ten more rows
+is a settings-page question (`docs/TASTE_QUEUE.md`).
+
+**Why:** rank 4 of the review's functional blockers; each is a stranger's first ten minutes.
+
+**Reverse cost:** `followed` and the tick re-resolve are eleven lines; the digit loop bound is one
+literal; the empty-pack return is one line.

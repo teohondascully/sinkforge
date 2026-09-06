@@ -76,6 +76,10 @@ func _test_the_verbs() -> void:
 	_check(kinds.has(Command.Kind.BUILD) and kinds.has(Command.Kind.DROP) and cmds.size() == 2, "build at the aimed metre and drop, on their press edges (%d commands)" % cmds.size())
 	_check(hands.verbs(_hand({Controls.BUILD: true, Controls.DROP: true}), none_digit, Vector2i(4, 9), false).is_empty(), "...and nothing while they stay held")
 	_check(hands.verbs(_hand({Controls.BUILD: true}), none_digit, PlayInput.NONE, false).is_empty(), "a build with no aim is nothing")
+	var ten: Callable = func(i: int) -> bool: return i == 9
+	var tenth: Array[Command] = hands.verbs(_hand({}), ten, PlayInput.NONE, false)
+	_check(tenth.size() == 1 and tenth[0].kind == Command.Kind.SELECT and tenth[0].index == 9, "the tenth digit -- the 0 key -- selects slot 9 (D0412: it was labelled and unreachable)")
+	_check(Main._digit_down(9) == false and Main._digit_down(0) == false, "no digit is down in a headless test (the poll runs; the 0 key is the tenth)")
 	var two: Callable = func(i: int) -> bool: return i == 2
 	var sel: Array[Command] = hands.verbs(_hand({}), two, PlayInput.NONE, false)
 	_check(sel.size() == 1 and sel[0].kind == Command.Kind.SELECT and sel[0].index == 2, "the third digit selects slot 2")

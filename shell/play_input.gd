@@ -70,7 +70,7 @@ func verbs(pressed: Callable, digit_down: Callable, aim_logic: Vector2i, auto_pi
 	if _edge(pressed, Controls.CLEAR_PLAN):
 		out.append(Command.clear_plan())
 	var digit: int = -1
-	for i: int in 9:
+	for i: int in 10:   # ten wells, ten digits: the tenth is the 0 key (D0412; it was labelled and unreachable)
 		if bool(digit_down.call(i)):
 			digit = i
 			break

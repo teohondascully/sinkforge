@@ -29,6 +29,11 @@ var items: Items
 var machines: Machines
 var body: Body
 var selected: int = 0                  # hotbar index into `Pack.slots()`
+## THE SELECTION FOLLOWS THE ITEM (D0412): the pack compacts when a stack drains, so an index alone
+## re-pointed BUILD and DROP at whatever slid into the numbered position. `select()` remembers the item the
+## index held (`followed`); `tick()` re-resolves the index to that item's current slot while it is carried,
+## and when it is gone the index stays where it was. Session-scoped like `selected`, in the signature too.
+var followed: StringName = &""
 var auto_pickup: bool = true
 var pending_winch_head: Vector2i = NONE
 var _drop_grace: Dictionary = {}       # logic_cell -> ticks remaining
@@ -43,6 +48,12 @@ func _init(p_world: World, p_items: Items, p_machines: Machines, p_body: Body) -
 
 ## Age the drop grace: once per tick, from the owner.
 func tick() -> void:
+	if followed != &"":
+		var slots: Array[Dictionary] = items.pack.slots()
+		for i: int in slots.size():
+			if slots[i]["item"] == followed:
+				selected = i
+				break
 	for cell: Vector2i in _drop_grace.keys():
 		var left: int = int(_drop_grace[cell]) - 1
 		if left <= 0:
@@ -213,4 +224,11 @@ func state_signature() -> String:
 	var grace: PackedStringArray = []
 	for cell: Vector2i in Ordering.cells(_drop_grace):
 		grace.append("%d,%d=%d" % [cell.x, cell.y, int(_drop_grace[cell])])
-	return "v%d,%d,%d|%s" % [selected, pending_winch_head.x, pending_winch_head.y, ";".join(grace)]
+	return "v%d,%s,%d,%d|%s" % [selected, followed, pending_winch_head.x, pending_winch_head.y, ";".join(grace)]
+
+
+## A hotbar digit: the index, and the item it holds now, which the selection then follows.
+func select(index: int) -> void:
+	selected = index
+	var slots: Array[Dictionary] = items.pack.slots()
+	followed = slots[index]["item"] if index >= 0 and index < slots.size() else &""

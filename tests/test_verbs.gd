@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_drop_feeds_an_eater_else_tosses_forward_else_straight_down_and_grace_holds_it()
 	_test_collect_reach_and_configure()
 	_test_winch_link_is_two_presses()
+	_test_the_selection_follows_its_item_as_stacks_drain()
 	_finish("verbs")
 
 
@@ -147,3 +148,28 @@ func _test_winch_link_is_two_presses() -> void:
 	_check(verbs.link_winch(Vector2i(6, 9)) == &"", "a linked head does not arm again")
 	_check(verbs.link_winch(Vector2i(8, 9)) == &"armed" and verbs.link_winch(Vector2i(7, 9)) == &"failed" and verbs.pending_winch_head == Verbs.NONE, "a second head aimed at the taken station: failed, and the arm is spent")
 	_check(verbs.link_winch(Vector2i(14, 9)) == &"", "out of reach")
+
+
+## D0412 (the review's hotbar finding): the pack compacts when a stack drains, so a bare index re-pointed
+## BUILD and DROP at whatever slid into the numbered position. The selection now follows the item it was
+## given: coal in slot 3 stays selected when the ore in slot 1 is dropped and coal becomes slot 2; and when
+## the followed item itself is gone the index stays put, so the next thing there is what is selected.
+func _test_the_selection_follows_its_item_as_stacks_drain() -> void:
+	_rig()
+	_carry(&"ore", 4)
+	_carry(&"wood", 1)
+	_carry(&"coal", 2)
+	verbs.select(2)
+	_check(verbs.selected == 2 and verbs.followed == &"coal" and verbs.selected_item() == &"coal", "digit 3 selects the coal and remembers it")
+	items.pack.remove(&"ore", 4)             # the ore stack drains; wood and coal compact left
+	verbs.tick()
+	_check(verbs.selected == 1 and verbs.selected_item() == &"coal", "the ore gone, the selection follows the coal to slot 2 (index %d)" % verbs.selected)
+	items.pack.remove(&"coal", 2)
+	verbs.tick()
+	_check(verbs.selected == 1 and verbs.followed == &"coal" and verbs.selected_item() == &"wood", "the coal itself gone, the index stays and the pack's last stack is what is selected")
+	_carry(&"coal", 1)
+	verbs.tick()
+	_check(verbs.selected == 1 and verbs.selected_item() == &"coal", "coal picked up again lands in slot 2 and is followed there")
+	verbs.select(7)
+	_check(verbs.followed == &"" and verbs.selected == 7, "a digit past the pack selects the empty index and follows nothing")
+	_check(verbs.state_signature().find("coal") < 0 and verbs.state_signature().begins_with("v7,,"), "the followed item is in the signature (%s)" % verbs.state_signature().substr(0, 12))

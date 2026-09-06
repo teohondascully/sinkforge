@@ -62,6 +62,8 @@ static func layout(frame: Frame, font: Font, pointer: Vector2 = NO_POINTER) -> D
 		return {}
 	var o: Interface.Observation = frame.obs
 	var slots: Array[Dictionary] = o.pack
+	if slots.is_empty():
+		return {}   # an empty pack draws no bar (D0412): a lit empty well read as missing content
 	var cap: int = maxi(1, o.pack_slots)
 	var n: int = clampi(slots.size(), 1, cap)
 	var sel: int = o.pack_selected

@@ -307,7 +307,7 @@ func apply(command: Command) -> Result:
 		Command.Kind.SELECT:
 			if command.index < 0 or command.index >= Pack.inventory_slots():
 				return Result.rejected(REJECT_BAD_SELECTION)
-			_verbs.selected = command.index
+			_verbs.select(command.index)   # the index, and the item it holds, which the selection follows (D0412)
 			return Result.accepted()
 		Command.Kind.CLEAR_PLAN:
 			_plan.clear()

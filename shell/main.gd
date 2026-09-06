@@ -260,7 +260,7 @@ func _driven(action: StringName) -> bool:
 
 
 static func _digit_down(i: int) -> bool:
-	return Input.is_physical_key_pressed(KEY_1 + i)
+	return Input.is_physical_key_pressed(KEY_0 if i == 9 else KEY_1 + i)   # the tenth well is the 0 key (D0412)
 
 
 func _hud_keys(page_open: bool) -> void:

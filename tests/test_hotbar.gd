@@ -48,8 +48,7 @@ func _test_labels() -> void:
 
 func _test_the_bar_is_the_pack_with_a_floor_of_one() -> void:
 	var empty: Dictionary = Hotbar.layout(_frame([]), _font())
-	_check((empty["wells"] as Array).size() == 1 and not (empty["wells"] as Array)[0].has("item"), "an empty pack draws one empty well")
-	_check((empty["label"] as Dictionary).is_empty() and not bool(empty["sel_lit"]) or bool(empty["sel_lit"]), "and no name plate")
+	_check(empty.is_empty(), "an empty pack draws NO bar (D0412): a lit empty well read as missing content, and the bar is the carried items")
 	var three: Dictionary = Hotbar.layout(_frame(["coal", "stone", "drill"], 1), _font())
 	_check((three["wells"] as Array).size() == 3, "three items are three wells, no trailing empties (%d)" % (three["wells"] as Array).size())
 	_check(bool(three["sel_lit"]) and (three["wells"] as Array)[1]["active"], "the selected well is lit")
