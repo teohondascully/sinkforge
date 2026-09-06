@@ -407,7 +407,7 @@ jobs:
       #   test_objectives.gd                             test_objectives (the ladder off the observation: the first frame primes, gains are rises a spend cannot lower, the pack and machine steps, the line's rate after the drill, latching, the step clock and the finish -- A' step 6h (ii), D0370)
       #   test_hints.gd                                  test_hints (legacy's teaching mechanism on this build's content: the acquisition edge once per world, one bubble at a time in table order, the moments as rising edges off the observation, busy freezes and hides, the ceremony holds, the linger cap, taught ids and resync -- A' step 6h (ii), D0370)
       #   test_objective_line.gd                         test_objective_line (the banner's alphas and layout: the opening how-to fades, nothing offered until stalled, clamped to the corner chips' free span, the finish, a redraw through the HUD host -- A' step 6h (ii), D0370)
-      #   test_hint_bubble.gd                            test_hint_bubble (world to canvas through the view rect, the placement rule: above the anchor, flips near the top, lifts over a pivot, on-canvas; the layout follows the lesson; a redraw through the host -- A' step 6h (ii), D0370)
+      #   test_lesson_dock.gd                            test_lesson_dock (the lesson text at one place above the hotbar band, never on the body; the dock clear of the action area at the closest zoom under the largest lead a visible lesson can have; world to canvas on the frame; the layout follows the lesson; a redraw through the host -- D0413, was test_hint_bubble D0370)
       #   test_minimap.gd                                test_minimap (the frame fits the world's aspect corner or centred, the image rebuilds only on a new coarse version, the overlays land by the scale, a real observation carries the plane and its version moves on a centre write, a redraw through the host -- A' step 6i, D0371)
       #   test_page_draw.gd                              test_page_draw (the page primitives' arithmetic: tracked width, the keycap floor, the rail's slot pitch floor and cap, the word baseline -- A' step 6j, D0372)
       #   test_settings_page.gd                          test_settings_page (legacy's split kept: the tables and labels on this build's four actions, payloads that clamp, the cursor steps and jumps, clashes over every action, the geometry and the rise, a click routed against what a real redraw painted -- A' step 6j, D0372)
@@ -546,7 +546,7 @@ jobs:
             res://tests/test_objectives.gd \
             res://tests/test_hints.gd \
             res://tests/test_objective_line.gd \
-            res://tests/test_hint_bubble.gd \
+            res://tests/test_lesson_dock.gd \
             res://tests/test_minimap.gd \
             res://tests/test_page_draw.gd \
             res://tests/test_settings_page.gd \

@@ -70,3 +70,14 @@ var tone: RockTone = null
 ## `MachineDef`. **Empty in this build**, which legacy already handles as its designed path: "with no
 ## marker in the sky none of this fires and the field is exactly what it was."
 var marks: PackedVector2Array = PackedVector2Array()
+
+
+## A world point on the HUD canvas, through the view rect: the canvas IS the viewport, so a HUD chip that
+## marks a thing in the world (the rung's target ring) maps through this and nothing else. Off-canvas
+## far away when the frame has no view yet. Was `HintBubble.world_to_canvas` until D0413 moved the lessons
+## off the body; the mapping outlived the bubble.
+func canvas_of(world: Vector2) -> Vector2:
+	var r: Rect2 = view_world_rect
+	if r.size.x <= 0.0 or r.size.y <= 0.0:
+		return Vector2(-1000.0, -1000.0)
+	return Vector2((world.x - r.position.x) * UiTheme.CANVAS.x / r.size.x, (world.y - r.position.y) * UiTheme.CANVAS.y / r.size.y)

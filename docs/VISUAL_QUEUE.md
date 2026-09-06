@@ -177,7 +177,9 @@ tint in the dark end is the cheap half), `view/fx/particles.gd` (ambient motes, 
 (icon draw), `item_look.gd`.
 
 ### V27 · The depth chip reads as debug text
-**What:** "71 m STONEREACH" in a grey box; correct, uncomposed. **Where:** `view/hud/depth_chip.gd`.
+**What:** executed (D0413): the bordered panel is a soft edgeless plate, the numeral 11 pt, the band 8 pt,
+inks dimmed; the readout is a glance, the arrival plate is the announcement. Capture
+`tests/body/recordings/round15_2026-09-06/hud/{before,after}_grapple_hint_60m.png`.
 
 ### V28 · Key legend never fades
 **What:** "A / D move · SPACE jump · LMB mine" stays after the verbs are demonstrated. **Where:**
@@ -354,8 +356,10 @@ every wet cell while water moves. Returns on any breach. **Where:** `sim/fluid/w
 ### V69 · The stroke had two stills
 **What:** executed (D0399): the level mid-swing frame.
 ### V70 · The hint bubble sits over the miner's head
-**What:** "GRAPPLE — fire the winch..." covers the rock above the miner, where the winch would be aimed.
-**Where:** `view/hud/hint_bubble.gd` (anchor beside, not above).
+**What:** executed (D0413, the review's rank 6): the lesson text docks at one place, lower left above the
+hotbar band (`view/hud/lesson_dock.gd`); the rect is a function of the text alone and is pinned clear of
+the action area round the miner at the closest zoom under the largest lead a visible lesson can have.
+Near the body only the pointers remain: the rung's ring, the aim marks. Same capture as V27.
 ### V71 · The parting lines are ruled where the fade field runs flat
 **What:** the laminae's bed thickness varies by facies, but inside one facies the lines are a metre apart
 on a straight warp; a face can read as ruled paper. **Where:** `RockTone.lamina`. Fork T018.

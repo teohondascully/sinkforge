@@ -102,7 +102,7 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	var at: Vector2 = target(objectives.current_id(), frame.obs)
 	if at == NONE:
 		return
-	var canvas: Vector2 = HintBubble.world_to_canvas(frame, at)
+	var canvas: Vector2 = frame.canvas_of(at)
 	if not Rect2(Vector2.ZERO, UiTheme.CANVAS).has_point(canvas):
 		return
 	var breath: float = 0.55 + 0.45 * sin(frame.anim_time * TAU * BREATH_HZ)

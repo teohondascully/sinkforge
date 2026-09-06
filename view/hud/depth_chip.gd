@@ -26,24 +26,29 @@ extends RefCounted
 ## rather than a clamped zero, so the number is never fudged." A clamp would make the readout lie for
 ## exactly the part of the world the player starts in.
 
-## EVERY NUMBER BELOW IS IN LEGACY'S AUTHORING CANVAS (`UiTheme.AUTHORED`, 640x360), exactly as
-## `legacy/scenes/hud.gd` wrote it, and is carried onto ours through `UiTheme.px`/`UiTheme.pt` at the
-## point of use. Baking the factor into the constants instead would delete the provenance: the value here
-## would no longer be the value in the file it was ported from, and the next port would have to guess
-## which convention this one used (D0290).
-const LABEL_SIZE: int = 15   ## the metres numeral
-const BAND_SIZE: int = 10    ## the band name beside it, deliberately smaller: it is context, not the value
+## EVERY NUMBER BELOW IS IN LEGACY'S AUTHORING CANVAS (`UiTheme.AUTHORED`, 640x360) and is carried onto
+## ours through `UiTheme.px`/`UiTheme.pt` at the point of use, so the convention is legacy's file's and
+## the next port need not guess it (D0290). THE VALUES ARE NO LONGER LEGACY'S: the chip was ported as a
+## 15-pt numeral in a bordered panel and read as debug text (V27) and as a rival to the objective line
+## (the new-player review's rank 6). D0413 QUIETS IT -- a smaller numeral, the band name smaller still, a
+## soft plate with no edge -- because the readout is a glance, not a headline: the arrival plate announces
+## a band when it changes, and the chip only has to answer "how deep" when asked.
+const LABEL_SIZE: int = 11   ## the metres numeral (legacy 15)
+const BAND_SIZE: int = 8     ## the band name beside it, deliberately smaller: it is context, not the value (legacy 10)
 const MARGIN := Vector2(10.0, 8.0)
-const CHIP_HEIGHT: float = 22.0
-const PAD: float = 12.0      ## inner air, left of the numeral
-const GAP: float = 10.0      ## between numeral and band name
-const MIN_WIDTH: float = 96.0  ## so the chip does not breathe on every metre boundary
+const CHIP_HEIGHT: float = 16.0   ## legacy 22
+const PAD: float = 8.0       ## inner air, left of the numeral (legacy 12)
+const GAP: float = 8.0       ## between numeral and band name (legacy 10)
+const MIN_WIDTH: float = 72.0  ## so the chip does not breathe on every metre boundary (legacy 96)
+const PLATE_ALPHA: float = 0.45   ## the soft plate: enough to hold the numeral over a bright sky, no edge
+const INK_ALPHA: float = 0.9
+const BAND_ALPHA: float = 0.85
 
-## Legacy's two baselines, and they are NOT the same offset. The smaller type sits a pixel higher so the
-## two strings share an optical centre rather than a baseline, which is what stops the band name from
-## looking like it has sunk below the number it annotates.
-const LABEL_BASELINE: float = 6.0
-const BAND_BASELINE: float = 5.0
+## Two baselines, legacy's rule re-set for the quieter type: they are NOT the same offset. The smaller
+## type sits a pixel higher so the two strings share an optical centre rather than a baseline, which is
+## what stops the band name from looking like it has sunk below the number it annotates.
+const LABEL_BASELINE: float = 4.0   ## legacy 6, for the 15-pt numeral
+const BAND_BASELINE: float = 3.0    ## legacy 5
 
 
 ## The metres label. `+N m` above the datum, `N m` at or below it -- legacy's own formatting, and the
@@ -100,8 +105,9 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 	if l.is_empty():
 		return
 	var font: Font = ThemeDB.fallback_font
-	UiTheme.panel(ci, l["chip"])
+	PageDraw.round_rect(ci, l["chip"], UiTheme.px(3.0), Color(UiTheme.UI_BG.r, UiTheme.UI_BG.g, UiTheme.UI_BG.b, PLATE_ALPHA))
 	ci.draw_string(font, l["label_at"], l["label"],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LABEL_SIZE), UiTheme.UI_TEXT)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LABEL_SIZE), Color(UiTheme.UI_TEXT, INK_ALPHA))
+	var tint: Color = l["tint"]
 	ci.draw_string(font, l["band_at"], l["band"],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(BAND_SIZE), l["tint"])
+		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(BAND_SIZE), Color(tint, BAND_ALPHA))

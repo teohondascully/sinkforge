@@ -17146,3 +17146,41 @@ is a settings-page question (`docs/TASTE_QUEUE.md`).
 
 **Reverse cost:** `followed` and the tick re-resolve are eleven lines; the digit loop bound is one
 literal; the empty-pack return is one line.
+
+## D0413 · 2026-09-06 · HUD composition: the lessons dock off the body, the depth chip goes quiet (Astra rank 6; V70, V27)
+
+**Decided:** (1) the lesson text leaves the miner. Legacy's bubble hung over the head with a tail and
+lifted only for the rope's pivots; the first lesson a stranger meets, GRAPPLE, told them to throw a line
+at the rock above while covering that rock (`before_grapple_hint_60m.png`). The zone round the miner is
+where every verb lands -- the aim ring, the mining reach, the throw, the rung's target ring -- and text has
+no business in it. `view/hud/lesson_dock.gd` (`LessonDock`, replacing `HintBubble`) puts the active lesson
+at ONE place: the lower left, the legend's margin, its foot a gap above the hotbar band, wrapped at 150
+authored px. The rect is a function of the text and the font and nothing else; the plate rises 4 px as it
+fades in so the arrival is seen. The review's "short pointer only" near the body is read as: what stays
+near the miner points and does not read -- the rung's ring (`TargetGuide`) and the aim marks -- and no
+lesson, short or long, is anchored to the body, because a lesson that is sometimes at the body and
+sometimes in the dock teaches the player nowhere to look. The busy rule (hidden above 1.25x a run, the
+ceremony's precedence) is untouched. The world-to-canvas mapping the bubble owned moved to
+`Frame.canvas_of`; the placement rule (`hint_tail`/`hint_rect`, the flip, the lift) is deleted with the
+anchor it served. (2) The depth chip is quieted: the bordered panel becomes a soft edgeless plate at 0.45,
+the numeral 15 -> 11 pt, the band 10 -> 8 pt, the inks dimmed, the baselines re-set for the smaller type.
+The readout answers "how deep" when glanced at; the arrival plate is the announcement. The chip's
+constants are no longer legacy's values and its header now says so; the AUTHORED-canvas convention
+(D0290) stands.
+
+**The action area, pinned** (`tests/test_lesson_dock.gd`, replacing `test_hint_bubble`): a disc of the
+mining reach (3.2 m) plus half the body round the miner, the miner displaced from the canvas centre by
+the camera's lead at the busy threshold (`RUN_SPEED x BUSY_ARM x LEAD_TIME`, the vertical share), at the
+closest zoom; the TALLEST lesson's dock (every DEFS and MOMENTS text, tokens filled with their fallback
+names) stays clear. Measured: 38 px clear at zoom 2.00 under a 128 px lead (10 px at a 160 wrap, which is
+why the wrap is 150; a 260 wrap fails at -67 px -- the mutant). Also pinned: the rect is the same with the
+body elsewhere; the arriving plate sits below its seat and fades in; the mapping on the frame.
+
+**Not done, named:** the inspector's hover tooltip still draws at the pointer, which IS the aim; the
+review did not name it and a hover tooltip that is not at the pointer is a different design
+(`docs/TASTE_QUEUE.md`). The settings footer was rank 6's fourth item and landed in D0410.
+
+**Why:** a lesson that covers its own subject is worse than no lesson; and the depth chip competed with
+the objective line for the top of the screen when its job is a glance.
+
+**Reverse cost:** the dock is one rect function; the chip is nine constants and one draw call.
