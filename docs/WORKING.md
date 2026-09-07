@@ -410,18 +410,14 @@ Not started: ore's sparkle (V32).
 **Not touched since the wrap:** Part B (the signature look), the lighting experiment (Astra's item 5),
 ranks 9-13.
 
-**BLOCKED ON THE DIRECTOR (D0426):** nine commits on `main` (3a6d0d54..af3e1c70) carry the personal git
-identity; the authorship CI job is red on every push until they are rewritten, and `main`'s branch
-protection refused the force-push. The procedure is in D0426; it takes a minute with force pushes allowed.
+**D0426 executed as D0429:** the fourteen commits rewritten and force-pushed under a lease on the director's word, the protection restored identically.
 
 ### Next action
 
 **A′ is complete through step 8; the look pass, the two-phase round, Part A of the A+ round, ranks 1-6
 and 8 of the integration pass, Astra's audit order through item 5, and five stranger runs are on main.**
 
-**FIRST, the director's one line (D0426):** nine commits on `main` carry the personal git identity and
-the authorship CI job is red on every push until they are rewritten; `main`'s branch protection refused
-the force-push. The procedure is in D0426 and takes a minute with force pushes allowed.
+**D0426 is executed (D0429):** every ref carries the one identity; the authorship job is green again from e2850726.
 
 **The director's calls:** play the opening (`godot --path .`: the tree stands six metres left of spawn,
 the forge's ring stays for the rung, a floor drop docks DROPPED, the lamp lights faces in the deep);

@@ -20,8 +20,8 @@ fed in three of five. No stranger has felled a tree: two never reached the rung,
 the pad for a tree the tutorial never gave them and fell into the chimney two metres past it.** The tree
 is back (D0425). The chimney is the director's (T031).
 
-**BLOCKED ON ONE LINE (D0426):** nine commits carry the personal git identity; the authorship CI job is red
-on every push; the rewrite is rehearsed, verified and refused by branch protection.
+**D0426 executed (D0429):** the director said fix it; fourteen commits rewritten to the one identity and
+force-pushed under a lease, the branch protection opened for the seconds it took and restored identically.
 
 ---
 
@@ -95,14 +95,14 @@ is legacy's pass.
 
 ## The decisions this round is waiting on
 
-**D0426's one line** (force pushes on `main` for a minute; the procedure is in the entry). **Play the
+**Play the
 opening** (`godot --path .`). **T031** the chimney at the pad's edge -- forbid the clamped mouth, or a lip,
 or leave it as the first descent. **T032** four ring kinds -- a distinct form for the tutorial ring.
 **D0427** as Part B's first line or a switch at zero. **T024–T030** unchanged, T029 taken provisionally by
 the payout tick's name.
 
-**CI:** `d5e99690` is the head to read (3291ec3a went out with the occlusion refactor unstaged; d5e99690 is the tree the gates ran on). Every push since `1356268b` is red on the authorship job only;
-suites, structural gates and the headed boot are green on `1e56abe9` (the last completed run).
+**CI:** `e2850726` is the head to read (the rewrite's new hash of the wrap). Every push from `1356268b`
+to `e4b5d899` was red on the authorship job only; the rewrite clears it.
 
 ---
 
@@ -118,7 +118,7 @@ has still never been played by a stranger** after two fixes aimed at it (D0423's
 
 ## Blocked, and what it's waiting on
 
-The authorship job (D0426), on the director's branch-protection minute. Nothing else blocks.
+Nothing blocks.
 
 ## Taste queue
 

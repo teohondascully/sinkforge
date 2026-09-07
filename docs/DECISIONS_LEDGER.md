@@ -17640,3 +17640,22 @@ samples, and the agents' journals are thinning.
 verb that fails silently at the second rung is read as a broken game.
 
 **Reverse cost:** one alpha floor; one StringName through three files; one moment.
+
+## D0429 · 2026-09-06 · D0426 executed: fourteen commits rewritten to the one identity, force-pushed under a lease, the protection restored identically
+
+**Decided, on the director's word ("fix the authorship so we can push"):** `main`'s protection was
+opened for force pushes for the seconds the push took (`PUT .../branches/main/protection` with the same
+body and `allow_force_pushes: true`), the range `fc0d64a9..main` -- fourteen commits by then, the nine of
+D0426 and the five since -- rewritten with `filter-branch --env-filter` to the noreply identity, pushed
+with `--force-with-lease=main:e4b5d899`, and the protection PUT back with the snapshot taken before; the
+before and after snapshots compare identical field by field (URLs aside). Verified before the push: all
+fourteen trees and messages identical to the originals, `git diff e4b5d899 main` empty, the base
+`fc0d64a9` untouched. After: `check_trailers.sh` PASS over 2794 commits, one author, one committer, on
+every branch, tag and remote.
+
+**The hashes moved:** the old head `e4b5d899` is `e2850726`; the old head lives in the reflog only, no
+tag kept. D0419's and D0426's hash references stay as written; this entry is the pointer.
+
+**Why:** the personal address was public in fourteen commits and the authorship job blocked every green.
+
+**Reverse cost:** none worth taking; the old commits are the same trees under the wrong name.
