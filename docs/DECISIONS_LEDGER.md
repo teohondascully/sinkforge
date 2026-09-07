@@ -18534,3 +18534,23 @@ FAR DOWN; far across, or under by less, keeps TOO FAR.
 The rung's how-to already says dig first; the refusal now agrees with it.
 
 **Reverse cost:** the condition and the moment's line.
+
+## D0474 · 2026-09-07 · The metre tolerance is for a pointed rock; a pointer on open air keeps legacy's reach
+
+**Decided:** D0464 set the aim snap's tolerance to a metre for every cursor out of reach. The first
+shipped-seed batch on it (58-60, a fresh game on 8612f74a) put all three first presses where the
+strangers' presses have gone since D0449: the forge's open pocket, 80 px left of the ring, 3.9 m from the
+body -- and all three were refused "air" (by hand: aim (117, 81), open). Before D0464 that press snapped
+to the vein 2.3 m from the cursor and gave four ore at 1.3-2.2 s (34-39: 6 of 6); on D0464 the first rung
+came at 12.8 s, 16.8 s and never (S60: sixty bursts, five clay, "never found a single ore"). The metre
+now applies only when the pointed cell is ROCK out of reach (S43's case: a mark 3.25 m off, the ground
+at the feet cut instead); a pointer on open air out of reach keeps legacy's reach-wide snap (there is
+nothing under the pointer to be substituted for, and the reticle shows the snapped cell before the
+press). By hand on this tree the same two presses cut 5 and 11 ore. Pinned: open air past the reach takes
+a reachable visible rock toward it; open air with no rock within a reach stays raw; the D0464 pins hold.
+
+**Why:** D0464 was measured on one rung and not re-measured on the one it shares an instrument with;
+the opening's own signal (D0447-D0458) rode on the snap the metre removed. "Reversed rule has a pinning
+suite" -- and a pinned rule has a stranger batch waiting to go red.
+
+**Reverse cost:** the `solid_miss` line. Recorded in `docs/CORRECTIONS.md` as an amendment of D0464.

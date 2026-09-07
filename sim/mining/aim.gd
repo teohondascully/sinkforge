@@ -13,11 +13,13 @@ extends RefCounted
 const CELL_FX: int = Mining.CELL_PX * Fx.SCALE
 const LOGIC_FX: int = Mining.LOGIC_TILE_PX * Fx.SCALE
 ## The snap tolerance from the cursor, an `Fx` length over `Mining.REACH_DEN` so the squared compare stays
-## integer. One reach while the cursor is IN reach of the body: a buried block takes its nearest visible
-## face, so a hold on a ringed block under a metre of roof tunnels toward it. One metre once the cursor is
-## OUT of reach: a near miss of the reach circle still snaps to the face you can carve, and a press a
-## body length beyond it is refused "far", which the TOO FAR lesson explains. Legacy's one reach either
-## way cut the ground at the feet for a hold on a mark 4.4 m off, with no refusal (stranger 43, D0464).
+## integer. One reach while the cursor is IN reach of the body (a buried block takes its nearest visible
+## face, so a hold on a ringed block under a metre of roof tunnels toward it) and while the cursor is on
+## OPEN AIR out of reach (nothing under the pointer to substitute for: the nearest rock toward it, D0474).
+## One metre for a ROCK pointed at out of reach: a near miss of the reach circle still snaps to the face
+## you can carve, and a press a body length beyond it is refused "far", which the TOO FAR lesson explains.
+## Legacy's one reach either way cut the ground at the feet for a hold on a mark 3.25 m off, with no
+## refusal (stranger 43, D0464).
 const REACH_PX_FX_NUM: int = Mining.REACH_NUM * Mining.LOGIC_TILE_PX * Fx.SCALE
 const METRE_FX_NUM: int = LOGIC_FX * Mining.REACH_DEN
 ## Cells scanned either side of the body: the reach in terrain cells, rounded up, plus one.
@@ -83,7 +85,12 @@ static func effective(grid: TileGrid, body_x: int, body_y: int, point_x: int, po
 ## The reachable, visible solid cell whose centre is closest to the point, within one reach radius of it,
 ## else `fallback`. Scans the in-reach neighbourhood in a fixed row-major order, so ties are stable.
 static func nearest_reachable_solid(grid: TileGrid, body_x: int, body_y: int, point_x: int, point_y: int, fallback: Vector2i) -> Vector2i:
-	var tolerance: int = REACH_PX_FX_NUM if Mining.in_reach(body_x, body_y, fallback) else METRE_FX_NUM
+	# The metre applies to a pointed ROCK out of reach (D0464); a pointer on open air out of reach keeps
+	# legacy's reach-wide snap (D0474): three fresh-game strangers pressed on the forge's open pocket, 4 m
+	# off, and the vein 2.3 m from the cursor is what the first rung is; there was nothing under the pointer
+	# to be substituted for. A reticle shows the snapped cell before the press.
+	var solid_miss: bool = grid.in_bounds(fallback) and grid.is_solid(fallback) and not Mining.in_reach(body_x, body_y, fallback)
+	var tolerance: int = METRE_FX_NUM if solid_miss else REACH_PX_FX_NUM
 	# The material under the cursor first (D0452): a pointer on a buried ore cell takes the ore's own
 	# visible face over a nearer clay one, so the snap never cuts an unrelated block for the one pointed at.
 	if grid.in_bounds(fallback) and grid.is_solid(fallback):

@@ -198,6 +198,18 @@ func _test_a_cursor_out_of_reach_snaps_a_near_miss_and_refuses_a_body_length() -
 	var buried: Vector2i = _at_cell_centre(Vector2i(10, 15))
 	got = Aim.effective(grid, body.x, body.y, buried.x, buried.y, false)
 	_check(got == Vector2i(10, 10), "control: a buried cell IN reach keeps the reach-wide tolerance, the floor's face (10, 10) a metre and a quarter from the cursor (%s)" % str(got))
+	# D0474: a cursor on OPEN AIR out of reach keeps legacy's reach. The room raised to row 1: its air at
+	# (21, 1), 11 across and 7 up, is out of reach, and the ceiling and the wall stand within a reach of it.
+	for y: int in range(1, 5):
+		for x: int in range(0, 22):
+			grid.excavate(Vector2i(x, y))
+	var open_far: Vector2i = _at_cell_centre(Vector2i(21, 1))
+	got = Aim.effective(grid, body.x, body.y, open_far.x, open_far.y, false)
+	_check(not Mining.in_reach(body.x, body.y, Vector2i(21, 1)) and got != Vector2i(21, 1) and grid.is_solid(got) and Mining.in_reach(body.x, body.y, got),
+		"a cursor on open air past the reach takes a reachable visible rock toward it, as legacy did (%s)" % str(got))
+	var open: TileGrid = TileGrid.new(64, 64, 1)
+	var lone: Vector2i = _at_cell_centre(Vector2i(40, 40))
+	_check(Aim.effective(open, body.x, body.y, lone.x, lone.y, false) == Vector2i(40, 40), "...and open air with no rock within a reach of it stays raw (%s)" % str(Aim.effective(open, body.x, body.y, lone.x, lone.y, false)))
 
 
 func _test_dig_plan_paints_a_drag_and_drains_the_nearest_workable_mark() -> void:

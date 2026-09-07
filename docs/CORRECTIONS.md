@@ -504,3 +504,12 @@ D0433 tightened the target ring to 0.35 m within 1.5 m of the body. D0447 restor
 with D0443's outline of the target's metre inside it, after seven of fifteen strangers lost the first rung at
 that range against none of eight who tried before. (The D0447 entry's "six of fourteen" was a miscount,
 corrected here the same hour; the member lists are in the batch report.) The D0433 entry stands as written; `RING_NEAR_M` equals `RING_M`.
+
+## D0464's metre, narrowed by D0474 (2026-09-07)
+
+D0464 set the aim snap's tolerance to one metre for every cursor out of reach, on stranger 43's frames
+(a hold on the WHITE SQUARE from 3.25 m cut the ground at the feet). The first fresh-game batch on it
+(58-60) lost the opening: the strangers' habitual first press on the forge's open pocket, 3.9 m off, had
+been snapping to the vein 2.3 m from the cursor, and D0464 refused it "air". D0474 keeps the metre for a
+pointed ROCK out of reach and restores legacy's reach for a pointer on open air. The D0464 entry stands
+as written; its far pin still holds (the cursor in that pin is on rock).
