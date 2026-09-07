@@ -58,6 +58,7 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
 	{"id": &"dropped_floor", "text": "DROPPED — the stack fell at your feet, and you pick up what lies there as you stand. A machine takes a drop only when you stand BESIDE it: a body length."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
+	{"id": &"way_down", "text": "THE WAY DOWN — the ground is rock you can cut. Point at the ground under you and hold [MINE]: the metre opens and you drop into it. One metre at a time is a safe fall."},
 	{"id": &"deep_enough", "text": "GRAPPLE — POINT at rock above you and press [GRAPPLE] to throw your line there. Hold [REEL] to climb it, press [GRAPPLE] again to let go and fly."},
 	{"id": &"pump", "text": "PUMP IT — hold [REEL] at the bottom of the arc, [LOWER] at the top."},
 	{"id": &"chain", "text": "CHAIN IT — press [GRAPPLE] again in mid-air to plant the next line, and the speed you left with is the speed you keep."},
@@ -83,9 +84,31 @@ var _prev_on_floor: bool = true
 var _prev_vel_y: int = 0
 var _far_ticks: int = 0
 var _air_ticks: int = 0
+## THE WAY DOWN (T037 taken provisionally, D0440). Stranger 15, sent to descend, mined four ore in the first
+## hold and then walked the pad for a minute looking for an entrance to the caverns drawn below it; nothing
+## on screen said the ground is rock you can cut. Once the body has ranged WAY_DOWN_RANGE_M across the
+## surface without ever standing WAY_DOWN_DEPTH_M below the datum, and has broken rock once (the verb is
+## known), the lesson names the floor. The tutorial's fourth rung says the same thing later, to the player
+## who got there.
+const WAY_DOWN_RANGE_M: float = 24.0
+const WAY_DOWN_DEPTH_M: float = 4.0
+var _min_x_m: float = INF
+var _max_x_m: float = -INF
+var _deepest_m: float = -INF
+var _broke_once: bool = false
 const FAR_TICKS: int = 20
 const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
 var _thrown: bool = false           ## a line has been live once this session; the grapple is known
+
+
+## The surface walked from edge to edge with the verb known and nothing dug down (T037).
+func _way_down_wanted(o: Interface.Observation) -> bool:
+	var x_m: float = float(o.pos_x) / float(Fx.SCALE) / float(Interface.Observation.LOGIC_PX)
+	_min_x_m = minf(_min_x_m, x_m)
+	_max_x_m = maxf(_max_x_m, x_m)
+	_deepest_m = maxf(_deepest_m, MaterialLook.depth_m_exact(o.cell.y))
+	_broke_once = _broke_once or o.mining_broke
+	return _broke_once and _max_x_m - _min_x_m >= WAY_DOWN_RANGE_M and _deepest_m < WAY_DOWN_DEPTH_M
 
 
 ## Whether the player has met the grapple: the lesson given (queued counts: it shows within QUEUE_LINGER),
@@ -143,6 +166,7 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	note(&"aim_air", _air_ticks >= AIR_TICKS)
 	note(&"dropped_floor", o.drop_went == &"floor")   # the drop's own TOO FAR (D0428, stranger 5)
 	note(&"in_water", o.wet)
+	note(&"way_down", _way_down_wanted(o))
 	note(&"deep_enough", float(MaterialLook.depth_m(o.cell.y)) >= DEPTH_HINT_M)
 	if o.grapple_live:
 		_thrown = true

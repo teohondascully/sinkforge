@@ -42,7 +42,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_obs([]), 0.016)
 	h.observe(_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 9, "nine pack lessons and nine moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 10, "nine pack lessons and ten moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -66,6 +66,43 @@ func _air_pins(h: Hints, far: Interface.Observation, dry: Interface.Observation)
 	_check(h.active_id() == &"aim_air" and h.active_text().begins_with("NOTHING THERE") and Hints.AIR_TICKS > 3 * Hints.FAR_TICKS, "the %dth tick on air fires NOTHING THERE, a count well past TOO FAR's %d (%s)" % [Hints.AIR_TICKS, Hints.FAR_TICKS, h.active_id()])
 	for _i: int in 30:
 		h.observe(dry, 0.5)
+
+
+## T037 (D0440, stranger 15): a body that has broken rock once and walked the surface WAY_DOWN_RANGE_M across
+## without standing WAY_DOWN_DEPTH_M down is told the ground is the way; one that went down already is not.
+func _way_down_pins() -> void:
+	var h: Hints = Hints.new()
+	var m: int = Interface.Observation.LOGIC_PX * S
+	var o: Interface.Observation = _obs()
+	o.cell.y = Interface.Observation.SKY_ROWS - 2               # standing on the surface
+	o.mining_broke = true
+	h.observe(o, 0.016)
+	o.mining_broke = false
+	for i: int in 30:
+		o.pos_x = i * m                                          # 29 m of walking, one metre a frame
+		h.observe(o, 0.016)
+		if h.active_id() == &"way_down":
+			break
+	_check(h.active_id() == &"way_down" and h.active_text().begins_with("THE WAY DOWN") and float(o.pos_x) / float(m) >= Hints.WAY_DOWN_RANGE_M,
+		"the surface walked %.0f m across with rock broken once and nothing dug teaches THE WAY DOWN (%s)" % [float(o.pos_x) / float(m), h.active_id()])
+	var h2: Hints = Hints.new()
+	var deep: Interface.Observation = _obs()
+	deep.cell.y = Interface.Observation.SKY_ROWS + int(Hints.WAY_DOWN_DEPTH_M + 1.0) * 4   # five metres down once
+	deep.mining_broke = true
+	h2.observe(deep, 0.016)
+	deep.mining_broke = false
+	deep.cell.y = Interface.Observation.SKY_ROWS - 2
+	for i: int in 40:
+		deep.pos_x = i * m
+		h2.observe(deep, 0.016)
+	_check(h2.active_id() == &"" and h2.queued() == 0, "control: a body that once stood five metres down is not told, however far it walks (%s)" % h2.active_id())
+	var h3: Hints = Hints.new()
+	var never: Interface.Observation = _obs()
+	never.cell.y = Interface.Observation.SKY_ROWS - 2
+	for i: int in 40:
+		never.pos_x = i * m
+		h3.observe(never, 0.016)
+	_check(h3.active_id() == &"" and h3.queued() == 0, "control: a body that has never broken rock is not told either -- the verb comes first (%s)" % h3.active_id())
 
 
 func _test_one_bubble_at_a_time_in_table_order() -> void:
@@ -104,6 +141,7 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	for _i: int in 30:
 		h.observe(dry, 0.5)
 	_air_pins(h, far, dry)
+	_way_down_pins()
 	var deep: Interface.Observation = _obs()
 	deep.cell.y = Interface.Observation.SKY_ROWS + 40
 	h.observe(deep, 0.016)

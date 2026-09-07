@@ -270,7 +270,8 @@ past it; the camera clamps to the grid and the body clamps a tick later (frame 2
 run 12). *Question: a cliff, a sheer bore wall in the lore's own material, dark rock to the edge of the
 canvas, or a wider world so the edge is never reached in the opening?*
 
-**T037 · Nothing says the way down is to dig.** Stranger 15, sent to descend twenty metres, mined four
+**T037 · Nothing says the way down is to dig.** *TAKEN provisionally (D0440): the moment lesson, fired
+after 24 m of surface ranged with rock broken once and nothing below 4 m. Overrule by deleting the row.* Stranger 15, sent to descend twenty metres, mined four
 ore in the first hold and then walked the pad for a minute looking for "an entrance" to the caverns
 visible below, pressing Q, E, Tab and Shift; "no access to deep areas" was the verdict. The GDD's identity
 is solid earth you carve into, and the only sentence that says so is the fourth rung's "dig down to it".

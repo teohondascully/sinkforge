@@ -17894,3 +17894,24 @@ as a question with costs, not built.
 loop's latency, not the fixes, set the pace.
 
 **Reverse cost:** one optional argument; one file.
+
+## D0440 · 2026-09-06 · THE WAY DOWN: the ground named as the way (T037 taken provisionally)
+
+**Decided:** a tenth moment lesson. Stranger 15, sent to descend twenty metres, mined four ore in the first
+hold and then walked the pad for a minute pressing Q, E, Tab and Shift, looking for "an entrance" to the
+caverns drawn below; "no access to deep areas" was the verdict. The GDD's identity is solid earth you carve
+into, and the only sentence that said so was the fourth rung's "dig down to it", for the player who got
+there. Now, once the body has broken rock once (the verb is known), ranged 24 m across the surface and
+never stood 4 m below the datum, the dock says: "THE WAY DOWN -- the ground is rock you can cut. Point at
+the ground under you and hold [MINE]: the metre opens and you drop into it. One metre at a time is a safe
+fall." Two controls in `test_hints`: a body that once stood five metres down is never told; a body that
+has never broken rock is never told. The lesson is a moment (latched once), so a player who knows it hears
+it once.
+
+**Not done:** the range and depth are picked, not measured against a stranger; the next batch is the test.
+
+**Why:** the first rung and the descent share one verb, and a stranger who has used it on a vein does not
+generalise it to the floor without being told; stranger 13 did the opposite (dug the floor when the vein
+was wanted). The pointer carries the vein; a sentence carries the floor.
+
+**Reverse cost:** one moment, one helper, four fields.
