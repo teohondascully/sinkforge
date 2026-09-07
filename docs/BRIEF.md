@@ -77,9 +77,16 @@ pays the WINCH pair for six ingots and the winch leaves the starter cache, so th
 source; the winch rung names the price, rings the rig until the payout and counts its second demand. CI is
 green on 2f3e2041 (four jobs); 7037e526 carries D2 and is on CI now.
 
-**For the director:** D3–D6's rewards (a data diff each); a machine's need-bubble while another is ringed
-(the rig asked for ingots during the smelt rung); the stride; the seam's size and colour (one black metre
-at +5 reads as shadow). **Verification cadence:** touched suites locally, gates once a push, the battery on
-CI. **Next:** the six-seat batch (strangers 76-81, missions and seats prepared) after the human opening
-session or on the director's word that the screen is free; it measures the label fix, the seam ring and the
-slot together.
+**The batch (76-81, six seats, all VALID, D0493).** Ore 6 of 6 (four in under 5 s). Coal 2 of 6, smelt 1 of
+6, **deliver 1 of 6: S77 is the first stranger the rig has ever paid (the drill in hand at 54.0 s)**, BUILD
+0 of 6. The wall is the coal's legibility, not the forge's: the seam is a black metre beside a black hole
+(S79 stood on it with the ring under its feet and strode on), its hover card called it "Ore Vein", and the
+card's "right of you" is true only at the spawn. Three fixes with frame-and-input causes: the seam's card
+says COAL SEAM in coal; the smelt card says "press each stack's NUMBER then [DROP]" (S76 took forty bursts
+to the number key); BUILD on a solid metre says IN THE ROCK (S77's RMB on the vein itself was silent). The
+slot could not be isolated: no seat repeated a refusal on one cell after a release.
+
+**For the director:** the seam's look (one black metre reads as shadow; a texture or a glint would do what
+no card can); the stride (T035: four D bursts took S79 31 m past the pad); the smelt card's "right of you";
+D3–D6's rewards; the rig's need-bubble during the smelt rung. **Verification cadence:** touched suites
+locally, gates once a push, the battery on CI. **Next batch** after the next discoverability change.
