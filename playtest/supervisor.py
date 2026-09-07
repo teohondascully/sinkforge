@@ -46,6 +46,8 @@ def _check(session, patience):
         return None                          # not booted yet: not ours to judge
     if (session / "HARNESS_INVALID.json").exists():
         return None                          # already finished
+    if (_load(session / "response.json") or {}).get("quit"):
+        return None                          # quit cleanly: the process is meant to be gone
     if _owned_pid(session) is None:
         return "process death: the seat's pid is gone or is not this session's seat"
     command = _load(session / "command.json") or {}

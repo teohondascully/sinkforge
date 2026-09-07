@@ -24,6 +24,12 @@ func _init(world: World, machines: Machines) -> void:
 ## base (`docs/ARCHITECTURE.md` §9: "non-solid to the player except a 1-tile base" -- every machine here
 ## is one tile, so the base is the machine).
 func blocks(grid: TileGrid, terrain_cell: Vector2i) -> bool:
+	# The world ends in a wall (T036 taken provisionally, D0457): a cell past the grid blocks like rock, so
+	# the body stops at the edge instead of leaving it and being clamped back a tick later with a "left the
+	# world" report. Strangers 11, 12, 21 and 33 walked there; 33's run was voided by the report. The
+	# body's own base `Surroundings` keeps the old answer, so every body suite runs as before.
+	if not grid.in_bounds(terrain_cell):
+		return true
 	if grid.is_solid(terrain_cell):
 		return not PASSABLE.has(grid.get_material(terrain_cell))
 	return _machines.machine_at(logic_of(terrain_cell)) != null

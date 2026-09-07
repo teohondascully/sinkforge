@@ -267,7 +267,8 @@ edge is three seconds of walking from spawn. *Question: is the pad too small for
 too high for the pad? A walk/run split (shift), a wider pad, or a slower legacy constant re-derived for
 a body 1.25 m tall.*
 
-**T036 · The world ends without a wall.** *More (D0444): at the edge the camera clamps and the body leaves
+**T036 · The world ends without a wall.** *TAKEN provisionally (D0457): the edge blocks the body like rock
+(two lines in `WorldSurroundings.blocks`); what the edge LOOKS like stays open.* *More (D0444): at the edge the camera clamps and the body leaves
 the frame's centre; stranger 21 read THE WAY DOWN there and pressed "under me" at screen centre sixteen
 times, on air.* Strangers 11 and 12 both walked to the east edge (32 m from
 spawn) and stood at the screen's right border with the ground running under the frame and nothing drawn

@@ -464,7 +464,15 @@ platform, engine, frame cap and priority. **D0453:** the commit identity is teoh
 51fe12d7 on (two-era gate). **D0454:** `playtest/stranger.py start|validate` (the pin and the VOID
 classifier; first rung read from the pack) and `playtest/replay.py` (signatures per burst). **The
 overnight loop runs under the director's fifteen amendments of 2026-09-07** (recorded in D0452-D0454 and
-the batch reports): a batch counts only when every seat's run is VALID and on one build.
+the batch reports): a batch counts only when every seat's run is VALID and on one build. **D0455:** the
+stuck-seat supervisor. **Strangers 31-33 (25ebea81, the first pinned batch):** 31 and 32 VALID, 33 VOID
+(the east edge: "left the world" three times). Four ore on the first press at 1.3-2.2 s, all three, every
+press on the vein beside the forge, 80 px left of the ring; ingots 13.7-17.4 s; wood 42.5 s and 105.2 s
+(33 never); BUILD stopped both who reached it (the how-to cut at "shaft m…"; the ring on a pile three
+metres down). **D0456:** the scoop measures from the body head to feet (the ingots came only after a step
+closer; found by the ceiling run `playtest/ceiling.py` and stranger 30). **D0457:** the world ends in a wall
+(T036 taken provisionally); the every-rung wrap pin measures the live corner (the corner map's), BUILD and
+HOPPER shortened to fit.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall

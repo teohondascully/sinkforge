@@ -18214,3 +18214,40 @@ strangers beside it were untouched. `stranger.py validate` reads `HARNESS_INVALI
 have cost the other two.
 
 **Reverse cost:** one script.
+
+## D0456 · 2026-09-07 · The scoop measures from the body, head to feet; the ceiling run
+
+**Decided:** `playtest/ceiling.py` plays the opening by script on a pinned seat (the mission is the script
+itself) and times the rungs from the receipts: ore at 1.3 s. Its second rung failed: the ore was dropped
+from where the forge was in reach, the forge took it and ran, and the ingots never came -- they land a
+metre lower in the forge's well, 3.26 m from the body's CENTRE, 2.3 m from its feet, and the scoop
+measured from the centre point. Stranger 30 had reported the same ("no ingots were ever produced"). The
+scoop's distance is now to the trunk, head to feet (the vertical distance shrinks by the half-height,
+never below zero; the horizontal is unchanged); the same function orders the drop's eater lookups, so
+"beside" means the body, not a point. Pinned through the door: from 1.25 m left of the spawn the drop is
+fed and the ingots are in the pack four seconds later with no step taken; the mutation fails it.
+The ceiling run is a route-and-adapter check and the denominator for a stranger's time; it says nothing
+about what a stranger can see (the director's rule 10).
+
+**Why:** the sentence "then wait -- the ingots come to you" was false from the spot the drop had just
+approved.
+
+**Reverse cost:** three lines in one function.
+
+## D0457 · 2026-09-07 · The world ends in a wall (T036 taken provisionally); the how-to pin measures the live span
+
+**Decided:** (1) Stranger 33 ran east to the world's edge and the body's box left the grid three times
+("left the world", D0055's report), which the validator reads as an unexpected invariant and voids the run
+-- the fourth stranger at that edge (11, 12, 21 before). `WorldSurroundings.blocks` now answers true for a
+cell past the grid, so the body stops against the edge like rock; the body's base `Surroundings` keeps the
+old answer and every body suite runs as before (the pressure probe still reports exactly once). Pinned
+through the door with a base-surroundings control. The drawn edge (a cliff, a bore wall, dark rock) stays
+T036's open half. (2) Stranger 32 read the BUILD how-to as "press RMB over the shaft m…": the every-rung
+wrap pin measured the span at the depth chip's 88 px, and the live corner is the corner map's wider frame
+(D0430). The pin measures the live corner now (with a control that it IS wider); BUILD and HOPPER
+overflowed and are shortened to fit whole.
+
+**Why:** a run voided by the world's edge is a game finding, not a harness one; a pin that measures a
+narrower card than the screen draws is the quiet green.
+
+**Reverse cost:** two lines in `blocks`; two labels.

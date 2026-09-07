@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_the_mine_hold_rides_the_move_frame()
 	_test_the_session_round_trips_through_the_door()
 	_test_a_new_game_stands_on_the_spawn()
+	_test_the_world_ends_in_a_wall()
 	_finish("interface_verbs")
 
 
@@ -202,3 +203,40 @@ func _test_a_new_game_stands_on_the_spawn() -> void:
 	var o2: Interface.Observation = door.observe(Interface.Envelope.new(Rect2i(100, 60, 60, 40)))
 	_check(o2.on_floor and o2.cell.y == spawn.y * 4 + 3 or o2.on_floor, "thirty ticks in, it stands on the surface (cell %s)" % str(o2.cell))
 	_check(Session.new_game(StrataData.SHALLOW_CLAY, 1, &"no_such_start") == null and WorldSeeder.last_refusal.begins_with("unknown start"), "an unknown start refuses the game by name")
+
+
+## T036 taken provisionally (D0457): a body run at the world's east edge stops against it like rock and
+## never leaves the grid, so the "left the world" report stays what D0055 meant it for. Control: the
+## base `Surroundings` a body suite runs on still lets the box past the edge, where the clamp catches it.
+func _test_the_world_ends_in_a_wall() -> void:
+	var door: Interface = Session.new_game(StrataData.SHALLOW_CLAY, 20260903, &"tutorial")
+	if door == null:
+		_check(false, "the tutorial starts")
+		return
+	var b: Body = door.services()["body"]
+	var w: World = door.services()["world"]
+	var grid_max_x: int = w.grid.width * Body.CELL_PX * Fx.SCALE
+	var violations: int = 0
+	for _i: int in 900:                                           # fifteen seconds of running right
+		var f: InputFrame = InputFrame.new()
+		f.move_dir = 1
+		door.apply(Command.move(f))
+		if b.bounds_violation_this_tick:
+			violations += 1
+	var right_edge: int = b.pos_x + (Body.WIDTH_PX * Fx.SCALE) / 2
+	_check(violations == 0 and right_edge <= grid_max_x and right_edge >= grid_max_x - 2 * Body.CELL_PX * Fx.SCALE,
+		"fifteen seconds of running east: the body stands against the edge (right edge %d of %d) with no bounds report (%d)" % [right_edge, grid_max_x, violations])
+	var bare: Body = Body.new(grid_max_x - 8 * Body.CELL_PX * Fx.SCALE, b.pos_y)
+	var open: TileGrid = TileGrid.new(w.grid.width, w.grid.height, 1)
+	var floor_row: int = Body._px_to_cell(bare.pos_y + (Body.HEIGHT_PX * Fx.SCALE) / 2)
+	for x: int in range(w.grid.width - 40, w.grid.width):
+		open.set_material(Vector2i(x, floor_row), ROCK)             # a floor to the edge, so only the edge is in question
+	var bare_violations: int = 0
+	for _i: int in 120:
+		var f: InputFrame = InputFrame.new()
+		f.move_dir = 1
+		bare.tick(f, open)
+		if bare.bounds_violation_this_tick:
+			bare_violations += 1
+	var bare_right: int = bare.pos_x + (Body.WIDTH_PX * Fx.SCALE) / 2
+	_check(bare_violations > 0 and bare_right >= grid_max_x - Body.CELL_PX * Fx.SCALE, "control: on the base surroundings the same run on a floored edge is reported past the grid (%d ticks in violation, right edge %d)" % [bare_violations, bare_right])

@@ -206,9 +206,17 @@ func reachable_eater(item: StringName) -> MachineState:
 	return best
 
 
+## The scoop's distance to a metre: from the BODY, head to feet, not from its centre point (D0456). The
+## ceiling run and stranger 30 dropped ore into the forge from where the drop's reach allowed and the ingots,
+## landing a metre lower in the forge's well, lay 3.26 m from the centre and 2.3 m from the feet: "then
+## wait -- the ingots come to you" was false from the spot the sentence had just approved. Horizontal
+## distance is unchanged; the vertical one is measured to the nearest point of the trunk.
 func _dist_sq_to_metre(logic_cell: Vector2i) -> int:
 	var half: int = Aim.LOGIC_FX / 2
-	return Fx.length_sq(logic_cell.x * Aim.LOGIC_FX + half - body.pos_x, logic_cell.y * Aim.LOGIC_FX + half - body.pos_y)
+	var dy: int = logic_cell.y * Aim.LOGIC_FX + half - body.pos_y
+	var trunk: int = (Body.HEIGHT_PX / 2) * Fx.SCALE
+	dy = 0 if absi(dy) <= trunk else dy - trunk * signi(dy)
+	return Fx.length_sq(logic_cell.x * Aim.LOGIC_FX + half - body.pos_x, dy)
 
 
 ## Scoop resting piles within the scoop reach, skipping cells under drop grace. Returns units collected.

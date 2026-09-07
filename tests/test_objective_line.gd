@@ -80,12 +80,17 @@ func _wrap_pins(later: Objectives, font: Font) -> void:
 	var free_w: float = UiTheme.CANVAS.x - (corner + UiTheme.px(18.0)) * 2.0
 	for line: String in lines:
 		_check(font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(ObjectiveLine.HOWTO_SIZE)).x <= free_w - UiTheme.px(ObjectiveLine.PAD) * 2.0 + 0.01, "each line fits the span (%s)" % line)
-	# EVERY rung's how-to, tokens filled, wraps whole at the seat's span (D0443 reworded the smelt line; a
-	# future rewording that runs to a third line loses its last clause to the ellipsis, silently).
+	# EVERY rung's how-to, tokens filled, wraps whole at the LIVE span (D0443 reworded the smelt line; a
+	# future rewording that runs to a third line loses its last clause to the ellipsis, silently). The live
+	# corner is the wider of the depth chip and the corner map (D0430), which this pin measured at the
+	# chip's 88 px until stranger 32 read "press RMB over the shaft m…" (D0457): the map's frame is wider.
+	var live_corner: float = maxf(corner, Minimap.frame_rect(Vector2i(256, 1120), false).size.x)
+	_check(live_corner > corner + 20.0, "control: the corner map is the wider corner chip (%.0f px over the depth chip's %.0f)" % [live_corner, corner])
+	var live_w: float = UiTheme.CANVAS.x - (live_corner + UiTheme.px(18.0)) * 2.0 - UiTheme.px(ObjectiveLine.PAD) * 2.0
 	for def: Dictionary in Objectives.STEPS:
 		var filled: String = BindingLabels.fill(String(def["label"]))
-		var wl: PackedStringArray = ObjectiveLine.wrap_howto(font, filled, UiTheme.pt(ObjectiveLine.HOWTO_SIZE), free_w - UiTheme.px(ObjectiveLine.PAD) * 2.0)
-		_check(wl.size() <= ObjectiveLine.HOWTO_LINES and not wl[wl.size() - 1].ends_with("…"), "%s: the how-to fits in %d line(s) whole (%s)" % [def["id"], wl.size(), filled.left(40)])
+		var wl: PackedStringArray = ObjectiveLine.wrap_howto(font, filled, UiTheme.pt(ObjectiveLine.HOWTO_SIZE), live_w)
+		_check(wl.size() <= ObjectiveLine.HOWTO_LINES and not wl[wl.size() - 1].ends_with("…"), "%s: the how-to fits in %d line(s) whole at the live span (%s)" % [def["id"], wl.size(), filled.left(40)])
 	var w: PackedStringArray = ObjectiveLine.wrap_howto(font, "one two three four five six seven eight nine ten eleven twelve", UiTheme.pt(9), 60.0)
 	_check(w.size() == ObjectiveLine.HOWTO_LINES and w[w.size() - 1].ends_with("…") and w[0] != "", "past two lines the tail gives with an ellipsis (%s)" % str(w))
 	_check(ObjectiveLine.wrap_howto(font, "", UiTheme.pt(9), 400.0).is_empty(), "an empty how-to is no lines")
