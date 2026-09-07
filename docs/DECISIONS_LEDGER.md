@@ -18000,3 +18000,18 @@ because the camera clamps at the world's east edge and the body was no longer at
 rung's verb is POINT, and the sentence should be too.
 
 **Reverse cost:** one sentence.
+
+## D0445 · 2026-09-06 · THAT IS A MACHINE: a held MINE on a machine cell is not "open air"
+
+**Decided:** a machine is not terrain, so `MineHold` refuses a MINE held on its cell as `air`, and D0436's
+NOTHING THERE told stranger 20, pointing at the forge from six metres, that there was "no rock under the
+pointer" -- true and useless. The view knows the machine (`Observation.machine_at` on the aimed cell's
+metre): that refusal now counts toward a twelfth moment on TOO FAR's count, "THAT IS A MACHINE -- [MINE]
+cuts rock, not machines. Stand beside it and press [DROP] to feed it what it takes; what it makes comes to
+you as you stand there", and never toward NOTHING THERE. Pinned in `test_hints` (51). No sim change: the
+refusal reason stays `air`; the view names the thing under the pointer.
+
+**Why:** the lesson is the one place a wrong press is explained, and "air" over a forge teaches the wrong
+model of the forge.
+
+**Reverse cost:** one moment, one counter, one lookup.

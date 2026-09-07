@@ -56,6 +56,7 @@ const DEFS: Array[Dictionary] = [
 const MOMENTS: Array[Dictionary] = [
 	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
 	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
+	{"id": &"aim_machine", "text": "THAT IS A MACHINE — [MINE] cuts rock, not machines. Stand beside it and press [DROP] to feed it what it takes; what it makes comes to you as you stand there."},
 	{"id": &"dropped_wrong", "text": "WRONG STACK — you dropped {dropped}; the machine beside you takes {wanted}. Press the number over the {wanted} in your bar to hold it, then [DROP]."},
 	{"id": &"dropped_floor", "text": "DROPPED — the stack fell at your feet, and you pick up what lies there as you stand. A machine takes a drop only when you stand BESIDE it: a body length."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
@@ -85,6 +86,7 @@ var _prev_on_floor: bool = true
 var _prev_vel_y: int = 0
 var _far_ticks: int = 0
 var _air_ticks: int = 0
+var _machine_ticks: int = 0
 ## THE WAY DOWN (T037 taken provisionally, D0440). Stranger 15, sent to descend, mined four ore in the first
 ## hold and then walked the pad for a minute looking for an entrance to the caverns drawn below it; nothing
 ## on screen said the ground is rock you can cut. Once the body has ranged WAY_DOWN_RANGE_M across the
@@ -200,8 +202,13 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	# your reach", so a pointer a hand's width off a thin trunk read as unreachable for eighteen seconds.
 	# A metre breaking under a held pointer leaves it on air too, for as long as the re-aim takes: the
 	# count restarts at a break and runs a second and a half, so ordinary digging never hears this.
-	_air_ticks = 0 if o.mining_broke else (_air_ticks + 1 if o.aim_refusal == &"air" else 0)
+	# A machine under a held MINE is refused as "air" too (a machine is not terrain); it is not open air to the
+	# player (D0445, stranger 20 held MINE on the forge from six metres and read NOTHING THERE).
+	var on_machine: bool = o.aim_refusal == &"air" and not o.machine_at(Vector2i(o.aim_cell.x >> 2, o.aim_cell.y >> 2)).is_empty()
+	_air_ticks = 0 if o.mining_broke or on_machine else (_air_ticks + 1 if o.aim_refusal == &"air" else 0)
 	note(&"aim_air", _air_ticks >= AIR_TICKS)
+	_machine_ticks = _machine_ticks + 1 if on_machine else 0
+	note(&"aim_machine", _machine_ticks >= FAR_TICKS)
 	var counts: Dictionary = Payouts.pack_counts(o)
 	var wrong: bool = _wrong_stack(o, counts)
 	note(&"dropped_wrong", wrong)

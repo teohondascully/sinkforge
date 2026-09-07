@@ -42,7 +42,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_obs([]), 0.016)
 	h.observe(_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 11, "nine pack lessons and eleven moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 12, "nine pack lessons and twelve moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -66,6 +66,17 @@ func _air_pins(h: Hints, far: Interface.Observation, dry: Interface.Observation)
 	_check(h.active_id() == &"aim_air" and h.active_text().begins_with("NOTHING THERE") and Hints.AIR_TICKS > 3 * Hints.FAR_TICKS, "the %dth tick on air fires NOTHING THERE, a count well past TOO FAR's %d (%s)" % [Hints.AIR_TICKS, Hints.FAR_TICKS, h.active_id()])
 	for _i: int in 30:
 		h.observe(dry, 0.5)
+	# D0445 (stranger 20): the same "air" refusal with a machine under the aimed cell is THAT IS A MACHINE, on
+	# TOO FAR's count, and never NOTHING THERE however long it is held.
+	var h2: Hints = Hints.new()
+	var machine: Interface.Observation = _obs()
+	machine.aim_refusal = &"air"
+	machine.aim_cell = Vector2i(46, 82)
+	var typed: Array[Dictionary] = [{"cell": Vector2i(11, 20), "id": &"processor", "recipe": &"smelt_ingot", "input": {}, "output": {}}]
+	machine.machines = typed
+	for _i: int in 2 * Hints.AIR_TICKS:
+		h2.observe(machine, 0.016)
+	_check(h2.active_id() == &"aim_machine" and h2.active_text().begins_with("THAT IS A MACHINE") and not h2.taught_ids().has("aim_air"), "MINE held on the forge's cell teaches THAT IS A MACHINE and never NOTHING THERE (%s)" % h2.active_id())
 
 
 ## T037 (D0440, stranger 15): a body that has broken rock once and walked the surface WAY_DOWN_RANGE_M across
