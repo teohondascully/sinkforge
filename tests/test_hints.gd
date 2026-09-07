@@ -264,6 +264,10 @@ func _test_a_drop_that_hits_the_floor_teaches_once() -> void:
 	floor.drop_went = &"floor"
 	h.observe(floor, 0.016)
 	_check(h.active_id() == &"dropped_floor" and h.active_text().begins_with("DROPPED"), "the first drop to the floor docks DROPPED (%s)" % h.active_id())
+	# D0481 (strangers 61, 67): "stand BESIDE it" sent one stranger off the forge's own column, which takes the
+	# drop, and named no machine while a second machine's bubble stood on screen; the lesson says over or
+	# beside, and points at the WHITE RING.
+	_check("over it or beside it" in h.active_text() and "WHITE RING" in h.active_text() and "BESIDE it" not in h.active_text(), "DROPPED allows standing over the machine and names the ring (%s)" % h.active_text())
 	for _i: int in 30:
 		h.observe(_hint_obs(), 0.5)
 	h.observe(floor, 0.016)

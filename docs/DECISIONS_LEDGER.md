@@ -18669,3 +18669,19 @@ No gameplay, verification rule, source path, unique capture or historical log is
 ownership. Stable links and retained snapshots let the cleanup improve navigation without losing evidence.
 Timing percentages reported by engineering remain estimates; orchestration changes need measured phases.
 **Reverse cost:** documentation-only diff; prior operational text is preserved at named snapshot paths.
+
+## D0481 · 2026-09-07 · DROPPED says over or beside, and names the ring
+
+**Decided:** the floor-drop lesson reads "A machine takes a drop from within a body length, over it or
+beside it; the WHITE RING marks the one this step wants" in place of "only when you stand BESIDE it: a
+body length". S61 stood on the forge's own column, which takes the drop, read BESIDE and stepped away,
+then dropped at the pad twice more and never smelted; S67 (the rung-2 variant) dropped at the pad, read
+the same lesson, and spent nine Q presses on the shaft's buried forge 7 m east, whose need-bubble shares
+the ringed forge's glyph. Six of nine first drops across 61-69 were at the pad, 3 m off, so this lesson
+is the one that has to carry the rung. Six lines in the dock, checked on a live seat. Pinned in
+`tests/test_hints.gd`.
+
+**Why:** a lesson that excludes a working position and names no machine while two stand on screen is
+the wording cause (the director's class 5) for two of the four smelt failures with frames.
+
+**Reverse cost:** one string.
