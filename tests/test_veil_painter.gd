@@ -338,20 +338,20 @@ func _test_the_lamp_is_dimmer_in_daylight_than_in_the_deep() -> void:
 	_check(surface > 0.0, "...and it is never switched OFF -- a floor, not a gate")
 
 
-## D0427 (Astra's item 5): the lamp's light falls by exp(-LAMP_OCCLUSION) per solid cell on the line from
+## D0427 (Astra's item 5): the lamp's light falls by exp(-K) per solid cell on the line from
 ## the cut's centre, the endpoint's own cell excluded -- a face is lit, the mass behind it dark. The shader's
 ## `occluded` is the same march; this pins the arithmetic it is fed. Zero is legacy's pass (the control).
 func _test_the_lamp_is_occluded_by_the_rock_it_crosses() -> void:
 	var wall_from: int = 10   # columns >= 10 are rock; the lamp stands in air at x = 4
 	var solid: Callable = func(c: Vector2i) -> bool: return c.x >= wall_from
 	var lamp := Vector2(4.5, 0.5)
-	var face: float = VeilPainter.lamp_occlusion(lamp, Vector2(10.5, 0.5), solid)
-	var two_in: float = VeilPainter.lamp_occlusion(lamp, Vector2(12.5, 0.5), solid)
-	var four_in: float = VeilPainter.lamp_occlusion(lamp, Vector2(14.5, 0.5), solid)
+	var face: float = VeilOcclusion.survives(lamp, Vector2(10.5, 0.5), solid)
+	var two_in: float = VeilOcclusion.survives(lamp, Vector2(12.5, 0.5), solid)
+	var four_in: float = VeilOcclusion.survives(lamp, Vector2(14.5, 0.5), solid)
 	_check(face > 0.9, "the face cell itself is lit: no solid cell lies between the lamp and it (%.2f)" % face)
 	_check(two_in < face and four_in < two_in, "the light falls with every cell of rock crossed (%.2f > %.2f > %.2f)" % [face, two_in, four_in])
-	_check(absf(two_in - exp(-VeilPainter.LAMP_OCCLUSION * 2.0)) < 0.12 and absf(four_in - exp(-VeilPainter.LAMP_OCCLUSION * 4.0)) < 0.12,
-		"two cells in keeps about exp(-2k) = %.2f (%.2f), four about exp(-4k) = %.2f (%.2f): the sampled march tracks the depth" % [exp(-VeilPainter.LAMP_OCCLUSION * 2.0), two_in, exp(-VeilPainter.LAMP_OCCLUSION * 4.0), four_in])
-	_check(VeilPainter.lamp_occlusion(lamp, Vector2(8.5, 0.5), solid) == 1.0, "a point in open air between the lamp and the wall loses nothing")
-	_check(VeilPainter.lamp_occlusion(lamp, Vector2(14.5, 0.5), solid, 0.0) == 1.0, "control: at k = 0 the pool passes through rock as legacy's did")
-	_check(VeilPainter.LAMP_OCCLUSION > 0.0 and VeilLayer.lamp_occlusion == VeilPainter.LAMP_OCCLUSION, "the layer feeds the shader the painter's constant, and it is on (%.2f)" % VeilLayer.lamp_occlusion)
+	_check(absf(two_in - exp(-VeilOcclusion.K * 2.0)) < 0.12 and absf(four_in - exp(-VeilOcclusion.K * 4.0)) < 0.12,
+		"two cells in keeps about exp(-2k) = %.2f (%.2f), four about exp(-4k) = %.2f (%.2f): the sampled march tracks the depth" % [exp(-VeilOcclusion.K * 2.0), two_in, exp(-VeilOcclusion.K * 4.0), four_in])
+	_check(VeilOcclusion.survives(lamp, Vector2(8.5, 0.5), solid) == 1.0, "a point in open air between the lamp and the wall loses nothing")
+	_check(VeilOcclusion.survives(lamp, Vector2(14.5, 0.5), solid, 0.0) == 1.0, "control: at k = 0 the pool passes through rock as legacy's did")
+	_check(VeilOcclusion.K > 0.0 and VeilLayer.lamp_occlusion == VeilOcclusion.K, "the layer feeds the shader the painter's constant, and it is on (%.2f)" % VeilLayer.lamp_occlusion)

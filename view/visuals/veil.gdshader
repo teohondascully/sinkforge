@@ -51,8 +51,8 @@ uniform vec4 lamp_cuts[3];
 // cave read as a disc of brightness stamped on the mass. Each lamp cut now marches from its centre to the
 // pixel across `cells_tex` and loses exp(-lamp_occlusion) per solid CELL crossed (the pixel's own cell is
 // not counted, so a face is lit and the mass behind it goes dark over about half a metre). Zero is the
-// old pass, and the control in a comparison. `VeilPainter.lamp_occlusion` is the CPU statement of the
-// same arithmetic.
+// old pass, and the control in a comparison. `VeilOcclusion.survives` is the CPU statement of the same
+// arithmetic.
 uniform float lamp_occlusion = 0.0;
 uniform int occlusion_steps = 12;
 // every other source (`VeilSources.cuts`): xy centre, z radius, w strength, all in cells; and its tint

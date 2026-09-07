@@ -19,7 +19,7 @@ extends RefCounted
 ##   --act=mine|map|settings|game  a scripted hand for a capture: hold MINE at the rock ahead from tick 20 with
 ##                           the pointer posed, or press the map / settings key once at tick 20 (game: the GAME face)
 ##   --lamp-occlusion=K      the veil lamp's loss per solid cell crossed (D0427); 0 is legacy's pass, the
-##                           control of a lighting comparison. Unset: `VeilPainter.LAMP_OCCLUSION`.
+##                           control of a lighting comparison. Unset: `VeilOcclusion.K`.
 
 const NO_WARP: Vector2i = Vector2i(-1, -1)
 

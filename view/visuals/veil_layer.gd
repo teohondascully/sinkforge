@@ -35,7 +35,7 @@ var _ore: OrePainter = null
 var _falling: FallingItems = null
 ## The lamp's occlusion per solid cell crossed (D0427); the seat's `--lamp-occlusion=K` overrides it for
 ## a comparison, and 0 is legacy's pass. Read once at construction.
-static var lamp_occlusion: float = VeilPainter.LAMP_OCCLUSION
+static var lamp_occlusion: float = VeilOcclusion.K
 
 ## Uploads, for the instrument and the suite: a frame that moved nothing uploads nothing.
 var cell_uploads: int = 0
@@ -62,7 +62,7 @@ func _init(ore: OrePainter = null, falling: FallingItems = null) -> void:
 		material.set_shader_parameter(&"lamp_grain", VeilPainter.LAMP_GRAIN)
 		material.set_shader_parameter(&"lamp_window_gain", VeilPainter.LAMP_WINDOW_GAIN)
 		material.set_shader_parameter(&"lamp_occlusion", lamp_occlusion)
-		material.set_shader_parameter(&"occlusion_steps", VeilPainter.OCCLUSION_STEPS)
+		material.set_shader_parameter(&"occlusion_steps", VeilOcclusion.STEPS)
 		material.set_shader_parameter(&"sky_fade_m", VeilLight.SKY_FADE_M)
 		material.set_shader_parameter(&"ambient_light", Vector3(VeilLight.AMBIENT_LIGHT.r, VeilLight.AMBIENT_LIGHT.g, VeilLight.AMBIENT_LIGHT.b))
 		material.set_shader_parameter(&"void_floor", VeilLight.VOID_FLOOR)

@@ -17590,8 +17590,8 @@ the cost measured. The veil's lamp pool (legacy's `lamp_lift`, three radial cuts
 a cell three deep in a wall took the same lift as the face, so a lit cave read as a disc of warmth
 stamped on the mass. `veil.gdshader::occluded` now marches each lamp cut from its centre to the pixel
 across `cells_tex` (12 samples) and the light falls by exp(-k) per solid cell crossed, the pixel's own
-cell excluded; `VeilPainter.lamp_occlusion` is the CPU statement of the same arithmetic and
-`test_veil_painter` pins it (a face lit; two cells in ~exp(-2k); k = 0 is legacy's pass). `LAMP_OCCLUSION
+cell excluded; `VeilOcclusion.survives` is the CPU statement of the same arithmetic and
+`test_veil_painter` pins it (a face lit; two cells in ~exp(-2k); k = 0 is legacy's pass). `VeilOcclusion.K
 = 0.5`: a lit crust of about half a metre. The seat's `--lamp-occlusion=K` is the comparison's dial.
 
 **What the captures show** (`tests/body/recordings/round15_2026-09-06/lighting/`): at 46 m in
