@@ -472,7 +472,12 @@ press on the vein beside the forge, 80 px left of the ring; ingots 13.7-17.4 s; 
 metres down). **D0456:** the scoop measures from the body head to feet (the ingots came only after a step
 closer; found by the ceiling run `playtest/ceiling.py` and stranger 30). **D0457:** the world ends in a wall
 (T036 taken provisionally); the every-rung wrap pin measures the live corner (the corner map's), BUILD and
-HOPPER shortened to fit.
+HOPPER shortened to fit. **D0458:** the cut mark (a second white square on the surface over a buried
+target, named by the BUILD and HOPPER how-tos); NOT ORE reads the rung (it had fired on the ceiling run's
+felling once the ore was spent). **Strangers 34-36 (7708c8f5): 3 VALID, first rung 3 of 3** (2.2, 2.2,
+21.6 s); ingots 17.6 s for one, two dropped their ore far from any forge (one down the chimney's dug cap);
+wood 21.0 s for one; BUILD stops the one who reached it (before the cut mark). The ceiling on this build:
+1.3 / 6.7 / 12.1 s.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
