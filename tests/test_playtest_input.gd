@@ -21,6 +21,7 @@ func _run() -> void:
 	_test_bounds(bridge)
 	_test_keys_and_buttons_as_actions(bridge)
 	await _test_the_pointer_is_the_seats_own(bridge)
+	_test_composed_moves(bridge)
 	_finish("playtest input")
 
 
@@ -77,3 +78,28 @@ func _test_the_pointer_is_the_seats_own(bridge: RefCounted) -> void:
 	_check(Controls.pointer_posed(), "an empty burst keeps the last pointer: a still hand is not a released one")
 	probe.queue_free()
 	Controls.release_pointer()
+
+
+## COMPOSED MOVES (D0420): one command may carry a sequence of timed segments -- "Space and D for 10
+## ticks, then D for 30, then A for 20" -- run inside the game loop with one screenshot at the end, so a
+## move that needs mid-air steering does not depend on a screenshot round trip per key change. The whole
+## sequence is bounded like a single burst; each segment is validated like one; the seat pulls segments
+## with `next_segment` and the bridge applies each at its boundary.
+func _test_composed_moves(bridge: RefCounted) -> void:
+	var jump_right: Dictionary = {"moves": [{"ticks": 10, "keys": ["Space", "D"]}, {"ticks": 30, "keys": ["D"]}, {"ticks": 20, "keys": ["A"], "mouse": [400, 300]}]}
+	_check(bridge.validate(jump_right) == "", "a composed move validates as a whole (%s)" % bridge.validate(jump_right))
+	_check(bridge.validate({"moves": [{"ticks": 200}, {"ticks": 101}]}) != "", "the segments' total is bounded like one burst (301)")
+	_check(bridge.validate({"moves": [{"ticks": 10, "keys": ["NOT_A_KEY"]}]}) != "", "a bad key inside a segment is refused")
+	_check(bridge.validate({"moves": []}) != "", "an empty sequence is refused")
+	_check(bridge.validate({"moves": "D"}) != "", "moves must be a list")
+	_check(bridge.total_ticks(jump_right) == 60, "the sequence lasts the sum of its segments (%d)" % bridge.total_ticks(jump_right))
+	_check(bridge.total_ticks({"ticks": 45, "keys": ["D"]}) == 45, "a flat burst is one segment (%d)" % bridge.total_ticks({"ticks": 45, "keys": ["D"]}))
+	bridge.begin(jump_right)
+	_check(bridge.next_segment(root) == 10 and Input.is_physical_key_pressed(KEY_SPACE) and Input.is_physical_key_pressed(KEY_D), "segment 1: Space and D down for 10 ticks")
+	_check(bridge.next_segment(root) == 30 and not Input.is_physical_key_pressed(KEY_SPACE) and Input.is_physical_key_pressed(KEY_D), "segment 2: Space released at the boundary, D held on")
+	_check(bridge.next_segment(root) == 20 and Input.is_physical_key_pressed(KEY_A) and not Input.is_physical_key_pressed(KEY_D) and bridge.pointer == Vector2(400, 300), "segment 3: A, and the pointer moved with it")
+	_check(bridge.next_segment(root) == -1, "then nothing: the sequence is spent")
+	bridge.begin({"ticks": 5, "keys": ["W"]})
+	_check(bridge.next_segment(root) == 5 and Input.is_physical_key_pressed(KEY_W) and not Input.is_physical_key_pressed(KEY_A), "a flat burst still runs as one segment, releasing what the sequence left down")
+	_check(bridge.next_segment(root) == -1, "...and is spent after it")
+	bridge.apply({}, root)

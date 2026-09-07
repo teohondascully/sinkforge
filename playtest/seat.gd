@@ -47,6 +47,11 @@ func _physics_process(_delta: float) -> bool:
 	if not ready or paused:
 		return false
 	if remaining == 0:
+		# The next segment of a composed move (D0420), or the screenshot when the sequence is spent.
+		var next: int = bridge.next_segment(root)
+		if next > 0:
+			remaining = next - 1
+			return false
 		paused = true
 		_capture.call_deferred()
 	else:
@@ -78,10 +83,11 @@ func _process(_delta: float) -> bool:
 		_write("response.json", {"id": request_id, "error": error})
 		return false
 	_write("input_%04d.json" % request_id, command)
-	# Input callbacks must run unpaused, as in ordinary play.
+	# Input callbacks must run unpaused, as in ordinary play. The first segment applies on the next
+	# physics tick through `next_segment`, the rest at their boundaries (D0420).
 	paused = false
-	bridge.apply(command, root)
-	remaining = int(command.get("ticks", 1))
+	bridge.begin(command)
+	remaining = 0
 	return false
 
 
