@@ -31,7 +31,10 @@ F2  -- found during the queue #2 self-audit, `docs/DECISIONS_LEDGER.md` D0162: G
 """
 import sys
 import tempfile
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gate_status as gs  # noqa: E402
@@ -192,6 +195,62 @@ def branch_f2_env_expression_in_step_name_resolves_before_matching() -> None:
           plain == "A perfectly ordinary step name")
 
 
+def branch_report_executes_each_local_step_once_per_invocation() -> None:
+    """Shared gate evidence and unlinked summaries must not rerun commands; a new report must."""
+    gates = {n: {"title": f"Gate {n}", "body": ""} for n in (1, 2)}
+    shared = {"job": "checks", "name": "shared", "run": "check shared", "coe": False}
+    unlinked = {"job": "checks", "name": "unlinked", "run": "check extra", "coe": False}
+    other_job = dict(unlinked, job="other")
+    engine = {"job": "checks", "name": "engine", "run": "godot --headless", "coe": False}
+    advisory = dict(unlinked, name="advisory", coe=True)
+    steps = [shared, unlinked, other_job, engine, advisory]
+    links = {1: [shared], 2: [shared]}
+    ci = {"shared": "success", "unlinked": "skipped", "engine": "failure"}
+    output = StringIO()
+    with patch.object(gs, "parse_gates", return_value=gates), \
+            patch.object(gs, "parse_workflow_steps", return_value=steps), \
+            patch.object(gs, "link_gates", return_value=(links, {1: "test", 2: "test"})), \
+            patch.object(gs, "git_head", return_value="test-head"), \
+            patch.object(gs, "fetch_ci_state", return_value=(None, "synthetic", ci)), \
+            patch.object(gs, "run_locally", return_value="FAIL (exit 1)") as run, \
+            redirect_stdout(output), redirect_stderr(StringIO()):
+        rc = gs.main()
+        first_calls = [c.args[0] for c in run.call_args_list]
+        run.reset_mock()
+        run.return_value = "PASS"
+        ci.clear()
+        output.seek(0)
+        first_output = output.getvalue()
+        output.truncate(0)
+        second_rc = gs.main()
+        second_calls = [c.args[0] for c in run.call_args_list]
+    expected = ["check shared", "check extra", "check extra"]
+    check("report executes shared and unlinked steps once; distinct jobs stay distinct",
+          first_calls == expected, repr(first_calls))
+    check("a second report executes afresh with no persistent cache", second_calls == expected)
+    check("cached local failure preserves CI success and DISAGREE", "DISAGREE -- CI=success, local=FAIL" in first_output)
+    check("unlinked failure and skipped summaries retain their members",
+          "unnumbered steps currently FAIL: ['engine']" in first_output
+          and "unnumbered steps currently SKIPPED: ['unlinked', 'unlinked']" in first_output)
+    check("a later report uses fresh CI and local results", "local=PASS" in output.getvalue()
+          and "DISAGREE" not in output.getvalue() and "[UNKNOWN " in output.getvalue())
+    check("report exit remains informational", rc == second_rc == 0)
+
+
+def branch_local_cache_preserves_errors_and_command_identity() -> None:
+    step = {"job": "checks", "name": "same", "run": "check original", "coe": False}
+    cache = {}
+    with patch.object(gs, "run_locally", return_value="FAIL (timeout)") as run:
+        first = gs.classify_step(step, {"same": "failure"}, cache)
+        repeated = gs.classify_step(dict(step), {"same": "failure"}, cache)
+        cancelled = gs.classify_step(step, {"same": "cancelled"}, cache)
+        check("cached errors retain failure details", first == repeated and "timeout" in repeated[1])
+        check("CI is reclassified independently of cached local errors", cancelled[0] == "SKIPPED")
+        check("an error is executed once, not retried by report formatting", run.call_count == 1)
+        gs.classify_step(dict(step, run="check changed"), {}, cache)
+        check("a changed command is not hidden by the cache", run.call_count == 2)
+
+
 def main() -> int:
     for branch in (
         branch_a1_skipped_never_promoted_to_pass,
@@ -203,6 +262,8 @@ def main() -> int:
         branch_a2_bare_directory_citation_does_not_overmatch,
         branch_a4_deleting_a_workflow_step_changes_the_table,
         branch_f2_env_expression_in_step_name_resolves_before_matching,
+        branch_report_executes_each_local_step_once_per_invocation,
+        branch_local_cache_preserves_errors_and_command_identity,
     ):
         branch()
 

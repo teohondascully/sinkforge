@@ -62,8 +62,9 @@ would still be missed, and closing that gap further is a separate, later task, n
   an unrelated, deliberately-uncommitted investigation was sitting in the tree), and reporting that as a
   plain FAIL would misattribute local, uncommitted state to CI itself.
 
-RUNTIME: two to three minutes. Every non-engine `run:` step of harness.yml is re-executed locally, each
-capped at 120 s, and a progress line per step goes to stderr so the wait is visibly work, not a hang.
+Every eligible local step is executed once per report, each capped at 120 s. Shared gate references
+and summary lists reuse that result; a new report runs fresh checks. Runtime depends on the checks.
+A progress line per executed step goes to stderr.
 - Multiple candidate steps for one gate (real when Tier 2 evidence is ambiguous, e.g. gate 1's directory-
   only citation matches every script under `tools/layer_lint/`): every candidate's status is shown; the
   gate's own row is FAIL if any candidate failed, PASS only if every candidate passed. A gate is never
@@ -230,7 +231,7 @@ def link_gates(gates: dict[int, dict], steps: list[dict]) -> tuple[dict[int, lis
     return links, kind
 
 
-def classify_step(s: dict, ci_steps: dict[str, str]) -> tuple[str, str]:
+def classify_step(s: dict, ci_steps: dict[str, str], local_results: dict | None = None) -> tuple[str, str]:
     """Returns (status, detail_line) for one step. status is one of PASS/FAIL/SKIPPED/UNKNOWN.
 
     CI's own reported conclusion is authoritative whenever CI reported ANYTHING for this step name at
@@ -246,10 +247,16 @@ def classify_step(s: dict, ci_steps: dict[str, str]) -> tuple[str, str]:
     ci_conclusion = ci_steps.get(s["name"])
     local = None
     if not NEEDS_ENGINE_RE.search(s["run"]) and s["run"]:
-        # Progress on stderr: the whole report re-runs every non-engine step (each capped at 120 s) and
-        # takes two to three minutes in total, which read as a hang to anyone watching stdout (D0394).
-        print("gate_status: running locally: %s" % s["name"][:70], file=sys.stderr)
-        local = run_locally(s["run"])
+        # Cache local execution only: CI classification remains independent. The caller owns the
+        # report lifetime; standalone calls without a cache still execute afresh.
+        key = (s["job"], s["name"], s["run"])
+        if local_results is not None and key in local_results:
+            local = local_results[key]
+        else:
+            print("gate_status: running locally: %s" % s["name"][:70], file=sys.stderr)
+            local = run_locally(s["run"])
+            if local_results is not None:
+                local_results[key] = local
 
     if ci_conclusion in ("skipped", "cancelled"):
         reason = "an earlier step in this job already failed" if ci_conclusion == "skipped" else "run was cancelled"
@@ -284,7 +291,7 @@ def classify_step(s: dict, ci_steps: dict[str, str]) -> tuple[str, str]:
     return "UNKNOWN", "%s: no CI conclusion available%s" % (s["name"][:60], local_note)
 
 
-def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str]) -> tuple[str, list[str]]:
+def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str], local_results: dict | None = None) -> tuple[str, list[str]]:
     """Rolls up each linked step's own classify_step() verdict into the gate's single status, worst-first:
     FAIL (a real failure anywhere) beats SKIPPED (CI never exercised some evidence) beats UNKNOWN (no
     data at all) beats PASS. A gate is never reported PASS on the strength of a step CI did not run."""
@@ -294,7 +301,7 @@ def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str]) -> tuple[st
     details = []
     statuses = []
     for s in gate_steps:
-        status, detail = classify_step(s, ci_steps)
+        status, detail = classify_step(s, ci_steps, local_results)
         details.append(detail)
         statuses.append(status)
 
@@ -323,6 +330,7 @@ def main() -> int:
     links, kind = link_gates(gates, steps)
     head = git_head()
     ci_conclusion, ci_note, ci_steps = fetch_ci_state(head)
+    local_results: dict[tuple[str, str, str], str] = {}
 
     print("gate_status: commit=%s" % head)
     print("gate_status: CI %s" % ci_note)
@@ -350,7 +358,7 @@ def main() -> int:
             counts["no_code"] += 1
             continue
         counts["code"] += 1
-        status, details = resolve_status(gate_steps, ci_steps)
+        status, details = resolve_status(gate_steps, ci_steps, local_results)
         rows.append((n, g["title"], status, kind[n], details))
 
     for n, title, status, evidence, details in rows:
@@ -390,12 +398,12 @@ def main() -> int:
     print("gate_status: %d CI step(s) run a real check tied to NO QUALITY.md gate number:" % len(unlinked))
     for s in unlinked:
         gate_steps = [s]
-        status, details = resolve_status(gate_steps, ci_steps)
+        status, details = resolve_status(gate_steps, ci_steps, local_results)
         print("  [%-8s] (%s) %s" % (status, s["job"], s["name"]))
         for d in details:
             print("             - %s" % d)
-    unlinked_fail = [s["name"] for s in unlinked if resolve_status([s], ci_steps)[0] == "FAIL"]
-    unlinked_skipped = [s["name"] for s in unlinked if resolve_status([s], ci_steps)[0] == "SKIPPED"]
+    unlinked_fail = [s["name"] for s in unlinked if resolve_status([s], ci_steps, local_results)[0] == "FAIL"]
+    unlinked_skipped = [s["name"] for s in unlinked if resolve_status([s], ci_steps, local_results)[0] == "SKIPPED"]
     print("gate_status: unnumbered steps currently FAIL: %s" % unlinked_fail)
     print("gate_status: unnumbered steps currently SKIPPED: %s" % unlinked_skipped)
     return 0
