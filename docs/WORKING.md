@@ -408,7 +408,13 @@ the target ring tightens as the body arrives. The smelt how-to now says the whol
 6's first hesitation). **Strangers 7-9 (D0434)** ran in parallel on 3cf6a5bd with three missions (uncoached; wood;
 down and back): all three ended 51 m down the chimney; eight of nine have. T031 TAKEN provisionally: two
 metres of clay cap the mouth in the tutorial start. The drop's TOO FAR flashes the machine it fell short
-of; the GRAPPLE lesson says POINT; the smelt how-to says the whole stack goes in.
+of; the GRAPPLE lesson says POINT; the smelt how-to says the whole stack goes in. **D0435:** pumping
+posed in the water suite (the level falls from the top; conservation exact). **Strangers 10-12 (D0436)**
+ran on the capped world: the cap held (none of three fell in); stranger 10 felled the tree (the first) and
+reached BUILD at 49 s; strangers 11 and 12 never mined an ore, because one D press before the first
+pointer moved the ring to the shaft's buried ore. The ring now prefers hits at the body's own level;
+the slash on air teaches NOTHING THERE; the seat settles the body before every frame (`settled_ticks`,
+`still`). Named: T034 the felled crown floats, T035 run speed against the pad, T036 the world's edge.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -435,8 +441,8 @@ T031 (taken provisionally in D0434: the chimney capped; overrule by deleting two
 (four ring kinds); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
 at zero; the forks T024-T030.
 
-**Cheap next steps that need no ruling:** a sixth stranger to finally play the wood rung with the tree in
-place; the large map as a wider
+**Cheap next steps that need no ruling:** a batch of three strangers on the D0436 build (the level-first
+ring and the settled frame are untested by a stranger); the large map as a wider
 window; the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
 instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
 bake (V32).

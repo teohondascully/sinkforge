@@ -32,6 +32,14 @@ const RING_FLOOR: float = 0.38
 const RING_NEAR_M: float = 0.35
 const NEAR_M: float = 1.5
 const FAR_M: float = 3.5
+## THE RING PREFERS YOUR OWN LEVEL (D0436, strangers 11 and 12). Two of three strangers on the capped world
+## walked right before pointing, and the ring left the vein at the pad for the drill shaft's buried ore two
+## metres under the surface: nearer by the ruler, past the reach from anywhere they could stand, and the
+## how-to still said "at your feet". Each held MINE on it under TOO FAR a dozen times and never came back.
+## A hit farther than a reach above or below the body's centre -- reachable only by digging, climbing or a
+## fall -- ranks behind every hit in the body's own reach band, whatever the distance across.
+const BAND_PX: float = float(Interface.Observation.REACH_PX)
+const OUT_OF_BAND: float = 1.0e12      ## px^2 added to a hit outside the band: past any in-window distance
 
 ## THE SEARCH IS PAID ONCE PER CELL MOVED, NOT PER FRAME (D0414). The first cut scanned the full 81x81
 ## window through a Callable every rendered frame: 3 ms, forty per cent of the 120 Hz budget, the largest
@@ -124,6 +132,8 @@ static func scan(o: Interface.Observation, body: Vector2, wanted: Callable, from
 				continue
 			var at: Vector2 = (Vector2(c) + Vector2(0.5, 0.5)) * cell_px
 			var d: float = at.distance_squared_to(body)
+			if absf(at.y - body.y) > BAND_PX:
+				d += OUT_OF_BAND
 			if d < best_d:
 				best_d = d
 				best = at

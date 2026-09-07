@@ -271,6 +271,7 @@ var aim_cell: Vector2i = Vector2i(-1, -1)
 ## world verb uses. The inspector answers nothing out of reach (6h, D0369): a readout on a cell you
 ## cannot act on is an invitation to walk into a wall.
 var aim_in_reach: bool = false
+const REACH_PX: int = (Mining.REACH_NUM * LOGIC_PX) / Mining.REACH_DEN   # that reach in world px, for the view
 ## THE WHOLE WORLD, COARSELY (A' step 6i, D0371): one class byte per logic cell over `map_cells`, the
 ## grid's own coarse plane (`TileGrid.COARSE_*`), copied by value like every other plane -- a
 ## PackedByteArray copy is copy-on-write, so the copy costs nothing until someone writes. `map_version`

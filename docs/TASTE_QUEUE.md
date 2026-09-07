@@ -249,3 +249,23 @@ seven ore, took the first ingot and walked off to look for the second; the forge
 filling bar the whole time (frame 7 of run 8), drawn at legacy's chrome scale on a one-metre face. *Question:
 a larger badge on the machine you stand beside, a "5 more" line in the arrival tick ("+1 ingot, 2 more
 coming"), or leave the face alone and let the ring on the forge hold the player there?*
+
+**T034 · A felled trunk leaves its crown in the air.** Stranger 10 cut the tutorial tree's trunk for a
+wood block and walked away from a canopy of leaves floating over nothing (frame 33 of run 10). The tree
+pass plants leaves as terrain cells, so the trunk's fall does not take them. *Question: does the crown
+fall with the trunk (Terraria's whole-tree drop), crumble to leaves over a few seconds, or stay -- an
+arbour reads as a ruin here -- and if it falls, does it pay leaves or wood?*
+
+**T035 · Walking is fast against the pad.** RUN_SPEED is legacy's 150 px/s, 9.4 m/s in this scale: a D
+held for two thirds of a second carried stranger 11 seven metres, past the forge pocket, the vein, the
+adit and the drill shaft -- the whole authored opening -- before the first frame came back. Two of three
+strangers on the capped world overshot the pad on their first key. The world is 64 m wide, so the east
+edge is three seconds of walking from spawn. *Question: is the pad too small for the speed, or the speed
+too high for the pad? A walk/run split (shift), a wider pad, or a slower legacy constant re-derived for
+a body 1.25 m tall.*
+
+**T036 · The world ends without a wall.** Strangers 11 and 12 both walked to the east edge (32 m from
+spawn) and stood at the screen's right border with the ground running under the frame and nothing drawn
+past it; the camera clamps to the grid and the body clamps a tick later (frame 28 of run 11, frame 21 of
+run 12). *Question: a cliff, a sheer bore wall in the lore's own material, dark rock to the edge of the
+canvas, or a wider world so the edge is never reached in the opening?*

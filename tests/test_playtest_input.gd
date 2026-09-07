@@ -92,6 +92,7 @@ func _test_composed_moves(bridge: RefCounted) -> void:
 	_check(bridge.validate({"moves": [{"ticks": 10, "keys": ["NOT_A_KEY"]}]}) != "", "a bad key inside a segment is refused")
 	_check(bridge.validate({"moves": []}) != "", "an empty sequence is refused")
 	_check(bridge.validate({"moves": "D"}) != "", "moves must be a list")
+	_check(bridge.validate({"ticks": 30, "keys": ["D"], "settle": false}) == "" and bridge.validate({"ticks": 30, "settle": "no"}) != "", "settle, the seat's rest-before-capture (D0436), is a bool or refused")
 	_check(bridge.total_ticks(jump_right) == 60, "the sequence lasts the sum of its segments (%d)" % bridge.total_ticks(jump_right))
 	_check(bridge.total_ticks({"ticks": 45, "keys": ["D"]}) == 45, "a flat burst is one segment (%d)" % bridge.total_ticks({"ticks": 45, "keys": ["D"]}))
 	bridge.begin(jump_right)

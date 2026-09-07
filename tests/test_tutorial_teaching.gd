@@ -133,6 +133,42 @@ func _test_the_ring_finds_the_real_targets() -> void:
 	_check(coal != TargetGuide.NONE and coal.x > body_px.x, "FUEL rings the coal seam to the right")
 	_check(TargetGuide.target(&"auto", o) == TargetGuide.NONE, "a rung with nothing to point at rings nothing")
 	_budgeted_walk_pins(o, body_px)
+	_band_pins(door, world, body)
+
+
+## D0436 (strangers 11 and 12): from the drill shaft's lip the buried vein two metres under the surface is
+## the nearest ore by the ruler and out of reach from anywhere the body can stand; the ring prefers the
+## vein at the body's own level, however far across. Standing IN the shaft, the buried vein is the level one.
+func _band_pins(door: Interface, world: World, body: Body) -> void:
+	var spawn_x: int = body.pos_x
+	body.pos_x = spawn_x + int(7.5 * 16.0) * Fx.SCALE                 # the shaft's right lip, on the surface
+	var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	var body_px: Vector2 = Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE)
+	var ruler: Vector2 = TargetGuide.NONE
+	var ruler_d: float = 1.0e18
+	for dy: int in range(-TargetGuide.SEARCH_CELLS, TargetGuide.SEARCH_CELLS + 1):
+		for dx: int in range(-TargetGuide.SEARCH_CELLS, TargetGuide.SEARCH_CELLS + 1):
+			var c: Vector2i = Vector2i(floori(body_px.x / 4.0) + dx, floori(body_px.y / 4.0) + dy)
+			if not (o.window.has_point(c) and o.is_ore_like_at(c) and o.material_at(c) != &"coal"):
+				continue
+			var at: Vector2 = (Vector2(c) + Vector2(0.5, 0.5)) * 4.0
+			if at.distance_squared_to(body_px) < ruler_d:
+				ruler_d = at.distance_squared_to(body_px)
+				ruler = at
+	var ring: Vector2 = TargetGuide.target(&"mine", o)
+	_check(ruler != TargetGuide.NONE and ruler.y - body_px.y > TargetGuide.BAND_PX and absf(ruler.x - body_px.x) < 16.0,
+		"control: the ruler's nearest ore from the shaft's lip is the buried vein, %.1f m below the body's centre and past its reach" % ((ruler.y - body_px.y) / 16.0))
+	_check(ring != TargetGuide.NONE and ring != ruler and absf(ring.y - body_px.y) <= TargetGuide.BAND_PX and ring.x < body_px.x - 6.0 * 16.0,
+		"MINE rings the vein at the body's own level instead, %.1f m to the left (the ruler's was %.1f m off)" % [(body_px.x - ring.x) / 16.0, sqrt(ruler_d) / 16.0])
+	body.pos_x = spawn_x + 7 * 16 * Fx.SCALE + 8 * Fx.SCALE            # in the shaft's mouth, a metre down
+	body.pos_y += 16 * Fx.SCALE
+	o = door.observe(Interface.Envelope.oracle_over(world.grid))
+	body_px = Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE)
+	var below: Vector2 = TargetGuide.target(&"mine", o)
+	_check(below != TargetGuide.NONE and below.y > body_px.y and absf(below.y - body_px.y) <= TargetGuide.BAND_PX and absf(below.x - body_px.x) < 8.0,
+		"standing in the shaft's mouth the buried vein is at the body's level and the ring is on it (%.1f m below)" % ((below.y - body_px.y) / 16.0))
+	body.pos_x = spawn_x
+	body.pos_y -= 16 * Fx.SCALE
 
 
 ## D0431 (stranger 6): the tree stands six metres left of spawn; from the drill shaft at +7 that is 13 m,

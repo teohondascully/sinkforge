@@ -17785,3 +17785,36 @@ was posed through the same plane call, not the same machine.
 **Why:** the audit's water conclusion was "avoided, not repaired" until pumping was exercised.
 
 **Reverse cost:** one test and one optional parameter.
+
+## D0436 · 2026-09-06 · Strangers 10-12 on the capped world: the ring prefers your level, the slash on air is named, the seat's frame is taken at rest
+
+**Decided:** three changes from the batch that tested D0434 (`docs/playtests/2026-09-06_strangers10-12.md`).
+(1) THE RING PREFERS THE BODY'S OWN LEVEL. Strangers 11 and 12 walked right before pointing, and the target
+ring moved from the vein at the pad to the drill shaft's buried ore two metres under the surface: the
+nearest ore by the ruler, 3.4 m below the body's centre, past the 3.2 m reach from anywhere they could
+stand, under a how-to that still read "at your feet". Neither ever mined an ore. `TargetGuide.scan` now
+adds `OUT_OF_BAND` to any hit farther than `Interface.Observation.REACH_PX` above or below the body's
+centre, so every hit at the body's level ranks first whatever the distance across; standing in the shaft,
+the buried vein is the level one. Pinned in `test_tutorial_teaching` with a ruler control (the brute nearest
+IS the buried vein, so the pin is not vacuous) and the mutation fails it. (2) NOTHING THERE. TOO FAR had
+taught stranger 10 that the red slashed square means "past your reach"; the same slash on open air beside
+a thin trunk then read as reach for eighteen seconds. A slash held on AIR for `FAR_TICKS` teaches
+"NOTHING THERE -- the red slashed square is on open air: no rock under the pointer. Point at the rock or
+trunk itself; a trunk is thin, so aim at its middle." The far and air counts are separate, so alternating
+teaches neither (`test_hints`). (3) THE SEAT SETTLES BEFORE THE FRAME. Frame 16 of run 10 was taken while
+the body still slid from the burst before; the stranger aimed at the trunk where the frame showed it and
+the body was most of a metre on. `playtest/seat.gd` now releases every input when the sequence is spent
+and runs on until the body's velocity is zero (at most `SETTLE_MAX` 90 ticks), then captures; the
+observation carries `settled_ticks` and `still`; "settle": false keeps the raw cut. The one sim fact the
+seat reads is the body's velocity. Measured live: a 30-tick walk settles in 4 ticks.
+
+**Also read, not changed:** the cap held (none of three fell in; eight of nine had before); the whole-stack
+smelt sentence held one stranger at the forge for both ingots; the drop-short flash and "POINT" went
+untested. Three taste items: T034 the felled crown floats, T035 RUN_SPEED against a 64 m world, T036 the
+east edge without a wall.
+
+**Why:** the first rung was seconds for eight of nine strangers and never for two of three here; the
+difference was one D press before the first pointer, and the ring's ruler.
+
+**Reverse cost:** two constants and two lines in the scan; one moment and one counter; one bool and one
+read of the body's velocity in the seat.

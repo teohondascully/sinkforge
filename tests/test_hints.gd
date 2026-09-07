@@ -42,7 +42,22 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_obs([]), 0.016)
 	h.observe(_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 8, "nine pack lessons and eight moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 9, "nine pack lessons and nine moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+
+
+## D0436: the same slash held on open air teaches NOTHING THERE, on the same count; the far ticks and the
+## air ticks are separate counts, so alternating the two teaches neither.
+func _air_pins(h: Hints, far: Interface.Observation, dry: Interface.Observation) -> void:
+	var air: Interface.Observation = _obs()
+	air.aim_refusal = &"air"
+	for i: int in 2 * Hints.FAR_TICKS:
+		h.observe(air if i % 2 == 0 else far, 0.016)
+	_check(h.active_id() == &"", "alternating air and far refusals for %d ticks teaches nothing (%s)" % [2 * Hints.FAR_TICKS, h.active_id()])
+	for _i: int in Hints.FAR_TICKS:
+		h.observe(air, 0.016)
+	_check(h.active_id() == &"aim_air" and h.active_text().begins_with("NOTHING THERE"), "held on air for %d ticks fires NOTHING THERE (%s)" % [Hints.FAR_TICKS, h.active_id()])
+	for _i: int in 30:
+		h.observe(dry, 0.5)
 
 
 func _test_one_bubble_at_a_time_in_table_order() -> void:
@@ -80,6 +95,7 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	_check(h.active_id() == &"too_far", "the twentieth tick fires TOO FAR (%s)" % h.active_id())
 	for _i: int in 30:
 		h.observe(dry, 0.5)
+	_air_pins(h, far, dry)
 	var deep: Interface.Observation = _obs()
 	deep.cell.y = Interface.Observation.SKY_ROWS + 40
 	h.observe(deep, 0.016)

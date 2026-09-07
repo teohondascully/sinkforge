@@ -11,6 +11,8 @@ var pointer: Vector2 = Vector2(640, 360)
 ## move that needs mid-air steering does not wait on a screenshot per key change. The sequence is bounded
 ## like one burst (300 ticks in all) and each segment is validated like one.
 func validate(command: Dictionary) -> String:
+	if command.has("settle") and not command["settle"] is bool:
+		return "settle must be true or false"
 	if command.has("moves"):
 		var moves: Variant = command["moves"]
 		if not moves is Array or (moves as Array).is_empty():

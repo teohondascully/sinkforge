@@ -9,6 +9,15 @@ var remaining: int = -1
 var request_id: int = 0
 var capturing: bool = false
 var ready: bool = false
+## THE FRAME IS TAKEN AT REST (D0436, stranger 10). A burst that ended mid-stride captured a body still
+## sliding: the stranger aimed at the trunk where the frame showed it, the body slid a hand's width on,
+## and eighteen seconds of MINE went into the air beside it. When the sequence is spent the seat releases
+## every input and runs on, up to SETTLE_MAX ticks, until the body's velocity is zero -- a slide ends, a
+## fall lands -- then captures. `settled_ticks` in the observation says how many it took and `still`
+## whether it got there. A command with "settle": false keeps the raw cut.
+const SETTLE_MAX: int = 90
+var settling: int = -1              ## ticks spent settling this burst; -1 while the sequence still runs
+var settle: bool = true
 
 
 func _initialize() -> void:
@@ -37,7 +46,7 @@ func _start() -> void:
 	if not game.boot(false):
 		quit(2)
 		return
-	_write("receipt.json", {"engine": Engine.get_version_info(), "mode": "screen-only paused-between-bursts",
+	_write("receipt.json", {"engine": Engine.get_version_info(), "mode": "screen-only settled-between-bursts",
 		"viewport": [1280, 720], "session_dir": session_dir, "pid": OS.get_process_id()})
 	ready = true
 	remaining = 1
@@ -46,17 +55,29 @@ func _start() -> void:
 func _physics_process(_delta: float) -> bool:
 	if not ready or paused:
 		return false
-	if remaining == 0:
-		# The next segment of a composed move (D0420), or the screenshot when the sequence is spent.
+	if remaining > 0:
+		remaining -= 1
+		return false
+	if settling < 0:
+		# The next segment of a composed move (D0420), or the release when the sequence is spent.
 		var next: int = bridge.next_segment(root)
 		if next > 0:
 			remaining = next - 1
 			return false
-		paused = true
-		_capture.call_deferred()
-	else:
-		remaining -= 1
+		bridge.apply({}, root)
+		settling = 0
+	if settle and settling < SETTLE_MAX and _moving():
+		settling += 1
+		return false
+	paused = true
+	_capture.call_deferred()
 	return false
+
+
+## Whether the body is still moving: the one sim fact the seat reads, to know when the frame is honest.
+func _moving() -> bool:
+	var body: Body = game.door.services()["body"]
+	return body.vel_x != 0 or body.vel_y != 0
 
 
 func _process(_delta: float) -> bool:
@@ -87,6 +108,8 @@ func _process(_delta: float) -> bool:
 	# physics tick through `next_segment`, the rest at their boundaries (D0420).
 	paused = false
 	bridge.begin(command)
+	settle = bool(command.get("settle", true))
+	settling = -1
 	remaining = 0
 	return false
 
@@ -97,7 +120,8 @@ func _capture() -> void:
 	var path: String = session_dir.path_join("frame_%04d.png" % request_id)
 	var result: Error = root.get_texture().get_image().save_png(path)
 	var response: Dictionary = {"id": request_id, "tick": game.tick,
-		"sim_seconds": float(game.tick) / 60.0, "screenshot": path, "capture_error": result}
+		"sim_seconds": float(game.tick) / 60.0, "screenshot": path, "capture_error": result,
+		"settled_ticks": maxi(settling, 0), "still": not _moving()}
 	_write("observation_%04d.json" % request_id, response)
 	_write("response.json", response)
 	capturing = false
