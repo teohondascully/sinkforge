@@ -432,7 +432,14 @@ for Codex is `docs/audits/2026-09-06-update-for-codex.md` (D0416-D0438, with §1
 "hold ORE (its number key)" was read and acted on by both who reached the forge; THE WAY DOWN fired twice
 and one dug on it; S20 overshot the vein by five metres on two presses and never mined (T035); S21 pressed
 "under me" at screen centre at the world's east edge where the camera clamps (T036). The first rung's
-sentence now leads with POINT and names no direction. 11.6-13.0 s a burst.
+sentence now leads with POINT and names no direction. 11.6-13.0 s a burst. **D0445:** a held MINE on a
+machine says THAT IS A MACHINE. **Strangers 22-24 (D0446, D0447):** S22 is the best run yet (ore 3.4 s,
+ingots 12.1 s, wood 40.5 s, stuck at BUILD on the word "spawn", T038); two strangers could not close the
+settings page by ESC (handled twice a tick; fixed, pinned, measured live); two of three never mined ore,
+pressing at the feet or a far rock while the outlined block sat 20 px off -- the ring's tightening
+(D0433) is the one visual change common to every failing batch since, and D0447 restores the 0.9 m ring
+with the outline inside it. The loop is measured per burst (`timing.jsonl`): the seat's share is ~1 s;
+the agent's think time is the rest. Astra's queue is tracked at `docs/VISUAL_REVIEW_QUEUE_2026-09-07.md`.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -459,8 +466,9 @@ T031 (taken provisionally in D0434: the chimney capped; overrule by deleting two
 (four ring kinds); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
 at zero; the forks T024-T030.
 
-**Cheap next steps that need no ruling:** a batch on the D0444 build (the POINT sentence; WRONG STACK and
-the "more coming" tick still unseen); a machine under the pointer named as a machine, not "open air"; the
-rest of the Codex update's §10 (downscaled frames, more seats, a seat-driven scripted stranger); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
+**Cheap next steps that need no ruling:** a batch on the D0447 build (the big ring with the outline;
+WRONG STACK and the "more coming" tick still unseen); Astra's testing-loop items 3-4 (event-triggered and
+composed bursts) and the seat-driven ceiling run (12); then Astra's visual P0s in order (the hotbar's
+content-aware width, the objective card's rest height, the refusal slot); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
 instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
 bake (V32).

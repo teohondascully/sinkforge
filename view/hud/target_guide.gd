@@ -26,10 +26,12 @@ const VISITS_PER_FRAME: int = 4000     ## about 2 ms of predicate calls, D0414's
 ## pointer that does not read is cheap: it stays for the rung's life at this floor, full while the how-to
 ## is up. A ring a stranger has stopped needing is one ring; a rung with no pointer is a stranger lost.
 const RING_FLOOR: float = 0.38
-## THE RING TIGHTENS AS YOU ARRIVE (D0433; D0423 named it): a 0.9 m ring on a trunk the body stands beside
-## sat on the miner's own chest. Within NEAR_M of the target it draws at RING_NEAR_M, growing back to RING_M
-## by FAR_M, so the pointer yields the body once the body is there and the aim square takes over.
-const RING_NEAR_M: float = 0.35
+## THE RING DOES NOT TIGHTEN (D0447 reversed D0433). D0433 shrank the ring to 0.35 m within NEAR_M so it would
+## not sit on the miner's chest; eight of eight strangers who tried had mined the vein on the pad before it,
+## eight of fourteen since -- every failure at the range where the ring was a nine-pixel speck. RING_NEAR_M
+## is RING_M now (the lerp below is a constant); within NEAR_M the target's own metre is outlined inside the
+## ring, so the ring finds the eye and the outline names the block. The chest overlap is the cheaper fault.
+const RING_NEAR_M: float = 0.9       ## D0447: the ring no longer tightens; the outline names the block inside it
 const NEAR_M: float = 2.2               ## from the body's CENTRE, 1.25 m over its feet: a cell beside the boot is 1.6-2 m off
 const FAR_M: float = 3.5
 ## THE BLOCK ITSELF WHEN YOU ARE THERE (D0443, strangers 13 and 17). A 0.35 m ring at play zoom is a

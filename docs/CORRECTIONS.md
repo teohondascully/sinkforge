@@ -497,3 +497,9 @@ a correction until something explicitly supersedes its claim; it stays in `docs/
 D0438 (2) hung a chevron over a near target so the tightened ring would be seen. It was seen: stranger 17
 pointed at it, three times, on air. D0443 replaces it with an outline of the target's own metre. The D0438
 entry stands as written; its chevron constants are gone from `view/hud/target_guide.gd`.
+
+## D0433's tightening, reversed by D0447 (2026-09-06)
+
+D0433 tightened the target ring to 0.35 m within 1.5 m of the body. D0447 restores 0.9 m at every range,
+with D0443's outline of the target's metre inside it, after six of fourteen strangers lost the first rung at
+that range against none of eight before. The D0433 entry stands as written; `RING_NEAR_M` equals `RING_M`.

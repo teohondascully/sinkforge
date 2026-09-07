@@ -18038,3 +18038,23 @@ optimised.
 waits is the long one.
 
 **Reverse cost:** one static function and two call sites; three timestamps and one log line.
+
+## D0447 · 2026-09-06 · The ring does not tighten (D0433 reversed); the outline stays inside it
+
+**Decided:** D0433 shrank the target ring from 0.9 m to 0.35 m within NEAR_M so it would not sit on the
+miner's chest beside a trunk (stranger 6's hesitation). Since then the first rung -- the vein a step from
+the spawn, at exactly that range -- has been lost by six of fourteen strangers who tried, against none of
+eight before (`docs/playtests/2026-09-06_strangers22-24.md`, "a pattern across fourteen runs"). Three
+sentences and two markers moved the failure without removing it; the one visual change common to every
+failing batch is a marker under ten pixels where the eye has to find it. RING_NEAR_M is RING_M: the ring
+is 0.9 m (46 px at play zoom) at every range, and D0443's outline of the target's metre stays inside it --
+the ring finds the eye, the outline names the block. The chest overlap is the cheaper fault. Recorded in
+`docs/CORRECTIONS.md`; `test_tutorial_teaching` pins the constant ring.
+
+**Not proven:** that the ring's size was the cause. The batches also changed the sentence and the strangers
+walked more; batch 25-27 is the test, and the same three missions are kept for it.
+
+**Why:** the tightening solved a cosmetic fault and may have created a discoverability one at the game's
+first ten seconds; the reverse trade is the right side to be wrong on.
+
+**Reverse cost:** one constant.

@@ -212,9 +212,10 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 		seen = g2._cached_target(&"wood", o)
 		frames += 1
 	_check(seen == whole and frames >= 1 and frames <= 12, "the chip's frame-budgeted walk shows the ring within %d frames" % frames)
-	# D0433: the ring tightens as the body arrives, so it never sits on the miner's chest.
-	_check(is_equal_approx(TargetGuide.ring_m(0.5), TargetGuide.RING_NEAR_M) and is_equal_approx(TargetGuide.ring_m(6.0), TargetGuide.RING_M) and TargetGuide.ring_m(2.5) > TargetGuide.RING_NEAR_M and TargetGuide.ring_m(2.5) < TargetGuide.RING_M,
-		"the ring is %.2f m beside the target, %.2f m far off, between in between" % [TargetGuide.ring_m(0.5), TargetGuide.ring_m(6.0)])
+	# D0447 reversed D0433's tightening: the ring is RING_M at every range (a 46 px ring at play zoom finds the
+	# eye where a 9 px one did not), and the outline inside it names the block.
+	_check(is_equal_approx(TargetGuide.ring_m(0.5), TargetGuide.RING_M) and is_equal_approx(TargetGuide.ring_m(6.0), TargetGuide.RING_M) and TargetGuide.RING_M * 2.0 * 25.6 >= 40.0,
+		"the ring is %.2f m at every range, %.0f px across at play zoom" % [TargetGuide.ring_m(0.5), TargetGuide.RING_M * 2.0 * 25.6])
 	# D0443 (strangers 13 and 17): where the ring has tightened to a speck, the target's own metre is outlined
 	# -- the square the pointer must land on -- and nothing hangs in the air beside it to be pointed at.
 	var beside: float = Vector2(1.5, 1.25).length()   # a cell a step to the side of the boot, from the body's centre
