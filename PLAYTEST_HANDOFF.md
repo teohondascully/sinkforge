@@ -21,6 +21,8 @@ godot --path . --resolution 1280x720 --disable-vsync --position 0,0 --script res
 python3 playtest/command.py "$SESSION" '{"ticks":1,"mouse":[640,360]}'
 ```
 
+A command is a flat burst, or a COMPOSED MOVE: `{"moves":[{"ticks":10,"keys":["Space","D"]},{"ticks":30,"keys":["D"]},{"ticks":20,"keys":["A"]}]}` runs its segments back to back inside the game loop, each key set switching at its boundary, with one screenshot at the end (D0420). The segments total at most 300 ticks and each is validated like a burst. This is what makes mid-air steering possible over a screenshot round trip.
+
 The Godot process must remain running in another terminal. `--disable-vsync` is required when the window is
 not on the active Space: with vsync on, the render loop waits for a display it cannot present to and the
 seat answers a burst in minutes or never (2026-09-06). The pointer is the SEAT'S OWN, posed at the named

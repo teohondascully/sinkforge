@@ -17344,3 +17344,22 @@ Verified end to end: one LMB burst on the ringed rock completes "Mine 4 ore".
 before the subject is judged.
 
 **Reverse cost:** two lines in the bridge, one flag.
+
+## D0420 · 2026-09-06 · Composed moves in the playtest adapter: timed segments inside one burst, one screenshot at the end
+
+**Decided:** a command may carry `moves`, a sequence of timed segments -- "Space and D for 10 ticks, then D
+for 30, then A for 20" -- that the seat runs back to back inside the game loop, each key set, pointer and
+button set switching at its segment boundary, with one screenshot when the sequence is spent. The whole
+sequence is bounded like one burst (300 ticks) and each segment is validated like one. The bridge stages
+the queue (`begin`) and the seat pulls one segment per boundary (`next_segment`), so the seat's own tick
+accounting is unchanged and a flat burst is a one-segment sequence. Pinned: the sequence validates as a
+whole and refuses a bad segment, an empty list and a total over the bound; segments apply in order with
+the release edges at the boundaries; the pointer moves with its segment; a flat burst still runs.
+
+**Why:** the director's read of the adapter's real problem: a screenshot round trip costs seconds, and a
+move that needs a key change in mid-air cannot be played one key per round trip. Composed moves let an
+agent think in moves rather than keys, which is also the shape a later on-device player would emit. The
+boundary the adapter keeps -- no simulation state, no target coordinates -- is untouched: a composed move
+is still physical input over a fixed window.
+
+**Reverse cost:** one field, three functions in the bridge, six lines in the seat.

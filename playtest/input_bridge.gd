@@ -6,10 +6,61 @@ var held_buttons: Array = []
 var pointer: Vector2 = Vector2(640, 360)
 
 
+## The whole command: a flat burst, or `moves`, a sequence of timed segments run inside the game loop with
+## one screenshot at the end (D0420) -- "Space and D for 10 ticks, then D for 30, then A for 20" -- so a
+## move that needs mid-air steering does not wait on a screenshot per key change. The sequence is bounded
+## like one burst (300 ticks in all) and each segment is validated like one.
 func validate(command: Dictionary) -> String:
+	if command.has("moves"):
+		var moves: Variant = command["moves"]
+		if not moves is Array or (moves as Array).is_empty():
+			return "moves must be a non-empty list of segments"
+		var total: int = 0
+		for seg: Variant in moves:
+			if not seg is Dictionary or (seg as Dictionary).has("moves"):
+				return "each segment must be a flat burst"
+			var error: String = _validate_segment(seg)
+			if error != "":
+				return error
+			total += int((seg as Dictionary).get("ticks", 1))
+		if total > MAX_TICKS:
+			return "moves must total at most %d ticks" % MAX_TICKS
+		return ""
+	return _validate_segment(command)
+
+
+## How long the command runs, in ticks: the sum of its segments.
+func total_ticks(command: Dictionary) -> int:
+	if command.has("moves"):
+		var total: int = 0
+		for seg: Variant in command["moves"]:
+			total += int((seg as Dictionary).get("ticks", 1))
+		return total
+	return int(command.get("ticks", 1))
+
+
+## Stage a validated command; the seat then pulls one segment per boundary with `next_segment`.
+func begin(command: Dictionary) -> void:
+	_queue = command["moves"].duplicate() if command.has("moves") else [command]
+
+
+## Apply the next segment and return its length in ticks, or -1 when the sequence is spent.
+func next_segment(viewport: Viewport) -> int:
+	if _queue.is_empty():
+		return -1
+	var seg: Dictionary = _queue.pop_front()
+	apply(seg, viewport)
+	return int(seg.get("ticks", 1))
+
+
+const MAX_TICKS: int = 300
+var _queue: Array = []
+
+
+func _validate_segment(command: Dictionary) -> String:
 	var ticks: Variant = command.get("ticks", 1)
-	if not (ticks is int or ticks is float) or float(ticks) != int(ticks) or int(ticks) < 1 or int(ticks) > 300:
-		return "ticks must be an integer in 1..300"
+	if not (ticks is int or ticks is float) or float(ticks) != int(ticks) or int(ticks) < 1 or int(ticks) > MAX_TICKS:
+		return "ticks must be an integer in 1..%d" % MAX_TICKS
 	var keys: Variant = command.get("keys", [])
 	if not keys is Array:
 		return "keys must be an array"
