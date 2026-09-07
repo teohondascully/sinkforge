@@ -83,6 +83,9 @@ def validate(session):
     notes = []
     manifest = _load(session / "batch.json") or {}
     receipt = _load(session / "receipt.json")
+    invalid = _load(session / "HARNESS_INVALID.json")
+    if invalid:
+        void.append("HARNESS_INVALID by the supervisor: %s" % invalid.get("reason"))
     if receipt is None:
         void.append("no receipt.json: the seat never booted")
     elif receipt.get("priority") != "foreground":

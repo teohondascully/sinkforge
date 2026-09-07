@@ -87,6 +87,7 @@ def main():
             print("DIVERGED at burst %d:" % n)
             for k, (a, b) in diff.items():
                 print("  %s: source %s | replay %s" % (k, json.dumps(a), json.dumps(b)))
+            subprocess.run([sys.executable, str(command), str(target), '{"quit":true}', "--timeout", "20"], capture_output=True, text=True)
             return 1
         print("  burst %d: tick %s matches" % (n, got["tick"]))
     subprocess.run([sys.executable, str(command), str(target), '{"quit":true}', "--timeout", "20"], capture_output=True, text=True)

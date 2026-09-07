@@ -18197,3 +18197,20 @@ so the settle rule voids nothing that was ever valid.
 the classifier makes the void a fact the report cannot argue with.
 
 **Reverse cost:** two scripts and one receipt field.
+
+## D0455 · 2026-09-07 · The stuck-seat supervisor terminates only the seat it owns and stands a fresh one up beside it
+
+**Decided:** the director's rule 9. `playtest/supervisor.py` watches the seats it is given: the pid in
+the seat's own receipt must still be a seat whose arguments name that session directory, and a command
+written to `command.json` must be answered within its patience (150 s: past the agent's 120 s timeout). A
+seat that fails either is finished: `HARNESS_INVALID.json` records the reason, the last frame's path, the
+unanswered command and the last answered id; the frames, receipts, inputs and `seat.out` stay untouched;
+the owned pid gets SIGTERM, then SIGKILL two seconds later if it still answers to that name; no command or
+response file is rewritten; and a replacement seat is pinned into `<dir>-r<n>` with the same mission
+through `stranger.py start`, for a NEW stranger. Exercised on a seat frozen with SIGSTOP: the three live
+strangers beside it were untouched. `stranger.py validate` reads `HARNESS_INVALID.json` as a VOID reason.
+
+**Why:** a hung seat left alone cost a full batch tonight; a kill by name rather than by ownership could
+have cost the other two.
+
+**Reverse cost:** one script.
