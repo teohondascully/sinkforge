@@ -341,3 +341,33 @@ The game work waiting on faster iteration is in §8.
   when the dropped item is not what the machine beside you takes (stranger 16 dropped clay four times);
   the smelt how-to says hold ORE; every rung's how-to pinned to wrap whole. Add to §7: the D0443 markers,
   D0440's lesson and D0442's tick have not been seen by a stranger yet.
+
+## Addendum 2: the D0443 verification loop, closed as far as three strangers close it (head a4af10eb)
+
+The second auditor was right that batch 16-18 proved D0443's problems and not its fixes. Batch 19-21 ran
+on 8e2bb4b1 (D0443 in) and is read in `docs/playtests/2026-09-06_strangers19-21.md`, against the
+auditor's own checklist:
+
+| Check | Result |
+|---|---|
+| Does the outline receive the pointer? | S19 7.6 s and S21 11.0 s, both after walking first; S20 never came within NEAR_M (overshot the vein by 5 m on two presses, then pointed at the FORGE cell from 6 m: NOTHING THERE) |
+| First ore when the player walks first | 2 of 3 |
+| WRONG STACK with clay beside the forge | never had cause: both strangers who reached the forge pressed the ore's number key first ("Selecting ore with key 1" in S21's journal). The "hold ORE (its number key selects it)" sentence was read and acted on |
+| First ingot | S19 at 21.5 s, after two short drops (4.1 m, with the drop-short flash on the forge) |
+| THE WAY DOWN fires | twice (S20 at ~42 s, S21 at ~17 s); S20 dug 1-2 m on it; S21 failed sixteen digs because the camera clamps at the world's east edge and the body was no longer at screen centre (T036) |
+| The crown falls (T034) | S19 frame 37: the trunk cut at its base, the canopy gone, live in a stranger's run |
+| Pace | 11.6-13.0 s a burst (21.5 two batches earlier) |
+
+Decided from it: **D0444** the first rung's sentence leads with POINT and names no direction ("a step to
+your LEFT" made two strangers walk, and walking at 9.4 m/s is how they lost the vein); **D0445** a MINE
+held on a machine cell teaches THAT IS A MACHINE, never NOTHING THERE (S20). WRONG STACK now has the real
+door journey the auditor asked for (`test_tutorial_teaching::_test_wrong_stack_through_the_door`: clay dug,
+the vein mined, clay selected, dropped beside the forge; the pack's fall and `drop_went` arrive in one
+observe).
+
+**Still unverified by a stranger:** the "more coming" tick (D0442), WRONG STACK itself (the sentence
+pre-empted it), the POINT sentence (batch 22-24 is running on it). **The identity finding** in the second
+audit is inverted: the repository's `authorship` gate requires one identity across every commit and
+~1,300 commits carry the noreply address; the Gmail address was the drift D0429 removed. Nothing is
+rewritten without the director's word. **CI:** every run after 143203a1 was cancelled by the next push
+(concurrency); a4af10eb is the first allowed to finish -- no push until it does.
