@@ -110,8 +110,10 @@ def validate(session):
         asked = int(last_command.get("id", answered))
         if asked > answered and not last_command.get("quit"):
             void.append("stale response id: command %d never answered (last answer %d)" % (asked, answered))
-        if asked > answered and last_command.get("quit"):
+        if asked > answered and last_command.get("quit") and not response.get("quit"):
             void.append("the quit at id %d was never answered: process death or a hang (last answer %d)" % (asked, answered))
+        if asked > answered and last_command.get("quit") and response.get("quit"):
+            notes.append("a second quit (id %d) after the seat had already quit at %d: the orchestrator's, not the run's" % (asked, answered))
         if not response.get("quit") and not last_command.get("quit"):
             notes.append("no quit was sent: the seat may still be running")
     for i, o in observations.items():

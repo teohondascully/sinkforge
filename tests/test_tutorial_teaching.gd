@@ -131,6 +131,7 @@ func _test_the_ring_finds_the_real_targets() -> void:
 	var drill: Vector2 = TargetGuide.target(&"build", o)
 	_check(drill != TargetGuide.NONE and drill.x > body_px.x and drill.y > body_px.y, "BUILD rings the crew's drill, below and to the right (%.1f m off)" % (body_px.distance_to(drill) / 16.0))
 	_cut_mark_pins(o, drill, vein, forge)
+	_cut_through_pins(door, world, drill)
 	_shaft_mouth_pins(o, drill)
 	var coal: Vector2 = TargetGuide.target(&"fuel", o)
 	_check(coal != TargetGuide.NONE and coal.x > body_px.x, "FUEL rings the coal seam to the right")
@@ -244,6 +245,26 @@ func _cut_mark_pins(o: Interface.Observation, drill: Vector2, vein: Vector2, for
 	_check(cut.size == Vector2(16.0, 16.0) and cut.position.x == float(drill_m.x) * 16.0 and cut.position.y < drill.y - 16.0 and not o.solid_at(Vector2i(drill_m.x * 4 + 2, int(cut.position.y / 4.0) - 2)),
 		"BUILD's cut mark is the top of the roof over the drill, in its column, under open air (%s over %s)" % [cut, drill_m])
 	_check(TargetGuide.cut_metre(o, vein).size == Vector2.ZERO and TargetGuide.cut_metre(o, forge).size == Vector2.ZERO, "the surface vein and the forge, under open air, get no cut mark")
+
+
+## D0467 (strangers 46 and 48): the first bite at the WHITE SQUARE took its centre cell and the square
+## vanished, the body still standing on the metre's rim; both stopped digging. The roof metre counts as
+## roof while any of its sixteen cells stands, and the mark goes only when the metre is clear.
+func _cut_through_pins(door: Interface, world: World, drill: Vector2) -> void:
+	var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	var cut: Rect2 = TargetGuide.cut_metre(o, drill)
+	var col: int = int(cut.position.x / 4.0)
+	var row: int = int(cut.position.y / 4.0)
+	for c: Vector2i in [Vector2i(col + 1, row), Vector2i(col + 2, row), Vector2i(col + 1, row + 1), Vector2i(col + 2, row + 1), Vector2i(col + 1, row + 2), Vector2i(col + 2, row + 2)]:
+		world.grid.excavate(c)                                             # a bite through the middle, the rim standing
+	var bitten: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	_check(not bitten.solid_at(Vector2i(col + 2, row + 2)) and bitten.solid_at(Vector2i(col, row)), "control: the metre's centre is open and its corner stands")
+	_check(TargetGuide.cut_metre(bitten, drill) == cut, "the mark stays on the bitten metre while its rim stands (%s)" % str(TargetGuide.cut_metre(bitten, drill)))
+	for dy: int in 4:
+		for dx: int in 4:
+			world.grid.excavate(Vector2i(col + dx, row + dy))
+	var clear: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	_check(TargetGuide.cut_metre(clear, drill).size == Vector2.ZERO, "...and goes once the metre is clear (%s)" % str(TargetGuide.cut_metre(clear, drill)))
 
 
 ## D0459: the drill in hand moves BUILD's ring from the pile to the shaft's mouth -- the open metre over

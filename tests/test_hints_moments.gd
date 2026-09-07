@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_test_wrong_stack_pins()
 	_test_mined_wrong_pins()
 	_test_sight_pins()
+	_test_cut_through_pins()
 	_test_left_working_pins()
 	_finish("hints_moments")
 
@@ -95,6 +96,33 @@ func _test_sight_pins() -> void:
 	_check(h.active_id() == &"", "a brush past a buried cell (%d ticks) teaches nothing yet" % (Hints.FAR_TICKS - 1))
 	h.observe(behind, 0.016)
 	_check(h.active_id() == &"aim_sight" and h.active_text().begins_with("BEHIND ROCK"), "the %dth tick on a cell behind rock fires BEHIND ROCK (%s)" % [Hints.FAR_TICKS, h.active_id()])
+
+
+## D0467 (strangers 46 and 48): a hold whose own bite opened the pointer's cell runs on air; half a second
+## of that is CUT THROUGH, and NOTHING THERE stays quiet for it. Air with no bite behind it keeps the old
+## lesson at its own time.
+func _test_cut_through_pins() -> void:
+	var h: Hints = Hints.new()
+	var bite: Interface.Observation = _hint_obs()
+	bite.mining_broke = true
+	bite.mining_broke_material = &"ore_iron"                       # ore, so NOT ORE stays out of the way
+	var air: Interface.Observation = _hint_obs()
+	air.aim_refusal = &"air"
+	h.observe(bite, 0.016)
+	for _i: int in Hints.CUT_TICKS - 1:
+		h.observe(air, 0.016)
+	_check(h.active_id() == &"", "air for %d ticks after the bite teaches nothing yet" % (Hints.CUT_TICKS - 1))
+	h.observe(air, 0.016)
+	_check(h.active_id() == &"cut_through" and h.active_text().begins_with("CUT THROUGH"), "the %dth tick on air after your own bite is CUT THROUGH (%s)" % [Hints.CUT_TICKS, h.active_id()])
+	for _i: int in Hints.AIR_TICKS:
+		h.observe(air, 0.016)
+	_check(h.active_id() != &"aim_air", "...and NOTHING THERE stays quiet for a hole you cut yourself (%s)" % h.active_id())
+	var cold: Hints = Hints.new()
+	for _i: int in Hints.AIR_TICKS - 1:
+		cold.observe(air, 0.016)
+	_check(cold.active_id() == &"", "control: air with no bite behind it says nothing for %d ticks" % (Hints.AIR_TICKS - 1))
+	cold.observe(air, 0.016)
+	_check(cold.active_id() == &"aim_air", "...and NOTHING THERE at the %dth (%s)" % [Hints.AIR_TICKS, cold.active_id()])
 
 
 func _test_mined_wrong_pins() -> void:

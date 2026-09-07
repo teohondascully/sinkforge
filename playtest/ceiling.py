@@ -49,17 +49,63 @@ def rung(session, name, budget_bursts, step):
     return None
 
 
+def rung4(session, hold):
+    """The fourth rung from the rung-4 save, by the same physical bursts a stranger sends (D0467): walk to the
+    WHITE SQUARE's column (dx +4 of the spawn), bite the roof metre four times (its centre, its bottom row,
+    then the two rim columns the body's edges rest on), drop into the adit onto the drill, press the
+    drill's slot, step toward the ring at the shaft's mouth and press BUILD on it. Read from the receipts:
+    the drill in the pack, then the rung past BUILD."""
+    resp = burst(session, {"ticks": 5}, "ceiling r4: look")
+    body_cell = (resp.get("state") or {}).get("cell") or [117, 75]
+    square_cell_x = 130 + 4 * 4 + 1                                  # the roof metre's second column, dx +4 of the spawn
+    px_per_cell = PX_PER_M / 4.0
+    ticks = max(1, int(round((square_cell_x - body_cell[0]) * 1.5)))  # a burst of D moves ~0.6 cell a tick
+    resp = burst(session, {"ticks": ticks, "keys": ["D"]}, "ceiling r4: walk to the square")
+    body_cell = (resp.get("state") or {}).get("cell") or body_cell
+    while body_cell[0] < square_cell_x:
+        resp = burst(session, {"ticks": 2, "keys": ["D"]}, "ceiling r4: a nudge onto the metre")
+        body_cell = (resp.get("state") or {}).get("cell") or body_cell
+    bites = [([BODY_X, FEET_Y + 2.4 * px_per_cell], "the centre"), ([BODY_X, FEET_Y + 2.7 * px_per_cell], "the bottom row"),
+             ([BODY_X - 2.5 * px_per_cell, FEET_Y + 1.6 * px_per_cell], "the left rim"), ([BODY_X + 2.5 * px_per_cell, FEET_Y + 1.6 * px_per_cell], "the right rim")]
+
+    def drill_pickup(i):
+        at, name = bites[min(i, len(bites) - 1)]
+        resp = burst(session, {"ticks": 120, "mouse": at, "buttons": [1]}, "ceiling r4: bite %s" % name)
+        return resp, pack(resp, "drill") >= 1
+    got = rung(session, "drill_in_hand", 6, drill_pickup)
+    if got is None:
+        return 1
+    slots = list((got.get("state") or {}).get("slots") or [])              # the bar's order, not the sorted pack
+    burst(session, {"ticks": 3, "keys": [str(slots.index("drill") + 1)]}, "ceiling r4: select the drill")
+    burst(session, {"ticks": 8, "keys": ["D"]}, "ceiling r4: a step toward the ring")
+
+    def place(i):
+        resp = burst(session, {"ticks": 10, "mouse": [BODY_X + (2.2 - 0.4 * i) * PX_PER_M, FEET_Y + 0.6 * PX_PER_M], "buttons": [2]}, "ceiling r4: BUILD on the ring")
+        return resp, (resp.get("state") or {}).get("rung") not in (None, "", "build")
+    placed = rung(session, "drill_placed", 5, place)
+    if not hold:
+        burst(session, {"quit": True}, "ceiling r4: done")
+    print(json.dumps({"ceiling_rung4": placed is not None, "sim_seconds": (placed or {}).get("sim_seconds")}))
+    return 0 if placed is not None else 1
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("session_dir")
     parser.add_argument("--hold", action="store_true", help="leave the seat up at the end (for a look at the BUILD rung)")
     parser.add_argument("--save-to", default="", help="after the third rung, write the session here: the rung-4 mission variant's save (D0462)")
+    parser.add_argument("--rung4", default="", help="open this rung-4 save and play the fourth rung only: the drill placed at the shaft's mouth (D0467)")
     args = parser.parse_args()
     session = Path(args.session_dir).resolve()
-    rc = subprocess.run([sys.executable, str(HERE / "stranger.py"), "start", str(session), "--mission", str(Path(__file__).resolve()), "--model", "script:ceiling"]).returncode
+    start = [sys.executable, str(HERE / "stranger.py"), "start", str(session), "--mission", str(Path(__file__).resolve()), "--model", "script:ceiling"]
+    if args.rung4:
+        start += ["--load", args.rung4]
+    rc = subprocess.run(start).returncode
     if rc != 0:
         print("ceiling: the seat did not come up foreground (rc %d)" % rc, file=sys.stderr)
         return 2
+    if args.rung4:
+        return rung4(session, args.hold)
     results = {}
     # Rung 1: the ringed block, a metre left of the boot, at the surface.
     ring = [BODY_X - 1.1 * PX_PER_M, FEET_Y + 0.3 * PX_PER_M]
@@ -72,7 +118,7 @@ def main():
         return 1
     # Rung 2: select the ore's slot, walk left to stand beside the forge (dx -3; beside means within a
     # body length: dx -1.5), drop, and stand there while the ingots come.
-    slots = list(((results["ore"].get("state") or {}).get("pack") or {}).keys())
+    slots = list((results["ore"].get("state") or {}).get("slots") or [])   # the bar's order: slot N is key N
     ore_key = str(slots.index("ore") + 1) if "ore" in slots else "1"
     burst(session, {"ticks": 3, "keys": [ore_key]}, "ceiling: select the ore")
     burst(session, {"ticks": 10, "keys": ["A"]}, "ceiling: a step left, beside the forge")

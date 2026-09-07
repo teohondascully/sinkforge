@@ -289,10 +289,9 @@ static func cut_metre(o: Interface.Observation, at: Vector2) -> Rect2:
 	var row: int = int(floorf(at.y / m)) - 1
 	var top: int = -1                                                       # the topmost solid metre of the roof over the target
 	for _step: int in 64:
-		var c := Vector2i(col * 4 + 2, row * 4 + 2)                          # the metre's centre cell
-		if not o.in_window(c):
+		if not o.in_window(Vector2i(col * 4 + 2, row * 4 + 2)):
 			return Rect2()
-		if o.solid_at(c):
+		if _metre_has_rock(o, col, row):
 			top = row
 		elif top >= 0:
 			break                                                           # open air over a roof: the roof's top is the cut
@@ -300,6 +299,16 @@ static func cut_metre(o: Interface.Observation, at: Vector2) -> Rect2:
 	if top < 0:
 		return Rect2()
 	return Rect2(Vector2(float(col), float(top)) * m, Vector2(m, m))
+
+
+## A metre is roof while ANY of its sixteen cells stands (D0467): the first bite takes the centre and the
+## mark used to vanish with it, the body still on the rim; the mark stays until the metre is clear.
+static func _metre_has_rock(o: Interface.Observation, col: int, row: int) -> bool:
+	for dy: int in 4:
+		for dx: int in 4:
+			if o.solid_at(Vector2i(col * 4 + dx, row * 4 + dy)):
+				return true
+	return false
 
 
 ## The metre (world px) the target cell lies in: what the pointer has to land on.

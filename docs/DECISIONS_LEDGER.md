@@ -18403,3 +18403,29 @@ director's rule 11; the ladder pins read the same.
 thing the other rungs teach the player to look for.
 
 **Reverse cost:** one string.
+
+## D0467 · 2026-09-07 · The cut mark stays while any cell of the roof metre stands; the air after your own bite is CUT THROUGH
+
+**Decided:** the cut mark (D0458) read a metre as roof by its centre cell, and the first bite at the
+WHITE SQUARE is a cone five cells wide at the surface and one at the pointer, which takes the centre:
+strangers 46 and 48 (the rung-4 variant on 0ed149e4) pressed the square inside ten seconds, broke nine
+cells, and the square vanished with three quarters of the metre standing and the body on its rim; both
+stopped digging there. By hand (`playtest/ceiling.py --rung4`, twenty-one bursts, 14.1 s) the metre takes
+four bites, the last two on the rim columns the body's edges rest on, before the body drops onto the
+pile. Now (1) `TargetGuide.cut_metre` reads a metre as roof while ANY of its sixteen cells is solid, so
+the mark stays until the hole is clear (pinned: a bite through the middle keeps the mark, a cleared metre
+loses it; the pin goes red under the centre rule); (2) a hold that runs on air within half a second of
+its own break -- the pointer's cell went -- is a new moment, CUT THROUGH: "the rock under the pointer is
+gone; point at what is left of the WHITE SQUARE; a hole has to be a little wider than you before you
+drop in", at `CUT_TICKS` (30), and NOTHING THERE is held back for that run (pinned in `test_hints` and
+`test_hints_moments`; the old "a break restarts the count" pin restated). Also: the seat's receipts carry
+`slots` in the bar's own order (the `pack` dict is sorted; the first scripted run pressed the coal's key
+for the drill), and `stranger.py validate` notes a second quit after a clean one instead of voiding.
+
+**Why:** the mark said "dig here" and went away after the first swing of the pick, when the hole was
+not yet a hole; the lesson that fired instead (NOTHING THERE, "point at the rock or trunk itself") was
+written for a pointer that was never on rock. The body's width against the metre's is a fact of the
+physics (a body one metre wide needs a hole a little wider); the mark cannot show it, the lesson can say it.
+
+**Reverse cost:** the sixteen-cell test back to the centre cell; the moment's line and its three-line
+detector; `slots` is additive.

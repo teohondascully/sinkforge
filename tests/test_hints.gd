@@ -31,7 +31,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_hint_obs([]), 0.016)
 	h.observe(_hint_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 15, "nine pack lessons and fifteen moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 16, "nine pack lessons and sixteen moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -48,11 +48,17 @@ func _air_pins(h: Hints, far: Interface.Observation, dry: Interface.Observation)
 	for _i: int in Hints.AIR_TICKS - 1:
 		h.observe(air, 0.016)
 	h.observe(broke, 0.016)
-	for _i: int in Hints.AIR_TICKS - 1:
+	for _i: int in Hints.AIR_TICKS:
 		h.observe(air, 0.016)
-	_check(h.active_id() == &"", "a break under the pointer restarts the count: %d air ticks, a break, %d more teach nothing (%s)" % [Hints.AIR_TICKS - 1, Hints.AIR_TICKS - 1, h.active_id()])
-	h.observe(air, 0.016)
-	_check(h.active_id() == &"aim_air" and h.active_text().begins_with("NOTHING THERE") and Hints.AIR_TICKS > 3 * Hints.FAR_TICKS, "the %dth tick on air fires NOTHING THERE, a count well past TOO FAR's %d (%s)" % [Hints.AIR_TICKS, Hints.FAR_TICKS, h.active_id()])
+	# D0467: a break under the pointer restarts the count AND names the hole: the air after your own bite
+	# is CUT THROUGH at CUT_TICKS, and NOTHING THERE never comes for it, however long it is held.
+	_check(h.active_id() == &"cut_through", "%d air ticks, a break, %d more: CUT THROUGH, not NOTHING THERE (%s)" % [Hints.AIR_TICKS - 1, Hints.AIR_TICKS, h.active_id()])
+	var cold: Hints = Hints.new()
+	for _i: int in Hints.AIR_TICKS - 1:
+		cold.observe(air, 0.016)
+	_check(cold.active_id() == &"", "air with no bite behind it teaches nothing for %d ticks (%s)" % [Hints.AIR_TICKS - 1, cold.active_id()])
+	cold.observe(air, 0.016)
+	_check(cold.active_id() == &"aim_air" and cold.active_text().begins_with("NOTHING THERE") and Hints.AIR_TICKS > 3 * Hints.FAR_TICKS, "the %dth tick on air fires NOTHING THERE, a count well past TOO FAR's %d (%s)" % [Hints.AIR_TICKS, Hints.FAR_TICKS, cold.active_id()])
 	for _i: int in 30:
 		h.observe(dry, 0.5)
 	# D0445 (stranger 20): the same "air" refusal with a machine under the aimed cell is THAT IS A MACHINE, on

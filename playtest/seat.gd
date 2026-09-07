@@ -220,7 +220,11 @@ func _state_now() -> Dictionary:
 		pack[String(item)] = int((now["pack"] as Dictionary)[item])
 	var f: Frame = game.view.current_frame()
 	var cell: Array = [f.obs.cell.x, f.obs.cell.y] if f != null and f.obs != null else []
-	return {"rung": String(now.get("rung", &"")), "progress": String(now.get("progress", "")), "pack": pack, "lesson": String(now.get("lesson", &"")), "cell": cell}
+	var slots: Array = []                                    # the bar's own order: slot N is key N (the pack dict above is sorted)
+	if f != null and f.obs != null:
+		for slot: Dictionary in f.obs.pack:
+			slots.append(String(slot["item"]))
+	return {"rung": String(now.get("rung", &"")), "progress": String(now.get("progress", "")), "pack": pack, "slots": slots, "lesson": String(now.get("lesson", &"")), "cell": cell}
 
 
 ## The session written to a named path (the ceiling run makes the rung-N variant's save, D0462); the seat's
