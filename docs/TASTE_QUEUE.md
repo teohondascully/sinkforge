@@ -238,7 +238,8 @@ D0388 lowered the keepout so the boot seed would HAVE a mouth. Legacy's opening 
 want to DROP a mouth that lands in the keepout (so the first one falls where the terrain puts it), or the
 mouth a lip the body cannot walk into blind?*
 
-**T032 · Four kinds of ring on the opening frame.** The tutorial's target ring (pale gold, breathing), the
+**T032 · Four kinds of ring on the opening frame.** *TAKEN provisionally (D0449): the target is the one
+white mark, a reticle with compass ticks over a dark rim; the machine bubbles keep their status colours.* The tutorial's target ring (pale gold, breathing), the
 machine status pips (a small ring and a dot), the grapple's landing ring (hemp now, and gated, D0424), and
 the aim square's own ring when the pointer rests on a lode. The third stranger's first hesitation was
 which ring the lesson meant. *Question: does the target ring want a distinct FORM -- brackets, a
@@ -289,3 +290,11 @@ under the ground RIGHT of spawn -- dig down to it"; stranger 22, three rungs don
 *Question: "to the RIGHT of where you began", or the dig spot itself marked on the surface above the pile
 (a second outline, on the ground the player must open), or the drill pile moved up under the adit floor
 where a stranger already walks?*
+
+**T039 · The hotbar's capacity: shown or not.** Astra's visual queue (P0 items 5-6) asks for a content-aware
+hotbar with an explicit capacity ("5/10" or an expandable tray). The bar IS content-aware already -- it
+draws only the slots carried, with a floor of one (legacy's rule, D0368) -- and hides the cap on purpose:
+"a bar that reports totals is on its way to being a second inventory"; the PACK FULL chip says when the
+cap bites. *Question: does the director want the cap visible before it bites (a "5 of 10" under the bar,
+or one dim empty well past the last full one), or does legacy's rule stand?* Two strangers (14, 20) said
+they could not tell what they held from the bar; none said they wanted to know how much more it takes.

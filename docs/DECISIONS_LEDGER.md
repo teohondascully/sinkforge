@@ -18080,3 +18080,20 @@ the seat; 6-8 (downscaled frames, cached crops) and 12 (the physical ceiling run
 that shows the thing.
 
 **Reverse cost:** one file and a flag.
+
+## D0449 · 2026-09-06 · The target is the one white mark: a reticle over a dark rim (T032 taken provisionally)
+
+**Decided:** the target ring was gold, and a stalled machine's need bubble is a gold-amber ring on a stem
+above its roof. Strangers 25 and 26, told to point at the RINGED rock, pressed the forge's bubble and the
+drill shaft's, six and nine metres off, on their first presses (batch 25-27, in progress as this is
+written; the presses are in `input_0001.json`). T032 asked whether the target ring wanted a distinct FORM
+rather than only a distinct ink; it gets both: the ink is white over a dark rim, and no status that raises a
+bubble is achromatic (`StatusLook`; pinned); the ring wears four compass ticks, a reticle, which no bubble
+does; the near outline takes the same white and rim. The two sentences that said RINGED say WHITE RING.
+Captured at spawn: the white reticle beside the boot, the amber bubbles over the machines, nothing else
+white but the aim square -- which marks where the pointer IS, and merges with the reticle when it arrives.
+
+**Why:** "ringed" named a shape the screen had four of; the sentence can only work if the word names one
+thing.
+
+**Reverse cost:** two colours and a loop of four lines; two words.

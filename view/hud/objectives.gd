@@ -22,8 +22,8 @@ const LINGER_DONE: float = 5.0
 ## `BindingLabels` with whatever the verb is bound to now; the target where a stranger stands; the progress
 ## the chip appends from `progress()`. "Grapple" is the line the body throws; "winch" is the machine.
 const STEPS: Array[Dictionary] = [
-	{"id": &"mine", "label": "POINT at the RINGED silver-flecked rock beside you (in reach from here) and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
-	{"id": &"smelt", "label": "Stand beside the RINGED forge holding ORE (its number key selects it), press [DROP]: the stack goes in, then wait — the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
+	{"id": &"mine", "label": "POINT at the silver-flecked rock in the WHITE RING beside you and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
+	{"id": &"smelt", "label": "Stand beside the WHITE-RINGED forge holding ORE (its number key selects it), press [DROP]: the stack goes in, then wait — the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
 	{"id": &"wood", "label": "Hold [MINE] on a tree's brown TRUNK, not its leaves — sixteen cuts make a block", "goal": "Get wood", "count": &"wood", "need": 1},
 	{"id": &"build", "label": "The crew's drill lies under the ground RIGHT of spawn — dig down to it, walk over it, then select it and press [BUILD] over the shaft mouth", "goal": "Build the line"},
 	{"id": &"fuel", "label": "Hold [MINE] on the black coal seam by the shaft, select the coal, stand by the Drill and press [DROP]", "goal": "Fuel the Drill"},

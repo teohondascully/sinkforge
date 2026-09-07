@@ -216,6 +216,13 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 	# eye where a 9 px one did not), and the outline inside it names the block.
 	_check(is_equal_approx(TargetGuide.ring_m(0.5), TargetGuide.RING_M) and is_equal_approx(TargetGuide.ring_m(6.0), TargetGuide.RING_M) and TargetGuide.RING_M * 2.0 * 25.6 >= 40.0,
 		"the ring is %.2f m at every range, %.0f px across at play zoom" % [TargetGuide.ring_m(0.5), TargetGuide.RING_M * 2.0 * 25.6])
+	# D0449 (T032; strangers 25 and 26 pressed the machines' gold need-bubbles): the target's ink is the one
+	# achromatic mark on the screen -- every status colour has a hue, the target has none.
+	var chromatic: bool = true
+	for status: StringName in StatusLook.LOOK:
+		if StatusLook.LOOK[status]["fix"] != &"none":   # the statuses that raise a need bubble, the ring a stranger confused
+			chromatic = chromatic and (StatusLook.LOOK[status]["color"] as Color).s >= 0.3
+	_check(TargetGuide.INK.s < 0.05 and TargetGuide.INK.v > 0.9 and chromatic, "the target's ink is white (s %.2f) and every status that raises a bubble is chromatic (s >= 0.3)" % TargetGuide.INK.s)
 	# D0443 (strangers 13 and 17): where the ring has tightened to a speck, the target's own metre is outlined
 	# -- the square the pointer must land on -- and nothing hangs in the air beside it to be pointed at.
 	var beside: float = Vector2(1.5, 1.25).length()   # a cell a step to the side of the boot, from the body's centre

@@ -12,7 +12,13 @@ extends RefCounted
 const RING_M: float = 0.9              ## the ring's radius, metres
 const RING_WIDTH: float = 2.0          ## canvas px
 const BREATH_HZ: float = 0.8
-const INK := Color(0.97, 0.87, 0.55)
+## THE TARGET IS THE ONE WHITE MARK (D0449; T032 answered). The ring was gold, and every machine's need
+## bubble is a gold-amber ring on a stem: strangers 25 and 26 read "RINGED" and pressed the forge's bubble
+## and the drill shaft's, 6-9 m off. The target's ink is achromatic -- white over a dark rim -- and no
+## status colour is (`StatusLook`); the ring wears four compass ticks, a reticle, which no bubble does.
+const INK := Color(0.98, 0.98, 0.96)
+const RIM := Color(0.05, 0.04, 0.03)
+const TICK_LEN: float = 5.0            ## canvas px, outside the ring at the compass points
 ## THE SEARCH REACHES THE SCREEN'S HALF-WIDTH AND PAYS FOR IT ACROSS FRAMES (D0431, stranger 6). Ten metres
 ## left the tutorial tree unringed from the drill shaft 13 m away, and the stranger went the other way over
 ## the chimney. A 100-cell miss is 40k visits, ten times D0414's budget; so the ring walk spends at most
@@ -212,13 +218,18 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	var breath: float = 0.55 + 0.45 * sin(frame.anim_time * TAU * BREATH_HZ)
 	var body: Vector2 = Vector2(float(frame.obs.pos_x), float(frame.obs.pos_y)) / float(Fx.SCALE)
 	var r: float = ring_m(body.distance_to(at) / float(Interface.Observation.LOGIC_PX)) * float(o_px_per_m(frame)) * (0.92 + 0.08 * breath)
-	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(INK, alpha * (0.45 + 0.4 * breath)), RING_WIDTH, true)
-	ci.draw_arc(canvas, r * 0.55, 0.0, TAU, 24, Color(INK, alpha * 0.25 * breath), 1.0, true)
+	var ink: float = alpha * (0.55 + 0.4 * breath)
+	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(RIM, alpha * 0.6), RING_WIDTH + 2.0, true)
+	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(INK, ink), RING_WIDTH, true)
+	for d: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+		ci.draw_line(canvas + d * (r + 2.0), canvas + d * (r + 2.0 + TICK_LEN), Color(RIM, alpha * 0.6), RING_WIDTH + 2.0, true)
+		ci.draw_line(canvas + d * (r + 2.0), canvas + d * (r + 2.0 + TICK_LEN), Color(INK, ink), RING_WIDTH, true)
 	if near(body.distance_to(at) / float(Interface.Observation.LOGIC_PX)):
 		var metre: Rect2 = target_metre(at)
 		var rect := Rect2(frame.canvas_of(metre.position), frame.canvas_of(metre.end) - frame.canvas_of(metre.position))
 		ci.draw_rect(rect, Color(INK, alpha * NEAR_FILL * breath))
-		ci.draw_rect(rect, Color(INK, alpha * (0.55 + 0.4 * breath)), false, RING_WIDTH)
+		ci.draw_rect(rect.grow(1.0), Color(RIM, alpha * 0.6), false, RING_WIDTH + 2.0)
+		ci.draw_rect(rect, Color(INK, ink), false, RING_WIDTH)
 
 
 ## The metre (world px) the target cell lies in: what the pointer has to land on.
