@@ -17915,3 +17915,17 @@ generalise it to the floor without being told; stranger 13 did the opposite (dug
 was wanted). The pointer carries the vein; a sentence carries the floor.
 
 **Reverse cost:** one moment, one helper, four fields.
+
+## D0441 · 2026-09-06 · The large map is a tall window centred on the body, not the whole world in a sliver
+
+**Decided:** D0430 made the corner chart a local window and left the large form (the map key) drawing the
+whole 64 x 276 m world fitted into a 360 x 272 box: 63 px wide, a sliver nobody could read. The large form is
+now `Minimap.large_window`: the world's width (LARGE_SPAN_M 64) by LARGE_BOX's aspect -- 200 x 330 authored,
+400 x 660 px on the 720 px canvas -- about 106 m tall, centred on the body and clamped to the world, at 6.25
+px a metre. `corner_window` and `large_window` share `window_of`. Captured: the strata bands, the chimneys
+as dark columns, the trees, the viewport rectangle and the machines read as shapes. The whole-world form is
+gone; a world wider than 64 m shows 64 m of it, as the corner does.
+
+**Why:** the game is vertical; a chart that is 63 px wide cannot show a shaft.
+
+**Reverse cost:** LARGE_BOX and one line in `layout`.

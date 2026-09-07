@@ -48,6 +48,14 @@ func _test_the_frame_fits_the_aspect() -> void:
 	_check(is_equal_approx(wide.size.x, Minimap.CORNER_SPAN_M) and wide.position.x == 0.0 and is_equal_approx(wide.size.y, 40.0), "a wide world shows CORNER_SPAN_M of width, clamped at the left edge, the whole of a short height")
 	var big: Rect2 = Minimap.frame_rect(Vector2i(40, 30), true)
 	_check(big.get_center().is_equal_approx(UiTheme.CANVAS * 0.5) and big.size.x > small.size.x, "the large form is centred and larger")
+	# THE LARGE FORM IS A TALL WINDOW (D0441): the world's width by the tall box's aspect, centred on the body,
+	# and it fills its box on a deep world instead of drawing the whole world as a sliver.
+	var lw: Rect2 = Minimap.large_window(Vector2i(64, 300), Vector2(32.0, 150.0))
+	_check(is_equal_approx(lw.size.x, 64.0) and absf(lw.size.y - 64.0 * Minimap.LARGE_BOX.y / Minimap.LARGE_BOX.x) < 0.01 and is_equal_approx(lw.get_center().y, 150.0) and lw.size.y > win.size.y * 2.0,
+		"the large window is 64 m by %.0f m, centred on the body, more than twice the corner's height (%s)" % [lw.size.y, str(lw)])
+	var deep_big: Rect2 = Minimap.frame_rect(Vector2i(64, 300), true)
+	_check(is_equal_approx(deep_big.size.x, Minimap.LARGE_BOX.x * UiTheme.UI_SCALE) and is_equal_approx(deep_big.size.y, Minimap.LARGE_BOX.y * UiTheme.UI_SCALE) and deep_big.size.y <= UiTheme.CANVAS.y - 2.0 * UiTheme.px(3.0) and deep_big.size.x / lw.size.x >= 6.0,
+		"on a deep world the large form fills its %s box, fits the canvas with the panel's border, at %.1f px a metre (%s)" % [str(Minimap.LARGE_BOX), deep_big.size.x / lw.size.x, str(deep_big.size)])
 
 
 func _test_the_texture_rebuilds_only_on_a_new_version() -> void:
@@ -100,7 +108,9 @@ func _test_the_overlays_land_by_the_scale() -> void:
 	_check(is_equal_approx(dw.get_center().y, 200.0) and (dl["you"] as Vector2).is_equal_approx((dl["rect"] as Rect2).get_center()), "200 m down, the window is centred on the body and the body marks the map's centre")
 	_check((dl["dots"] as Array).size() == 1, "the machine 190 m above the window is not drawn; the one beside the body is (%d)" % (dl["dots"] as Array).size())
 	m.large = true
-	_check((m.layout(deep)["dots"] as Array).size() == 2 and (m.layout(deep)["window"] as Rect2).size == Vector2(64.0, 300.0), "the large form is still the whole world with every machine")
+	var lg: Dictionary = m.layout(deep)
+	_check((lg["dots"] as Array).size() == 1 and is_equal_approx((lg["window"] as Rect2).get_center().y, 200.0) and (lg["window"] as Rect2).size.y < 300.0,
+		"the large form is a tall window centred on the body too: the machine 190 m above is outside it, the one beside the body inside (%d dots, window %s)" % [(lg["dots"] as Array).size(), str(lg["window"])])
 	m.large = false
 	m.shown = false
 	_check(m.layout(f).is_empty(), "hidden: nothing")

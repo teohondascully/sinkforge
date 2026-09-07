@@ -1,7 +1,7 @@
 class_name Minimap
 extends RefCounted
 
-## THE MINIMAP (A' step 6i, D0371): the whole world in a corner box, or centred and large. Legacy
+## THE MINIMAP (A' step 6i, D0371): a local chart in a corner box, or a tall window centred and large. Legacy
 ## `hud.gd`'s `minimap_frame`, `_fit`, `_draw_minimap` and `_rebuild_minimap` on the layout/paint split,
 ## with the plan's own correction: legacy keyed its cached terrain image on `sim.solid.size()`, a count
 ## without membership, and this keys it on the grid's `coarse_version`, which bumps only when a class
@@ -31,7 +31,13 @@ const MINI_H: float = 96.0
 const CORNER_SPAN_M: float = 64.0
 const MINI_TOP: float = 34.0
 const MARGIN_RIGHT: float = 12.0
-const LARGE_BOX := Vector2(360.0, 272.0)
+## THE LARGE FORM IS A TALL WINDOW, NOT THE WHOLE WORLD (D0441; D0430 made the corner a local chart and left
+## the large form a 64 x 276 m sliver 63 px wide). This game is vertical: the large map shows the world's
+## width by LARGE_BOX's aspect -- 64 m by about 106 m -- centred on the body and clamped to the world, at
+## six pixels a metre (the box is authored at UI_SCALE, 400 x 660 px on the 720 px canvas), so a shaft, a
+## cave and the machines in them read as shapes.
+const LARGE_BOX := Vector2(200.0, 330.0)
+const LARGE_SPAN_M: float = 64.0
 const VOID_COLOR := Color(0.05, 0.06, 0.09)
 const ROCK_DARKEN: float = 0.35     ## the band colour is authored for lit rock; a chart of it reads darker
 const WALL_DARKEN: float = 0.62
@@ -63,9 +69,8 @@ static func fit(aspect: Vector2, box: Vector2) -> Vector2:
 ## world's aspect inside a box rather than deriving one side from the other -- a corner element has a
 ## height budget as much as a width one.
 static func frame_rect(map_cells: Vector2i, is_large: bool) -> Rect2:
-	var world := Vector2(float(map_cells.x), float(map_cells.y))
 	if is_large:
-		var big: Vector2 = fit(world, LARGE_BOX * UiTheme.UI_SCALE)
+		var big: Vector2 = fit(large_window(map_cells, Vector2.ZERO).size, LARGE_BOX * UiTheme.UI_SCALE)
 		return Rect2((UiTheme.CANVAS - big) * 0.5, big)
 	var small: Vector2 = fit(corner_window(map_cells, Vector2.ZERO).size, Vector2(UiTheme.px(MINI_W), UiTheme.px(MINI_H)))
 	return Rect2(Vector2(UiTheme.CANVAS.x - small.x - UiTheme.px(MARGIN_RIGHT), UiTheme.px(MINI_TOP)), small)
@@ -73,11 +78,20 @@ static func frame_rect(map_cells: Vector2i, is_large: bool) -> Rect2:
 
 ## The corner's window over the world, in logic cells: the lesser of the world's width and CORNER_SPAN_M
 ## wide, the box's height's worth at that scale tall (never more than the world), centred on `body`
-## (logic cells) and clamped inside the world. The large form's window is the whole world.
+## (logic cells) and clamped inside the world.
 static func corner_window(map_cells: Vector2i, body: Vector2) -> Rect2:
+	return window_of(map_cells, body, CORNER_SPAN_M, Vector2(MINI_W, MINI_H))
+
+
+## The large form's window: LARGE_SPAN_M wide by LARGE_BOX's aspect, centred and clamped the same way.
+static func large_window(map_cells: Vector2i, body: Vector2) -> Rect2:
+	return window_of(map_cells, body, LARGE_SPAN_M, LARGE_BOX)
+
+
+static func window_of(map_cells: Vector2i, body: Vector2, span_m: float, box: Vector2) -> Rect2:
 	var world := Vector2(float(map_cells.x), float(map_cells.y))
-	var w: float = minf(world.x, CORNER_SPAN_M)
-	var h: float = minf(world.y, w * MINI_H / MINI_W)
+	var w: float = minf(world.x, span_m)
+	var h: float = minf(world.y, w * box.y / box.x)
 	var origin := Vector2(clampf(body.x - w * 0.5, 0.0, world.x - w), clampf(body.y - h * 0.5, 0.0, world.y - h))
 	return Rect2(origin, Vector2(w, h))
 
@@ -142,7 +156,7 @@ func layout(frame: Frame) -> Dictionary:
 	var rect: Rect2 = frame_rect(o.map_cells, large)
 	var px_per_logic: float = float(Interface.Observation.LOGIC_PX)
 	var body := Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE) / px_per_logic
-	var window: Rect2 = Rect2(Vector2.ZERO, Vector2(o.map_cells)) if large else corner_window(o.map_cells, body)
+	var window: Rect2 = large_window(o.map_cells, body) if large else corner_window(o.map_cells, body)
 	var scale := Vector2(rect.size.x / window.size.x, rect.size.y / window.size.y)
 	var view: Rect2 = frame.view_world_rect
 	var view_rect := Rect2(rect.position + (view.position / px_per_logic - window.position) * scale, view.size / px_per_logic * scale)
