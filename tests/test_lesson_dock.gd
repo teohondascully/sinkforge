@@ -23,6 +23,7 @@ func _initialize() -> void:
 	_test_canvas_of()
 	_test_the_dock_is_stable_and_clear_of_the_action_area()
 	_test_the_layout_follows_the_lesson()
+	_test_the_dock_clears_a_full_hotbar_and_the_whole_legend()
 	await _test_paint_runs_through_the_hud_host()
 	_finish("lesson_dock")
 
@@ -142,3 +143,34 @@ func _test_paint_runs_through_the_hud_host() -> void:
 	_check(int(ran[0]) > 1, "paint() ran through the host over several frames (%d)" % int(ran[0]))
 	_check(chip.hints.taught_ids().has("torch") or int(ran[0]) < 3, "the torch that arrived mid-run was taught (%s)" % str(chip.hints.taught_ids()))
 	view.queue_free()
+
+
+## Astra's next test for the dock (D0416): readable beside the legend and a populated hotbar. The tallest
+## lesson's plate against a ten-slot hotbar's backing and the legend's full first line: no overlap, and a
+## gap between the dock's foot and the legend's cap.
+func _test_the_dock_clears_a_full_hotbar_and_the_whole_legend() -> void:
+	var font: Font = ThemeDB.fallback_font
+	var tallest: Rect2 = LessonDock.dock_rect(font, TEXT)
+	for text: String in _every_lesson():
+		var r: Rect2 = LessonDock.dock_rect(font, text)
+		if r.size.y > tallest.size.y:
+			tallest = r
+	var f: Frame = _frame()
+	var typed: Array[Dictionary] = []
+	for i: int in 10:
+		typed.append({"item": &"ore", "count": 99})
+	f.obs.pack = typed
+	f.obs.pack_slots = 10
+	f.obs.pack_bulk_cap = 400
+	var bar: Dictionary = Hotbar.layout(f, font)
+	var backing: Rect2 = bar["backing"]
+	_check(backing.size.x > 0.0 and not tallest.intersects(backing), "the tallest lesson's plate does not touch a full ten-slot hotbar's backing (%s vs %s)" % [tallest, backing])
+	var legend: KeyLegend = KeyLegend.new()
+	var l: Dictionary = legend.layout(f, font)
+	var parts: PackedStringArray = legend.remaining()
+	var text: String = KeyLegend.SEPARATOR.join(parts)
+	var tw: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(KeyLegend.SIZE)).x
+	var cap: float = float((l["at"] as Vector2).y) - font.get_ascent(UiTheme.pt(KeyLegend.SIZE))
+	var legend_rect := Rect2(Vector2((l["at"] as Vector2).x, cap), Vector2(tw, font.get_height(UiTheme.pt(KeyLegend.SIZE))))
+	_check(parts.size() >= 3 and not tallest.intersects(legend_rect) and tallest.end.y < legend_rect.position.y, "the plate sits %.0f px above the whole legend's line (%d parts, %.0f px wide)" % [legend_rect.position.y - tallest.end.y, parts.size(), tw])
+	_check(not legend_rect.intersects(backing), "and the legend's line stays clear of the hotbar's backing")
