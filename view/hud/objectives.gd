@@ -25,7 +25,7 @@ const STEPS: Array[Dictionary] = [
 	{"id": &"mine", "label": "POINT at the silver-flecked rock in the WHITE RING beside you and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
 	{"id": &"smelt", "label": "Stand beside the WHITE-RINGED forge holding ORE (its number key selects it), press [DROP]: the stack goes in, then wait — the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
 	{"id": &"wood", "label": "Hold [MINE] on a tree's brown TRUNK, not its leaves — sixteen cuts make a block", "goal": "Get wood", "count": &"wood", "need": 1},
-	{"id": &"build", "label": "The crew's drill lies in the WHITE RING: dig straight down at the WHITE SQUARE above it, walk over it, select it, press [BUILD] at the shaft's mouth", "goal": "Build the line"},
+	{"id": &"build", "label": "The crew's drill lies in the WHITE RING: dig down at the WHITE SQUARE above it, walk over it, press its slot's key, [BUILD] where the ring moves", "goal": "Build the line"},
 	{"id": &"fuel", "label": "Hold [MINE] on the black coal seam by the shaft, select the coal, stand by the Drill and press [DROP]", "goal": "Fuel the Drill"},
 	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore into the forge below. First automation!", "goal": "First automation"},
 	{"id": &"hopper", "label": "The crew's cache lies in the WHITE RING: dig down at the WHITE SQUARE above it, set the HOPPER over the Drill with [BUILD], drop coal in", "goal": "Automate the coal feed"},

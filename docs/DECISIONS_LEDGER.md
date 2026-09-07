@@ -18385,3 +18385,21 @@ count says "a thing", and the objective's "select it" has nothing on the bar to 
 already knows what a drill looks like; the bar should say the same.
 
 **Reverse cost:** the `_machine` branch and the colour line.
+
+## D0466 · 2026-09-07 · The build rung names the ring that moves, not "the shaft's mouth"
+
+**Decided:** the BUILD how-to ended "select it, press [BUILD] at the shaft's mouth". The pad has a shaft
+of its own at dx +7, open, with a forge in it, and two of the three strangers on the rung-4 variant read
+that shaft as the one named: S45 walked to it first, dug three metres down it and fed it the ingots; S44's
+first hesitation was "whether shaft's mouth means the surface entrance or the drill location". Since
+D0459 the ring itself moves to the shaft's mouth the moment the drill is carried, so the ring is the
+thing to name; and "select it" said nothing about how (S44 carried the drill for nine bursts with the
+ingot selected). Now: "The crew's drill lies in the WHITE RING: dig down at the WHITE SQUARE above it,
+walk over it, press its slot's key, [BUILD] where the ring moves". "Straight" went to keep two lines at
+the live corner (the wrap pin refused three drafts before this one). Provisional wording under the
+director's rule 11; the ladder pins read the same.
+
+**Why:** a noun the world has two of is not a guide; the ring is unique on screen and is already the
+thing the other rungs teach the player to look for.
+
+**Reverse cost:** one string.
