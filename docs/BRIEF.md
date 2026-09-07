@@ -69,9 +69,17 @@ the forge would feed nothing; the falling route is the drill's stream (D0483). A
 body on a flat floor, floor cells a few metres off are occluded by the nearer floor (the grazing line of
 sight, D0452), which is why a pointer along the ground gets TOO FAR where one on a face gets the snap.
 
-**For the director:** the forge's intake rule (pass or jam: one line of `data/machines/processor.yaml`);
-D2–D6's rewards (a data diff each); a machine's need-bubble while another is ringed (the rig asked for
-ingots during the smelt rung); the stride; the seam's size and colour (one black metre at +5 reads as
-shadow). **Verification cadence:** touched suites locally, gates once a push, the battery on CI. **Next:**
-the six-seat batch on this head when the screen is free (it measures the label fix, the seam ring and the
-slot together), then D2's reward.
+**The director's rulings, applied (D0491, D0492).** The forge's intake stays `pass`, provisional, D0490's
+suite pinning both rules. No elevated coal pocket: hand-cut yield goes to the pack, so a coal cap over the
+forge would feed nothing; the ledger keeps the shipped DRILL-STREAM route (a machine's behaviour, D0483)
+distinct from the spec's future DUG COAL CHANNEL (a discovery with bare hands, waiting on a yield rule). D2
+pays the WINCH pair for six ingots and the winch leaves the starter cache, so the rig is the way up's one
+source; the winch rung names the price, rings the rig until the payout and counts its second demand. CI is
+green on 2f3e2041 (four jobs); 7037e526 carries D2 and is on CI now.
+
+**For the director:** D3–D6's rewards (a data diff each); a machine's need-bubble while another is ringed
+(the rig asked for ingots during the smelt rung); the stride; the seam's size and colour (one black metre
+at +5 reads as shadow). **Verification cadence:** touched suites locally, gates once a push, the battery on
+CI. **Next:** the six-seat batch (strangers 76-81, missions and seats prepared) after the human opening
+session or on the director's word that the screen is free; it measures the label fix, the seam ring and the
+slot together.
