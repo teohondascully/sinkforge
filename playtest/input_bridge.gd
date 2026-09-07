@@ -33,7 +33,7 @@ func validate(command: Dictionary) -> String:
 	return ""
 
 
-func apply(command: Dictionary, viewport: Viewport) -> void:
+func apply(command: Dictionary, _viewport: Viewport) -> void:
 	var keys: Array = command.get("keys", [])
 	var buttons: Array = command.get("buttons", [])
 	for key: Variant in held_keys:
@@ -49,8 +49,14 @@ func apply(command: Dictionary, viewport: Viewport) -> void:
 	motion.position = next
 	motion.global_position = next
 	motion.relative = next - pointer
-	# push_input updates the viewport's mouse position, including get_global_mouse_position.
-	viewport.push_input(motion, true)
+	# The motion goes through the Input singleton (a pushed event never reached the viewport's mouse
+	# position at all), AND the seat's pointer is POSED at the named pixel: in a headed window the
+	# viewport's mouse position is the operating system's cursor, so no injected event can move the aim,
+	# and the first screen-led attempt's LMB bursts followed the tester's own hand. `Controls.pose_pointer`
+	# is the seat's own scripted-hand hook (the `--act=mine` capture path); the player still names a
+	# viewport pixel and nothing else. `tests/test_playtest_input.gd` pins both.
+	Input.parse_input_event(motion)
+	Controls.pose_pointer(_viewport.get_canvas_transform().affine_inverse() * next)
 	pointer = next
 	for button: Variant in held_buttons:
 		if button not in buttons:

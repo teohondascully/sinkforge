@@ -11,17 +11,22 @@ Latest verified commit: see `git log -1`.
 - `playtest/seat.gd` — paused-between-bursts Godot launcher.
 - `playtest/input_bridge.gd` — physical key/mouse event bridge and validation.
 - `playtest/command.py` — sends one JSON burst and waits for its response.
-- `tests/test_playtest_input.gd` — 15 assertions for bounds, press/release edges, and mouse/key delivery.
+- `tests/test_playtest_input.gd` — 24 assertions for bounds, press/release edges, key and button delivery as ACTIONS, and the posed pointer.
 
 ## Run
 
 ```sh
 SESSION="$(mktemp -d /tmp/sinkforge-player-XXXXXX)"
-godot --path . --resolution 1280x720 --script res://playtest/seat.gd -- --session-dir="$SESSION"
+godot --path . --resolution 1280x720 --disable-vsync --position 0,0 --script res://playtest/seat.gd -- --session-dir="$SESSION"
 python3 playtest/command.py "$SESSION" '{"ticks":1,"mouse":[640,360]}'
 ```
 
-The Godot process must remain running in another terminal. Each command is limited to 1–300 ticks and must use viewport coordinates in 1280×720. The response and `frame_NNNN.png` are the player-visible evidence. Finish with `{"quit":true}`.
+The Godot process must remain running in another terminal. `--disable-vsync` is required when the window is
+not on the active Space: with vsync on, the render loop waits for a display it cannot present to and the
+seat answers a burst in minutes or never (2026-09-06). The pointer is the SEAT'S OWN, posed at the named
+pixel through `Controls.pose_pointer`; in a headed window the viewport's mouse position is the operating
+system's cursor and no injected event moves it, so the first attempt's LMB bursts followed the tester's
+hand (fixed 2026-09-06, `tests/test_playtest_input.gd` 24 assertions). The system cursor is never touched. Each command is limited to 1–300 ticks and must use viewport coordinates in 1280×720. The response and `frame_NNNN.png` are the player-visible evidence. Finish with `{"quit":true}`.
 
 ## Evidence from this session
 
