@@ -24,6 +24,11 @@ const MARGIN_X: float = 10.0            ## the legend's and the depth chip's lef
 const BAND_GAP: float = 8.0             ## above the hotbar band
 const RISE: float = 4.0                 ## authored px the plate rises over its fade-in
 const INK := Color(0.92, 0.88, 0.74)
+## THE REFUSAL SLOT (D0488): a one-line plate in the dock's place that says the live refusal's headline --
+## TOO FAR, NOTHING THERE, THAT IS A MACHINE -- on every refused press, for the short linger `Refusals`
+## keeps, above the lesson plate when one is up. Its rule is the refusal's red, the slashed square's own,
+## so the word and the mark read as one answer.
+const SLOT_GAP: float = 4.0             ## authored px between the slot and the lesson plate under it
 
 var hints: Hints = Hints.new()
 var _plate: ArrivalPlate = null
@@ -49,17 +54,32 @@ static func dock_rect(font: Font, text: String) -> Rect2:
 	return Rect2(Vector2(UiTheme.px(MARGIN_X), UiTheme.px(Hotbar.HOTBAR_BAND_TOP - BAND_GAP) - b.y), b)
 
 
-## Everything the dock decides: `{}` for no lesson.
+## Everything the dock decides: `{}` for no lesson and no refusal; the lesson's `rect`/`text`/`alpha`/
+## `text_at` when one is up; a `slot` dictionary of the same keys when a refusal is live (D0488).
 static func layout(h: Hints, frame: Frame, font: Font) -> Dictionary:
 	if h == null or frame == null or frame.obs == null or font == null:
 		return {}
+	var out: Dictionary = {}
 	var text: String = BindingLabels.fill(h.active_text())   # the verb's CURRENT key, never its name (D0411)
 	var a: float = h.active_alpha()
-	if text == "" or a <= 0.01:
-		return {}
-	var rect: Rect2 = dock_rect(font, text)
-	rect.position.y += UiTheme.px(RISE) * (1.0 - a)
-	return {"rect": rect, "text": text, "alpha": a, "text_at": rect.position + Vector2(UiTheme.px(8.0), UiTheme.px(13.0))}
+	var foot: float = UiTheme.px(Hotbar.HOTBAR_BAND_TOP - BAND_GAP)   # where the slot's foot goes: the dock's, or over the lesson
+	if text != "" and a > 0.01:
+		var rect: Rect2 = dock_rect(font, text)
+		rect.position.y += UiTheme.px(RISE) * (1.0 - a)
+		out = {"rect": rect, "text": text, "alpha": a, "text_at": rect.position + Vector2(UiTheme.px(8.0), UiTheme.px(13.0))}
+		foot = dock_rect(font, text).position.y - UiTheme.px(SLOT_GAP)
+	var word: String = h.slot_text()
+	var sa: float = h.slot_alpha()
+	if word != "" and sa > 0.01:
+		var srect: Rect2 = slot_rect(font, word, foot)
+		out["slot"] = {"rect": srect, "text": word, "alpha": sa, "text_at": srect.position + Vector2(UiTheme.px(8.0), UiTheme.px(13.0))}
+	return out
+
+
+## The slot's rect for `word`, its foot at `foot` (the dock's foot, or a gap above the lesson plate).
+static func slot_rect(font: Font, word: String, foot: float) -> Rect2:
+	var b: Vector2 = box(font, word)
+	return Rect2(Vector2(UiTheme.px(MARGIN_X), foot - b.y), b)
 
 
 func paint(frame: Frame, ci: CanvasItem) -> void:
@@ -70,11 +90,17 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	hints.observe(frame.obs, dt, _plate != null and _plate.on_screen(frame))
 	var font: Font = ThemeDB.fallback_font
 	var l: Dictionary = layout(hints, frame, font)
-	if l.is_empty():
-		return
+	if l.has("rect"):
+		_plate_draw(ci, font, l, UiTheme.UI_EDGE_HI)
+	if l.has("slot"):
+		_plate_draw(ci, font, l["slot"], MarkPainter.REFUSE)
+
+
+## One plate: shadow, ground, the left rule in `rule`, the text.
+static func _plate_draw(ci: CanvasItem, font: Font, l: Dictionary, rule: Color) -> void:
 	var rect: Rect2 = l["rect"]
 	var a: float = l["alpha"]
 	PageDraw.round_rect(ci, Rect2(rect.position + Vector2(0.0, UiTheme.px(1.5)), rect.size), UiTheme.px(4.0), Color(0.0, 0.0, 0.0, 0.38 * a))
 	PageDraw.round_rect(ci, rect, UiTheme.px(4.0), Color(UiTheme.UI_BG.r, UiTheme.UI_BG.g, UiTheme.UI_BG.b, UiTheme.UI_BG.a * a))
-	ci.draw_rect(Rect2(rect.position + Vector2(0.0, UiTheme.px(3.0)), Vector2(UiTheme.px(1.5), rect.size.y - UiTheme.px(6.0))), Color(UiTheme.UI_EDGE_HI.r, UiTheme.UI_EDGE_HI.g, UiTheme.UI_EDGE_HI.b, a))
+	ci.draw_rect(Rect2(rect.position + Vector2(0.0, UiTheme.px(3.0)), Vector2(UiTheme.px(1.5), rect.size.y - UiTheme.px(6.0))), Color(rule.r, rule.g, rule.b, a))
 	ci.draw_multiline_string(font, l["text_at"], l["text"], HORIZONTAL_ALIGNMENT_LEFT, UiTheme.px(WRAP), UiTheme.pt(FS), -1, Color(INK, a))

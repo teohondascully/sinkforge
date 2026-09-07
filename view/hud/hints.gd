@@ -59,9 +59,7 @@ var _primed: bool = false
 var _was_anchored: bool = false
 var _prev_on_floor: bool = true
 var _prev_vel_y: int = 0
-var _far_ticks: int = 0
-var _air_ticks: int = 0
-var _machine_ticks: int = 0
+var _refusals: Refusals = Refusals.new()   ## the held verb's refusals and the slot (D0488)
 ## THE WAY DOWN (T037 taken provisionally, D0440). Stranger 15, sent to descend, mined four ore in the first
 ## hold and then walked the pad for a minute looking for an entrance to the caverns drawn below it; nothing
 ## on screen said the ground is rock you can cut. Once the body has ranged WAY_DOWN_RANGE_M across the
@@ -81,15 +79,13 @@ var _min_x_m: float = INF
 var _max_x_m: float = -INF
 var _deepest_m: float = -INF
 var _broke_once: bool = false
-const FAR_TICKS: int = 20
-const BELOW_CELLS: int = 8          ## two metres under the body's centre: past the feet and into the ground (D0473)
-var _sight_ticks: int = 0
+const FAR_TICKS: int = Refusals.FAR_TICKS          ## the counts live in `Refusals`; the suites' names stay
+const AIR_TICKS: int = Refusals.AIR_TICKS
+const CUT_TICKS: int = Refusals.CUT_TICKS
+const BELOW_CELLS: int = Refusals.BELOW_CELLS
 var _coming_prev: int = 0
 var _ingots_prev: int = 0
 var objectives: Objectives = null   ## the ladder, for the rung-gated lessons; a bare Hints reads the pack instead
-const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
-const CUT_TICKS: int = 30           ## half a second on air right after your own bite opened the pointer's cell (D0467)
-var _since_break: int = 100000
 var _thrown: bool = false           ## a line has been live once this session; the grapple is known
 
 
@@ -219,12 +215,10 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	var speed: float = Vector2(float(o.vel_x), float(o.vel_y)).length() / float(Fx.SCALE)
 	_busy = speed > run * (BUSY_RELEASE if _busy else BUSY_ARM)
 	_ceremony = ceremony
-	_note_refusals(o)
+	_note_refusals(o, delta)
 	var counts: Dictionary = Payouts.pack_counts(o)
 	note(&"mined_wrong", _mined_wrong(o, counts))
 	note(&"wrong_spot", _wrong_spot(o))
-	note(&"build_far", o.aim_refusal == &"build_far")                # a BUILD's own refusals, one observe wide (D0470)
-	note(&"build_here", o.aim_refusal == &"build_here")
 	var wrong: bool = _wrong_stack(o, counts)
 	note(&"dropped_wrong", wrong)
 	note(&"dropped_floor", o.drop_went == &"floor" and not wrong)   # the drop's own TOO FAR (D0428, stranger 5)
@@ -250,32 +244,21 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	refresh(counts, delta)
 
 
-## The held verb's four refusals, each on its own count.
-## TOO FAR: a third of a second of holding MINE on rock past the reach (D0421): the mark shows the slash at
-## once, the lesson says why once, and never for a tap that merely brushed past.
-## NOTHING THERE: the same slash on AIR (D0436, stranger 10): TOO FAR had taught that the slashed square
-## means "past your reach", so a pointer a hand's width off a thin trunk read as unreachable for eighteen
-## seconds. A metre breaking under a held pointer leaves it on air too, for as long as the re-aim takes: the
-## count restarts at a break and runs a second and a half, so ordinary digging never hears this.
-## THAT IS A MACHINE: a machine under a held MINE is refused as "air" too (a machine is not terrain); it is
-## not open air to the player (D0445, stranger 20 held MINE on the forge from six metres).
-## BEHIND ROCK: the third refusal, "sight" (D0452): rock in reach behind other rock -- a dig-plan mark under
-## a cut, or a buried cell nothing visible stands near. Wordless before; stranger 29 met it four times.
-func _note_refusals(o: Interface.Observation) -> void:
-	_far_ticks = _far_ticks + 1 if o.aim_refusal == &"far" else 0
-	var below: bool = o.aim_cell.y - o.cell.y >= BELOW_CELLS          # a buried target: "step closer" cannot be done on foot (D0473)
-	note(&"too_far", _far_ticks >= FAR_TICKS and not below)
-	note(&"far_below", _far_ticks >= FAR_TICKS and below)
-	var on_machine: bool = o.aim_refusal == &"air" and not o.machine_at(Vector2i(o.aim_cell.x >> 2, o.aim_cell.y >> 2)).is_empty()
-	_air_ticks = 0 if o.mining_broke or on_machine else (_air_ticks + 1 if o.aim_refusal == &"air" else 0)
-	_since_break = 0 if o.mining_broke else _since_break + 1
-	var own_cut: bool = _since_break - _air_ticks <= CUT_TICKS       # the air run began within half a second of a break: the pointer's cell went
-	note(&"cut_through", _air_ticks >= CUT_TICKS and own_cut)
-	note(&"aim_air", _air_ticks >= AIR_TICKS and not own_cut)
-	_machine_ticks = _machine_ticks + 1 if on_machine else 0
-	note(&"aim_machine", _machine_ticks >= FAR_TICKS)
-	_sight_ticks = _sight_ticks + 1 if o.aim_refusal == &"sight" else 0
-	note(&"aim_sight", _sight_ticks >= FAR_TICKS)
+## The held verb's refusals, each on its own count in `Refusals`; BUILD's two ride the same channel (D0470).
+func _note_refusals(o: Interface.Observation, delta: float) -> void:
+	_refusals.read(o, delta)
+	for id: StringName in _refusals.fired:
+		note(id, _refusals.fired[id])
+
+
+## THE REFUSAL SLOT (D0488): the live refusal's headline, on every press, latched by nothing; "" while the
+## refusal's own lesson holds the plate.
+func slot_text() -> String:
+	return _refusals.slot_text(_active)
+
+
+func slot_alpha() -> float:
+	return _refusals.slot_alpha(_active)
 
 
 ## Detects acquisition edges against `counts` ({item: n}), fires the moments' rising edges, advances the

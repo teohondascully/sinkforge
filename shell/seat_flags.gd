@@ -16,8 +16,9 @@ extends RefCounted
 ##   --fresh                 a new game: the slot on disk is neither loaded nor written
 ##   --mute=a,b,...          hide every world layer whose cost-report label starts with a listed stem, and
 ##                           `post` for the lens: the ablation profile for a frame the script cannot time (D0418)
-##   --act=mine|map|settings|game  a scripted hand for a capture: hold MINE at the rock ahead from tick 20 with
-##                           the pointer posed, or press the map / settings key once at tick 20 (game: the GAME face)
+##   --act=mine|far|map|settings|game  a scripted hand for a capture: hold MINE at the rock ahead from tick 20
+##                           with the pointer posed (far: six metres ahead, a refused press, D0488), or press
+##                           the map / settings key once at tick 20 (game: the GAME face)
 ##   --lamp-occlusion=K      the veil lamp's loss per solid cell crossed (D0427); 0 is legacy's pass, the
 ##                           control of a lighting comparison. Unset: `VeilOcclusion.K`.
 ##   --muted                 the Master bus muted for this boot, whatever the settings file says: a

@@ -18812,3 +18812,39 @@ has, and the reports' "no error message" claims (S66, S72, S74) are only worth r
 no other channel to miss.
 
 **Reverse cost:** the `shown` line and the `--full` flag.
+
+## D0488 · 2026-09-07 · The refusal slot: every refused press says its headline on the dock, latched by nothing
+
+**Decided:** a one-line plate at the lesson dock's place (`view/hud/lesson_dock.gd`, `view/hud/refusals.gd`)
+says the live refusal's headline -- TOO FAR, TOO FAR DOWN, NOTHING THERE, CUT THROUGH, THAT IS A MACHINE,
+BEHIND ROCK, STEP ASIDE -- from the refusal's first frame, for 1.5 s after it ends (the last 0.5 s fading),
+its left rule in the slashed square's red. It stacks a gap above the lesson plate when a lesson is up and
+says nothing while the refusal's OWN lesson holds the plate, whose first words are the same headline. The
+headline is the lesson text's words before the dash, authored once in `HintTexts`. The refusal read
+(counts, the below / on-machine / own-cut classification) moved out of `Hints` into `Refusals` for the size
+gate; `Hints.FAR_TICKS` and kin alias it for the suites.
+
+**Why:** the refusal LESSONS fire once a game after a hold (a third of a second for TOO FAR, a second and a
+half for NOTHING THERE). The second TOO FAR of a run, and every press shorter than the hold, showed the
+slashed square and nothing else; the receipts since stranger 25 carry refusals the screen never named. S64
+(64-66) pressed the same pixel twice, refused `air` one burst and cutting the trunk the next, with no word for
+either; S66's report called a visible lesson "no feedback". The mark says "not from here" (D0421); the word
+says WHICH "not", every time, without re-teaching.
+
+**Alternatives:** (a) unlatch the lessons -- nine seconds of how-to on every brush, the plate never quiet;
+(b) text on the miner -- the zone round the body is where every verb lands (D0413), rejected there;
+(c) a shorter hold before the lesson -- still once a game. The slot is a fourth channel, not a change to
+the three.
+
+**Verified:** `tests/test_lesson_dock.gd` (35 asserted): the word at full alpha on the first frame of a far
+press with no lesson yet; still up a second after a two-frame brush's release; fading through the last half
+second; gone past the linger; the next press names itself again and the SAME refusal a second time says it
+again (the mutant that latches the slot fails both); TOO FAR DOWN on a buried cell, BEHIND ROCK on `sight`;
+the slot sits a gap above the rope lesson at its left; TOO FAR's own lesson on the plate and the slot
+yields. The action-area pin now covers the tallest lesson with the slot over it (213 px, 26 px clear).
+`test_hints` 48, `test_hints_moments` 28 unchanged. Captured on the seat with the new `--act=far` (a posed
+press six metres ahead): tick 28 shows TOO FAR in the slot and the slashed square, tick 70 the full lesson
+with the slot gone.
+
+**Provisional:** the linger (1.5 s) and the yield rule are guesses until a batch reads them; the slot is
+silent for the drop's DROPPED and NOT ORE, which are not aim refusals and have their own moments.

@@ -269,9 +269,10 @@ func _read_hands(page_open: bool) -> InputFrame:
 	var grid: TileGrid = (door.services()["world"] as World).grid
 	var grid_ok: Callable = func(c: Vector2i) -> bool: return grid.in_bounds(c)
 	if drive or String(flags["act"]) != "":
-		if String(flags["act"]) == "mine":   # aim half a metre ahead and just under the feet: the ground he stands on
+		if String(flags["act"]) in ["mine", "far"]:   # aim half a metre ahead and just under the feet: the ground he stands on; "far": six metres ahead, past the reach (D0488)
 			var body: Body = door.services()["body"]
-			Controls.pose_pointer(Vector2(float(body.pos_x) / float(Fx.SCALE) + 8.0 * float(body.facing),
+			var ahead: float = 8.0 if String(flags["act"]) == "mine" else 96.0
+			Controls.pose_pointer(Vector2(float(body.pos_x) / float(Fx.SCALE) + ahead * float(body.facing),
 				float(body.pos_y) / float(Fx.SCALE) + float(Body.HEIGHT_PX) / 2.0 + 4.0))
 		return hands.read(_driven, Controls.pointer_world(self), cell_px, grid_ok)
 	return hands.read(Controls.pressed, Controls.pointer_world(self), cell_px, grid_ok)

@@ -11,7 +11,7 @@ extends RefCounted
 static func driven(flags: Dictionary, tick: int, action: StringName) -> bool:
 	var act: String = flags["act"]
 	if act != "":
-		if act == "mine" and action == Controls.MINE:
+		if (act == "mine" or act == "far") and action == Controls.MINE:
 			return tick >= 20
 		if act == "map" and action == Controls.MAP:
 			return tick == 20
