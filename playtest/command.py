@@ -34,6 +34,7 @@ def main():
     # One round-trip per burst (D0439): the journal line rides the command, stamped with the burst's id and
     # game time once the frame is back, so a screen-led agent makes one call and one frame read a burst.
     parser.add_argument("--note", default=None, help="a journal entry for this burst, appended to JOURNAL.md with its id and game time")
+    parser.add_argument("--full", action="store_true", help="print the whole receipt (scripts); without it the line carries only what a player has -- the screenshot and the clock (D0487)")
     args = parser.parse_args()
     response_path = args.session_dir / "response.json"
     previous = json.loads(response_path.read_text())
@@ -51,7 +52,11 @@ def main():
             if args.note is not None:
                 with (args.session_dir / "JOURNAL.md").open("a") as journal:
                     journal.write("\n## Burst %d (%.1f s)\n%s\n" % (command["id"], response.get("sim_seconds", -1.0), args.note.strip()))
-            print(json.dumps(response))
+            # THE PLAYER'S LINE (D0487): a stranger reads this JSON; the receipt's `refusal`, `lesson`, `broke`,
+            # `state` are the seat's private evidence and not on any screen, and the agents quoted them
+            # ("refusal_at", "dropped_floor") as if the game had said them. Scripts ask for --full.
+            shown = response if args.full else {k: response[k] for k in ("id", "screenshot", "sim_seconds", "error", "capture_error") if k in response}
+            print(json.dumps(shown))
             return 1 if response.get("error") or response.get("capture_error", 0) else 0
         time.sleep(0.05)
     raise TimeoutError(f"No response after {args.timeout:.0f} seconds; inspect the game's log")

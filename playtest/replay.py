@@ -70,7 +70,7 @@ def main():
         c = json.loads(Path(p).read_text())
         for k in ("id", "sent_at"):
             c.pop(k, None)
-        r = subprocess.run([sys.executable, str(command), str(target), json.dumps(c), "--timeout", "120", "--note", "replay of input_%04d" % n],
+        r = subprocess.run([sys.executable, str(command), str(target), json.dumps(c), "--timeout", "120", "--note", "replay of input_%04d" % n, "--full"],
                            capture_output=True, text=True)
         lines = [l for l in r.stdout.strip().splitlines() if l.startswith("{")]
         if not lines:

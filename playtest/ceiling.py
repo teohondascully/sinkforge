@@ -23,7 +23,7 @@ BODY_X, FEET_Y = 640, 400           # the body at rest on the spawn pad, screen 
 
 
 def burst(session, command, note):
-    r = subprocess.run([sys.executable, str(HERE / "command.py"), str(session), json.dumps(command), "--timeout", "120", "--note", note],
+    r = subprocess.run([sys.executable, str(HERE / "command.py"), str(session), json.dumps(command), "--timeout", "120", "--note", note, "--full"],
                        capture_output=True, text=True)
     lines = [l for l in r.stdout.strip().splitlines() if l.startswith("{")]
     if not lines:

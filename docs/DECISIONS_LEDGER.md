@@ -18795,3 +18795,20 @@ forge three metres left; the lip pin (D0438) poses a coal to keep its subject.
 ingredients needs the ring to say which one is next, not both at once and not the machine before the fuel.
 
 **Reverse cost:** the `smelt` branch's first four lines.
+
+## D0487 · 2026-09-07 · The player's line: a stranger's command returns the screenshot and the clock, nothing else
+
+**Decided:** `playtest/command.py` prints only `id`, `screenshot`, `sim_seconds` and any error unless
+`--full` is passed; the whole receipt stays in `observation_NNNN.json` for the validator, the replay, the
+evidence table and the scripts (the ceiling, the replay and the minimal pair pass `--full`). Since D0421 the
+agents have read `refusal`, `refusal_at`, `lesson` and `broke` off the returned line and quoted them as if
+the game had said them ("Game showed 'refusal_at' coordinates", S65; "dropped_floor", S61); a reported
+success or failure then reflected privileged receipts, which Astra's audit named and which rule 5 (inputs
+and screenshots are evidence, the report a hypothesis) had let pass because the classifier never read the
+report. Live-checked: the player's line carries five keys, the full line seventeen.
+
+**Why:** a stranger with the seat's receipts is not a stranger; the pixels are the only channel a player
+has, and the reports' "no error message" claims (S66, S72, S74) are only worth reading when the agent had
+no other channel to miss.
+
+**Reverse cost:** the `shown` line and the `--full` flag.
