@@ -17945,3 +17945,37 @@ Pinned in `test_payouts` (35). The badge and bar are unchanged.
 surface at that moment is the tick.
 
 **Reverse cost:** one static function and an optional argument.
+
+## D0443 · 2026-09-06 · Strangers 16-17: the block itself instead of the chevron, WRONG STACK, the smelt how-to says hold ORE
+
+**Decided:** three changes from the first batch on the one-call protocol (18's agent died of an API error at
+44 bursts; its frames stand). (1) THE BLOCK ITSELF. D0438's chevron hung 0.85 m over the target; stranger 17
+pointed AT it, on air, three times (bursts 6-8, NOTHING THERE each time), and never mined an ore. Within
+NEAR_M the guide now outlines the target's own METRE -- the square the pointer must land on -- breathing,
+with a faint fill; the chevron is gone eleven entries after it came (recorded in `docs/CORRECTIONS.md`). A
+marker that floats beside the thing invites the pointer to it; the marker has to BE the thing. (2) WRONG
+STACK. Stranger 16 mined ore at 41 s and then pressed Q beside the forge a dozen times with CLAY selected
+(the clay from the pit they had dug filled slot 1); every drop landed on the floor, DROPPED said "stand
+BESIDE it", they stepped closer and dropped clay again. When a floor drop's item is one no machine within
+the drop's far range takes, and the pack holds one such a machine does, an eleventh moment names both:
+"WRONG STACK -- you dropped clay; the machine beside you takes ore. Press the number over the ore in your
+bar to hold it, then [DROP]." The dropped item is read off the pack's fall this frame (no new observation
+field: `interface.gd` and `observation.gd` stand at 398 and 399 lines of the 400 cap); the wanted one is
+the first recipe input of a machine in range the pack still holds. DROPPED yields to it. Placeholders in a
+moment's text are filled from a per-lesson table at note time. Two controls in `test_hints` (ore short of
+the forge is DROPPED; clay with no machine in range is DROPPED). (3) The smelt how-to: "Stand beside the
+RINGED forge holding ORE (its number key selects it), press [DROP]: the stack goes in, then wait -- the
+ingots come to you". `test_objective_line` now pins that EVERY rung's how-to, tokens filled, wraps whole
+at the seat's span, so a future rewording cannot lose its last clause to the ellipsis silently.
+
+**Also read:** the one-call protocol brought a burst from ~21 s of wall to ~15 s (S17: 42 bursts in 11.0
+min; S16: 43 in 14.0). Stranger 16 mined ore at 41 s after walking LEFT past the vein and back (the
+sentence was stale after the first press; the ring carried it eventually); stranger 17 walked left past
+the vein into the forge pocket's lip on the first four bursts (30-tick presses at 9.4 m/s, T035). Neither
+felled a tree; neither reached an ingot.
+
+**Why:** two markers in a row lured the pointer off the rock (the speck was too small to see; the chevron
+was too easy to point at), and one verb (Q) with one silent precondition (the selected stack) cost a
+stranger who had done everything else right.
+
+**Reverse cost:** the outline block; one moment, one helper, one table; one sentence.

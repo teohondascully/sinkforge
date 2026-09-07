@@ -214,8 +214,9 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 	# D0433: the ring tightens as the body arrives, so it never sits on the miner's chest.
 	_check(is_equal_approx(TargetGuide.ring_m(0.5), TargetGuide.RING_NEAR_M) and is_equal_approx(TargetGuide.ring_m(6.0), TargetGuide.RING_M) and TargetGuide.ring_m(2.5) > TargetGuide.RING_NEAR_M and TargetGuide.ring_m(2.5) < TargetGuide.RING_M,
 		"the ring is %.2f m beside the target, %.2f m far off, between in between" % [TargetGuide.ring_m(0.5), TargetGuide.ring_m(6.0)])
-	# D0438 (stranger 13): where the ring has tightened to a speck, a chevron hangs over the target, clear of
-	# the ground line and the sprite: it rises more than the miner's half-height above a cell at the feet.
+	# D0443 (strangers 13 and 17): where the ring has tightened to a speck, the target's own metre is outlined
+	# -- the square the pointer must land on -- and nothing hangs in the air beside it to be pointed at.
 	var beside: float = Vector2(1.5, 1.25).length()   # a cell a step to the side of the boot, from the body's centre
-	_check(TargetGuide.near(beside) and TargetGuide.near(TargetGuide.NEAR_M) and not TargetGuide.near(3.0), "the chevron shows for a cell beside the boot (%.2f m from the centre), within %.1f m, and not beyond" % [beside, TargetGuide.NEAR_M])
-	_check(TargetGuide.CHEVRON_RISE_M - TargetGuide.CHEVRON_BOB_M > 0.5 and TargetGuide.CHEVRON_HALF_M * 2.0 * 25.6 >= 10.0, "it rises %.2f m over the target (past the ground line from a cell at the feet) and is %.0f px wide at play zoom" % [TargetGuide.CHEVRON_RISE_M, TargetGuide.CHEVRON_HALF_M * 2.0 * 25.6])
+	_check(TargetGuide.near(beside) and TargetGuide.near(TargetGuide.NEAR_M) and not TargetGuide.near(3.0), "the block outline shows for a cell beside the boot (%.2f m from the centre), within %.1f m, and not beyond" % [beside, TargetGuide.NEAR_M])
+	var metre: Rect2 = TargetGuide.target_metre(Vector2(102.0, 322.0))
+	_check(metre == Rect2(96.0, 320.0, 16.0, 16.0) and metre.has_point(Vector2(102.0, 322.0)), "the outlined metre is the one the target cell lies in (%s)" % str(metre))

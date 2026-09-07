@@ -56,6 +56,7 @@ const DEFS: Array[Dictionary] = [
 const MOMENTS: Array[Dictionary] = [
 	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
 	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
+	{"id": &"dropped_wrong", "text": "WRONG STACK — you dropped {dropped}; the machine beside you takes {wanted}. Press the number over the {wanted} in your bar to hold it, then [DROP]."},
 	{"id": &"dropped_floor", "text": "DROPPED — the stack fell at your feet, and you pick up what lies there as you stand. A machine takes a drop only when you stand BESIDE it: a body length."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
 	{"id": &"way_down", "text": "THE WAY DOWN — the ground is rock you can cut. Point at the ground under you and hold [MINE]: the metre opens and you drop into it. One metre at a time is a safe fall."},
@@ -92,6 +93,13 @@ var _air_ticks: int = 0
 ## who got there.
 const WAY_DOWN_RANGE_M: float = 24.0
 const WAY_DOWN_DEPTH_M: float = 4.0
+## THE WRONG STACK (D0443, stranger 16). Q drops the SELECTED stack; the sixteenth stranger, holding clay
+## from the pit they had dug, pressed Q beside the forge a dozen times, read DROPPED each time ("stand
+## BESIDE it"), stepped closer and dropped clay again. When a floor drop's item is one no machine within
+## the drop's own far range takes, and the pack holds one such a machine does, the lesson names both.
+const WANTED_RANGE_M: float = 12.0        ## `Verbs.FAR_EATER_M`, the range the drop's TOO FAR already uses
+var _prev_counts: Dictionary = {}
+var _subs: Dictionary = {}                ## lesson id -> {placeholder: text}, filled when the moment is noted
 var _min_x_m: float = INF
 var _max_x_m: float = -INF
 var _deepest_m: float = -INF
@@ -99,6 +107,36 @@ var _broke_once: bool = false
 const FAR_TICKS: int = 20
 const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
 var _thrown: bool = false           ## a line has been live once this session; the grapple is known
+
+
+## A floor drop of an item no machine in range takes, while the pack holds one a machine does: the dropped
+## item is the one whose count fell this frame; the wanted one is the first recipe input a machine within
+## WANTED_RANGE_M asks for that the pack still holds. Fills the lesson's placeholders.
+func _wrong_stack(o: Interface.Observation, counts: Dictionary) -> bool:
+	var dropped: StringName = &""
+	for item: StringName in _prev_counts:
+		if int(counts.get(item, 0)) < int(_prev_counts[item]):
+			dropped = item
+	_prev_counts = counts
+	if o.drop_went != &"floor" or dropped == &"":
+		return false
+	var body := Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
+	var wanted: StringName = &""
+	for rec: Dictionary in o.machines:
+		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+		if at.distance_to(body) > WANTED_RANGE_M * float(Interface.Observation.LOGIC_PX):
+			continue
+		var inputs: Dictionary = RecipesRecords.RECORDS.get(String(rec.get("recipe", &"")), {}).get("inputs", {})
+		for need: Variant in inputs:
+			var item := StringName(String(need))
+			if item == dropped:
+				return false                         # the machine takes what fell: that is the BESIDE lesson's case
+			if wanted == &"" and int(counts.get(item, 0)) > 0:
+				wanted = item
+	if wanted == &"":
+		return false
+	_subs[&"dropped_wrong"] = {"{dropped}": Hotbar.item_label(dropped).to_lower(), "{wanted}": Hotbar.item_label(wanted).to_lower()}
+	return true
 
 
 ## The surface walked from edge to edge with the verb known and nothing dug down (T037).
@@ -164,7 +202,10 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	# count restarts at a break and runs a second and a half, so ordinary digging never hears this.
 	_air_ticks = 0 if o.mining_broke else (_air_ticks + 1 if o.aim_refusal == &"air" else 0)
 	note(&"aim_air", _air_ticks >= AIR_TICKS)
-	note(&"dropped_floor", o.drop_went == &"floor")   # the drop's own TOO FAR (D0428, stranger 5)
+	var counts: Dictionary = Payouts.pack_counts(o)
+	var wrong: bool = _wrong_stack(o, counts)
+	note(&"dropped_wrong", wrong)
+	note(&"dropped_floor", o.drop_went == &"floor" and not wrong)   # the drop's own TOO FAR (D0428, stranger 5)
 	note(&"in_water", o.wet)
 	note(&"way_down", _way_down_wanted(o))
 	note(&"deep_enough", float(MaterialLook.depth_m(o.cell.y)) >= DEPTH_HINT_M)
@@ -179,7 +220,6 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	note(&"hard_landing", VoiceCues.landing_impact(_primed, _prev_on_floor, _prev_vel_y, o) >= LAND_HARD_PX_S)
 	_prev_on_floor = o.on_floor
 	_prev_vel_y = o.vel_y
-	var counts: Dictionary = Payouts.pack_counts(o)
 	if not _primed:
 		for def: Dictionary in DEFS:
 			_had[def["item"]] = int(counts.get(def["item"], 0)) > 0
@@ -240,7 +280,10 @@ func active_text() -> String:
 		return ""
 	for m: Dictionary in MOMENTS:
 		if m["id"] == _active:
-			return String(m["text"])
+			var text: String = String(m["text"])
+			for key: String in _subs.get(_active, {}):
+				text = text.replace(key, String((_subs[_active] as Dictionary)[key]))
+			return text
 	for def: Dictionary in DEFS:
 		if def["id"] == _active:
 			return String(def["text"])

@@ -42,7 +42,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_obs([]), 0.016)
 	h.observe(_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 10, "nine pack lessons and ten moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 11, "nine pack lessons and eleven moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -105,6 +105,43 @@ func _way_down_pins() -> void:
 	_check(h3.active_id() == &"" and h3.queued() == 0, "control: a body that has never broken rock is not told either -- the verb comes first (%s)" % h3.active_id())
 
 
+## D0443 (stranger 16): clay dropped on the floor beside a forge that takes ore, with ore in the pack, teaches
+## WRONG STACK with both names filled in; ore dropped short of the same forge is the BESIDE lesson's case.
+func _wrong_stack_pins() -> void:
+	var forge: Dictionary = {"cell": Vector2i(11, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {}, "output": {}}
+	var h: Hints = Hints.new()
+	var o: Interface.Observation = _obs([["clay", 3], ["ore", 4]])
+	o.pos_x = 10 * 16 * S
+	o.pos_y = 10 * 16 * S
+	var typed: Array[Dictionary] = [forge]
+	o.machines = typed
+	h.observe(o, 0.016)
+	var after: Interface.Observation = _obs([["ore", 4]])
+	after.pos_x = o.pos_x
+	after.pos_y = o.pos_y
+	after.machines = typed
+	after.drop_went = &"floor"
+	h.observe(after, 0.016)
+	_check(h.active_id() == &"dropped_wrong" and h.active_text().find("you dropped clay") >= 0 and h.active_text().find("takes ore") >= 0,
+		"clay on the floor beside a forge, ore in the pack: WRONG STACK names both (%s)" % h.active_text().left(72))
+	var h2: Hints = Hints.new()
+	h2.observe(o, 0.016)
+	var short: Interface.Observation = _obs([["clay", 3]])
+	short.pos_x = o.pos_x
+	short.pos_y = o.pos_y
+	short.machines = typed
+	short.drop_went = &"floor"
+	h2.observe(short, 0.016)
+	_check(h2.active_id() == &"dropped_floor", "control: ore on the floor beside the same forge is the BESIDE lesson, not WRONG STACK (%s)" % h2.active_id())
+	var h3: Hints = Hints.new()
+	var alone: Interface.Observation = _obs([["clay", 3], ["ore", 4]])
+	h3.observe(alone, 0.016)
+	var alone_after: Interface.Observation = _obs([["ore", 4]])
+	alone_after.drop_went = &"floor"
+	h3.observe(alone_after, 0.016)
+	_check(h3.active_id() == &"dropped_floor", "control: clay on the floor with no machine in range is the BESIDE lesson too (%s)" % h3.active_id())
+
+
 func _test_one_bubble_at_a_time_in_table_order() -> void:
 	var h: Hints = Hints.new()
 	h.observe(_obs(), 0.016)
@@ -142,6 +179,7 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 		h.observe(dry, 0.5)
 	_air_pins(h, far, dry)
 	_way_down_pins()
+	_wrong_stack_pins()
 	var deep: Interface.Observation = _obs()
 	deep.cell.y = Interface.Observation.SKY_ROWS + 40
 	h.observe(deep, 0.016)

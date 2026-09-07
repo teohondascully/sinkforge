@@ -491,3 +491,9 @@ Not every ledger entry that says "found" or "fixed" is a correction — most ent
 not a repudiation of a prior claim. This page exists only for entries whose own text names an earlier
 entry as wrong. A finding that was simply incomplete (e.g., D0139's own still-open investigation) is not
 a correction until something explicitly supersedes its claim; it stays in `docs/WORKING.md` instead.
+
+## D0438's chevron, reversed by D0443 (2026-09-06)
+
+D0438 (2) hung a chevron over a near target so the tightened ring would be seen. It was seen: stranger 17
+pointed at it, three times, on air. D0443 replaces it with an outline of the target's own metre. The D0438
+entry stands as written; its chevron constants are gone from `view/hud/target_guide.gd`.
