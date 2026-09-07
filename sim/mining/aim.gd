@@ -77,13 +77,28 @@ static func effective(grid: TileGrid, body_x: int, body_y: int, point_x: int, po
 ## The reachable, visible solid cell whose centre is closest to the point, within one reach radius of it,
 ## else `fallback`. Scans the in-reach neighbourhood in a fixed row-major order, so ties are stable.
 static func nearest_reachable_solid(grid: TileGrid, body_x: int, body_y: int, point_x: int, point_y: int, fallback: Vector2i) -> Vector2i:
+	# The material under the cursor first (D0452): a pointer on a buried ore cell takes the ore's own
+	# visible face over a nearer clay one, so the snap never cuts an unrelated block for the one pointed at.
+	if grid.in_bounds(fallback) and grid.is_solid(fallback):
+		var same: Vector2i = _nearest_visible(grid, body_x, body_y, point_x, point_y, grid.get_material(fallback))
+		if same != Mining.NO_CELL:
+			return same
+	var any: Vector2i = _nearest_visible(grid, body_x, body_y, point_x, point_y, &"")
+	return any if any != Mining.NO_CELL else fallback
+
+
+## The reachable, visible solid cell of `material` (any, when empty) whose centre is nearest the point and
+## within one reach of it, else `Mining.NO_CELL`. Row-major over the in-reach neighbourhood, so ties are stable.
+static func _nearest_visible(grid: TileGrid, body_x: int, body_y: int, point_x: int, point_y: int, material: StringName) -> Vector2i:
 	var body_cell: Vector2i = cell_of(body_x, body_y)
-	var best: Vector2i = fallback
+	var best: Vector2i = Mining.NO_CELL
 	var best_d: int = -1
 	for dy: int in range(-SPAN, SPAN + 1):
 		for dx: int in range(-SPAN, SPAN + 1):
 			var c: Vector2i = body_cell + Vector2i(dx, dy)
 			if not grid.in_bounds(c) or not grid.is_solid(c) or not Mining.in_reach(body_x, body_y, c):
+				continue
+			if material != &"" and grid.get_material(c) != material:
 				continue
 			if not LineOfSight.clear(grid, body_cell, c):
 				continue

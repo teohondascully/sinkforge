@@ -42,7 +42,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_obs([]), 0.016)
 	h.observe(_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 13, "nine pack lessons and thirteen moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 14, "nine pack lessons and fourteen moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -120,6 +120,18 @@ func _way_down_pins() -> void:
 ## WRONG STACK with both names filled in; ore dropped short of the same forge is the BESIDE lesson's case.
 ## D0450 (stranger 26): a break whose yield is not ore, with no ore in the pack, teaches NOT ORE once and names
 ## what fell; an ore break, a pack already holding ore, or a session past THE WAY DOWN, teaches nothing.
+## D0452: the "sight" refusal held FAR_TICKS teaches BEHIND ROCK once; a brush teaches nothing.
+func _sight_pins() -> void:
+	var h: Hints = Hints.new()
+	var behind: Interface.Observation = _obs()
+	behind.aim_refusal = &"sight"
+	for _i: int in Hints.FAR_TICKS - 1:
+		h.observe(behind, 0.016)
+	_check(h.active_id() == &"", "a brush past a buried cell (%d ticks) teaches nothing yet" % (Hints.FAR_TICKS - 1))
+	h.observe(behind, 0.016)
+	_check(h.active_id() == &"aim_sight" and h.active_text().begins_with("BEHIND ROCK"), "the %dth tick on a cell behind rock fires BEHIND ROCK (%s)" % [Hints.FAR_TICKS, h.active_id()])
+
+
 func _mined_wrong_pins() -> void:
 	var h: Hints = Hints.new()
 	var clay: Interface.Observation = _obs()
@@ -218,6 +230,7 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	_way_down_pins()
 	_wrong_stack_pins()
 	_mined_wrong_pins()
+	_sight_pins()
 	var deep: Interface.Observation = _obs()
 	deep.cell.y = Interface.Observation.SKY_ROWS + 40
 	h.observe(deep, 0.016)

@@ -56,6 +56,7 @@ const DEFS: Array[Dictionary] = [
 const MOMENTS: Array[Dictionary] = [
 	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
 	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
+	{"id": &"aim_sight", "text": "BEHIND ROCK — that rock is in reach, but another rock is in the way of your pick. Cut the near one first, or point at a face you can see."},
 	{"id": &"aim_machine", "text": "THAT IS A MACHINE — [MINE] cuts rock, not machines. Stand beside it and press [DROP] to feed it what it takes; what it makes comes to you as you stand there."},
 	{"id": &"mined_wrong", "text": "NOT ORE — that was {broke}, and the task wants ore. The ore is the silver-flecked rock inside the WHITE RING: cut that one."},
 	{"id": &"dropped_wrong", "text": "WRONG STACK — you dropped {dropped}; the machine beside you takes {wanted}. Press the number over the {wanted} in your bar to hold it, then [DROP]."},
@@ -108,6 +109,7 @@ var _max_x_m: float = -INF
 var _deepest_m: float = -INF
 var _broke_once: bool = false
 const FAR_TICKS: int = 20
+var _sight_ticks: int = 0
 const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
 var _thrown: bool = false           ## a line has been live once this session; the grapple is known
 
@@ -225,6 +227,10 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	note(&"aim_air", _air_ticks >= AIR_TICKS)
 	_machine_ticks = _machine_ticks + 1 if on_machine else 0
 	note(&"aim_machine", _machine_ticks >= FAR_TICKS)
+	# The third refusal, "sight" (D0452): rock in reach behind other rock -- a dig-plan mark under a cut,
+	# or a buried cell nothing visible stands near. Wordless before; stranger 29 met it four times.
+	_sight_ticks = _sight_ticks + 1 if o.aim_refusal == &"sight" else 0
+	note(&"aim_sight", _sight_ticks >= FAR_TICKS)
 	var counts: Dictionary = Payouts.pack_counts(o)
 	note(&"mined_wrong", _mined_wrong(o, counts))
 	var wrong: bool = _wrong_stack(o, counts)

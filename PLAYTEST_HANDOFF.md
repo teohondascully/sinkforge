@@ -17,9 +17,16 @@ Latest verified commit: see `git log -1`.
 
 ```sh
 SESSION="$(mktemp -d /tmp/sinkforge-player-XXXXXX)"
-godot --path . --resolution 1280x720 --disable-vsync --position 0,0 --script res://playtest/seat.gd -- --session-dir="$SESSION"
+bash playtest/seat.sh "$SESSION"          # macOS: LaunchServices, foreground priority, waits for frame_0000
 python3 playtest/command.py "$SESSION" '{"ticks":1,"mouse":[640,360]}'
 ```
+
+`playtest/seat.sh` is a local macOS adapter (D0452): a seat started with `godot ... &` from an agent's
+shell inherits background priority and starves the moment a foreground app is busy. Elsewhere, run the
+binary directly: `godot --path . --resolution 1280x720 --disable-vsync --position 0,0 --always-on-top
+--script res://playtest/seat.gd -- --session-dir="$SESSION"`. Either way `receipt.json` records the
+launcher, the platform, the engine, the frame cap, the process's nice value and whether it ran foreground
+or background; a batch whose receipts say `background` is a harness fact, never a game finding.
 
 A command is a flat burst, or a COMPOSED MOVE: `{"moves":[{"ticks":10,"keys":["Space","D"]},{"ticks":30,"keys":["D"]},{"ticks":20,"keys":["A"]}]}` runs its segments back to back inside the game loop, each key set switching at its boundary, with one screenshot at the end (D0420). The segments total at most 300 ticks and each is validated like a burst. This is what makes mid-air steering possible over a screenshot round trip.
 

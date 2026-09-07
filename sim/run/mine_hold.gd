@@ -41,7 +41,10 @@ func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: D
 		last_aim = raw
 	else:
 		last_aim = Vector2i(-1, -1)
-	var aim: Vector2i = Aim.effective(world.grid, body.pos_x, body.pos_y, point.x, point.y, building)
+	# The exact cell is the BUILD preview's (a block or machine selected, the pointer idle); a held MINE
+	# snaps to the visible face whatever the hand holds (D0452, stranger 29: with one clay in the pack the
+	# hold on the ringed block's second row was refused "sight", wordless, four times).
+	var aim: Vector2i = Aim.effective(world.grid, body.pos_x, body.pos_y, point.x, point.y, building and not frame.mine_held)
 	var work: Vector2i = aim
 	if frame.mine_held and not _workable(world, body, work):
 		var marked: Vector2i = plan.nearest_workable(world.grid, body.pos_x, body.pos_y)

@@ -18129,3 +18129,48 @@ next stranger who reaches BUILD says whether it was enough.
 **Why:** a stranger who did everything right lost the run to a developer's word.
 
 **Reverse cost:** two labels.
+
+## D0452 · 2026-09-07 · A held MINE snaps whatever the hand holds, to the pointed material's visible face; BEHIND ROCK; the seat at foreground priority
+
+**Decided:** (1) Stranger 29 read NOT ORE, put the pointer inside the white ring, held MINE four times
+(60, 120, 300, 120 ticks) and was refused "sight" each time, wordlessly. Replayed to the tick
+(`playtest/replay` by hand: 1511 = 1511) and rebuilt in the sim: with one clay in the pack, selected, the
+door passed `building = true` to the mine hold, and `Aim.effective` returns the EXACT cell in that mode
+(the build preview's need), so a press on the block's second row had no visible face to snap to. A held
+MINE now snaps whatever is selected; the idle aim keeps the exact cell. (2) The snap prefers the pointed
+cell's own material: a pointer on buried ore takes ore's visible face over a nearer clay one (the
+director's "never onto an unrelated material"); the other three refusals to be wrong are pinned with it --
+never an occluded cell, an open cell in reach stays open (so a machine's cell and the sky are refusals,
+not snaps), nothing snaps from a cursor with no rock within a reach. (3) The "sight" refusal keeps its
+meaning (a dig-plan mark under a cut; a buried cell nothing visible stands near) and gets its lesson:
+BEHIND ROCK, on TOO FAR's count. (4) The seat: every seat this session started from an agent's shell ran
+at background priority (`ps -o nice` 5); under the director's foreground load four seats fell to half a
+tick a second and one hung outright, which took strangers 28-30's tails and my own replays.
+`playtest/seat.sh` starts the seat through LaunchServices (nice 0), the seat caps its frame rate at 60
+(idle 2.5% of a core, not 50-70%) and sleeps a millisecond, not seven, when the window cannot draw; the
+receipt names the launcher, platform, engine, frame cap, nice value and foreground/background, and each
+burst's receipt carries the last refusal, the body and aim cells at the first refusal, and every cell
+broken. Turning the render loop off for a burst, and a 60-step physics catch-up, were both tried and
+dropped: the hangs they were meant to cure were the priority's.
+
+**Why:** a stranger who did everything the screen asked was refused by a flag from another verb; and a
+harness that starves under the director's own use cannot be read for the game.
+
+**Reverse cost:** one boolean expression in the hold; the material pass in the snap (one function); one
+moment row; the launcher script and six receipt fields.
+
+## D0453 · 2026-09-07 · The commit identity is teohondascully@gmail.com, author and committer, from this commit on
+
+**Decided:** the director's rule (2026-09-07, amendment 14): every commit carries
+`teohondascully@gmail.com` as both author and committer. The 2,828 commits before this one carry the
+noreply address the D0429 rewrite gave them; a second whole-history rewrite was not asked for and is not
+done here. The authorship gate now checks two eras by the switch's commit time (the epoch of 75196ccf):
+at or before it, the noreply identity on both fields; after it, the Gmail one; any third identity or a
+mixed commit fails, and the classifier is exercised on three bad lines and two good ones before the
+history is read. The repository's local `user.email` is set to the Gmail address; the memory that said
+"check the email is the noreply before every push" is corrected.
+
+**Why:** "one identity" said nothing about which; the director said which.
+
+**Reverse cost:** two constants and the epoch in one script; a rewrite, if the director wants the history
+uniform, is a separate lease as D0429 was.

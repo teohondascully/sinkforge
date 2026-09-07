@@ -6,6 +6,7 @@ const Events = preload("res://playtest/seat_events.gd")
 var bridge: RefCounted = Bridge.new()
 var game: Main
 var session_dir: String = ""
+var launcher: String = "direct"    ## who started the process: `playtest/seat.sh` says launchservices
 var remaining: int = -1
 var request_id: int = 0
 var capturing: bool = false
@@ -29,6 +30,9 @@ var _sent_ms: int = 0
 ## `"until": "event"` (D0448): the burst is cut at the first player-visible change (`seat_events.gd`).
 var until_event: bool = false
 var ended_by: String = "ticks"
+var last_refusal: StringName = &""
+var refusal_at: Dictionary = {}     ## the body's and the aim's terrain cells at the burst's first refusal
+var broke: Array = []               ## every terrain cell the burst broke, in order
 var _events_prev: Dictionary = {}
 var _airborne: int = 0
 
@@ -37,6 +41,8 @@ func _initialize() -> void:
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--session-dir="):
 			session_dir = arg.trim_prefix("--session-dir=")
+		elif arg.begins_with("--launcher="):
+			launcher = arg.trim_prefix("--launcher=")
 	if not session_dir.is_absolute_path() or not DirAccess.dir_exists_absolute(session_dir):
 		printerr("playtest: supply an existing absolute --session-dir")
 		quit(2)
@@ -51,6 +57,11 @@ func _initialize() -> void:
 func _start() -> void:
 	root.size = Vector2i(1280, 720)
 	Input.use_accumulated_input = false
+	# D0452: the frame cap keeps an idle seat at ~2.5% of a core instead of spinning; the occluded-window
+	# sleep (the engine's own, when nothing can draw) is a millisecond, not seven. `playtest/seat.sh` is the
+	# launcher that starts the seat at foreground priority, the other half of the same finding.
+	OS.low_processor_usage_mode_sleep_usec = 1000
+	Engine.max_fps = 60
 	Settings.path = session_dir.path_join("settings.cfg")
 	game = Main.new()
 	game.autoboot = false
@@ -61,8 +72,12 @@ func _start() -> void:
 		quit(2)
 		return
 	Settings.apply_audio()
+	# The adapter named in full (D0452): a local macOS launcher is not a CI assumption, and a seat that ran
+	# at background priority is a harness fact the batch report must carry, not a game finding.
 	_write("receipt.json", {"engine": Engine.get_version_info(), "mode": "screen-only settled-between-bursts",
-		"viewport": [1280, 720], "session_dir": session_dir, "pid": OS.get_process_id(), "muted": AudioServer.is_bus_mute(0)})
+		"viewport": [1280, 720], "session_dir": session_dir, "pid": OS.get_process_id(), "muted": AudioServer.is_bus_mute(0),
+		"platform": OS.get_name(), "launcher": launcher, "max_fps": Engine.max_fps, "vsync": DisplayServer.window_get_vsync_mode(),
+		"nice": _nice(), "priority": "foreground" if _nice() == 0 else "background", "physics_hz": Engine.physics_ticks_per_second})
 	ready = true
 	remaining = 1
 
@@ -72,6 +87,7 @@ func _physics_process(_delta: float) -> bool:
 		return false
 	if remaining > 0:
 		remaining -= 1
+		_note_refusal()
 		if until_event and _event_now() != "":
 			remaining = 0
 			bridge.abandon()
@@ -95,6 +111,21 @@ func _physics_process(_delta: float) -> bool:
 
 
 ## The first player-visible change since the burst began, remembered as `ended_by`; "" while nothing has.
+## The last refusal the held verb met during the burst (D0452's read of stranger 29: a press inside the
+## ring was refused after twelve bursts and no frame said why): `far`, `air`, `sight`, or empty. The
+## capture itself comes after the release, when the refusal is already gone from the observation.
+func _note_refusal() -> void:
+	var f: Frame = game.view.current_frame()
+	if f == null or f.obs == null:
+		return
+	if f.obs.aim_refusal != &"":
+		if last_refusal == &"":
+			refusal_at = {"body": [f.obs.cell.x, f.obs.cell.y], "aim": [f.obs.aim_cell.x, f.obs.aim_cell.y]}
+		last_refusal = f.obs.aim_refusal
+	for c: Vector2i in f.obs.mining_broke_cells:
+		broke.append([c.x, c.y])
+
+
 func _event_now() -> String:
 	var o: Interface.Observation = game.view.current_frame().obs if game.view.current_frame() != null else null
 	_airborne = 0 if o == null or o.on_floor else _airborne + 1
@@ -147,6 +178,9 @@ func _process(_delta: float) -> bool:
 	_camera_still = 0
 	until_event = String(command.get("until", "ticks")) == "event"
 	ended_by = "ticks"
+	last_refusal = &""
+	refusal_at = {}
+	broke = []
 	_airborne = 0
 	_events_prev = Events.snapshot(game.stack, game.view.current_frame(), 0)
 	remaining = 0
@@ -162,10 +196,19 @@ func _capture() -> void:
 		"sim_seconds": float(game.tick) / 60.0, "screenshot": path, "capture_error": result,
 		"settled_ticks": maxi(settling, 0), "still": not _moving(),
 		"sent_at": _sent_ms, "received_at": _received_ms, "captured_at": int(Time.get_unix_time_from_system() * 1000.0),
-		"ended_by": ended_by}
+		"ended_by": ended_by, "refusal": String(last_refusal), "refusal_at": refusal_at, "broke": broke}
 	_write("observation_%04d.json" % request_id, response)
 	_write("response.json", response)
 	capturing = false
+
+
+## The process's nice value as the OS reports it (macOS: 5 under a background clamp, 0 foreground); -1
+## when it cannot be read.
+func _nice() -> int:
+	var out: Array = []
+	if OS.execute("ps", ["-o", "nice=", "-p", str(OS.get_process_id())], out) != 0 or out.is_empty():
+		return -1
+	return int(String(out[0]).strip_edges())
 
 
 func _write(name: String, data: Dictionary) -> void:

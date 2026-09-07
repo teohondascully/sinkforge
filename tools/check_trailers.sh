@@ -166,18 +166,36 @@ fi
 # clone never fetches. The effect was a gate that read RED locally and GREEN in CI off the same commit --
 # a verdict that depended on which machine's ref set it saw, which is the one property a gate may not have.
 # Found by an external audit 2026-08-30. If the scan's ref set above ever changes, change these with it.
-authors="$(git log --format='%ae' --branches --tags --remotes | sort -u | wc -l | tr -d ' ')"
-[ "$authors" -eq 1 ]; check $? "every commit shares one author identity ($authors distinct found)"
-committers="$(git log --format='%ce' --branches --tags --remotes | sort -u | wc -l | tr -d ' ')"
-[ "$committers" -eq 1 ]; check $? "every commit shares one committer identity ($committers distinct found)"
-if [ "$authors" -ne 1 ] || [ "$committers" -ne 1 ]; then
-	echo "  identities present:" >&2
-	git log --format='%ae%n%ce' --branches --tags --remotes | sort -u | sed 's/^/    /' >&2
+# Two eras, one identity each (D0453, the director's rule of 2026-09-07: every commit is authored AND
+# committed as teohondascully@gmail.com). The history before the switch carries the noreply address the
+# D0429 rewrite gave it; rewriting 1,300 commits again was not asked for, so the boundary is the switch's
+# commit time: at or before it, the noreply identity on both fields; after it, the Gmail identity on both.
+# Any third identity, or a mixed commit, fails either era. The classifier is a pure function of one
+# "<committer-epoch> <author-email> <committer-email>" line, so it can be handed a bad line as a control.
+OLD_ID='121736842+teohondascully@users.noreply.github.com'
+NEW_ID='teohondascully@gmail.com'
+SWITCH_EPOCH=1788764321
+classify() {  # classify "<epoch> <author> <committer>" -> prints nothing when right, the line when wrong
+	awk -v old="$OLD_ID" -v new="$NEW_ID" -v at="$SWITCH_EPOCH" '{
+		want = ($1 > at) ? new : old
+		if ($2 != want || $3 != want) print $0
+	}'
+}
+bad_probe="$(printf '%s\n' "$((SWITCH_EPOCH + 1)) $OLD_ID $OLD_ID" "$((SWITCH_EPOCH + 1)) $NEW_ID someone@example.invalid" "$SWITCH_EPOCH $NEW_ID $NEW_ID" | classify | wc -l | tr -d ' ')"
+[ "$bad_probe" -eq 3 ]; check $? "the identity classifier rejects a stale identity after the switch, a mixed commit, and the new identity before it (positive control: $bad_probe of 3 flagged)"
+good_probe="$(printf '%s\n' "$((SWITCH_EPOCH + 1)) $NEW_ID $NEW_ID" "$SWITCH_EPOCH $OLD_ID $OLD_ID" | classify | wc -l | tr -d ' ')"
+[ "$good_probe" -eq 0 ]; check $? "...and accepts the right identity in each era (negative control: $good_probe flagged)"
+wrong="$(git log --format='%ct %ae %ce' --branches --tags --remotes | classify)"
+wrong_n="$(printf '%s' "$wrong" | grep -c . || true)"
+[ "$wrong_n" -eq 0 ]; check $? "every commit carries its era's one identity as author and committer ($wrong_n do not)"
+if [ "$wrong_n" -ne 0 ]; then
+	echo "  commits with the wrong identity for their era (epoch author committer):" >&2
+	printf '%s\n' "$wrong" | head -20 | sed 's/^/    /' >&2
 fi
 
 echo
 if [ "$fails" -eq 0 ]; then
-	echo "check_trailers: PASS - $total commits, one author, no trailers"
+	echo "check_trailers: PASS - $total commits, one identity per era, no trailers"
 	exit 0
 fi
 echo "check_trailers: FAIL ($fails)" >&2

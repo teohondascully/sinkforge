@@ -11,6 +11,7 @@ const ROCK: StringName = &"hardrock"
 func _initialize() -> void:
 	_test_line_of_sight_cases_and_the_float_oracle()
 	_test_aim_is_exact_in_reach_and_snaps_to_the_nearest_visible_face()
+	_test_the_snap_takes_the_pointed_material_and_never_crosses_rock_or_air()
 	_test_dig_plan_paints_a_drag_and_drains_the_nearest_workable_mark()
 	_test_break_yield_bursts_once_and_opens_the_rest_as_lode()
 	_test_rubble_banks_sixteenths_into_blocks_and_a_pile_falls()
@@ -140,6 +141,38 @@ func _test_aim_is_exact_in_reach_and_snaps_to_the_nearest_visible_face() -> void
 	var open: TileGrid = TileGrid.new(64, 64, 1)
 	var far_air: Vector2i = _at_cell_centre(Vector2i(30, 30))
 	_check(Aim.effective(open, body.x, body.y, far_air.x, far_air.y, false) == Vector2i(30, 30), "open air beyond reach with no wall anywhere: raw")
+
+
+## D0452 (stranger 29): the snap's four refusals to be wrong. The pointed material's own visible face wins
+## over a nearer face of another material; an occluded cell is never chosen; open air in reach stays open
+## air (a machine's cell is open air to the grid); nothing snaps from a cursor with no rock within a reach.
+func _test_the_snap_takes_the_pointed_material_and_never_crosses_rock_or_air() -> void:
+	# A room over a flat floor (row 10). The body at (10, 8) sees the floor cells beside and under it. Under
+	# the floor an ore block (8-10, 10-12) whose top row is exposed except at (10, 10), which is clay: from
+	# the buried ore cell (10, 12) the clay above it is the nearer visible face (d² 4), the ore's own (9, 10) (5).
+	var grid: TileGrid = _solid_grid(ROCK)
+	for y: int in range(5, 10):
+		for x: int in range(6, 13):
+			grid.excavate(Vector2i(x, y))
+	for c: Vector2i in [Vector2i(8, 10), Vector2i(9, 10), Vector2i(8, 11), Vector2i(9, 11), Vector2i(10, 11), Vector2i(8, 12), Vector2i(9, 12), Vector2i(10, 12)]:
+		grid.set_material(c, &"ore_iron")
+	grid.set_material(Vector2i(10, 10), &"clay")
+	var body: Vector2i = _at_cell_centre(Vector2i(10, 8))
+	var buried: Vector2i = _at_cell_centre(Vector2i(10, 12))
+	var got: Vector2i = Aim.effective(grid, body.x, body.y, buried.x, buried.y, false)
+	_check(got == Vector2i(9, 10), "a cursor on buried ore takes ore's own visible face (9, 10), not the nearer clay at (10, 10) (%s)" % str(got))
+	grid.set_material(Vector2i(8, 10), ROCK)
+	grid.set_material(Vector2i(9, 10), ROCK)
+	var any: Vector2i = Aim.effective(grid, body.x, body.y, buried.x, buried.y, false)
+	_check(any == Vector2i(10, 10), "control: with no ore face visible the nearest visible cell wins, the clay at (10, 10) (%s)" % str(any))
+	for c: Vector2i in [got, any]:
+		_check(LineOfSight.clear(grid, Vector2i(10, 8), c) and c != Vector2i(10, 12), "the chosen face is visible from the body and never the occluded cell itself")
+	var air: Vector2i = _at_cell_centre(Vector2i(10, 9))
+	_check(Aim.effective(grid, body.x, body.y, air.x, air.y, false) == Vector2i(10, 9), "open air in reach stays the open cell: a machine's cell or the air beside the body never snaps onto rock")
+	var open: TileGrid = TileGrid.new(64, 64, 1)
+	var lone: Vector2i = _at_cell_centre(Vector2i(40, 40))
+	_check(Aim.effective(open, body.x, body.y, lone.x, lone.y, false) == Vector2i(40, 40), "a cursor with no rock within a reach of it snaps to nothing")
+	_check(Aim.effective(grid, body.x, body.y, buried.x, buried.y, true) == Vector2i(10, 12), "the build preview (idle, a block selected) keeps the exact cell")
 
 
 func _test_dig_plan_paints_a_drag_and_drains_the_nearest_workable_mark() -> void:
