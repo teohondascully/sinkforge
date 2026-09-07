@@ -28,7 +28,7 @@ const VISITS_PER_FRAME: int = 4000     ## about 2 ms of predicate calls, D0414's
 const RING_FLOOR: float = 0.38
 ## THE RING DOES NOT TIGHTEN (D0447 reversed D0433). D0433 shrank the ring to 0.35 m within NEAR_M so it would
 ## not sit on the miner's chest; eight of eight strangers who tried had mined the vein on the pad before it,
-## eight of fourteen since -- every failure at the range where the ring was a nine-pixel speck. RING_NEAR_M
+## eight of fifteen since -- every failure at the range where the ring was a nine-pixel speck. RING_NEAR_M
 ## is RING_M now (the lerp below is a constant); within NEAR_M the target's own metre is outlined inside the
 ## ring, so the ring finds the eye and the outline names the block. The chest overlap is the cheaper fault.
 const RING_NEAR_M: float = 0.9       ## D0447: the ring no longer tightens; the outline names the block inside it

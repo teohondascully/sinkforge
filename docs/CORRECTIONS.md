@@ -501,5 +501,6 @@ entry stands as written; its chevron constants are gone from `view/hud/target_gu
 ## D0433's tightening, reversed by D0447 (2026-09-06)
 
 D0433 tightened the target ring to 0.35 m within 1.5 m of the body. D0447 restores 0.9 m at every range,
-with D0443's outline of the target's metre inside it, after six of fourteen strangers lost the first rung at
-that range against none of eight before. The D0433 entry stands as written; `RING_NEAR_M` equals `RING_M`.
+with D0443's outline of the target's metre inside it, after seven of fifteen strangers lost the first rung at
+that range against none of eight who tried before. (The D0447 entry's "six of fourteen" was a miscount,
+corrected here the same hour; the member lists are in the batch report.) The D0433 entry stands as written; `RING_NEAR_M` equals `RING_M`.
