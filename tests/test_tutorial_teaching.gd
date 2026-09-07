@@ -132,3 +132,34 @@ func _test_the_ring_finds_the_real_targets() -> void:
 	var coal: Vector2 = TargetGuide.target(&"fuel", o)
 	_check(coal != TargetGuide.NONE and coal.x > body_px.x, "FUEL rings the coal seam to the right")
 	_check(TargetGuide.target(&"auto", o) == TargetGuide.NONE, "a rung with nothing to point at rings nothing")
+	_budgeted_walk_pins(o, body_px)
+
+
+## D0431 (stranger 6): the tree stands six metres left of spawn; from the drill shaft at +7 that is 13 m,
+## past the old ten-metre search, and no ring pointed at it. WOOD rings the tutorial tree from spawn now,
+## and the wider walk is paid across frames.
+func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
+	var trunk: Vector2 = TargetGuide.target(&"wood", o)
+	_check(trunk != TargetGuide.NONE and trunk.x < body_px.x and absf(body_px.distance_to(trunk) / 16.0 - 6.0) < 1.5, "WOOD rings the tutorial tree about six metres left (%.1f m off)" % (body_px.distance_to(trunk) / 16.0))
+	_check(TargetGuide.SEARCH_CELLS * 4 >= 25 * 16, "the search reaches the screen's half-width at play zoom (%d cells)" % TargetGuide.SEARCH_CELLS)
+	# The walk is paid across frames: a small budget stops short and hands back where it was; resumed, it
+	# reaches the full search's answer with the same visits in total.
+	var wanted: Callable = TargetGuide.cell_predicate(&"wood", o)
+	TargetGuide.scan_visits = 0
+	var step: Dictionary = TargetGuide.scan(o, body_px, wanted, 0, TargetGuide.NONE, 1.0e18, 50)
+	_check(not bool(step["done"]) and int(step["next_r"]) > 0 and int(step["next_r"]) < TargetGuide.SEARCH_CELLS, "a 50-visit budget stops the walk mid-way at radius %d" % int(step["next_r"]))
+	var rounds: int = 1
+	while not bool(step["done"]) and rounds < 1000:
+		step = TargetGuide.scan(o, body_px, wanted, int(step["next_r"]), step["best"], float(step["best_d"]), 50)
+		rounds += 1
+	var budgeted: int = TargetGuide.scan_visits
+	TargetGuide.scan_visits = 0
+	var whole: Vector2 = TargetGuide.target(&"wood", o)
+	_check(bool(step["done"]) and step["best"] == whole and budgeted == TargetGuide.scan_visits, "resumed over %d rounds it finds the same trunk with the same %d visits as one walk (%d)" % [rounds, TargetGuide.scan_visits, budgeted])
+	var g2: TargetGuide = TargetGuide.new(Objectives.new())
+	var frames: int = 0
+	var seen: Vector2 = TargetGuide.NONE
+	while seen == TargetGuide.NONE and frames < 60:
+		seen = g2._cached_target(&"wood", o)
+		frames += 1
+	_check(seen == whole and frames >= 1 and frames <= 12, "the chip's frame-budgeted walk shows the ring within %d frames" % frames)

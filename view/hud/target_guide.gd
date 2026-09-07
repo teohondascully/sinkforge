@@ -13,7 +13,13 @@ const RING_M: float = 0.9              ## the ring's radius, metres
 const RING_WIDTH: float = 2.0          ## canvas px
 const BREATH_HZ: float = 0.8
 const INK := Color(0.97, 0.87, 0.55)
-const SEARCH_CELLS: int = 40           ## ten metres each way, in terrain cells
+## THE SEARCH REACHES THE SCREEN'S HALF-WIDTH AND PAYS FOR IT ACROSS FRAMES (D0431, stranger 6). Ten metres
+## left the tutorial tree unringed from the drill shaft 13 m away, and the stranger went the other way over
+## the chimney. A 100-cell miss is 40k visits, ten times D0414's budget; so the ring walk spends at most
+## `VISITS_PER_FRAME` a frame and resumes where it stopped, keyed on the rung, the terrain and the body's
+## METRE, so a walking body does not restart it every cell. The ring arrives within a few frames of a hit.
+const SEARCH_CELLS: int = 100          ## twenty-five metres each way: the window's half-width at play zoom
+const VISITS_PER_FRAME: int = 4000     ## about 2 ms of predicate calls, D0414's measure
 ## THE RING OUTLIVES THE HOW-TO (D0428, stranger 5). D0411 gave the ring the how-to's alpha, so it faded at
 ## nine seconds and came back at the forty-second stall -- and the fifth stranger, who had wandered for ten
 ## seconds, spent the thirty between pressing DROP five metres from a forge nothing was pointing at. The
@@ -36,26 +42,42 @@ var _cache_key: Array = []
 var _cache_at: Vector2 = NONE
 var _miss_cell: Vector2i = Vector2i(-1000000, -1000000)
 var _miss_version: int = -1
+## The ring walk in flight: the next radius to visit and the best so far; `_scan_key` names what it is for.
+var _scan_key: Array = []
+var _scan_r: int = 0
+var _scan_best: Vector2 = NONE
+var _scan_best_d: float = 1.0e18
 
 
 func _init(p_objectives: Objectives) -> void:
 	objectives = p_objectives
 
 
-## The world position (px) of the current rung's target, or NONE. Pure over the observation.
-static func target(id: StringName, o: Interface.Observation) -> Vector2:
-	var body: Vector2 = Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
+## The predicate a rung searches the terrain with, or an invalid Callable when its target is a machine or
+## a pile (answered at once from the observation's lists).
+static func cell_predicate(id: StringName, o: Interface.Observation) -> Callable:
 	match id:
 		&"mine":
-			return _nearest_cell(o, body, func(c: Vector2i) -> bool: return o.is_ore_like_at(c) and o.material_at(c) != &"coal")
+			return func(c: Vector2i) -> bool: return o.is_ore_like_at(c) and o.material_at(c) != &"coal"
+		&"wood":
+			return func(c: Vector2i) -> bool: return o.material_at(c) == &"wood"
+		&"fuel":
+			return func(c: Vector2i) -> bool: return o.material_at(c) == &"coal"
+	return Callable()
+
+
+## The world position (px) of the current rung's target, or NONE. Pure over the observation; the full
+## search, for a suite. The painter walks the same rings across frames (`_cached_target`).
+static func target(id: StringName, o: Interface.Observation) -> Vector2:
+	var body: Vector2 = Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
+	var wanted: Callable = cell_predicate(id, o)
+	if wanted.is_valid():
+		return _nearest_cell(o, body, wanted)
+	match id:
 		&"smelt":
 			return _nearest_machine(o, body, &"processor")
-		&"wood":
-			return _nearest_cell(o, body, func(c: Vector2i) -> bool: return o.material_at(c) == &"wood")
 		&"build":
 			return _nearest_pile(o, body, &"drill")
-		&"fuel":
-			return _nearest_cell(o, body, func(c: Vector2i) -> bool: return o.material_at(c) == &"coal")
 		&"hopper":
 			return _nearest_pile(o, body, &"hopper")
 		&"power":
@@ -68,19 +90,30 @@ const NONE := Vector2(-1.0e9, -1.0e9)
 
 
 ## Rings outward from the body's cell. A ring at Chebyshev radius r holds no point nearer than (r - 1)
-## cells, so once a hit is held the walk stops at the ring that can no longer beat it.
+## cells, so once a hit is held the walk stops at the ring that can no longer beat it. The full walk.
 static func _nearest_cell(o: Interface.Observation, body: Vector2, wanted: Callable) -> Vector2:
+	var step: Dictionary = scan(o, body, wanted, 0, NONE, 1.0e18, 0x7fffffff)
+	return step["best"]
+
+
+## The ring walk from radius `from_r`, spending at most `budget` predicate calls: returns the best so far,
+## its squared distance, the next radius to visit, and whether the walk is done (the rings ran out, or no
+## farther ring can beat the hit). Pure; the painter's state is what it hands back in.
+static func scan(o: Interface.Observation, body: Vector2, wanted: Callable, from_r: int, best: Vector2, best_d: float, budget: int) -> Dictionary:
 	var cell_px: float = float(o.cell_px)
 	var centre := Vector2i(floori(body.x / cell_px), floori(body.y / cell_px))
-	var best: Vector2 = NONE
-	var best_d: float = 1.0e18
-	for r: int in range(0, SEARCH_CELLS + 1):
+	var spent: int = 0
+	var r: int = from_r
+	while r <= SEARCH_CELLS:
 		if best != NONE and float((r - 1) * (r - 1)) * cell_px * cell_px > best_d:
-			break
+			return {"best": best, "best_d": best_d, "next_r": r, "done": true}
+		if spent >= budget:
+			return {"best": best, "best_d": best_d, "next_r": r, "done": false}
 		for c: Vector2i in _ring(centre, r):
 			if not o.window.has_point(c):
 				continue
 			scan_visits += 1
+			spent += 1
 			if not bool(wanted.call(c)):
 				continue
 			var at: Vector2 = (Vector2(c) + Vector2(0.5, 0.5)) * cell_px
@@ -88,7 +121,8 @@ static func _nearest_cell(o: Interface.Observation, body: Vector2, wanted: Calla
 			if d < best_d:
 				best_d = d
 				best = at
-	return best
+		r += 1
+	return {"best": best, "best_d": best_d, "next_r": r, "done": true}
 
 
 ## The cells at Chebyshev radius `r` round `centre`; the centre itself at r == 0.
@@ -163,20 +197,41 @@ static func ring_alpha(obj: Objectives) -> float:
 ## The target for this rung, searched once per (rung, body cell, terrain version, pile count) and reused
 ## across the frames in between -- the only inputs the answer can move on.
 func _cached_target(id: StringName, o: Interface.Observation) -> Vector2:
+	var wanted: Callable = cell_predicate(id, o)
+	if wanted.is_valid():
+		return _scanned_target(id, o, wanted)
 	var key: Array = [id, o.cell, o.terrain_version, o.piles.size(), o.machines.size()]
 	if key == _cache_key:
 		return _cache_at
-	# A miss is the expensive answer (the whole window walked for nothing) and a metre of walking cannot
-	# bring a target ten metres off into reach; hold it until the body has moved that far or dug.
-	var same_rung: bool = not _cache_key.is_empty() and _cache_key[0] == id
-	if same_rung and _cache_at == NONE and o.terrain_version == _miss_version and o.cell.distance_squared_to(_miss_cell) < MISS_HOLD_CELLS * MISS_HOLD_CELLS:
-		return NONE
 	_cache_key = key
 	_cache_at = target(id, o)
-	if _cache_at == NONE:
-		_miss_cell = o.cell
-		_miss_version = o.terrain_version
 	return _cache_at
+
+
+## A terrain search paid across frames: keyed on the rung, the terrain and the body's METRE, it walks
+## `VISITS_PER_FRAME` predicate calls a frame from where it stopped and answers with the best so far. A
+## finished miss holds until the body has walked MISS_HOLD_CELLS or dug, as before.
+func _scanned_target(id: StringName, o: Interface.Observation, wanted: Callable) -> Vector2:
+	var metre := Vector2i(floori(float(o.cell.x) / 4.0), floori(float(o.cell.y) / 4.0))
+	var key: Array = [id, metre, o.terrain_version]
+	if key != _scan_key:
+		var same_rung: bool = not _scan_key.is_empty() and _scan_key[0] == id
+		if same_rung and _scan_best == NONE and _scan_r > SEARCH_CELLS and o.terrain_version == _miss_version and o.cell.distance_squared_to(_miss_cell) < MISS_HOLD_CELLS * MISS_HOLD_CELLS:
+			return NONE
+		_scan_key = key
+		_scan_r = 0
+		_scan_best = NONE
+		_scan_best_d = 1.0e18
+	if _scan_r <= SEARCH_CELLS:
+		var body: Vector2 = Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
+		var step: Dictionary = scan(o, body, wanted, _scan_r, _scan_best, _scan_best_d, VISITS_PER_FRAME)
+		_scan_best = step["best"]
+		_scan_best_d = step["best_d"]
+		_scan_r = SEARCH_CELLS + 1 if bool(step["done"]) else int(step["next_r"])
+		if bool(step["done"]) and _scan_best == NONE:
+			_miss_cell = o.cell
+			_miss_version = o.terrain_version
+	return _scan_best
 
 
 ## Canvas px a metre at this frame's zoom, off the view rect.

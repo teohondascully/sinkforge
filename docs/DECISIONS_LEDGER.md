@@ -17684,3 +17684,27 @@ to be a chart and not a ruler.
 **Why:** a map a stranger cannot read is a chip spending screen for nothing; the same box holds a chart.
 
 **Reverse cost:** one static function and one region draw.
+
+## D0431 · 2026-09-06 · The sixth stranger: the target ring's search reaches the screen and pays across frames
+
+**The run** (`docs/playtests/2026-09-06_stranger6.md`): the fastest opening yet -- ore at 2.5 s, the forge
+fed at 5.0 s ("-11 ore"), ingots at 7 and 9 s -- then the wood rung opened with the miner over the drill
+shaft at +7 m and the tutorial tree at -6 m: thirteen metres, past `TargetGuide`'s ten-metre search, so
+nothing was ringed, and the stranger went right, jumped the chimney, cut a leaf, and fell.
+
+**Decided:** `SEARCH_CELLS` 40 -> 100 (the observation window's half-width at play zoom; the walk already
+skipped cells outside the window, so the window is the true bound). A miss at 100 cells is 40k predicate
+calls, ten times what D0414 measured at 3 ms, so the walk is paid across frames: `TargetGuide.scan` walks
+rings from a given radius under a visit budget and hands back the best so far and where it stopped; the
+chip keeps that state keyed on (rung, terrain version, the body's METRE) and spends `VISITS_PER_FRAME`
+(4000, about 2 ms) a frame; a hit stops the walk at the first ring that cannot beat it as before; a
+finished miss holds for a metre of walking as before. The static `target()` is the same walk with no
+budget, for a suite. Pinned in `test_tutorial_teaching`: WOOD rings the tree six metres left from spawn;
+a 50-visit budget stops mid-walk and, resumed, finds the same trunk with the same total visits as one
+walk; the chip's own budgeted walk shows the ring within 12 frames. Quiet-tick p99 on the scripted walk
+1.6-1.8 ms after (2.6 before D0414's slice; no regression).
+
+**Why:** a pointer with a shorter reach than the screen points at nothing exactly when the player has
+stepped away from it.
+
+**Reverse cost:** one constant and one dictionary of scan state.
