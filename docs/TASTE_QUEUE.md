@@ -257,7 +257,8 @@ pass plants leaves as terrain cells, so the trunk's fall does not take them. *Qu
 fall with the trunk (Terraria's whole-tree drop), crumble to leaves over a few seconds, or stay -- an
 arbour reads as a ruin here -- and if it falls, does it pay leaves or wood?*
 
-**T035 · Walking is fast against the pad.** RUN_SPEED is legacy's 150 px/s, 9.4 m/s in this scale: a D
+**T035 · Walking is fast against the pad.** *More (D0444): strangers 17 and 20 overshot the vein by five
+metres on two presses and never mined; three of the last six first-rung failures begin with a walk.* RUN_SPEED is legacy's 150 px/s, 9.4 m/s in this scale: a D
 held for two thirds of a second carried stranger 11 seven metres, past the forge pocket, the vein, the
 adit and the drill shaft -- the whole authored opening -- before the first frame came back. Two of three
 strangers on the capped world overshot the pad on their first key. The world is 64 m wide, so the east
@@ -265,7 +266,9 @@ edge is three seconds of walking from spawn. *Question: is the pad too small for
 too high for the pad? A walk/run split (shift), a wider pad, or a slower legacy constant re-derived for
 a body 1.25 m tall.*
 
-**T036 · The world ends without a wall.** Strangers 11 and 12 both walked to the east edge (32 m from
+**T036 · The world ends without a wall.** *More (D0444): at the edge the camera clamps and the body leaves
+the frame's centre; stranger 21 read THE WAY DOWN there and pressed "under me" at screen centre sixteen
+times, on air.* Strangers 11 and 12 both walked to the east edge (32 m from
 spawn) and stood at the screen's right border with the ground running under the frame and nothing drawn
 past it; the camera clamps to the grid and the body clamps a tick later (frame 28 of run 11, frame 21 of
 run 12). *Question: a cliff, a sheer bore wall in the lore's own material, dark rock to the edge of the

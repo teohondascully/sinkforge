@@ -17979,3 +17979,24 @@ was too easy to point at), and one verb (Q) with one silent precondition (the se
 stranger who had done everything else right.
 
 **Reverse cost:** the outline block; one moment, one helper, one table; one sentence.
+
+## D0444 · 2026-09-06 · Strangers 19-21, the first batch on D0443: the first rung's sentence leads with POINT
+
+**Decided:** the first rung's how-to no longer tells the player where to walk. "At your feet" made
+stranger 13 dig under their own feet; "a step to your LEFT" (D0438) made strangers 17 and 20 walk left --
+7 m on two presses at 9.4 m/s, past the vein, past the forge pocket -- and neither mined an ore. From
+spawn the vein is 1.5-2 m off, inside the 3.2 m reach: the sentence is "POINT at the RINGED silver-flecked
+rock beside you (in reach from here) and hold [MINE]". Once the body has moved the ring carries the
+target, as before. `test_objective_line` pins it at one how-to line beside the depth chip.
+
+**What the batch showed** (`docs/playtests/2026-09-06_strangers19-21.md`): the "hold ORE (its number key
+selects it)" sentence was read and acted on by both strangers who reached the forge (WRONG STACK never had
+cause to fire); S19 reached ingots at 21.5 s and felled the tutorial tree's trunk, the crown falling live;
+THE WAY DOWN fired twice as designed and one stranger dug on it; the other stranger failed sixteen digs
+because the camera clamps at the world's east edge and the body was no longer at the frame's centre
+(T036). 11.6-13.0 s a burst.
+
+**Why:** three sentences about position in one day, each moving the failure rather than removing it; the
+rung's verb is POINT, and the sentence should be too.
+
+**Reverse cost:** one sentence.

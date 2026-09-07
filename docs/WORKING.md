@@ -428,6 +428,11 @@ one-call build: 15-20 s a burst (from 21.5); S17 pointed at the chevron on air (
 metre is outlined); S16 dropped clay at the forge four times (WRONG STACK names both items; the smelt
 how-to says hold ORE); S18 mined at 9 s and never dug (D0440's lesson was not on that build). The update
 for Codex is `docs/audits/2026-09-06-update-for-codex.md` (D0416-D0438, with §10 on the loop's pace).
+**Strangers 19-21 (D0444), the first batch ON D0443:** S19 ore 7.6 s, ingots 21.5 s, the crown fell live;
+"hold ORE (its number key)" was read and acted on by both who reached the forge; THE WAY DOWN fired twice
+and one dug on it; S20 overshot the vein by five metres on two presses and never mined (T035); S21 pressed
+"under me" at screen centre at the world's east edge where the camera clamps (T036). The first rung's
+sentence now leads with POINT and names no direction. 11.6-13.0 s a burst.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -454,8 +459,8 @@ T031 (taken provisionally in D0434: the chimney capped; overrule by deleting two
 (four ring kinds); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
 at zero; the forks T024-T030.
 
-**Cheap next steps that need no ruling:** a batch of three strangers on the D0443 build (the outline,
-WRONG STACK, THE WAY DOWN, the "more coming" tick are untested by a stranger); the rest of the Codex
-update's §10 (downscaled frames, more seats, a seat-driven scripted stranger); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
+**Cheap next steps that need no ruling:** a batch on the D0444 build (the POINT sentence; WRONG STACK and
+the "more coming" tick still unseen); a machine under the pointer named as a machine, not "open air"; the
+rest of the Codex update's §10 (downscaled frames, more seats, a seat-driven scripted stranger); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
 instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
 bake (V32).
