@@ -18891,3 +18891,25 @@ there. The forge's rule is the director's; the flag makes the ruling a one-line 
 the clay is taken out; the same feed under `pass` drops the clay and smelts; the ledger balances under both.
 The mutant that skips the jam check fails two. `test_machines` 113 and `test_looks` 29 unchanged; the
 schema validator passes with the field.
+
+## D0491 · 2026-09-07 · No elevated coal pocket: hand-cut yield goes to the pack, and the drill's stream is not the spec's coal channel
+
+**Decided (the director, on the morning report):** the forge's intake stays `pass`, provisional, with D0490's
+suite pinning both rules. The spec's "coal pocket elevated above the intake" is NOT added. Recorded here
+instead: under the current yield semantics a hand-cut cell's material goes into the PACK (`Items.yield_break`,
+the "+6 ore" float), never onto the ground as a falling pile, so a coal metre over the forge's column would
+put coal in the player's hand and nothing in the forge. The gravity-fed pocket the spec describes needs a
+yield rule this build does not have (a cut that drops a pile, or a channel that carries one), and is not
+built by geometry alone.
+
+**Two routes, kept distinct in the docs and the ladder:** (1) THE DRILL-STREAM ROUTE, shipped (D0483): a
+drill burning coal lets one coal fall down its column when the machine below wants it and holds none; the
+auto rung reads it. This is a machine's behaviour, not a discovery about the ground. (2) THE DUG COAL CHANNEL,
+the spec's future beat: the player finds coal above a forge, opens the ground between them, and the coal
+comes down on its own -- a discovery about gravity and rock, made with bare hands. It waits on the yield
+rule (a cut that leaves a pile where the pack is full, or a "cut and let fall" verb) and is the director's
+to schedule. The ladder's texts name neither route as the other.
+
+**Why record rather than build:** the director's item 3 was written against the fixture opening; the shipped
+opening already carries the recipe, the record and the flag, and building the pocket under today's rule would
+ship a lesson the sim contradicts (the class D0464/D0467/D0470 exist to remove).
