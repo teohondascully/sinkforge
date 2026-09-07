@@ -18058,3 +18058,25 @@ walked more; batch 25-27 is the test, and the same three missions are kept for i
 first ten seconds; the reverse trade is the right side to be wrong on.
 
 **Reverse cost:** one constant.
+
+## D0448 · 2026-09-06 · The burst ends when something happens: `"until": "event"` (Astra's items 3-4)
+
+**Decided:** a burst of 120 ticks that walked past a lesson, a pickup and a refusal came back with one
+frame of the aftermath, and the agent guessed the middle. With `"until": "event"` the seat watches the
+player-visible state the HUD itself draws from (`playtest/seat_events.gd`: the rung and its count, the
+pack, the active lesson, a refusal's rising edge, a drop, a landing after twelve airborne ticks) and cuts
+the burst -- the rest of a composed sequence abandoned, the release and the settle as usual -- at the
+first change, so the frame IS the moment; the observation says `ended_by`. Nothing read is sim state the
+player cannot see: the boundary D0419 drew holds. Pinned pure in `test_playtest_input` (the event order,
+the once-only refusal, the hop that is not a landing, the abandon) and measured live: MINE held on the
+vein for 300 ticks came back at tick 79 (`objective`), again at 113 (`pack`); a 300-tick walk with nothing
+on it ran out (`ticks`); a press on far rock came back in 7 ticks (`refusal`). The mission template says
+so. Default stays `ticks`.
+
+**Not done:** Astra's items 1-2 (one agent context over several seats; a supervisor) are orchestration, not
+the seat; 6-8 (downscaled frames, cached crops) and 12 (the physical ceiling run) wait.
+
+**Why:** an event-cut burst buys two things at once: fewer frames that show nothing, and the one frame
+that shows the thing.
+
+**Reverse cost:** one file and a flag.

@@ -2,6 +2,7 @@ extends SceneTree
 
 ## Alternate launcher; ordinary Main, no gameplay overrides. Files stay in --session-dir.
 const Bridge = preload("res://playtest/input_bridge.gd")
+const Events = preload("res://playtest/seat_events.gd")
 var bridge: RefCounted = Bridge.new()
 var game: Main
 var session_dir: String = ""
@@ -25,6 +26,11 @@ var _camera_prev: Vector2 = Vector2.INF
 var _camera_still: int = 0
 var _received_ms: int = 0
 var _sent_ms: int = 0
+## `"until": "event"` (D0448): the burst is cut at the first player-visible change (`seat_events.gd`).
+var until_event: bool = false
+var ended_by: String = "ticks"
+var _events_prev: Dictionary = {}
+var _airborne: int = 0
 
 
 func _initialize() -> void:
@@ -66,6 +72,9 @@ func _physics_process(_delta: float) -> bool:
 		return false
 	if remaining > 0:
 		remaining -= 1
+		if until_event and _event_now() != "":
+			remaining = 0
+			bridge.abandon()
 		return false
 	if settling < 0:
 		# The next segment of a composed move (D0420), or the release when the sequence is spent.
@@ -83,6 +92,17 @@ func _physics_process(_delta: float) -> bool:
 	paused = true
 	_capture.call_deferred()
 	return false
+
+
+## The first player-visible change since the burst began, remembered as `ended_by`; "" while nothing has.
+func _event_now() -> String:
+	var o: Interface.Observation = game.view.current_frame().obs if game.view.current_frame() != null else null
+	_airborne = 0 if o == null or o.on_floor else _airborne + 1
+	var now: Dictionary = Events.snapshot(game.stack, game.view.current_frame(), _airborne)
+	var e: String = Events.fired(_events_prev, now)
+	if e != "":
+		ended_by = e
+	return e
 
 
 ## Whether the picture is still changing under a still hand: the body's velocity (the one sim fact the
@@ -125,6 +145,10 @@ func _process(_delta: float) -> bool:
 	settle = bool(command.get("settle", true))
 	settling = -1
 	_camera_still = 0
+	until_event = String(command.get("until", "ticks")) == "event"
+	ended_by = "ticks"
+	_airborne = 0
+	_events_prev = Events.snapshot(game.stack, game.view.current_frame(), 0)
 	remaining = 0
 	return false
 
@@ -137,7 +161,8 @@ func _capture() -> void:
 	var response: Dictionary = {"id": request_id, "tick": game.tick,
 		"sim_seconds": float(game.tick) / 60.0, "screenshot": path, "capture_error": result,
 		"settled_ticks": maxi(settling, 0), "still": not _moving(),
-		"sent_at": _sent_ms, "received_at": _received_ms, "captured_at": int(Time.get_unix_time_from_system() * 1000.0)}
+		"sent_at": _sent_ms, "received_at": _received_ms, "captured_at": int(Time.get_unix_time_from_system() * 1000.0),
+		"ended_by": ended_by}
 	_write("observation_%04d.json" % request_id, response)
 	_write("response.json", response)
 	capturing = false

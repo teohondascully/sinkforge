@@ -93,6 +93,13 @@ func _test_composed_moves(bridge: RefCounted) -> void:
 	_check(bridge.validate({"moves": []}) != "", "an empty sequence is refused")
 	_check(bridge.validate({"moves": "D"}) != "", "moves must be a list")
 	_check(bridge.validate({"ticks": 30, "keys": ["D"], "settle": false}) == "" and bridge.validate({"ticks": 30, "settle": "no"}) != "", "settle, the seat's rest-before-capture (D0436), is a bool or refused")
+	_check(bridge.validate({"ticks": 300, "keys": ["D"], "until": "event"}) == "" and bridge.validate({"ticks": 30, "until": "lesson"}) != "", "until is \"ticks\" or \"event\" (D0448) or refused")
+	bridge.begin({"moves": [{"ticks": 10, "keys": ["D"]}, {"ticks": 20, "keys": ["A"]}]})
+	_check(bridge.next_segment(root) == 10, "a sequence begins")
+	bridge.abandon()
+	_check(bridge.next_segment(root) == -1, "abandoned at an event, the rest of the sequence is gone (D0448)")
+	bridge.apply({}, root)
+	_event_pins()
 	_check(bridge.total_ticks(jump_right) == 60, "the sequence lasts the sum of its segments (%d)" % bridge.total_ticks(jump_right))
 	_check(bridge.total_ticks({"ticks": 45, "keys": ["D"]}) == 45, "a flat burst is one segment (%d)" % bridge.total_ticks({"ticks": 45, "keys": ["D"]}))
 	bridge.begin(jump_right)
@@ -104,3 +111,28 @@ func _test_composed_moves(bridge: RefCounted) -> void:
 	_check(bridge.next_segment(root) == 5 and Input.is_physical_key_pressed(KEY_W) and not Input.is_physical_key_pressed(KEY_A), "a flat burst still runs as one segment, releasing what the sequence left down")
 	_check(bridge.next_segment(root) == -1, "...and is spent after it")
 	bridge.apply({}, root)
+
+
+## D0448: the events that cut a burst, in the order a player would name them, over hand-built snapshots.
+func _event_pins() -> void:
+	var Events: GDScript = load("res://playtest/seat_events.gd")
+	var base: Dictionary = {"rung": &"mine", "progress": "0/4", "pack": {}, "lesson": &"", "refusal": &"", "on_floor": true, "airborne": 0, "drop": &""}
+	_check(Events.fired(base, base.duplicate()) == "", "nothing changed, no event")
+	var o: Dictionary = base.duplicate(); o["progress"] = "1/4"
+	_check(Events.fired(base, o) == "objective", "the count moving is an objective event")
+	var p: Dictionary = base.duplicate(); p["pack"] = {&"ore": 1}
+	_check(Events.fired(base, p) == "pack", "the pack changing is a pack event")
+	var l: Dictionary = base.duplicate(); l["lesson"] = &"too_far"
+	_check(Events.fired(base, l) == "lesson", "a lesson docking is a lesson event")
+	var gone: Dictionary = l.duplicate(); gone["lesson"] = &""
+	_check(Events.fired(l, gone) == "", "...and a lesson leaving is not")
+	var r: Dictionary = base.duplicate(); r["refusal"] = &"far"
+	_check(Events.fired(base, r) == "refusal" and Events.fired(r, r.duplicate()) == "", "a refusal's rising edge is an event, once")
+	var d: Dictionary = base.duplicate(); d["drop"] = &"floor"
+	_check(Events.fired(base, d) == "drop", "a drop is an event")
+	var air: Dictionary = base.duplicate(); air["on_floor"] = false; air["airborne"] = Events.AIRBORNE_TICKS
+	var land: Dictionary = base.duplicate()
+	var hop: Dictionary = base.duplicate(); hop["on_floor"] = false; hop["airborne"] = 3
+	_check(Events.fired(air, land) == "landing" and Events.fired(hop, land) == "", "the floor after a %d-tick fall is a landing; after a hop it is not" % Events.AIRBORNE_TICKS)
+	var both: Dictionary = base.duplicate(); both["pack"] = {&"ore": 1}; both["progress"] = "1/4"
+	_check(Events.fired(base, both) == "objective", "when both move in one tick the objective is named first")

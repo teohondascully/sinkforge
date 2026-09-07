@@ -13,6 +13,8 @@ var pointer: Vector2 = Vector2(640, 360)
 func validate(command: Dictionary) -> String:
 	if command.has("settle") and not command["settle"] is bool:
 		return "settle must be true or false"
+	if command.has("until") and not command["until"] in ["ticks", "event"]:
+		return "until must be \"ticks\" or \"event\""
 	if command.has("moves"):
 		var moves: Variant = command["moves"]
 		if not moves is Array or (moves as Array).is_empty():
@@ -44,6 +46,11 @@ func total_ticks(command: Dictionary) -> int:
 ## Stage a validated command; the seat then pulls one segment per boundary with `next_segment`.
 func begin(command: Dictionary) -> void:
 	_queue = command["moves"].duplicate() if command.has("moves") else [command]
+
+
+## Drop the rest of a sequence: the burst was cut at an event (D0448); the release follows as if it were spent.
+func abandon() -> void:
+	_queue.clear()
 
 
 ## Apply the next segment and return its length in ticks, or -1 when the sequence is spent.

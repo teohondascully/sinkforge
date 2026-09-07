@@ -19,6 +19,8 @@ The JSON has these fields, all optional except ticks:
 - "mouse": [x, y] where to put the pointer, in screen pixels of a 1280 wide by 720 tall picture. The top-left of the screenshot is [0,0]. The pointer stays where you last put it.
 - "buttons": mouse buttons held for the burst: 1 is the left button, 2 the right, 3 the middle. Same hold rule as keys.
 
+Add "until":"event" to any burst to have it STOP EARLY the moment something happens on screen (the task's count changes, your pack changes, a message appears, a red mark appears, you land from a fall, you drop something): the screenshot is then taken at that moment, not at the end. The response says "ended_by": "objective", "pack", "lesson", "refusal", "landing", "drop" or "ticks" (nothing happened, the burst ran out). Use it for long walks and long holds so you do not miss the moment: '{"ticks":300,"keys":["D"],"until":"event"}'.
+
 You may also send a COMPOSED MOVE: a sequence of segments run back to back with one screenshot at the end: '{"moves":[{"ticks":10,"keys":["Space","D"]},{"ticks":30,"keys":["D"]}]}' (at most 300 ticks in total).
 
 Example: hold the left mouse button on the pixel at (618,405) for two seconds: '{"ticks":120,"mouse":[618,405],"buttons":[1]}'. Walk right for one second: '{"ticks":60,"keys":["D"]}'. Look for half a second: '{"ticks":30}'.
