@@ -527,9 +527,14 @@ got its refusal or its cells and every lesson was the right one for its press; t
 and walked off, two dropped the pack with Q "to the drill" (the smelt rung's verb). The variant over
 five batches: 13 valid of 15, the drill in hand 3, placed 1 (off the line), the ceiling 14.1 s. Six
 strangers ended in the sinkhole at dx +15 (a jump without a direction held does not leave it). **The variant
-loop ends here** (rule 13: the remaining failures have no game-side frame cause). **Next: strangers
-58-60 on the shipped seed, a fresh game, to re-measure the opening on the D0464+ build and read the
-forge's bubble question; then the wrap.**
+loop ends here** (rule 13: the remaining failures have no game-side frame cause). **Strangers 58-60 (8612f74a,
+the shipped seed, a fresh game): 3 VALID, the first rung 2 of 3 at 12.8 and 16.8 s, S60 never** -- all
+three first presses on the forge's open pocket 3.9 m off, refused "air" by D0464's metre where legacy's
+reach had snapped them to the vein at 1.3-2.2 s. **D0474:** the metre applies to a pointed rock out of
+reach; open air out of reach keeps legacy's reach (by hand the same presses cut 5 and 11 ore; recorded
+in CORRECTIONS.md as an amendment of D0464). S58 reached BUILD from a fresh game at 80.6 s. **The
+overnight loop closes here. Next: a shipped-seed batch on the D0474 build (the opening's re-measure);
+the director's calls in the brief.**
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
