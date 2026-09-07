@@ -198,6 +198,10 @@ appears. **Where:** `view/visuals/mark_painter.gd`.
 visible at this scale; the broken cell just vanishes. **Where:** `crack_painter.gd`, `particles.gd`
 (`chip` size), `Observation.mining_blow_px`.
 
+### V76 · The back of a cave read as rock (executed, D0422)
+**What:** the wall plane took the tooth's grain and the face's laminae; blind judges read every cavity of
+the opening frame as solid (0 of 9). Stamped below solid, flat, faces rimmed above the veil: 5 of 9.
+**Where:** `wall_painter.gd`, `rock_tooth.gdshader`. The ore half of rank 7 (V32) is untouched.
 ### V32 · Ore in rock is a grey smear
 **What:** iron reads as grey cells with white dots; coal as black cells; against the static both are
 "another mosaic". **Where:** `material_look.gd` nugget rendering, `ore_painter.gd` pips.

@@ -17419,3 +17419,43 @@ with evidence). And two runs of two agents are two samples: the numbers above ar
 **Why:** "sixteen cuts make a block" was in the sentence and nowhere on the screen.
 
 **Reverse cost:** one function, one wash.
+
+## D0422 · 2026-09-06 · Rank 7, first slice: the back wall stamped below solid, flat, and every face rimmed -- judged blind
+
+**The instrument first.** Astra's rank 7 asked for solid, background and air to read as three things at
+play zoom. A blind judge (a fresh-context vision agent told nothing about the game) was shown eight
+120x120 crops of the opening frame at 1280x720, each centred on a spot whose truth the grid supplied --
+three open cavities with a back wall, four solid cells, one sky -- and asked what the player could do at
+the centre. Three judges per condition, because one judge disagreed with itself across near-identical
+crops (confidence 3-4 of 5).
+
+**Before:** 13 of 24 spots right; the three cavity spots read as SOLID in 9 of 9 tries -- "dark rock
+with embedded ore", "striped solid earth layers". Not one judge saw a cavity.
+
+**Decided:** three changes in the bake and the pass above the veil. (1) The wall is stamped one alpha
+level below solid (254/255, legacy's `VOID_ALPHA`), its cast composed into the one draw, so the tooth
+and the grit pass -- which tell rock from wall by `step(0.998, a)` -- stop graining the back of every
+cave; D0379 recorded exactly this as the follow-up it would not fake. (2) The wall is FLAT: the
+material's depth-darkened base with no bedding tone a plane back; the laminae are the face's. Legacy's
+own word for the wall. Two pins that held the opposite ("keeps the per-cell grain") are reversed with
+the reason, and `test_wall_lode`'s retained-separation floor is re-ratcheted 0.40 -> 0.30 against a
+reference built the way the wall now is (coal 0.36 at row 208 the new worst). (3) The tooth pass adds a
+one-world-pixel RIM on any solid pixel whose neighbour is not solid -- open air or the stamped wall --
+at 0.10 absolute above the veil, so a face bordering a cavity keeps an edge in the dark where a recess
+shadow has nothing left to darken.
+
+**After:** 17 of 24 right; the cavity spots read as open in 5 of 9 tries (one judge 3 of 3, one 2 of 3,
+one 0 of 3). The one persistent misread is a SOLID spot beside the dug pit and its machine, read as
+open in 5 of 6 tries across both conditions: the pit, not the rock, is what the judge saw. The recess
+shadow's per-cell steps still read as "striations" to one judge; that is the AO ramp quantised to the
+cell, a real depth cue, left as it is. Captures: `before_spawn_t1.png` / `after2_spawn_t1.png` under
+`tests/body/recordings/round15_2026-09-06/rank7/`.
+
+**Not claimed:** which of the three changes carried the gain (the stamp-and-rim alone, one judge, read
+1 of 3 cavities); that a human reads the frame the way the judge does; anything about ore's sparkle
+(rank 7's other half, not started).
+
+**Why:** the review asked for identical frames judged at play zoom; a blind judge with the grid's
+truth is the nearest instrument this seat has to a stranger's eye, and it moved.
+
+**Reverse cost:** one alpha constant, one colour function, seven shader lines.

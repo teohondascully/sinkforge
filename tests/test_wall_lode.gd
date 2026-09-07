@@ -20,10 +20,11 @@ const ROW_STEP: int = 32
 
 ## Floors RATCHETED to measured behaviour, not guessed (memory: a ratchet is not a bound). Mark-vs-host
 ## runs 0.29 (coal, the deliberately dark one) to 0.82 (ore_iron) over 1-100 m; retained plane separation
-## runs 0.48 (coal) to 0.77 (ore_copper). Both sit below the binding case with room, so a regression trips
-## them and ordinary palette work does not.
+## ran 0.48 (coal) to 0.77 (ore_copper) against the toned wall, and 0.36 (coal, row 208) upward against
+## the FLAT wall D0422 made (the reference below is built the way the wall is). Both sit below the binding
+## case with room, so a regression trips them and ordinary palette work does not.
 const MIN_MARK_SEPARATION: float = 0.25
-const MIN_PLANE_RETAINED: float = 0.40
+const MIN_PLANE_RETAINED: float = 0.30
 
 ## The strip each mean is taken over. Wide enough that a ~10% mark density lands many marks in it, so a
 ## patch mean is a patch rather than a sample of whichever branch one column fell in.
@@ -211,7 +212,9 @@ func _plane_separation_retained(look: MaterialLook, material: StringName, row: i
 	for col: int in range(0, STRIP):
 		var f: Color = look.cell_color(material, col, row)
 		var n: Color = WallPainter.wall_color(look, material, col, row)
-		var b: Color = f.darkened(WallPainter.RECESS).lerp(WallPainter.COOL, WallPainter.COOL_MIX)
+		# The plane with no mark taken out: the FLAT rock recessed (D0422 flattened the wall's bedding tone;
+		# the recess and the cool are what this row measures, so the reference is built the way the wall is).
+		var b: Color = look.flat_color(material, row).darkened(WallPainter.RECESS).lerp(WallPainter.COOL, WallPainter.COOL_MIX)
 		front += Vector3(f.r, f.g, f.b)
 		now += Vector3(n.r, n.g, n.b)
 		before += Vector3(b.r, b.g, b.b)

@@ -30,6 +30,13 @@ uniform sampler2D gram_tex : hint_default_black, filter_nearest, repeat_disable;
 uniform float tooth_add : hint_range(0.0, 0.12) = 0.030;   // absolute value added at peak, post-veil (was 0.060)
 uniform float mottle_add : hint_range(0.0, 0.03) = 0.012;  // coarser octave so the tooth is not uniform (was 0.006)
 uniform float mottle_scale : hint_range(1.0, 16.0) = 4.0;  // tooth samples per mottle sample: 8 world px, two cells
+// THE RIM (D0422, rank 7): a solid pixel whose neighbour a world pixel away is NOT solid -- open air, or the
+// back wall stamped below the threshold -- takes an absolute lift, so every face that borders a cavity
+// carries a one-world-pixel edge that survives the veil the way the tooth does. This is the cue that says
+// "face" in the dark, where a recess shadow on the wall has nothing left to darken. Above the veil, so it
+// is the same faint line lit or unlit; the lit face barely shows it.
+uniform float rim_add : hint_range(0.0, 0.3) = 0.10;
+uniform float rim_px : hint_range(0.5, 3.0) = 1.0;
 
 // Hash cell in legacy world px per grammar, as (width, height). A cell wider than it is tall makes the
 // field change slowly along x and quickly along y, which is a flat lamina; the transpose is a steep one.
@@ -63,5 +70,12 @@ void fragment() {
 	}
 	float tooth = hash(floor(world_pos / cell)) * tooth_add;
 	float mottle = hash(floor(world_pos / mottle_scale) + 17.0) * mottle_add;
-	COLOR = vec4(vec3((tooth + mottle) * solid), 1.0);
+	vec2 d = TEXTURE_PIXEL_SIZE * rim_px;
+	float open_near = 0.0;
+	open_near = max(open_near, 1.0 - step(0.998, texture(TEXTURE, UV + vec2(d.x, 0.0)).a));
+	open_near = max(open_near, 1.0 - step(0.998, texture(TEXTURE, UV - vec2(d.x, 0.0)).a));
+	open_near = max(open_near, 1.0 - step(0.998, texture(TEXTURE, UV + vec2(0.0, d.y)).a));
+	open_near = max(open_near, 1.0 - step(0.998, texture(TEXTURE, UV - vec2(0.0, d.y)).a));
+	float rim = open_near * rim_add;
+	COLOR = vec4(vec3((tooth + mottle + rim) * solid), 1.0);
 }
