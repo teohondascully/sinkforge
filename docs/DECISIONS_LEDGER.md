@@ -18174,3 +18174,26 @@ history is read. The repository's local `user.email` is set to the Gmail address
 
 **Reverse cost:** two constants and the epoch in one script; a rewrite, if the director wants the history
 uniform, is a separate lease as D0429 was.
+
+## D0454 · 2026-09-07 · A stranger run is pinned before it plays and classified after, by the seat's receipts alone
+
+**Decided:** the director's rules 3, 4, 5, 6 and 8 for the overnight loop, as tools. `playtest/stranger.py
+start` writes `batch.json` (build SHA and dirty flag, branch, mission path and SHA-256, model, session
+directory, launch time) and boots the seat through the launcher; the seat's receipt adds the boot line
+(site, seed, start), engine, platform, launcher, frame cap and process priority. `validate` reads only
+what the seat wrote and the agent's `input_*.json`, and names a run VOID for: no receipt, no response, a
+stale response id (a command never answered; a quit never answered), a capture error, a frame that did not
+settle, a stall (a burst's wall time over ten times its sim time), an input carrying a non-physical key, a
+save written, a SCRIPT ERROR, an invariant report other than the known ambiguous-floor one, or a seat at
+background priority (HARNESS_INVALID). Every burst's receipt now carries the HUD state (rung, progress,
+pack, lesson), so first-rung success is read as "four ore in the pack at some burst" on a VALID run, with
+every input physical by construction -- never from the objective line and never from the report.
+`playtest/replay.py` re-sends a run's inputs to a fresh seat with the same capture policy, checks the
+boot line and warns when the build differs, and compares tick, state, broken cells, refusal and
+`ended_by` per burst, naming the first divergence. Over 315 archived bursts no frame had failed to settle,
+so the settle rule voids nothing that was ever valid.
+
+**Why:** a batch that mixes a stalled seat with a played one, or a report with a frame, proves nothing;
+the classifier makes the void a fact the report cannot argue with.
+
+**Reverse cost:** two scripts and one receipt field.

@@ -196,10 +196,21 @@ func _capture() -> void:
 		"sim_seconds": float(game.tick) / 60.0, "screenshot": path, "capture_error": result,
 		"settled_ticks": maxi(settling, 0), "still": not _moving(),
 		"sent_at": _sent_ms, "received_at": _received_ms, "captured_at": int(Time.get_unix_time_from_system() * 1000.0),
-		"ended_by": ended_by, "refusal": String(last_refusal), "refusal_at": refusal_at, "broke": broke}
+		"ended_by": ended_by, "refusal": String(last_refusal), "refusal_at": refusal_at, "broke": broke,
+		"state": _state_now()}
 	_write("observation_%04d.json" % request_id, response)
 	_write("response.json", response)
 	capturing = false
+
+
+## The HUD-visible state at the capture, as the events read it (rung, progress, pack, lesson): the
+## validator's independent read of "four ore in the pack through ordinary input" (the director's rule 6).
+func _state_now() -> Dictionary:
+	var now: Dictionary = Events.snapshot(game.stack, game.view.current_frame(), _airborne)
+	var pack: Dictionary = {}
+	for item: Variant in now.get("pack", {}):
+		pack[String(item)] = int((now["pack"] as Dictionary)[item])
+	return {"rung": String(now.get("rung", &"")), "progress": String(now.get("progress", "")), "pack": pack, "lesson": String(now.get("lesson", &""))}
 
 
 ## The process's nice value as the OS reports it (macOS: 5 under a background clamp, 0 foreground); -1

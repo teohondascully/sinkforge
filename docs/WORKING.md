@@ -6,7 +6,7 @@ a MODULE.md, or a claim first. **Reset 2026-09-03**: the previous 500-line accum
 queue, lane tables, Slice 1.5, D0139) is in `git log -p -- docs/WORKING.md`; everything durable in it
 is in the ledger.
 
-**Last updated: 2026-09-06.** Bump this date whenever this file changes — a CI gate fails if it's
+**Last updated: 2026-09-07.** Bump this date whenever this file changes — a CI gate fails if it's
 older than `HEAD`'s own commit date.
 
 ## CURRENT STAGE — A′: lift legacy's sim hub onto the substrate (approved 2026-09-03; steps 0–5 done; step 6, the views and the boot scene, in progress: 6a water, 6b the look registries, 6c the machine painter, 6d payouts, 6e falling items, 6f the audio, 6g the hotbar, 6h the inspector, objectives and hints, 6i the minimap, 6j the settings page, 6k the lights, 6l the ore seams and the veil's sources, 6m the marks, 6n the ambience, 6o the surface, 6p the shaders, 6q the boot done -- step 6 complete; step 8, the worldgen content, in progress: 8a the determinism half closed by measurement, 8b relief and scarps, 8c rifts and sinkhole mouths, 8d ledges/spires/rubble/droughts, 8e aquifers and lodes, 8f the richness field, 8g trees, 8h the switch-on done -- step 8 complete)
@@ -450,8 +450,21 @@ rim; every status that raises a bubble is chromatic (pinned); the two sentences 
 provisionally). **D0450:** NOT ORE, once, on a break whose yield is not ore while the pack holds none,
 naming what fell, never after THE WAY DOWN; the vein card says "hold to cut it, or stand a Drill just
 above it". The rope painter's pin on the old gold ink went red on CI and was re-stated (1622a422).
-Since D0433: 8 of 18 mined. **Strangers 28-30 are running on b0871cc4** (D0449 + D0450), the first
-batch on the white reticle.
+Since D0433: 8 of 18 mined. **Strangers 28-30 (b0871cc4): VOID by the seat, not the game.** Every seat
+this session ran at background priority (a child of the agent's shell: nice 5) and starved under the
+director's foreground load: three seats at half a tick a second for two minutes, agents' commands timing
+out. What the frames still show: S30 mined 11 ore at 2.2 s on the vein beside the forge (the reworded
+vein card), not the ring; S28 read the white ring as a reach circle and pressed the shaft's bubble first;
+S29 read NOT ORE, put the pointer inside the ring four times and was refused "sight" -- one clay in the
+pack had set the BUILD flag that switches the mine aim to the exact cell. **D0452:** a held MINE snaps
+whatever the hand holds, to the pointed material's visible face (pinned: material, occlusion, air, far;
+through the door with clay selected; the mutation reproduces the refusal); BEHIND ROCK for the sight
+refusal; `playtest/seat.sh` boots the seat at foreground priority and the receipt names launcher,
+platform, engine, frame cap and priority. **D0453:** the commit identity is teohondascully@gmail.com from
+51fe12d7 on (two-era gate). **D0454:** `playtest/stranger.py start|validate` (the pin and the VOID
+classifier; first rung read from the pack) and `playtest/replay.py` (signatures per burst). **The
+overnight loop runs under the director's fifteen amendments of 2026-09-07** (recorded in D0452-D0454 and
+the batch reports): a batch counts only when every seat's run is VALID and on one build.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
