@@ -357,7 +357,7 @@ pins encoded legacy's silence, and I never ran the suite that enumerated the rul
 and the meter's lambdas on the `RenderingServer` signals crashed Godot at exit on every perf run until the
 seat node forwarded them (in D0414).
 
-### Astra's audit order, taken (2026-09-06; D0416–D0431, on main)
+### Astra's audit order, taken (2026-09-06; D0416–D0432, on main)
 
 **The audit (D0416)** tightened three conclusions -- the opening completes through first automation, not
 "end to end"; the GPU is a working hypothesis; the water fix at the warp may be avoided, not repaired --
@@ -403,7 +403,7 @@ a local chart (the world's width by 48 m, scrolling) in a 128 x 96 box; the bann
 two-line how-to is balanced. **D0426 executed (D0429).** **Stranger 6 (D0431):** ore 2.5 s, ingots 7-9 s
 (the fastest); the wood rung opened 13 m from the tree, past the ring's ten-metre search; the search now
 reaches the screen's half-width and is paid across frames. Six runs: the front has moved to the wood
-rung and the chimney.
+rung and the chimney. **D0432:** every airborne source occluded like the lamp; seams exempt.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -431,7 +431,7 @@ T031 (the chimney at +14 m has taken three of five strangers; the mechanism is t
 at zero; the forks T024-T030.
 
 **Cheap next steps that need no ruling:** a sixth stranger to finally play the wood rung with the tree in
-place; the other sources (torches, machines) occluded the way the lamp is; the large map as a wider
+place; the large map as a wider
 window; the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
 instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
 bake (V32).

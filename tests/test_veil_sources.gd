@@ -137,6 +137,12 @@ func _test_the_seams_and_the_motes() -> void:
 	_check(is_equal_approx(VeilSources.seam_strength(1.0, 30.0), 0.62 + 0.26 * OrePainter.breath(1.0, 30.0)), "...with the glow's own breath, so reveal and pool agree")
 	var mc: Dictionary = cuts[1]
 	_check((mc["centre"] as Vector2).is_equal_approx(Vector2(10.0, 20.0)) and is_equal_approx(float(mc["radius"]), 1.4 * 4.0) and is_equal_approx(float(mc["strength"]), 0.5) and mc["tint"] == Color.WHITE, "a mote at px (40, 80) cuts at cell (10, 20), 1.4 m, 0.5, white")
+	# D0432: the seam glows from inside the rock and is the one source rock does not occlude; the mote is in
+	# the air and is. The packed tint's fourth lane carries the flag to the shader.
+	_check(bool(sc.get("in_rock", false)) and not bool(mc.get("in_rock", false)), "the seam is marked in-rock, the mote is not")
+	var packed: Array = VeilLayer.pack_cuts(cuts)
+	var tints: PackedVector4Array = packed[1]
+	_check(tints[0].w == 0.0 and tints[1].w == 1.0, "packed: the seam's fourth lane is 0 (unoccluded), the mote's 1 (%.0f, %.0f)" % [tints[0].w, tints[1].w])
 
 
 func _test_the_composition_only_adds_light() -> void:

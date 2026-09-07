@@ -17708,3 +17708,21 @@ walk; the chip's own budgeted walk shows the ring within 12 frames. Quiet-tick p
 stepped away from it.
 
 **Reverse cost:** one constant and one dictionary of scan state.
+
+## D0432 · 2026-09-06 · Every source in the air is occluded the way the lamp is; a seam glows from inside its rock
+
+**Decided:** D0427's march now applies to every cut `VeilSources` lists -- machines, beacons, torches,
+conduits, motes -- and not to ore seams, which glow from INSIDE the rock and would occlude themselves. The
+flag rides the packed tint's unused fourth lane (1 in the air, 0 in rock; `pack_cuts`), the seam cut
+carries `in_rock`, and the shader multiplies the lift by `occluded` when the lane says so. Pinned in
+`test_veil_sources` (the seam flagged, the mote not; the packed lanes). `--lamp-occlusion=0` still restores
+legacy's pass for every source at once.
+
+**Seen:** the beacon room 60 m down (`lighting/room_k0.png` / `room_k0.5.png`): a small difference, as it
+should be -- the room is open air and nothing stands between its sources and its floor; the mass above the
+ceiling darkens past its face. The cost bound grows with the sources in a pixel's pools (12 reads each);
+a torch-lit room with three torches is six cuts.
+
+**Why:** a rule that holds for the lamp and not the torch on the wall beside it is a rule the eye catches.
+
+**Reverse cost:** one lane and one multiply.

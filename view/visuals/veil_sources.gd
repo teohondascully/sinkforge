@@ -110,7 +110,9 @@ static func cuts(obs: Interface.Observation, seams: Array[Dictionary], motes: Ar
 				out.append(_cut(at, CONDUIT_R_M, lvl * CONDUIT_S))
 	for seam: Dictionary in seams:
 		var pos: Vector2 = seam["pos"]
-		out.append({"centre": pos, "radius": float(seam["radius"]), "strength": seam_strength(t, pos.x), "tint": light_tint(OrePainter.SEAM_LIGHT)})
+		# A seam glows from INSIDE the rock (D0432): the occlusion march would put its own rock between it
+		# and every pixel, so it is the one source kind the shader does not occlude.
+		out.append({"centre": pos, "radius": float(seam["radius"]), "strength": seam_strength(t, pos.x), "tint": light_tint(OrePainter.SEAM_LIGHT), "in_rock": true})
 	var cell_px: float = float(Interface.Observation.CELL_PX)
 	for m: Dictionary in motes:
 		var at: Vector2 = (m["pos"] as Vector2) / cell_px

@@ -46,7 +46,8 @@ uniform float lamp_grain = 0.13;
 uniform float lamp_window_gain = 2.2;
 // `lamp_lift`: three cuts in CELLS -- xy centre, z radius, w strength (already scaled by depth)
 uniform vec4 lamp_cuts[3];
-// THE LAMP IS OCCLUDED BY THE ROCK IT CROSSES (D0427, Astra's item 5, the bounded lighting experiment).
+// THE LAMP IS OCCLUDED BY THE ROCK IT CROSSES (D0427, Astra's item 5, the bounded lighting experiment; every
+// source in the air since D0432, seams excepted).
 // Legacy's pool lit rock through rock: a cell three deep in a wall took the same lift as the face, so a lit
 // cave read as a disc of brightness stamped on the mass. Each lamp cut now marches from its centre to the
 // pixel across `cells_tex` and loses exp(-lamp_occlusion) per solid CELL crossed (the pixel's own cell is
@@ -160,6 +161,9 @@ void fragment() {
 		float lift = cut_lift(cuts[i], at_cells, cell);
 		if (lift <= 0.0) {
 			continue;
+		}
+		if (cut_tints[i].a > 0.5) {
+			lift *= occluded(cuts[i].xy, at_cells);   // a source in the air is blocked by rock (D0432); a seam is not
 		}
 		vec3 target = cut_tints[i].rgb;
 		rgb += max(target - rgb, vec3(0.0)) * lift;

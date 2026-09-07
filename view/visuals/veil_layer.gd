@@ -129,6 +129,8 @@ static func lamp_cuts(obs: Interface.Observation, t: float = 0.0) -> PackedVecto
 
 
 ## Every other source packed for the shader, capped at `MAX_CUTS` in the order `VeilSources` lists them.
+## The tint's fourth lane says whether rock occludes the source (D0432): 1 for a lamp in the air (a torch,
+## a machine, a mote, a beacon), 0 for a seam that glows from inside the rock.
 static func pack_cuts(cuts: Array[Dictionary]) -> Array:
 	var geo: PackedVector4Array = PackedVector4Array()
 	var tints: PackedVector4Array = PackedVector4Array()
@@ -140,7 +142,7 @@ static func pack_cuts(cuts: Array[Dictionary]) -> Array:
 		var at: Vector2 = c["centre"]
 		var tint: Color = c["tint"]
 		geo[i] = Vector4(at.x, at.y, float(c["radius"]), float(c["strength"]))
-		tints[i] = Vector4(tint.r, tint.g, tint.b, 1.0)
+		tints[i] = Vector4(tint.r, tint.g, tint.b, 0.0 if bool(c.get("in_rock", false)) else 1.0)
 	return [geo, tints, n]
 
 
