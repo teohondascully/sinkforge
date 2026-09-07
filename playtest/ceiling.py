@@ -50,37 +50,21 @@ def rung(session, name, budget_bursts, step):
 
 
 def rung4(session, hold):
-    """The fourth rung from the rung-4 save, by the same physical bursts a stranger sends (D0467): walk to the
-    WHITE SQUARE's column (dx +4 of the spawn), bite the roof metre four times (its centre, its bottom row,
-    then the two rim columns the body's edges rest on), drop into the adit onto the drill, press the
-    drill's slot, step toward the ring at the shaft's mouth and press BUILD on it. Read from the receipts:
-    the drill in the pack, then the rung past BUILD."""
+    """BUILD from its door (D0485): the save holds the drill in the pack, the body by the rig. Walk east to the
+    shaft's mouth (dx +7 of the spawn), press the drill's slot key and BUILD on the mouth's lower open cell.
+    Read from the receipts: the rung past BUILD."""
     resp = burst(session, {"ticks": 5}, "ceiling r4: look")
-    body_cell = (resp.get("state") or {}).get("cell") or [117, 75]
-    square_cell_x = 130 + 4 * 4 + 1                                  # the roof metre's second column, dx +4 of the spawn
-    px_per_cell = PX_PER_M / 4.0
-    ticks = max(1, int(round((square_cell_x - body_cell[0]) * 1.5)))  # a burst of D moves ~0.6 cell a tick
-    resp = burst(session, {"ticks": ticks, "keys": ["D"]}, "ceiling r4: walk to the square")
-    body_cell = (resp.get("state") or {}).get("cell") or body_cell
-    while body_cell[0] < square_cell_x:
-        resp = burst(session, {"ticks": 2, "keys": ["D"]}, "ceiling r4: a nudge onto the metre")
+    body_cell = (resp.get("state") or {}).get("cell") or [136, 75]
+    while body_cell[0] < 154:                                                 # dx +6: the mouth's column in reach
+        resp = burst(session, {"ticks": max(2, min(20, int((154 - body_cell[0]) * 1.5))), "keys": ["D"]}, "ceiling r4: walk toward the shaft")
         body_cell = (resp.get("state") or {}).get("cell") or body_cell
-    bites = [([BODY_X, FEET_Y + 2.4 * px_per_cell], "the centre"), ([BODY_X, FEET_Y + 2.7 * px_per_cell], "the bottom row"),
-             ([BODY_X - 2.5 * px_per_cell, FEET_Y + 1.6 * px_per_cell], "the left rim"), ([BODY_X + 2.5 * px_per_cell, FEET_Y + 1.6 * px_per_cell], "the right rim")]
-
-    def drill_pickup(i):
-        at, name = bites[min(i, len(bites) - 1)]
-        resp = burst(session, {"ticks": 120, "mouse": at, "buttons": [1]}, "ceiling r4: bite %s" % name)
-        return resp, pack(resp, "drill") >= 1
-    got = rung(session, "drill_in_hand", 6, drill_pickup)
-    if got is None:
-        return 1
-    slots = list((got.get("state") or {}).get("slots") or [])              # the bar's order, not the sorted pack
-    burst(session, {"ticks": 3, "keys": [str(slots.index("drill") + 1)]}, "ceiling r4: select the drill")
-    burst(session, {"ticks": 8, "keys": ["D"]}, "ceiling r4: a step toward the ring")
+    slots = list((resp.get("state") or {}).get("slots") or [])
+    burst(session, {"ticks": 3, "keys": [str(slots.index("drill") + 1) if "drill" in slots else "1"]}, "ceiling r4: select the drill")
+    px_per_cell = PX_PER_M / 4.0
 
     def place(i):
-        resp = burst(session, {"ticks": 10, "mouse": [BODY_X + (2.2 - 0.4 * i) * PX_PER_M, FEET_Y + 0.6 * PX_PER_M], "buttons": [2]}, "ceiling r4: BUILD on the ring")
+        mouth = [BODY_X + (157.5 - (body_cell[0] + 0.5)) * px_per_cell, FEET_Y + (85.5 - 79.5) * px_per_cell + i * 4]
+        resp = burst(session, {"ticks": 10, "mouse": mouth, "buttons": [2]}, "ceiling r4: BUILD on the shaft's mouth")
         return resp, (resp.get("state") or {}).get("rung") not in (None, "", "build")
     placed = rung(session, "drill_placed", 5, place)
     if not hold:
@@ -95,7 +79,7 @@ def main():
     parser.add_argument("--hold", action="store_true", help="leave the seat up at the end (for a look at the BUILD rung)")
     parser.add_argument("--save-to", default="", help="after the third rung, write the session here: the rung-4 mission variant's save (D0462)")
     parser.add_argument("--save-after", default="drill", choices=["ore", "drill"], help="which rung --save-to follows: 'ore' writes the rung-2 variant (the forge rung's door, D0479) and stops there; 'drill' (default) writes BUILD's door")
-    parser.add_argument("--rung4", default="", help="open this rung-4 save and play the fourth rung only: the drill placed at the shaft's mouth (D0467)")
+    parser.add_argument("--rung4", default="", help="open this BUILD-door save (the drill in hand) and play the fourth rung only: the drill placed at the shaft's mouth (D0467, D0485)")
     args = parser.parse_args()
     session = Path(args.session_dir).resolve()
     start = [sys.executable, str(HERE / "stranger.py"), "start", str(session), "--mission", str(Path(__file__).resolve()), "--model", "script:ceiling"]
