@@ -215,3 +215,7 @@ legacy/tools/test_director_bus.sh
 # the director selects from these move into history/ as committed captures; the raw logs
 # are working material. Resolves gate 27's expected red on these files (D0389).
 tests/body/recordings/
+
+# The gate mutation tests' timing report: CI writes it in the runner and uploads it; a local battery run leaves it
+# in the repo root and the next run's untracked-files gate trips on it (2026-09-07).
+gate_timing.txt

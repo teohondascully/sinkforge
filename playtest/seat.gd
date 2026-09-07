@@ -34,6 +34,7 @@ var ended_by: String = "ticks"
 var last_refusal: StringName = &""
 var refusal_at: Dictionary = {}     ## the body's and the aim's terrain cells at the burst's first refusal
 var broke: Array = []               ## every terrain cell the burst broke, in order
+var pointed: Dictionary = {}        ## at the burst's first held-button tick: the pointer's raw terrain cell, the snapped aim, the body (D0476)
 var _events_prev: Dictionary = {}
 var _airborne: int = 0
 
@@ -123,6 +124,10 @@ func _note_refusal() -> void:
 	var f: Frame = game.view.current_frame()
 	if f == null or f.obs == null:
 		return
+	if pointed.is_empty() and not bridge.held_buttons.is_empty():
+		var w: Vector2 = Controls.pointer_world(game.view)                 # the posed pointer, world px
+		var c: int = Interface.Observation.CELL_PX
+		pointed = {"raw": [floori(w.x / float(c)), floori(w.y / float(c))], "aim": [f.obs.aim_cell.x, f.obs.aim_cell.y], "body": [f.obs.cell.x, f.obs.cell.y]}
 	if f.obs.aim_refusal != &"":
 		if last_refusal == &"":
 			refusal_at = {"body": [f.obs.cell.x, f.obs.cell.y], "aim": [f.obs.aim_cell.x, f.obs.aim_cell.y]}
@@ -189,6 +194,7 @@ func _process(_delta: float) -> bool:
 	last_refusal = &""
 	refusal_at = {}
 	broke = []
+	pointed = {}
 	_airborne = 0
 	_events_prev = Events.snapshot(game.stack, game.view.current_frame(), 0)
 	remaining = 0
@@ -204,7 +210,7 @@ func _capture() -> void:
 		"sim_seconds": float(game.tick) / 60.0, "screenshot": path, "capture_error": result,
 		"settled_ticks": maxi(settling, 0), "still": not _moving(),
 		"sent_at": _sent_ms, "received_at": _received_ms, "captured_at": int(Time.get_unix_time_from_system() * 1000.0),
-		"ended_by": ended_by, "refusal": String(last_refusal), "refusal_at": refusal_at, "broke": broke,
+		"ended_by": ended_by, "refusal": String(last_refusal), "refusal_at": refusal_at, "broke": broke, "pointed": pointed,
 		"state": _state_now()}
 	_write("observation_%04d.json" % request_id, response)
 	_write("response.json", response)

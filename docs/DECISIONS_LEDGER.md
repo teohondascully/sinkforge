@@ -18554,3 +18554,51 @@ the opening's own signal (D0447-D0458) rode on the snap the metre removed. "Reve
 suite" -- and a pinned rule has a stranger batch waiting to go red.
 
 **Reverse cost:** the `solid_miss` line. Recorded in `docs/CORRECTIONS.md` as an amendment of D0464.
+
+## D0475 · 2026-09-07 · The first-rung gate passes twice; D0474 is legacy's rule with one provisional line
+
+**Decided:** The director's gate for the D0474 build was the first rung read from the pack, valid runs
+only, no injection. Two batches of three fresh-context strangers, all on the uncoached mission (58-60's
+mix of uncoached / wood / down-and-back was set aside so every seat measures the opening): 61-63 on the
+shipped seed, 64-66 on the holdout seed 20260907, all six VALID by the classifier, four ore by ordinary
+input at 2.2, 2.8, 11.3 / 8.7, 7.0, 4.3 s. Two consecutive valid 3-of-3 batches: the gate passes. Every
+one of the six successes came through the aim snap -- no pointer landed on a visible reachable cell; the
+face of the ringed metre is a 32 × 8 px target and the pointers landed 8-95 px left and 9-29 px low.
+**D0474's status, as the director asked:** the reach-wide snap for open air or an occluded cell out of
+reach is legacy's rule verbatim (`legacy/scenes/main.gd` `_effective_aim`, "Terraria-style mining
+reach"), its seam included -- an open cell IN reach aims exactly and is refused, so the forge's top
+cell (in reach) refused S66 with THAT IS A MACHINE and the pocket cell two rows down (out of reach)
+cut 11 ore -- and is durable: legacy's, pinned, and the opening's 6 of 6 rides on it. The metre for a
+pointed ROCK out of reach (D0464's line, `solid_miss`) is the provisional half: one line, pinned, its
+evidence S43's silent ground cut, no batch since has exercised it. The seven cases the director named
+are all pinned now: pointed rock near miss, pointed rock too far, buried rock in reach (occluded), open
+air near miss, open air too far (added), no reachable rock, a machine's cell in reach and the pocket
+below it out of reach (added, at the interface). **Left to the director, recorded not changed:** the
+sinkhole mouths at cells 190 / 199 (15-17 m east; D0388's 12 m keepout, a 3 m mouth half-width, the
+strangers' 9 m stride: the second stride east lands on the mouth on both seeds; nine strangers have
+ended there), the smelt lesson's BESIDE where the forge's own column takes the drop (S61 stood on it
+and stepped away), the Q at the spawn cell (4 of 6 first drops), the trunk cells behind the body's
+legs, the stride.
+
+**Why:** rule 7 asks two consecutive 3-of-3 before the opening is called stable, and a holdout seed
+before the gate is believed; a rule copied from legacy with a pinned seam is a decision the game already
+made, and a one-line narrowing with one stranger's evidence is not.
+
+**Reverse cost:** none for the reading; the provisional line is `solid_miss` in `sim/mining/aim.gd`.
+
+## D0476 · 2026-09-07 · The receipts carry the pointed cell; the evidence table is a tool
+
+**Decided:** `playtest/seat.gd` records `pointed` on every burst: at the first tick a mouse button is
+held, the pointer's raw terrain cell (from the posed pointer, world px over `CELL_PX`), the snapped aim
+and the body's cell; `{}` for a burst with no button. Until now the aim was in the receipt only at a
+refusal, and a successful press's pointed cell had to be estimated from the screen (8 px a cell about the
+body's rest position), which the director's table asks for directly. Live-checked on a fresh seat: S62's
+press reads raw (122,82), aim (126,80), body (130,75); a walk reads `{}`. `playtest/evidence.py` prints
+the per-burst table (input, what ended it, refusal and where, pointed, cells broken, HUD state, pack and
+its change) from the receipts alone; the two batch reports were written from it.
+
+**Why:** rule 5 -- inputs and screenshots are evidence, the report is a hypothesis -- and the reading
+of six runs took a scratch script three times; the seat knew the cell all along.
+
+**Reverse cost:** the `pointed` lines in the seat and the tool.
+
