@@ -30,16 +30,9 @@ static func at(stage: int) -> Dictionary:
 
 ## What the demand at `stage` takes, item id -> count; `{}` past the ladder's end.
 static func wants(stage: int) -> Dictionary:
-	return _items(at(stage).get("wants", {}))
+	return RecipeDef.item_counts(at(stage).get("wants", {}))
 
 
 ## What the rig sets down when the demand at `stage` is met.
 static func grants(stage: int) -> Dictionary:
-	return _items(at(stage).get("grants", {}))
-
-
-static func _items(table: Dictionary) -> Dictionary:
-	var out: Dictionary = {}
-	for key: Variant in table:
-		out[StringName(String(key))] = int(table[key])
-	return out
+	return RecipeDef.item_counts(at(stage).get("grants", {}))

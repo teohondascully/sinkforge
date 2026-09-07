@@ -43,14 +43,14 @@ static func exists(recipe_id: StringName) -> bool:
 
 func _read(record: Dictionary) -> void:
 	id = StringName(String(record["id"]))
-	inputs = _item_counts(record.get("inputs", {}))
-	outputs = _item_counts(record.get("outputs", {}))
+	inputs = item_counts(record.get("inputs", {}))
+	outputs = item_counts(record.get("outputs", {}))
 	time_ticks = int(record["time_ticks"])
 
 
 ## Codegen keeps YAML keys as `String`; the hub compares item ids as `StringName`, so the keys are
-## converted once here rather than at every lookup.
-static func _item_counts(raw: Dictionary) -> Dictionary:
+## converted once here rather than at every lookup. Public: the demand ladder's tables are the same shape (D0484).
+static func item_counts(raw: Dictionary) -> Dictionary:
 	var out: Dictionary = {}
 	for k: Variant in raw:
 		out[StringName(String(k))] = int(raw[k])

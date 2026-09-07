@@ -59,7 +59,7 @@ func _test_what_a_stalled_machine_asks_for() -> void:
 	_check(MachinePainter.need_item(_rec(&"processor", {"status": &"no_input", "recipe": &"smelt_ingot", "input": {&"ore": 3}})) == &"coal", "a forge holding ore and no coal asks for coal")
 	_check(MachinePainter.need_item(_rec(&"processor", {"status": &"no_input", "recipe": &"smelt_ingot", "input": {&"coal": 2}})) == &"ore", "...and holding coal and no ore asks for ore")
 	_check(MachinePainter.need_item(_rec(&"processor", {"status": &"no_input", "recipe": &"smelt_ingot", "input": {&"ore": 1, &"coal": 1}})) == &"ore", "one ore of the two a craft takes: still ore")
-	_check(MachinePainter.need_item(_rec(&"rig", {"status": &"no_input", "behavior": &"rig", "stage": 0, "input": {}})) == &"ingot", "the rig at stage 0 asks for the first demand's ingots (D0484)")
+	_check(MachinePainter.need_item(_rec(&"rig", {"status": &"no_input", "behavior": &"rig", "stage": 0, "wants": {&"ingot": 2}, "input": {}})) == &"ingot", "the rig asks for its demand's ingots, read off the observation (D0484)")
 	_check(MachinePainter.ink(&"ore") == ItemLook.color(&"ore") and MachinePainter.ink(&"no_such") == MachinePainter.CHROME,
 		"a mark wears its item's colour, or chrome, never white")
 

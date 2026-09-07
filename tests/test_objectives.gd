@@ -55,9 +55,9 @@ func _test_the_pack_steps() -> void:
 	_check(obj.is_done(&"mine") and obj.is_done(&"smelt") and not obj.is_done(&"deliver"), "ore and two ingots of either kind complete the first two; the delivery waits on the rig")
 	_check(obj.current_id() == &"deliver" and obj.progress(&"deliver") == "0/2", "next is the delivery, counted 0/2 with no rig in sight (%s %s)" % [obj.current_id(), obj.progress(&"deliver")])
 	# D0485: the deliver rung reads the rig, not the pack -- one ingot in its mouth is 1/2, a met demand (stage 1) is done.
-	obj.refresh(_obs([["ore", 4], ["ingot", 1]], [_m(&"rig", Vector2i(4, 6), {"input": {&"ingot": 1}, "stage": 0})]), 0.016)
+	obj.refresh(_obs([["ore", 4], ["ingot", 1]], [_m(&"rig", Vector2i(4, 6), {"input": {&"ingot": 1}, "stage": 0, "wants": {&"ingot": 2}})]), 0.016)
 	_check(not obj.is_done(&"deliver") and obj.progress(&"deliver") == "1/2", "one ingot in the rig: 1/2, not done (%s)" % obj.progress(&"deliver"))
-	obj.refresh(_obs([["ore", 4]], [_m(&"rig", Vector2i(4, 6), {"input": {}, "stage": 1})]), 0.016)
+	obj.refresh(_obs([["ore", 4]], [_m(&"rig", Vector2i(4, 6), {"input": {}, "stage": 1, "wants": {}})]), 0.016)
 	_check(obj.is_done(&"deliver") and obj.progress(&"deliver") == "2/2" and obj.current_id() == &"build", "the demand met: 2/2, and next is the drill (%s)" % obj.current_id())
 
 

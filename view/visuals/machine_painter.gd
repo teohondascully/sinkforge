@@ -154,7 +154,7 @@ static func need_item(rec: Dictionary) -> StringName:
 		return &"coal"
 	var inputs: Dictionary = _recipe(rec).get("inputs", {})
 	if StringName(rec.get("behavior", &"")) == &"rig":
-		inputs = Demands.wants(int(rec.get("stage", 0)))          # the demand's items are what the rig asks for (D0484)
+		inputs = rec.get("wants", {})                             # the demand's items are what the rig asks for (D0484)
 	if inputs.is_empty():
 		return &"ore"
 	var held: Dictionary = rec.get("input", {})

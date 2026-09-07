@@ -122,4 +122,5 @@ static func _machine_record(m: MachineState, world: World, machines: Machines) -
 		"name": m.def.display_name, "recipe": m.def.recipe.id if m.def.recipe != null else &"",   # the painter's nameplate and ports (6c)
 		"status": MachineStatus.of(m, world, machines), "power_permille": m.power_permille,
 		"progress_permille": progress, "facing": m.facing, "fuel": m.fuel, "filter": m.filter, "stage": m.stage,
+		"wants": Demands.wants(m.stage) if m.def.behavior == &"rig" else {},   # the rig's current demand, so the view never reads the ladder (D0484)
 		"input": m.input_buffer.duplicate(), "output": m.output_buffer.duplicate()}

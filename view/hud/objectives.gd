@@ -113,18 +113,23 @@ func progress(id: StringName) -> String:
 	return ""
 
 
-## THE RIG'S COUNT (D0485): "1/2" while the first demand is being filled; "2/2" once it has been met.
+## THE RIG'S COUNT (D0485): "1/2" while the first demand is being filled; "2/2" once it has been met. The
+## observation carries what the rig wants (the view reads no ladder); the first demand's need is the
+## ladder's own first line, kept here as the card's number once the rig has moved on from it.
+const FIRST_DEMAND_NEED: int = 2
 static func delivered(o: Interface.Observation) -> String:
-	var want: Dictionary = Demands.wants(0)
-	if want.is_empty():
-		return ""
-	var item: StringName = want.keys()[0]
-	var need: int = int(want[item])
 	for rec: Dictionary in o.machines:
-		if rec.get("behavior", &"") == &"rig":
-			var held: int = need if int(rec.get("stage", 0)) >= 1 else int((rec.get("input", {}) as Dictionary).get(item, 0))
-			return "%d/%d" % [mini(held, need), need]
-	return "0/%d" % need
+		if rec.get("behavior", &"") != &"rig":
+			continue
+		var want: Dictionary = rec.get("wants", {})
+		if int(rec.get("stage", 0)) >= 1:
+			return "%d/%d" % [FIRST_DEMAND_NEED, FIRST_DEMAND_NEED]
+		if want.is_empty():
+			return ""
+		var item: StringName = want.keys()[0]
+		var need: int = int(want[item])
+		return "%d/%d" % [mini(int((rec.get("input", {}) as Dictionary).get(item, 0)), need), need]
+	return "0/%d" % FIRST_DEMAND_NEED
 
 
 ## The first rig's stage in the window: demands met (D0485). 0 with no rig in sight.
