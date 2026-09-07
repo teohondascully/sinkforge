@@ -1,17 +1,30 @@
 extends "res://tests/test_base.gd"
 
-## Removing release edges or accepting invalid bursts must fail this test.
+## THE SCREEN-LED PLAYTEST BRIDGE (`playtest/input_bridge.gd`, 3a6d0d54; D0419). Removing a release edge,
+## accepting an invalid burst, or delivering a key as a keycode without its ACTION must fail here; and the
+## pointer must be the seat's own, posed at the named pixel, because in a headed window the viewport's
+## mouse position is the operating system's cursor and no injected event moves it.
+
+const PATH: String = "res://playtest/input_bridge.gd"
+
+
 func _initialize() -> void:
 	_run.call_deferred()
 
 
 func _run() -> void:
-	var path: String = "res://playtest/input_bridge.gd"
-	_check(ResourceLoader.exists(path), "physical-input bridge exists")
-	if not ResourceLoader.exists(path):
+	_check(ResourceLoader.exists(PATH), "physical-input bridge exists")
+	if not ResourceLoader.exists(PATH):
 		_finish("playtest input")
 		return
-	var bridge: RefCounted = load(path).new()
+	var bridge: RefCounted = load(PATH).new()
+	_test_bounds(bridge)
+	_test_keys_and_buttons_as_actions(bridge)
+	await _test_the_pointer_is_the_seats_own(bridge)
+	_finish("playtest input")
+
+
+func _test_bounds(bridge: RefCounted) -> void:
 	_check(bridge.validate({"ticks": 0}) != "", "reject zero-duration action")
 	_check(bridge.validate({"ticks": 301}) != "", "bound unattended input duration")
 	_check(bridge.validate({"ticks": 1, "keys": ["NOT_A_KEY"]}) != "", "reject unknown physical keys")
@@ -19,6 +32,9 @@ func _run() -> void:
 	_check(bridge.validate({"ticks": 1, "buttons": [8]}) != "", "reject unsupported mouse buttons")
 	_check(bridge.validate({"ticks": 1, "keys": ["D"], "mouse": [200, 300]}) == "", "ordinary input accepted")
 	_check(bridge.validate(JSON.parse_string('{"ticks":60,"buttons":[1],"mouse":[602,415]}')) == "", "JSON numeric buttons accepted")
+
+
+func _test_keys_and_buttons_as_actions(bridge: RefCounted) -> void:
 	bridge.apply({"keys": ["D", "Space"]}, root)
 	_check(Input.is_physical_key_pressed(KEY_D), "physical D reaches Input singleton")
 	_check(Input.is_physical_key_pressed(KEY_SPACE), "physical Space reaches Input singleton")
@@ -35,9 +51,13 @@ func _run() -> void:
 	bridge.apply({}, root)
 	_check(not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT), "empty input releases mouse")
 	_check(not Input.is_action_pressed(Controls.MINE) and not Input.is_action_pressed(Controls.LEFT), "and releases the actions")
-	# THE POINTER MUST REACH THE SEAT'S AIM. `Controls.pointer_world` reads `Viewport.get_mouse_position()`,
-	# and a motion pushed with `Viewport.push_input` leaves it where it was (the first screen-led attempt's
-	# LMB bursts mined nothing for this reason); the event has to go through `Input.parse_input_event`.
+
+
+## A pushed event never moved `Viewport.get_mouse_position()` (the first screen-led attempt's LMB bursts
+## mined nothing), and in a headed window that position is the OS cursor anyway. So the bridge parses the
+## motion through the Input singleton AND poses the seat's pointer (`Controls.pose_pointer`, the `--act`
+## captures' own hook) at the named pixel through the canvas transform. The player names a screen pixel.
+func _test_the_pointer_is_the_seats_own(bridge: RefCounted) -> void:
 	var before: Vector2 = root.get_mouse_position()
 	bridge.apply({"mouse": [300, 200]}, root)
 	await process_frame
@@ -47,11 +67,6 @@ func _run() -> void:
 	await process_frame
 	var again: Vector2 = root.get_mouse_position()
 	_check(again != moved and (again - moved).x > 0.0 and (again - moved).y > 0.0, "and a second burst moves it the way the pointer went (%s -> %s)" % [moved, again])
-	# IN A HEADED WINDOW THE VIEWPORT'S MOUSE POSITION IS THE OPERATING SYSTEM'S CURSOR: no injected motion
-	# moves it (a headed probe read the real cursor back after parsing an event at (618,405)), so the seat's
-	# aim followed the tester's own hand, not the burst. The bridge therefore POSES the pointer the way the
-	# seat's own scripted hand does (`Controls.pose_pointer`, the `--act=mine` capture path): the named
-	# viewport pixel through the canvas transform. The player still names a screen pixel and nothing else.
 	var probe: Node2D = Node2D.new()
 	root.add_child(probe)
 	bridge.apply({"mouse": [300, 200]}, root)
@@ -62,4 +77,3 @@ func _run() -> void:
 	_check(Controls.pointer_posed(), "an empty burst keeps the last pointer: a still hand is not a released one")
 	probe.queue_free()
 	Controls.release_pointer()
-	_finish("playtest input")
