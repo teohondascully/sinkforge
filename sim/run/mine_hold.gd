@@ -4,8 +4,9 @@ extends RefCounted
 ## THE MINE HOLD, one tick: legacy `main.gd` `_update_mining` 1522-1624's decision half, lifted in A'
 ## step 4b (D0357) over the blocks step 3i already lifted. While the button is held the drag paints the
 ## dig plan; the aim is the frame's cell snapped to the nearest visible face (`Aim`); when the aim
-## itself offers no workable block the nearest marked cell in reach becomes the work target (the plan
-## drains when the hand is free); rock is charged and broken (`Mining`), a lode face is worked
+## itself offers no workable block the nearest marked cell in reach becomes the work target; the plan
+## lives only while the button is held (D0477: a mark left by one press was dug by a later hold pointed
+## elsewhere, under a TOO FAR lesson, in three of six runs); rock is charged and broken (`Mining`), a lode face is worked
 ## (`LodeWork`), and what breaks is yielded to the ledger. Building keeps the aim exact.
 ##
 ## Rides `MOVE`'s `InputFrame` (`has_aim`, `aim_col`/`aim_row`, `mine_held`): aim is state-affecting
@@ -26,6 +27,8 @@ var crown: TreeFall = TreeFall.new()   ## the leaves a cut trunk leaves unsuppor
 func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: DigPlan, lode: LodeWork, body: Body, building: bool) -> void:
 	refusal = &""
 	crown.crumble(world.grid)   # last tick's unsupported leaves, whatever this tick aims at
+	if not frame.mine_held:
+		plan.clear()            # the plan lives while the button is held (D0477): a release forgets every mark
 	if not frame.has_aim:
 		last_aim = Vector2i(-1, -1)
 		aim_cell = Vector2i(-1, -1)

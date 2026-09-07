@@ -18602,3 +18602,27 @@ of six runs took a scratch script three times; the seat knew the cell all along.
 
 **Reverse cost:** the `pointed` lines in the seat and the tool.
 
+## D0477 · 2026-09-07 · The dig plan lives while the button is held
+
+**Decided:** `MineHold.step` clears the plan on every tick the mine button is not held. Legacy's plan
+(D0354, lifted verbatim) kept every mark for the whole game: each hold painted the solid cell under the
+pointer into it, allowed beyond reach, and a hold whose own aim was not workable dug the nearest mark in
+reach instead. In three of the six valid runs of the gate a mark left by an early press was dug by a
+later hold pointed elsewhere and refused: S62's first press at (122,82), snapped to the face, left its
+raw cell marked; 25 s later a 300-tick hold on the tree from the pad, refused `far` with TOO FAR on
+screen, dug 9 cells at the vein and paid 3 ore. S63's two refused first presses marked (115,85) and
+(120,85); its trunk hold, cut through to air, dug five of them. S64's first press, refused `far` at
+(102,80), was dug 48 s later by a hold on air beside the tree under NOTHING THERE; S64 then walked
+onto that hole and fell 18 m. Replay of 62 IDENTICAL over 32 bursts; minimal pair on fresh seats: the
+same two presses with nothing between broke the 9 cells, with a C tap (clear plan) between broke none;
+on this tree, nothing between, none. The C key stays (it clears mid-hold). Pinned at the interface: a
+held drag paints, the release forgets, a later 200-tick hold on air digs none of the released marks
+(the mutant digs three).
+
+**Why:** the class D0464, D0467 and D0470 exist to remove -- a hold that neither cuts what was pointed
+at nor only says why -- and a mark the player never meant, drawn as a small orange outline nobody read,
+is the quiet form of it. Legacy's sketch-then-dig survives inside one hold (sweep, keep holding, the
+hand works the sweep); what does not survive is a sketch across a release. The director may want the
+whole feature back with a legible mark; this is the reversible half.
+
+**Reverse cost:** two lines in `sim/run/mine_hold.gd` and the pins in `tests/test_interface_verbs.gd`.

@@ -4,9 +4,11 @@ extends RefCounted
 ## THE DIG PLAN: sweep-paint marks on every solid cell the cursor crosses while the mine button is held,
 ## sampled sub-cell so a fast drag skips no block, allowed beyond reach (the plan is where you intend to
 ## dig; reach gates the work, not the sketch). When the cursor itself offers no workable block, the
-## nearest marked cell the body can work becomes the work target: the precise hover always wins, the
-## plan drains when the hand is free. Lifted in A' step 3i (D0354) from `legacy/scenes/main.gd`
-## `_paint_dig_marks` 1806 and `_nearest_marked_workable` 1824.
+## nearest marked cell the body can work becomes the work target: the precise hover always wins. Lifted
+## in A' step 3i (D0354) from `legacy/scenes/main.gd` `_paint_dig_marks` 1806 and `_nearest_marked_workable`
+## 1824, with one amendment (D0477): the plan lives while the button is held and is cleared on release
+## (`MineHold.step`). Legacy kept marks for the whole game, and a stranger's refused press left a mark that
+## a later hold, pointed elsewhere and refused, dug in silence.
 ##
 ## STATE, signed: a mark decides which cell the hand digs next, so two runs with different plans break
 ## different cells. Legacy did not save it; the save gains it with the mining state (D0354). Legacy's

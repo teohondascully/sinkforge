@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_every_verb_command_answers_with_a_detail_or_a_named_reason()
 	_test_a_build_that_places_nothing_says_why()
 	_test_the_mine_hold_rides_the_move_frame()
+	_test_a_machine_cell_in_reach_is_exact_and_its_pocket_out_of_reach_snaps()
 	_test_the_session_round_trips_through_the_door()
 	_test_a_new_game_stands_on_the_spawn()
 	_test_the_world_ends_in_a_wall()
@@ -110,6 +111,28 @@ func _short_drop_pins() -> void:
 	_check(_oracle().drop_short_cell == Vector2i(-1, -1), "and is gone after DROP_SHORT_TICKS")
 
 
+## Legacy's seam, verbatim through D0474 (strangers 61 and 66): a MINE hold on a machine's own cell IN reach
+## aims exactly (an open cell in reach is never snapped) and is refused air -- the MACHINE lesson reads it --
+## while the open pocket cell below the machine, OUT of reach, takes the reach-wide snap to rock. The same
+## column, two cells apart, two outcomes; pinned so a change to either half is a decision, not drift.
+func _test_a_machine_cell_in_reach_is_exact_and_its_pocket_out_of_reach_snaps() -> void:
+	_rig()
+	for c: int in range(12, 16):
+		for r: int in range(40, 48):
+			world.grid.excavate(Vector2i(c, r))                             # a two-metre pocket in the floor, metre column 3
+	machines.place(world, MachineDef.of(&"processor"), Vector2i(3, 10))
+	var top := Vector2i(14, 40)                                             # the machine's top row, 8 cells left and 5 down of the body's centre: in reach
+	_check(Mining.in_reach(body.pos_x, body.pos_y, top) and not world.grid.is_solid(top) and not _oracle().machine_at(Vector2i(3, 10)).is_empty(), "control: the machine stands in the pocket and its top cell is in reach")
+	iface.apply(Command.move(_frame(top, true)))
+	var o: Interface.Observation = _oracle()
+	_check(o.aim_cell == top and o.aim_refusal == &"air" and not o.machine_at(Vector2i(o.aim_cell.x >> 2, o.aim_cell.y >> 2)).is_empty(), "a hold on the machine's cell in reach aims exactly and is refused air, on a machine (%s, %s)" % [o.aim_cell, o.aim_refusal])
+	var below := Vector2i(14, 47)                                           # the pocket's lowest row under the machine: open, out of reach
+	_check(not Mining.in_reach(body.pos_x, body.pos_y, below) and not world.grid.is_solid(below), "control: the pocket's lowest cell is open and out of reach")
+	iface.apply(Command.move(_frame(below, true)))
+	o = _oracle()
+	_check(o.aim_cell != below and world.grid.is_solid(o.aim_cell) and Mining.in_reach(body.pos_x, body.pos_y, o.aim_cell) and o.aim_refusal == &"", "a hold on the pocket's open cell out of reach snaps to reachable rock and cuts (%s)" % str(o.aim_cell))
+	iface.apply(Command.move(_frame(below, false)))
+
 ## D0470 (strangers 49, 50, 51): RMB past the reach, or on the body's own cell with a machine in hand,
 ## placed nothing and said nothing. The refusal rides the observation's refusal channel, one observe wide.
 func _test_a_build_that_places_nothing_says_why() -> void:
@@ -168,6 +191,7 @@ func _test_the_mine_hold_rides_the_move_frame() -> void:
 			mined_from_plan = true
 			break
 	_check(mined_from_plan, "with the cursor on air the hold drains the nearest marked cell in reach")
+	_released_plan_pins(air)
 	world.deposits.seed_lode(Vector2i(24, 39), &"coal", 2)
 	world.grid.excavate(Vector2i(24, 39))
 	var got: int = 0
@@ -179,6 +203,28 @@ func _test_the_mine_hold_rides_the_move_frame() -> void:
 	_check(got == 1 and _oracle().aim_is_lode and _oracle().aim_cell == Vector2i(24, 39), "holding on a lode face works it: a unit a cycle, and the aim reads as a lode")
 	_check(Invariants.check_item_conservation(items, 1) == null, "conserved through the hold")
 
+
+## D0477 (strangers 62, 63, 64): a mark left by one press was dug by a later hold pointed elsewhere and
+## refused (TOO FAR, NOTHING THERE on screen), 25-48 s later. The plan lives while the button is held.
+func _released_plan_pins(air: Vector2i) -> void:
+	iface.apply(Command.move(_frame(Vector2i(16, 43), true)))
+	iface.apply(Command.move(_frame(Vector2i(28, 43), true)))                 # a drag along the row under the hole the body sits in
+	var painted: Array[Vector2i] = _oracle().dig_marks.duplicate()
+	var body_cell := Vector2i(Aim.cell_of(body.pos_x, body.pos_y))
+	var workable: int = 0
+	for c: Vector2i in painted:
+		if world.grid.is_solid(c) and Mining.in_reach(body.pos_x, body.pos_y, c) and LineOfSight.clear(world.grid, body_cell, c):
+			workable += 1
+	_check(painted.size() >= 3 and workable >= 1, "control: the drag painted %d marks, %d of them workable from where the body stands" % [painted.size(), workable])
+	iface.apply(Command.move(_frame(Vector2i(28, 43), false)))
+	_check(_oracle().dig_marks.is_empty(), "the release forgets the plan (%d marks left)" % _oracle().dig_marks.size())
+	for _i: int in 200:
+		iface.apply(Command.move(_frame(air, true)))
+	var dug: int = 0
+	for c: Vector2i in painted:
+		dug += 0 if world.grid.is_solid(c) else 1
+	_check(dug == 0, "a later hold on air digs none of the released marks (%d of %d dug)" % [dug, painted.size()])
+	iface.apply(Command.move(_frame(air, false)))
 
 func _test_the_session_round_trips_through_the_door() -> void:
 	_rig()

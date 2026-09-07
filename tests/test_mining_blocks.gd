@@ -210,6 +210,11 @@ func _test_a_cursor_out_of_reach_snaps_a_near_miss_and_refuses_a_body_length() -
 	var open: TileGrid = TileGrid.new(64, 64, 1)
 	var lone: Vector2i = _at_cell_centre(Vector2i(40, 40))
 	_check(Aim.effective(open, body.x, body.y, lone.x, lone.y, false) == Vector2i(40, 40), "...and open air with no rock within a reach of it stays raw (%s)" % str(Aim.effective(open, body.x, body.y, lone.x, lone.y, false)))
+	for x: int in range(0, 21):
+		open.set_material(Vector2i(x, 10), ROCK)                          # a floor under the body, reachable, and nothing else
+	var too_far: Vector2i = _at_cell_centre(Vector2i(40, 8))
+	_check(Aim.effective(open, body.x, body.y, too_far.x, too_far.y, false) == Vector2i(40, 8) and Mining.in_reach(body.x, body.y, Vector2i(12, 10)),
+		"open air too far: reachable rock exists (the floor) but none within a reach of the cursor, so the raw cell stays and the hold refuses air (%s)" % str(Aim.effective(open, body.x, body.y, too_far.x, too_far.y, false)))
 
 
 func _test_dig_plan_paints_a_drag_and_drains_the_nearest_workable_mark() -> void:
