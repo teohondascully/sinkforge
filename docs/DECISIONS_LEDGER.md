@@ -17768,3 +17768,20 @@ who leaves after the first is not held); the next batch on the capped world is t
 are now seconds; what remained was a hole beside the pad and a verb that failed without naming its target.
 
 **Reverse cost:** two record lines; one Vector2i through three files and one mark; two sentences.
+
+## D0435 · 2026-09-06 · Pumping posed: the water's fills hold while a pump drains the pool from its floor
+
+**Decided:** D0417 left one moving-water state unposed -- a pump. `test_water_painter` now drains the
+generated pool through the pump's own path (`WaterPlane.remove_water` over the mouth's metre and the
+reach below it, at the pump record's rate and a full budget every tick, `Runners._run_pump`'s arithmetic)
+for the 240-tick sweep. What happened is not what D0417 predicted: the surface does not stay still -- the
+level falls from the top, the surface row thinning from 49 wet cells to 10 while the wet set changes on
+only 2 of 30 samples; 351 units taken, conservation exact. Every fill and line at six ripple phases
+triangulates. The sweep takes an optional per-tick Callable so the pour and the pump share it.
+
+**Not posed:** a real powered pump through the machine registry (power, fuel, the runner) -- the state
+was posed through the same plane call, not the same machine.
+
+**Why:** the audit's water conclusion was "avoided, not repaired" until pumping was exercised.
+
+**Reverse cost:** one test and one optional parameter.

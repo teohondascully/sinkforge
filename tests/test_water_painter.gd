@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_test_only_the_top_cell_ripples()
 	_test_every_fill_is_a_simple_polygon_at_every_level_and_phase()
 	_test_the_fills_hold_under_renewed_flow()
+	_test_the_fills_hold_while_a_pump_drains_from_below()
 	_test_depth_runs_out()
 	_test_the_wet_cells_reach_the_observation_sparsely()
 	_test_the_drips_pour_only_where_there_is_room_below()
@@ -230,6 +231,57 @@ func _test_the_fills_hold_under_renewed_flow() -> void:
 	_check_over(int(tally["checked"]), int(tally["bad"]) == 0 and int(tally["checked"]) > 1000, "every fill and line of moving water triangulates: %d of %d shapes over 30 samples x 6 phases" % [int(tally["checked"]) - int(tally["bad"]), tally["checked"]])
 
 
+## D0417 named pumping as the one moving-water state it did not pose: a pump takes water from its own
+## metre and the metres under it (`Runners._run_pump`, through `WaterPlane.remove_water`) and the pool's
+## level falls from the top. The same removal, at the pump record's rate, from the pool's floor metre every
+## tick of the sweep (D0435).
+func _test_the_fills_hold_while_a_pump_drains_from_below() -> void:
+	var door: Interface = Session.new_game(StrataData.SHALLOW_CLAY, 20260826, &"tutorial")
+	if door == null:
+		_check(false, "the tutorial world builds")
+		return
+	var world: World = door.services()["world"]
+	var grid: TileGrid = world.grid
+	var everywhere := Rect2i(0, 0, grid.width, grid.height)
+	var wet: Array[Vector2i] = world.water.wet_terrain_cells_in(everywhere)
+	if wet.is_empty():
+		_check(false, "control: the generated world has water to pump")
+		return
+	var sites: Array[Vector2i] = _belly_sites(grid, wet)
+	var mouth: Vector2i = WorldSurroundings.logic_of(sites[0] + Vector2i(0, -1))   # the wet metre on the pool's floor
+	var rate: int = int(MachinesRecords.RECORDS["pump"]["rate"])
+	var reach: int = int(MachinesRecords.RECORDS["pump"]["reach"])
+	var total0: int = world.water.total_water()
+	var drained: Array[int] = [0]
+	var pump: Callable = func() -> void:
+		var budget: int = rate * World.N * World.N   # a fully powered pump's budget, Runners' arithmetic
+		for dy: int in range(0, reach):
+			var c: Vector2i = mouth + Vector2i(0, dy)
+			if budget <= 0 or not world.logic_in_bounds(c) or world.logic_solid(c):
+				break
+			for terrain_cell: Vector2i in world.terrain_cells_of(c):
+				if budget <= 0:
+					break
+				var got: int = world.water.remove_water(terrain_cell, budget)
+				budget -= got
+				drained[0] += got
+	var surface_row: int = sites[1].y
+	var top_before: int = 0
+	for c: Vector2i in wet:
+		if c.y == surface_row:
+			top_before += 1
+	var tally: Dictionary = _sweep_moving_water(door, world, everywhere, wet, pump)
+	var top_after: int = 0
+	for c: Vector2i in world.water.wet_terrain_cells_in(everywhere):
+		if c.y == surface_row:
+			top_after += 1
+	# The pumped state: water taken from the pool's floor, the level falling from the top -- the surface row
+	# thins while the mass below keeps its shape, the opposite of the pour, which moved the belly.
+	_check(drained[0] > 0 and top_after < top_before, "control: the pump took %d units from the floor and the surface row thinned from %d wet cells to %d (the wet set changed on %d of 30 samples)" % [drained[0], top_before, top_after, tally["moved"]])
+	_check(world.water.total_water() + drained[0] == total0, "what the pump took is exactly what the pool lost (%d + %d = %d)" % [world.water.total_water(), drained[0], total0])
+	_check_over(int(tally["checked"]), int(tally["bad"]) == 0 and int(tally["checked"]) > 1000, "every fill and line of water draining from below triangulates: %d of %d shapes" % [int(tally["checked"]) - int(tally["bad"]), tally["checked"]])
+
+
 ## The widest wet row is a real pool's belly: the drain is the first rock under its middle, the breach the
 ## rock beyond its leftmost cell.
 static func _belly_sites(grid: TileGrid, wet: Array[Vector2i]) -> Array[Vector2i]:
@@ -254,10 +306,12 @@ static func _belly_sites(grid: TileGrid, wet: Array[Vector2i]) -> Array[Vector2i
 ## 240 ticks of flow; every eighth, every wet cell's fill and line at six ripple phases. Returns
 ## {moved, checked, bad}: the samples on which the wet set changed, the shapes checked, the ones that
 ## did not triangulate.
-static func _sweep_moving_water(door: Interface, world: World, everywhere: Rect2i, wet: Array[Vector2i]) -> Dictionary:
+static func _sweep_moving_water(door: Interface, world: World, everywhere: Rect2i, wet: Array[Vector2i], each_tick: Callable = Callable()) -> Dictionary:
 	var out: Dictionary = {"moved": 0, "checked": 0, "bad": 0}
 	var last_wet: Array[Vector2i] = wet
 	for tick: int in 240:
+		if each_tick.is_valid():
+			each_tick.call()
 		WaterFlow.step(world.water, world.grid)
 		if tick % 8 != 7:
 			continue
