@@ -482,7 +482,23 @@ wood 21.0 s for one; BUILD stops the one who reached it (before the cut mark). T
 5.9 s) -- the second consecutive 3-of-3, the provisional opening signal (rule 7); two left the forge at
 "1/2" (the second ingot lands two seconds after the first; the card said 0.7 s) -> **D0461:** STILL
 WORKING and the card in hub seconds. Wood failed both who tried (the trunk, two cells wide). Nobody
-reached BUILD. **Next: the holdout batch on seed 20260907.**
+reached BUILD. **D0462:** the rung-N mission variant: a seat opened from a save the ceiling run wrote
+after its third rung (`--load`, the seat's save command, the save's hash in the pin;
+`tests/body/saves/rung4_f298443d.json`). **Strangers 40-42 (f298443d, THE HOLDOUT seed 20260907): 40 and
+41 VALID, 42 VOID (a frame that never settles: the body swinging on the grapple; the harness's rule, not
+the game's); first rung 1 of 2 valid** (36.9 s; S41 mined sixteen copper at 18 m and NOT ORE said "ore
+copper"). The first presses cluster on the forge's column again (80 px left of the ring). The opening
+signal did not transfer. **D0463:** an item's label is its material record's display name ("Copper ore").
+**Strangers 43-45 (b580f563, THE RUNG-4 VARIANT): 3 VALID, the drill placed by 0 of 3;** S44 reached it
+at 56.6 s. The frames gave three fixes: **D0464** the aim snap's tolerance is a metre once the cursor is
+out of reach (S43 held on the WHITE SQUARE from 3.25 m and the ground at the feet went, 2.85 m from the
+cursor, wordlessly; now refused "far" with TOO FAR; the far pin goes red under the old tolerance);
+**D0465** a carried machine's icon is its casing and glyph (S44 carried five white squares and never
+pressed a slot); **D0466** the BUILD how-to ends "press its slot's key, [BUILD] where the ring moves"
+(S44 and S45 read "the shaft's mouth" as the pad's own open shaft at dx +7). Noted, not changed: the
+how-to's 9 s hold (D0411) was gone when S45 pressed at open air; the grapple swing voids a run under the
+non-settling rule; floor drops; the trunk's two-cell width against the agents' pointer. **Next: strangers
+46-48, the variant again on 0ed149e4.**
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -510,9 +526,11 @@ T031 (taken provisionally in D0434: the chimney capped; overrule by deleting two
 world's edge), T038 ("spawn"), T039 (the hotbar's capacity); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
 at zero; the forks T024-T030.
 
-**Cheap next steps that need no ruling:** read strangers 28-30 from their frames (the white reticle,
-NOT ORE and the vein card; WRONG STACK and the "more coming" tick still unseen); Astra's testing-loop
-item 4 (composed bursts; 3 is D0448) and the seat-driven ceiling run (12); then Astra's visual P0s in order (the hotbar's
-content-aware width, the objective card's rest height, the refusal slot); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
-instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
-bake (V32).
+**Cheap next steps that need no ruling:** keep cycling pinned stranger batches (the rung-4 variant for
+BUILD, the shipped seed for the opening) and fix only what a batch's frames and inputs show; decide the
+forge's need-bubble and nameplate during the mine rung on shipped-seed evidence (10 of 17 first presses
+since D0449 landed on the forge's column); the how-to's hold on a multi-step rung (D0411's 9 s); the
+grapple swing against the non-settling void rule (a harness question); Astra's visual P0s in order (the
+hotbar's content-aware width, the objective card's rest height, the refusal slot); the wood ring on the
+miner's chest when the trunk stands behind the body; the blind-judge instrument re-run on the ore half of
+rank 7 once the richness-scaled nugget count can be read from the bake (V32).
