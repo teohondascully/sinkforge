@@ -29,6 +29,9 @@ const STYLE: Dictionary = {
 	# machines) until the hero machine's own silhouette gets an art pass.
 	&"winch_head": {"kind": "hopper", "color": Color(0.70, 0.48, 0.22)},      # cable amber: the hauling end
 	&"winch_station": {"kind": "hopper", "color": Color(0.34, 0.46, 0.56)},   # cool steel: the receiving end
+	# The crew's rig (D0484) is graybox too: the hopper's bin silhouette (it takes deliveries) in the crew's
+	# brass, until the bore's head gets its own art pass.
+	&"rig": {"kind": "hopper", "color": Color(0.78, 0.62, 0.30)},
 }
 const FURNACE_BODY := Color(0.28, 0.23, 0.20)   # dark sooty IRON: the heat is in the glowing mouth, lit only while smelting
 const RUNNER_BODY := Color(0.30, 0.55, 0.75)    # steel-blue, the generic processor
