@@ -12,9 +12,14 @@ extends RefCounted
 
 const CELL_FX: int = Mining.CELL_PX * Fx.SCALE
 const LOGIC_FX: int = Mining.LOGIC_TILE_PX * Fx.SCALE
-## The snap tolerance is one reach radius from the cursor, squared, scaled by REACH_DEN^2 so the compare
-## stays integer: point at or near a wall and it snaps; point at open air far off and it does not.
+## The snap tolerance from the cursor, an `Fx` length over `Mining.REACH_DEN` so the squared compare stays
+## integer. One reach while the cursor is IN reach of the body: a buried block takes its nearest visible
+## face, so a hold on a ringed block under a metre of roof tunnels toward it. One metre once the cursor is
+## OUT of reach: a near miss of the reach circle still snaps to the face you can carve, and a press a
+## body length beyond it is refused "far", which the TOO FAR lesson explains. Legacy's one reach either
+## way cut the ground at the feet for a hold on a mark 4.4 m off, with no refusal (stranger 43, D0464).
 const REACH_PX_FX_NUM: int = Mining.REACH_NUM * Mining.LOGIC_TILE_PX * Fx.SCALE
+const METRE_FX_NUM: int = LOGIC_FX * Mining.REACH_DEN
 ## Cells scanned either side of the body: the reach in terrain cells, rounded up, plus one.
 const SPAN: int = (Mining.REACH_NUM * Mining.LOGIC_TILE_PX + Mining.REACH_DEN * Mining.CELL_PX - 1) / (Mining.REACH_DEN * Mining.CELL_PX) + 1
 
@@ -63,7 +68,8 @@ static func cell_center_fx(cell: Vector2i) -> Vector2i:
 
 ## The aim for a pointer at (`point_x`, `point_y`): the exact cell while building; else an open cell in
 ## reach or a solid block in reach with a clear line of sight; else the nearest reachable solid toward
-## the cursor; else the raw cell (nothing snaps when the cursor is far from any wall).
+## the cursor within the tolerance; else the raw cell (nothing snaps when the cursor is far from any
+## wall, or a body length past the reach: the hold is refused and says why).
 static func effective(grid: TileGrid, body_x: int, body_y: int, point_x: int, point_y: int, building: bool) -> Vector2i:
 	var raw: Vector2i = cell_of(point_x, point_y)
 	if building:
@@ -77,19 +83,21 @@ static func effective(grid: TileGrid, body_x: int, body_y: int, point_x: int, po
 ## The reachable, visible solid cell whose centre is closest to the point, within one reach radius of it,
 ## else `fallback`. Scans the in-reach neighbourhood in a fixed row-major order, so ties are stable.
 static func nearest_reachable_solid(grid: TileGrid, body_x: int, body_y: int, point_x: int, point_y: int, fallback: Vector2i) -> Vector2i:
+	var tolerance: int = REACH_PX_FX_NUM if Mining.in_reach(body_x, body_y, fallback) else METRE_FX_NUM
 	# The material under the cursor first (D0452): a pointer on a buried ore cell takes the ore's own
 	# visible face over a nearer clay one, so the snap never cuts an unrelated block for the one pointed at.
 	if grid.in_bounds(fallback) and grid.is_solid(fallback):
-		var same: Vector2i = _nearest_visible(grid, body_x, body_y, point_x, point_y, grid.get_material(fallback))
+		var same: Vector2i = _nearest_visible(grid, body_x, body_y, point_x, point_y, grid.get_material(fallback), tolerance)
 		if same != Mining.NO_CELL:
 			return same
-	var any: Vector2i = _nearest_visible(grid, body_x, body_y, point_x, point_y, &"")
+	var any: Vector2i = _nearest_visible(grid, body_x, body_y, point_x, point_y, &"", tolerance)
 	return any if any != Mining.NO_CELL else fallback
 
 
 ## The reachable, visible solid cell of `material` (any, when empty) whose centre is nearest the point and
-## within one reach of it, else `Mining.NO_CELL`. Row-major over the in-reach neighbourhood, so ties are stable.
-static func _nearest_visible(grid: TileGrid, body_x: int, body_y: int, point_x: int, point_y: int, material: StringName) -> Vector2i:
+## within `tolerance` (an `Fx` length over `Mining.REACH_DEN`) of it, else `Mining.NO_CELL`. Row-major
+## over the in-reach neighbourhood, so ties are stable.
+static func _nearest_visible(grid: TileGrid, body_x: int, body_y: int, point_x: int, point_y: int, material: StringName, tolerance: int) -> Vector2i:
 	var body_cell: Vector2i = cell_of(body_x, body_y)
 	var best: Vector2i = Mining.NO_CELL
 	var best_d: int = -1
@@ -104,8 +112,8 @@ static func _nearest_visible(grid: TileGrid, body_x: int, body_y: int, point_x: 
 				continue
 			var centre: Vector2i = cell_center_fx(c)
 			var d: int = Fx.length_sq(centre.x - point_x, centre.y - point_y)
-			if d * Mining.REACH_DEN * Mining.REACH_DEN > REACH_PX_FX_NUM * REACH_PX_FX_NUM:
-				continue                                        # farther than a reach from the cursor
+			if d * Mining.REACH_DEN * Mining.REACH_DEN > tolerance * tolerance:
+				continue                                        # farther than the tolerance from the cursor
 			if best_d < 0 or d < best_d:
 				best_d = d
 				best = c

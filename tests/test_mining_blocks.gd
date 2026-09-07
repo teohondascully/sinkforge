@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_test_line_of_sight_cases_and_the_float_oracle()
 	_test_aim_is_exact_in_reach_and_snaps_to_the_nearest_visible_face()
 	_test_the_snap_takes_the_pointed_material_and_never_crosses_rock_or_air()
+	_test_a_cursor_out_of_reach_snaps_a_near_miss_and_refuses_a_body_length()
 	_test_dig_plan_paints_a_drag_and_drains_the_nearest_workable_mark()
 	_test_break_yield_bursts_once_and_opens_the_rest_as_lode()
 	_test_rubble_banks_sixteenths_into_blocks_and_a_pile_falls()
@@ -173,6 +174,30 @@ func _test_the_snap_takes_the_pointed_material_and_never_crosses_rock_or_air() -
 	var lone: Vector2i = _at_cell_centre(Vector2i(40, 40))
 	_check(Aim.effective(open, body.x, body.y, lone.x, lone.y, false) == Vector2i(40, 40), "a cursor with no rock within a reach of it snaps to nothing")
 	_check(Aim.effective(grid, body.x, body.y, buried.x, buried.y, true) == Vector2i(10, 12), "the build preview (idle, a block selected) keeps the exact cell")
+
+
+## D0464 (stranger 43): the snap's tolerance from the cursor is one reach only while the cursor is in
+## reach (a buried block takes its nearest visible face); out of reach it is a metre, so a near miss of
+## the reach circle snaps to the face you can carve and a press a body length past it is refused "far"
+## instead of cutting the floor at your feet. A room (x 0-21, rows 5-9) over a floor at row 10, closed by
+## a wall whose face is column 22; the body at (10, 8); the reach is 12.8 cells, so the face's cell
+## (22, 8) is in reach and the wall's second column (23, 8) is not.
+func _test_a_cursor_out_of_reach_snaps_a_near_miss_and_refuses_a_body_length() -> void:
+	var grid: TileGrid = _solid_grid(ROCK)
+	for y: int in range(5, 10):
+		for x: int in range(0, 22):
+			grid.excavate(Vector2i(x, y))
+	var body: Vector2i = _at_cell_centre(Vector2i(10, 8))
+	_check(Mining.in_reach(body.x, body.y, Vector2i(22, 8)) and not Mining.in_reach(body.x, body.y, Vector2i(23, 8)), "the fixture's reach edge: the wall's face (22, 8) in, its second column (23, 8) out")
+	var near_miss: Vector2i = _at_cell_centre(Vector2i(25, 8))
+	var got: Vector2i = Aim.effective(grid, body.x, body.y, near_miss.x, near_miss.y, false)
+	_check(got == Vector2i(22, 8), "a cursor three cells into the wall, out of reach: the face (22, 8), three quarters of a metre from the cursor (%s)" % str(got))
+	var far: Vector2i = _at_cell_centre(Vector2i(28, 8))
+	got = Aim.effective(grid, body.x, body.y, far.x, far.y, false)
+	_check(got == Vector2i(28, 8) and not Mining.in_reach(body.x, body.y, got), "a cursor six cells into the wall, a metre and a half from the face: not snapped, the raw cell out of reach, so the hold refuses far (%s)" % str(got))
+	var buried: Vector2i = _at_cell_centre(Vector2i(10, 15))
+	got = Aim.effective(grid, body.x, body.y, buried.x, buried.y, false)
+	_check(got == Vector2i(10, 10), "control: a buried cell IN reach keeps the reach-wide tolerance, the floor's face (10, 10) a metre and a quarter from the cursor (%s)" % str(got))
 
 
 func _test_dig_plan_paints_a_drag_and_drains_the_nearest_workable_mark() -> void:

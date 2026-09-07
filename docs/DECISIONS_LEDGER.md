@@ -18343,3 +18343,25 @@ ORE pins read the same.
 **Why:** a name the data already carries should not be re-derived worse.
 
 **Reverse cost:** two lines.
+
+## D0464 · 2026-09-07 · The mine's snap tolerance is a metre once the cursor is out of reach
+
+**Decided:** legacy's aim snap (lifted verbatim in D0354) took the nearest reachable visible block within
+one REACH (3.2 m) of the cursor, whatever the cursor's own distance. Stranger 43 (the rung-4 variant),
+standing 4.4 m from the WHITE SQUARE the objective names, held MINE on the square twice: the game cut
+nine cells of ground at the body's feet, 2.85 m from the cursor, with no refusal and no lesson (bursts 16
+and 26; `broke` in the receipts, the crumble in frame 26 beside the feet while the square stands). The
+tolerance is now two-tier: one reach while the cursor is IN reach of the body (a buried block takes its
+nearest visible face, so a hold on a ringed block under a roof tunnels toward it, the D0452 rule), one
+metre once the cursor is OUT of reach (a near miss of the reach circle still snaps to the face; a press a
+body length past it is refused "far", and the TOO FAR lesson says step closer). Pinned three ways in
+`test_mining_blocks`: the near miss snaps, the far press does not, the buried-in-reach control keeps the
+reach-wide snap; the far pin goes red under the one-reach tolerance (mutation-tested).
+
+**Why:** a hold that cuts something 2.85 m from where the player pointed, wordlessly, is a quiet green: a
+stranger at rest reads the frame and sees the square intact and the ground gone, and a human sees ore they
+did not aim at come into the pack (burst 16 cut nine ore from the vein while the pointer was on the pad).
+The refusal has a lesson; the substitution had nothing.
+
+**Reverse cost:** one line (`tolerance` back to `REACH_PX_FX_NUM`) and the far pin. Provisional under the
+director's rule 11: the metre is a first value, not a measured one.
