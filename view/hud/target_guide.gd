@@ -135,42 +135,11 @@ static func target(id: StringName, o: Interface.Observation) -> Vector2:
 	return NONE
 
 const NONE := Vector2(-1.0e9, -1.0e9)
-const SHAFT_ABOVE_M: int = 4              ## how far above a forge the shaft's vein and mouth are looked for
 
 
-## THE SHAFT'S MOUTH (D0459): "the line" is a drill over a vein over a forge in one column, and the seeded
-## shaft is the one place with a forge under ore under open air. The mouth is the open metre right above
-## the topmost ore-like metre that stands over a processor within SHAFT_ABOVE_M; the nearest such mouth to
-## the body by the ring's own ranking. NONE when the window holds no forge with ore over it.
+## The shaft's mouth (D0459) lives in `ShaftMouth` (out of this file for the size gate, D0492).
 static func shaft_mouth(o: Interface.Observation, body: Vector2) -> Vector2:
-	var best: Vector2 = NONE
-	var best_d: float = 1.0e18
-	for rec: Dictionary in o.machines:
-		if rec.get("id", &"") != &"processor":
-			continue
-		var col: int = (rec["cell"] as Vector2i).x
-		var row: int = (rec["cell"] as Vector2i).y - 1
-		var vein_row: int = -1
-		for _step: int in SHAFT_ABOVE_M:
-			var c := Vector2i(col * 4 + 2, row * 4 + 2)
-			if not o.in_window(c):
-				break
-			if o.is_ore_like_at(c):
-				vein_row = row
-			elif vein_row >= 0 and not o.solid_at(c):
-				break
-			row -= 1
-		if vein_row < 0:
-			continue
-		var mouth := Vector2i(col * 4 + 2, (vein_row - 1) * 4 + 2)
-		if not o.in_window(mouth) or o.solid_at(mouth):
-			continue
-		var at: Vector2 = (Vector2(col, vein_row - 1) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
-		var d: float = _ranked(at, body)
-		if d < best_d:
-			best_d = d
-			best = at
-	return best
+	return ShaftMouth.find(o, body)
 
 
 ## Rings outward from the body's cell. A ring at Chebyshev radius r holds no point nearer than (r - 1)
@@ -201,7 +170,7 @@ static func scan(o: Interface.Observation, body: Vector2, wanted: Callable, from
 			if not bool(wanted.call(c)):
 				continue
 			var at: Vector2 = (Vector2(c) + Vector2(0.5, 0.5)) * cell_px
-			var d: float = _ranked(at, body)
+			var d: float = ranked(at, body)
 			if d < best_d:
 				best_d = d
 				best = at
@@ -226,7 +195,8 @@ static func _ring(centre: Vector2i, r: int) -> Array[Vector2i]:
 
 ## The band rule for a machine or a pile, the same as a cell's (D0438, stranger 14: the SMELT ring chose the
 ## auto forge buried in the drill shaft over the surface forge eighteen metres off, and the drop fell short).
-static func _ranked(at: Vector2, body: Vector2) -> float:
+## The band rule (D0436): a hit outside the body's reach band ranks behind every hit inside it.
+static func ranked(at: Vector2, body: Vector2) -> float:
 	var d: float = at.distance_squared_to(body)
 	return d + OUT_OF_BAND if absf(at.y - body.y) > BAND_PX else d
 
@@ -238,7 +208,7 @@ static func _nearest_machine(o: Interface.Observation, body: Vector2, id: String
 		if rec.get("id", &"") != id:   # the machine's record id; its `behavior` is a routing tag, empty for a forge
 			continue
 		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
-		var d: float = _ranked(at, body)
+		var d: float = ranked(at, body)
 		if d < best_d:
 			best_d = d
 			best = at
@@ -252,7 +222,7 @@ static func _nearest_pile(o: Interface.Observation, body: Vector2, item: StringN
 		if int((o.piles[cell] as Dictionary).get(item, 0)) <= 0:
 			continue
 		var at: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
-		var d: float = _ranked(at, body)
+		var d: float = ranked(at, body)
 		if d < best_d:
 			best_d = d
 			best = at
