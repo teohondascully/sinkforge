@@ -17737,3 +17737,34 @@ Pinned in `test_tutorial_teaching`.
 **Why:** a pointer is for the distance; at arm's length it is in the way.
 
 **Reverse cost:** one lerp.
+
+## D0434 · 2026-09-06 · Strangers 7-9 in parallel: the chimney capped (T031 taken), the drop's TOO FAR on the machine, the grapple lesson says POINT
+
+**The batch** (`docs/playtests/2026-09-06_strangers7-9.md`): three agents at once on 3cf6a5bd -- uncoached,
+wood-seeking, down-and-back. All three ended 51 m down the chimney at +14 m; eight of nine strangers have
+fallen into it and none has climbed out. The uncoached one pressed DROP from the adit six metres from the
+forge (the third to do so); the wood-seeker fed the forge and left after the first of two ingots; the
+down-and-back one threw a line and held W with no ascent -- the throw went where the pointer was, which
+no agent had moved above the body.
+
+**Decided, T031 taken provisionally:** the tutorial start caps the chimney's mouth with two metres of
+clay (`{kind: solid, dx: 14, dy: 0|1, material: clay, off_pad: true}`), so the world's first descent is a
+dig, not a blind fall two metres past the pad, and the world beneath is untouched. The `off_pad` flag
+exempts a fixture from `test_shallow_clay_content`'s pad-width pin, which otherwise rightly refuses a
+fixture beyond the pad. I deferred this call three times as the director's; eight falls in nine runs made
+it the opening's blocker, and two record lines reverse it. (2) **The drop's own TOO FAR is drawn on the
+machine:** `Verbs.last_drop_short` names the nearest machine within 12 m that would have eaten a stack
+that fell to the floor; the interface holds it for `DROP_SHORT_TICKS` (36) as `drop_short_cell`; the
+mark layout flashes that machine in the refusal's red square and bar. Pinned in `test_interface_verbs`
+(named, held, gone) and `test_mark_painter` (the square and bar on the cell). (3) The GRAPPLE lesson:
+"POINT at rock above you and press [GRAPPLE] to throw your line there" -- the climb is pinned working
+(`test_grapple_body`), the aiming was the missing word. (4) The smelt how-to: "press [DROP]: the whole
+stack of ore goes in, then wait" (stranger 6's first hesitation).
+
+**Not done, named:** the forge's cadence is invisible beside it (one ingot every two seconds; a stranger
+who leaves after the first is not held); the next batch on the capped world is the test of all four.
+
+**Why:** the pointer, the marks and the sentences were fixed run by run and the opening's first two rungs
+are now seconds; what remained was a hole beside the pad and a verb that failed without naming its target.
+
+**Reverse cost:** two record lines; one Vector2i through three files and one mark; two sentences.

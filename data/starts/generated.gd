@@ -198,6 +198,20 @@ const RECORDS: Dictionary = {
 				"trunk_m": 2,
 			},
 			{
+				"kind": "solid",
+				"dx": 14,
+				"dy": 0,
+				"material": "clay",
+				"off_pad": true,
+			},
+			{
+				"kind": "solid",
+				"dx": 14,
+				"dy": 1,
+				"material": "clay",
+				"off_pad": true,
+			},
+			{
 				"kind": "open",
 				"cells": [
 					[

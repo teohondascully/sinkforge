@@ -226,11 +226,11 @@ cells for later digging (legacy's plan); the second stranger left yellow dashes 
 trunk and had no word for them or a way to clear them it knew (D0423). *Question: gate the plan behind a
 modifier, teach it as a lesson when the first dash lands, or make CLEAR_PLAN a visible control?*
 
-**T031 · The shaft beside the pad swallows a stranger who walks right for two seconds.** The third
+**T031 · TAKEN 2026-09-06, provisionally (D0434): two metres of clay cap the mouth in the tutorial start; two record lines reverse it.** The shaft beside the pad swallows a stranger who walks right for two seconds. The third
 stranger, beside the forge with the smelt rung open, pressed D for 120 ticks and stood 22 m down THE
 CLAYBAND with no line and the way back a lesson it had not met (D0424); the fourth took the same fall
 looking for a tree (D0425 gives the wood rung a tree on the pad, which removes that reason to leave it).
-The fifth fell in too (D0428): three of five. **The mechanism:** it is a one-metre chimney 45 m deep at
+The fifth fell in too (D0428): three of five; then 6, 7, 8 and 9: eight of nine. **The mechanism:** it is a one-metre chimney 45 m deep at
 +14 m from spawn, and `vertical_passes.gd` clamps a sinkhole that would open inside the 12 m spawn keepout
 to exactly the keepout's edge -- the world's first mouth stands two metres past the pad by construction, and
 D0388 lowered the keepout so the boot seed would HAVE a mouth. Legacy's opening had the same shaft.

@@ -357,7 +357,7 @@ pins encoded legacy's silence, and I never ran the suite that enumerated the rul
 and the meter's lambdas on the `RenderingServer` signals crashed Godot at exit on every perf run until the
 seat node forwarded them (in D0414).
 
-### Astra's audit order, taken (2026-09-06; D0416–D0432, on main)
+### Astra's audit order, taken (2026-09-06; D0416–D0434, on main)
 
 **The audit (D0416)** tightened three conclusions -- the opening completes through first automation, not
 "end to end"; the GPU is a working hypothesis; the water fix at the warp may be avoided, not repaired --
@@ -403,7 +403,12 @@ a local chart (the world's width by 48 m, scrolling) in a 128 x 96 box; the bann
 two-line how-to is balanced. **D0426 executed (D0429).** **Stranger 6 (D0431):** ore 2.5 s, ingots 7-9 s
 (the fastest); the wood rung opened 13 m from the tree, past the ring's ten-metre search; the search now
 reaches the screen's half-width and is paid across frames. Six runs: the front has moved to the wood
-rung and the chimney. **D0432:** every airborne source occluded like the lamp; seams exempt.
+rung and the chimney. **D0432:** every airborne source occluded like the lamp; seams exempt. **D0433:**
+the target ring tightens as the body arrives. The smelt how-to now says the whole stack goes in (stranger
+6's first hesitation). **Strangers 7-9 (D0434)** ran in parallel on 3cf6a5bd with three missions (uncoached; wood;
+down and back): all three ended 51 m down the chimney; eight of nine have. T031 TAKEN provisionally: two
+metres of clay cap the mouth in the tutorial start. The drop's TOO FAR flashes the machine it fell short
+of; the GRAPPLE lesson says POINT; the smelt how-to says the whole stack goes in.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -426,7 +431,7 @@ and 8 of the integration pass, Astra's audit order through item 5, and five stra
 
 **The director's calls:** play the opening (`godot --path .`: the tree stands six metres left of spawn,
 the forge's ring stays for the rung, a floor drop docks DROPPED, the lamp lights faces in the deep);
-T031 (the chimney at +14 m has taken three of five strangers; the mechanism is the keepout clamp); T032
+T031 (taken provisionally in D0434: the chimney capped; overrule by deleting two record lines); T032
 (four ring kinds); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
 at zero; the forks T024-T030.
 

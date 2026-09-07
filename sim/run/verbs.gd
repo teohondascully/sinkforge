@@ -38,8 +38,12 @@ var auto_pickup: bool = true
 var pending_winch_head: Vector2i = NONE
 var _drop_grace: Dictionary = {}       # logic_cell -> ticks remaining
 ## Where the last drop went (D0428): &"fed" into a machine's mouth, &"floor" to a pile or the sink, &""
-## when nothing left the pack. A view reads it to say so; the sim does not.
+## when nothing left the pack. A view reads it to say so; the sim does not. `last_drop_short` is the
+## nearest machine that WOULD have eaten the stack had the body stood beside it, when a floor drop had one
+## within FAR_EATER_M (D0434): the drop's own TOO FAR, drawn on the machine.
 var last_drop: StringName = &""
+var last_drop_short: Vector2i = NONE
+const FAR_EATER_M: int = 12
 
 
 func _init(p_world: World, p_items: Items, p_machines: Machines, p_body: Body) -> void:
@@ -148,6 +152,7 @@ func _place(logic_cell: Vector2i) -> StringName:
 ## that is not solid, else straight down your own column. Returns the units that left the pack.
 func drop() -> int:
 	last_drop = &""
+	last_drop_short = NONE
 	var item: StringName = selected_item()
 	if item == &"":
 		return 0
@@ -165,7 +170,25 @@ func drop() -> int:
 	if dropped > 0:
 		_drop_grace[items.last_drop_landing] = DROP_GRACE_TICKS
 		last_drop = &"floor"
+		last_drop_short = nearest_eater_in_sight(item)
 	return dropped
+
+
+## The nearest machine within FAR_EATER_M that eats `item`, reach or no reach; NONE when there is none.
+func nearest_eater_in_sight(item: StringName) -> Vector2i:
+	var best: Vector2i = NONE
+	var best_d: int = -1
+	var limit: int = FAR_EATER_M * Aim.LOGIC_FX
+	for m: MachineState in machines.machines:
+		if not Machines.machine_eats(m, item):
+			continue
+		var d: int = _dist_sq_to_metre(m.logic_cell)
+		if d > limit * limit:
+			continue
+		if best_d < 0 or d < best_d:
+			best_d = d
+			best = m.logic_cell
+	return best
 
 
 ## The nearest machine in reach that would consume `item`, or null; ties by distance, so a wall of

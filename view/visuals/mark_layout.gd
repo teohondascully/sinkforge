@@ -21,7 +21,18 @@ static func build(o: Interface.Observation, t: float, look: MaterialLook) -> Arr
 	_aim(o, t, look, out)
 	_feed(o, t, out)
 	_hint(o, t, out)
+	_short(o, out)
 	return out
+
+
+## THE DROP'S OWN TOO FAR (D0434): a stack dropped with a machine in sight that would have eaten it had the
+## body stood beside it flashes that machine in the refusal's grammar -- the red square and the bar -- for
+## the half second the observation holds the cell. Three strangers pressed DROP from the adit six metres
+## from a forge they could see; the tick said "-7 ore" and nothing named the forge.
+static func _short(o: Interface.Observation, out: Array[Dictionary]) -> void:
+	if o.drop_short_cell == NONE:
+		return
+	refusal(MarkPainter.mark_rect(MarkPainter.logic_rect(o.drop_short_cell)), 1.0, out)
 
 
 ## The painted dig plan: every marked cell wears a whisper of amber fill, and the plan's OUTLINE breathes

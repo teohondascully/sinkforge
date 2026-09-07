@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_standing_in_your_own_way_is_a_refusal_with_a_hint()
 	_test_a_machine_under_the_aim_pulses_in_its_colour()
 	_test_the_drop_lights_the_mouth_it_feeds()
+	_test_a_drop_that_falls_short_flashes_the_machine_it_missed()
 	_test_the_rope_previews_its_unroll()
 	_test_the_dig_plan_outlines_its_region()
 	await _test_paint_runs_on_a_real_view()
@@ -226,6 +227,26 @@ func _test_the_drop_lights_the_mouth_it_feeds() -> void:
 	_hold(&"drill", 1)
 	var d: Interface.Observation = _aim(Vector2i(34, 101))
 	_check(d.feed_target == NONE, "holding something no machine eats lights nothing")
+
+
+## D0434 (strangers 3, 5 and 7): a stack dropped six metres from a forge fell at the feet; the tick said
+## "-7 ore" and nothing named the forge. The observation names the machine the drop fell short of, and the
+## layout draws the refusal's square and bar on it while the name holds.
+func _test_a_drop_that_falls_short_flashes_the_machine_it_missed() -> void:
+	var o: Interface.Observation = Interface.Observation.new()
+	var quiet: int = _kinds(MarkLayout.build(o, 0.0, MaterialLook.new()), &"bar").size()
+	o.drop_short_cell = Vector2i(12, 24)
+	var marks: Array[Dictionary] = MarkLayout.build(o, 0.0, MaterialLook.new())
+	var bars: Array[Dictionary] = _kinds(marks, &"bar")
+	var squares: Array[Dictionary] = _kinds(marks, &"square")
+	var cell: Rect2 = MarkPainter.mark_rect(MarkPainter.logic_rect(Vector2i(12, 24)))
+	var on_cell: int = 0
+	for sq: Dictionary in squares:
+		if (sq["rect"] as Rect2).is_equal_approx(cell) and (sq["color"] as Color).r > 0.8 and (sq["color"] as Color).g < 0.5:
+			on_cell += 1
+	_check(bars.size() == quiet + 1 and on_cell == 1, "the missed forge wears the refusal's red square and its bar (%d squares on it, %d bars)" % [on_cell, bars.size()])
+	o.drop_short_cell = Vector2i(-1, -1)
+	_check(_kinds(MarkLayout.build(o, 0.0, MaterialLook.new()), &"bar").size() == quiet, "and nothing once the name is gone")
 
 
 func _test_the_rope_previews_its_unroll() -> void:

@@ -35,6 +35,13 @@ fixtures:
   # between spawn and the shaft because its trees were walk-through; this world's are solid, so it stands
   # at -6, on the pad past the forge pocket, off the adit's path and on the side away from the shaft.
   - {kind: tree, dx: -6, trunk_m: 2}
+  # THE CHIMNEY'S CAP (T031 taken provisionally, D0434). The site's first sinkhole mouth stands at +14 m --
+  # a one-metre chimney 45 m deep, two metres past the pad, put there by the keepout clamp
+  # (vertical_passes.gd) -- and six of eight strangers walked into it before the third rung. Two metres of
+  # clay over its mouth: the descent is a dig, not a blind fall, and the world beneath is untouched. Off
+  # the pad by design (`off_pad` exempts it from the pad-width pin). Delete these two lines to reverse.
+  - {kind: solid, dx: 14, dy: 0, material: clay, off_pad: true}
+  - {kind: solid, dx: 14, dy: 1, material: clay, off_pad: true}
   # The bootstrap forge pocket (MINESHAFT_FORGE_CELL 46): a shallow one-deep well off the drill shaft.
   - {kind: open, cells: [[-3, 0], [-3, 1]]}
   - {kind: solid, dx: -3, dy: 2, material: clay, deposit: 0}

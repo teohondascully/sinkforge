@@ -46,6 +46,8 @@ func _test_the_pad_the_spawn_and_the_start_agree() -> void:
 		% [spawn, int(_site["relief"]["pad_centre_m"]), int(start["spawn_col_m"])])
 	var reach: int = 0
 	for f: Dictionary in start.get("fixtures", []):
+		if bool(f.get("off_pad", false)):
+			continue   # the chimney's cap stands beyond the pad by design (D0434)
 		if f.has("dx"):
 			reach = maxi(reach, absi(int(f["dx"])))
 		for cell: Array in f.get("cells", []):

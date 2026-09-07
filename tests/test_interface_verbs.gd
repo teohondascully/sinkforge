@@ -80,6 +80,32 @@ func _test_every_verb_command_answers_with_a_detail_or_a_named_reason() -> void:
 	_check(iface.apply(Command.link_winch(Vector2i(4, 9))).detail == &"armed" and _oracle().winch_armed == Vector2i(4, 9), "link arms the head, and the observation shows the armed cell")
 	_check(iface.apply(Command.link_winch(Vector2i(3, 9))).detail == &"linked" and _oracle().winch_routes[Vector2i(4, 9)] == Vector2i(3, 9), "and commits the route")
 	_check(str(Command.build(Vector2i(1, 2))) == "Build(1,2)" and str(Command.select(2)) == "Select(2)" and str(Command.drop()) == "Drop(0,0)", "commands print as their own rejection reasons")
+	_short_drop_pins()
+
+
+## D0434: a drop that falls short of a machine in sight names that machine for DROP_SHORT_TICKS, so the mark
+## can flash it in the refusal's grammar; a drop with no eater around names nothing.
+func _short_drop_pins() -> void:
+	_rig()
+	items.pack.add(&"ore", 3)
+	items.produced(&"ore", 3)
+	iface.apply(Command.select(0))
+	iface.apply(Command.drop())
+	_check(_oracle().drop_short_cell == Vector2i(-1, -1), "a floor drop with no machine in sight names no machine")
+	items.pack.add(&"ore", 3)
+	items.produced(&"ore", 3)
+	world.set_solid(Vector2i(11, 9), &"")
+	machines.place(world, MachineDef.of(&"processor"), Vector2i(11, 9))   # six metres right: in sight, out of the 3.2 m reach
+	iface.apply(Command.select(0))
+	var r: Interface.Result = iface.apply(Command.drop())
+	var o: Interface.Observation = _oracle()
+	_check(r.ok and o.drop_went == &"floor" and o.drop_short_cell == Vector2i(11, 9), "the stack fell to the floor and the forge six metres off is named as what it fell short of (%s)" % o.drop_short_cell)
+	for _i: int in Interface.DROP_SHORT_TICKS - 2:
+		iface.apply(Command.move(InputFrame.new()))
+	_check(_oracle().drop_short_cell == Vector2i(11, 9), "the name holds through the flash")
+	for _i: int in 4:
+		iface.apply(Command.move(InputFrame.new()))
+	_check(_oracle().drop_short_cell == Vector2i(-1, -1), "and is gone after DROP_SHORT_TICKS")
 
 
 func _test_the_mine_hold_rides_the_move_frame() -> void:

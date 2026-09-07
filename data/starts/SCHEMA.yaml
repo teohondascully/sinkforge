@@ -7,7 +7,8 @@ fields:
   spawn_col_m: {required: false, type: int}
   # The fixtures, stamped IN FILE ORDER. Each is a dict with a `kind` and the fields that kind reads;
   # every cell is `dx`/`dy` in METRES from (spawn_col_m, the surface row), dy positive DOWN.
-  #   solid   dx dy material deposit   -- a metre of `material`; `deposit` per 4 px cell (16 to the metre)
+  #   solid   dx dy material deposit   -- a metre of `material`; `deposit` per 4 px cell (16 to the metre);
+  #                                      `off_pad: true` marks a fixture deliberately beyond the pad (D0434)
   #   open    cells: [[dx, dy], ...]   -- excavate whole metres (walls stay: the hole reveals them)
   #   room    dx dy w h [floor]        -- a w x h rectangle of open metres from (dx, dy), and when `floor`
   #                                      names a material, the row under it solid in that material (D0407)
