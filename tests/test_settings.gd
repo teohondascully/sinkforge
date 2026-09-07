@@ -19,6 +19,7 @@ const SCRATCH_PATH: String = "user://test_settings_scratch.cfg"
 func _initialize() -> void:
 	_test_the_two_halves_share_one_bindings_map()
 	_test_persist_false_writes_no_file_at_all()
+	_test_force_mute_wins_over_the_file_and_is_not_written()
 	_test_audio_levels_are_dB_offsets_with_full_meaning_zero()
 	_test_level_resolves_every_row_the_page_draws()
 	_test_event_labels_are_unique_because_collision_detection_compares_them()
@@ -62,6 +63,30 @@ func _test_persist_false_writes_no_file_at_all() -> void:
 		"CONTROL: with persist=true the same call DOES write, so the line above measures the gate and not a broken writer (file exists: %s)" % wrote_now)
 	if wrote_now:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SCRATCH_PATH))
+	Settings.persist = was_persist
+	Settings.path = was_path
+
+
+## D0437: a scripted boot's --muted mutes the Master bus whatever the file says, and the file keeps its word.
+func _test_force_mute_wins_over_the_file_and_is_not_written() -> void:
+	var was_persist: bool = Settings.persist
+	var was_path: String = Settings.path
+	var was_muted: bool = Settings.muted
+	Settings.persist = true
+	Settings.path = SCRATCH_PATH
+	Settings.muted = false
+	Settings.save_settings()                       # a file that says unmuted
+	Settings.persist = false
+	Settings.load_settings()
+	_check(not Settings.muted and not AudioServer.is_bus_mute(0), "control: the file says unmuted and the bus follows it (muted %s, bus %s)" % [Settings.muted, AudioServer.is_bus_mute(0)])
+	Settings.load_settings(true)
+	_check(Settings.muted and AudioServer.is_bus_mute(0), "load_settings(true) mutes the bus over the file's word (muted %s, bus %s)" % [Settings.muted, AudioServer.is_bus_mute(0)])
+	var cfg := ConfigFile.new()
+	cfg.load(SCRATCH_PATH)
+	_check(not bool(cfg.get_value("audio", "muted", true)), "...and the file still says unmuted: the flag is this boot's, never saved")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCRATCH_PATH))
+	Settings.muted = was_muted
+	Settings.apply_audio()
 	Settings.persist = was_persist
 	Settings.path = was_path
 

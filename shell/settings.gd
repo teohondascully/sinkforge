@@ -46,8 +46,10 @@ static var persist: bool = false                     ## gate: load/save only whe
 static var path: String = "user://settings.cfg"      ## overridable so a test can isolate its file
 
 
-## Load the config, keeping defaults when the file is missing, and apply everything live.
-static func load_settings() -> void:
+## Load the config, keeping defaults when the file is missing, and apply everything live. `force_mute`
+## is a scripted boot's `--muted` (D0437): the bus off for this process, whatever the file said, and the
+## file is not written (`persist` is off on every boot that passes it).
+static func load_settings(force_mute: bool = false) -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(path) == OK:
 		muted = bool(cfg.get_value("audio", "muted", muted))
@@ -61,6 +63,8 @@ static func load_settings() -> void:
 		bindings = {}
 		for key: String in cfg.get_section_keys("bindings") if cfg.has_section("bindings") else []:
 			bindings[StringName(key)] = cfg.get_value("bindings", key)
+	if force_mute:
+		muted = true
 	apply_audio()
 	# Reconciled before it is applied (see `_reconcile_bindings`), so InputMap never holds a duplicate that
 	# came in on disk, not even for the two lines between here and there.
