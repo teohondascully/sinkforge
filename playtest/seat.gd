@@ -210,7 +210,9 @@ func _state_now() -> Dictionary:
 	var pack: Dictionary = {}
 	for item: Variant in now.get("pack", {}):
 		pack[String(item)] = int((now["pack"] as Dictionary)[item])
-	return {"rung": String(now.get("rung", &"")), "progress": String(now.get("progress", "")), "pack": pack, "lesson": String(now.get("lesson", &""))}
+	var f: Frame = game.view.current_frame()
+	var cell: Array = [f.obs.cell.x, f.obs.cell.y] if f != null and f.obs != null else []
+	return {"rung": String(now.get("rung", &"")), "progress": String(now.get("progress", "")), "pack": pack, "lesson": String(now.get("lesson", &"")), "cell": cell}
 
 
 ## The process's nice value as the OS reports it (macOS: 5 under a background clamp, 0 foreground); -1

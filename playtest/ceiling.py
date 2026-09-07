@@ -84,17 +84,24 @@ def main():
     results["ingots"] = rung(session, "ingots", 8, smelt)
     if results["ingots"] is None:
         return 1
-    # Rung 3: the tree at dx -6 (a two-metre trunk above the surface). Walk to dx -4.5 and hold on the
-    # trunk's middle, a metre and a half left, a metre up.
-    burst(session, {"ticks": 20, "keys": ["A"]}, "ceiling: walk to the tree")
-    trunk = [BODY_X - 1.5 * PX_PER_M, FEET_Y - 1.0 * PX_PER_M]
+    # Rung 3: the tree at dx -6 m of the spawn (a two-metre trunk above the surface, two cells wide). Walk
+    # left until the body's cell is within a reach of the trunk, then aim by cell: the receipts carry the
+    # body's terrain cell, and the screen is 6.4 px a cell around the body at rest.
+    trunk_cell_x = 130 - 6 * 4 + 2                                # the spawn column's cell 130; the trunk's right cell
+    resp = burst(session, {"ticks": 12, "keys": ["A"]}, "ceiling: walk to the tree")
+    body_cell = (resp.get("state") or {}).get("cell") or [130, 75]
+    while body_cell[0] - trunk_cell_x > 8:
+        resp = burst(session, {"ticks": 4, "keys": ["A"]}, "ceiling: a step nearer the tree")
+        body_cell = (resp.get("state") or {}).get("cell") or body_cell
+    px_per_cell = PX_PER_M / 4.0
+    trunk = [BODY_X + (trunk_cell_x + 0.5 - (body_cell[0] + 0.5)) * px_per_cell, FEET_Y - 3.5 * px_per_cell]
 
     def wood(i):
         resp = burst(session, {"ticks": 120, "mouse": trunk, "buttons": [1], "until": "event"}, "ceiling: hold MINE on the trunk")
         if pack(resp, "wood") >= 1:
             return resp, True
-        if i % 2 == 1:                                          # re-aim a little lower each miss
-            trunk[1] += 0.3 * PX_PER_M
+        if resp.get("refusal") == "air":                        # a cell off the trunk: try one cell left
+            trunk[0] -= px_per_cell
         return resp, False
     results["wood"] = rung(session, "wood", 12, wood)
     burst(session, {"quit": True}, "ceiling: done")
