@@ -244,7 +244,8 @@ the aim square's own ring when the pointer rests on a lode. The third stranger's
 which ring the lesson meant. *Question: does the target ring want a distinct FORM -- brackets, a
 reticle, ticks at the compass points -- rather than only a distinct ink?*
 
-**T033 · The machine's held count and progress bar are eight pixels tall at play zoom.** Stranger 8 fed
+**T033 · The machine's held count and progress bar are eight pixels tall at play zoom.** *TAKEN (D0442): the
+second option -- the arrival tick reads "+1 ingot · 2 more". The badge and bar are as they were.* Stranger 8 fed
 seven ore, took the first ingot and walked off to look for the second; the forge wore a "5" badge and a
 filling bar the whole time (frame 7 of run 8), drawn at legacy's chrome scale on a one-metre face. *Question:
 a larger badge on the machine you stand beside, a "5 more" line in the arrival tick ("+1 ingot, 2 more

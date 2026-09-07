@@ -60,9 +60,36 @@ static func losses_between(prev: Dictionary, now: Dictionary) -> Array[Dictionar
 	return out
 
 
-## What a tick says: the signed count and the item's name in lower case ("+7 ore", "-1 drill").
-static func label_of(item: StringName, count: int, loss: bool) -> String:
-	return "%s%d %s" % ["-" if loss else "+", count, Hotbar.item_label(item).to_lower()]
+## What a tick says: the signed count and the item's name in lower case ("+7 ore", "-1 drill"), and for a
+## gain a machine beside the body is still working on, how many more are coming ("+1 ingot · 2 more").
+static func label_of(item: StringName, count: int, loss: bool, more: int = 0) -> String:
+	var base: String = "%s%d %s" % ["-" if loss else "+", count, Hotbar.item_label(item).to_lower()]
+	return base if loss or more <= 0 else "%s · %d more" % [base, more]
+
+
+## THE TICK SAYS WHAT IS STILL COMING (T033, D0442; stranger 8 fed seven ore, took the first ingot and
+## walked off to look for the second). For a gained `item`, the units the machines within the collect
+## reach of the body still owe: what sits in their output buffers plus what their held inputs will make,
+## by their recipe. The machine's own badge is eight pixels at play zoom; the tick at the head is legible.
+static func coming(o: Interface.Observation, item: StringName) -> int:
+	var body := Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
+	var more: int = 0
+	for rec: Dictionary in o.machines:
+		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+		if at.distance_to(body) > float(Interface.Observation.REACH_PX):
+			continue
+		more += int((rec.get("output", {}) as Dictionary).get(item, 0))
+		var recipe: Dictionary = RecipesRecords.RECORDS.get(String(rec.get("recipe", &"")), {})
+		var out_n: int = int((recipe.get("outputs", {}) as Dictionary).get(item, 0))
+		if out_n <= 0:
+			continue
+		var batches: int = -1
+		for need: Variant in (recipe.get("inputs", {}) as Dictionary):
+			var held: int = int((rec.get("input", {}) as Dictionary).get(StringName(String(need)), 0))
+			var per: int = maxi(int((recipe["inputs"] as Dictionary)[need]), 1)
+			batches = held / per if batches < 0 else mini(batches, held / per)
+		more += maxi(batches, 0) * out_n
+	return more
 
 
 static func pack_counts(o: Interface.Observation) -> Dictionary:
@@ -75,17 +102,18 @@ static func pack_counts(o: Interface.Observation) -> Dictionary:
 
 ## Bank a gain of `count` × `item` at `pos` (legacy px), merging into a recent nearby tick of the same
 ## item and sign when there is one.
-func gain(pos: Vector2, item: StringName, count: int = 1, loss: bool = false) -> void:
+func gain(pos: Vector2, item: StringName, count: int = 1, loss: bool = false, more: int = 0) -> void:
 	if count <= 0:
 		return
 	for q: Dictionary in _t:
 		if q["item"] == item and bool(q["loss"]) == loss and float(q["age"]) < MERGE_AGE and Vector2(q["pos"]).distance_to(pos) < MERGE_RADIUS:
 			q["count"] = int(q["count"]) + count
+			q["more"] = more                         # the latest word on what is still coming
 			q["age"] = 0.0                          # re-pop it: the count changed, so re-read it
 			return
 	if _t.size() >= MAX:
 		return
-	_t.append({"pos": pos, "item": item, "count": count, "age": 0.0, "loss": loss})
+	_t.append({"pos": pos, "item": item, "count": count, "age": 0.0, "loss": loss, "more": more})
 
 
 ## A loss of `count` × `item`: the same tick, signed the other way.
@@ -118,7 +146,7 @@ func observe_frame(frame: Frame) -> void:
 	if _primed:
 		var hand := Vector2(float(o.hand.x) / float(Fx.SCALE), float(o.hand.y) / float(Fx.SCALE)) / SCALE
 		for g: Dictionary in gains_between(_prev_pack, now):
-			gain(hand, g["item"], int(g["count"]))
+			gain(hand, g["item"], int(g["count"]), false, coming(o, g["item"]))
 		for g: Dictionary in losses_between(_prev_pack, now):
 			lose(hand, g["item"], int(g["count"]))
 	_prev_pack = now
@@ -143,7 +171,7 @@ func draw(canvas: CanvasItem) -> void:
 	for q: Dictionary in _t:
 		var t: float = clampf(float(q["age"]) / LIFE, 0.0, 1.0)
 		var loss: bool = bool(q.get("loss", false))
-		var label: String = label_of(q["item"], int(q["count"]), loss)
+		var label: String = label_of(q["item"], int(q["count"]), loss, int(q.get("more", 0)))
 		var w: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
 		var span: float = PIP_R * 2.0 + 3.0 + w
 		var origin: Vector2 = Vector2(q["pos"]) - Vector2(span * 0.5, RISE * (1.0 - pow(1.0 - t, 2.2)))

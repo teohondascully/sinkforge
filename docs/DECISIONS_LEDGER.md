@@ -17929,3 +17929,19 @@ gone; a world wider than 64 m shows 64 m of it, as the corner does.
 **Why:** the game is vertical; a chart that is 63 px wide cannot show a shaft.
 
 **Reverse cost:** LARGE_BOX and one line in `layout`.
+
+## D0442 · 2026-09-06 · The arrival tick says what is still coming (T033 taken: the second option)
+
+**Decided:** stranger 8 fed seven ore, took the first ingot and walked off to look for the second; the
+forge wore a "5" badge and a filling bar the whole time, eight pixels tall at play zoom (T033). Of T033's
+three options -- a larger badge, a remainder on the arrival tick, or leave it to the ring -- the tick: it is
+drawn at the head in legible type at the moment the player is deciding whether to wait. `Payouts.coming(o,
+item)` sums, over the machines within the collect reach of the body, the item in their output buffers plus
+what their held inputs will make by their recipe (whole batches, the scarcest input bounding); the tick
+reads "+1 ingot · 2 more". Nothing on a loss, nothing for a machine out of reach or short of a batch.
+Pinned in `test_payouts` (35). The badge and bar are unchanged.
+
+**Why:** the number the player needs is "how many more", not "how many inside", and the one legible
+surface at that moment is the tick.
+
+**Reverse cost:** one static function and an optional argument.

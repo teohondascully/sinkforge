@@ -67,8 +67,12 @@ func _test_the_cap_and_the_retirement() -> void:
 
 
 func _frame(t: float, pack: Array) -> Frame:
+	return _frame_with(t, pack, Interface.Observation.new())
+
+
+func _frame_with(t: float, pack: Array, obs: Interface.Observation) -> Frame:
 	var f: Frame = Frame.new()
-	f.obs = Interface.Observation.new()
+	f.obs = obs
 	var typed: Array[Dictionary] = []
 	for s: Dictionary in pack:
 		typed.append(s)
@@ -130,6 +134,7 @@ func _test_a_loss_is_a_named_signed_tick_that_never_merges_with_a_gain() -> void
 	_check(Payouts.losses_between({}, {&"stone": 3}).is_empty() and Payouts.losses_between({&"stone": 3}, {&"stone": 3}).is_empty(), "a rise and no change are not losses")
 	_check(Payouts.label_of(&"ore", 7, false) == "+7 ore" and Payouts.label_of(&"ore", 7, true) == "-7 ore", "the label is signed and named (%s / %s)" % [Payouts.label_of(&"ore", 7, false), Payouts.label_of(&"ore", 7, true)])
 	_check(Payouts.label_of(&"drill", 1, true) == "-1 drill", "a machine item takes its record's display name, lowered (%s)" % Payouts.label_of(&"drill", 1, true))
+	_coming_pins()
 	var p: Payouts = Payouts.new()
 	p.gain(Vector2(0, 0), &"ore", 7)
 	p.lose(Vector2(0, 0), &"ore", 7)
@@ -144,3 +149,29 @@ func _test_a_loss_is_a_named_signed_tick_that_never_merges_with_a_gain() -> void
 		q.observe_frame(_frame(0.2 + 0.1 * float(i), []))
 	q.observe_frame(_frame(1.3, [{"item": &"ore", "count": 7}]))
 	_check(q.size() == 1, "re-collected after the grace: the loss has retired and the gain is its own tick (%d)" % q.size())
+
+
+## T033 (D0442, stranger 8): the arrival tick says how many more the forge beside you still owes -- its
+## output buffer plus what its held ore will smelt by the recipe -- and nothing when the machine is out of
+## the collect reach, holds too little for a batch, or the tick is a loss.
+func _coming_pins() -> void:
+	var f: Frame = _frame(0.0, [])
+	var o: Interface.Observation = f.obs
+	o.pos_x = 10 * 16 * S
+	o.pos_y = 10 * 16 * S
+	var forge: Dictionary = {"cell": Vector2i(11, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {&"ore": 5}, "output": {&"ingot": 1}}
+	var far: Dictionary = {"cell": Vector2i(30, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {&"ore": 8}, "output": {}}
+	var typed: Array[Dictionary] = [forge, far]
+	o.machines = typed
+	_check(Payouts.coming(o, &"ingot") == 3, "five ore held and one ingot waiting in the forge a metre off: 2 + 1 = %d more coming; the forge twenty metres off counts nothing" % Payouts.coming(o, &"ingot"))
+	_check(Payouts.coming(o, &"ore") == 0, "ore is the forge's input, not its output: nothing coming")
+	forge["input"] = {&"ore": 1}
+	forge["output"] = {}
+	_check(Payouts.coming(o, &"ingot") == 0, "one ore is short of a two-ore batch: nothing coming")
+	_check(Payouts.label_of(&"ingot", 1, false, 2) == "+1 ingot · 2 more" and Payouts.label_of(&"ingot", 1, false, 0) == "+1 ingot" and Payouts.label_of(&"ore", 7, true, 2) == "-7 ore",
+		"the label carries the remainder on a gain only (%s)" % Payouts.label_of(&"ingot", 1, false, 2))
+	var p: Payouts = Payouts.new()
+	forge["input"] = {&"ore": 4}
+	p.observe_frame(f)
+	p.observe_frame(_frame_with(0.016, [{"item": &"ingot", "count": 1}], o))
+	_check(p.size() == 1 and int((p._t[0] as Dictionary)["more"]) == 2, "an ingot arriving beside a forge holding four ore ticks with 2 more (%s)" % [p._t])
