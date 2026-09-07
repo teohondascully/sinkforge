@@ -17726,3 +17726,14 @@ a torch-lit room with three torches is six cuts.
 **Why:** a rule that holds for the lamp and not the torch on the wall beside it is a rule the eye catches.
 
 **Reverse cost:** one lane and one multiply.
+
+## D0433 · 2026-09-06 · The target ring tightens as the body arrives
+
+**Decided:** D0423 named the wood ring sitting on the miner's own chest when the trunk stood beside the
+body. `TargetGuide.ring_m`: within 1.5 m of the target the ring draws at 0.35 m, growing back to its 0.9 m
+by 3.5 m, so the pointer yields the body once the body is there and the aim square carries the rest.
+Pinned in `test_tutorial_teaching`.
+
+**Why:** a pointer is for the distance; at arm's length it is in the way.
+
+**Reverse cost:** one lerp.

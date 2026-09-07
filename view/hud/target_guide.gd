@@ -26,6 +26,12 @@ const VISITS_PER_FRAME: int = 4000     ## about 2 ms of predicate calls, D0414's
 ## pointer that does not read is cheap: it stays for the rung's life at this floor, full while the how-to
 ## is up. A ring a stranger has stopped needing is one ring; a rung with no pointer is a stranger lost.
 const RING_FLOOR: float = 0.38
+## THE RING TIGHTENS AS YOU ARRIVE (D0433; D0423 named it): a 0.9 m ring on a trunk the body stands beside
+## sat on the miner's own chest. Within NEAR_M of the target it draws at RING_NEAR_M, growing back to RING_M
+## by FAR_M, so the pointer yields the body once the body is there and the aim square takes over.
+const RING_NEAR_M: float = 0.35
+const NEAR_M: float = 1.5
+const FAR_M: float = 3.5
 
 ## THE SEARCH IS PAID ONCE PER CELL MOVED, NOT PER FRAME (D0414). The first cut scanned the full 81x81
 ## window through a Callable every rendered frame: 3 ms, forty per cent of the 120 Hz budget, the largest
@@ -181,9 +187,16 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	if not Rect2(Vector2.ZERO, UiTheme.CANVAS).has_point(canvas):
 		return
 	var breath: float = 0.55 + 0.45 * sin(frame.anim_time * TAU * BREATH_HZ)
-	var r: float = RING_M * float(o_px_per_m(frame)) * (0.92 + 0.08 * breath)
+	var body: Vector2 = Vector2(float(frame.obs.pos_x), float(frame.obs.pos_y)) / float(Fx.SCALE)
+	var r: float = ring_m(body.distance_to(at) / float(Interface.Observation.LOGIC_PX)) * float(o_px_per_m(frame)) * (0.92 + 0.08 * breath)
 	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(INK, alpha * (0.45 + 0.4 * breath)), RING_WIDTH, true)
 	ci.draw_arc(canvas, r * 0.55, 0.0, TAU, 24, Color(INK, alpha * 0.25 * breath), 1.0, true)
+
+
+## The ring's radius in metres for a target `dist_m` from the body: tight when the body has arrived, full
+## from FAR_M out.
+static func ring_m(dist_m: float) -> float:
+	return lerpf(RING_NEAR_M, RING_M, clampf((dist_m - NEAR_M) / (FAR_M - NEAR_M), 0.0, 1.0))
 
 
 ## The ring's alpha: the how-to's while it is up, never below RING_FLOOR while the rung is open; nothing

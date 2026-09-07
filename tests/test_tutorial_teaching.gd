@@ -163,3 +163,6 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 		seen = g2._cached_target(&"wood", o)
 		frames += 1
 	_check(seen == whole and frames >= 1 and frames <= 12, "the chip's frame-budgeted walk shows the ring within %d frames" % frames)
+	# D0433: the ring tightens as the body arrives, so it never sits on the miner's chest.
+	_check(is_equal_approx(TargetGuide.ring_m(0.5), TargetGuide.RING_NEAR_M) and is_equal_approx(TargetGuide.ring_m(6.0), TargetGuide.RING_M) and TargetGuide.ring_m(2.5) > TargetGuide.RING_NEAR_M and TargetGuide.ring_m(2.5) < TargetGuide.RING_M,
+		"the ring is %.2f m beside the target, %.2f m far off, between in between" % [TargetGuide.ring_m(0.5), TargetGuide.ring_m(6.0)])
