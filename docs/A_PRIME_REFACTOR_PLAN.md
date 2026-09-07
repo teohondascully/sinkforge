@@ -1,5 +1,9 @@
 # A′ refactor plan — lift legacy's sim hub onto the substrate, then finish the game
 
+Navigation update, 2026-09-07: this document preserves the approved port decision and source mappings.
+Use [WORKING](WORKING.md) and [BACKLOG](BACKLOG.md) for current execution. Completed steps below
+must not be replayed; the unfinished economy work still requires its stated scope.
+
 **Status:** normative execution plan, written 2026-09-03 on the director's approval of
 `docs/FLIP_ANALYSIS_2026-09-02.md`'s recommendation. **Execution began 2026-09-03: step 0 done (D0343),
 step 2 done (D0344), step 1 ruled (D0345). Each step in §4 carries a status line; a step with none has not

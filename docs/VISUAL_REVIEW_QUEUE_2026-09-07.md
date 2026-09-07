@@ -1,5 +1,8 @@
 # Sinkforge visual review queue — 2026-09-07
 
+Status: review candidates, not approved tasks. [BACKLOG](BACKLOG.md) owns execution routing.
+Revalidate against the current build and director rulings, particularly conflicting hotbar proposals.
+
 This is a review queue, not a claim that every item should ship. It was made from five fresh captures on the current head: surface boot, horizon, shallow underground, close aim, and active mining. The captures were used as inspection evidence and are not canonical milestone art.
 
 ## Immediate testing-loop queue

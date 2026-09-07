@@ -1,123 +1,32 @@
-# CONTEXT
+# Project context
 
-**Read this first, every session, before anything else.** If you read only one file in this repository, read this one. It is kept short deliberately — `wc -l CONTEXT.md` is the number, not a figure written here to go stale; if it's grown noticeably, something belongs in `docs/` instead.
+Status: current orientation, 2026-09-07.
 
----
+Sinkforge is a persistent 2D excavation and factory game with reproducible agent playtesting.
+The current game includes traversal, mining, machines, transport, water, saves, and presentation.
+The surface-rig demand economy remains planned. See [README](README.md) for implemented scope,
+[current work](docs/WORKING.md) for execution state, and [the backlog](docs/BACKLOG.md) for task routing.
 
-## What this is
+## Sources of truth
 
-**Sinkforge is a factory game with a persistent underground shaft and an idle game's progression curve.** 2D, side-view, vertical.
+- [GDD](docs/GDD.md): intended design and ruled constraints.
+- [Architecture](docs/ARCHITECTURE.md): module boundaries and engineering contracts.
+- [Quality](docs/QUALITY.md): verification policy.
+- [Contributing](CONTRIBUTING.md): commands and setup.
+- [Ledger](docs/DECISIONS_LEDGER.md) and [ADRs](docs/adr/README.md): decisions and rationale.
+- [Documentation guide](docs/README.md): status and reference navigation.
 
-The player bores a shaft from a permanent surface rig, builds extraction and routing infrastructure inside it, and hauls refined material back up to satisfy demands waiting at the rig. There is no reset: the shaft is the same one the player started on, deeper and more built-out than it was an hour ago. Satisfying a demand unlocks the next capability, which is what lets the shaft go deeper still. One shaft, one permanent rig — the shaft is where the factory lives, the rig is the standing consumer that makes building it necessary in the first place.
+The simulation is headless GDScript running in Godot, with explicit ticks and fixed-point body math.
+`core/`, `sim/`, and `interface/` hold the computational boundary; `view/` and `shell/` supply
+presentation and application IO. The working playtest adapter is in `playtest/`.
+Replay evidence must name its build and platform; do not generalize a pinned test to all state.
 
-Three things follow that are easy to miss and expensive to get wrong:
+## Operating rules
 
-- **The terrain is the factory.** The shape you dig is the routing, independent of whether the shaft resets — an aquifer where you wanted your main chute, ore forty meters further than the last vein. What no longer holds: geology used to reshuffle every run and no longer does, since there is one shaft now. Lateral variety instead has to come from the un-mined extent of that one world; whether that's enough is an open question (`docs/GDD.md` §8).
-- **No global multipliers. Ever.** Factory games are ratio puzzles; idle games are number puzzles. Every upgrade is a new capability or a changed constraint, never a rate multiplied. See `docs/GDD.md` §2 and §5.
-- **Down is free, up is powered.** The central asymmetry. R1 below.
-- **The rig-as-consumer macro-loop needs a micro-loop underneath it.** Feeding the rig is a transaction, minutes apart; nothing was renewing interest between deliveries. Three want-layers (Reveal, Flow, Pressure) are the proposed fix — Reveal is the first one under test. `docs/GDD.md` §12.
-
-It is also, and equally, a **measurement instrument for game design**. The game is playable end to end with no renderer, so that automated agents can play it thousands of times and produce falsifiable evidence about whether the design works. Both halves are the product. Neither is a wrapper around the other.
-
-This is a portfolio centerpiece. The standard is: a senior staff engineer reads this repository for ten minutes and comes away impressed. That standard applies to the repository as an artifact, not only to the code inside it.
-
----
-
-## The one-sentence architecture
-
-**The simulation is a pure, engine-free library, deterministic within a single platform/build. Everything else, including Godot, is a client of it.** (Cross-platform bit-identical replay has a known, diagnosed gap in multiple float sites on the terrain-generation and RNG state path — corrected 2026-08-29, fix queue R5, a prior version of this line named only the cave noise; `docs/DECISIONS_LEDGER.md` D0183 enumerates all four known sites, D0171/D0172 fix not yet scheduled.)
-
-```
-L4  experiment   claims, sweeps, ablations, reports
-L3  harness      scenarios, envelopes, driver, aggregation
-L2  interface    observe() and apply(). THE ONLY DOOR into the sim.
-L1  sim          the entire game. deterministic. no engine.
-L0  core         fixed-point, seeded RNG, IDs
-
-view/ and shell/ are clients of L2, peers of the agents. Never above L1.
-```
-
-Dependency flow is one-way and lint-enforced: `L0 ← L1 ← L2 ← L3 ← L4`, with `view` and `shell` hanging off L2. Any cycle is a build failure.
-
-Two invariants carry the whole design:
-
-1. **A run must complete with no renderer.** If finishing a run needs a window, the research loop is dead.
-2. **Agents and humans enter through the same door.** Different doors make agent runs and human runs incomparable, and every number the instrument produces becomes unfalsifiable.
-
-Full detail: `docs/ARCHITECTURE.md`.
-
----
-
-## The unit of work is a claim
-
-Every design assertion in this project is a file in `claims/`: an English statement, the scenario that tests it, a metric, a threshold, the current measured value, and a status.
-
-CI runs the claims. A change that breaks one fails the build and names it. Design regressions become as visible as code regressions.
-
-**The claim corpus only grows.** Every bug a human finds becomes a scenario and stays forever.
-
-Two rules that follow from this, and they are the most important process rules in the repository:
-
-- **No harness surface without a claim it serves.** Every check must trace to a claim ID. This is the direct fix for the failure mode that produced the previous codebase, where instrumentation grew 90% in five days while the game grew 9%.
-- **Instrument LOC growth may not outpace game LOC growth.** A trailing-window velocity check
-  (`docs/QUALITY.md` gate 7, `tools/layer_lint/check_loc_ratio.py`), reported in CI. The absolute
-  instrument/game ratio is reported alongside it, not itself a gate — see gate 7's own text for why that
-  distinction is load-bearing, not a downgrade. The velocity condition **warns**; it **blocks only when
-  game LOC growth is zero** (D0259). Pace is a signal worth reading; direction is the only one worth
-  failing a build over. When it fails, the next unit of work is game.
-
-Format and workflow: `docs/CLAIMS.md`.
-
----
-
-## The four design rules
-
-These are invariants. A proposal that violates one is a design change, not an implementation detail. Push back if you find one that cannot be implemented cleanly.
-
-**R1. Down is free, up is powered.** Gravity moves material downward at zero cost, through excavated space. All upward movement consumes fuel per unit per meter, forever. Transport cost is a first-class simulated quantity, not a rate cap.
-
-**R2. Deep material is required, not more valuable.** No exponential per-unit value by depth. Tier-N upgrades require tier-N material *and* large quantities of tier-1 material. The exponential lives in quantity required.
-
-**R3. Water is continuous upkeep, not a countdown.** Groundwater seeps into every excavated section, always. Pump capacity is infrastructure, not a one-time purchase against a clock. A starved section floods and its machines are wrecked into scrap.
-
-**R4. Every tool tier removes one skill and introduces another.** Upgrades change the shape of the problem, not the numbers.
-
-Rationale, consequences, and the dead ends already ruled out: `docs/GDD.md`.
-
----
-
-## Repository map
-
-```
-CONTEXT.md            this file
-README.md             public-facing. what the project is.
-ONBOARDING.md         the session brief. paste as message one.
-claims/               one file per design assertion. the unit of work.
-core/                 L0
-sim/                  L1  (one dir per module, each with MODULE.md)
-interface/            L2
-harness/              L3
-experiment/           L4
-view/                 renderer, client of L2
-shell/                entry points, scene flow, save IO
-data/                 all content as declarative text. no binary resources.
-scenarios/            declarative test fixtures. each names a claim.
-tools/                lints, validators, report generators
-tests/                unit, property, scenario, golden
-docs/                 normative documents only. see docs/README.md
-docs/adr/             numbered decision records
-docs/archive/         superseded documents, headed and dated
-docs/BRIEF.md         this session's digest, incl. "What was learned" — findings, not a work log
-docs/WORKING.md       current state. not a log. resets when a stage closes
-docs/DECISIONS_LEDGER.md   append-only judgment calls, numbered, never edited after the fact
-history/              curated images, policy-capped at 12 — currently 168, cull left as director-action.
-                      earns its place by illustrating a finding
-legacy/               the pre-pivot codebase. read-only. excluded from build.
-```
-
-`legacy/` exists so that porting has provenance. Nothing in it is on the build path. Files leave `legacy/` one at a time, under the gates in `docs/QUALITY.md`, and the commit that moves a file says why.
-
----
+Preserve concurrent edits and historical evidence. No gameplay or verification policy changes are
+implied by documentation cleanup. Follow the user's scoped task and record unresolved decisions.
+The detailed existing operating rules below remain in force; completed implementation instructions
+and stale build summaries were removed to [a historical snapshot](docs/archive/cleanup-2026-09-07/CONTEXT.md).
 
 ## Context discipline
 
@@ -221,67 +130,3 @@ human drives it. Full detail: `docs/ARCHITECTURE.md` §6, `docs/QUALITY.md` §2.
   and the condition to meet before parallel write work starts on `sim/` or `view/`.
 
 ---
-
-## Tick order
-
-Fixed and documented. Changing it requires an ADR.
-
-```
-input → body → machines → transport → items → fluid → economy → invariants → telemetry
-```
-
-The sim advances only by explicit `tick()`. It never sees `delta`, never reads a wall clock, and never touches the engine.
-
----
-
-## Determinism
-
-Non-negotiable, because it is what makes agent testing, replay debugging, and sweeps possible at all.
-
-- Fixed timestep, 60 Hz. Rendering interpolates.
-- Fixed-point for all state-affecting positions and velocities.
-- Seeded, split RNG. One stream per subsystem. Streams are serialized state.
-- No iteration over hash maps in state-affecting code.
-- Generational-index entity IDs. Never pointers, never bare array positions.
-- Four decoupled resolutions (visual, terrain/digging, machine/logic, collision) — collision is derived from the fine terrain as an integer heightfield, never equal to the pixel grid itself. `docs/ARCHITECTURE.md` §9.
-
-`replay_determinism_test` must exist and pass from day one: run a recorded input log twice from one seed, hash state every 100 ticks, assert identical. Real subject now `tests/test_shaft_replay_determinism.gd` (gate 8) — proven WITHIN a platform (two independent processes, bit-identical); NOT yet proven ACROSS platforms, since multiple sites on the terrain-generation and RNG state path use real floats, not fixed-point (corrected 2026-08-29, fix queue R5 — a prior version of this line named only the cave noise; `docs/DECISIONS_LEDGER.md` D0183 enumerates all four known sites, D0171/D0172 — a real, diagnosed, unscheduled fix, not a design decision made here).
-
----
-
-## What agents can and cannot measure
-
-Be honest about this in every report. It is the difference between a credible instrument and a dashboard.
-
-**Can:** reachability, dominant strategies, strategy diversity, stall location and duration, softlocks, regression across systems, legibility from a rendered frame.
-
-**Cannot:** whether the game is fun. Agents do not get bored, do not misread visuals, and have no muscle memory.
-
-Any claim about engagement needs a stated proxy metric and a stated account of what that proxy misses. `experiment/calibration/` holds recorded human sessions, captured through the same L2 interface with the same telemetry schema, so proxies can be checked against real behavior instead of assumed.
-
----
-
-## Current state
-
-Pivoted from a persistent-world factory game on 2026-08-25, then pivoted again on 2026-08-27 when the
-run-based roguelite structure the first pivot adopted was itself retired, back to a persistent shaft
-(`docs/GDD.md` §9, D0076). The prior codebase is in `legacy/`, tagged `pre-pivot`; the compatibility
-audit and pivot plan in `docs/archive/` remain accurate about the code they measured — the engineering
-layers (`core/`, `sim/world`, `sim/terrain_gen`, `sim/body`) are unaffected by the second pivot,
-confirmed directly (D0076).
-
-What was found structurally absent in the prior codebase, and is therefore greenfield: session/save
-infrastructure, typed command layer, declarative scenario format, R1's transport cost model, R3's local
-flood mechanics — L2 through L4 of the instrument. Session/save shape is open again as of the second
-pivot: the run/meta split `sim/run`/`sim/meta` assumed no longer applies, and nothing replaces it yet.
-
-`claims/C001-two-minute-run.md` is RETIRED — it measured the run-based roguelite structure, which is
-retired (`docs/GDD.md` §9, `docs/DECISIONS_LEDGER.md` D0076). Start point now: `claims/C003-cold-start-reaches-d1.md`,
-BLOCKED on nearly the entire remaining build sequence (its own `blocked_on` names what's missing). It is
-the definition of done for the entire first sequence of work.
-
-**2026-09-03:** the direction question is settled and planned. `docs/FLIP_ANALYSIS_2026-09-02.md` is
-the complete-read analysis (491 of 491 code files) and `docs/A_PRIME_REFACTOR_PLAN.md` is the
-self-contained execution plan: lift legacy's `FactorySim` hub whole onto this substrate, then the views
-it unblocks, then the rig-as-consumer economy. A session executing it needs only that file, the analysis,
-and the tree. Nothing in it had been executed at the time of writing.

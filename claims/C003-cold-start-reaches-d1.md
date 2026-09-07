@@ -8,20 +8,15 @@ created: 2026-08-27
 last_measured: never
 first_failed_at: never
 scenario: scenarios/cold_start_to_d1.yaml
-blocked_on: nearly everything. No save/load code exists anywhere in the repository. No `interface/`,
-  no `harness/`, no `sim/commands` beyond a skeleton `MODULE.md`. `data/economy/` (the D1 demand itself)
-  does not exist. Determinism is now proven through a real `sim/terrain_gen`+`sim/body` run (gate 8),
-  but only WITHIN a single platform — cross-platform bit-identical replay has a known, diagnosed,
-  unfixed gap (`docs/DECISIONS_LEDGER.md` D0171/D0172). See "Why this is blocked on nearly everything"
-  below.
+blocked_on: rig demand state and delivery, D1 unlock/build costs, and an executable cold-start scenario.
 ---
 
 ## Claim
 
 A scripted agent, given no privileged information beyond what a first-time player would have, can start
 from a cold checkpoint (fresh persistent shaft, permanent rig, nothing built), and satisfy the rig's
-first demand (D1 — currently drafted, in the director's reversal brief, this session's transcript, not a
-tracked repository file — as 30 iron ingot, unlocking the drill), entirely headless, within N sim-minutes.
+first demand (D1: provisionally 30 iron ingot, unlocking the drill), entirely headless,
+within N sim-minutes. The quantity is a design proposal, not an implemented economy record.
 
 ## Why this matters
 
@@ -47,7 +42,7 @@ checkpoint (re-loadable, re-derivable byte-identically from the same seed and in
 ## Metric
 
 Not yet named precisely — depends on how demand-satisfaction is surfaced through `interface/`'s
-`observe()`, which does not exist yet. Provisionally: a telemetry event marking a demand as satisfied
+`observe()`, which now exists; the demand event does not yet exist. Provisionally: a telemetry event marking a demand as satisfied
 (`demand_satisfied.id == "D1"`), with `ticks_used` from the same driver-process pattern C001 used.
 
 ## Threshold
@@ -61,38 +56,24 @@ number to reason from, not before.
 
 ## Current value
 
-Never measured. Blocked on essentially the entire remaining build sequence.
+Never measured. Blocked on the rig demand transaction, unlock/build economy, and executable scenario.
 
-## Why this is blocked on nearly everything
+## Current blockers and available foundation
 
-Verified directly, not assumed, during the review that preceded this claim's filing:
+Updated 2026-09-07 against `61b50fa4`. The claim remains BLOCKED and never measured.
+Its previous blocker list predated the implemented interface, saves, machines, transport, and fluid.
 
-- **No save/load code exists anywhere.** `docs/ARCHITECTURE.md` §11's checkpoint/save schema is prose
-  only — no serialization exists in `sim/`, `shell/`, or anywhere else in the repository.
-- **No `interface/`, no `harness/`.** Both are stub `README.md`/`MODULE.md` files. The
-  `(checkpoint, seed, policy, horizon)` episode format this claim is shaped around is a generalization
-  of the `scenarios/*.yaml` format `harness/scenario/` is supposed to hold, and that layer is unbuilt.
-- **No `sim/commands` beyond a skeleton.** A scripted agent needs a typed command vocabulary to act
-  through; `sim/commands/MODULE.md` states the shape and nothing else exists.
-- **No `data/economy/`.** There is nothing for a bot to play toward yet — this is next session's
-  explicit scope (`docs/WORKING.md`), not started.
-- **Determinism is proven within a platform, not yet across platforms, and not through the whole stack.**
-  `tests/test_shaft_replay_determinism.gd` (`docs/QUALITY.md` gate 8) now proves a real `sim/world` +
-  `sim/terrain_gen` + `sim/body` run replays bit-identical across two independent OS processes on the
-  same seed — closing the gap this bullet used to describe. Two gaps remain, real and diagnosed, not
-  closed: (1) multiple float sites on the terrain-generation and RNG state path (corrected 2026-08-29, fix
-  queue R5 — a prior version of this bullet named only the cave-carving noise as the exception;
-  `docs/DECISIONS_LEDGER.md` D0183 enumerates all four known sites), not fixed-point, so cross-platform
-  (e.g. macOS vs. the project's own Linux CI) bit-identical replay is NOT yet proven for anything that
-  touches generated terrain (D0171 the canonical crack reference, D0172 the fix diagnosis — a real design
-  cycle, not scheduled); (2) nothing has shown determinism through `machines`/`transport`/`fluid`/
-  `economy`, none of
-  which have a line of code yet. Any future claim about checkpoint fidelity — including this one's own
-  re-loadability requirement — inherits both gaps until they're closed.
+Available: `interface/interface.gd`, `shell/session.gd`, `shell/save_game.gd`,
+`sim/commands/command.gd`, machine/item/transport/fluid services, and the physical-input playtest
+adapter. Scripted tutorial completion is separate from satisfying a rig demand.
 
-This is not a near-term claim. It is filed now so the eventual work has a stated target rather than
-accumulating toward one that was never written down — the same reasoning `docs/CLAIMS.md` §6 gives for
-writing a claim before the code that satisfies it exists.
+Missing: the rig demand state and delivery transaction, D1 capability unlock and per-instance build
+costs, real economy records, and `scenarios/cold_start_to_d1.yaml`.
+The existing `sim/economy/production_rate.gd` measures production history; it does not implement demand.
+
+Checkpoint and replay foundations now exist. Any C003 measurement must still verify fidelity for
+its complete scenario and name the build, seed, platform and input policy. This edit establishes no
+new cross-platform determinism result and sets no pacing threshold.
 
 ## What this claim does not measure
 

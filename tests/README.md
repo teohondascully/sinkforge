@@ -1,18 +1,23 @@
-Tests for the new codebase (`core/`, `sim/`, `interface/`, ...). Not to be confused with
-`legacy/tests/`, the pre-pivot suite, which is frozen and excluded from every gate.
+# Tests
 
-**Actual current structure, corrected 2026-08-29 (queue #3 Part M2): flat, not subdivided.** Every real
-`test_*.gd` file lives directly under `tests/` or `tests/body/`; the `unit/`, `property/`, `scenario/`,
-and `golden/` subdirectories below are an intended future organization that was never adopted — each
-holds only its own `README.md`, no test files. Real examples of what those categories describe: the
-determinism property (`tests/test_shaft_replay_determinism.gd`, `docs/QUALITY.md` gate 8) and the
-`traverse_time` golden regression (`tests/test_body_acceptance.gd`, `docs/ARCHITECTURE.md` §9). There is
-no committed conservation-of-matter test — gate 9 is one of the gates `tools/gate_status.py` reports as
-NO-CODE; a prior version of this file described one as if it existed. For which gate has which test
-right now, read `docs/QUALITY.md`'s own gate list or run `tools/gate_status.py`, rather than trusting a
-hand-maintained mapping here — that mapping is exactly what went stale.
+Status: current layout, 2026-09-07.
 
-Counts toward the instrument side of the LOC ratio (`docs/QUALITY.md` gate 7).
+Most Godot suites are flat `tests/test_*.gd` files. `tests/body/` contains scenes, support code,
+recorded inputs, saves, and local captures. The `unit/`, `property/`, `scenario/`, and `golden/`
+README-only directories are historical scaffolding, not the current test taxonomy.
 
-Coverage target: ≥85% line coverage on `core/` and `sim/` (`docs/QUALITY.md` gate 14). `view/` and
-`shell/` are exempt — chasing coverage in rendering code is theater.
+Use the commands in [CONTRIBUTING.md](../CONTRIBUTING.md).
+The [CI workflow](../.github/workflows/harness.yml) is the source of suite membership;
+`tools/list_ci_suites.py` selects the per-commit tests job, excluding scheduled fuzz work.
+Do not infer coverage from a directory count or a passing subset.
+
+Representative suites:
+- `test_items.gd`: item behavior and conservation.
+- `test_water_flow.gd`: fluid behavior and conservation.
+- `test_save_game.gd`: persistence.
+- `test_shaft_replay_determinism.gd`: seeded replay and golden comparisons.
+- `test_tutorial_playthrough.gd`: scripted opening through the interface.
+
+The [backlog](../docs/BACKLOG.md) tracks future organization by component.
+Moves must preserve suite discovery, fixture references, and UIDs.
+[Evidence policy](../docs/EVIDENCE.md) distinguishes required fixtures from local run artifacts.

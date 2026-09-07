@@ -18656,3 +18656,16 @@ the opening's own detours, and a batch that starts at the drop measures the rung
 is the instrument for one rung (the brief's learned item 10).
 
 **Reverse cost:** the `--save-after` branch and one save file.
+
+## D0480 · 2026-09-07 · Repository cleanup: truthful entry points and one backlog route
+
+**Decided:** execute the director-approved documentation batches against 61b50fa4. Replace stale
+setup/build summaries, preserve prior operational documents in docs/archive/cleanup-2026-09-07,
+and route current work through docs/BACKLOG.md. Existing P/T/V records and D addresses remain intact.
+No gameplay, verification rule, source path, unique capture or historical log is removed.
+
+**Alternative:** broad directory moves and deletion of old records in the same pass.
+**Why:** obsolete entry points misdescribe implemented systems; current queue duplication obscures
+ownership. Stable links and retained snapshots let the cleanup improve navigation without losing evidence.
+Timing percentages reported by engineering remain estimates; orchestration changes need measured phases.
+**Reverse cost:** documentation-only diff; prior operational text is preserved at named snapshot paths.

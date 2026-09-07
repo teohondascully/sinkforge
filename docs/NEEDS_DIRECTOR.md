@@ -1,5 +1,8 @@
 # Needs director
 
+Status: source records. Schedule work through [BACKLOG](BACKLOG.md). Preserve P IDs and explicit
+closures; revalidate older unresolved diagnoses against the current build before implementing them.
+
 Things a session stopped on rather than plowed through. **Nothing here has been applied.** Each entry
 is a diagnosis plus a proposed remedy, held because the call is a judgment the director owns: a feel
 decision, a policy decision, or a trade with no obviously right side.

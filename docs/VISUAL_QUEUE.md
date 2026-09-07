@@ -1,5 +1,8 @@
 # Visual Queue (v3, 2026-09-05; v2 2026-09-04)
 
+Status: historical findings and execution evidence. Schedule current work through
+[BACKLOG](BACKLOG.md); later execution sections can supersede earlier V entries.
+
 **Re-derived from the REAL seat.** v1 (fa8be271) was catalogued from `tests/body/reveal_scene.gd` with its
 `--camera` flag teleporting the camera 70 m from the miner's lamp -- its "deep is black" frames were a
 picture of nothing, and three of its P0s were artifacts (v1's V02 "no lamp presence", V03 "miner invisible
@@ -391,4 +394,3 @@ it the line runs across open sky at the miner's feet and reads as a wire (strang
 **What:** a column whose surface is lower than its neighbours gets a beam even when the dip is the hill's
 own shape, not a dug shaft; a pale light in open air (stranger 1, frame 38). **Where:**
 `LightPainter._paint_godrays`, `godray()`: gate on the mouth being under an enclosing ceiling.
-
