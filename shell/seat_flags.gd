@@ -20,6 +20,8 @@ extends RefCounted
 ##                           the pointer posed, or press the map / settings key once at tick 20 (game: the GAME face)
 ##   --lamp-occlusion=K      the veil lamp's loss per solid cell crossed (D0427); 0 is legacy's pass, the
 ##                           control of a lighting comparison. Unset: `VeilOcclusion.K`.
+##   --muted                 the Master bus muted for this boot, whatever the settings file says: a
+##                           scripted seat on a machine somebody is using (D0437)
 
 const NO_WARP: Vector2i = Vector2i(-1, -1)
 
@@ -27,7 +29,7 @@ const NO_WARP: Vector2i = Vector2i(-1, -1)
 static func parse(args: PackedStringArray) -> Dictionary:
 	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
 		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false, "start": "",
-		"mute": PackedStringArray(), "lamp_occlusion": -1.0}
+		"mute": PackedStringArray(), "lamp_occlusion": -1.0, "muted": false}
 	for a: String in args:
 		if a.begins_with("--quit-after="):
 			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
@@ -56,6 +58,8 @@ static func parse(args: PackedStringArray) -> Dictionary:
 			f["start"] = a.substr("--start=".length())
 		elif a.begins_with("--lamp-occlusion="):
 			f["lamp_occlusion"] = maxf(float(a.substr("--lamp-occlusion=".length())), 0.0)
+		elif a == "--muted":
+			f["muted"] = true
 	return f
 
 

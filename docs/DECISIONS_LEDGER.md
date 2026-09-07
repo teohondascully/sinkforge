@@ -17818,3 +17818,20 @@ difference was one D press before the first pointer, and the ring's ruler.
 
 **Reverse cost:** two constants and two lines in the scan; one moment and one counter; one bool and one
 read of the body's velocity in the seat.
+
+## D0437 · 2026-09-06 · The playtest seat boots muted; `--muted` for any scripted boot
+
+**Decided:** the director, working on the machine while three seats played, asked for a mute setting set
+true. `Settings.muted` existed (the Master bus, persisted, D0227) but nothing scripted set it: the seat
+boots with `persist` off against a fresh session file, so every seat played the mix on the director's
+speakers, and the only switch was the settings page. Now `playtest/seat.gd` sets `Settings.muted` before
+`boot` and applies it after, and the receipt records `AudioServer.is_bus_mute(0)` -- the bus, not the
+setting (true with the line, false with it commented out, both measured). `SeatFlags` gains `--muted`,
+applied in `Main.boot` after the settings file is read and never saved, for captures and smokes. The
+default a new player hears is unchanged. The three seats already playing were stopped and their strangers
+with them (13-15, at 21, 17 and 17 bursts; void, not archived); the batch relaunches silent.
+
+**Why:** the seat is the director's screen only when the director's eye is the instrument; here it was
+the director's speakers with nobody's ear on them.
+
+**Reverse cost:** one line in the seat, one flag.

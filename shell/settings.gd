@@ -26,8 +26,9 @@ extends RefCounted
 ## Sound ships on: roughly half of what this game tells the player it tells by ear, and a player who never
 ## opens the settings page would otherwise never learn the audio is there. Mute stays one switch over the
 ## whole mix rather than levels pinned to zero (see `apply_audio`) and is persisted, so turning it off is
-## equally a one-time act. Scripted boots silence themselves in `main.gd::_ready()`, where they also
-## decline to persist, so this default describes what a new player hears.
+## equally a one-time act. A scripted boot is silenced by `--muted` (`SeatFlags`, applied in `Main.boot`
+## after the file is read, never saved) and the playtest seat sets `muted` before it boots (D0437), so this
+## default describes what a new player hears.
 static var muted: bool = false
 static var master: float = 1.0          ## 0..1, the Master bus (everything)
 static var sound: float = 1.0           ## 0..1, effect voices: the positional pool and UI dings

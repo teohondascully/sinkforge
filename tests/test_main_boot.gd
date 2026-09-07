@@ -30,6 +30,8 @@ func _test_the_project_boots_into_the_shell() -> void:
 	if node != null:
 		node.free()
 	_check(Main.parse_quit_after(PackedStringArray(["--quit-after=12"])) == 12 and Main.parse_quit_after(PackedStringArray([])) == -1 and Main.parse_quit_after(PackedStringArray(["--quit-after=-3"])) == 0, "the smoke flag parses, is absent as -1, and never negative")
+	# D0437: a scripted boot on a machine somebody is using is silenced by --muted; absent, the settings decide.
+	_check(bool(SeatFlags.parse(PackedStringArray(["--muted"]))["muted"]) and not bool(SeatFlags.parse(PackedStringArray([]))["muted"]), "--muted parses and is off by default")
 
 
 func _hand(down: Dictionary) -> Callable:

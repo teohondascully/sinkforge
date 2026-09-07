@@ -43,11 +43,13 @@ func _start() -> void:
 	game.autoboot = false
 	game.save_path = session_dir.path_join("save.json")
 	root.add_child(game)
+	Settings.muted = true   # a seat plays on a machine somebody is using; the stranger reads a screen (D0437)
 	if not game.boot(false):
 		quit(2)
 		return
+	Settings.apply_audio()
 	_write("receipt.json", {"engine": Engine.get_version_info(), "mode": "screen-only settled-between-bursts",
-		"viewport": [1280, 720], "session_dir": session_dir, "pid": OS.get_process_id()})
+		"viewport": [1280, 720], "session_dir": session_dir, "pid": OS.get_process_id(), "muted": AudioServer.is_bus_mute(0)})
 	ready = true
 	remaining = 1
 

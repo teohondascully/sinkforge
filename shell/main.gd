@@ -77,6 +77,9 @@ func boot(load_save: bool) -> bool:
 	Settings.persist = load_save
 	Controls.register()
 	Settings.load_settings()
+	if bool(flags["muted"]):
+		Settings.muted = true      # this boot only; not saved (D0437)
+		Settings.apply_audio()
 	var env: Dictionary = _open_session(load_save, phases)
 	if door == null:
 		push_error("boot: the start refused: %s" % WorldSeeder.last_refusal)
