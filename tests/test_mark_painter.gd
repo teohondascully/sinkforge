@@ -21,6 +21,7 @@ var _door: Interface
 func _initialize() -> void:
 	_test_the_grammar_constants()
 	_test_rock_wears_the_square_sized_to_the_blow()
+	_test_a_held_button_past_the_reach_is_slashed_and_named()
 	_test_a_held_drill_ghosts_and_previews()
 	_test_standing_in_your_own_way_is_a_refusal_with_a_hint()
 	_test_a_machine_under_the_aim_pulses_in_its_colour()
@@ -29,6 +30,29 @@ func _initialize() -> void:
 	_test_the_dig_plan_outlines_its_region()
 	await _test_paint_runs_on_a_real_view()
 	_finish("mark_painter")
+
+
+## D0421, from the first stranger's run: MINE held on the right rock from a step too far, three times,
+## and the frame did not change. The hold names its refusal (`far` / `sight` / `air`), the observation
+## carries it, and the aim square goes to the refusal red at full weight with the bar struck across it --
+## only while the button is held; a pointer merely resting past the reach keeps its faint chrome.
+func _test_a_held_button_past_the_reach_is_slashed_and_named() -> void:
+	_session()
+	var resting: Interface.Observation = _aim(Vector2i(60, 101), false)   # 6.5 m off: past a 3.2 m reach
+	_check(resting.aim_refusal == &"" and not resting.aim_in_reach, "a pointer resting past the reach refuses nothing (%s)" % resting.aim_refusal)
+	var far: Interface.Observation = _aim(Vector2i(60, 101), true)
+	_check(far.aim_refusal == &"far" and far.solid_at(far.aim_cell), "held on rock past the reach: the refusal is `far` (%s)" % far.aim_refusal)
+	var marks: Array[Dictionary] = MarkLayout.build(far, 0.0, MaterialLook.new())
+	var squares: Array[Dictionary] = _kinds(marks, &"square")
+	var bars: Array[Dictionary] = _kinds(marks, &"bar")
+	_check(squares.size() == 1 and Color(squares[0]["color"]).r == MarkPainter.REFUSE.r and Color(squares[0]["color"]).a > 0.9, "the square is the refusal red at full weight")
+	_check(bars.size() == 1 and Color(bars[0]["color"]).r == MarkPainter.REFUSE.r, "...with the refusal bar struck across it: the same grammar as standing in your own way (%d bars)" % bars.size())
+	var resting_marks: Array[Dictionary] = MarkLayout.build(resting, 0.0, MaterialLook.new())
+	_check(_kinds(resting_marks, &"bar").is_empty(), "control: the resting pointer past the reach draws no bar")
+	var air: Interface.Observation = _aim(Vector2i(34, 60), true)   # the sky over the body
+	_check(air.aim_refusal == &"air" or air.aim_cell == Vector2i(-1, -1), "held on nothing: `air`, unless the hold snapped to a face (%s -> %s)" % [air.aim_refusal, air.aim_cell])
+	var near: Interface.Observation = _aim(Vector2i(34, 101), true)
+	_check(near.aim_refusal == &"", "held on rock in reach: no refusal, the blow lands (%s)" % near.aim_refusal)
 
 
 ## A hub session: iron from logic row 25 down, the body standing on it at logic column 8.

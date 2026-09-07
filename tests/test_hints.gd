@@ -39,7 +39,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_obs([]), 0.016)
 	h.observe(_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 6, "nine pack lessons and six moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 7, "nine pack lessons and seven moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 func _test_one_bubble_at_a_time_in_table_order() -> void:
@@ -66,6 +66,17 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	h.observe(dry, 0.016)
 	h.observe(wet, 0.016)
 	_check(h.active_id() == &"", "a second wading does not re-teach")
+	# D0421: MINE held on rock past the reach for a third of a second teaches TOO FAR, once; a brush past
+	# the reach (fewer ticks) teaches nothing.
+	var far: Interface.Observation = _obs()
+	far.aim_refusal = &"far"
+	for _i: int in Hints.FAR_TICKS - 1:
+		h.observe(far, 0.016)
+	_check(h.active_id() == &"", "a brush past the reach (%d ticks) teaches nothing yet" % (Hints.FAR_TICKS - 1))
+	h.observe(far, 0.016)
+	_check(h.active_id() == &"too_far", "the twentieth tick fires TOO FAR (%s)" % h.active_id())
+	for _i: int in 30:
+		h.observe(dry, 0.5)
 	var deep: Interface.Observation = _obs()
 	deep.cell.y = Interface.Observation.SKY_ROWS + 40
 	h.observe(deep, 0.016)

@@ -162,7 +162,7 @@ static func _mode_line(rec: Dictionary, recipe: Dictionary, status: StringName, 
 static func _describe_terrain(o: Interface.Observation, aim: Vector2i, logic: Vector2i) -> Dictionary:
 	var vein: StringName = o.lode_at(aim)
 	if vein != &"" and not o.solid_at(aim):
-		return {"name": "%s Lode" % _cap(vein), "mode": "%d left — work the face by hand, %d%% of the next unit off it" % [o.deposit_at(aim), o.lode_permille(aim) / 10]}
+		return {"name": "%s Lode" % _cap(vein), "mode": "%d left — hold to work the face; %d%% to the next unit" % [o.deposit_at(aim), o.lode_permille(aim) / 10]}
 	if o.solid_at(aim) and o.deposit_at(aim) > 0:
 		return {"name": "Ore Vein", "mode": "%d ore — stand a Drill just above it" % o.deposit_at(aim)}
 	if o.is_climbable(logic):

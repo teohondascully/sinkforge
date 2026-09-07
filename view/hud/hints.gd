@@ -47,6 +47,7 @@ const DEFS: Array[Dictionary] = [
 ## State-edge hints: the rising edge fires once and latches like a pack hint. `in_water` sits above the
 ## swing techniques so a player who is wading is told about the pump before being told how to swing.
 const MOMENTS: Array[Dictionary] = [
+	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
 	{"id": &"deep_enough", "text": "GRAPPLE — press [GRAPPLE] to throw your line at rock above. Hold [REEL] to climb it, press [GRAPPLE] again to let go and fly."},
 	{"id": &"pump", "text": "PUMP IT — hold [REEL] at the bottom of the arc, [LOWER] at the top."},
@@ -71,6 +72,8 @@ var _primed: bool = false
 var _was_anchored: bool = false
 var _prev_on_floor: bool = true
 var _prev_vel_y: int = 0
+var _far_ticks: int = 0
+const FAR_TICKS: int = 20
 
 
 func _init() -> void:
@@ -110,6 +113,10 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	var speed: float = Vector2(float(o.vel_x), float(o.vel_y)).length() / float(Fx.SCALE)
 	_busy = speed > run * (BUSY_RELEASE if _busy else BUSY_ARM)
 	_ceremony = ceremony
+	# A third of a second of holding MINE on rock past the reach (D0421): the mark shows the slash at once,
+	# the lesson says why once, and never for a tap that merely brushed past.
+	_far_ticks = _far_ticks + 1 if o.aim_refusal == &"far" else 0
+	note(&"too_far", _far_ticks >= FAR_TICKS)
 	note(&"in_water", o.wet)
 	note(&"deep_enough", float(MaterialLook.depth_m(o.cell.y)) >= DEPTH_HINT_M)
 	var fast: bool = speed > run * CHAIN_SPEED_MULT

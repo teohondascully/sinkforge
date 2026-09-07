@@ -214,3 +214,8 @@ step down the stranger can see?*
 
 **T028 · The score costs 50 ms of boot and is silent until the body is deep.** Mounted so the MUSIC slider
 has a consumer (D0410). *Question: worth its boot cost before any music is authored, or a stub until it is?*
+
+**T029 · Only the selected hotbar slot carries its name.** The first stranger cut a tree's leaves, saw a
+green block appear beside the ingots, and believed it was wood; the counter stayed 0/1 and read as a bug
+(D0421). *Question: a name under every slot (clutter), a name on hover only, or the item's name flashed
+beside the miner as it lands in the pack?*
