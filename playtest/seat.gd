@@ -23,6 +23,8 @@ var settling: int = -1              ## ticks spent settling this burst; -1 while
 var settle: bool = true
 var _camera_prev: Vector2 = Vector2.INF
 var _camera_still: int = 0
+var _received_ms: int = 0
+var _sent_ms: int = 0
 
 
 func _initialize() -> void:
@@ -114,6 +116,8 @@ func _process(_delta: float) -> bool:
 		_write("response.json", {"id": request_id, "error": error})
 		return false
 	_write("input_%04d.json" % request_id, command)
+	_received_ms = int(Time.get_unix_time_from_system() * 1000.0)   # the loop measured (D0446): pickup, play, capture
+	_sent_ms = int(command.get("sent_at", 0))
 	# Input callbacks must run unpaused, as in ordinary play. The first segment applies on the next
 	# physics tick through `next_segment`, the rest at their boundaries (D0420).
 	paused = false
@@ -132,7 +136,8 @@ func _capture() -> void:
 	var result: Error = root.get_texture().get_image().save_png(path)
 	var response: Dictionary = {"id": request_id, "tick": game.tick,
 		"sim_seconds": float(game.tick) / 60.0, "screenshot": path, "capture_error": result,
-		"settled_ticks": maxi(settling, 0), "still": not _moving()}
+		"settled_ticks": maxi(settling, 0), "still": not _moving(),
+		"sent_at": _sent_ms, "received_at": _received_ms, "captured_at": int(Time.get_unix_time_from_system() * 1000.0)}
 	_write("observation_%04d.json" % request_id, response)
 	_write("response.json", response)
 	capturing = false

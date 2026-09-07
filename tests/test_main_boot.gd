@@ -30,6 +30,13 @@ func _test_the_project_boots_into_the_shell() -> void:
 	if node != null:
 		node.free()
 	_check(Main.parse_quit_after(PackedStringArray(["--quit-after=12"])) == 12 and Main.parse_quit_after(PackedStringArray([])) == -1 and Main.parse_quit_after(PackedStringArray(["--quit-after=-3"])) == 0, "the smoke flag parses, is absent as -1, and never negative")
+	# D0446 (stranger 23, six bursts trapped): ESC is the SETTINGS action's key; the page closes on its edge,
+	# once, and the large map closes first when it is up. The map key does nothing while the page is open.
+	_check(HudBridge.hud_toggles({"settings": true}, true, false) == {"settings": false, "map": false}, "SETTINGS with the page open closes it")
+	_check(HudBridge.hud_toggles({"settings": true}, false, false) == {"settings": true, "map": false}, "...and with it closed opens it")
+	_check(HudBridge.hud_toggles({"settings": true}, false, true) == {"settings": false, "map": false}, "with the large map up the same edge closes the map and leaves the page closed")
+	_check(HudBridge.hud_toggles({"map": true}, true, false) == {"settings": true, "map": false} and HudBridge.hud_toggles({"map": true}, false, false) == {"settings": false, "map": true}, "the map key is inert under the page and toggles the map otherwise")
+	_check(HudBridge.hud_toggles({}, true, true) == {"settings": true, "map": true}, "no edge, no change")
 	# D0437: a scripted boot on a machine somebody is using is silenced by --muted; absent, the settings decide.
 	_check(bool(SeatFlags.parse(PackedStringArray(["--muted"]))["muted"]) and not bool(SeatFlags.parse(PackedStringArray([]))["muted"]), "--muted parses and is off by default")
 

@@ -18015,3 +18015,26 @@ refusal reason stays `air`; the view names the thing under the pointer.
 model of the forge.
 
 **Reverse cost:** one moment, one counter, one lookup.
+
+## D0446 · 2026-09-06 · ESC closes the settings page once; the loop measured per burst
+
+**Decided:** (1) ESC did not close the settings page. It is bound to the SETTINGS action (`Controls`), so a
+press with the page open was handled twice in one tick: `_unhandled_input` set the page closed, then
+`_hud_keys`' action edge toggled it open again. Two of three strangers in batch 22-24 met it -- 23 spent six
+bursts trapped ("Escape key and various click attempts failed to close it"), 24 "had to press K after
+Escape" -- and a director pressing ESC would meet it too. The modals are decided in one place now,
+`HudBridge.hud_toggles(keys, settings_open, map_large)`: the SETTINGS edge closes the large map if it is up
+and otherwise toggles the page (resetting its capture and armed state); the MAP edge toggles the map unless
+the page is up; `_unhandled_input` marks ESC handled and does nothing else with it. Pinned pure in
+`test_main_boot` (five cases) and measured live on a seat: ESC opens, ESC closes, M opens the map, ESC
+closes the map and leaves the page shut (a luma probe of the plate: 27.8 open, 38.1 shut). (2) THE LOOP
+MEASURED (Astra's item 20, the update's §10): `command.py` stamps `sent_at`; the seat answers with
+`received_at` and `captured_at`; the command appends one row a burst to `timing.jsonl` -- `think_ms` (the
+agent's own latency since the last frame came back), `pickup_ms`, `play_ms` (ticks plus settle),
+`capture_ms`, `wall_ms`, `sim_ticks`, `settled_ticks` -- so the largest term can be named before it is
+optimised.
+
+**Why:** the key the footer names must work; and a loop cannot be made faster by guessing which of its four
+waits is the long one.
+
+**Reverse cost:** one static function and two call sites; three timestamps and one log line.

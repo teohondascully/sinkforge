@@ -134,3 +134,19 @@ static func key(page: SettingsPage, keycode: int) -> Dictionary:
 	if slot >= 0 and slot < SettingsPage.RAIL_ORDER.size():
 		page.set_cat(SettingsPage.RAIL_ORDER[slot])
 	return {}
+
+
+## ONE PLACE DECIDES THE MODALS (D0446). The SETTINGS edge (K, or ESC, which is bound to it) closes the
+## large map if it is up and otherwise toggles the page; the MAP edge toggles the map unless the page is up.
+## ESC used to be handled twice -- closed in `_unhandled_input`, then toggled back open by this edge in the
+## same tick -- so the page could not be left by the key its own footer names.
+static func hud_toggles(keys: Dictionary, settings_open: bool, map_large: bool) -> Dictionary:
+	var out: Dictionary = {"settings": settings_open, "map": map_large}
+	if bool(keys.get("settings", false)):
+		if map_large:
+			out["map"] = false
+		else:
+			out["settings"] = not settings_open
+	elif bool(keys.get("map", false)) and not settings_open:
+		out["map"] = not map_large
+	return out

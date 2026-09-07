@@ -283,11 +283,13 @@ static func _digit_down(i: int) -> bool:
 
 func _hud_keys(page_open: bool) -> void:
 	var keys: Dictionary = hands.hud_keys(Controls.pressed)
-	if bool(keys["settings"]) and stack.settings != null:
-		stack.settings.open = not stack.settings.open
-		stack.settings.capture = &""
-	if bool(keys["map"]) and stack.minimap != null and not page_open:
-		stack.minimap.large = not stack.minimap.large
+	if stack.settings != null and stack.minimap != null:
+		var next: Dictionary = HudBridge.hud_toggles(keys, stack.settings.open, stack.minimap.large)
+		if bool(next["settings"]) != stack.settings.open:
+			stack.settings.open = bool(next["settings"])
+			stack.settings.capture = &""
+			stack.settings.armed = ""
+		stack.minimap.large = bool(next["map"])
 	if bool(keys["save"]):
 		save()
 	if stack.settings != null and stack.settings.open:
@@ -306,10 +308,6 @@ func _effects(delta: float) -> void:
 ## The settings page's own input: a capture takes the next key, a click lands on a control, the arrows
 ## and Enter drive the focus.
 func _unhandled_input(ev: InputEvent) -> void:
-	if booted and stack.minimap != null and stack.minimap.large and ev is InputEventKey and ev.pressed and (ev as InputEventKey).keycode == KEY_ESCAPE:
-		stack.minimap.large = false   # a modal closes on ESC, the map like the page (D0410)
-		get_viewport().set_input_as_handled()
-		return
 	if not booted or stack.settings == null or not stack.settings.open:
 		return
 	var page: SettingsPage = stack.settings
@@ -322,10 +320,9 @@ func _unhandled_input(ev: InputEvent) -> void:
 		_game_verb(HudBridge.apply(page.click(at), page, at.x))
 		get_viewport().set_input_as_handled()
 	elif ev is InputEventKey and ev.pressed and not ev.echo:
-		if (ev as InputEventKey).keycode == KEY_ESCAPE:
-			page.open = false
-			page.armed = ""
-		else:
+		# ESC is the SETTINGS action's own key and closes the page through `_hud_keys`' edge (D0446); closing
+		# it here as well re-toggled it open the same tick, and no stranger could leave the page by ESC.
+		if (ev as InputEventKey).keycode != KEY_ESCAPE:
 			var payload: Dictionary = HudBridge.key(page, (ev as InputEventKey).keycode)
 			if not payload.is_empty():
 				_game_verb(HudBridge.apply(payload, page, -1.0))

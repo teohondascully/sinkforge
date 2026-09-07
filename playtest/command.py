@@ -6,6 +6,24 @@ from pathlib import Path
 import time
 
 
+def _log_timing(session_dir, previous, command, response):
+    """The loop measured, one line a burst (D0446): where the wall time goes. `think` is the agent's own
+    latency between the last frame's return and this command; `pickup` the seat noticing the file;
+    `play` the burst's ticks plus the settle; `capture` the PNG's save and this poll noticing it."""
+    now = int(time.time() * 1000)
+    sent = int(command.get("sent_at", now))
+    received = int(response.get("received_at", sent))
+    captured = int(response.get("captured_at", now))
+    row = {"id": command["id"], "think_ms": sent - int(previous.get("returned_at", sent)), "pickup_ms": received - sent,
+           "play_ms": captured - received, "capture_ms": now - captured, "wall_ms": now - int(previous.get("returned_at", sent)),
+           "sim_ticks": int(response.get("tick", 0)) - int(previous.get("tick", 0)), "settled_ticks": response.get("settled_ticks", 0)}
+    response["returned_at"] = now
+    with (session_dir / "timing.jsonl").open("a") as log:
+        log.write(json.dumps(row) + "\n")
+    with (session_dir / "response.json").open("w") as f:
+        json.dump(response, f)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("session_dir", type=Path)
@@ -21,6 +39,7 @@ def main():
     previous = json.loads(response_path.read_text())
     command = json.loads(args.command)
     command["id"] = previous["id"] + 1
+    command["sent_at"] = int(time.time() * 1000)
     pending = args.session_dir / "command.json.tmp"
     pending.write_text(json.dumps(command))
     os.replace(pending, args.session_dir / "command.json")
@@ -28,6 +47,7 @@ def main():
     while time.monotonic() < deadline:
         response = json.loads(response_path.read_text())
         if response["id"] == command["id"]:
+            _log_timing(args.session_dir, previous, command, response)
             if args.note is not None:
                 with (args.session_dir / "JOURNAL.md").open("a") as journal:
                     journal.write("\n## Burst %d (%.1f s)\n%s\n" % (command["id"], response.get("sim_seconds", -1.0), args.note.strip()))
