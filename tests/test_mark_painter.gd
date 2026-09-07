@@ -25,6 +25,7 @@ func _initialize() -> void:
 	_test_the_cut_fills_the_square_from_the_floor_up()
 	_test_a_held_drill_ghosts_and_previews()
 	_test_standing_in_your_own_way_is_a_refusal_with_a_hint()
+	_test_the_reticle_stands_where_the_cut_will_land()
 	_test_a_machine_under_the_aim_pulses_in_its_colour()
 	_test_the_drop_lights_the_mouth_it_feeds()
 	_test_a_drop_that_falls_short_flashes_the_machine_it_missed()
@@ -120,6 +121,13 @@ func _hold(item: StringName, n: int) -> void:
 			return
 
 
+func _has_rect(marks: Array[Dictionary], rect: Rect2) -> bool:
+	for m: Dictionary in marks:
+		if (m["rect"] as Rect2) == rect:
+			return true
+	return false
+
+
 func _kinds(marks: Array[Dictionary], kind: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for m: Dictionary in marks:
@@ -157,6 +165,42 @@ func _test_rock_wears_the_square_sized_to_the_blow() -> void:
 	_check(not far.aim_in_reach and fsq.size() == 1 and is_equal_approx(Color(fsq[0]["color"]).a, 0.18), "out of reach the square goes faint and the corners leave (%d marks)" % fsq.size())
 	_check(MarkPainter.sky_marks(o).is_empty(), "the stars do not step aside for a cursor on rock")
 	_check(MarkLayout.build(_aim(Vector2i(40, 90)), 0.0, MaterialLook.new()).is_empty(), "open air in reach with nothing in hand: no mark at all")
+
+
+## THE RETICLE IS THE EFFECTIVE CELL (D0489; S61, 61-63): a pointer on open air past the reach with rock
+## within a reach of it -- the forge's pocket, the vein beside it -- snaps (D0474). The square must stand on
+## the snapped cell before the press, the press must land there, and the raw cell must wear nothing: what
+## the player sees before they press is what the pick will hit.
+func _test_the_reticle_stands_where_the_cut_will_land() -> void:
+	_session()
+	var o0: Interface.Observation = _door.observe(Interface.Envelope.oracle_over(_world.grid))
+	var body_cell: Vector2i = Aim.cell_of(o0.pos_x, o0.pos_y)
+	for x: int in range(body_cell.x - 14, body_cell.x - 10):                  # S61's pocket: a metre-wide hole in the surface, 3 m left, 2 m deep
+		for y: int in range(body_cell.y + 5, body_cell.y + 13):
+			_world.grid.excavate(Vector2i(x, y))
+	var raw := body_cell + Vector2i(-12, 6)                                  # open air in the pocket, 13.4 cells off: past the 12.8-cell reach
+	_check(not Mining.in_reach(o0.pos_x, o0.pos_y, raw) and not _world.grid.is_solid(raw), "control: the raw cell is open air past the reach (%s from %s)" % [raw, body_cell])
+	var resting: Interface.Observation = _aim(raw, false)
+	_check(resting.aim_cell != raw and resting.solid_at(resting.aim_cell) and resting.aim_in_reach and resting.aim_refusal == &"", "before the press the aim is the snapped face: rock in reach, not the raw cell (%s)" % str(resting.aim_cell))
+	var cell_px: float = float(resting.cell_px)
+	var rect: Rect2 = MarkPainter.mark_rect(MarkPainter.blow_rect(resting))       # the aim square's rect, about `aim_cell`
+	var squares: Array[Dictionary] = _kinds(MarkLayout.build(resting, 0.0, MaterialLook.new()), &"square")
+	var on_raw: int = 0
+	for sq: Dictionary in squares:
+		on_raw += 1 if (sq["rect"] as Rect2).has_point((Vector2(raw) + Vector2(0.5, 0.5)) * cell_px) else 0
+	_check(_has_rect(squares, rect) and rect.has_point((Vector2(resting.aim_cell) + Vector2(0.5, 0.5)) * cell_px), "the aim square stands on the snapped cell's centre (%d squares)" % squares.size())
+	_check(on_raw == 0, "...and no square stands on the raw pointer's cell (%d do)" % on_raw)
+	var held: Interface.Observation = _aim(raw, true)
+	_check(held.aim_cell == resting.aim_cell and held.aim_refusal == &"", "the press lands where the reticle stood (%s, %s)" % [str(held.aim_cell), held.aim_refusal])
+	_check(_has_rect(_kinds(MarkLayout.build(held, 0.0, MaterialLook.new()), &"square"), rect), "...and the aim square does not move under the press")
+	var broke: Array = []
+	for _i: int in 240:
+		var o: Interface.Observation = _aim(raw, true)
+		if o.mining_broke:
+			broke = o.mining_broke_cells
+			break
+	_check(broke.has(resting.aim_cell), "the cut lands on the cell the reticle stood on (%s in %s)" % [str(resting.aim_cell), str(broke)])
+	_aim(raw, false)
 
 
 func _test_a_held_drill_ghosts_and_previews() -> void:

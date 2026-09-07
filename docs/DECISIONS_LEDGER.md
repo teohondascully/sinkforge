@@ -18848,3 +18848,25 @@ with the slot gone.
 
 **Provisional:** the linger (1.5 s) and the yield rule are guesses until a batch reads them; the slot is
 silent for the drop's DROPPED and NOT ORE, which are not aim refusals and have their own moments.
+
+## D0489 · 2026-09-07 · The reticle is the effective cell: pinned end to end, and S61's frame re-read
+
+**Decided:** `tests/test_mark_painter.gd` pins, through the real door and the mark layer, that on S61's
+geometry (a pointer on open air in a pocket past the reach, a vein face within a reach of it) the aim square
+stands on the snapped cell before the press, no square stands on the raw cell, the press lands on the cell
+the square stood on, the square does not move under the press, and the cut breaks that cell. No code
+changed: the observation's `aim_cell` has been the hold's worked cell since D0354 and the mark layer draws
+from it. The mutant that hands the raw cell to the observation while held fails four assertions.
+
+**Why:** the director's item read S61's `frame_0001.png` as the reticle on the raw pointer while the cut
+landed at the ring. Re-read against the receipt: the large double square over the forge is the smelt rung's
+guide outline (the pack held 11 ore by the capture, the rung had ticked to smelt in that burst), and the
+small chrome square stands on vein cell (125, 81), one of the receipt's sixteen broken cells. The reticle was
+right; the frame had two squares and the larger one was read. The pin makes the property a claim the suite
+holds rather than one a frame is read for.
+
+**Learned, and recorded rather than changed:** the first fixture put the pointer on open air 3.5 m along a
+FLAT floor and the aim did not snap at all: from a body standing on a floor, the line of sight to a floor
+cell more than a few cells away grazes the nearer floor cells first, and `_nearest_visible` refuses an
+occluded cell (D0452). Legacy's rule, and why a stranger pointing along the ground gets TOO FAR where one
+pointing at a face gets the snap: the floor hides itself. The fixture is a pocket with a wall, as at the pad.
