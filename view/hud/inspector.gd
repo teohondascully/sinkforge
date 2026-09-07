@@ -164,7 +164,9 @@ static func _describe_terrain(o: Interface.Observation, aim: Vector2i, logic: Ve
 	if vein != &"" and not o.solid_at(aim):
 		return {"name": "%s Lode" % _cap(vein), "mode": "%d left — hold to work the face; %d%% to the next unit" % [o.deposit_at(aim), o.lode_permille(aim) / 10]}
 	if o.solid_at(aim) and o.deposit_at(aim) > 0:
-		return {"name": "Ore Vein", "mode": "%d ore — stand a Drill just above it" % o.deposit_at(aim)}
+		# The hand verb first (D0450, stranger 27): the card over the first rung's own target said only "stand a
+		# Drill", and the stranger spent the run trying to place one.
+		return {"name": "Ore Vein", "mode": "%d ore — hold to cut it, or stand a Drill just above it" % o.deposit_at(aim)}
 	if o.is_climbable(logic):
 		return {"name": "Rope", "mode": "a hung line — climb it"}
 	if o.has_torch(logic):

@@ -18097,3 +18097,21 @@ white but the aim square -- which marks where the pointer IS, and merges with th
 thing.
 
 **Reverse cost:** two colours and a loop of four lines; two words.
+
+## D0450 · 2026-09-06 · NOT ORE once on a miss; the vein card says the hand verb first
+
+**Decided:** two more first-rung silences from batch 25-27 (`docs/playtests/2026-09-06_strangers25-27.md`).
+(1) Stranger 26 named the ring, pointed three metres right of it, cut clay, read "+1 clay", and left to
+search the caves: the cut answered and the task said nothing. A lesson `mined_wrong` fires once on a break
+whose yield is not ore while the pack holds no ore -- "NOT ORE — that was clay, and the task wants ore. The
+ore is the silver-flecked rock inside the WHITE RING: cut that one." Never after THE WAY DOWN, which asks
+for exactly that cut; never for a break whose material is unknown (a fixture's bare break). The yield is
+read as data from the material record's `yields` (D0409's contract; the view may not call the sim's
+`yield_of`). (2) Stranger 27's first press landed on ore at the forge's foot and the inspect card said
+"13 ore — stand a Drill just above it"; the journal's next line is "I need to place a Drill machine" and
+forty bursts went to placing one. The card now says "hold to cut it, or stand a Drill just above it".
+
+**Why:** the first rung is the gate every stranger has to pass; a surface that answers the target with a
+veteran's sentence, or answers a miss with a tick and no correction, loses a player who did the reading.
+
+**Reverse cost:** one moment row and one function; four words on a card.

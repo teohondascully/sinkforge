@@ -57,6 +57,7 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
 	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
 	{"id": &"aim_machine", "text": "THAT IS A MACHINE — [MINE] cuts rock, not machines. Stand beside it and press [DROP] to feed it what it takes; what it makes comes to you as you stand there."},
+	{"id": &"mined_wrong", "text": "NOT ORE — that was {broke}, and the task wants ore. The ore is the silver-flecked rock inside the WHITE RING: cut that one."},
 	{"id": &"dropped_wrong", "text": "WRONG STACK — you dropped {dropped}; the machine beside you takes {wanted}. Press the number over the {wanted} in your bar to hold it, then [DROP]."},
 	{"id": &"dropped_floor", "text": "DROPPED — the stack fell at your feet, and you pick up what lies there as you stand. A machine takes a drop only when you stand BESIDE it: a body length."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
@@ -141,6 +142,21 @@ func _wrong_stack(o: Interface.Observation, counts: Dictionary) -> bool:
 	return true
 
 
+## A cell broken whose yield is not ore while the pack holds none (D0450, stranger 26): the pointer was
+## three metres right of the ring, the clay ticked "+1 clay", and the stranger read the verb as spent and
+## left to search the caves. Nothing after THE WAY DOWN, which asks for exactly this cut; the yield must be
+## known (a fixture's bare break names no material).
+func _mined_wrong(o: Interface.Observation, counts: Dictionary) -> bool:
+	if not o.mining_broke or int(counts.get(&"ore", 0)) > 0 or _done.has(&"way_down"):
+		return false
+	var rec: Dictionary = MaterialsRecords.RECORDS.get(String(o.mining_broke_material), {})
+	var got := StringName(String(rec.get("yields", String(o.mining_broke_material))))   # D0409's contract, read as data
+	if got == &"" or got == &"ore":
+		return false
+	_subs[&"mined_wrong"] = {"{broke}": Hotbar.item_label(got).to_lower()}
+	return true
+
+
 ## The surface walked from edge to edge with the verb known and nothing dug down (T037).
 func _way_down_wanted(o: Interface.Observation) -> bool:
 	var x_m: float = float(o.pos_x) / float(Fx.SCALE) / float(Interface.Observation.LOGIC_PX)
@@ -210,6 +226,7 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	_machine_ticks = _machine_ticks + 1 if on_machine else 0
 	note(&"aim_machine", _machine_ticks >= FAR_TICKS)
 	var counts: Dictionary = Payouts.pack_counts(o)
+	note(&"mined_wrong", _mined_wrong(o, counts))
 	var wrong: bool = _wrong_stack(o, counts)
 	note(&"dropped_wrong", wrong)
 	note(&"dropped_floor", o.drop_went == &"floor" and not wrong)   # the drop's own TOO FAR (D0428, stranger 5)

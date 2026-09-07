@@ -66,7 +66,7 @@ func _test_the_terrain_answers() -> void:
 	var o: Interface.Observation = _obs()
 	o.materials[30 * W + 30] = 2
 	var d: Dictionary = Inspector.describe(o)
-	_check(d.get("name", "") == "Ore Vein" and String(d["mode"]).begins_with("12 ore"), "a solid ore cell is a vein with its default yield (%s)" % str(d))
+	_check(d.get("name", "") == "Ore Vein" and String(d["mode"]).begins_with("12 ore — hold to cut it"), "a solid ore cell is a vein with its default yield, the hand verb first (D0450) (%s)" % str(d))
 	o.ore_yield[Vector2i(30, 30)] = 5
 	_check(String(Inspector.describe(o)["mode"]).begins_with("5 ore"), "an explicit yield overrides the default")
 	o.materials[30 * W + 30] = 0

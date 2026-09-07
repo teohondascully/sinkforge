@@ -42,7 +42,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_obs([]), 0.016)
 	h.observe(_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 12, "nine pack lessons and twelve moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 13, "nine pack lessons and thirteen moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -118,6 +118,32 @@ func _way_down_pins() -> void:
 
 ## D0443 (stranger 16): clay dropped on the floor beside a forge that takes ore, with ore in the pack, teaches
 ## WRONG STACK with both names filled in; ore dropped short of the same forge is the BESIDE lesson's case.
+## D0450 (stranger 26): a break whose yield is not ore, with no ore in the pack, teaches NOT ORE once and names
+## what fell; an ore break, a pack already holding ore, or a session past THE WAY DOWN, teaches nothing.
+func _mined_wrong_pins() -> void:
+	var h: Hints = Hints.new()
+	var clay: Interface.Observation = _obs()
+	clay.mining_broke = true
+	clay.mining_broke_material = &"clay"
+	h.observe(_obs(), 0.016)
+	h.observe(clay, 0.016)
+	_check(h.active_id() == &"mined_wrong" and h.active_text().begins_with("NOT ORE — that was clay,"), "clay broken with no ore held teaches NOT ORE naming clay (%s: %s)" % [h.active_id(), h.active_text().left(30)])
+	var h2: Hints = Hints.new()
+	var vein: Interface.Observation = _obs()
+	vein.mining_broke = true
+	vein.mining_broke_material = &"ore_iron"
+	h2.observe(vein, 0.016)
+	var held: Interface.Observation = _obs([["ore", 1]])
+	held.mining_broke = true
+	held.mining_broke_material = &"clay"
+	h2.observe(held, 0.016)
+	_check(h2.active_id() == &"" and h2.queued() == 0 and String(MaterialsRecords.RECORDS["ore_iron"]["yields"]) == "ore", "control: an ore_iron break (yield ore), then clay with ore in the pack, teach nothing (%s)" % h2.active_id())
+	var h3: Hints = Hints.new()
+	h3.restore_taught([&"way_down"])
+	h3.observe(clay, 0.016)
+	_check(h3.active_id() == &"" and h3.queued() == 0, "control: after THE WAY DOWN a clay break is the asked-for cut, not a miss (%s)" % h3.active_id())
+
+
 func _wrong_stack_pins() -> void:
 	var forge: Dictionary = {"cell": Vector2i(11, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {}, "output": {}}
 	var h: Hints = Hints.new()
@@ -191,6 +217,7 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	_air_pins(h, far, dry)
 	_way_down_pins()
 	_wrong_stack_pins()
+	_mined_wrong_pins()
 	var deep: Interface.Observation = _obs()
 	deep.cell.y = Interface.Observation.SKY_ROWS + 40
 	h.observe(deep, 0.016)
