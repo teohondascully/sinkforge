@@ -20,9 +20,10 @@ static func plant(grid: TileGrid, rng: SplitRng, cfg: Dictionary, surface: Packe
 	var last: int = -grid.width
 	var gap: int = int(cfg["gap_m"]) * cells_per_m
 	var chance: float = float(cfg["chance"]) / float(cells_per_m)    # legacy's rate was a metre of ground
-	var trunk_w: int = maxi(1, Relief.milli_cells(float(cfg["trunk_w_m"]), cells_per_m) / MILLI)
-	var rx: int = maxi(1, Relief.milli_cells(float(cfg["canopy_w_m"]), cells_per_m) / (2 * MILLI))
-	var ry: int = maxi(1, Relief.milli_cells(float(cfg["canopy_h_m"]), cells_per_m) / (2 * MILLI))
+	var g: Dictionary = geometry(cfg, cells_per_m)
+	var trunk_w: int = g["trunk_w"]
+	var rx: int = g["rx"]
+	var ry: int = g["ry"]
 	for col: int in grid.width:
 		if col >= keepout.x and col <= keepout.y:
 			continue
@@ -37,13 +38,29 @@ static func plant(grid: TileGrid, rng: SplitRng, cfg: Dictionary, surface: Packe
 			continue                                   # not enough sky above for trunk and canopy
 		if _blocked(grid, col, ground, trunk, trunk_w):
 			continue                                   # a hill cell already occupies the trunk space
-		for h: int in range(1, trunk + 1):
-			for dx: int in trunk_w:
-				grid.set_material(Vector2i(col + dx, ground - h), &"wood")
-		_canopy(grid, Vector2i(col + trunk_w / 2, top - ry), rx, ry)
+		plant_one(grid, col, ground, trunk, trunk_w, rx, ry)
 		last = col
 		planted += 1
 	return planted
+
+
+## The tree's cell geometry from a site's `tree` config: trunk width and the canopy's half-axes, in cells.
+static func geometry(cfg: Dictionary, cells_per_m: int) -> Dictionary:
+	return {
+		"trunk_w": maxi(1, Relief.milli_cells(float(cfg["trunk_w_m"]), cells_per_m) / MILLI),
+		"rx": maxi(1, Relief.milli_cells(float(cfg["canopy_w_m"]), cells_per_m) / (2 * MILLI)),
+		"ry": maxi(1, Relief.milli_cells(float(cfg["canopy_h_m"]), cells_per_m) / (2 * MILLI)),
+	}
+
+
+## One tree: a trunk of `trunk` cells of wood rising from the cell above `ground` at `col`, `trunk_w` wide,
+## and the canopy ellipse over it. Shared by the pass and by a start record's `tree` fixture (D0425), so
+## the tutorial's guaranteed tree is the same shape as the world's.
+static func plant_one(grid: TileGrid, col: int, ground: int, trunk: int, trunk_w: int, rx: int, ry: int) -> void:
+	for h: int in range(1, trunk + 1):
+		for dx: int in trunk_w:
+			grid.set_material(Vector2i(col + dx, ground - h), &"wood")
+	_canopy(grid, Vector2i(col + trunk_w / 2, ground - trunk - ry), rx, ry)
 
 
 static func _blocked(grid: TileGrid, col: int, ground: int, trunk: int, trunk_w: int) -> bool:

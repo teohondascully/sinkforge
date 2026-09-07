@@ -9,8 +9,9 @@ stamps it, in file order, through the sim's own verbs (A′ step 3h, D0353).
 
 `tutorial.yaml` is legacy's `seed_tutorial` translated: cells are metres from the spawn column on the
 surface row; materials are this build's (`ore` → `ore_iron`, `earth` → `clay`); per-metre stocks are
-written per 4 px cell (÷16, D0349). Not carried: the tutorial tree (flora and the `wood`/`leaves`
-materials are not lifted yet) and the starter tool kit (a dead tool ladder, plan §3.2). `dev_kit.yaml`
+written per 4 px cell (÷16, D0349). The tutorial tree is carried since D0425 (five `solid` fixtures of
+`wood` and `leaves`, moved to the pad's far side because this world's trees are solid); not carried: the
+starter tool kit (a dead tool ladder, plan §3.2). `dev_kit.yaml`
 is legacy's `_dev_seed_pack` minus the splitter (a ruling), for exercising the build loop without
 hand-mining first; it is opt-in and stamps nothing into the world.
 

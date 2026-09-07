@@ -17501,3 +17501,40 @@ pad (T031); the four ring kinds (T032); the wood rung has still not been played 
 short, or ten seconds late.
 
 **Reverse cost:** one Callable, one colour, one latch, one wrap function, one signed tick.
+
+## D0425 · 2026-09-06 · The fourth stranger: legacy's guaranteed tutorial tree returns as a `tree` fixture; the ore socket tried and reversed
+
+**The run** (`docs/playtests/2026-09-06_stranger4.md`, after D0424): first ore at 1.0 s of game time,
+ingots by 14.5 s with the drop read as feeding ("-5 ore", the flames); then the wood rung, and the same
+fall stranger 3 took -- past the shaft east of the pad, 46 m down, 4 m climbed in seven bursts of
+grappling. The rung opened with no ring: the site keeps worldgen trees 12 m off the spawn, the seed's
+nearest trunks stand 22 m either side (one across the shaft), and `TargetGuide` searches 10 m. Legacy
+planted a guaranteed tree beside its spawn for this exact reason (`world_seeder.gd:90`, "unreachable on
+the surface early"); D0353 named it "not carried".
+
+**Decided:** (1) a `tree` fixture kind in `data/starts/` -- `{kind: tree, dx, trunk_m}` -- planted by
+`TreePass.plant_one`, factored out of the pass so the tutorial's tree is the shape of every other tree
+(the first cut, five `solid` metres in legacy's T, read as a crate beside the world's cell-canopy trees);
+the site's `tree` config gives the trunk width and canopy, with a fallback for a bare stamp. The
+tutorial's stands at -6 m: on the pad, past the forge pocket, off the adit's path, on the side away from
+the shaft (legacy's +2 assumed walk-through trees; this world's are solid). (2) The playthrough suite's
+walk to the adit is centred to a tenth of a metre: arriving from the tree's side with the loose tolerance
+left the body's edge over the coal metre, which held it up when the metre under it opened. The driver,
+not the game. (3) Rank 7's ore half, TRIED AND REVERSED: legacy's dark socket under each nugget
+(`terrain_painter.gd:127`, offset down-right) as the cell below-right of a speck. At the surface vein it
+was invisible in the nugget colour (0.30,0.34,0.43 against a matrix of 0.21,0.24,0.31) and marginal as a
+matrix shadow; it put a socket cell 0.106 from deepstone (the palette floor is 0.25) and under the wall
+lode's recess pins. Not kept. **The real lever, named:** legacy scaled the nugget count by the cell's
+richness (`nugget_count + richness - 1`, capped at count + 6 -- twelve crystals on a rich cell against
+six); the port draws a flat six. Carrying it needs the deposit plane in the bake.
+
+**Pinned:** `test_world_seeder` (the tree's trunk cells and canopy; a tree without a trunk refused by
+name; "tree" was the suite's own example of an unknown kind -- now "statue"), `test_tutorial_playthrough`
+(fells the tutorial tree 5.2 m from spawn; green end to end), the record's neighbours
+(`shallow_clay_content`, `tutorial_teaching`, `interface_verbs`, `water_painter`, `beacon_probe`,
+`tree_pass`). Seen on the seat: `stranger4_fix/after_spawn_tree.png`.
+
+**Why:** two strangers in a row left the pad for a tree the tutorial never gave them, and the world
+beside the pad is a shaft.
+
+**Reverse cost:** one record line and one fixture kind; the tree pass gained a public function.

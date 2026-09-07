@@ -15,4 +15,6 @@ fields:
   #   machine id dx dy                 -- a machine placed there (the cell must be open by then)
   #   pack    item count               -- items in the pack, counted as produced (conservation holds)
   #   pile    item count dx dy         -- items lying on the floor of that metre, to be walked over (D0409)
+  #   tree    dx trunk_m               -- a tree rooted on the surface at dx, planted by the world's own tree
+  #                                      pass in the site's shape: legacy's guaranteed tutorial tree (D0425)
   fixtures: {required: true, type: list}

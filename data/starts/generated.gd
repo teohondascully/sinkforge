@@ -193,6 +193,11 @@ const RECORDS: Dictionary = {
 				"amount": 8,
 			},
 			{
+				"kind": "tree",
+				"dx": -6,
+				"trunk_m": 2,
+			},
+			{
 				"kind": "open",
 				"cells": [
 					[

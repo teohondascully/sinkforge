@@ -228,9 +228,10 @@ modifier, teach it as a lesson when the first dash lands, or make CLEAR_PLAN a v
 
 **T031 · The shaft beside the pad swallows a stranger who walks right for two seconds.** The third
 stranger, beside the forge with the smelt rung open, pressed D for 120 ticks and stood 22 m down THE
-CLAYBAND with no line and the way back a lesson it had not met (D0424). Legacy's opening had the same
-shaft. *Question: is a twenty-metre fall a step from the first forge the intended first descent, or does
-the pad want a lip, a ledge, or the shaft's mouth a few metres further off?*
+CLAYBAND with no line and the way back a lesson it had not met (D0424); the fourth took the same fall
+looking for a tree (D0425 gives the wood rung a tree on the pad, which removes that reason to leave it).
+Legacy's opening had the same shaft. *Question: is a twenty-metre fall a step from the first forge the
+intended first descent, or does the pad want a lip, a ledge, or the shaft's mouth a few metres further off?*
 
 **T032 · Four kinds of ring on the opening frame.** The tutorial's target ring (pale gold, breathing), the
 machine status pips (a small ring and a dot), the grapple's landing ring (hemp now, and gated, D0424), and

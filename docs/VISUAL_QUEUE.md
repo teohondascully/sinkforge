@@ -205,6 +205,10 @@ the opening frame as solid (0 of 9). Stamped below solid, flat, faces rimmed abo
 ### V32 · Ore in rock is a grey smear
 **What:** iron reads as grey cells with white dots; coal as black cells; against the static both are
 "another mosaic". **Where:** `material_look.gd` nugget rendering, `ore_painter.gd` pips.
+**Tried 2026-09-06 (D0425):** legacy's dark socket cell under each speck -- invisible in the nugget colour,
+marginal as a matrix shadow, and it broke the palette floor and the wall lode's recess pins. Reversed.
+**The lever:** legacy's nugget count scaled with the cell's richness (6 -> up to 12 on a rich cell); the
+port draws a flat 6. Needs the deposit plane readable from the bake.
 
 ### V33 · Lode outlines are thin orange wireframes
 **What:** the lode's flecked socket reads as a 1 px orange contour (r03, r20). **Where:**

@@ -16,7 +16,10 @@ extends RefCounted
 ## The surface row is the generator's datum, `ShaftGenerator.SKY_ROWS`, in metres.
 
 const SURFACE_ROW_M: int = ShaftGenerator.SKY_ROWS / LogicGrid.TERRAIN_PER_LOGIC
-const KINDS: Array[String] = ["solid", "open", "room", "lode", "machine", "pack", "pile"]
+const KINDS: Array[String] = ["solid", "open", "room", "lode", "machine", "pack", "pile", "tree"]
+## A `tree` fixture's shape when the record names no site (a bare stamp in a suite): a metre-cell trunk,
+## a three-by-two canopy -- the site's own `tree` config when it can be read.
+const TREE_FALLBACK: Dictionary = {"trunk_w_m": 0.5, "canopy_w_m": 3.0, "canopy_h_m": 2.5}
 
 static var last_refusal: String = ""
 
@@ -59,10 +62,18 @@ static func stamp_record(world: World, items: Items, machines: Machines, start: 
 	var fixtures: Array = start.get("fixtures", [])
 	if not _valid(world, fixtures, anchor):
 		return false
+	var tree_cfg: Dictionary = _tree_cfg(str(start.get("site", "")))
 	for f: Dictionary in fixtures:
-		if not _stamp_one(world, items, machines, f, anchor):
+		if not _stamp_one(world, items, machines, f, anchor, tree_cfg):
 			return false
 	return true
+
+
+## The site's `tree` config for the record's `tree` fixtures, or the fallback when the record names none.
+static func _tree_cfg(site_id: String) -> Dictionary:
+	if site_id == "" or not StrataData.exists(StringName(site_id)):
+		return TREE_FALLBACK
+	return StrataData.get_site(StringName(site_id)).get("tree", TREE_FALLBACK)
 
 
 ## The air metre the body stands in at a new game: above the surface at the spawn column.
@@ -80,6 +91,9 @@ static func _cells_of(f: Dictionary, anchor: Vector2i) -> Array[Vector2i]:
 		for dy: int in rows:
 			for dx: int in int(f.get("w", 0)):
 				out.append(anchor + Vector2i(int(f.get("dx", 0)) + dx, int(f.get("dy", 0)) + dy))
+	elif str(f.get("kind", "")) == "tree":
+		for dy: int in range(1, int(f.get("trunk_m", 0)) + 3):    # the trunk metres and two of canopy over them
+			out.append(anchor + Vector2i(int(f.get("dx", 0)), -dy))
 	elif f.has("dx"):
 		out.append(anchor + Vector2i(int(f["dx"]), int(f["dy"])))
 	return out
@@ -104,6 +118,9 @@ static func _valid(world: World, fixtures: Array, anchor: Vector2i) -> bool:
 		if kind == "machine" and not MachineDef.exists(StringName(str(f.get("id", "")))):
 			last_refusal = "unknown machine: %s" % str(f.get("id", ""))
 			return false
+		if kind == "tree" and int(f.get("trunk_m", 0)) <= 0:
+			last_refusal = "tree fixture needs trunk_m in metres: %s" % [f]
+			return false
 		if kind in ["pack", "pile"] and int(f.get("count", 0)) <= 0:
 			last_refusal = "%s fixture with no count: %s" % [kind, str(f.get("item", ""))]
 			return false
@@ -114,9 +131,17 @@ static func _valid(world: World, fixtures: Array, anchor: Vector2i) -> bool:
 	return true
 
 
-static func _stamp_one(world: World, items: Items, machines: Machines, f: Dictionary, anchor: Vector2i) -> bool:
+static func _stamp_one(world: World, items: Items, machines: Machines, f: Dictionary, anchor: Vector2i, tree_cfg: Dictionary) -> bool:
 	var cells: Array[Vector2i] = _cells_of(f, anchor)
 	match str(f["kind"]):
+		"tree":
+			# THE GUARANTEED TUTORIAL TREE (legacy world_seeder.gd:90-99; D0425), planted by the world's own
+			# tree pass so it is the same shape as every other tree: a trunk `trunk_m` tall centred in its
+			# metre, the site's canopy over it. Cells, not metres: a metre-block tree read as a crate.
+			var per: int = LogicGrid.TERRAIN_PER_LOGIC
+			var g: Dictionary = TreePass.geometry(tree_cfg, per)
+			var col: int = (anchor.x + int(f["dx"])) * per + (per - int(g["trunk_w"])) / 2
+			TreePass.plant_one(world.grid, col, anchor.y * per, int(f["trunk_m"]) * per, g["trunk_w"], g["rx"], g["ry"])
 		"solid":
 			var material: StringName = StringName(str(f["material"]))
 			world.set_solid(cells[0], material)

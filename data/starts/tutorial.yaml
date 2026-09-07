@@ -26,6 +26,15 @@ fixtures:
   - {kind: lode, dx: 5, dy: 5, material: ore_iron, amount: 8}
   - {kind: lode, dx: 5, dy: 6, material: ore_iron, amount: 8}
   - {kind: lode, dx: 5, dy: 7, material: ore_iron, amount: 8}
+  # THE GUARANTEED TUTORIAL TREE (legacy world_seeder.gd:90-99, TUTORIAL_TREE_COL 51; D0425): "the wood
+  # source the bazaar step needs, since depth-banded worldgen plants trees out past the ruin, unreachable
+  # on the surface early." The same is true here -- the site keeps trees 12 m off the spawn and the seed's
+  # nearest stands 22 m away, across the shaft strangers 3 and 4 fell into looking for one. Legacy's
+  # trunk was two metres with a crown of three leaf metres; here the world's own tree pass plants it, so
+  # it is the shape of every other tree (a metre-block tree read as a crate). Legacy stood it at +2
+  # between spawn and the shaft because its trees were walk-through; this world's are solid, so it stands
+  # at -6, on the pad past the forge pocket, off the adit's path and on the side away from the shaft.
+  - {kind: tree, dx: -6, trunk_m: 2}
   # The bootstrap forge pocket (MINESHAFT_FORGE_CELL 46): a shallow one-deep well off the drill shaft.
   - {kind: open, cells: [[-3, 0], [-3, 1]]}
   - {kind: solid, dx: -3, dy: 2, material: clay, deposit: 0}

@@ -62,12 +62,13 @@ func _body_m() -> Vector2:
 	return Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE) / M_PX
 
 
-## Walk until the body's centre is within a third of a metre of `x_m`, jumping when a step blocks the way.
-func _walk_to(x_m: float, max_ticks: int = 900) -> bool:
+## Walk until the body's centre is within `tol` metres of `x_m` (a third by default), jumping when a step
+## blocks the way.
+func _walk_to(x_m: float, max_ticks: int = 900, tol: float = 0.34) -> bool:
 	var stuck: int = 0
 	for _i: int in max_ticks:
 		var dx: float = x_m - _body_m().x
-		if absf(dx) < 0.34:
+		if absf(dx) < tol:
 			_tick(_frame())
 			return true
 		var before: float = _body_m().x
@@ -160,7 +161,9 @@ func _rungs_wood_and_build() -> void:
 	_check(arrived, "the body walks to the trunk (%.1f m from spawn, at x %.1f m)" % [absf(float(trunk.x) / 4.0 - float(ANCHOR.x)), _body_m().x])
 	var felled: int = _fell(trunk)
 	_check(obj.is_done(&"wood"), "rung 3 latches: wood in the pack (%d) after %d trunk cells felled -- sixteen cells make a block" % [items.pack.count(&"wood"), felled])
-	_walk_to(float(ANCHOR.x) + 4.5)
+	# Centred on the metre, tightly: arriving from the tree's side with the loose tolerance left the body's
+	# edge over the coal metre beside it, which held it up when the metre under it opened (D0425).
+	_walk_to(float(ANCHOR.x) + 4.5, 900, 0.1)
 	_check(items.pack.count(&"drill") == 0, "the drill lies in the adit below, not in the pack: nothing was stocked")
 	_dig_down_to(ANCHOR + Vector2i(4, 3))
 	_wait(30, func() -> bool: return items.pack.count(&"drill") > 0)

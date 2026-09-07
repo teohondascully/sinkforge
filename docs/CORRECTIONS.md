@@ -480,6 +480,11 @@ file touches three `_check` lines (one rewritten, two removed). No partition of 
 number was not read off any output; the standing rule against exactly this was in the same session's
 brief. What stands: one pin changed, 33 unchanged and green (`ALL PASS (hotbar) -- 34 asserted`).
 
+**D0425, read and deliberately excluded, not silently dropped:** its header says "tried and reversed" of
+an experiment inside the same entry (the ore socket, captured, measured against two suites, and not kept).
+Nothing earlier claimed the socket worked; there is no prior claim to correct. Noted here so the freshness
+gate stops flagging it, with the same reasoning as D0181 and D0185.
+
 ## What this page is not
 
 Not every ledger entry that says "found" or "fixed" is a correction — most entries describe new work,

@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_refusals_leave_the_world_untouched()
 	_test_twins_sign_the_same_and_the_real_site_takes_it()
 	_test_a_room_fixture_opens_a_rectangle_and_floors_it()
+	_test_the_tutorial_tree_is_planted_by_the_worlds_own_pass()
 	_finish("world_seeder")
 
 
@@ -86,8 +87,10 @@ func _test_refusals_leave_the_world_untouched() -> void:
 	_check(not WorldSeeder.stamp_record(world, items, machines, bad_machine) and WorldSeeder.last_refusal == "unknown machine: ore_vent", "an unknown machine, caught before the open fixture ahead of it stamped")
 	var far: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "lode", "dx": 40, "dy": 0, "material": "coal", "amount": 1}]}
 	_check(not WorldSeeder.stamp_record(world, items, machines, far) and WorldSeeder.last_refusal.begins_with("cell out of bounds"), "a cell off the world")
-	var odd: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "tree", "dx": 0, "dy": 0}]}
-	_check(not WorldSeeder.stamp_record(world, items, machines, odd) and WorldSeeder.last_refusal == "unknown fixture kind: tree", "an unknown kind")
+	var odd: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "statue", "dx": 0, "dy": 0}]}
+	_check(not WorldSeeder.stamp_record(world, items, machines, odd) and WorldSeeder.last_refusal == "unknown fixture kind: statue", "an unknown kind")
+	var stump: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "tree", "dx": 0}]}
+	_check(not WorldSeeder.stamp_record(world, items, machines, stump) and WorldSeeder.last_refusal.begins_with("tree fixture needs trunk_m"), "a tree with no trunk is refused by name")
 	var empty_pack: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "pack", "item": "ore", "count": 0}]}
 	_check(not WorldSeeder.stamp_record(world, items, machines, empty_pack), "a pack fixture with no count")
 	_check(world.state_signature() + items.state_signature() + machines.state_signature() == before, "after every refusal nothing was stamped")
@@ -137,3 +140,33 @@ func _test_a_room_fixture_opens_a_rectangle_and_floors_it() -> void:
 	_check(not WorldSeeder.stamp_record(world, items, machines, bad) and WorldSeeder.last_refusal.begins_with("room fixture needs"), "a room with no width is refused by name")
 	var bad_floor: Dictionary = {"spawn_col_m": 32, "fixtures": [{"kind": "room", "dx": 0, "dy": 4, "w": 2, "h": 2, "floor": "ore"}]}
 	_check(not WorldSeeder.stamp_record(world, items, machines, bad_floor), "and an unknown floor material")
+
+
+## D0425 (strangers 3 and 4): legacy's guaranteed tutorial tree, back as a `tree` fixture -- planted through
+## `TreePass.plant_one` so it is the shape of every other tree. The tutorial's stands six metres left of
+## spawn: a two-metre trunk of wood centred in its metre, leaves over it, air beside it.
+func _test_the_tutorial_tree_is_planted_by_the_worlds_own_pass() -> void:
+	_flat()
+	_check(WorldSeeder.stamp(world, items, machines, &"tutorial", &"shallow_clay"), "the tutorial stamps with its tree (%s)" % WorldSeeder.last_refusal)
+	var per: int = LogicGrid.TERRAIN_PER_LOGIC
+	var g: Dictionary = TreePass.geometry(StrataData.SHALLOW_CLAY["tree"], per)
+	var col: int = (32 - 6) * per + (per - int(g["trunk_w"])) / 2
+	var ground: int = WorldSeeder.SURFACE_ROW_M * per
+	var wood: int = 0
+	for h: int in range(1, 2 * per + 1):
+		if world.grid.get_material(Vector2i(col, ground - h)) == &"wood":
+			wood += 1
+	_check(wood == 2 * per, "a two-metre trunk of wood over the surface at -6 m (%d of %d cells)" % [wood, 2 * per])
+	_check(world.grid.get_material(Vector2i(col, ground - 2 * per - 1)) == &"leaves", "leaves directly over the trunk")
+	_check(not world.grid.is_solid(Vector2i(col - 2 * int(g["rx"]), ground - 1)) and not world.grid.is_solid(Vector2i(col, ground - 2 * per - 2 * int(g["ry"]) - 2)),
+		"air beside the trunk's foot and above the canopy: the tree is a tree, not a metre-block")
+	var trunk_cells: int = 0
+	var leaf_cells: int = 0
+	for c: Vector2i in world.terrain_cells_of(Vector2i(26, WorldSeeder.SURFACE_ROW_M - 1)):
+		if world.grid.get_material(c) == &"wood":
+			trunk_cells += 1
+	for c: Vector2i in world.terrain_cells_of(Vector2i(25, WorldSeeder.SURFACE_ROW_M - 3)):
+		if world.grid.get_material(c) == &"leaves":
+			leaf_cells += 1
+	_check(trunk_cells == int(g["trunk_w"]) * per and leaf_cells > 0 and leaf_cells < per * per,
+		"the trunk metre is %d of 16 cells wood (the site's trunk width), the canopy's edge metre part leaves (%d): cells, not metres" % [trunk_cells, leaf_cells])
