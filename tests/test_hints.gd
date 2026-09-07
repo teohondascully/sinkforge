@@ -45,17 +45,25 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 9, "nine pack lessons and nine moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
-## D0436: the same slash held on open air teaches NOTHING THERE, on the same count; the far ticks and the
-## air ticks are separate counts, so alternating the two teaches neither.
+## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
+## far ticks and the air ticks are separate counts, so alternating the two teaches neither.
 func _air_pins(h: Hints, far: Interface.Observation, dry: Interface.Observation) -> void:
 	var air: Interface.Observation = _obs()
 	air.aim_refusal = &"air"
-	for i: int in 2 * Hints.FAR_TICKS:
+	for i: int in 2 * Hints.AIR_TICKS:
 		h.observe(air if i % 2 == 0 else far, 0.016)
-	_check(h.active_id() == &"", "alternating air and far refusals for %d ticks teaches nothing (%s)" % [2 * Hints.FAR_TICKS, h.active_id()])
-	for _i: int in Hints.FAR_TICKS:
+	_check(h.active_id() == &"", "alternating air and far refusals for %d ticks teaches nothing (%s)" % [2 * Hints.AIR_TICKS, h.active_id()])
+	var broke: Interface.Observation = _obs()
+	broke.aim_refusal = &"air"
+	broke.mining_broke = true
+	for _i: int in Hints.AIR_TICKS - 1:
 		h.observe(air, 0.016)
-	_check(h.active_id() == &"aim_air" and h.active_text().begins_with("NOTHING THERE"), "held on air for %d ticks fires NOTHING THERE (%s)" % [Hints.FAR_TICKS, h.active_id()])
+	h.observe(broke, 0.016)
+	for _i: int in Hints.AIR_TICKS - 1:
+		h.observe(air, 0.016)
+	_check(h.active_id() == &"", "a break under the pointer restarts the count: %d air ticks, a break, %d more teach nothing (%s)" % [Hints.AIR_TICKS - 1, Hints.AIR_TICKS - 1, h.active_id()])
+	h.observe(air, 0.016)
+	_check(h.active_id() == &"aim_air" and h.active_text().begins_with("NOTHING THERE") and Hints.AIR_TICKS > 3 * Hints.FAR_TICKS, "the %dth tick on air fires NOTHING THERE, a count well past TOO FAR's %d (%s)" % [Hints.AIR_TICKS, Hints.FAR_TICKS, h.active_id()])
 	for _i: int in 30:
 		h.observe(dry, 0.5)
 

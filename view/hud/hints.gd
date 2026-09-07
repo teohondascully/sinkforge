@@ -84,6 +84,7 @@ var _prev_vel_y: int = 0
 var _far_ticks: int = 0
 var _air_ticks: int = 0
 const FAR_TICKS: int = 20
+const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
 var _thrown: bool = false           ## a line has been live once this session; the grapple is known
 
 
@@ -136,8 +137,10 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	note(&"too_far", _far_ticks >= FAR_TICKS)
 	# The same slash on AIR (D0436, stranger 10): TOO FAR had taught that the slashed square means "past
 	# your reach", so a pointer a hand's width off a thin trunk read as unreachable for eighteen seconds.
-	_air_ticks = _air_ticks + 1 if o.aim_refusal == &"air" else 0
-	note(&"aim_air", _air_ticks >= FAR_TICKS)
+	# A metre breaking under a held pointer leaves it on air too, for as long as the re-aim takes: the
+	# count restarts at a break and runs a second and a half, so ordinary digging never hears this.
+	_air_ticks = 0 if o.mining_broke else (_air_ticks + 1 if o.aim_refusal == &"air" else 0)
+	note(&"aim_air", _air_ticks >= AIR_TICKS)
 	note(&"dropped_floor", o.drop_went == &"floor")   # the drop's own TOO FAR (D0428, stranger 5)
 	note(&"in_water", o.wet)
 	note(&"deep_enough", float(MaterialLook.depth_m(o.cell.y)) >= DEPTH_HINT_M)

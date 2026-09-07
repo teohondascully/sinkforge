@@ -269,3 +269,11 @@ spawn) and stood at the screen's right border with the ground running under the 
 past it; the camera clamps to the grid and the body clamps a tick later (frame 28 of run 11, frame 21 of
 run 12). *Question: a cliff, a sheer bore wall in the lore's own material, dark rock to the edge of the
 canvas, or a wider world so the edge is never reached in the opening?*
+
+**T037 · Nothing says the way down is to dig.** Stranger 15, sent to descend twenty metres, mined four
+ore in the first hold and then walked the pad for a minute looking for "an entrance" to the caverns
+visible below, pressing Q, E, Tab and Shift; "no access to deep areas" was the verdict. The GDD's identity
+is solid earth you carve into, and the only sentence that says so is the fourth rung's "dig down to it".
+*Question: a moment lesson ("THE WAY DOWN — the ground is rock you can cut: point at the floor and hold
+[MINE]") fired when the first rung is done and the body has crossed the pad without digging; or the
+first rung's own how-to naming the floor as rock; or leave it to the fourth rung and accept the walk.*

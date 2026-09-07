@@ -160,6 +160,18 @@ func _band_pins(door: Interface, world: World, body: Body) -> void:
 		"control: the ruler's nearest ore from the shaft's lip is the buried vein, %.1f m below the body's centre and past its reach" % ((ruler.y - body_px.y) / 16.0))
 	_check(ring != TargetGuide.NONE and ring != ruler and absf(ring.y - body_px.y) <= TargetGuide.BAND_PX and ring.x < body_px.x - 6.0 * 16.0,
 		"MINE rings the vein at the body's own level instead, %.1f m to the left (the ruler's was %.1f m off)" % [(body_px.x - ring.x) / 16.0, sqrt(ruler_d) / 16.0])
+	# D0438 (stranger 14): the same rule for a machine. From the lip the auto forge buried in the shaft is the
+	# nearer processor by the ruler; SMELT rings the surface forge ten metres west at the body's level.
+	var forge: Vector2 = TargetGuide.target(&"smelt", o)
+	var buried: Vector2 = TargetGuide.NONE
+	var buried_d: float = 1.0e18
+	for rec: Dictionary in o.machines:
+		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * 16.0
+		if rec.get("id", &"") == &"processor" and at.distance_squared_to(body_px) < buried_d:
+			buried_d = at.distance_squared_to(body_px)
+			buried = at
+	_check(buried != TargetGuide.NONE and buried.y - body_px.y > TargetGuide.BAND_PX and absf(buried.x - body_px.x) < 16.0, "control: the ruler's nearest forge from the lip is the one buried in the shaft, %.1f m below" % ((buried.y - body_px.y) / 16.0))
+	_check(forge != TargetGuide.NONE and forge != buried and absf(forge.y - body_px.y) <= TargetGuide.BAND_PX and forge.x < body_px.x - 8.0 * 16.0, "SMELT rings the surface forge at the body's level instead, %.1f m to the left" % ((body_px.x - forge.x) / 16.0))
 	body.pos_x = spawn_x + 7 * 16 * Fx.SCALE + 8 * Fx.SCALE            # in the shaft's mouth, a metre down
 	body.pos_y += 16 * Fx.SCALE
 	o = door.observe(Interface.Envelope.oracle_over(world.grid))
@@ -202,3 +214,8 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 	# D0433: the ring tightens as the body arrives, so it never sits on the miner's chest.
 	_check(is_equal_approx(TargetGuide.ring_m(0.5), TargetGuide.RING_NEAR_M) and is_equal_approx(TargetGuide.ring_m(6.0), TargetGuide.RING_M) and TargetGuide.ring_m(2.5) > TargetGuide.RING_NEAR_M and TargetGuide.ring_m(2.5) < TargetGuide.RING_M,
 		"the ring is %.2f m beside the target, %.2f m far off, between in between" % [TargetGuide.ring_m(0.5), TargetGuide.ring_m(6.0)])
+	# D0438 (stranger 13): where the ring has tightened to a speck, a chevron hangs over the target, clear of
+	# the ground line and the sprite: it rises more than the miner's half-height above a cell at the feet.
+	var beside: float = Vector2(1.5, 1.25).length()   # a cell a step to the side of the boot, from the body's centre
+	_check(TargetGuide.near(beside) and TargetGuide.near(TargetGuide.NEAR_M) and not TargetGuide.near(3.0), "the chevron shows for a cell beside the boot (%.2f m from the centre), within %.1f m, and not beyond" % [beside, TargetGuide.NEAR_M])
+	_check(TargetGuide.CHEVRON_RISE_M - TargetGuide.CHEVRON_BOB_M > 0.5 and TargetGuide.CHEVRON_HALF_M * 2.0 * 25.6 >= 10.0, "it rises %.2f m over the target (past the ground line from a cell at the feet) and is %.0f px wide at play zoom" % [TargetGuide.CHEVRON_RISE_M, TargetGuide.CHEVRON_HALF_M * 2.0 * 25.6])

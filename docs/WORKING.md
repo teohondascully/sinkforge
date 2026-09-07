@@ -415,6 +415,12 @@ reached BUILD at 49 s; strangers 11 and 12 never mined an ore, because one D pre
 pointer moved the ring to the shaft's buried ore. The ring now prefers hits at the body's own level;
 the slash on air teaches NOTHING THERE; the seat settles the body before every frame (`settled_ticks`,
 `still`). Named: T034 the felled crown floats, T035 run speed against the pad, T036 the world's edge.
+**D0437:** the playtest seat boots muted (the director was on the machine); `--muted` for any scripted
+boot. **Strangers 13-15 (D0438)** on the muted seats: one of three mined ore quickly; S13 dug under their
+own feet and never saw the nine-pixel ring; S14's smelt ring pointed into the shaft (the level rule now
+covers machines and piles); S15 never dug (T037). Taken: the near chevron (NEAR_M 2.2 from the body's
+centre), "a step to your LEFT", the camera in the seat's settle, NOTHING THERE at 90 ticks restarted by a
+break, and T034 provisionally: a felled trunk's crown crumbles (`TreeFall`, grounded-wood support).
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -441,8 +447,9 @@ T031 (taken provisionally in D0434: the chimney capped; overrule by deleting two
 (four ring kinds); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
 at zero; the forks T024-T030.
 
-**Cheap next steps that need no ruling:** a batch of three strangers on the D0436 build (the level-first
-ring and the settled frame are untested by a stranger); the large map as a wider
+**Cheap next steps that need no ruling:** a batch of three strangers on the D0438 build (the chevron, the
+LEFT sentence and the machine-level ring are untested by a stranger); T037's "the way down is to dig"
+lesson; the large map as a wider
 window; the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
 instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
 bake (V32).

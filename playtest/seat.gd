@@ -13,11 +13,16 @@ var ready: bool = false
 ## sliding: the stranger aimed at the trunk where the frame showed it, the body slid a hand's width on,
 ## and eighteen seconds of MINE went into the air beside it. When the sequence is spent the seat releases
 ## every input and runs on, up to SETTLE_MAX ticks, until the body's velocity is zero -- a slide ends, a
-## fall lands -- then captures. `settled_ticks` in the observation says how many it took and `still`
-## whether it got there. A command with "settle": false keeps the raw cut.
-const SETTLE_MAX: int = 90
+## fall lands -- AND the camera has stopped: the rig eases after the body (`CameraRig.FOLLOW_SPEED`, the
+## lead's own easing), so a frame taken the tick the body stopped still had the world sliding under the
+## pointer by two metres. Then it captures. `settled_ticks` in the observation says how many it took and
+## `still` whether it got there. A command with "settle": false keeps the raw cut.
+const SETTLE_MAX: int = 120
+const CAMERA_STILL_TICKS: int = 6   ## the pixel-snapped camera unmoved this long is at rest
 var settling: int = -1              ## ticks spent settling this burst; -1 while the sequence still runs
 var settle: bool = true
+var _camera_prev: Vector2 = Vector2.INF
+var _camera_still: int = 0
 
 
 func _initialize() -> void:
@@ -68,6 +73,8 @@ func _physics_process(_delta: float) -> bool:
 			return false
 		bridge.apply({}, root)
 		settling = 0
+	_camera_still = _camera_still + 1 if game.camera.position == _camera_prev else 0
+	_camera_prev = game.camera.position
 	if settle and settling < SETTLE_MAX and _moving():
 		settling += 1
 		return false
@@ -76,10 +83,11 @@ func _physics_process(_delta: float) -> bool:
 	return false
 
 
-## Whether the body is still moving: the one sim fact the seat reads, to know when the frame is honest.
+## Whether the picture is still changing under a still hand: the body's velocity (the one sim fact the
+## seat reads) and the camera's pixel position.
 func _moving() -> bool:
 	var body: Body = game.door.services()["body"]
-	return body.vel_x != 0 or body.vel_y != 0
+	return body.vel_x != 0 or body.vel_y != 0 or _camera_still < CAMERA_STILL_TICKS
 
 
 func _process(_delta: float) -> bool:
@@ -112,6 +120,7 @@ func _process(_delta: float) -> bool:
 	bridge.begin(command)
 	settle = bool(command.get("settle", true))
 	settling = -1
+	_camera_still = 0
 	remaining = 0
 	return false
 

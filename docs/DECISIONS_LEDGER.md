@@ -17835,3 +17835,43 @@ with them (13-15, at 21, 17 and 17 bursts; void, not archived); the batch relaun
 the director's speakers with nobody's ear on them.
 
 **Reverse cost:** one line in the seat, one flag.
+
+## D0438 · 2026-09-06 · Strangers 13-15: the level rule for machines, the near chevron, the camera in the settle, the crown falls with the trunk (T034 taken provisionally)
+
+**Decided:** six changes from the batch that tested D0436 (`docs/playtests/2026-09-06_strangers13-15.md`).
+(1) THE LEVEL RULE FOR MACHINES AND PILES. D0436 ranked terrain hits at the body's level first and left
+`_nearest_machine`/`_nearest_pile` on the ruler; stranger 14's SMELT ring chose the auto forge buried in
+the drill shaft (4.8 m below the body's centre) over the surface forge eighteen metres west, and the drop
+fell short. One `_ranked` for all three, pinned with a ruler control. (2) THE CHEVRON WHEN YOU ARE THERE.
+D0433's tightened ring is a nine-pixel speck beside the boot; stranger 13 stood on the pad with the vein a
+step left, dug under their own feet, and never saw it. Within NEAR_M a chevron hangs CHEVRON_RISE_M over
+the target, bobbing, clear of the ground line and the sprite. NEAR_M is 2.2 m, not 1.5: it is measured
+from the body's CENTRE, 1.25 m over the feet, and a cell beside the boot is 1.6-2.0 m off -- at 1.5 the
+near state never fired for the thing it was for (measured on the first capture; the second shows the
+chevron). (3) The first rung's how-to says "a step to your LEFT", not "at your feet", which stranger 13
+read as "below you". The record puts the vein at -2..-1; the ring carries it once the body moves. (4) THE
+CAMERA IN THE SETTLE. D0436 settled the body; the rig eases after it (`FOLLOW_SPEED`, the lead's own
+easing) for ~50 more ticks, and my own first live check aimed at a trunk the frame showed two metres from
+where the settled camera put it. The seat now also waits for the pixel-snapped camera to hold still for
+CAMERA_STILL_TICKS; SETTLE_MAX 120. Measured: a 32-tick walk settles in 68 ticks. (5) NOTHING THERE at
+AIR_TICKS 90, the count restarted by a break: a metre breaking under a held pointer leaves it on air for as
+long as the re-aim takes, and D0436's 20 ticks docked the lesson on the second tick-third of every dig
+(strangers 13 and 14, my own check). (6) THE CROWN FALLS WITH THE TRUNK (T034 taken provisionally,
+`sim/mining/tree_fall.gd`, hooked in `MineHold.step` and `Interface._apply_mine`). After a wood cell
+breaks, leaves within 8 m that no chain of leaves connects to GROUNDED wood -- wood that reaches, through
+wood, a solid cell of anything else -- are queued nearest-first and crumble at two cells a tick; nothing is
+paid; a stub of wood in the foliage holds nothing and stays (its cuts are the player's wood). Grounded
+rather than "any wood" because the first live felling left one trunk cell inside the canopy's bottom row
+and the whole crown stood on it. A touching neighbour's crown stands on its own trunk. The queue is
+transient with the hold; a save mid-crumble leaves the rest standing. Pinned in `test_tree_fall` (13),
+verified live: the tutorial tree felled in two bites, crown gone within a second.
+
+**Also read:** the cap held for all three (five of five since D0434); the settled frame showed no streaks;
+S15 never dug (T037 named); the forge-fed sentence untested again.
+
+**Why:** two batches in a row lost the first rung to the pointer -- the ruler, then the speck -- while the
+verbs worked; and a canopy floating over nothing is the kind of frame the director reads as the whole
+game's quality.
+
+**Reverse cost:** one `_ranked`; the chevron block and two constants; one sentence; two seat constants;
+one constant and a reset; two hook lines and one file.

@@ -20,10 +20,12 @@ var aim_is_lode: bool = false
 ## the right rock from a step too far, three times, and the screen said nothing; the mark and the lesson
 ## read this field.
 var refusal: StringName = &""
+var crown: TreeFall = TreeFall.new()   ## the leaves a cut trunk leaves unsupported (T034, D0438)
 
 
 func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: DigPlan, lode: LodeWork, body: Body, building: bool) -> void:
 	refusal = &""
+	crown.crumble(world.grid)   # last tick's unsupported leaves, whatever this tick aims at
 	if not frame.has_aim:
 		last_aim = Vector2i(-1, -1)
 		aim_cell = Vector2i(-1, -1)
@@ -58,6 +60,7 @@ func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: D
 	mining.mine(world.grid, body.pos_x, body.pos_y, work, frame.mine_held and visible)
 	if mining.broke_this_tick:
 		items.yield_break(mining.broke_cells, mining.broke_materials)
+		crown.after_break(world.grid, mining.broke_cells, mining.broke_materials)
 
 
 ## Workable by hand: an exposed lode, or solid rock in reach and in sight (legacy `_workable` 1786).

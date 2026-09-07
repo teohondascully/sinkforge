@@ -384,6 +384,7 @@ func _apply_mine(cell: Vector2i) -> Result:
 		return Result.rejected(REJECT_NO_LINE_OF_SIGHT)   # legacy's `_mineable` gate, integer DDA (D0354)
 	_mining.mine(grid, _body.pos_x, _body.pos_y, cell, true)
 	_items.yield_break(_mining.broke_cells, _mining.broke_materials)
+	_hold.crown.after_break(grid, _mining.broke_cells, _mining.broke_materials)   # T034, D0438
 	_drain_events()
 	return Result.accepted()
 

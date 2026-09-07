@@ -22,7 +22,7 @@ const LINGER_DONE: float = 5.0
 ## `BindingLabels` with whatever the verb is bound to now; the target where a stranger stands; the progress
 ## the chip appends from `progress()`. "Grapple" is the line the body throws; "winch" is the machine.
 const STEPS: Array[Dictionary] = [
-	{"id": &"mine", "label": "Stand by the RINGED silver-flecked rock at your feet, point at it and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
+	{"id": &"mine", "label": "Stand by the RINGED silver-flecked rock a step to your LEFT, point at it and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
 	{"id": &"smelt", "label": "Walk to the RINGED forge, stand beside it and press [DROP]: the whole stack of ore goes in, then wait — the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
 	{"id": &"wood", "label": "Hold [MINE] on a tree's brown TRUNK, not its leaves — sixteen cuts make a block", "goal": "Get wood", "count": &"wood", "need": 1},
 	{"id": &"build", "label": "The crew's drill lies under the ground RIGHT of spawn — dig down to it, walk over it, then select it and press [BUILD] over the shaft mouth", "goal": "Build the line"},

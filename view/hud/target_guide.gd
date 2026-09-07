@@ -30,8 +30,16 @@ const RING_FLOOR: float = 0.38
 ## sat on the miner's own chest. Within NEAR_M of the target it draws at RING_NEAR_M, growing back to RING_M
 ## by FAR_M, so the pointer yields the body once the body is there and the aim square takes over.
 const RING_NEAR_M: float = 0.35
-const NEAR_M: float = 1.5
+const NEAR_M: float = 2.2               ## from the body's CENTRE, 1.25 m over its feet: a cell beside the boot is 1.6-2 m off
 const FAR_M: float = 3.5
+## THE CHEVRON WHEN YOU ARE THERE (D0438, stranger 13). A 0.35 m ring at play zoom is a nine-pixel speck
+## beside the miner's boot, and the thirteenth stranger, standing on the pad with the vein a step to the
+## left, dug the ground under their own feet and never saw it. Within NEAR_M a chevron hangs over the
+## target, CHEVRON_RISE_M above its centre, bobbing: a pointer that clears the ground line and the sprite.
+const CHEVRON_RISE_M: float = 0.85
+const CHEVRON_HALF_M: float = 0.22
+const CHEVRON_BOB_M: float = 0.08
+const BOB_HZ: float = 1.6
 ## THE RING PREFERS YOUR OWN LEVEL (D0436, strangers 11 and 12). Two of three strangers on the capped world
 ## walked right before pointing, and the ring left the vein at the pad for the drill shaft's buried ore two
 ## metres under the surface: nearer by the ruler, past the reach from anywhere they could stand, and the
@@ -131,9 +139,7 @@ static func scan(o: Interface.Observation, body: Vector2, wanted: Callable, from
 			if not bool(wanted.call(c)):
 				continue
 			var at: Vector2 = (Vector2(c) + Vector2(0.5, 0.5)) * cell_px
-			var d: float = at.distance_squared_to(body)
-			if absf(at.y - body.y) > BAND_PX:
-				d += OUT_OF_BAND
+			var d: float = _ranked(at, body)
 			if d < best_d:
 				best_d = d
 				best = at
@@ -156,6 +162,13 @@ static func _ring(centre: Vector2i, r: int) -> Array[Vector2i]:
 	return out
 
 
+## The band rule for a machine or a pile, the same as a cell's (D0438, stranger 14: the SMELT ring chose the
+## auto forge buried in the drill shaft over the surface forge eighteen metres off, and the drop fell short).
+static func _ranked(at: Vector2, body: Vector2) -> float:
+	var d: float = at.distance_squared_to(body)
+	return d + OUT_OF_BAND if absf(at.y - body.y) > BAND_PX else d
+
+
 static func _nearest_machine(o: Interface.Observation, body: Vector2, id: StringName) -> Vector2:
 	var best: Vector2 = NONE
 	var best_d: float = 1.0e18
@@ -163,7 +176,7 @@ static func _nearest_machine(o: Interface.Observation, body: Vector2, id: String
 		if rec.get("id", &"") != id:   # the machine's record id; its `behavior` is a routing tag, empty for a forge
 			continue
 		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
-		var d: float = at.distance_squared_to(body)
+		var d: float = _ranked(at, body)
 		if d < best_d:
 			best_d = d
 			best = at
@@ -177,7 +190,7 @@ static func _nearest_pile(o: Interface.Observation, body: Vector2, item: StringN
 		if int((o.piles[cell] as Dictionary).get(item, 0)) <= 0:
 			continue
 		var at: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
-		var d: float = at.distance_squared_to(body)
+		var d: float = _ranked(at, body)
 		if d < best_d:
 			best_d = d
 			best = at
@@ -201,6 +214,17 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	var r: float = ring_m(body.distance_to(at) / float(Interface.Observation.LOGIC_PX)) * float(o_px_per_m(frame)) * (0.92 + 0.08 * breath)
 	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(INK, alpha * (0.45 + 0.4 * breath)), RING_WIDTH, true)
 	ci.draw_arc(canvas, r * 0.55, 0.0, TAU, 24, Color(INK, alpha * 0.25 * breath), 1.0, true)
+	if near(body.distance_to(at) / float(Interface.Observation.LOGIC_PX)):
+		var ppm: float = float(o_px_per_m(frame))
+		var apex: Vector2 = canvas + Vector2(0.0, -(CHEVRON_RISE_M + CHEVRON_BOB_M * sin(frame.anim_time * TAU * BOB_HZ)) * ppm)
+		var half: float = CHEVRON_HALF_M * ppm
+		ci.draw_colored_polygon(PackedVector2Array([apex, apex + Vector2(-half, -half * 1.4), apex + Vector2(half, -half * 1.4)]), Color(INK, alpha * 0.9))
+		ci.draw_polyline(PackedVector2Array([apex + Vector2(-half, -half * 1.4), apex, apex + Vector2(half, -half * 1.4)]), Color(0.05, 0.04, 0.03, alpha * 0.8), 1.0, true)
+
+
+## Whether the target is close enough that the ring has tightened to a speck and the chevron carries it.
+static func near(dist_m: float) -> bool:
+	return dist_m <= NEAR_M
 
 
 ## The ring's radius in metres for a target `dist_m` from the body: tight when the body has arrived, full
