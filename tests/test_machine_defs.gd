@@ -8,8 +8,8 @@ extends "res://tests/test_base.gd"
 ## three dead ones cannot happen silently.
 
 const LIFTED_MACHINES: Array[StringName] = [&"blast_furnace", &"conduit", &"drill", &"gear_mill",
-	&"generator", &"hopper", &"iron_forge", &"lift", &"plate_press", &"processor", &"pump", &"rope",
-	&"torch", &"winch_head", &"winch_station"]
+	&"generator", &"hopper", &"iron_forge", &"lift", &"plate_press", &"processor", &"pump", &"rig", &"rope",
+	&"torch", &"winch_head", &"winch_station"]   # `rig` is this game's own, not a lift (D0484): the demand side
 const NOT_CONVERTED: Array[StringName] = [&"splitter", &"spur", &"ore_vent", &"crusher",
 	&"descent_engine", &"h_drill", &"drift_rig"]
 
@@ -27,7 +27,7 @@ func _initialize() -> void:
 
 func _test_the_machine_population_is_exactly_the_lift_list() -> void:
 	var ids: Array[StringName] = MachineDef.ids()
-	_check(ids == LIFTED_MACHINES, "MachineDef.ids() is exactly the 15 LIFT machines, sorted (got %s)" % str(ids))
+	_check(ids == LIFTED_MACHINES, "MachineDef.ids() is exactly the 15 LIFT machines and the rig, sorted (got %s)" % str(ids))
 	var resolved: int = 0
 	for id: StringName in LIFTED_MACHINES:
 		if MachineDef.of(id) != null and MachineDef.of(id).id == id and MachineDef.exists(id):

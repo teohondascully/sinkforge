@@ -1,0 +1,7 @@
+# D1 (D0484): the first delivery. Two ingots from the coal-fed forge buy the drill -- legacy's tutorial left the
+# drill lying in the adit for free (D0409); the rig is where it comes from now. Provisional numbers.
+id: d1
+order: 1
+wants: {ingot: 2}
+grants: {drill: 1}
+goal: Deliver 2 ingots to the rig

@@ -83,6 +83,11 @@ const RECORDS: Dictionary = {
 		"rate": 3,
 		"power_demand_milli": 4000,
 	},
+	"rig": {
+		"id": "rig",
+		"display_name": "Crew Rig",
+		"behavior": "rig",
+	},
 	"rope": {
 		"id": "rope",
 		"display_name": "Rope",

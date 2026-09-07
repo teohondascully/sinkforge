@@ -98,6 +98,8 @@ static func machine_eats(machine: MachineState, item: StringName) -> bool:
 		return true
 	if behavior == &"winch_head":
 		return Pack.is_bulk_item(item)
+	if behavior == &"rig":
+		return Demands.wants(machine.stage).has(item)     # the demand's items and nothing else (D0484)
 	var recipe: RecipeDef = machine.def.recipe
 	return recipe != null and recipe.inputs.has(item)
 
@@ -184,7 +186,7 @@ func state_signature() -> String:
 	for m: MachineState in machines:
 		i += 1
 		var head: Vector2i = StateHash.term(m.logic_cell.x, m.logic_cell.y, StateHash.id_fold(m.def.id), Vector2i(i, i))
-		var body: String = "%d,%d,%d,%d,%d,%d,%d,%s" % [m.progress_ticks, m.route_toggle, m.fuel, m.power_permille, m.fed, m.facing, m.mode, m.filter]
+		var body: String = "%d,%d,%d,%d,%d,%d,%d,%s,%d" % [m.progress_ticks, m.route_toggle, m.fuel, m.power_permille, m.fed, m.facing, m.mode, m.filter, m.stage]
 		for buffer: Dictionary in [m.input_buffer, m.output_buffer]:
 			for item: StringName in Ordering.ids(buffer):
 				body += "|%s=%d" % [item, int(buffer[item])]

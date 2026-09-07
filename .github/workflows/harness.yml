@@ -381,6 +381,7 @@ jobs:
       #   test_world_verbs.gd                            test_world_verbs (World + LogicGrid: the metre-cell derivations and legacy's block/conduit/rope/torch/sapling verbs -- A' step 3b, ADR 0009, D0347)
       #   test_items.gd                                  test_items (the pack and its cap, ground piles, landing, the ledger, builder verbs, the deposit plane -- A' step 3c, D0348)
       #   test_machines.gd                               test_machines (the registry, the power field in milli-units, five runners, status reads, build/pickup, the hub tick -- A' step 3d, D0349)
+      #   test_rig.gd                                    test_rig (the crew's rig: the demand ladder from data/progression, D1 met pays the drill, the stage rides the save -- D0484)
       #   test_transport.gd                              test_transport (the flow phase, the lift's rise and updraft, the Freight Winch lifecycle -- A' step 3e, D0350)
       #   test_economy.gd                                test_economy (the production-rate ring buffer in centi-items a minute: derived, windowed, never state -- A' step 3f, D0351)
       #   test_save_game.gd                              test_save_game (the v3 envelope round-tripped and ticked, through disk, every refusal, winch reconciliation, the durability protocol -- A' step 3g, ADR 0010, D0352)
@@ -524,6 +525,7 @@ jobs:
             res://tests/test_world_verbs.gd \
             res://tests/test_items.gd \
             res://tests/test_machines.gd \
+            res://tests/test_rig.gd \
             res://tests/test_transport.gd \
             res://tests/test_economy.gd \
             res://tests/test_save_game.gd \

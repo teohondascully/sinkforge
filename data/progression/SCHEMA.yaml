@@ -1,0 +1,9 @@
+# The rig's demand ladder (D0484): what the surface rig asks for, in order, and what it pays with. The spec's
+# D1-D6 as records, so a chapter is a data diff. Read through `Demands` (sim/economy/demands.gd) by the rig's
+# runner, `Machines.machine_eats`, the machine painter's need bubble and the objective ladder. Integers only.
+fields:
+  id: {required: true, type: str}
+  order: {required: true, type: int}        # 1 = the first demand; the rig's `stage` indexes the sorted list
+  wants: {required: true, type: dict}       # item id -> count the rig takes for this demand
+  grants: {required: true, type: dict}      # item id -> count set down when the demand is met
+  goal: {required: true, type: str}         # the objective card's short line for this demand

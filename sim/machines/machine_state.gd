@@ -43,6 +43,8 @@ var mode: int = 0
 ## Hopper only: the one item id banked here. Auto-latches on the first item banked; everything else
 ## passes through. &"" = not yet latched.
 var filter: StringName = &""
+## Rig only (D0484): demands met so far; `Demands.at(stage)` is the one it asks for now. Saved and signed.
+var stage: int = 0
 
 
 func _init(machine_def: MachineDef, machine_logic_cell: Vector2i) -> void:

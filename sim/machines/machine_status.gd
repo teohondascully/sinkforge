@@ -19,6 +19,8 @@ static func of(m: MachineState, world: World, machines: Machines) -> StringName:
 			return Movers.status_mover(m)
 		&"winch_head":
 			return Movers.status_winch_head(m, machines)
+		&"rig":
+			return &"idle" if Demands.wants(m.stage).is_empty() else &"no_input"   # asking, or the ladder spent (D0484)
 	var recipe: RecipeDef = m.def.recipe
 	if recipe == null:
 		return &"idle"

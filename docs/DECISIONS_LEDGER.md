@@ -18734,3 +18734,24 @@ demand-driven pass keeps legacy's sorting-stack idea (the coal pours past to the
 without a drill that starves itself.
 
 **Reverse cost:** one recipe line, `need_item`'s loop, and the two drill functions; the suites' coal feeds.
+
+## D0484 · 2026-09-07 · The crew's rig: the demand ladder as data, D1 pays the drill
+
+**Decided:** a machine record `rig` (display "Crew Rig", behavior `rig`), the demand records under
+`data/progression` (schema: id, order, wants, grants, goal; `d1`: two ingots buy one drill), the
+`Demands` helper (`sim/economy/demands.gd`: the records in order, `wants`/`grants` at a stage), and the
+runner `_run_rig`: the rig eats only what its current demand asks for (`machine_eats`), and when the
+demand is met it consumes the delivery, sets the granted machine into its output (which falls to the
+floor at its foot the same tick, as a forge's ingots do, for the walk-over pickup) and moves to the
+next demand. `MachineState.stage` counts the demands met; it rides the save (`MACHINE_INT_FIELDS`), the
+registry's signature and the observation's machine dict; the status is `no_input` while asking and
+`idle` once the ladder is spent; the need bubble asks for the demand's first lacking item. Its own suite
+(`tests/test_rig.gd`, registered in CI): the ladder in order, one ingot waits, two pay the drill onto the
+floor, the ledger and conservation, the stage through capture and restore.
+
+**Why:** D0482. The A′ plan deferred the demand side to the director; the director scoped its first
+transaction; the rest of the ladder (D2-D6) is a data diff when its rewards are decided. The rig is not
+a lift: legacy sold the drill at a bazaar this game refused (D0346), and the rig is the answer to where a
+machine comes from. Its placement in the world and the ladder's deliver rung are D0485-D0486.
+
+**Reverse cost:** the record, the `Demands` file, the runner case and the `stage` field.

@@ -29,7 +29,7 @@ const REQUIRED_KEYS: Array[String] = [
 ## Fields whose absence would change the world's future and which therefore may not be defaulted: an
 ## error path that returned the passing value (legacy's own finding).
 const NO_DEFAULT_KEYS: Array[String] = ["world_seed", "width", "height"]
-const MACHINE_INT_FIELDS: Array[String] = ["progress_ticks", "route_toggle", "fuel", "fed", "mode"]
+const MACHINE_INT_FIELDS: Array[String] = ["progress_ticks", "route_toggle", "fuel", "fed", "mode", "stage"]
 
 enum Read { NONE, OK, RECOVERED, CORRUPT }
 static var last_read: Read = Read.NONE
@@ -56,7 +56,7 @@ static func capture(world: World, items: Items, machines: Machines) -> Dictionar
 			"in": m.input_buffer.duplicate(), "out": m.output_buffer.duplicate(),
 			"progress_ticks": m.progress_ticks, "route_toggle": m.route_toggle, "fuel": m.fuel,
 			"power_permille": m.power_permille, "fed": m.fed, "facing": m.facing, "mode": m.mode,
-			"filter": String(m.filter),
+			"filter": String(m.filter), "stage": m.stage,
 		})
 	return {
 		"version": VERSION,

@@ -1,0 +1,7 @@
+# THE CREW'S RIG (D0484): the surface head of the bore and the spec's demand side, the one machine legacy never
+# had. It takes what the current demand asks for (data/progression), pays in a machine when the demand is met
+# (set down into its output, scooped like a forge's ingots) and moves to the next demand. Runner `_run_rig`;
+# `MachineState.stage` counts the demands met and rides the save. Nothing passes through it.
+id: rig
+display_name: Crew Rig
+behavior: rig
