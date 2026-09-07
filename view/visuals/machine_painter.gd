@@ -146,13 +146,19 @@ static func glyph_scale(face: Rect2) -> float:
 	return clampf(minf(face.size.x, face.size.y) / CELL + 0.24, 0.6, 1.0) * CHROME_SCALE
 
 
-## What a stalled machine is asking for: coal when it is out of fuel, otherwise its recipe's first input.
+## What a stalled machine is asking for: coal when it is out of fuel, otherwise the first recipe input it
+## holds too little of for one craft (D0483: a forge with ore and no coal asks for coal, not ore), else
+## the recipe's first input.
 static func need_item(rec: Dictionary) -> StringName:
 	if StringName(rec.get("status", &"")) == &"no_fuel":
 		return &"coal"
 	var inputs: Dictionary = _recipe(rec).get("inputs", {})
 	if inputs.is_empty():
 		return &"ore"
+	var held: Dictionary = rec.get("input", {})
+	for need: Variant in inputs:
+		if int(held.get(StringName(String(need)), 0)) < int(inputs[need]):
+			return StringName(String(need))
 	return StringName(String(inputs.keys()[0]))
 
 

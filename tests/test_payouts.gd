@@ -159,19 +159,19 @@ func _coming_pins() -> void:
 	var o: Interface.Observation = f.obs
 	o.pos_x = 10 * 16 * S
 	o.pos_y = 10 * 16 * S
-	var forge: Dictionary = {"cell": Vector2i(11, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {&"ore": 5}, "output": {&"ingot": 1}}
-	var far: Dictionary = {"cell": Vector2i(30, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {&"ore": 8}, "output": {}}
+	var forge: Dictionary = {"cell": Vector2i(11, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {&"ore": 5, &"coal": 3}, "output": {&"ingot": 1}}   # D0483: a craft is 2 ore + 1 coal
+	var far: Dictionary = {"cell": Vector2i(30, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {&"ore": 8, &"coal": 4}, "output": {}}
 	var typed: Array[Dictionary] = [forge, far]
 	o.machines = typed
 	_check(Payouts.coming(o, &"ingot") == 3, "five ore held and one ingot waiting in the forge a metre off: 2 + 1 = %d more coming; the forge twenty metres off counts nothing" % Payouts.coming(o, &"ingot"))
 	_check(Payouts.coming(o, &"ore") == 0, "ore is the forge's input, not its output: nothing coming")
-	forge["input"] = {&"ore": 1}
+	forge["input"] = {&"ore": 1, &"coal": 1}
 	forge["output"] = {}
 	_check(Payouts.coming(o, &"ingot") == 0, "one ore is short of a two-ore batch: nothing coming")
 	_check(Payouts.label_of(&"ingot", 1, false, 2) == "+1 ingot · 2 more" and Payouts.label_of(&"ingot", 1, false, 0) == "+1 ingot" and Payouts.label_of(&"ore", 7, true, 2) == "-7 ore",
 		"the label carries the remainder on a gain only (%s)" % Payouts.label_of(&"ingot", 1, false, 2))
 	var p: Payouts = Payouts.new()
-	forge["input"] = {&"ore": 4}
+	forge["input"] = {&"ore": 4, &"coal": 2}
 	p.observe_frame(f)
 	p.observe_frame(_frame_with(0.016, [{"item": &"ingot", "count": 1}], o))
 	_check(p.size() == 1 and int((p._t[0] as Dictionary)["more"]) == 2, "an ingot arriving beside a forge holding four ore ticks with 2 more (%s)" % [p._t])

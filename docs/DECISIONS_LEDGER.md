@@ -18685,3 +18685,52 @@ is the one that has to carry the rung. Six lines in the dock, checked on a live 
 the wording cause (the director's class 5) for two of the four smelt failures with frames.
 
 **Reverse cost:** one string.
+
+## D0482 · 2026-09-07 · The opening's contract: fuel-fed forge, dug supply, rig demand
+
+**Decided (the director, in conversation, on Astra's audit of 2026-09-07):** the shipped opening follows
+the spec's loop -- a forge that needs fuel, a supply the player digs, a surface rig whose demands pay in
+capabilities. The tutorial's free drill in the adit, the coal-free smelt and the ladder's wood rung are
+fixture behaviour inherited from legacy's tutorial (D0409, D0425), not approved design, and they go: the
+forge takes coal, the rig grants the drill for the first delivery, wood returns when torches or supports
+need it. The recipe runner's pass-through of unwanted items stays for now, named as provisional (the
+spec's mixed-stream jam is a later question). The first five minutes are the whole loop in miniature:
+mine ore, learn the forge wants coal, carry it twice, deliver ingots to the rig, receive the drill, set
+it over the vein, watch the first chain run. Verb lessons and refusals stay; the how-to sentences shrink
+to what the world cannot show.
+
+**The arc, as the director and I hold it:** one hole, forever deeper, the surface as trunk; the rig's
+demands D1-D6 as chapters; depth as the pacing axis with down free and up paid. Recorded as design
+intent from the same conversation, not built tonight: a second axis at every tier -- the lateral fork
+(copper and lead apart at one band), one factory-shape trade-off per tier (a steep chute that floods vs a
+switchback that drains), maintain-vs-expand as the lower tiers keep asking for attention, and one reason
+per tier to go back up. The spec's D6 is the horizon; the lore's bore (proposed) may give it a face.
+
+**Why:** 69 stranger runs call the verbs satisfying and the ladder aimless; nothing flows by itself until
+a rung nobody reached. The economy's demand side was deferred by the A′ plan for the director to scope,
+and the director has now scoped its first transaction. The acceptance test moves from four ore in a pack
+to a self-feeding forge and a D1 delivery, read from the rig's receipt.
+
+**Reverse cost:** a design decision; its code lands in D0483-D0486.
+
+## D0483 · 2026-09-07 · The forge takes coal; a drill passes coal down its stream on demand
+
+**Decided:** `smelt_ingot` is 2 ore + 1 coal → 1 ingot (legacy's ore-only smelt was the tutorial's
+fixture, D0482). Three consequences, each built: the machine need-bubble names the first recipe input the
+machine lacks for one craft (a forge with ore and no coal asks for coal, not ore); `Machines.machine_eats`
+follows the recipe unchanged, so the forge takes coal from a drop and a hopper; and the tutorial's shaft --
+coal tossed at the mouth onto the drill, the forge three metres below -- would have starved that forge, so
+a drill holding more than one coal lets ONE fall with its bored stream whenever the first machine its
+stream lands in eats coal and holds none for a craft (`_pass_surplus_coal`, `_coal_taker_below`). The
+drill keeps every other coal as its own fuel: a drill fed eleven coals still runs its 660 ticks (the
+first draft kept one and passed the rest, and the drill suite caught it). Same landing as the bored ore,
+so the coal is in the forge before the metre is through. Suites re-fed: machines (a clay passes through,
+the coal stays), transport (the hopper's feed cap counts the coal), payouts and hints (a craft is two ore
+and a coal), the door and the playthrough (the seam is dug before the forge; the playthrough's first
+automation now latches with the drill feeding the forge below it).
+
+**Why:** the spec's first discovery is fuel; a forge that smelts for free has nothing to discover. The
+demand-driven pass keeps legacy's sorting-stack idea (the coal pours past to the machine that wants it)
+without a drill that starves itself.
+
+**Reverse cost:** one recipe line, `need_item`'s loop, and the two drill functions; the suites' coal feeds.

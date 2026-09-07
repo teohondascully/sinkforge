@@ -142,12 +142,25 @@ func _rungs_mine_and_smelt() -> void:
 	var spent: int = _mine(vein, func() -> bool: return obj.is_done(&"mine"))
 	_check(obj.is_done(&"mine"), "rung 1 latches: %d ore in the pack after %d ticks of holding MINE (the vein yields `ore`, the ladder's word)" % [items.pack.count(&"ore"), spent])
 	_check(items.pack.count(&"ore") >= 4 and items.pack.count(&"ore_iron") == 0, "and what the hand holds is `ore`, never the material's name")
+	# D0483: the forge takes coal. The seam five metres right of spawn is the fuel for the forge as well as,
+	# later, the drill; dig it now and drop both stacks.
+	_walk_to(float(ANCHOR.x) + 5.5)
+	_mine(_tc(ANCHOR + Vector2i(5, 0)), func() -> bool: return items.pack.count(&"coal") >= 6)
+	_check(items.pack.count(&"coal") >= 6, "coal dug from the seam for the forge and the drill (%d)" % items.pack.count(&"coal"))
 	_walk_to(float(ANCHOR.x) - 2.0)
 	var forge: MachineState = machines.machine_at(ANCHOR + Vector2i(-3, 0))
 	_check(forge != null and forge.def.id == &"processor", "the bootstrap forge stands three metres left of spawn")
 	_tick(_frame(), [Command.select(_slot_of(&"ore"))])
 	var r: Interface.Result = door.apply(Command.drop())
 	_check(r.ok and int(forge.input_buffer.get(&"ore", 0)) >= 4, "drop feeds the forge in reach: %s, %d ore in its mouth" % [r.detail, int(forge.input_buffer.get(&"ore", 0))])
+	_tick(_frame(), [Command.select(_slot_of(&"coal"))])
+	var carried: int = items.pack.count(&"coal")
+	items.pack.remove(&"coal", carried - 2)                                # keep two coal for the forge, the rest for the drill later
+	items.consumed(&"coal", carried - 2)
+	var rc: Interface.Result = door.apply(Command.drop())
+	_check(rc.ok and int(forge.input_buffer.get(&"coal", 0)) >= 2, "drop feeds the forge coal too: %s, %d coal in its mouth" % [rc.detail, int(forge.input_buffer.get(&"coal", 0))])
+	items.pack.add(&"coal", carried - 2)
+	items.produced(&"coal", carried - 2)
 	_wait(600, func() -> bool: return obj.is_done(&"smelt"))
 	_check(obj.is_done(&"smelt"), "rung 2 latches: %d ingots collected off the pocket floor by walking near it (no key)" % obj.gained(&"ingot"))
 
@@ -179,9 +192,7 @@ func _rungs_wood_and_build() -> void:
 ## 5. FUEL: the coal seam by the shaft, then drop coal on the drill. 6. AUTO: stand back -- the drill bores,
 ## the ore falls into the forge below, ingots come out, the rate list moves.
 func _rungs_fuel_and_automation() -> void:
-	_walk_to(float(ANCHOR.x) + 5.5)
-	_mine(_tc(ANCHOR + Vector2i(5, 0)), func() -> bool: return items.pack.count(&"coal") >= 2)
-	_check(items.pack.count(&"coal") >= 2, "coal dug from the seam (%d)" % items.pack.count(&"coal"))
+	_check(items.pack.count(&"coal") >= 4, "coal kept from the seam for the drill and the forge below it (%d)" % items.pack.count(&"coal"))
 	_walk_to(float(ANCHOR.x) + 6.5)
 	_tick(_frame(), [Command.select(_slot_of(&"coal"))])
 	var rf: Interface.Result = door.apply(Command.drop())

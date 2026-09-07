@@ -63,7 +63,7 @@ func _test_way_down_pins() -> void:
 ## D0461 (strangers 37, 38): out of reach of a forge that still holds your ore, with no ingot gained, is
 ## STILL WORKING with the count still to come; the same walk after the forge emptied into the pack is not.
 func _test_left_working_pins() -> void:
-	var forge: Dictionary = {"cell": Vector2i(11, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {&"ore": 2}, "output": {}}
+	var forge: Dictionary = {"cell": Vector2i(11, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {&"ore": 2, &"coal": 1}, "output": {}}   # D0483: a craft is 2 ore + 1 coal
 	var h: Hints = Hints.new()
 	var near: Interface.Observation = _hint_obs([["ingot", 1]])
 	near.pos_x = 10 * 16 * S

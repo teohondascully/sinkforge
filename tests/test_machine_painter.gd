@@ -55,6 +55,10 @@ func _test_what_a_stalled_machine_asks_for() -> void:
 	_check(MachinePainter.need_item(_rec(&"iron_forge", {"status": &"no_input", "recipe": &"smelt_iron"})) == &"iron",
 		"starved, it asks for its recipe's first input")
 	_check(MachinePainter.need_item(_rec(&"hopper", {"status": &"no_input"})) == &"ore", "with no recipe the bubble falls back on ore")
+	# D0483: the forge takes ore and coal; the bubble names what it lacks for one craft, in recipe order.
+	_check(MachinePainter.need_item(_rec(&"processor", {"status": &"no_input", "recipe": &"smelt_ingot", "input": {&"ore": 3}})) == &"coal", "a forge holding ore and no coal asks for coal")
+	_check(MachinePainter.need_item(_rec(&"processor", {"status": &"no_input", "recipe": &"smelt_ingot", "input": {&"coal": 2}})) == &"ore", "...and holding coal and no ore asks for ore")
+	_check(MachinePainter.need_item(_rec(&"processor", {"status": &"no_input", "recipe": &"smelt_ingot", "input": {&"ore": 1, &"coal": 1}})) == &"ore", "one ore of the two a craft takes: still ore")
 	_check(MachinePainter.ink(&"ore") == ItemLook.color(&"ore") and MachinePainter.ink(&"no_such") == MachinePainter.CHROME,
 		"a mark wears its item's colour, or chrome, never white")
 

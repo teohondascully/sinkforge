@@ -104,7 +104,7 @@ func _test_drop_feeds_an_eater_else_tosses_forward_else_straight_down_and_grace_
 	_carry(&"ore", 5)
 	_select(&"ore")
 	var forge: MachineState = machines.place(world, MachineDef.of(&"processor"), Vector2i(7, 9))
-	_check(verbs.reachable_eater(&"ore") == forge and verbs.reachable_eater(&"coal") == null, "the forge in reach eats ore, not coal")
+	_check(verbs.reachable_eater(&"ore") == forge and verbs.reachable_eater(&"coal") == forge and verbs.reachable_eater(&"clay") == null, "the forge in reach eats ore and coal (D0483), not clay")
 	_check(verbs.drop() == 5 and int(forge.input_buffer[&"ore"]) == 5 and items.pack.is_empty(), "the toss goes into a machine in reach that wants it")
 	machines.remove(world, items, Vector2i(7, 9))
 	_carry(&"coal", 3)

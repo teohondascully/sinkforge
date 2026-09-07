@@ -91,7 +91,7 @@ func _test_registry_place_remove_occupancy_and_first_machine_below() -> void:
 	var gen: MachineState = _put(&"generator", Vector2i(9, 8))
 	_check(Machines.machine_eats(drill, &"coal") and Machines.machine_eats(gen, &"coal") and not Machines.machine_eats(drill, &"ore"), "coal burners eat coal, not ore")
 	var proc: MachineState = _put(&"processor", Vector2i(10, 8))
-	_check(Machines.machine_eats(proc, &"ore") and not Machines.machine_eats(proc, &"coal"), "a recipe machine eats its inputs")
+	_check(Machines.machine_eats(proc, &"ore") and Machines.machine_eats(proc, &"coal") and not Machines.machine_eats(proc, &"clay"), "a recipe machine eats its inputs: ore and, since D0483, coal; not clay")
 
 
 ## legacy `_test_power_field`: an attenuating diamond, maximum of overlaps, and the throttle.
@@ -141,22 +141,24 @@ func _test_conduit_network_carries_down_and_sideways_never_up() -> void:
 	_check(not s2.has(Vector2i(5, 5)) and not s2.has(Vector2i(5, 4)), "power never flows UP a conduit")
 
 
-## legacy `_test_production`: 2 ore -> 1 ingot over 40 ticks; junk passes through; the ledger balances.
+## legacy `_test_production`: 2 ore + 1 coal -> 1 ingot over 40 ticks (D0483: the forge takes fuel; legacy's
+## smelt took ore alone); junk passes through; the ledger balances.
 func _test_recipe_runner_consumes_produces_and_passes_junk_through() -> void:
 	_rig()
 	var forge: MachineState = _put(&"processor", Vector2i(5, 6))
 	_feed(Vector2i(5, 6), &"ore", 5)
-	_feed(Vector2i(5, 6), &"coal", 1)
+	_feed(Vector2i(5, 6), &"coal", 2)
+	_feed(Vector2i(5, 6), &"clay", 1)
 	_steps(1)
-	_check(int(items.piles.sink.get(&"coal", 0)) == 1 and not forge.input_buffer.has(&"coal"), "coal is not in the recipe: passed through and fell on out (to the sink, no floor) on the first tick")
+	_check(int(items.piles.sink.get(&"clay", 0)) == 1 and not forge.input_buffer.has(&"clay") and int(forge.input_buffer[&"coal"]) == 2, "clay is not in the recipe: passed through and fell on out (to the sink, no floor) on the first tick; the coal stays, the recipe wants it")
 	_check(forge.progress_ticks == 1, "progress counts in ticks")
 	_steps(38)
 	_check(int(items.total_produced.get(&"ingot", 0)) == 0, "39 ticks: nothing yet")
 	_steps(1)
-	_check(int(items.piles.sink.get(&"ingot", 0)) == 1 and int(forge.input_buffer[&"ore"]) == 3, "tick 40: one ingot (fallen on out), two ore eaten")
-	_check(int(items.total_produced[&"ingot"]) == 1 and int(items.total_consumed[&"ore"]) == 2, "the ledger saw the craft")
+	_check(int(items.piles.sink.get(&"ingot", 0)) == 1 and int(forge.input_buffer[&"ore"]) == 3 and int(forge.input_buffer[&"coal"]) == 1, "tick 40: one ingot (fallen on out), two ore and one coal eaten")
+	_check(int(items.total_produced[&"ingot"]) == 1 and int(items.total_consumed[&"ore"]) == 2 and int(items.total_consumed[&"coal"]) == 1, "the ledger saw the craft")
 	_steps(40)
-	_check(int(items.total_produced[&"ingot"]) == 2 and int(forge.input_buffer[&"ore"]) == 1, "a second craft; the odd ore waits")
+	_check(int(items.total_produced[&"ingot"]) == 2 and int(forge.input_buffer[&"ore"]) == 1 and not forge.input_buffer.has(&"coal"), "a second craft; the odd ore waits, the coal is spent")
 	_steps(200)
 	_check(int(items.total_produced[&"ingot"]) == 2 and forge.progress_ticks == 0, "starved: no progress accrues without a full input set")
 	_check(Invariants.check_item_conservation(items, 280) == null, "present == produced - consumed across buffers, with machine_total attached")
@@ -326,7 +328,9 @@ func _test_machine_status_mirrors_each_runner() -> void:
 	_put(&"processor", Vector2i(2, 2))
 	_check(_status(Vector2i(2, 2)) == &"no_input", "forge, empty: no_input")
 	_feed(Vector2i(2, 2), &"ore", 2)
-	_check(_status(Vector2i(2, 2)) == &"working", "forge, fed: working")
+	_check(_status(Vector2i(2, 2)) == &"no_input", "forge, ore and no coal: no_input (D0483)")
+	_feed(Vector2i(2, 2), &"coal", 1)
+	_check(_status(Vector2i(2, 2)) == &"working", "forge, fed ore and coal: working")
 	_put(&"generator", Vector2i(4, 2))
 	_check(_status(Vector2i(4, 2)) == &"no_fuel", "generator, cold: no_fuel")
 	_feed(Vector2i(4, 2), &"coal", 1)

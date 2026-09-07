@@ -189,6 +189,7 @@ static func _run_drill(m: MachineState, world: World, items: Items, machines: Ma
 		return                          # ore has no drain below: stall, and the status reads "blocked"
 	if not _burn_or_refuel(m, items):
 		return                          # out of fuel, no coal -> idle ("feed me coal")
+	_pass_surplus_coal(m, world, items, machines, (m.logic_cell if lode_cell != NONE else target) + Vector2i(0, 1))
 	m.fuel -= _live_mouths(world, m.logic_cell) if lode_cell != NONE else 1
 	m.progress_ticks += 1
 	if m.progress_ticks < recipe.time_ticks:
@@ -204,6 +205,38 @@ static func _run_drill(m: MachineState, world: World, items: Items, machines: Ma
 		items.resettle_pile_above(target)     # the metre is bored out: anything resting above now falls
 	items.produced(item, 1)
 	items.eject(target + Vector2i(0, 1), item, 1, target)
+
+
+## DEMAND-DRIVEN COAL DOWN THE STREAM (D0483): the forge takes coal now, and the tutorial's shaft is fed by
+## one toss at the mouth. A drill holding more than one coal lets ONE fall with its stream when the first
+## machine its stream lands in eats coal and holds none for a craft; otherwise every coal is the drill's
+## own fuel (a drill fed eleven coals still runs its 660 ticks). Same landing as the bored item, so the
+## coal is in the forge before the metre is through. Conservation-neutral: the coal moves, nothing is made.
+static func _pass_surplus_coal(m: MachineState, world: World, items: Items, machines: Machines, landing: Vector2i) -> void:
+	if int(m.input_buffer.get(&"coal", 0)) <= 1:
+		return
+	var taker: MachineState = _coal_taker_below(world, machines, landing)
+	if taker == null:
+		return
+	var want: int = 1
+	if taker.def.recipe != null and taker.def.recipe.inputs.has(&"coal"):
+		want = int(taker.def.recipe.inputs[&"coal"])
+	if int(taker.input_buffer.get(&"coal", 0)) >= want:
+		return
+	_take_from_buffer(m.input_buffer, &"coal", 1)
+	items.eject(landing, &"coal", 1, m.logic_cell)
+
+
+## The first machine the column below `from` lands in, if it eats coal; null past a solid or off the map.
+static func _coal_taker_below(world: World, machines: Machines, from: Vector2i) -> MachineState:
+	for row: int in range(from.y, Landing.floor_rows(world)):
+		var here := Vector2i(from.x, row)
+		var below: MachineState = machines.machine_at(here)
+		if below != null:
+			return below if Machines.machine_eats(below, &"coal") else null
+		if not world.logic_air(here):
+			return null
+	return null
 
 
 ## ONE COLUMN, ONE DRAIN: every covered lode cell gives up a unit and all of it pours out of the head's

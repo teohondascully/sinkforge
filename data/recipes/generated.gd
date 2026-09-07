@@ -40,6 +40,7 @@ const RECORDS: Dictionary = {
 		"id": "smelt_ingot",
 		"inputs": {
 			"ore": 2,
+			"coal": 1,
 		},
 		"outputs": {
 			"ingot": 1,

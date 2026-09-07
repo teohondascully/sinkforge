@@ -1,5 +1,5 @@
 # Lifted verbatim from legacy/src/data/recipes/smelt_ingot.tres (D0346). Legacy `time = 2.0` s -> 40 ticks at 20 Hz.
 id: smelt_ingot
-inputs: {ore: 2}
+inputs: {ore: 2, coal: 1}    # D0483: the forge takes fuel; legacy's coal-free smelt was the tutorial's fixture
 outputs: {ingot: 1}
 time_ticks: 40

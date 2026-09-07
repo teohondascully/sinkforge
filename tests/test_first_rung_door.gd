@@ -136,6 +136,21 @@ func _test_the_ingots_come_to_the_spot_the_drop_was_taken_from() -> void:
 	tick.call(InputFrame.new(), [Command.select(slot)])
 	var o: Interface.Observation = tick.call(InputFrame.new(), [Command.drop()])
 	_check(o.drop_went == &"fed", "premise: from %.2f m left of the spawn the forge took the stack (%s)" % [(32.5 - float(spot.x) / float(Fx.SCALE * 16)), o.drop_went])
+	o = _drop_posed_coal(tick, items)
+	_check(o.drop_went == &"fed", "...and the coal (%s)" % o.drop_went)
 	for _i: int in 240:
 		o = tick.call(InputFrame.new(), [])
 	_check(items.pack.count(&"ingot") >= 2 and Vector2i(body.pos_x, body.pos_y) == spot, "four seconds later, without a step, the ingots are in the pack (%d ingots; moved %s)" % [items.pack.count(&"ingot"), str(Vector2i(body.pos_x, body.pos_y) != spot)])
+
+
+## D0483: the forge takes coal too. The coal is posed into the pack (the seam's dig is not this suite's
+## subject; the scoop's payout where you stand is) and dropped the same way as the ore.
+func _drop_posed_coal(tick: Callable, items: Items) -> Interface.Observation:
+	items.pack.add(&"coal", 2)
+	items.produced(&"coal", 2)
+	var slot: int = 0
+	for i: int in items.pack.slots().size():
+		if items.pack.slots()[i]["item"] == &"coal":
+			slot = i
+	tick.call(InputFrame.new(), [Command.select(slot)])
+	return tick.call(InputFrame.new(), [Command.drop()])
