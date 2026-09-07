@@ -25,10 +25,10 @@ const STEPS: Array[Dictionary] = [
 	{"id": &"mine", "label": "POINT at the silver-flecked rock in the WHITE RING beside you and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
 	{"id": &"smelt", "label": "Stand beside the WHITE-RINGED forge holding ORE (its number key selects it), press [DROP]: the stack goes in, then wait — the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
 	{"id": &"wood", "label": "Hold [MINE] on a tree's brown TRUNK, not its leaves — sixteen cuts make a block", "goal": "Get wood", "count": &"wood", "need": 1},
-	{"id": &"build", "label": "The crew's drill is buried in the WHITE RING, right of where you began: dig to it, walk over it, select it, press [BUILD] at the shaft's mouth", "goal": "Build the line"},
+	{"id": &"build", "label": "The crew's drill lies in the WHITE RING: dig straight down at the WHITE SQUARE above it, walk over it, select it, press [BUILD] at the shaft's mouth", "goal": "Build the line"},
 	{"id": &"fuel", "label": "Hold [MINE] on the black coal seam by the shaft, select the coal, stand by the Drill and press [DROP]", "goal": "Fuel the Drill"},
 	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore into the forge below. First automation!", "goal": "First automation"},
-	{"id": &"hopper", "label": "The crew's cache is under where you began, three metres below the adit floor: dig to it, set the HOPPER over the Drill with [BUILD], drop coal in", "goal": "Automate the coal feed"},
+	{"id": &"hopper", "label": "The crew's cache lies in the WHITE RING: dig down at the WHITE SQUARE above it, set the HOPPER over the Drill with [BUILD], drop coal in", "goal": "Automate the coal feed"},
 	{"id": &"power", "label": "Set the GENERATOR from the cache down with [BUILD] and press [DROP] to feed it coal — the deep needs power", "goal": "Burn coal for power"},
 	{"id": &"winch", "label": "Stand the WINCH HEAD on a lode with [BUILD], then press [LINK] on it and on its Station — the vein climbs on its own", "goal": "Raise the winch"},
 ]

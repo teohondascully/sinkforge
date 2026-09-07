@@ -165,6 +165,7 @@ static func _mount_hud(view: WorldView, stack: ViewStack, hints: Hints = null) -
 	# the inspector also stacks under the corner map (6i, D0371).
 	view.add_hud().add_stateful_chip(Inspector.new(plate, minimap), &"paint")
 	var dock: LessonDock = LessonDock.new(plate, hints)   # the lessons off the body, at one place (D0413)
+	dock.hints.objectives = line.objectives                # NOT ORE reads the rung, not the pack (D0458)
 	view.add_hud().add_stateful_chip(dock, &"paint")
 	view.add_hud().add_stateful_chip(plate, &"paint")
 	var legend: KeyLegend = KeyLegend.new()

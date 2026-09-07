@@ -18251,3 +18251,21 @@ overflowed and are shortened to fit whole.
 narrower card than the screen draws is the quiet green.
 
 **Reverse cost:** two lines in `blocks`; two labels.
+
+## D0458 · 2026-09-07 · The cut mark: a second white square on the surface over a buried target; NOT ORE reads the rung
+
+**Decided:** (1) T038's second answer. Strangers 31 and 32 reached BUILD with the ring on the crew's drill
+three metres down in the roofed adit and dug elsewhere; the ceiling run reaches the rung in 12 s and
+stands over the same picture. `TargetGuide.cut_metre` walks up the target's column through open cells to
+the roof over it and returns the roof's topmost metre; the guide draws it as a second white square, the
+same ink and rim as the target's own, and the BUILD and HOPPER how-tos say "dig straight down at the
+WHITE SQUARE above it". A target under open air (the vein, the forge, the trunk) gets no cut mark
+(pinned on the real world). (2) The NOT ORE lesson (D0450) keyed on "no ore in the pack", and the ore is
+spent in the forge by the wood rung: it fired "that was wood, and the task wants ore" on the ceiling run's
+felling. The lesson reads the ladder now (the mine rung open), the dock hands the hints the same ladder
+the banner draws (pinned at boot), and a bare `Hints` in a suite keeps the pack rule.
+
+**Why:** a ring three metres under the ground cannot say "here"; a lesson that names a rung already passed
+is noise a stranger has to disprove.
+
+**Reverse cost:** one function and four lines in the guide; one field in the hints; two labels.

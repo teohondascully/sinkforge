@@ -110,6 +110,7 @@ var _deepest_m: float = -INF
 var _broke_once: bool = false
 const FAR_TICKS: int = 20
 var _sight_ticks: int = 0
+var objectives: Objectives = null   ## the ladder, for the rung-gated lessons; a bare Hints reads the pack instead
 const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
 var _thrown: bool = false           ## a line has been live once this session; the grapple is known
 
@@ -144,12 +145,14 @@ func _wrong_stack(o: Interface.Observation, counts: Dictionary) -> bool:
 	return true
 
 
-## A cell broken whose yield is not ore while the pack holds none (D0450, stranger 26): the pointer was
+## A cell broken whose yield is not ore while the MINE rung is open (D0450, stranger 26): the pointer was
 ## three metres right of the ring, the clay ticked "+1 clay", and the stranger read the verb as spent and
-## left to search the caves. Nothing after THE WAY DOWN, which asks for exactly this cut; the yield must be
-## known (a fixture's bare break names no material).
+## left to search the caves. The rung, not the pack (D0458): the ore is spent in the forge by the wood rung,
+## and "that was wood, and the task wants ore" fired on the ceiling run's felling. Nothing after THE WAY
+## DOWN, which asks for exactly this cut; the yield must be known (a fixture's bare break names no material).
 func _mined_wrong(o: Interface.Observation, counts: Dictionary) -> bool:
-	if not o.mining_broke or int(counts.get(&"ore", 0)) > 0 or _done.has(&"way_down"):
+	var rung_open: bool = objectives.current_id() == &"mine" if objectives != null else int(counts.get(&"ore", 0)) == 0
+	if not o.mining_broke or not rung_open or _done.has(&"way_down"):
 		return false
 	var rec: Dictionary = MaterialsRecords.RECORDS.get(String(o.mining_broke_material), {})
 	var got := StringName(String(rec.get("yields", String(o.mining_broke_material))))   # D0409's contract, read as data

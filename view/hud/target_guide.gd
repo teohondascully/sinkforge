@@ -225,11 +225,42 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 		ci.draw_line(canvas + d * (r + 2.0), canvas + d * (r + 2.0 + TICK_LEN), Color(RIM, alpha * 0.6), RING_WIDTH + 2.0, true)
 		ci.draw_line(canvas + d * (r + 2.0), canvas + d * (r + 2.0 + TICK_LEN), Color(INK, ink), RING_WIDTH, true)
 	if near(body.distance_to(at) / float(Interface.Observation.LOGIC_PX)):
-		var metre: Rect2 = target_metre(at)
-		var rect := Rect2(frame.canvas_of(metre.position), frame.canvas_of(metre.end) - frame.canvas_of(metre.position))
-		ci.draw_rect(rect, Color(INK, alpha * NEAR_FILL * breath))
-		ci.draw_rect(rect.grow(1.0), Color(RIM, alpha * 0.6), false, RING_WIDTH + 2.0)
-		ci.draw_rect(rect, Color(INK, ink), false, RING_WIDTH)
+		_outline(frame, ci, target_metre(at), alpha, ink, breath)
+	var cut: Rect2 = cut_metre(frame.obs, at)
+	if cut.size != Vector2.ZERO:
+		_outline(frame, ci, cut, alpha, ink, breath)
+
+
+## The target's metre, or the metre to cut, drawn as the one white square with its rim.
+func _outline(frame: Frame, ci: CanvasItem, metre: Rect2, alpha: float, ink: float, breath: float) -> void:
+	var rect := Rect2(frame.canvas_of(metre.position), frame.canvas_of(metre.end) - frame.canvas_of(metre.position))
+	ci.draw_rect(rect, Color(INK, alpha * NEAR_FILL * breath))
+	ci.draw_rect(rect.grow(1.0), Color(RIM, alpha * 0.6), false, RING_WIDTH + 2.0)
+	ci.draw_rect(rect, Color(INK, ink), false, RING_WIDTH)
+
+
+## THE CUT MARK (T038's second answer, D0458): a target under the ground -- the crew's drill three metres
+## down in the roofed adit, the cache under the spawn -- gets a second white square on the topmost solid
+## metre straight above it, the one to dig at. Strangers 31 and 32 reached BUILD and dug elsewhere; the ring
+## from three metres up cannot say "here". Empty when the target is not buried (a solid metre must stand
+## over it) or the column's top is out of the window.
+static func cut_metre(o: Interface.Observation, at: Vector2) -> Rect2:
+	var m: float = float(Interface.Observation.LOGIC_PX)
+	var col: int = int(floorf(at.x / m))
+	var row: int = int(floorf(at.y / m)) - 1
+	var top: int = -1                                                       # the topmost solid metre of the roof over the target
+	for _step: int in 64:
+		var c := Vector2i(col * 4 + 2, row * 4 + 2)                          # the metre's centre cell
+		if not o.in_window(c):
+			return Rect2()
+		if o.solid_at(c):
+			top = row
+		elif top >= 0:
+			break                                                           # open air over a roof: the roof's top is the cut
+		row -= 1
+	if top < 0:
+		return Rect2()
+	return Rect2(Vector2(float(col), float(top)) * m, Vector2(m, m))
 
 
 ## The metre (world px) the target cell lies in: what the pointer has to land on.

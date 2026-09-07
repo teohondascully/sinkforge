@@ -157,6 +157,7 @@ func _test_a_headless_boot_ticks_and_saves() -> void:
 	var ok: bool = main.boot(false)
 	_check(ok and main.booted and main.door != null and main.view != null, "a headless boot builds the door and the view")
 	_check(main.stack != null and main.stack.settings != null and main.stack.minimap != null and main.stack.hints != null, "...with the HUD handles the shell drives")
+	_check(main.stack.hints != null and main.stack.hints.objectives == main.stack.objectives and main.stack.objectives != null, "...and the hints read the same ladder the banner draws (D0458)")
 	var placed: int = (main.door.services()["machines"] as Machines).machines.size()
 	_check(placed >= 2, "the tutorial start stamped its two processors (%d machines)" % placed)
 	for _i: int in 4:

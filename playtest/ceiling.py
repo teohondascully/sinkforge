@@ -52,6 +52,7 @@ def rung(session, name, budget_bursts, step):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("session_dir")
+    parser.add_argument("--hold", action="store_true", help="leave the seat up at the end (for a look at the BUILD rung)")
     args = parser.parse_args()
     session = Path(args.session_dir).resolve()
     rc = subprocess.run([sys.executable, str(HERE / "stranger.py"), "start", str(session), "--mission", str(Path(__file__).resolve()), "--model", "script:ceiling"]).returncode
@@ -104,7 +105,8 @@ def main():
             trunk[0] -= px_per_cell
         return resp, False
     results["wood"] = rung(session, "wood", 12, wood)
-    burst(session, {"quit": True}, "ceiling: done")
+    if not args.hold:
+        burst(session, {"quit": True}, "ceiling: done")
     done = {k: v is not None for k, v in results.items()}
     print(json.dumps({"ceiling": done, "sim_seconds": {k: (v or {}).get("sim_seconds") for k, v in results.items()}}))
     return 0 if all(done.values()) else 1

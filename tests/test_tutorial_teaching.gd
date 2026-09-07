@@ -130,6 +130,7 @@ func _test_the_ring_finds_the_real_targets() -> void:
 	_check(forge != TargetGuide.NONE and forge.x < body_px.x and body_px.distance_to(forge) < 4.0 * 16.0, "SMELT rings the forge three metres left (%.1f m off)" % (body_px.distance_to(forge) / 16.0))
 	var drill: Vector2 = TargetGuide.target(&"build", o)
 	_check(drill != TargetGuide.NONE and drill.x > body_px.x and drill.y > body_px.y, "BUILD rings the crew's drill, below and to the right (%.1f m off)" % (body_px.distance_to(drill) / 16.0))
+	_cut_mark_pins(o, drill, vein, forge)
 	var coal: Vector2 = TargetGuide.target(&"fuel", o)
 	_check(coal != TargetGuide.NONE and coal.x > body_px.x, "FUEL rings the coal seam to the right")
 	_check(TargetGuide.target(&"auto", o) == TargetGuide.NONE, "a rung with nothing to point at rings nothing")
@@ -234,6 +235,16 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 ## D0443's WRONG STACK on a REAL journey, not a hand-built observation (the second auditor's ask): a stranger
 ## digs a clay cell, mines the vein, walks beside the forge with the CLAY selected and presses DROP. The
 ## pack's fall and `drop_went` arrive in the same observe; the lesson names clay and ore.
+## D0458 (T038's second answer): the drill lies in the roofed adit; the cut mark is the roof's top metre,
+## straight above it at the surface; the surface vein and the forge, under open air, get no cut mark.
+func _cut_mark_pins(o: Interface.Observation, drill: Vector2, vein: Vector2, forge: Vector2) -> void:
+	var cut: Rect2 = TargetGuide.cut_metre(o, drill)
+	var drill_m := Vector2i(int(floorf(drill.x / 16.0)), int(floorf(drill.y / 16.0)))
+	_check(cut.size == Vector2(16.0, 16.0) and cut.position.x == float(drill_m.x) * 16.0 and cut.position.y < drill.y - 16.0 and not o.solid_at(Vector2i(drill_m.x * 4 + 2, int(cut.position.y / 4.0) - 2)),
+		"BUILD's cut mark is the top of the roof over the drill, in its column, under open air (%s over %s)" % [cut, drill_m])
+	_check(TargetGuide.cut_metre(o, vein).size == Vector2.ZERO and TargetGuide.cut_metre(o, forge).size == Vector2.ZERO, "the surface vein and the forge, under open air, get no cut mark")
+
+
 func _test_wrong_stack_through_the_door() -> void:
 	var door: Interface = Session.new_game(StrataData.SHALLOW_CLAY, SEED, &"tutorial")
 	if door == null:

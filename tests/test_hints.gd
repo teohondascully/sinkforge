@@ -154,6 +154,20 @@ func _mined_wrong_pins() -> void:
 	h3.restore_taught([&"way_down"])
 	h3.observe(clay, 0.016)
 	_check(h3.active_id() == &"" and h3.queued() == 0, "control: after THE WAY DOWN a clay break is the asked-for cut, not a miss (%s)" % h3.active_id())
+	# D0458: with the ladder attached the rung decides, not the pack -- wood felled on the wood rung with
+	# the ore long spent in the forge teaches nothing; the same break on the mine rung does.
+	var h4: Hints = Hints.new()
+	h4.objectives = Objectives.new()
+	h4.objectives.restore_done([&"mine", &"smelt"])
+	var wood: Interface.Observation = _obs()
+	wood.mining_broke = true
+	wood.mining_broke_material = &"wood"
+	h4.observe(wood, 0.016)
+	_check(h4.objectives.current_id() == &"wood" and h4.active_id() == &"" and h4.queued() == 0, "on the wood rung, an empty pack and a wood break teach nothing (%s)" % h4.active_id())
+	var h5: Hints = Hints.new()
+	h5.objectives = Objectives.new()
+	h5.observe(wood, 0.016)
+	_check(h5.objectives.current_id() == &"mine" and h5.active_id() == &"mined_wrong", "on the mine rung the same break is NOT ORE (%s)" % h5.active_id())
 
 
 func _wrong_stack_pins() -> void:
