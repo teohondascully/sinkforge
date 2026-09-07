@@ -114,7 +114,7 @@ func boot(load_save: bool) -> bool:
 	if is_inside_tree():
 		get_tree().root.title = "Sinkforge"
 	booted = true
-	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, SEED, SeatFlags.start_id(flags, START)])
+	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, world_seed(), SeatFlags.start_id(flags, START)])
 	var mute: PackedStringArray = flags["mute"]
 	if not mute.is_empty():
 		print("%s muted=%s" % [BOOT_LINE, ",".join(DrawCost.mute(view, mute))])   # the ablation profile's run label (D0418)
@@ -139,7 +139,7 @@ func _open_session(load_save: bool, phases: Dictionary) -> Dictionary:
 			push_warning("boot: the slot was refused (%s); a new game instead" % SaveGame.last_invalid)
 	if door == null:
 		t = Time.get_ticks_msec()
-		door = Session.new_game(StrataData.get_site(SITE), SEED, SeatFlags.start_id(flags, START))
+		door = Session.new_game(StrataData.get_site(SITE), world_seed(), SeatFlags.start_id(flags, START))
 		phases["new_game"] = Time.get_ticks_msec() - t
 	return env
 
@@ -185,6 +185,11 @@ func restore(env: Dictionary) -> bool:
 		return false
 	SeatHud.restore(stack, env)
 	return true
+
+
+## The world's seed: the shipped one unless `--seed=<n>` names another (the holdout run, D0460).
+func world_seed() -> int:
+	return int(flags["seed"]) if int(flags["seed"]) > 0 else SEED
 
 
 func save() -> bool:

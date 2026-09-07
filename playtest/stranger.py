@@ -50,7 +50,11 @@ def start(args):
         "started_at": int(time.time()),
     }
     (session / "batch.json").write_text(json.dumps(manifest, indent=1))
-    rc = subprocess.run(["bash", args.seat, str(session)]).returncode
+    env = dict(os.environ)
+    if args.seed:
+        env["SEED"] = str(args.seed)
+        manifest["seed_requested"] = args.seed
+    rc = subprocess.run(["bash", args.seat, str(session)], env=env).returncode
     if rc != 0:
         manifest["seat_boot"] = "FAILED rc=%d" % rc
         (session / "batch.json").write_text(json.dumps(manifest, indent=1))
@@ -171,6 +175,7 @@ def main():
     s.add_argument("--mission", required=True)
     s.add_argument("--model", default="claude-haiku-4-5")
     s.add_argument("--seat", default=str(Path(__file__).with_name("seat.sh")))
+    s.add_argument("--seed", type=int, default=0, help="boot another world (the holdout run); 0 keeps the shipped seed")
     v = sub.add_parser("validate")
     v.add_argument("session_dir")
     v.add_argument("--json", action="store_true")

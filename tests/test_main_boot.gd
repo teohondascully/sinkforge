@@ -39,6 +39,7 @@ func _test_the_project_boots_into_the_shell() -> void:
 	_check(HudBridge.hud_toggles({}, true, true) == {"settings": true, "map": true}, "no edge, no change")
 	# D0437: a scripted boot on a machine somebody is using is silenced by --muted; absent, the settings decide.
 	_check(bool(SeatFlags.parse(PackedStringArray(["--muted"]))["muted"]) and not bool(SeatFlags.parse(PackedStringArray([]))["muted"]), "--muted parses and is off by default")
+	_check(int(SeatFlags.parse(PackedStringArray(["--seed=20260907"]))["seed"]) == 20260907 and int(SeatFlags.parse(PackedStringArray([]))["seed"]) == 0 and int(SeatFlags.parse(PackedStringArray(["--seed=-4"]))["seed"]) == 0, "--seed=<n> parses; absent or non-positive it is 0, the shipped seed (D0460)")
 
 
 func _hand(down: Dictionary) -> Callable:

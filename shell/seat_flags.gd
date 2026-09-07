@@ -29,7 +29,7 @@ const NO_WARP: Vector2i = Vector2i(-1, -1)
 static func parse(args: PackedStringArray) -> Dictionary:
 	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
 		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false, "start": "",
-		"mute": PackedStringArray(), "lamp_occlusion": -1.0, "muted": false}
+		"mute": PackedStringArray(), "lamp_occlusion": -1.0, "muted": false, "seed": 0}
 	for a: String in args:
 		if a.begins_with("--quit-after="):
 			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
@@ -56,6 +56,8 @@ static func parse(args: PackedStringArray) -> Dictionary:
 			f["fresh"] = true
 		elif a.begins_with("--start="):
 			f["start"] = a.substr("--start=".length())
+		elif a.begins_with("--seed="):
+			f["seed"] = maxi(int(a.substr("--seed=".length())), 0)   # 0 keeps the shipped seed (D0460, the holdout)
 		elif a.begins_with("--lamp-occlusion="):
 			f["lamp_occlusion"] = maxf(float(a.substr("--lamp-occlusion=".length())), 0.0)
 		elif a == "--muted":

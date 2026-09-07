@@ -18284,3 +18284,17 @@ not spent on a ring that vanishes.
 **Why:** a rung whose marker disappears halfway is two rungs with one sentence.
 
 **Reverse cost:** one function and three lines.
+
+## D0460 · 2026-09-07 · `--seed=<n>` for the holdout run
+
+**Decided:** the director's rule 7: after two consecutive 3-of-3 batches, one holdout seed or mission
+variant before any wording is called fixed. The boot takes `--seed=<n>` among its user args (0 or absent
+keeps the shipped 20260826; pinned in the flag parser); `playtest/seat.sh` passes `SEED=<n>` through, and
+`stranger.py start --seed <n>` records `seed_requested` in the pin beside the boot line the receipt reads
+back. Seed 20260907 booted: the same pad and fixtures (the record stamps them relative to the spawn), a
+different world around them -- a pit to the west, a different sinkhole east. The audio's synthesis seed
+stays the shipped constant; it is not the world.
+
+**Why:** a wording that works on one world is a wording that works on one world.
+
+**Reverse cost:** one flag.
