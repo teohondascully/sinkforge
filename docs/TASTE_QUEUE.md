@@ -230,8 +230,13 @@ modifier, teach it as a lesson when the first dash lands, or make CLEAR_PLAN a v
 stranger, beside the forge with the smelt rung open, pressed D for 120 ticks and stood 22 m down THE
 CLAYBAND with no line and the way back a lesson it had not met (D0424); the fourth took the same fall
 looking for a tree (D0425 gives the wood rung a tree on the pad, which removes that reason to leave it).
-Legacy's opening had the same shaft. *Question: is a twenty-metre fall a step from the first forge the
-intended first descent, or does the pad want a lip, a ledge, or the shaft's mouth a few metres further off?*
+The fifth fell in too (D0428): three of five. **The mechanism:** it is a one-metre chimney 45 m deep at
++14 m from spawn, and `vertical_passes.gd` clamps a sinkhole that would open inside the 12 m spawn keepout
+to exactly the keepout's edge -- the world's first mouth stands two metres past the pad by construction, and
+D0388 lowered the keepout so the boot seed would HAVE a mouth. Legacy's opening had the same shaft.
+*Question: is a forty-metre fall two metres past the pad the intended first descent, or does the clamp
+want to DROP a mouth that lands in the keepout (so the first one falls where the terrain puts it), or the
+mouth a lip the body cannot walk into blind?*
 
 **T032 · Four kinds of ring on the opening frame.** The tutorial's target ring (pale gold, breathing), the
 machine status pips (a small ring and a dot), the grapple's landing ring (hemp now, and gated, D0424), and

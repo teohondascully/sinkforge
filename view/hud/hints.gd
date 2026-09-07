@@ -55,6 +55,7 @@ const DEFS: Array[Dictionary] = [
 ## swing techniques so a player who is wading is told about the pump before being told how to swing.
 const MOMENTS: Array[Dictionary] = [
 	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
+	{"id": &"dropped_floor", "text": "DROPPED — the stack fell at your feet, and you pick up what lies there as you stand. A machine takes a drop only when you stand BESIDE it: a body length."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
 	{"id": &"deep_enough", "text": "GRAPPLE — press [GRAPPLE] to throw your line at rock above. Hold [REEL] to climb it, press [GRAPPLE] again to let go and fly."},
 	{"id": &"pump", "text": "PUMP IT — hold [REEL] at the bottom of the arc, [LOWER] at the top."},
@@ -131,6 +132,7 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	# the lesson says why once, and never for a tap that merely brushed past.
 	_far_ticks = _far_ticks + 1 if o.aim_refusal == &"far" else 0
 	note(&"too_far", _far_ticks >= FAR_TICKS)
+	note(&"dropped_floor", o.drop_went == &"floor")   # the drop's own TOO FAR (D0428, stranger 5)
 	note(&"in_water", o.wet)
 	note(&"deep_enough", float(MaterialLook.depth_m(o.cell.y)) >= DEPTH_HINT_M)
 	if o.grapple_live:

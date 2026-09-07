@@ -49,6 +49,7 @@ func _test_progress_and_the_reversed_reveal_rule() -> void:
 	o.pack = [{"item": &"ore", "count": 6}]
 	obj.refresh(o, 0.1)
 	_check(obj.is_done(&"mine") and obj.current_id() == &"smelt" and obj.step_age < ObjectiveLine.ACK_HOLD, "rung 1 latched, rung 2 current, fresh")
+	_check(TargetGuide.ring_alpha(obj) == 0.0, "the ring stands down while the finished rung is acknowledged")
 	var font: Font = ThemeDB.fallback_font
 	var l: Dictionary = ObjectiveLine.layout(obj, font, 0.0)
 	_check(String(l["text"]).begins_with("✓") and String(l["text"]).find("Mine 4 ore") >= 0, "the plate acknowledges the finished rung: %s" % l["text"])
@@ -56,6 +57,12 @@ func _test_progress_and_the_reversed_reveal_rule() -> void:
 	l = ObjectiveLine.layout(obj, font, 0.0)
 	_check(String(l["text"]).begins_with("Forge 2 ingots") and String(l["text"]).ends_with("0/2") and String(l["howto"]) != "", "then the next goal with its count and its how-to: %s" % l["text"])
 	_check(String(l["howto"]).find("[") < 0, "the how-to on the plate is filled")
+	# THE RING OUTLIVES THE HOW-TO (D0428, stranger 5): full while the how-to is up, the floor after it fades,
+	# never zero while the rung is open.
+	_check(TargetGuide.ring_alpha(obj) == 1.0, "the ring is full while the how-to is up (%.2f)" % TargetGuide.ring_alpha(obj))
+	obj.refresh(o, 20.0)
+	_check(float(ObjectiveLine.alphas(obj.current_index(), obj.step_age, false)["hint"]) == 0.0 and is_equal_approx(TargetGuide.ring_alpha(obj), TargetGuide.RING_FLOOR) and TargetGuide.RING_FLOOR > 0.0,
+		"twenty seconds in the how-to is gone and the ring holds at its floor (%.2f): the pointer stays for the rung's life" % TargetGuide.ring_alpha(obj))
 
 
 func _test_the_ladder_rides_the_save() -> void:

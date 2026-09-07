@@ -46,6 +46,15 @@ uniform float lamp_grain = 0.13;
 uniform float lamp_window_gain = 2.2;
 // `lamp_lift`: three cuts in CELLS -- xy centre, z radius, w strength (already scaled by depth)
 uniform vec4 lamp_cuts[3];
+// THE LAMP IS OCCLUDED BY THE ROCK IT CROSSES (D0427, Astra's item 5, the bounded lighting experiment).
+// Legacy's pool lit rock through rock: a cell three deep in a wall took the same lift as the face, so a lit
+// cave read as a disc of brightness stamped on the mass. Each lamp cut now marches from its centre to the
+// pixel across `cells_tex` and loses exp(-lamp_occlusion) per solid CELL crossed (the pixel's own cell is
+// not counted, so a face is lit and the mass behind it goes dark over about half a metre). Zero is the
+// old pass, and the control in a comparison. `VeilPainter.lamp_occlusion` is the CPU statement of the
+// same arithmetic.
+uniform float lamp_occlusion = 0.0;
+uniform int occlusion_steps = 12;
 // every other source (`VeilSources.cuts`): xy centre, z radius, w strength, all in cells; and its tint
 const int MAX_CUTS = 64;
 uniform vec4 cuts[MAX_CUTS];
@@ -69,6 +78,31 @@ float cut_lift(vec4 cut, vec2 at_cells, vec2 cell) {
 	float window = (1.0 - f) * clamp(f * lamp_window_gain, 0.0, 1.0);
 	float g = (sin(cell.x * 1.7 + cell.y * 2.3) * 0.62 + sin(cell.x * 4.1 - cell.y * 3.7) * 0.38) * lamp_grain * window;
 	return clamp(cut.w * f * f + g * cut.w, 0.0, 1.0);
+}
+
+// The light that survives the rock between `from_cells` and `to_cells`, 1.0 when nothing is crossed.
+float occluded(vec2 from_cells, vec2 to_cells) {
+	if (lamp_occlusion <= 0.0) {
+		return 1.0;
+	}
+	vec2 d = to_cells - from_cells;
+	float step_cells = length(d) / float(occlusion_steps);
+	vec2 own = floor(to_cells);
+	float solid_cells = 0.0;
+	for (int i = 1; i < occlusion_steps; i++) {
+		vec2 p = from_cells + d * (float(i) / float(occlusion_steps));
+		if (floor(p) == own) {
+			continue;   // the pixel's own cell: a face is lit by definition
+		}
+		vec2 uv = (p * cell_px - cells_origin_px) / cells_size_px;
+		if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) {
+			continue;
+		}
+		if (texture(cells_tex, uv).r > 0.001) {
+			solid_cells += step_cells;
+		}
+	}
+	return exp(-lamp_occlusion * solid_cells);
 }
 
 void fragment() {
@@ -111,7 +145,11 @@ void fragment() {
 	// `lamp_lift`: each cut lifts what the previous left; the lamp lifts toward ITS colour (legacy `_light_tint`)
 	float lit = 0.0;
 	for (int i = 0; i < 3; i++) {
-		lit += (1.0 - lit) * cut_lift(lamp_cuts[i], at_cells, cell);
+		float l = cut_lift(lamp_cuts[i], at_cells, cell);
+		if (l > 0.0) {
+			l *= occluded(lamp_cuts[i].xy, at_cells);
+		}
+		lit += (1.0 - lit) * l;
 	}
 	rgb += max(lamp_tint - rgb, vec3(0.0)) * clamp(lit, 0.0, 1.0);
 	// `VeilSources.compose`: a cut only ever adds, per channel, toward its tint

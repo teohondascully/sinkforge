@@ -37,6 +37,9 @@ var followed: StringName = &""
 var auto_pickup: bool = true
 var pending_winch_head: Vector2i = NONE
 var _drop_grace: Dictionary = {}       # logic_cell -> ticks remaining
+## Where the last drop went (D0428): &"fed" into a machine's mouth, &"floor" to a pile or the sink, &""
+## when nothing left the pack. A view reads it to say so; the sim does not.
+var last_drop: StringName = &""
 
 
 func _init(p_world: World, p_items: Items, p_machines: Machines, p_body: Body) -> void:
@@ -144,6 +147,7 @@ func _place(logic_cell: Vector2i) -> StringName:
 ## genuinely eats what you hold, the toss goes in; else it tosses forward into the facing column when
 ## that is not solid, else straight down your own column. Returns the units that left the pack.
 func drop() -> int:
+	last_drop = &""
 	var item: StringName = selected_item()
 	if item == &"":
 		return 0
@@ -152,6 +156,7 @@ func drop() -> int:
 	if mouth != null:
 		var fed: int = items.deposit(mouth.logic_cell, item, carried)
 		if fed > 0:
+			last_drop = &"fed"
 			return fed
 	var here: Vector2i = body_logic_cell()
 	var face: Vector2i = here + Vector2i(body.facing, 0)
@@ -159,6 +164,7 @@ func drop() -> int:
 	var dropped: int = items.drop_item(target, item, carried, here)
 	if dropped > 0:
 		_drop_grace[items.last_drop_landing] = DROP_GRACE_TICKS
+		last_drop = &"floor"
 	return dropped
 
 

@@ -17582,3 +17582,61 @@ command so the director's part is one line.
 
 **Lesson, for the wrap:** a red CI is read from its JOBS, not from the suite lines. Three pushes went by
 with the authorship job red while the suites were green.
+
+## D0427 · 2026-09-06 · The lamp is occluded by the rock it crosses: the bounded lighting experiment (Astra's item 5, Part B's first line)
+
+**The experiment, as asked:** one representative cave, a comparison with the camera still and moving,
+the cost measured. The veil's lamp pool (legacy's `lamp_lift`, three radial cuts) lit rock THROUGH rock:
+a cell three deep in a wall took the same lift as the face, so a lit cave read as a disc of warmth
+stamped on the mass. `veil.gdshader::occluded` now marches each lamp cut from its centre to the pixel
+across `cells_tex` (12 samples) and the light falls by exp(-k) per solid cell crossed, the pixel's own
+cell excluded; `VeilPainter.lamp_occlusion` is the CPU statement of the same arithmetic and
+`test_veil_painter` pins it (a face lit; two cells in ~exp(-2k); k = 0 is legacy's pass). `LAMP_OCCLUSION
+= 0.5`: a lit crust of about half a metre. The seat's `--lamp-occlusion=K` is the comparison's dial.
+
+**What the captures show** (`tests/body/recordings/round15_2026-09-06/lighting/`): at 46 m in
+STONEREACH (`stone46_k0.png` against `stone46_k0.5b.png`) the pool stops at the faces -- the ledge under
+the miner and the face to the right keep their warmth, the mass behind them goes dark, and the rock
+across the gap to the left is lit on its face alone. At 22 m the difference is small: the lamp is scaled
+down by depth there. Three frames of the scripted walk at 46 m (`walk_t60/100/140`) hold the crust
+steady frame to frame; the walk itself ran into a wall, so this is a stability sample, not a traverse.
+
+**Cost:** GPU-side only -- no CPU work was added -- and the GPU cannot be timed on this machine (D0418).
+Two interleaved pairs of the scripted walk with vsync off: frame p50 3.84/4.11/3.80/3.79 ms at k = 0
+against 3.92/4.01/4.09/3.90 at k = 0.5; p99 11.14/10.33/11.24/11.21 against 11.08/10.65/10.37/10.93.
+Inside the noise; the bound is 12 texture reads per lamp-lit pixel, three cuts, a disc of a few
+thousand pixels. Not done: the other sources (torches, machines) still light through rock; a warm
+bounce off lit floors; any shadow softening beyond the march's own penumbra.
+
+**Why:** Astra asked whether the Tiny-Glade direction is reachable in one bounded step before Part B
+commits; this is the smallest change that makes light land on surfaces instead of volumes, and it
+reads in the deep where the game is going.
+
+**Reverse cost:** one uniform at zero.
+
+## D0428 · 2026-09-06 · The fifth stranger: the ring outlives the how-to, and a drop that hits the floor says so
+
+**The run** (`docs/playtests/2026-09-06_stranger5.md`): first ore at 2.0 s; then twenty-five DROPs, the
+first from the adit's mouth 5 m east of the forge, the rest 50 m down the chimney at +14 m; the forge
+never fed; verdict "would not keep playing", the forge "broken". The frames: every drop fell at the
+feet and came back after the grace with only the signed ticks to say so ("popups"), and from 12.5 s to
+43.5 s -- the whole span of the surface attempts -- the rung's ring and how-to were faded (D0411's nine
+seconds, back at the forty-second stall), so nothing on screen pointed at the forge or said "beside".
+
+**Decided:** (1) `TargetGuide.ring_alpha`: the ring holds at `RING_FLOOR` 0.38 for the rung's life once
+the how-to fades, full while it is up, zero only during a finished rung's acknowledgement. D0411 tied it
+to the how-to to avoid a permanent ring; a rung with no pointer cost more. (2) `Verbs.last_drop` names
+where a drop went (`fed` / `floor`); the interface carries it one observe wide as `drop_went`; `Hints`
+docks DROPPED once on the first floor landing -- the drop's own TOO FAR. Pinned in `test_tutorial_teaching`
+(full, floor, zero), `test_interface_verbs` (floor, one observe), `test_hints` (fed teaches nothing; floor
+once; eight moments now).
+
+**Named, not done:** the chimney at +14 m has taken strangers 3, 4 and 5 -- `vertical_passes.gd` clamps a
+sinkhole that would land inside the spawn keepout to the keepout's edge, so the world's first mouth
+stands two metres past the pad by construction (T031, now with the mechanism). Five runs is five
+samples, and the agents' journals are thinning.
+
+**Why:** a stranger who has wandered for ten seconds is exactly the one who needs the pointer, and a
+verb that fails silently at the second rung is read as a broken game.
+
+**Reverse cost:** one alpha floor; one StringName through three files; one moment.

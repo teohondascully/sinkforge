@@ -357,7 +357,7 @@ pins encoded legacy's silence, and I never ran the suite that enumerated the rul
 and the meter's lambdas on the `RenderingServer` signals crashed Godot at exit on every perf run until the
 seat node forwarded them (in D0414).
 
-### Astra's audit order, taken (2026-09-06; D0416–D0425, on main)
+### Astra's audit order, taken (2026-09-06; D0416–D0428, on main)
 
 **The audit (D0416)** tightened three conclusions -- the opening completes through first automation, not
 "end to end"; the GPU is a working hypothesis; the water fix at the warp may be avoided, not repaired --
@@ -393,7 +393,12 @@ by 14.5 s (the drop read as feeding); then the same fall as stranger 3, looking 
 never gave it -- the site keeps trees 12 m off the spawn and the ring searches 10 m. Fixed: legacy's
 guaranteed tutorial tree is back as a `tree` start fixture planted by the world's own tree pass, 6 m left
 of spawn. Tried and reversed: the ore socket (V32; the lever is legacy's richness-scaled nugget count).
-No stranger has felled a tree yet.
+No stranger has felled a tree yet. **Stranger 5 (D0428):** first ore 2.0 s; the forge never fed --
+twenty-five DROPs from 5 m and then from 50 m down the chimney, with the ring and how-to faded for the
+whole surface span. Fixed: the ring holds at a floor for the rung's life; the first floor-landing drop
+docks DROPPED. **Astra's item 5 (D0427):** the lamp is occluded by the rock it crosses (a shader march,
+`LAMP_OCCLUSION` 0.5, `--lamp-occlusion=K` the dial); captures at 46 m show light on faces and dark mass;
+cost inside the noise on this machine. T031's mechanism named: the chimney at +14 m is the keepout clamp.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall

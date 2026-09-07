@@ -65,7 +65,10 @@ func _test_every_verb_command_answers_with_a_detail_or_a_named_reason() -> void:
 	items.produced(&"ore", 4)
 	iface.apply(Command.select(1))
 	r = iface.apply(Command.drop())
-	_check(r.ok and r.detail == &"dropped" and items.pack.count(&"ore") == 0 and _oracle().pile_at(Vector2i(6, 9)) == {&"ore": 4}, "drop tosses the selected stack forward on to the floor")
+	var went: Interface.Observation = _oracle()
+	_check(r.ok and r.detail == &"dropped" and items.pack.count(&"ore") == 0 and went.pile_at(Vector2i(6, 9)) == {&"ore": 4}, "drop tosses the selected stack forward on to the floor")
+	_check(went.drop_went == &"floor", "the observation says the drop went to the floor (D0428: %s)" % went.drop_went)
+	_check(_oracle().drop_went == &"", "and only for one observe")
 	_check(not iface.apply(Command.collect()).ok, "collect during the drop grace: nothing")
 	for _i: int in Verbs.DROP_GRACE_TICKS:
 		iface.apply(Command.move(InputFrame.new()))

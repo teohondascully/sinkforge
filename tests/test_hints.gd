@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_taught_ids_and_resync()
 	_test_a_waiting_lesson_makes_the_active_one_yield_on_wall_time()
 	_test_the_grapple_is_known_by_lesson_or_by_throw()
+	_test_a_drop_that_hits_the_floor_teaches_once()
 	_finish("hints")
 
 
@@ -41,7 +42,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_obs([]), 0.016)
 	h.observe(_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 7, "nine pack lessons and seven moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 8, "nine pack lessons and eight moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 func _test_one_bubble_at_a_time_in_table_order() -> void:
@@ -211,3 +212,23 @@ func _test_the_grapple_is_known_by_lesson_or_by_throw() -> void:
 	r.observe(_obs(), 0.016)
 	r.restore_taught(["deep_enough"])
 	_check(r.grapple_known(), "a save that taught the deep lesson restores the knowledge")
+
+
+## D0428 (stranger 5): twenty-five DROPs five metres from the forge, the stack at the feet and back, and
+## nothing but the ticks to say so. The first drop that lands on the floor docks the lesson; a drop that
+## fed a machine does not; it latches like every moment.
+func _test_a_drop_that_hits_the_floor_teaches_once() -> void:
+	var h: Hints = Hints.new()
+	h.observe(_obs(), 0.016)
+	var fed: Interface.Observation = _obs()
+	fed.drop_went = &"fed"
+	h.observe(fed, 0.016)
+	_check(h.active_id() == &"", "a drop that fed a machine teaches nothing")
+	var floor: Interface.Observation = _obs()
+	floor.drop_went = &"floor"
+	h.observe(floor, 0.016)
+	_check(h.active_id() == &"dropped_floor" and h.active_text().begins_with("DROPPED"), "the first drop to the floor docks DROPPED (%s)" % h.active_id())
+	for _i: int in 30:
+		h.observe(_obs(), 0.5)
+	h.observe(floor, 0.016)
+	_check(h.active_id() == &"" and h.queued() == 0, "a second floor drop is not taught again")

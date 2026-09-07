@@ -89,6 +89,8 @@ func boot(load_save: bool) -> bool:
 	if float(flags["zoom"]) > 0.0:
 		zoom = float(flags["zoom"])
 	camera.zoom = Vector2(zoom, zoom)
+	if float(flags["lamp_occlusion"]) >= 0.0:
+		VeilLayer.lamp_occlusion = float(flags["lamp_occlusion"])   # the lighting comparison's dial (D0427)
 	var t1: int = Time.get_ticks_msec()
 	stack = ViewStack.build_stack(self, door, look, camera, true, falling, payouts)
 	view = stack.view

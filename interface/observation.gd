@@ -291,6 +291,9 @@ var map_machines: Array[Vector2i] = []
 var aim_is_lode: bool = false
 ## Why a held MINE did nothing this tick (D0421): &"" / &"far" / &"sight" / &"air". See `MineHold.refusal`.
 var aim_refusal: StringName = &""
+## Where a DROP since the last observe went (D0428): &"fed" a machine, &"floor" a pile, &"" no drop. One
+## observe wide, like the flow events. See `Verbs.last_drop`.
+var drop_went: StringName = &""
 ## The aim's affordances (6m, D0376), from the verbs' own predicates (`AimPlanes.fill`): what is held,
 ## whether the build press would land, which mouth a drop would feed, the nearest open cell while you
 ## stand in your own way, how far a rope would unroll, what a drill would bore.

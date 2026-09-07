@@ -194,6 +194,13 @@ const LAMP_LEAD_M: float = 1.9        ## how far the pool leads toward what the 
 ## it fades" rather than ending in a clean gaussian blob.
 const LAMP_GRAIN: float = 0.13
 const LAMP_WINDOW_GAIN: float = 2.2
+## THE LAMP IS OCCLUDED BY THE ROCK IT CROSSES (D0427, Astra's item 5): the light a lamp cut delivers to a
+## point falls by exp(-LAMP_OCCLUSION) for every solid cell on the straight line from the cut's centre, the
+## point's own cell excluded -- so a face is lit and the mass behind it goes dark over about half a metre
+## (two cells keep 37%, four 14%). Legacy's pool lit rock through rock. Zero is legacy's pass and the
+## control. `veil.gdshader::occluded` is the GPU statement of this function; `OCCLUSION_STEPS` its samples.
+const LAMP_OCCLUSION: float = 0.5
+const OCCLUSION_STEPS: int = 12
 
 ## **THE LAMP IS SCALED BY HOW DARK THE MINER'S OWN SPOT IS**, and legacy records the regression it fixes:
 ## "at spawn the full-strength lamp washed out both the avatar and the starter ore it sits on, so every
@@ -242,6 +249,23 @@ static func lamp_scale(row: int) -> float:
 	var depth: float = MaterialLook.depth_m_exact(row)
 	var t: float = clampf((depth - LAMP_NONE_M) / (LAMP_FULL_M - LAMP_NONE_M), 0.0, 1.0)
 	return lerpf(LAMP_SURFACE_SCALE, 1.0, t)
+
+
+## The light that survives the rock between two points in cells: `solid` answers whether a cell is rock.
+## Samples the segment at `steps` points, the endpoint's own cell excluded, as the shader does.
+static func lamp_occlusion(from_cells: Vector2, to_cells: Vector2, solid: Callable, k: float = LAMP_OCCLUSION, steps: int = OCCLUSION_STEPS) -> float:
+	if k <= 0.0:
+		return 1.0
+	var d: Vector2 = to_cells - from_cells
+	var step_cells: float = d.length() / float(steps)
+	var own := Vector2i(floori(to_cells.x), floori(to_cells.y))
+	var solid_cells: float = 0.0
+	for i: int in range(1, steps):
+		var p: Vector2 = from_cells + d * (float(i) / float(steps))
+		var c := Vector2i(floori(p.x), floori(p.y))
+		if c != own and bool(solid.call(c)):
+			solid_cells += step_cells
+	return exp(-k * solid_cells)
 
 
 static func lamp_lift(obs: Interface.Observation, cell: Vector2i) -> float:

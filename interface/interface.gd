@@ -102,6 +102,7 @@ var _rates: ProductionRate = ProductionRate.new()
 var _hold: MineHold = MineHold.new()
 var _seen: SeenPlane                 ## what the map admits to: the cells the body has been near (D0400)
 var _events: Array[Dictionary] = []   # flow events since the last observe: the consumed channel
+var _drop_went: StringName = &""       # the last DROP's landing since the last observe (D0428)
 var _tick: int = 0
 ## The derived window planes, refreshed on terrain or window change rather than per tick (D0340). Held
 ## per Interface, not per Observation, because an Observation is built and thrown away every frame and a
@@ -192,6 +193,8 @@ func observe(envelope: Envelope) -> Observation:
 	_fill_line(o)
 	o.flow_events = _events.duplicate(true)
 	_events.clear()
+	o.drop_went = _drop_went
+	_drop_went = &""
 	return o
 
 
@@ -311,7 +314,10 @@ func apply(command: Command) -> Result:
 		Command.Kind.BUILD:
 			return _outcome(_verbs.build(command.cell))
 		Command.Kind.DROP:
-			return _outcome(&"dropped" if _verbs.drop() > 0 else &"")
+			var dropped: bool = _verbs.drop() > 0
+			if dropped:
+				_drop_went = _verbs.last_drop
+			return _outcome(&"dropped" if dropped else &"")
 		Command.Kind.COLLECT:
 			return _outcome(&"collected" if _verbs.collect() > 0 else &"")
 		Command.Kind.CONFIGURE:

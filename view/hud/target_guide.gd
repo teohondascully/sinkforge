@@ -14,6 +14,12 @@ const RING_WIDTH: float = 2.0          ## canvas px
 const BREATH_HZ: float = 0.8
 const INK := Color(0.97, 0.87, 0.55)
 const SEARCH_CELLS: int = 40           ## ten metres each way, in terrain cells
+## THE RING OUTLIVES THE HOW-TO (D0428, stranger 5). D0411 gave the ring the how-to's alpha, so it faded at
+## nine seconds and came back at the forty-second stall -- and the fifth stranger, who had wandered for ten
+## seconds, spent the thirty between pressing DROP five metres from a forge nothing was pointing at. The
+## pointer that does not read is cheap: it stays for the rung's life at this floor, full while the how-to
+## is up. A ring a stranger has stopped needing is one ring; a rung with no pointer is a stranger lost.
+const RING_FLOOR: float = 0.38
 
 ## THE SEARCH IS PAID ONCE PER CELL MOVED, NOT PER FRAME (D0414). The first cut scanned the full 81x81
 ## window through a Callable every rendered frame: 3 ms, forty per cent of the 120 Hz budget, the largest
@@ -131,7 +137,7 @@ static func _nearest_pile(o: Interface.Observation, body: Vector2, item: StringN
 func paint(frame: Frame, ci: CanvasItem) -> void:
 	if frame == null or frame.obs == null or objectives == null or objectives.all_done():
 		return
-	var alpha: float = float(ObjectiveLine.alphas(objectives.current_index(), objectives.step_age, false)["hint"])
+	var alpha: float = ring_alpha(objectives)
 	if alpha <= 0.0:
 		return
 	var at: Vector2 = _cached_target(objectives.current_id(), frame.obs)
@@ -144,6 +150,14 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	var r: float = RING_M * float(o_px_per_m(frame)) * (0.92 + 0.08 * breath)
 	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(INK, alpha * (0.45 + 0.4 * breath)), RING_WIDTH, true)
 	ci.draw_arc(canvas, r * 0.55, 0.0, TAU, 24, Color(INK, alpha * 0.25 * breath), 1.0, true)
+
+
+## The ring's alpha: the how-to's while it is up, never below RING_FLOOR while the rung is open; nothing
+## during a just-finished rung's acknowledgement (the how-to's own zero there).
+static func ring_alpha(obj: Objectives) -> float:
+	if obj.current_index() > 0 and obj.step_age < ObjectiveLine.ACK_HOLD:
+		return 0.0
+	return maxf(float(ObjectiveLine.alphas(obj.current_index(), obj.step_age, false)["hint"]), RING_FLOOR)
 
 
 ## The target for this rung, searched once per (rung, body cell, terrain version, pile count) and reused
