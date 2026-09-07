@@ -101,7 +101,7 @@ or leave it as the first descent. **T032** four ring kinds -- a distinct form fo
 **D0427** as Part B's first line or a switch at zero. **T024–T030** unchanged, T029 taken provisionally by
 the payout tick's name.
 
-**CI:** `3291ec3a` is the head to read. Every push since `1356268b` is red on the authorship job only;
+**CI:** `d5e99690` is the head to read (3291ec3a went out with the occlusion refactor unstaged; d5e99690 is the tree the gates ran on). Every push since `1356268b` is red on the authorship job only;
 suites, structural gates and the headed boot are green on `1e56abe9` (the last completed run).
 
 ---
