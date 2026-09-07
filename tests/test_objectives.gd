@@ -60,7 +60,12 @@ func _test_the_machine_steps() -> void:
 	var obj: Objectives = Objectives.new()
 	obj.refresh(_obs(), 0.016)
 	obj.refresh(_obs([], [_m(&"drill", Vector2i(5, 6))]), 0.016)
-	_check(obj.is_done(&"build") and not obj.is_done(&"fuel"), "a placed drill builds the line but is not fuelled")
+	_check(not obj.is_done(&"build"), "a drill alone, nothing under it, does not build the line (D0469)")
+	var forge: Dictionary = _m(&"processor", Vector2i(5, 8))
+	forge.erase("behavior")                                              # the Forge's record carries id only
+	obj.refresh(_obs([], [_m(&"drill", Vector2i(5, 6)), forge]), 0.016)
+	_check(obj.is_done(&"build") and not obj.is_done(&"fuel"), "a drill two metres over the forge builds the line but is not fuelled")
+	_check(not Objectives.drill_on_line(_obs([], [_m(&"drill", Vector2i(5, 6)), _m(&"processor", Vector2i(6, 8))])), "control: the forge a column over is not the line")
 	obj.refresh(_obs([], [_m(&"drill", Vector2i(5, 6), {"input": {&"coal": 2}})]), 0.016)
 	_check(obj.is_done(&"fuel"), "coal in its buffer fuels it")
 	obj.refresh(_obs([], [_m(&"drill", Vector2i(5, 6)), _m(&"hopper", Vector2i(5, 4), {"filter": &"coal"})]), 0.016)
@@ -86,7 +91,7 @@ func _test_the_line_has_run_and_completions_latch() -> void:
 	o.rates = [{"item": &"ingot", "rate_centi": 120}]
 	obj.refresh(o, 0.016)
 	_check(not obj.is_done(&"auto"), "an ingot rate before any drill existed is the player's hand, not the line")
-	obj.refresh(_obs([], [_m(&"drill", Vector2i(5, 6))]), 0.016)
+	obj.refresh(_obs([], [_m(&"drill", Vector2i(5, 6)), _m(&"processor", Vector2i(5, 8))]), 0.016)
 	obj.refresh(o, 0.016)
 	_check(obj.is_done(&"auto") and obj.is_done(&"build"), "the same rate after the drill was seen is first automation, and the removed drill's step stays done")
 	obj.refresh(_obs(), 0.016)
@@ -103,7 +108,7 @@ func _test_the_clock_and_the_finish() -> void:
 	_check(obj.step_age == 0.0 and obj.current_index() == 1, "advancing resets the step clock")
 	_check(obj.done_for() < 0.0 and not obj.all_done(), "not finished: done_for is -1")
 	var all: Array = []
-	for m: Dictionary in [_m(&"drill", Vector2i(5, 6), {"fuel": 1}), _m(&"hopper", Vector2i(5, 5), {"filter": &"coal"}), _m(&"generator", Vector2i(8, 6), {"fuel": 1}), _m(&"winch_head", Vector2i(9, 9), {"status": &"working"})]:
+	for m: Dictionary in [_m(&"drill", Vector2i(5, 6), {"fuel": 1}), _m(&"processor", Vector2i(5, 8)), _m(&"hopper", Vector2i(5, 5), {"filter": &"coal"}), _m(&"generator", Vector2i(8, 6), {"fuel": 1}), _m(&"winch_head", Vector2i(9, 9), {"status": &"working"})]:
 		all.append(m)
 	var o: Interface.Observation = _obs([["ore", 4], ["ingot", 2], ["wood", 1]], all)
 	o.rates = [{"item": &"ingot", "rate_centi": 50}]

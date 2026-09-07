@@ -36,41 +36,9 @@ const CHAIN_SPEED_MULT: float = 1.4      ## a release below 1.4x a run was not g
 const PUMP_DOWN: float = 0.85            ## cos(~32 degrees): near enough the bottom of the arc
 const LAND_HARD_PX_S: float = VoiceCues.LAND_HARD_PX_S
 
-## The teachable items, scanned in order (order is priority when several fire on one frame). The drill
-## belongs to the Objectives chain as its capstone; recipe machines need no bubble because drop in /
-## product out is the verb that chain taught.
-const DEFS: Array[Dictionary] = [
-	{"id": &"rope", "item": &"rope", "text": "ROPE — set it above a drop. Climb it up and down; leap off."},
-	{"id": &"torch", "item": &"torch", "text": "TORCH — set it on a wall-backed cell. Its light stays."},
-	{"id": &"generator", "item": &"generator", "text": "GENERATOR — set it down with [BUILD], stand by it and press [DROP] with coal selected. It powers what is near."},
-	{"id": &"conduit", "item": &"conduit", "text": "CONDUIT — lays a power line. Power flows down and sideways, never up."},
-	{"id": &"hopper", "item": &"hopper", "text": "HOPPER — banks what falls in, meters it down. Its filter is the first thing it tastes."},
-	{"id": &"lift", "item": &"lift", "text": "LIFT — hauls goods and YOU up its column."},
-	{"id": &"pump", "item": &"pump", "text": "PUMP — set it in the wet. Powered, it drains the water under it."},
-	{"id": &"winch_head", "item": &"winch_head", "text": "WINCH HEAD — the machine, not your line. Stand it on a lode with [BUILD], then [LINK] it to a Station. The vein climbs on its own."},
-	{"id": &"winch_station", "item": &"winch_station", "text": "WINCH STATION — the head's drain. Collect from it."},
-]
-
-## State-edge hints: the rising edge fires once and latches like a pack hint. `in_water` sits above the
-## swing techniques so a player who is wading is told about the pump before being told how to swing.
-const MOMENTS: Array[Dictionary] = [
-	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
-	{"id": &"cut_through", "text": "CUT THROUGH — the rock under the pointer is gone. Point at what is left of the WHITE SQUARE: a hole has to be a little wider than you before you drop in."},
-	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
-	{"id": &"aim_sight", "text": "BEHIND ROCK — that rock is in reach, but another rock is in the way of your pick. Cut the near one first, or point at a face you can see."},
-	{"id": &"aim_machine", "text": "THAT IS A MACHINE — [MINE] cuts rock, not machines. Stand beside it and press [DROP] to feed it what it takes; what it makes comes to you as you stand there."},
-	{"id": &"mined_wrong", "text": "NOT ORE — that was {broke}, and the task wants ore. The ore is the silver-flecked rock inside the WHITE RING: cut that one."},
-	{"id": &"dropped_wrong", "text": "WRONG STACK — you dropped {dropped}; the machine beside you takes {wanted}. Press the number over the {wanted} in your bar to hold it, then [DROP]."},
-	{"id": &"left_working", "text": "STILL WORKING — the forge has more of your ore in it, and what it makes comes to you only while you stand beside it. Step back and wait: {more} more coming."},
-	{"id": &"dropped_floor", "text": "DROPPED — the stack fell at your feet, and you pick up what lies there as you stand. A machine takes a drop only when you stand BESIDE it: a body length."},
-	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
-	{"id": &"way_down", "text": "THE WAY DOWN — the ground is rock you can cut. Point at the ground under you and hold [MINE]: the metre opens and you drop into it. One metre at a time is a safe fall."},
-	{"id": &"deep_enough", "text": "GRAPPLE — POINT at rock above you and press [GRAPPLE] to throw your line there. Hold [REEL] to climb it, press [GRAPPLE] again to let go and fly."},
-	{"id": &"pump", "text": "PUMP IT — hold [REEL] at the bottom of the arc, [LOWER] at the top."},
-	{"id": &"chain", "text": "CHAIN IT — press [GRAPPLE] again in mid-air to plant the next line, and the speed you left with is the speed you keep."},
-	{"id": &"wrapped", "text": "THE LINE CAUGHT — it bent around the rock instead of through it. A short line whips you round harder."},
-	{"id": &"hard_landing", "text": "HARD LANDING — a long drop costs your footing. A line fired on the way DOWN takes the fall instead of your legs."},
-]
+## The lesson tables live in `HintTexts` (D0469); these aliases keep every reader's name.
+const DEFS: Array[Dictionary] = HintTexts.DEFS
+const MOMENTS: Array[Dictionary] = HintTexts.MOMENTS
 
 var _had: Dictionary = {}           ## item -> held last frame; the acquisition edge
 var _done: Dictionary = {}          ## hint id -> shown (latched)
@@ -172,6 +140,17 @@ func _mined_wrong(o: Interface.Observation, counts: Dictionary) -> bool:
 ## first ingot came at two seconds, the second was two seconds behind it, and both left with "1/2". What
 ## was coming last tick (`Payouts.coming`: output plus the batches the held input makes, within reach) is
 ## nothing this tick, and the pack did not rise: the body left, the machine did not finish.
+## D0469 (stranger 51): a drill standing anywhere but on the line while the BUILD rung is open -- it was
+## set in the stranger's own tunnel, fuelled, bored the adit's ore into nothing, and the rung never ticked.
+func _wrong_spot(o: Interface.Observation) -> bool:
+	if objectives == null or objectives.current_id() != &"build":
+		return false
+	var placed: bool = false
+	for rec: Dictionary in o.machines:
+		placed = placed or rec.get("behavior", &"") == &"drill"
+	return placed and not Objectives.drill_on_line(o)
+
+
 func _left_working(o: Interface.Observation, counts: Dictionary) -> bool:
 	var ingots: int = int(counts.get(&"ingot", 0))
 	var coming: int = Payouts.coming(o, &"ingot")
@@ -239,6 +218,9 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	_note_refusals(o)
 	var counts: Dictionary = Payouts.pack_counts(o)
 	note(&"mined_wrong", _mined_wrong(o, counts))
+	note(&"wrong_spot", _wrong_spot(o))
+	note(&"build_far", o.aim_refusal == &"build_far")                # a BUILD's own refusals, one observe wide (D0470)
+	note(&"build_here", o.aim_refusal == &"build_here")
 	var wrong: bool = _wrong_stack(o, counts)
 	note(&"dropped_wrong", wrong)
 	note(&"dropped_floor", o.drop_went == &"floor" and not wrong)   # the drop's own TOO FAR (D0428, stranger 5)

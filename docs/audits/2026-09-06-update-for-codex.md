@@ -371,3 +371,41 @@ audit is inverted: the repository's `authorship` gate requires one identity acro
 ~1,300 commits carry the noreply address; the Gmail address was the drift D0429 removed. Nothing is
 rewritten without the director's word. **CI:** every run after 143203a1 was cancelled by the next push
 (concurrency); a4af10eb is the first allowed to finish -- no push until it does.
+
+## Addendum 3: the overnight loop under the director's fifteen amendments (2026-09-07, head 10750f32)
+
+Everything since D0447 was run as a pinned loop: every seat boots through LaunchServices at foreground
+priority with a receipt naming the build, seed, mission hash, model, engine, launcher and frame cap
+(`playtest/stranger.py start`); a run is VALID or VOID by a classifier that never reads the agent's
+report (`validate`: stale ids, capture errors, non-settling frames, process death, save access, wall
+time > 10x sim); the first rung is read from the pack in the receipts, never from the objective line; a
+supervisor (`playtest/supervisor.py`) kills only the seat it owns and writes HARNESS_INVALID; a replay
+tool (`playtest/replay.py`) compares tick, state, refusal and broke per burst; the ceiling run
+(`playtest/ceiling.py`, now `--rung4` too) is the denominator and is kept apart from stranger evidence.
+Batches 25-51, twenty-seven strangers. Reports in `docs/playtests/2026-09-07_*.md`.
+
+**What the loop found and fixed (each on a batch's frames and inputs, each pinned):** the build flag
+from one clay in the pack turned the mine aim exact and a stranger was refused "sight" wordlessly
+inside the ring (D0452); the scoop measured from the body's centre so the forge's ingots did not come
+to the drop spot (D0456); the world's edge (D0457); the cut mark for buried targets (D0458) and the ring
+that moves to the shaft's mouth once the drill is carried (D0459); STILL WORKING for the forge's second
+ingot and the card in hub seconds (D0461); the rung-N mission variant, a seat opened from a save the
+ceiling wrote after rung three, so strangers start at BUILD's door (D0462); "Copper ore" (D0463); the aim
+snap's one-reach tolerance cut the ground at the feet for a press on the mark from a body length past
+the reach (D0464); a carried machine was a white square in the bar (D0465); "the shaft's mouth" read as
+the pad's own shaft (D0466); the cut mark vanished after the first bite, three quarters of the metre
+standing, and NOTHING THERE fired for a hole the player had cut themselves (D0467).
+
+**The numbers, read by the pack:** on the shipped seed the first rung went 3 of 3 twice in a row (34-36,
+37-39: 1.3-21.6 s) after D0452-D0458; the holdout seed (40-42) gave 1 of 2 valid; the rung-4 variant
+(43-51) has had no stranger place the drill in nine runs, one reaching it (S44, 56.6 s), against a
+scripted ceiling of 14.1 s. Three of nine variant runs were VOID under rule 3 while the body swung on the
+grapple line: the swing is periodic and never settles. That rule is the director's; the frames before
+the swing are read anyway; the question of marking "on the line" frames as valid is put to the director.
+
+**For an auditor:** the instrument-side failures this loop caught in itself: seats at background priority
+under the director's foreground load (every seat this machine's Bash tool spawned ran nice 5 until
+D0452's launcher); the supervisor's first version marked two clean quits as deaths; the receipts' pack is
+sorted and the bar is not (the ceiling pressed the coal's key for the drill); a runtime error inside a
+test aborts the function and the suite prints ALL PASS with a smaller count (caught only because the
+battery ran the corrected file). None of these were visible from the agents' reports.

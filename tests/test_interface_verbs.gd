@@ -16,6 +16,7 @@ var iface: Interface
 
 func _initialize() -> void:
 	_test_every_verb_command_answers_with_a_detail_or_a_named_reason()
+	_test_a_build_that_places_nothing_says_why()
 	_test_the_mine_hold_rides_the_move_frame()
 	_test_the_session_round_trips_through_the_door()
 	_test_a_new_game_stands_on_the_spawn()
@@ -107,6 +108,25 @@ func _short_drop_pins() -> void:
 	for _i: int in 4:
 		iface.apply(Command.move(InputFrame.new()))
 	_check(_oracle().drop_short_cell == Vector2i(-1, -1), "and is gone after DROP_SHORT_TICKS")
+
+
+## D0470 (strangers 49, 50, 51): RMB past the reach, or on the body's own cell with a machine in hand,
+## placed nothing and said nothing. The refusal rides the observation's refusal channel, one observe wide.
+func _test_a_build_that_places_nothing_says_why() -> void:
+	_rig()
+	items.pack.add(&"hopper", 1)
+	items.produced(&"hopper", 1)
+	iface.apply(Command.select(0))
+	var r: Interface.Result = iface.apply(Command.build(Vector2i(12, 9)))
+	var o: Interface.Observation = _oracle()
+	_check(not r.ok and o.aim_refusal == &"build_far", "a BUILD seven metres off places nothing and the observation says build_far (%s)" % o.aim_refusal)
+	_check(_oracle().aim_refusal == &"", "...for one observe only (%s)" % _oracle().aim_refusal)
+	r = iface.apply(Command.build(Vector2i(5, 8)))
+	o = _oracle()
+	_check(not r.ok and o.aim_refusal == &"build_here" and machines.count() == 0, "a BUILD on the body's own cell places nothing and says build_here (%s)" % o.aim_refusal)
+	r = iface.apply(Command.build(Vector2i(6, 9)))
+	o = _oracle()
+	_check(r.ok and o.aim_refusal == &"" and machines.count() == 1, "control: a placement beside the body carries no refusal (%s)" % o.aim_refusal)
 
 
 func _test_the_mine_hold_rides_the_move_frame() -> void:

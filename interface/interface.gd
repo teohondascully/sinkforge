@@ -20,14 +20,12 @@ extends RefCounted
 ## make either one a second unfiltered channel into the grid.
 ##
 ## SMALL BECAUSE THE GAME IS SMALL. §5 names four envelope dimensions (vision, planning, motor, priors)
-## and three standard envelopes (Oracle, Constrained, Language). Exactly one of those has a mechanism in
-## this build -- a window, which is vision's spatial half -- and the rest are DELIBERATELY ABSENT rather
-## than stubbed: no fog, no planner bound, no motor noise, no priors table. A field for each would be four
-## lies in the type system (`docs/adr/0007-l2-interface.md`). They arrive when the mechanism does.
+## and three standard envelopes; one has a mechanism here (a window, vision's spatial half) and the rest
+## are DELIBERATELY ABSENT, not stubbed (`docs/adr/0007-l2-interface.md`): they arrive with the mechanism.
 ##
-## NOT A COORDINATOR. This object owns no scene, draws nothing, and runs no loop. It is constructed
-## around a grid, a body and a mining verb that its caller already owns, and it advances them only when
-## handed a `Command`. `tests/body/reveal_scene.gd` and friends still drive `sim/` directly, on purpose.
+## NOT A COORDINATOR. This object owns no scene, draws nothing, runs no loop: it advances the grid, body
+## and mining verb its caller owns only when handed a `Command`. `tests/body/reveal_scene.gd` and friends
+## still drive `sim/` directly, on purpose.
 
 
 ## `Interface.Observation`, split into its own file at A' step 4 (D0356). A `const` rather than a
@@ -103,6 +101,7 @@ var _hold: MineHold = MineHold.new()
 var _seen: SeenPlane                 ## what the map admits to: the cells the body has been near (D0400)
 var _events: Array[Dictionary] = []   # flow events since the last observe: the consumed channel
 var _drop_went: StringName = &""       # the last DROP's landing since the last observe (D0428)
+var _build_went: StringName = &""      # the last BUILD's refusal since the last observe (D0470): &"build_far" / &"build_here"
 var _drop_short_cell: Vector2i = Vector2i(-1, -1)   # the machine a drop fell short of, and until which tick (D0434)
 var _drop_short_until: int = -1
 const DROP_SHORT_TICKS: int = 36
@@ -191,7 +190,8 @@ func observe(envelope: Envelope) -> Observation:
 	o.aim_cell = _hold.aim_cell
 	o.aim_in_reach = _hold.aim_cell != Vector2i(-1, -1) and Mining.in_reach(_body.pos_x, _body.pos_y, _hold.aim_cell)
 	o.aim_is_lode = _hold.aim_is_lode
-	o.aim_refusal = _hold.refusal
+	o.aim_refusal = _build_went if _build_went != &"" else _hold.refusal   # a BUILD's refusal rides the same channel, one observe wide (D0470)
+	_build_went = &""
 	AimPlanes.fill(o, _verbs, _world, _machines)
 	_fill_line(o)
 	o.flow_events = _events.duplicate(true)
@@ -316,7 +316,9 @@ func apply(command: Command) -> Result:
 		Command.Kind.MINE:
 			return _apply_mine(command.cell)
 		Command.Kind.BUILD:
-			return _outcome(_verbs.build(command.cell))
+			var built: StringName = _verbs.build(command.cell)
+			_build_went = _verbs.last_build_refusal
+			return _outcome(built)
 		Command.Kind.DROP:
 			var dropped: bool = _verbs.drop() > 0
 			if dropped:

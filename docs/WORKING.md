@@ -497,8 +497,27 @@ cursor, wordlessly; now refused "far" with TOO FAR; the far pin goes red under t
 pressed a slot); **D0466** the BUILD how-to ends "press its slot's key, [BUILD] where the ring moves"
 (S44 and S45 read "the shaft's mouth" as the pad's own open shaft at dx +7). Noted, not changed: the
 how-to's 9 s hold (D0411) was gone when S45 pressed at open air; the grapple swing voids a run under the
-non-settling rule; floor drops; the trunk's two-cell width against the agents' pointer. **Next: strangers
-46-48, the variant again on 0ed149e4.**
+non-settling rule; floor drops; the trunk's two-cell width against the agents' pointer. **Strangers 46-48 (0ed149e4, the variant
+again): 46 VALID, 47 and 48 VOID by the swing (the grapple never settles; three of nine variant runs
+now); none reached the drill.** Two pressed the WHITE SQUARE inside ten seconds and the first bite (a cone,
+five cells wide at the top) took the metre's centre; the mark read the metre as open and vanished with
+three quarters of it standing; both stopped. **D0467:** a metre is roof while any of its sixteen cells
+stands (the mark stays until the hole is clear); CUT THROUGH for the air a hold runs on after its own
+bite ("point at what is left of the WHITE SQUARE; a hole has to be a little wider than you"); the
+ceiling's rung 4 (`--rung4`: the drill in hand 12.6 s, placed 14.1 s: four bites -- centre, bottom row,
+the two rim columns the body's edges rest on -- the fall onto the pile, the slot key, a step, BUILD on
+the ring); the receipts' `slots` in the bar's order (the pack dict is sorted; the script pressed the
+coal's key for the drill once). One stranger read TOO FAR and walked past the square (the lesson says
+closer, not which way). **Strangers 49-51 (10750f32): 3 VALID; the drill in hand 2 of 3
+(9.9 s, 42.1 s), placed 1 of 3 (S51, 18.6 s, the first ever), fuelled 23.5 s** -- in its own tunnel, off
+the line, so "First automation" never came. **D0468:** the cut mark is the metre and a cell either side
+(the six columns a body a metre wide needs; S50 chewed the metre three times and stood on the rim).
+**D0469:** the BUILD rung reads a drill over a smelter (`Objectives.drill_on_line`); WRONG SPOT for a
+drill set elsewhere; the lesson tables moved to `HintTexts`. **D0470:** a BUILD that places nothing says
+why (`build_far` / `build_here` on the refusal channel; TOO FAR for BUILD, STEP ASIDE). Noted: TOO FAR
+sends strangers a 4.5 m stride past the square (T035); the shaft's mouth cannot be walked into (a body
+a metre wide over a mouth a metre wide stands on both lips). **Next: strangers 52-54, the variant on the
+D0468-D0470 build.**
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall

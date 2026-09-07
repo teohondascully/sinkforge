@@ -13,6 +13,7 @@ func _initialize() -> void:
 	_test_mined_wrong_pins()
 	_test_sight_pins()
 	_test_cut_through_pins()
+	_test_wrong_spot_pins()
 	_test_left_working_pins()
 	_finish("hints_moments")
 
@@ -123,6 +124,37 @@ func _test_cut_through_pins() -> void:
 	_check(cold.active_id() == &"", "control: air with no bite behind it says nothing for %d ticks" % (Hints.AIR_TICKS - 1))
 	cold.observe(air, 0.016)
 	_check(cold.active_id() == &"aim_air", "...and NOTHING THERE at the %dth (%s)" % [Hints.AIR_TICKS, cold.active_id()])
+
+
+## D0469 (stranger 51): a drill set off the line while BUILD is open is WRONG SPOT; on the line it is the
+## rung's own tick; with no ladder attached a bare Hints says nothing about it.
+func _test_wrong_spot_pins() -> void:
+	var h: Hints = Hints.new()
+	h.objectives = Objectives.new()
+	h.objectives.refresh(_hint_obs(), 0.016)
+	for id: StringName in [&"mine", &"smelt", &"wood"]:
+		h.objectives._done[id] = true
+	_check(h.objectives.current_id() == &"build", "control: the ladder is at BUILD (%s)" % h.objectives.current_id())
+	var off: Interface.Observation = _hint_obs()
+	off.machines.append({"cell": Vector2i(9, 4), "id": &"drill", "behavior": &"drill", "status": &"idle"})
+	h.observe(off, 0.016)
+	_check(h.active_id() == &"wrong_spot" and h.active_text().begins_with("WRONG SPOT"), "a drill standing with nothing under it while BUILD is open: WRONG SPOT (%s)" % h.active_id())
+	var on: Interface.Observation = _hint_obs()
+	on.machines.append({"cell": Vector2i(9, 4), "id": &"drill", "behavior": &"drill", "status": &"idle"})
+	on.machines.append({"cell": Vector2i(9, 6), "id": &"processor", "status": &"idle"})
+	var fresh: Hints = Hints.new()
+	fresh.objectives = h.objectives
+	fresh.observe(on, 0.016)
+	_check(fresh.active_id() != &"wrong_spot", "a drill over the forge is the line, not a lesson (%s)" % fresh.active_id())
+	var bare: Hints = Hints.new()
+	bare.observe(off, 0.016)
+	_check(bare.active_id() == &"", "control: with no ladder attached the lesson never fires (%s)" % bare.active_id())
+	for pair: Array in [[&"build_far", "TOO FAR"], [&"build_here", "STEP ASIDE"]]:
+		var pressed: Interface.Observation = _hint_obs()
+		pressed.aim_refusal = pair[0]
+		var once: Hints = Hints.new()
+		once.observe(pressed, 0.016)
+		_check(once.active_id() == pair[0] and once.active_text().begins_with(pair[1]), "a BUILD refused %s teaches on the press itself, one observe wide (D0470) (%s)" % [pair[0], once.active_id()])
 
 
 func _test_mined_wrong_pins() -> void:

@@ -140,12 +140,30 @@ func _achieved(id: StringName, o: Interface.Observation) -> bool:
 		&"mine": return gained(&"ore") >= 4
 		&"smelt": return _gained_any(INGOTS) >= 2
 		&"wood": return gained(&"wood") >= 1
-		&"build": return _has_machine(o, &"drill")
+		&"build": return drill_on_line(o)
 		&"fuel": return _fuelled(o, &"drill")
 		&"auto": return _drill_seen and _rate_of_any(o, INGOTS) > 0
 		&"hopper": return _coal_hopper_above_drill(o)
 		&"power": return _fuelled(o, &"generator")
 		&"winch": return _working(o, &"winch_head")
+	return false
+
+
+## THE LINE (D0469, stranger 51): a drill with a smelter straight below it within `LINE_DROP_M` metres,
+## the vein between them -- the shaft's mouth over its ore over its forge. A drill set anywhere else
+## bores whatever is under it into nothing, and the automation rung after this one can never tick.
+const LINE_DROP_M: int = 4
+const SMELTERS: Array[StringName] = [&"processor", &"iron_forge", &"blast_furnace"]
+
+
+static func drill_on_line(o: Interface.Observation) -> bool:
+	for rec: Dictionary in o.machines:
+		if rec.get("behavior", &"") != &"drill":
+			continue
+		for dy: int in range(1, LINE_DROP_M + 1):
+			var below: Dictionary = o.machine_at((rec["cell"] as Vector2i) + Vector2i(0, dy))
+			if not below.is_empty() and (SMELTERS.has(StringName(below.get("id", &""))) or SMELTERS.has(StringName(below.get("behavior", &"")))):
+				return true
 	return false
 
 

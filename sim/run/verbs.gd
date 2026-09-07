@@ -28,6 +28,9 @@ var world: World
 var items: Items
 var machines: Machines
 var body: Body
+## Why the last BUILD placed nothing (D0470): &"build_far" past the reach, &"build_here" the body's own
+## cell with a machine in hand, &"" otherwise. The door hands it to the observation's refusal channel.
+var last_build_refusal: StringName = &""
 var selected: int = 0                  # hotbar index into `Pack.slots()`
 ## THE SELECTION FOLLOWS THE ITEM (D0412): the pack compacts when a stack drains, so an index alone
 ## re-pointed BUILD and DROP at whatever slid into the numbered position. `select()` remembers the item the
@@ -114,7 +117,9 @@ func body_occupies(logic_cell: Vector2i) -> bool:
 ## sapling), else place what is selected (a sapling on soil, a torch, a conduit, a rope, a machine, a
 ## block). Returns what happened, &"" for nothing.
 func build(logic_cell: Vector2i) -> StringName:
+	last_build_refusal = &""
 	if not can_reach(logic_cell):
+		last_build_refusal = &"build_far"
 		return &""
 	if machines.machine_at(logic_cell) != null:
 		return &"picked_up" if MachineVerbs.pickup_machine(items, machines, logic_cell) else &""
@@ -141,6 +146,8 @@ func _place(logic_cell: Vector2i) -> StringName:
 		return &"rope" if BuildVerbs.place_rope(items, logic_cell) > 0 else &""
 	if def != null and placeable(logic_cell):
 		return &"machine" if MachineVerbs.build_from_pack(items, machines, def, logic_cell, body.facing) != null else &""
+	if def != null and body_occupies(logic_cell):
+		last_build_refusal = &"build_here"                              # a machine in hand, the cell the body stands in (D0470)
 	var material: StringName = selected_build_material()
 	if material != &"" and placeable(logic_cell) and world.block_supported(logic_cell) and BuildVerbs.place_block(items, logic_cell, material):
 		return &"block"

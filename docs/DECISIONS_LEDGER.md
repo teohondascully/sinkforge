@@ -18448,3 +18448,42 @@ alternative is a support footprint narrower than the drawn body, a physics chang
 four cells is kept at six. The lesson can say "a little wider than you"; the mark should show it.
 
 **Reverse cost:** `rim` to zero and the range back to four.
+
+## D0469 · 2026-09-07 · The line is a drill over a smelter; a drill set elsewhere gets a lesson of its own
+
+**Decided:** the BUILD rung completed on any placed drill (`_has_machine`). Stranger 51 (the rung-4
+variant on 10750f32) reached the drill at 9.9 s, placed it at 18.6 s in the tunnel it had dug beside the
+adit, fuelled it at 23.5 s, and then waited five sim minutes on "First automation": the drill bored the
+adit's lode into nothing, since no forge stood under it, and the rung can only read an ingot rate. The
+rung now reads `Objectives.drill_on_line`: a drill with a smelter (the Forge, the Iron Forge, the Blast
+Furnace) straight below it within `LINE_DROP_M` (4) metres, the vein between. A drill standing anywhere
+else while BUILD is open is a new moment, WRONG SPOT ("a Drill bores what is under it and pours that into
+what is under THAT: it belongs in the WHITE RING, over the vein, over the forge; press [BUILD] on it to
+take it back"), gated on the ladder like NOT ORE. The lesson tables moved out of `Hints` into `HintTexts`
+(`Hints.DEFS` and `Hints.MOMENTS` alias them) so the detectors stay under the size gate. Pinned: a drill
+alone does not build the line, a drill two metres over the forge does, the forge a column over does not;
+WRONG SPOT on the ladder, silent off it; the playthrough's drill at the shaft's mouth still latches.
+
+**Why:** the rung's name is "Build the line", and a line is two machines in a column; accepting one
+machine anywhere let the next rung become unreachable with no word said.
+
+**Reverse cost:** the predicate back to `_has_machine` and the moment's line.
+
+## D0470 · 2026-09-07 · A BUILD that places nothing says why: TOO FAR or STEP ASIDE
+
+**Decided:** `Verbs.build` returned `&""` for a press past the reach and for a press on the body's own
+cell alike, and nothing downstream could tell either from "nothing selected": strangers 49 and 50 pressed
+RMB on the ring from four to six metres, repeatedly, and the screen did not change; by hand from inside
+the shaft the ring is the cell the body stands in. `Verbs.last_build_refusal` now names the two
+(`build_far`, `build_here` -- the latter only with a machine in hand); the door hands it to the
+observation's refusal channel (`aim_refusal`, one observe wide, the same field the seat's receipts and
+the mark read), and two moments fire on the press itself: TOO FAR for BUILD ("step closer, then press
+[BUILD] on it") and STEP ASIDE ("a machine cannot stand where you stand: step out of the ring"). Pinned
+at the door (`test_interface_verbs`: seven metres off, the body's cell, a placement beside carries no
+refusal, one observe wide) and in the hints. `interface.gd` and `observation.gd` sit at the size gate;
+three header lines were rewrapped and one comment shortened to make the room.
+
+**Why:** D0421's rule for MINE ("the held button that does nothing says so") applies to RMB too; this is
+the third verb given a voice (MINE D0421, DROP D0428/D0434, BUILD now).
+
+**Reverse cost:** the field, the two lines in the door, the two moments.

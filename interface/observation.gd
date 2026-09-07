@@ -291,7 +291,7 @@ var map_seen_recent: PackedInt32Array = PackedInt32Array()   # the indices the l
 var terrain_version: int = 0
 var map_machines: Array[Vector2i] = []
 var aim_is_lode: bool = false
-## Why a held MINE did nothing this tick (D0421): &"" / &"far" / &"sight" / &"air". See `MineHold.refusal`.
+## Why a held MINE did nothing (D0421): &"far" / &"sight" / &"air"; or why a BUILD placed nothing, one observe wide (D0470): &"build_far" / &"build_here".
 var aim_refusal: StringName = &""
 ## Where a DROP since the last observe went (D0428): &"fed" a machine, &"floor" a pile, &"" no drop. One
 ## observe wide, like the flow events. See `Verbs.last_drop`.
