@@ -137,8 +137,11 @@ func _test_recipe_machines_and_the_rate() -> void:
 	_rec(o, "gear_mill", &"working")
 	var d: Dictionary = Inspector.describe(o)
 	var recipe: Dictionary = RecipesRecords.RECORDS[String(MachinesRecords.RECORDS["gear_mill"]["recipe"])]
-	var secs: float = float(recipe["time_ticks"]) / float(Interface.Observation.TICK_HZ)
-	_check(String(d["mode"]).begins_with("makes") and String(d["mode"]).contains("%.1fs" % secs), "a recipe machine names its product and cycle from the data (%s)" % str(d["mode"]))
+	# D0461: a recipe's ticks are hub ticks, twenty a second, so a 40-tick smelt is 2.0 s, not the 0.7 s the
+	# card said while stranger 37 waited two seconds and left with one ingot of two.
+	var secs: float = float(recipe["time_ticks"]) / float(Interface.Observation.HUB_HZ)
+	_check(String(d["mode"]).begins_with("makes") and String(d["mode"]).contains("%.1fs" % secs) and Interface.Observation.HUB_HZ * HubTick.HUB_TICK_DIVISOR == Interface.Observation.TICK_HZ,
+		"a recipe machine names its product and cycle from the data, in hub seconds (%s)" % str(d["mode"]))
 	_check((d["in"] as Array).size() == (recipe["inputs"] as Dictionary).size(), "its input chips are the recipe's")
 	_check(not d.has("rate"), "no live rate, no rate line")
 	var out_item := StringName((recipe["outputs"] as Dictionary).keys()[0])

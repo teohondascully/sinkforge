@@ -18298,3 +18298,19 @@ stays the shipped constant; it is not the world.
 **Why:** a wording that works on one world is a wording that works on one world.
 
 **Reverse cost:** one flag.
+
+## D0461 · 2026-09-07 · STILL WORKING when the body leaves a forge holding its ore; the card's cycle in hub seconds
+
+**Decided:** strangers 37 and 38 fed the forge (9.9 s, 11.6 s), waited one burst, took the first ingot at
+two seconds and walked off at "1/2"; the second ingot landed two seconds later in an empty well. Probed
+through the door: the forge's cycle is 2.0 s a batch (40 recipe ticks at the hub's 20 Hz), and the card
+said "0.7s a cycle" (the ticks divided by the body's 60). (1) The card divides by `HUB_HZ` now, exposed on
+the observation and pinned equal to the tick rate over the hub divisor. (2) A moment `left_working`: what
+was coming last tick (`Payouts.coming`, within reach) is nothing this tick and the pack did not rise --
+the body left, the machine did not finish -- says STILL WORKING with the count still to come; the same walk
+after the forge emptied into the pack teaches nothing (pinned).
+
+**Why:** "then wait -- the ingots come to you" is true only while you stand there, and the card's number
+told a stranger the wait was over.
+
+**Reverse cost:** one moment row and one function; one constant on the observation.

@@ -154,8 +154,10 @@ static func _mode_line(rec: Dictionary, recipe: Dictionary, status: StringName, 
 			if (recipe.get("inputs", {}) as Dictionary).is_empty():
 				return "ore source"
 			var outs: Array = (recipe.get("outputs", {}) as Dictionary).keys()
+			# A recipe's ticks are the hub's, twenty a second (D0461): the forge's 40 are 2.0 s, and the card
+			# said 0.7 s while stranger 37 waited two seconds for the second ingot and left with one.
 			return "makes %s  (%.1fs a cycle)" % [_cap(StringName(outs[0])) if not outs.is_empty() else "?",
-				float(recipe.get("time_ticks", 0)) / float(Interface.Observation.TICK_HZ)]
+				float(recipe.get("time_ticks", 0)) / float(Interface.Observation.HUB_HZ)]
 	return ""
 
 

@@ -218,6 +218,7 @@ const LOGIC_PX: int = LogicGrid.TERRAIN_PER_LOGIC * Heightfield.TERRAIN_CELL_PX 
 ## same layer reason: a walk is the rush bed's zero and terminal fall its one; the line's load is read
 ## against gravity; a haul is a length delta per tick against the reel rate.
 const TICK_HZ: int = Body.TICK_HZ
+const HUB_HZ: int = ProductionRate.HUB_HZ   ## a recipe's `time_ticks` are HUB ticks: 20 a second, not 60 (D0461)
 const RUN_SPEED_PX_S: int = Body.RUN_SPEED_PX_S
 const MAX_FALL_PX_S: int = Body.MAX_FALL_PX_S
 const GRAVITY_PX_S2: int = Body.GRAVITY_PX_S2

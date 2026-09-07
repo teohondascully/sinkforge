@@ -181,6 +181,18 @@ func _feed_machine(items: Items, logic_cell: Vector2i, item: StringName, n: int)
 	items.deposit(logic_cell, item, n)
 
 
+## A bare observation for the lesson suites: a pack of [item, count] pairs, on the floor at the surface.
+func _hint_obs(pack: Array = []) -> Interface.Observation:
+	var o: Interface.Observation = Interface.Observation.new()
+	var typed: Array[Dictionary] = []
+	for p: Array in pack:
+		typed.append({"item": StringName(p[0]), "count": int(p[1])})
+	o.pack = typed
+	o.on_floor = true
+	o.cell = Vector2i(10, Interface.Observation.SKY_ROWS)
+	return o
+
+
 func _at_cell_centre(cell: Vector2i) -> Vector2i:
 	var cell_px: int = Heightfield.TERRAIN_CELL_PX * Fx.SCALE
 	return Vector2i(cell.x * cell_px + cell_px / 2, cell.y * cell_px + cell_px / 2)
