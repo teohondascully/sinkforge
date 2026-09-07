@@ -18640,3 +18640,19 @@ clay laid over the crown is roof and the mark sits on it (the mutant puts the ma
 leaves. Amendment 12: a visual fix with frame evidence from the current batch, on its own.
 
 **Reverse cost:** the `TREE` constant and one condition in `view/hud/target_guide.gd`.
+
+## D0479 · 2026-09-07 · The rung-2 variant: the forge rung read from its own door
+
+**Decided:** `ceiling.py --save-to <path> --save-after ore` writes the session right after the first rung
+(five ore in the pack, the body on the pad where every fresh-game stranger stood when the smelt card came
+up, the forge ringed three metres left) and stops; `tests/body/saves/rung2_0dc7e968.json` (sha256
+aa5130320e28…) is that save on the gate's build. Strangers open it through `stranger.py start --load`
+as the rung-4 variant did (D0462), told only that whoever played before them mined some ore. The
+director's order after the first-rung gate is the forge rung "with the same evidence discipline"; the
+six fresh-game runs of the gate carry it at 3 of 6 (15.9, 30.1, 17.4 s) with the failures downstream of
+the opening's own detours, and a batch that starts at the drop measures the rung alone.
+
+**Why:** rule 10's separation, applied a rung down: a fresh game measures the opening's sum; the variant
+is the instrument for one rung (the brief's learned item 10).
+
+**Reverse cost:** the `--save-after` branch and one save file.

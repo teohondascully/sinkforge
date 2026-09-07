@@ -94,6 +94,7 @@ def main():
     parser.add_argument("session_dir")
     parser.add_argument("--hold", action="store_true", help="leave the seat up at the end (for a look at the BUILD rung)")
     parser.add_argument("--save-to", default="", help="after the third rung, write the session here: the rung-4 mission variant's save (D0462)")
+    parser.add_argument("--save-after", default="wood", choices=["ore", "wood"], help="which rung --save-to follows: 'ore' writes the rung-2 variant (the forge rung's door, D0479) and stops there")
     parser.add_argument("--rung4", default="", help="open this rung-4 save and play the fourth rung only: the drill placed at the shaft's mouth (D0467)")
     args = parser.parse_args()
     session = Path(args.session_dir).resolve()
@@ -116,6 +117,14 @@ def main():
     results["ore"] = rung(session, "ore", 6, mine_ore)
     if results["ore"] is None:
         return 1
+    if args.save_to and args.save_after == "ore":
+        # The rung-2 variant (D0479): the ore in the pack, the body on the pad where every fresh-game stranger
+        # stood when the smelt card came up, the forge ringed three metres left. Saved and done.
+        r = burst(session, {"save": str(Path(args.save_to).resolve())}, "ceiling: the rung-2 save")
+        print(json.dumps({"saved": r.get("saved"), "path": r.get("path"), "tick": r.get("tick"), "pack": (results["ore"].get("state") or {}).get("pack")}))
+        if not args.hold:
+            burst(session, {"quit": True}, "ceiling: done at the smelt rung's door")
+        return 0 if r.get("saved") else 1
     # Rung 2: select the ore's slot, walk left to stand beside the forge (dx -3; beside means within a
     # body length: dx -1.5), drop, and stand there while the ingots come.
     slots = list((results["ore"].get("state") or {}).get("slots") or [])   # the bar's order: slot N is key N
