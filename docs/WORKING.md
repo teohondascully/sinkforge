@@ -477,7 +477,12 @@ target, named by the BUILD and HOPPER how-tos); NOT ORE reads the rung (it had f
 felling once the ore was spent). **Strangers 34-36 (7708c8f5): 3 VALID, first rung 3 of 3** (2.2, 2.2,
 21.6 s); ingots 17.6 s for one, two dropped their ore far from any forge (one down the chimney's dug cap);
 wood 21.0 s for one; BUILD stops the one who reached it (before the cut mark). The ceiling on this build:
-1.3 / 6.7 / 12.1 s.
+1.3 / 6.7 / 12.1 s. **D0459:** the drill in hand moves BUILD's ring to the shaft's mouth. **D0460:**
+`--seed=<n>` for the holdout. **Strangers 37-39 (68cee3f4): 3 VALID, first rung 3 of 3** (1.3, 2.2,
+5.9 s) -- the second consecutive 3-of-3, the provisional opening signal (rule 7); two left the forge at
+"1/2" (the second ingot lands two seconds after the first; the card said 0.7 s) -> **D0461:** STILL
+WORKING and the card in hub seconds. Wood failed both who tried (the trunk, two cells wide). Nobody
+reached BUILD. **Next: the holdout batch on seed 20260907.**
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
