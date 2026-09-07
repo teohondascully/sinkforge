@@ -104,6 +104,13 @@ static func target(id: StringName, o: Interface.Observation) -> Vector2:
 		return _nearest_cell(o, body, wanted)
 	match id:
 		&"smelt":
+			# D0486 (strangers 70-75, 0 of 6 smelted; three never found the seam): the forge takes coal too, so
+			# the ring goes to the coal seam until the pack holds coal, then to the forge -- the ring says what
+			# the rung needs NEXT, one thing at a time.
+			if int(Payouts.pack_counts(o).get(&"coal", 0)) == 0:
+				var seam: Vector2 = _nearest_cell(o, body, func(c: Vector2i) -> bool: return o.material_at(c) == &"coal")
+				if seam != NONE:
+					return seam
 			return _nearest_machine(o, body, &"processor")
 		&"deliver":
 			return _nearest_machine(o, body, &"rig")              # the crew's rig takes the ingots (D0485)

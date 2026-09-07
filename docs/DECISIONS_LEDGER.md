@@ -18781,3 +18781,17 @@ and no drill pile; the ladder's save pins stand on "deliver".
 data fix for a frame-and-input cause with nine strangers behind it, taken with the record it lives in.
 
 **Reverse cost:** the record's lines and the STEPS table; `delivered`/`rig_stage` in objectives.gd.
+
+## D0486 · 2026-09-07 · The smelt ring goes to the coal seam until the pack holds coal
+
+**Decided:** `TargetGuide.target(&"smelt")` rings the nearest coal cell while the pack holds no coal, and
+the forge once it does. The first batch on the new opening (70-75, six VALID) smelted 0 of 6: three never
+found the seam, a metre of black eight metres from the forge that reads as shadow; the how-to's words for
+it ("the black seam right of you") were also cut by the ellipsis on that build (fixed 8c6fc9f4). Pinned in
+the teaching suite: an empty-handed smelt rung rings the seam to the right, a coal in the pack rings the
+forge three metres left; the lip pin (D0438) poses a coal to keep its subject.
+
+**Why:** the ring is the one instrument every stranger has followed since D0447; a rung with two
+ingredients needs the ring to say which one is next, not both at once and not the machine before the fuel.
+
+**Reverse cost:** the `smelt` branch's first four lines.

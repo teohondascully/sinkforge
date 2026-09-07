@@ -126,8 +126,13 @@ func _test_the_ring_finds_the_real_targets() -> void:
 	var after_first: int = TargetGuide.scan_visits
 	var second: Vector2 = guide._cached_target(&"mine", o)
 	_check(first == vein and second == first and TargetGuide.scan_visits == after_first and after_first > 0, "the chip searches once per (rung, cell, terrain) and reuses it: %d visits, then none" % after_first)
+	var seam: Vector2 = TargetGuide.target(&"smelt", o)
+	_check(seam != TargetGuide.NONE and seam.x > body_px.x and o.material_at(Vector2i(int(seam.x / 4.0), int(seam.y / 4.0))) == &"coal", "SMELT with no coal in the pack rings the coal seam to the right first (D0486) (%.1f m off)" % (body_px.distance_to(seam) / 16.0))
+	var carrying: Array[Dictionary] = [{"item": &"coal", "count": 1}]
+	o.pack = carrying
 	var forge: Vector2 = TargetGuide.target(&"smelt", o)
-	_check(forge != TargetGuide.NONE and forge.x < body_px.x and body_px.distance_to(forge) < 4.0 * 16.0, "SMELT rings the forge three metres left (%.1f m off)" % (body_px.distance_to(forge) / 16.0))
+	o.pack = [] as Array[Dictionary]
+	_check(forge != TargetGuide.NONE and forge.x < body_px.x and body_px.distance_to(forge) < 4.0 * 16.0, "...and with coal carried it rings the forge three metres left (%.1f m off)" % (body_px.distance_to(forge) / 16.0))
 	_rig_and_drill_pins(door, world, o, body_px, vein, forge)
 	var coal: Vector2 = TargetGuide.target(&"fuel", o)
 	_check(coal != TargetGuide.NONE and coal.x > body_px.x, "FUEL rings the coal seam to the right")
@@ -162,8 +167,12 @@ func _band_pins(door: Interface, world: World, body: Body) -> void:
 	_check(ring != TargetGuide.NONE and ring != ruler and absf(ring.y - body_px.y) <= TargetGuide.BAND_PX and ring.x < body_px.x - 6.0 * 16.0,
 		"MINE rings the vein at the body's own level instead, %.1f m to the left (the ruler's was %.1f m off)" % [(body_px.x - ring.x) / 16.0, sqrt(ruler_d) / 16.0])
 	# D0438 (stranger 14): the same rule for a machine. From the lip the auto forge buried in the shaft is the
-	# nearer processor by the ruler; SMELT rings the surface forge ten metres west at the body's level.
+	# nearer processor by the ruler; SMELT rings the surface forge ten metres west at the body's level. With
+	# coal in the pack, since D0486 sends an empty-handed smelt rung to the seam first.
+	var with_coal: Array[Dictionary] = [{"item": &"coal", "count": 1}]
+	o.pack = with_coal
 	var forge: Vector2 = TargetGuide.target(&"smelt", o)
+	o.pack = [] as Array[Dictionary]
 	var buried: Vector2 = TargetGuide.NONE
 	var buried_d: float = 1.0e18
 	for rec: Dictionary in o.machines:
