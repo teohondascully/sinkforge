@@ -421,6 +421,13 @@ own feet and never saw the nine-pixel ring; S14's smelt ring pointed into the sh
 covers machines and piles); S15 never dug (T037). Taken: the near chevron (NEAR_M 2.2 from the body's
 centre), "a step to your LEFT", the camera in the seat's settle, NOTHING THERE at 90 ticks restarted by a
 break, and T034 provisionally: a felled trunk's crown crumbles (`TreeFall`, grounded-wood support).
+**D0439:** one call a burst (the journal rides the command; the mission template tracked). **D0440:** THE
+WAY DOWN lesson (T037 taken provisionally). **D0441:** the large map is a tall window (64 x 106 m).
+**D0442:** the arrival tick says what is still coming (T033 taken). **Strangers 16-18 (D0443)** on the
+one-call build: 15-20 s a burst (from 21.5); S17 pointed at the chevron on air (reversed: the target's
+metre is outlined); S16 dropped clay at the forge four times (WRONG STACK names both items; the smelt
+how-to says hold ORE); S18 mined at 9 s and never dug (D0440's lesson was not on that build). The update
+for Codex is `docs/audits/2026-09-06-update-for-codex.md` (D0416-D0438, with §10 on the loop's pace).
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -447,9 +454,8 @@ T031 (taken provisionally in D0434: the chimney capped; overrule by deleting two
 (four ring kinds); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
 at zero; the forks T024-T030.
 
-**Cheap next steps that need no ruling:** a batch of three strangers on the D0438 build (the chevron, the
-LEFT sentence and the machine-level ring are untested by a stranger); T037's "the way down is to dig"
-lesson; the large map as a wider
-window; the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
+**Cheap next steps that need no ruling:** a batch of three strangers on the D0443 build (the outline,
+WRONG STACK, THE WAY DOWN, the "more coming" tick are untested by a stranger); the rest of the Codex
+update's §10 (downscaled frames, more seats, a seat-driven scripted stranger); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
 instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
 bake (V32).

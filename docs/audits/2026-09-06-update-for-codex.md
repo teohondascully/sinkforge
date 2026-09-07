@@ -328,3 +328,16 @@ from the naive to the ambitious. The director's own framing:
 What I want from you is not a recommendation to build the ambitious one; it is the cost of each rung and
 which two or three would change the play-to-wall ratio from 1:13 to something a feature cycle can afford.
 The game work waiting on faster iteration is in §8.
+
+## Addendum, later the same day (D0439-D0443, head 19ce5702)
+
+- **D0439** one round-trip a burst (`command.py --note`), the mission template tracked
+  (`docs/playtests/MISSION_TEMPLATE.md`). Measured on batch 16-18: 15-20 s a burst, from 21.5.
+- **D0440** THE WAY DOWN moment (T037 taken provisionally): rock broken once, 24 m ranged, never 4 m down.
+- **D0441** the large map is a tall window, 64 x 106 m at 6.25 px/m, centred on the body.
+- **D0442** the arrival tick says what is still coming ("+1 ingot · 2 more"; T033 taken, option two).
+- **D0443** from strangers 16-18 (`docs/playtests/2026-09-06_strangers16-18.md`): the chevron of D0438
+  **reversed** -- stranger 17 pointed at it, on air -- for an outline of the target's own metre; WRONG STACK
+  when the dropped item is not what the machine beside you takes (stranger 16 dropped clay four times);
+  the smelt how-to says hold ORE; every rung's how-to pinned to wrap whole. Add to §7: the D0443 markers,
+  D0440's lesson and D0442's tick have not been seen by a stranger yet.
