@@ -4,143 +4,123 @@ Regenerated as the last action before reporting to the director, overwritten —
 session boundary, since a brief written mid-session goes stale the moment another decision lands.
 `CONTEXT.md`, "Review bandwidth." If this takes more than 90 seconds to read, it's too long.
 
-**Last updated: 2026-09-06, fifteenth round: Part A of the A+ brief, then the integration pass (the
-fourteenth round's brief is in `git log -p -- docs/BRIEF.md`; D0396–D0404). THIS ROUND: Part A -- the
-fresh-boot stutter closed at cause (D0405), the ruled beds (D0406), the beacon witnessed in the dark
-(D0407), the water's ripple bound (D0408). Then the director's next brief re-ranked everything under
-Astra's new-player review, "don't polish the look of an uncompleteable game": ranks 1-6 fixed with a
-playthrough test (D0409–D0413), rank 8's first slice measured and fixed (D0414), one correction to my own count (D0415). Part B, the signature
-look, is deferred and not started.** Captures before and after are under
-`tests/body/recordings/round15_2026-09-06/{beds,beacon,settings,tutorial,hud}/`.
+**Last updated: 2026-09-06, the integration pass continued under Astra's audit order (the round's
+first half -- Part A, ranks 1-6 and 8 -- is in `git log -p -- docs/BRIEF.md`; D0405–D0415). THIS HALF:
+Astra's audit taken in order (D0416): water under renewed flow (D0417), the profile that could not
+resolve its subject (D0418), then the thing the audit put first -- an unfamiliar player observed without
+coaching -- done five times through the other session's screen-led adapter, each run fixing what its
+frames showed (D0419–D0425, D0428); rank 7's first slice judged blind (D0422); the bounded lighting
+experiment (D0427). One repair waits on the director (D0426).** Captures under
+`tests/body/recordings/round15_2026-09-06/{rank7,stranger3_fix,stranger4_fix,lighting}/`; the five runs'
+frames under `tests/body/recordings/playtest_2026-09-06_stranger{1..5}/`; reports in `docs/playtests/`.
 
-**Headline: the opening completes through first automation.** Before D0409 the first rung could not be completed --
-the tutorial's ore yielded an item no recipe took, the forge stood a step beyond the scoop's reach, the
-hopper was scooped through rock, and the cache sat off the pad. `tests/test_tutorial_playthrough.gd`
-drives a fresh start through rungs 1-6 with the door's own verbs in 48 s of play; a build without the
-`yields` contract fails it at rung 1. That is feasibility, not discoverability: it says nothing about the
-rest of the tutorial, long-term progression, or whether a stranger UNDERSTANDS the opening (Astra's audit). Every sentence the tutorial speaks now names the key it is bound to,
-the thing it means is ringed in the world, and the lesson text lives at one place on the screen instead
-of over the rock the lesson is about.
+**Headline: five strangers, five runs, and the opening's first two rungs are now fast -- the first ore in
+10.7, 6.5, 4.0, 1.0 and 2.0 s of game time as the pointer and the marks were fixed run by run; the forge
+fed in three of five. No stranger has felled a tree: two never reached the rung, and the three who did left
+the pad for a tree the tutorial never gave them and fell into the chimney two metres past it.** The tree
+is back (D0425). The chimney is the director's (T031).
+
+**BLOCKED ON ONE LINE (D0426):** nine commits carry the personal git identity; the authorship CI job is red
+on every push; the rewrite is rehearsed, verified and refused by branch protection.
 
 ---
 
 ## What landed
 
-**Part A (D0405–D0408).** The water's active set with the lifted pass kept as the oracle, the aquifers
-settled at generation (hub p50 first 5 s 13.3 → 1.25 ms; water errors at the 206 m warp 249 → 0);
-`BedSequence`, a seeded succession for the laminae; the `beacon_probe` start record and the `room`
-fixture, the amber ring 2.3-2.8x its control's luminance from ten metres in the dark; the ripple's tops
-held under the film.
+**The audit's order (D0416–D0418).** Water breached and drained: 574,248 of 574,248 shapes triangulate,
+pumping named not posed. The ablation switch (`--mute`); the lens's screen mip chain removed on its own
+terms; the GPU unresolved on this machine after 23 runs -- stopped when the director asked.
 
-**Rank 1 (D0409), the opening loop.** `yields` on the material record (`WorldMaterials.yield_of`), one
-reach for the scoop and the pick (3.2 m), a standing collect verb, the `pile` fixture, the cache moved onto
-the pad. The playthrough suite, 20 assertions, is the proof.
+**The stranger protocol (D0419, D0420).** The adapter poses the seat's own pointer, never the OS cursor;
+vsync off so an unwatched window steps; composed moves. A fresh-context Haiku agent plays with no source,
+journals, reports; the frames are read, not the report.
 
-**Rank 2 (D0410), the settings agree with reality.** Every row has a consumer, pinned live: the three
-audio layers' injected levels, the score mounted (+50 ms boot, named), the shake kicked and decayed by the
-rig, the zoom immediate, the large map a modal that deafens the hands, fifteen bindings listed, the
-footer's legend fitting and LEFT/RIGHT adjusting a slider.
+**Five runs, five fixes.** S1 (D0421): a held MINE past the reach says so -- the red bar, TOO FAR; the
+ring is the pointer, no compass words. S2 (D0423): the cut fills the aim square from the floor up. S3
+(D0424): the grapple's landing ring waits to be known and is hemp; the payout tick names its item and a
+loss is a tick; the how-to wraps; a hidden lesson yields. S4 (D0425): legacy's guaranteed tutorial tree
+returns as a `tree` fixture planted by the world's own pass. S5 (D0428): the rung's ring stays for the
+rung's life; the first floor-landing drop docks DROPPED.
 
-**Rank 3 (D0411), the tutorial teaches.** `[MINE]` fills with the CURRENT binding from a table the shell
-writes; the goal carries its count; every rung shows its how-to the moment it opens and again on a stall
-(legacy's forty-second silence reversed); a finished rung is acknowledged first; `TargetGuide` rings the
-vein, the forge, the trunk, the drill, the seam; the ladder rides the save.
+**Rank 7, first slice (D0422).** Wall stamped below solid, flat, every face rimmed; the blind judge went
+13/24 → 17/24 and 0/9 → 5/9 on cavities. The ore half: legacy's socket tried and reversed (D0425); the
+lever is the richness-scaled nugget count.
 
-**Rank 4 (D0412), the hotbar.** The selection follows its item when the pack compacts; the tenth digit
-reaches slot 10; an empty pack draws no bar.
-
-**Rank 6 (D0413), the HUD's composition.** `LessonDock` replaces the head-anchored bubble: one place, lower
-left above the hotbar band, its rect a function of the text alone and pinned 38 px clear of the action
-area round the miner at the closest zoom under the largest lead a visible lesson can have (a 260 wrap
-fails at -67: the mutant). The depth chip: an edgeless plate, 11/8 pt, dimmed. Rank 5 (the water
-errors) landed inside D0405.
-
-**Rank 8, first slice (D0414).** Measured on the scripted walk with a meter that could finally see the
-frame: three instrument gaps closed (a 16.7 ms threshold, HUD chips named, a draw-phase clock). Two CPU
-causes at cause: the observation's plane rebuild 9.3 → 0.66 ms (the surface read off the sky floor; the
-old scan was also wrong underground), the target ring 3.0 → 0.04 ms a frame. Quiet-tick p99 on the walk
-6.4 → 2.6 ms. The remainder -- a draw phase of 4-12 ms at a constant 230 draw calls -- is consistent with
-a rendering-side wait and is a WORKING HYPOTHESIS until a GPU pass is named by a profile.
+**The lighting experiment (D0427).** The lamp is occluded by the rock it crosses (a 12-sample shader
+march, K 0.5); at 46 m light lands on faces and the mass goes dark; cost inside the noise; `--lamp-occlusion=0`
+is legacy's pass.
 
 ---
 
 ## What was learned
 
-1. **A stranger's blocker is a contract nobody wrote down.** Ore yielded "ore_iron", the forge took "ore";
-   both sides were right and the game could not be finished. The material record now SAYS what it yields,
-   and the playthrough is the only test that would have caught it.
-2. **Reach is one number or it is a trap.** The scoop at 2.5 m and the pick at 3.2 m put a machine in
-   the pick's reach and out of the hand's. One constant, referenced twice.
-3. **A reversed rule has a suite pinning the old one.** D0411 reversed legacy's silence; three pins in
-   `test_objective_line` encoded the silence and I ran every suite but that one. CI caught it, one push
-   later. Grep the CLASS across `tests/` when a rule flips, and run every hit.
-4. **A lambda on an engine singleton outlives the script language.** Two lambdas of a RefCounted on the
-   `RenderingServer` signals crashed Godot at exit on every perf run ("Godot quit unexpectedly", four
-   reports). A Node's own methods are dropped with the node. The crash reports were the instrument.
-5. **The painters' total was never the frame.** Every slow frame had painters under 3.5 ms; the frame
-   was 17-23. The missing phase was the draw's vsync wait after the CPU overran, and the overrun was an
-   observation scan (7.85 ms) and a HUD chip (3 ms) the report showed as `?`. Name the chips; clock the
-   phase; only then fix.
-6. **A cache keyed right is not a cache that hits.** The window snaps every eight metres, as designed --
-   and each hit of the miss cost 9 ms because one field inside it was scanned instead of read. Measure
-   the cost of a miss, not just the rate.
-7. **The scan was wrong as well as slow.** Scanning the surface from the window's top made rock at the
-   top row "the surface" and a cave mouth there a shaft to the sky. The cheap answer (the sky floor) was
-   also the true one.
-8. **The engine's TIME monitors refresh once a second.** Forty consecutive slow frames read identical
-   `proc`/`phys` values. An instrument that repeats itself is not measuring the frame.
-9. **The drop count under vsync is not a treatment metric on a shared machine.** 4-23 run to run; the
-   A/B spread swallowed the treatment. The quiet-tick p99 and a vsync-off count moved cleanly and are
-   what the ledger quotes.
-10. **"Short pointer only" is a design sentence, not a spec.** Read as: what stays near the miner points
-    and does not read. Written into the ledger as a reading so the director can overrule a reading, not
-    a mystery.
-11. **The action area is a testable rect.** Mining reach plus half the body, the camera's lead at the
-    busy threshold, the closest zoom, the TALLEST lesson: 38 px clear, and the pin fails a wider wrap.
+1. **The agent's report is a claim; the frames are the evidence.** Stranger 3 reported "drag-and-drop
+   worked" and "5 ingots made": the drags were MINE holds that dug dirt. Stranger 5 reported the forge
+   "broken": every DROP was 4 m or more from it. Read the inputs and the frames before believing a verdict
+   in either direction.
+2. **Each stranger's first hesitation was a field the game already knew and drew nowhere, too early, or
+   too late.** The refusal (S1), the progress (S2), the drop's landing and the grapple ring before its
+   lesson (S3), the missing tree (S4), the pointer faded when the wanderer needed it (S5). None needed
+   new state; each needed a place on the screen.
+3. **A pointer tied to a lesson's fade is a pointer missing when the lesson is most needed.** D0411's
+   ring followed the how-to's nine seconds; the stranger who wandered ten seconds got thirty with no
+   ring. The pointer that does not read is cheap; keep it for the rung's life.
+4. **"Not carried" from legacy is a claim about the world that outlives the session that made it.**
+   D0353 named the tutorial tree not carried; legacy had planted it precisely because worldgen keeps
+   trees out past the pad. Two strangers paid for it. When a legacy fixture is dropped, write WHY it was
+   safe to drop, and re-read that when a stranger goes looking.
+5. **The world's first mouth stands two metres past the pad by construction.** The sinkhole keepout clamp
+   pushes a mouth that would open inside the keepout to its edge; D0388 lowered the keepout so the boot
+   seed would have one. Three of five strangers fell in. A clamp that relocates is not a clamp that
+   forbids.
+6. **A visual experiment that breaks two pins is telling you something about the pins' subject, not just
+   the experiment.** The ore socket put a cell 0.106 from deepstone and under the wall lode's recess; the
+   suites are right that a marked cell darker than the matrix is a new kind of thing. Reversed, and the
+   real lever (richness-scaled nugget count) named instead.
+7. **The lamp's occlusion is the smallest change that makes light land on surfaces.** One uniform, one
+   march; the deep reads as lit faces and dark mass at once. The other sources still light through rock.
+8. **A red CI is read from its jobs.** Three pushes went by with the authorship job red while the suite
+   lines I was reading were green. `gh run view --json jobs` after every push.
+9. **The git identity moved with the other session's commit.** `.git/config` read the personal address
+   from 16:35; nine commits carry it in public; the rewrite is verified and waits on branch protection.
+   `git config user.email` before every push, every session.
+10. **A reversed rule's pins reverse with the reason, in the same commit.** D0365's "an item leaving the
+    pack is not a payout" had two pins; D0424 reversed them naming the stranger who read a drop as a forge
+    at work.
+11. **The playthrough suite's tolerance was a hidden dependence on approach direction.** Arriving from
+    the tree's side left the body's edge over the coal metre; a third of a metre was enough to pass from
+    the right and fail from the left. Centre to a tenth.
 
 ---
 
-## Astra's audit of this report (2026-09-06), applied
-
-Three conclusions tightened: "the game completes end to end" → the opening completes through first
-automation (rungs 1-6 scripted; not the remaining tutorial, not progression, not a stranger's
-understanding); "what remains is the GPU" → a rendering-side wait is a working hypothesis until a pass is
-profiled; the water fix at the 206 m warp may be AVOIDED rather than repaired -- pre-settling removes the
-trigger, and excavation or pumping can make shallow moving water again, so the triangulation issue is not
-closed generally until those states are exercised across ripple phases. Astra's next order: an unscripted
-stranger observed (the director's, not a script's), water under renewed flow, rank 7, a real profile of
-the drops, then a bounded lighting experiment in one cave. The lesson dock's next test: readable beside
-the legend and a populated hotbar, and noticed without losing the action.
-
 ## The decisions this round is waiting on
 
-**Play the opening.** `godot --path .`: rungs 1-6 complete from a fresh start; the lessons dock lower
-left; every settings row does something. **Part B:** the signature look was deferred for the integration
-pass; the opening completes through first automation, and the walk's remaining frame drops read as
-rendering-side, unprofiled. **The new forks T024–T028** (`docs/TASTE_QUEUE.md`): the dock without a body cue, the
-inspector's tooltip at the aim, the unbindable digits, the tutorial's thin-crust cavity, the score's
-boot cost. **Ranks 7, 9-13** were not reached: ore legibility (V32), the map's corner view, the
-Tiny-Glade lighting prototype, feel, audio, world identity.
+**D0426's one line** (force pushes on `main` for a minute; the procedure is in the entry). **Play the
+opening** (`godot --path .`). **T031** the chimney at the pad's edge -- forbid the clamped mouth, or a lip,
+or leave it as the first descent. **T032** four ring kinds -- a distinct form for the tutorial ring.
+**D0427** as Part B's first line or a switch at zero. **T024–T030** unchanged, T029 taken provisionally by
+the payout tick's name.
 
-**CI:** every commit is on main; `5c36864c` is the head to read. One red run (83072b0d, the objective
-line's stale pins, fixed in bbe37387 which is green), two cancelled by following pushes.
+**CI:** `3291ec3a` is the head to read. Every push since `1356268b` is red on the authorship job only;
+suites, structural gates and the headed boot are green on `1e56abe9` (the last completed run).
 
 ---
 
 ## Anything that felt wrong even though it passed
 
-**The walk still drops frames.** ~100 of 1500 frames over 8.3 ms with vsync off, at a constant 230 draw
-calls and 2.5 ms of painters: the GPU, which the script cannot time under Metal. **The boot's first frame
-is 73-85 ms** (shader compiles), named, not fixed. **The tutorial's opening cavity logs the ambiguous-floor
-invariant on every crossing** (T027). **The target ring's miss is a 3 ms scan** once per metre walked
-where no ore is within ten. **The inspector's tooltip sits at the aim** (T025).
+**The strangers' journals are thinning:** two of the last three summarised bursts in blocks against the
+mission, so the per-burst hesitation record is partial for S4 and S5. **The walk in the lighting capture
+ran into a wall**, so the moving-camera comparison is a stability sample, not a traverse. **The wood rung
+has still never been played by a stranger** after two fixes aimed at it (D0423's gauge, D0425's tree).
+**The GPU cost of the occlusion is a bound, not a measurement** (D0418's instrument limit stands).
 
 ---
 
 ## Blocked, and what it's waiting on
 
-Nothing blocks; the next step is the director's hands on the opening.
+The authorship job (D0426), on the director's branch-protection minute. Nothing else blocks.
 
 ## Taste queue
 
-**22 open.** T001–T011 unchanged; T012–T017 closed; T018–T023 open from the last round; T024–T028 new.
+**25 open of 32.** T001–T011 unchanged; T012–T017 ruled; T018–T028 open; T029 taken provisionally (D0424);
+T031, T032 new.

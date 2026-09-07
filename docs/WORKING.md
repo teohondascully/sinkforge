@@ -397,7 +397,7 @@ No stranger has felled a tree yet. **Stranger 5 (D0428):** first ore 2.0 s; the 
 twenty-five DROPs from 5 m and then from 50 m down the chimney, with the ring and how-to faded for the
 whole surface span. Fixed: the ring holds at a floor for the rung's life; the first floor-landing drop
 docks DROPPED. **Astra's item 5 (D0427):** the lamp is occluded by the rock it crosses (a shader march,
-`LAMP_OCCLUSION` 0.5, `--lamp-occlusion=K` the dial); captures at 46 m show light on faces and dark mass;
+`VeilOcclusion.K` 0.5, `--lamp-occlusion=K` the dial); captures at 46 m show light on faces and dark mass;
 cost inside the noise on this machine. T031's mechanism named: the chimney at +14 m is the keepout clamp.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
@@ -416,12 +416,21 @@ protection refused the force-push. The procedure is in D0426; it takes a minute 
 
 ### Next action
 
-**A′ is complete through step 8; the look pass, the two-phase round, Part A of the A+ round and ranks 1-6
-and 8 of the integration pass are on main.** The director's calls: watch an unfamiliar player take the opening
-without coaching, recording the first mined ore, the first ingot, the first automation and every
-hesitation (Astra's first recommendation; the script proved feasibility, not discoverability); play it
-(`godot --path .`: rungs 1-6 complete from a fresh start, the lessons dock lower left, the settings rows all live), the
-forks T018-T026, and whether Part B (the signature look) resumes now that the game completes end to end.
-Cheap next steps that need no ruling: rank 7 (ore legibility, V32), rank 9 (the map's corner view), a
-GPU timer for the walk's remaining drops, the boot's first-frame shader compile (73-85 ms), the sky
-painter's 1 ms.
+**A′ is complete through step 8; the look pass, the two-phase round, Part A of the A+ round, ranks 1-6
+and 8 of the integration pass, Astra's audit order through item 5, and five stranger runs are on main.**
+
+**FIRST, the director's one line (D0426):** nine commits on `main` carry the personal git identity and
+the authorship CI job is red on every push until they are rewritten; `main`'s branch protection refused
+the force-push. The procedure is in D0426 and takes a minute with force pushes allowed.
+
+**The director's calls:** play the opening (`godot --path .`: the tree stands six metres left of spawn,
+the forge's ring stays for the rung, a floor drop docks DROPPED, the lamp lights faces in the deep);
+T031 (the chimney at +14 m has taken three of five strangers; the mechanism is the keepout clamp); T032
+(four ring kinds); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
+at zero; the forks T024-T030.
+
+**Cheap next steps that need no ruling:** a sixth stranger to finally play the wood rung with the tree in
+place; the other sources (torches, machines) occluded the way the lamp is; rank 9 (the map's corner
+view, V34); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
+instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
+bake (V32).
