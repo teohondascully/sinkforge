@@ -533,8 +533,25 @@ three first presses on the forge's open pocket 3.9 m off, refused "air" by D0464
 reach had snapped them to the vein at 1.3-2.2 s. **D0474:** the metre applies to a pointed rock out of
 reach; open air out of reach keeps legacy's reach (by hand the same presses cut 5 and 11 ore; recorded
 in CORRECTIONS.md as an amendment of D0464). S58 reached BUILD from a fresh game at 80.6 s. **The
-overnight loop closes here. Next: a shipped-seed batch on the D0474 build (the opening's re-measure);
-the director's calls in the brief.**
+overnight loop closed there.** **The first-rung gate (the director's brief of 2026-09-07; D0475):
+strangers 61-63 (77dd4655, the shipped seed, all uncoached) 3 VALID, four ore by the pack at 2.2 / 2.8 /
+11.3 s; strangers 64-66 (the holdout seed 20260907) 3 VALID, at 8.7 / 7.0 / 4.3 s -- two consecutive
+valid 3-of-3 batches, the gate passes; every success through the snap.** D0474 is legacy's reach rule
+verbatim (durable, its in-reach/out-of-reach seam pinned: the machine's cell in reach exact and
+refused, the pocket cell below it out of reach snapped) with one provisional line (the metre for a
+pointed far rock). The forge rung 3 of 6 (15.9, 30.1, 17.4 s), wood 1 of 6 (47.5 s), BUILD reached
+once, finished never. **Fixed on frame-and-input evidence: D0477** the dig plan lives while the button
+is held (a mark from an early press was dug by a later refused hold in 3 of 6 runs, under TOO FAR /
+NOTHING THERE; replay IDENTICAL, minimal pair on fresh seats, arm A breaks 9 cells on the old tree and
+none on this one); **D0478** the cut mark's roof is ground, not the tree's own crown (the WHITE SQUARE
+floated over the leaves on the wood rung, three frames); **D0476** the receipts carry the pointed cell
+and `playtest/evidence.py` prints the per-burst table. Reports
+`docs/playtests/2026-09-07_strangers{61-63_shipped,64-66_holdout}.md`. **For the director:** the
+sinkhole mouths one stride east of the pad (cells 190 / 199; nine strangers; D0388's 12 m keepout vs a
+9 m stride), the smelt lesson's BESIDE where the forge's own column takes the drop, the Q at the spawn
+cell (4 of 6), the trunk cells behind the body's legs, the stride. **Next: the forge rung with the same
+discipline (a rung-2 variant save, or the shipped seed read at the drop), then wood and BUILD
+separately; a shipped-seed batch on this build re-measures the opening once more.**
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -563,9 +580,11 @@ world's edge), T038 ("spawn"), T039 (the hotbar's capacity); whether the lamp's 
 at zero; the forks T024-T030.
 
 **Cheap next steps that need no ruling:** keep cycling pinned stranger batches (the rung-4 variant for
-BUILD, the shipped seed for the opening) and fix only what a batch's frames and inputs show; decide the
-forge's need-bubble and nameplate during the mine rung on shipped-seed evidence (10 of 17 first presses
-since D0449 landed on the forge's column); the how-to's hold on a multi-step rung (D0411's 9 s); the
+BUILD, the shipped seed for the opening -- the first-rung gate passed twice on 77dd4655, D0475) and fix
+only what a batch's frames and inputs show; the forge rung next, with the same discipline; decide the
+forge's need-bubble and nameplate during the mine rung on shipped-seed evidence (14 of 23 first presses
+since D0449 landed on the forge's column) and the sinkhole keepout against the strangers' stride (D0388's
+12 m; nine strangers in the mouths at 15-17 m); the how-to's hold on a multi-step rung (D0411's 9 s); the
 grapple swing against the non-settling void rule (a harness question); Astra's visual P0s in order (the
 hotbar's content-aware width, the objective card's rest height, the refusal slot); the wood ring on the
 miner's chest when the trunk stands behind the body; the blind-judge instrument re-run on the ore half of

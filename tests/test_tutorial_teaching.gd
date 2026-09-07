@@ -137,6 +137,7 @@ func _test_the_ring_finds_the_real_targets() -> void:
 	_check(coal != TargetGuide.NONE and coal.x > body_px.x, "FUEL rings the coal seam to the right")
 	_check(TargetGuide.target(&"auto", o) == TargetGuide.NONE, "a rung with nothing to point at rings nothing")
 	_budgeted_walk_pins(o, body_px)
+	_tree_roof_pins(door, world)
 	_band_pins(door, world, body)
 
 
@@ -245,6 +246,34 @@ func _cut_mark_pins(o: Interface.Observation, drill: Vector2, vein: Vector2, for
 	_check(cut.size == Vector2(24.0, 16.0) and cut.position.x == float(drill_m.x) * 16.0 - 4.0 and cut.position.y < drill.y - 16.0 and not o.solid_at(Vector2i(drill_m.x * 4 + 2, int(cut.position.y / 4.0) - 2)),
 		"BUILD's cut mark is the top of the roof over the drill, its column and a cell either side (D0468), under open air (%s over %s)" % [cut, drill_m])
 	_check(TargetGuide.cut_metre(o, vein).size == Vector2.ZERO and TargetGuide.cut_metre(o, forge).size == Vector2.ZERO, "the surface vein and the forge, under open air, get no cut mark")
+
+
+## D0478 (strangers 62, 63, 64): on the wood rung the cut mark walked up from the trunk through the crown
+## and stood in the sky above the leaves, a WHITE SQUARE 100 px over the ring. A tree is not roof over its
+## own trunk; a metre of ground laid over the crown still is, and the mark sits on it.
+func _tree_roof_pins(door: Interface, world: World) -> void:
+	var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	var trunk: Vector2 = TargetGuide.target(&"wood", o)
+	var bare: Rect2 = TargetGuide.cut_metre(o, trunk)
+	_check(trunk != TargetGuide.NONE and bare.size == Vector2.ZERO, "the trunk under its own crown gets no cut mark (%s)" % str(bare))
+	var col: int = int(floorf(trunk.x / 16.0))
+	var crown_top: int = int(floorf(trunk.y / 4.0))
+	for c: int in range(col * 4 - 1, col * 4 + 5):
+		var r: int = crown_top
+		while r > 0 and o.material_at(Vector2i(c, r - 1)) in TargetGuide.TREE:
+			r -= 1
+		crown_top = mini(crown_top, r)
+	_check(o.material_at(Vector2i(col * 4, crown_top)) in TargetGuide.TREE or o.material_at(Vector2i(col * 4 + 1, crown_top)) in TargetGuide.TREE or crown_top < int(floorf(trunk.y / 4.0)), "control: the tree stands above its trunk (top row %d over %d)" % [crown_top, int(floorf(trunk.y / 4.0))])
+	var roof_row: int = int(floorf(float(crown_top) / 4.0)) - 1
+	for dy: int in 4:
+		for dx: int in 4:
+			world.grid.set_material(Vector2i(col * 4 + dx, roof_row * 4 + dy), &"clay")
+	var roofed: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	var cut: Rect2 = TargetGuide.cut_metre(roofed, trunk)
+	_check(cut.size == Vector2(24.0, 16.0) and cut.position.y == float(roof_row) * 16.0 and cut.position.x == float(col) * 16.0 - 4.0, "a metre of clay over the crown is roof, and the mark sits on it (%s, roof row %d)" % [str(cut), roof_row])
+	for dy: int in 4:
+		for dx: int in 4:
+			world.grid.excavate(Vector2i(col * 4 + dx, roof_row * 4 + dy))
 
 
 ## D0467 (strangers 46 and 48): the first bite at the WHITE SQUARE took its centre cell and the square

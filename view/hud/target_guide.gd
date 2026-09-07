@@ -9,6 +9,7 @@ extends RefCounted
 ## fades, and comes back when the player has stalled. It never highlights what is not on screen: the search
 ## is the observation's own window.
 
+const TREE: Array[StringName] = [&"wood", &"leaves"]   ## a tree over its own trunk is not roof (D0478)
 const RING_M: float = 0.9              ## the ring's radius, metres
 const RING_WIDTH: float = 2.0          ## canvas px
 const BREATH_HZ: float = 0.8
@@ -305,11 +306,14 @@ static func cut_metre(o: Interface.Observation, at: Vector2) -> Rect2:
 ## A metre is roof while ANY of its cells stands (D0467): the first bite takes the centre and the mark
 ## used to vanish with it, the body still on the rim; the mark stays until the hole is clear. The hole
 ## is the metre AND one cell either side (D0468): a body a metre wide rests its edges on whichever
-## neighbour column it overlaps, so four cells never drop it and six always do.
+## neighbour column it overlaps, so four cells never drop it and six always do. Roof is GROUND: a tree's
+## own trunk and crown over a wood target are not a roof to dig through (D0478: on the wood rung the
+## square floated in the sky above the leaves, strangers 62-64).
 static func _metre_has_rock(o: Interface.Observation, col: int, row: int) -> bool:
 	for dy: int in 4:
 		for dx: int in range(-1, 5):
-			if o.solid_at(Vector2i(col * 4 + dx, row * 4 + dy)):
+			var m: StringName = o.material_at(Vector2i(col * 4 + dx, row * 4 + dy))
+			if m != &"" and m not in TREE:
 				return true
 	return false
 

@@ -18626,3 +18626,17 @@ hand works the sweep); what does not survive is a sketch across a release. The d
 whole feature back with a legible mark; this is the reversible half.
 
 **Reverse cost:** two lines in `sim/run/mine_hold.gd` and the pins in `tests/test_interface_verbs.gd`.
+
+## D0478 · 2026-09-07 · The cut mark's roof is ground, not the target tree's own wood and leaves
+
+**Decided:** `TargetGuide._metre_has_rock` counts a cell as roof when its material is neither empty nor
+`wood` nor `leaves`. On the wood rung the cut mark (D0458: the topmost solid metre over a buried
+target) walked up from the trunk through the crown and stood in the sky above the leaves -- a hollow
+WHITE SQUARE 100 px over the ring on the trunk, in S62's frames 17-18, S63's frame 16, S64's frame 11
+-- while the card said "not its leaves". Pinned: the trunk under its own crown gets no mark; a metre of
+clay laid over the crown is roof and the mark sits on it (the mutant puts the mark at y 240, in the sky).
+
+**Why:** the mark is a promise the physics has to keep (D0467); over a tree it promised a dig through
+leaves. Amendment 12: a visual fix with frame evidence from the current batch, on its own.
+
+**Reverse cost:** the `TREE` constant and one condition in `view/hud/target_guide.gd`.
