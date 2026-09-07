@@ -215,12 +215,25 @@ step down the stranger can see?*
 **T028 · The score costs 50 ms of boot and is silent until the body is deep.** Mounted so the MUSIC slider
 has a consumer (D0410). *Question: worth its boot cost before any music is authored, or a stub until it is?*
 
-**T029 · Only the selected hotbar slot carries its name.** The first stranger cut a tree's leaves, saw a
+**T029 · TAKEN 2026-09-06 by its third option, provisionally (D0424).** Only the selected hotbar slot carries its name. The first stranger cut a tree's leaves, saw a
 green block appear beside the ingots, and believed it was wood; the counter stayed 0/1 and read as a bug
 (D0421). *Question: a name under every slot (clutter), a name on hover only, or the item's name flashed
-beside the miner as it lands in the pack?*
+beside the miner as it lands in the pack?* The payout tick now says "+1 sapling" / "-7 ore"; the hotbar's
+label is unchanged. The director may still want a name on hover as well.
 
 **T030 · The drag paints a dig plan a stranger cannot name.** Holding MINE while the pointer moves marks
 cells for later digging (legacy's plan); the second stranger left yellow dashes on distant canopies and a
 trunk and had no word for them or a way to clear them it knew (D0423). *Question: gate the plan behind a
 modifier, teach it as a lesson when the first dash lands, or make CLEAR_PLAN a visible control?*
+
+**T031 · The shaft beside the pad swallows a stranger who walks right for two seconds.** The third
+stranger, beside the forge with the smelt rung open, pressed D for 120 ticks and stood 22 m down THE
+CLAYBAND with no line and the way back a lesson it had not met (D0424). Legacy's opening had the same
+shaft. *Question: is a twenty-metre fall a step from the first forge the intended first descent, or does
+the pad want a lip, a ledge, or the shaft's mouth a few metres further off?*
+
+**T032 · Four kinds of ring on the opening frame.** The tutorial's target ring (pale gold, breathing), the
+machine status pips (a small ring and a dot), the grapple's landing ring (hemp now, and gated, D0424), and
+the aim square's own ring when the pointer rests on a lode. The third stranger's first hesitation was
+which ring the lesson meant. *Question: does the target ring want a distinct FORM -- brackets, a
+reticle, ticks at the compass points -- rather than only a distinct ink?*

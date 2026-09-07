@@ -357,6 +357,49 @@ pins encoded legacy's silence, and I never ran the suite that enumerated the rul
 and the meter's lambdas on the `RenderingServer` signals crashed Godot at exit on every perf run until the
 seat node forwarded them (in D0414).
 
+### Astra's audit order, taken (2026-09-06; D0416–D0424, on main)
+
+**The audit (D0416)** tightened three conclusions -- the opening completes through first automation, not
+"end to end"; the GPU is a working hypothesis; the water fix at the warp may be avoided, not repaired --
+and set the order: an unscripted stranger, water under renewed flow, rank 7, a profile, one lighting
+experiment. **Water (D0417):** the generated pool breached by a shaft and a gallery, 240 ticks, six ripple
+phases: 574,248 of 574,248 shapes triangulate, the pre-fix ripple fails 8,918; pumping is named, not
+posed. **The profile (D0418):** `--mute=<stems>` ablates world layers; the only GPU read under Metal is
+0.0; twenty-three runs showed the machine's load, not the configuration, choosing between two regimes
+(~95 vs ~300 frames over budget per 600), so the lens's cost is UNRESOLVED here; one change kept on its
+own terms (the post lens's screen mip chain removed, `filter_linear`). A resolved profile needs a GPU
+timer on an idle machine.
+
+**The stranger protocol.** The other session's screen-led adapter (`playtest/`, 3a6d0d54) fixed twice:
+the bridge poses the seat's own pointer, never the OS cursor, and the seat runs with vsync off so an
+unwatched window keeps stepping (**D0419**); composed moves -- timed segments inside one burst, one
+screenshot at the end (**D0420**). A fresh-context haiku agent plays with no source, no coordinates and no
+coaching, journals every burst, and reports; frames and inputs under
+`tests/body/recordings/playtest_2026-09-06_strangerN/`, journals and reports under `docs/playtests/`.
+**Stranger 1 (D0421):** first ore 10.7 s, ingots 26.1 s; three fruitless MINE holds from a step too far
+with nothing on screen saying so. Fixed: `MineHold.refusal` (far/sight/air) rides the observation, the aim
+square goes to the refusal red with the bar while held, a TOO FAR lesson docks; rungs 1-3 re-worded (the
+ring is the pointer, no compass words, the trunk not the leaves). **Stranger 2 (D0423):** first ore 6.5 s,
+ingots 11.4 s, then twenty-two bursts on trees and a stop at wood 0/1 -- sixteen blows, no hold long
+enough for one, no progress shown. Fixed: the banked share of the cut fills the aim square from the floor
+up. **Stranger 3 (D0424):** first ore 4.0 s; the forge never fed (every DROP 5 m or more from it, the
+stack falling at the feet and coming back after the grace with nothing said); stopped 50 m down the shaft
+beside the pad after a two-second walk right. Fixed: the grapple's landing ring waits to be known and is
+hemp (it was the brightest ring on the opening frame, in the target ring's ink); the payout tick names
+its item and a loss is a tick ("-7 ore"; T029 taken); the how-to wraps before it gives (the smelt
+sentence was cut at "the ingo…"); a lesson hidden by a busy body yields after 5 s when one waits. Named:
+T031 (the shaft beside the pad), T032 (four ring kinds). The wood rung has still not been played.
+
+**Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
+grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
+stamped one alpha level below solid (254/255) so the tooth and grit passes skip it, the wall FLAT (no
+bedding tone a plane back), and a one-world-pixel rim on every face bordering air or wall: 17/24 and 5/9.
+One persistent misread: a solid spot beside the dug pit read as open in 5/6 across both conditions.
+Not started: ore's sparkle (V32).
+
+**Not touched since the wrap:** Part B (the signature look), the lighting experiment (Astra's item 5),
+ranks 9-13.
+
 ### Next action
 
 **A′ is complete through step 8; the look pass, the two-phase round, Part A of the A+ round and ranks 1-6

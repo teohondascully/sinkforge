@@ -13,6 +13,7 @@ func _initialize() -> void:
 	_test_the_sag_bows_down_bounded_and_monotone()
 	_test_the_cord_and_the_hook()
 	_test_the_ghost_is_a_stub()
+	_test_the_landing_ring_waits_for_the_grapple_to_be_known()
 	await _test_paint_runs_against_a_real_frame_with_a_live_line()
 	_finish("rope_painter")
 
@@ -93,3 +94,21 @@ func _test_paint_runs_against_a_real_frame_with_a_live_line() -> void:
 		await process_frame
 	_check(int(ran[0]) > 0, "paint() ran to completion inside a real draw pass with a live line and placed ropes (%d)" % int(ran[0]))
 	view.queue_free()
+
+
+## D0424 (stranger 3): the landing ring was the brightest ring on the opening frame, in the tutorial
+## ring's own ink, beside a miner who had never heard of a hook. It waits for the grapple to be known, and
+## it is hemp now, so the tutorial's ring is the only ring of its ink.
+func _test_the_landing_ring_waits_for_the_grapple_to_be_known() -> void:
+	var o: Interface.Observation = Interface.Observation.new()
+	o.grapple_ghost = {"hit": true, "at": Vector2i(100, 100), "cell": Vector2i(6, 6)}
+	_check(not RopePainter.ghost_visible(o, false), "a stowed line with a landing and a player who has not met the grapple: no ring")
+	_check(RopePainter.ghost_visible(o, true), "the same, once the grapple is known: the ring draws")
+	o.grapple_live = true
+	_check(not RopePainter.ghost_visible(o, true), "a live line draws the line, not the ghost")
+	o.grapple_live = false
+	o.grapple_ghost = {}
+	_check(not RopePainter.ghost_visible(o, true), "no landing, no ring")
+	var d: float = Vector3(RopePainter.AIM_MARK.r, RopePainter.AIM_MARK.g, RopePainter.AIM_MARK.b).distance_to(Vector3(TargetGuide.INK.r, TargetGuide.INK.g, TargetGuide.INK.b))
+	var same: float = Vector3(0.99, 0.88, 0.56).distance_to(Vector3(TargetGuide.INK.r, TargetGuide.INK.g, TargetGuide.INK.b))
+	_check(d > 0.15 and same < 0.05, "the ring's ink stands off the tutorial ring's (%.2f) where legacy's pale gold did not (%.2f)" % [d, same])

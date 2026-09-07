@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_test_a_nearby_soon_gain_merges_into_the_count()
 	_test_the_cap_and_the_retirement()
 	_test_the_first_frame_primes_and_the_second_ticks()
+	_test_a_loss_is_a_named_signed_tick_that_never_merges_with_a_gain()
 	await _test_paint_runs_against_a_real_frame()
 	_finish("payouts")
 
@@ -86,9 +87,9 @@ func _test_the_first_frame_primes_and_the_second_ticks() -> void:
 	p.observe_frame(_frame(0.032, [{"item": &"iron_ore", "count": 5}]))
 	_check(p.size() == 1, "an unchanged pack adds nothing (%d)" % p.size())
 	p.observe_frame(_frame(0.048, [{"item": &"iron_ore", "count": 3}]))
-	_check(p.size() == 1, "a spend adds nothing (%d)" % p.size())
+	_check(p.size() == 2, "a spend is a loss tick of its own (D0424 reversed D0365's silence: a drop read as a forge at work) (%d)" % p.size())
 	p.observe_frame(_frame(0.064, [{"item": &"iron_ore", "count": 4}]))
-	_check(p.size() == 1, "a rise soon after merges into the live tick rather than stacking (%d)" % p.size())
+	_check(p.size() == 2, "a rise soon after merges into the live GAIN tick rather than stacking or touching the loss (%d)" % p.size())
 
 
 func _test_paint_runs_against_a_real_frame() -> void:
@@ -117,3 +118,29 @@ func _test_paint_runs_against_a_real_frame() -> void:
 		await process_frame
 	_check(int(ran[0]) > 0, "paint_frame() ran inside a real draw pass with a live tick (%d)" % int(ran[0]))
 	view.queue_free()
+
+
+## D0424 (stranger 3; T029): the tick names its item, and a stack leaving the pack is a tick too, signed
+## the other way and kept apart from a gain of the same item at the same spot -- a drop re-collected after
+## its grace shows both, in order.
+func _test_a_loss_is_a_named_signed_tick_that_never_merges_with_a_gain() -> void:
+	var l: Array[Dictionary] = Payouts.losses_between({&"ore": 7, &"stone": 2}, {&"stone": 2})
+	_check(l.size() == 1 and l[0]["item"] == &"ore" and int(l[0]["count"]) == 7, "ore leaving the pack entirely is a loss of 7 (%s)" % str(l))
+	_check(Payouts.losses_between({&"stone": 3}, {&"stone": 1}).size() == 1 and int(Payouts.losses_between({&"stone": 3}, {&"stone": 1})[0]["count"]) == 2, "a spend of 2 is a loss of 2")
+	_check(Payouts.losses_between({}, {&"stone": 3}).is_empty() and Payouts.losses_between({&"stone": 3}, {&"stone": 3}).is_empty(), "a rise and no change are not losses")
+	_check(Payouts.label_of(&"ore", 7, false) == "+7 ore" and Payouts.label_of(&"ore", 7, true) == "-7 ore", "the label is signed and named (%s / %s)" % [Payouts.label_of(&"ore", 7, false), Payouts.label_of(&"ore", 7, true)])
+	_check(Payouts.label_of(&"drill", 1, true) == "-1 drill", "a machine item takes its record's display name, lowered (%s)" % Payouts.label_of(&"drill", 1, true))
+	var p: Payouts = Payouts.new()
+	p.gain(Vector2(0, 0), &"ore", 7)
+	p.lose(Vector2(0, 0), &"ore", 7)
+	_check(p.size() == 2, "a loss at the spot of a young gain of the same item is its own tick (%d)" % p.size())
+	p.lose(Vector2(2, 0), &"ore", 1)
+	_check(p.size() == 2, "a second loss nearby merges into the loss, not the gain (%d)" % p.size())
+	var q: Payouts = Payouts.new()
+	q.observe_frame(_frame(0.0, [{"item": &"ore", "count": 7}]))
+	q.observe_frame(_frame(0.1, []))
+	_check(q.size() == 1, "the pack emptied between frames: one loss tick (%d)" % q.size())
+	for i: int in 10:                                 # dt clamps at 0.1 a frame: ten frames age the loss past its life
+		q.observe_frame(_frame(0.2 + 0.1 * float(i), []))
+	q.observe_frame(_frame(1.3, [{"item": &"ore", "count": 7}]))
+	_check(q.size() == 1, "re-collected after the grace: the loss has retired and the gain is its own tick (%d)" % q.size())

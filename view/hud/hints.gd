@@ -18,6 +18,13 @@ const SHOW_SECONDS: float = 9.0          ## how long a bubble lingers, long enou
 ## Reading time, not wall time: the countdown runs only while the body is calm, and MAX_LINGER caps the
 ## wait so a frozen bubble cannot hold the screen or block the queue behind it.
 const MAX_LINGER: float = SHOW_SECONDS * 3.0
+## A BUSY BODY CANNOT HOLD THE PLATE FOR A LESSON WHILE ANOTHER WAITS (D0424, stranger 3). The third
+## stranger fell twenty metres down the shaft beside the pad while TOO FAR was on the plate; the body was
+## busy the whole way, so the calm countdown never ran, and the GRAPPLE lesson -- the way back up --
+## waited behind a stale lesson for the full linger. Now the seconds a lesson spends HIDDEN (busy, not
+## being read) are capped at QUEUE_LINGER whenever a ready lesson waits behind it; the calm reading time
+## is untouched, so three lessons arriving at once on a still body still each get their read.
+const QUEUE_LINGER: float = 5.0
 const FADE_IN: float = 0.25
 const FADE_OUT: float = 0.6
 const DEPTH_HINT_M: float = 10.0         ## metres below the datum that make the climb a real trip
@@ -74,6 +81,13 @@ var _prev_on_floor: bool = true
 var _prev_vel_y: int = 0
 var _far_ticks: int = 0
 const FAR_TICKS: int = 20
+var _thrown: bool = false           ## a line has been live once this session; the grapple is known
+
+
+## Whether the player has met the grapple: the lesson given (queued counts: it shows within QUEUE_LINGER),
+## or a line thrown on their own. The rope painter's landing ring waits on this (D0424).
+func grapple_known() -> bool:
+	return _thrown or _done.has(&"deep_enough")
 
 
 func _init() -> void:
@@ -119,6 +133,8 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	note(&"too_far", _far_ticks >= FAR_TICKS)
 	note(&"in_water", o.wet)
 	note(&"deep_enough", float(MaterialLook.depth_m(o.cell.y)) >= DEPTH_HINT_M)
+	if o.grapple_live:
+		_thrown = true
 	var fast: bool = speed > run * CHAIN_SPEED_MULT
 	note(&"chain", _was_anchored and not o.grapple_anchored and not o.on_floor and fast)
 	_was_anchored = o.grapple_anchored
@@ -158,7 +174,8 @@ func refresh(counts: Dictionary, delta: float) -> void:
 		_lingered += delta
 		if not _busy:
 			_life -= delta          # only calm seconds count as read
-		if _life <= 0.0 or _lingered >= MAX_LINGER:
+		var hidden: float = _lingered - (SHOW_SECONDS - _life)   # wall seconds the lesson was not being read
+		if _life <= 0.0 or _lingered >= MAX_LINGER or (hidden >= QUEUE_LINGER and _has_ready_waiting()):
 			_active = &""
 	if _active == &"" and not _queue.is_empty() and not _ceremony:
 		for i: int in _queue.size():
@@ -169,6 +186,14 @@ func refresh(counts: Dictionary, delta: float) -> void:
 			_life = SHOW_SECONDS
 			_lingered = 0.0
 			break
+
+
+## Whether a queued lesson could take the plate now: gated lessons waiting on a situation do not count.
+func _has_ready_waiting() -> bool:
+	for id: StringName in _queue:
+		if _ready_to_show(id):
+			return true
+	return false
 
 
 func active_id() -> StringName:

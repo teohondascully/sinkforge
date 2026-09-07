@@ -17459,3 +17459,45 @@ cell, a real depth cue, left as it is. Captures: `before_spawn_t1.png` / `after2
 truth is the nearest instrument this seat has to a stranger's eye, and it moved.
 
 **Reverse cost:** one alpha constant, one colour function, seven shader lines.
+
+## D0424 · 2026-09-06 · The third stranger: the grapple's ring waits to be known, the tick names its item and its sign, the how-to wraps, a hidden lesson yields
+
+**The run** (`docs/playtests/2026-09-06_stranger3.md`, after D0423): first ore at 4.0 s of game time
+(stranger 1: 10.7, stranger 2: 6.5); the forge never fed; stopped after 35 bursts, 50 m down the shaft
+beside the pad. Verdict: "would keep playing if the tutorial and feedback were clearer about what each UI
+element means." The frames separate what the game did from what the agent believed. The game's part:
+(1) the brightest ring on the opening frame was `RopePainter`'s landing ghost, drawn from frame one in
+an ink 0.02 from the target ring's, ten metres above the lesson that introduces the grapple -- the first
+hesitation was which ring the lesson meant; (2) DROP five metres from the forge dropped the whole stack
+into the facing column, the hotbar vanished, the grace expired, the standing collect took it back, and
+nothing on screen said either -- read as a forge processing and failing, twice; (3) the smelt rung's
+how-to was elided at "the ingo…", cutting the clause that says the ingots come to you; (4) a two-second
+walk right from the pad is a twenty-metre fall, and the GRAPPLE lesson waited ten seconds behind a
+stale TOO FAR because the body was busy and the calm countdown never ran. The agent's part: it read
+the forge as left in a frame where it was right, and its "drags" were MINE holds that dug dirt.
+
+**Decided:** (1) the landing ring draws only once the grapple is known -- `Hints.grapple_known()`: the
+deep lesson given, or a line thrown -- and is hemp (`HEMP.lightened(0.15)`), the rope's colour, so the
+tutorial's pale gold is the only ring of its ink; the stack makes the `Hints` before the rope painter
+and the dock shares it. (2) The payout tick names its item and a loss is a tick: "+7 ore", and "-7 ore"
+dimmer and without the pip when the stack leaves the pack; a loss never merges with a gain. This
+reverses D0365's "an item leaving the pack is not a payout" and takes T029 by its third option. (3) The
+objective's how-to wraps to a second line; only past two does the tail give. (4) A lesson's HIDDEN
+seconds -- wall time not spent being read -- are capped at five when a ready lesson waits behind it; calm
+reading keeps its nine.
+
+**Pinned:** `test_rope_painter` (the gate; the ink 0.25 off the target ring's where legacy's was 0.02),
+`test_hints` (the yield on hidden time with its control; known by lesson, by throw, and from a save),
+`test_payouts` (losses, labels, no cross-sign merge, a drop re-collected after its grace shows both;
+two D0365 pins reversed with the reason), `test_objective_line` (two lines, the last clause kept, the
+banner one line taller, the tail gives past two). Seen on the seat: `stranger3_fix/` under
+`tests/body/recordings/round15_2026-09-06/` -- the opening without the ghost ring, "-7 ore" on the far
+drop, "+7 ore" after the grace, the how-to on two lines.
+
+**Not changed, named:** DROP is legacy's whole-stack verb (the stack came back); the shaft beside the
+pad (T031); the four ring kinds (T032); the wood rung has still not been played after D0423.
+
+**Why:** each of the four was something the game already knew and drew nowhere, in the wrong ink, cut
+short, or ten seconds late.
+
+**Reverse cost:** one Callable, one colour, one latch, one wrap function, one signed tick.

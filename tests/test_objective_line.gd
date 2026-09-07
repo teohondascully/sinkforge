@@ -65,6 +65,26 @@ func _test_the_layout() -> void:
 	var second: Dictionary = ObjectiveLine.layout(later, font, 0.0)
 	_check(not second.is_empty() and String(second["text"]).begins_with("Forge 2 ingots") and String(second["howto"]) != "", "the second step at 5 s: its goal and its how-to, not an empty sky (%s)" % second.get("text", ""))
 	_check(ObjectiveLine.layout(null, font, 0.0).is_empty(), "no ladder, no banner")
+	_wrap_pins(later, font)
+
+
+## D0424 (stranger 3): the smelt rung's how-to was elided at "the ingo…" beside a real depth chip, and the
+## clause cut was the one that says the ingots come to you. It wraps to a second line now; the banner grows
+## by one how-to line; only past two lines does the tail give.
+func _wrap_pins(later: Objectives, font: Font) -> void:
+	var corner: float = UiTheme.px(88.0)   # the depth chip's width with a band name on it, about what the seat shows
+	var l: Dictionary = ObjectiveLine.layout(later, font, corner)
+	var lines: PackedStringArray = String(l["howto"]).split("\n")
+	_check(lines.size() == 2 and String(l["howto"]).find("ingots come to you") >= 0, "the smelt how-to wraps to two lines and keeps its last clause (%d lines: %s)" % [lines.size(), l["howto"]])
+	_check(is_equal_approx((l["rect"] as Rect2).size.y, UiTheme.px(24.0 + 13.0 + ObjectiveLine.HOWTO_LINE_H)), "the banner is one how-to line taller (%.1f)" % (l["rect"] as Rect2).size.y)
+	var free_w: float = UiTheme.CANVAS.x - (corner + UiTheme.px(18.0)) * 2.0
+	for line: String in lines:
+		_check(font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(ObjectiveLine.HOWTO_SIZE)).x <= free_w - UiTheme.px(ObjectiveLine.PAD) * 2.0 + 0.01, "each line fits the span (%s)" % line)
+	var w: PackedStringArray = ObjectiveLine.wrap_howto(font, "one two three four five six seven eight nine ten eleven twelve", UiTheme.pt(9), 60.0)
+	_check(w.size() == ObjectiveLine.HOWTO_LINES and w[w.size() - 1].ends_with("…") and w[0] != "", "past two lines the tail gives with an ellipsis (%s)" % str(w))
+	_check(ObjectiveLine.wrap_howto(font, "", UiTheme.pt(9), 400.0).is_empty(), "an empty how-to is no lines")
+	var one: PackedStringArray = ObjectiveLine.wrap_howto(font, "short", UiTheme.pt(9), 400.0)
+	_check(one.size() == 1 and one[0] == "short", "a how-to that fits is one line, untouched")
 
 
 func _test_paint_runs_through_the_hud_host() -> void:

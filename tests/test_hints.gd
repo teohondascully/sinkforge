@@ -16,6 +16,8 @@ func _initialize() -> void:
 	_test_busy_freezes_and_hides_and_the_ceremony_holds()
 	_test_the_linger_cap_and_the_fade()
 	_test_taught_ids_and_resync()
+	_test_a_waiting_lesson_makes_the_active_one_yield_on_wall_time()
+	_test_the_grapple_is_known_by_lesson_or_by_throw()
 	_finish("hints")
 
 
@@ -152,3 +154,60 @@ func _test_taught_ids_and_resync() -> void:
 	_check(r.active_id() == &"" and r.queued() == 0, "resync clears the bubble and the queue")
 	r.observe(_obs([["lift", 1], ["rope", 1], ["hopper", 1]]), 0.016)
 	_check(r.active_id() == &"", "and the first frame after re-arms: the hopper already held is old news")
+
+
+## D0424 (stranger 3): a busy body froze TOO FAR's calm clock while the GRAPPLE lesson waited behind it
+## for the full 27 s linger, twenty metres down a shaft. With a ready lesson waiting, the active one yields
+## after QUEUE_LINGER seconds HIDDEN; with nothing waiting, the old cap stands (the control); and calm
+## reading is untouched (the table-order test above keeps its nine seconds a lesson).
+func _test_a_waiting_lesson_makes_the_active_one_yield_on_wall_time() -> void:
+	var h: Hints = Hints.new()
+	h.observe(_obs(), 0.016)
+	h.observe(_obs([["torch", 1]]), 0.016)
+	_check(h.active_id() == &"torch", "the torch is up")
+	var fast_wet: Interface.Observation = _obs([["torch", 1]])
+	fast_wet.vel_x = Interface.Observation.MAX_FALL_PX_S * S
+	fast_wet.wet = true
+	h.observe(fast_wet, 0.016)
+	_check(h.queued() == 1 and h.active_id() == &"torch", "wading fast: AQUIFER queues behind the torch (%d, %s)" % [h.queued(), h.active_id()])
+	var elapsed: float = 0.016
+	while elapsed < Hints.QUEUE_LINGER - 0.5:
+		h.observe(fast_wet, 0.5)
+		elapsed += 0.5
+	_check(h.active_id() == &"torch", "under QUEUE_LINGER the torch still holds the plate (%.1f s)" % elapsed)
+	h.observe(fast_wet, 1.0)
+	_check(h.active_id() == &"in_water" and h.queued() == 0, "past QUEUE_LINGER of wall time the torch yields and AQUIFER is up (%s)" % h.active_id())
+	# Control: no waiting lesson, the same busy body, the same wall time -- the old cap stands.
+	var c: Hints = Hints.new()
+	c.observe(_obs(), 0.016)
+	c.observe(_obs([["torch", 1]]), 0.016)
+	var fast: Interface.Observation = _obs([["torch", 1]])
+	fast.vel_x = Interface.Observation.MAX_FALL_PX_S * S
+	for _i: int in 14:
+		c.observe(fast, 0.5)
+	_check(c.active_id() == &"torch" and c.queued() == 0, "control: seven busy seconds with nothing waiting and the torch still holds (%s)" % c.active_id())
+
+
+## D0424: the rope painter's landing ring waits on this. Fresh: unknown. The deep lesson firing: known
+## (the latch is at queue time, and the lesson shows within QUEUE_LINGER). A line thrown before any lesson:
+## known too, and it stays known once the line is stowed.
+func _test_the_grapple_is_known_by_lesson_or_by_throw() -> void:
+	var h: Hints = Hints.new()
+	h.observe(_obs(), 0.016)
+	_check(not h.grapple_known(), "a fresh player has not met the grapple")
+	var deep: Interface.Observation = _obs()
+	deep.cell = Vector2i(10, MaterialLook.SURFACE_ROW + (int(Hints.DEPTH_HINT_M) + 1) * MaterialLook.CELLS_PER_METRE)
+	h.observe(deep, 0.016)
+	_check(h.grapple_known(), "the deep lesson firing makes the grapple known (active %s, queued %d)" % [h.active_id(), h.queued()])
+	var t: Hints = Hints.new()
+	t.observe(_obs(), 0.016)
+	var live: Interface.Observation = _obs()
+	live.grapple_live = true
+	t.observe(live, 0.016)
+	_check(t.grapple_known(), "a line thrown on the surface makes it known")
+	t.observe(_obs(), 0.016)
+	_check(t.grapple_known(), "and it stays known once the line is stowed")
+	var r: Hints = Hints.new()
+	r.observe(_obs(), 0.016)
+	r.restore_taught(["deep_enough"])
+	_check(r.grapple_known(), "a save that taught the deep lesson restores the knowledge")

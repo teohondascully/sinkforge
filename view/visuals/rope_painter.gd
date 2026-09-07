@@ -31,24 +31,40 @@ const SAG_MIN: float = 2.0
 ## The aiming ghost, drawn only while the line is stowed (on the rope the attention belongs on the arc):
 ## a dotted stub off the hand and one ring where the throw lands. A stub rather than a tether, because a
 ## lead inked hand to target read as a dimension line; the endpoint is the information.
+##
+## THE GHOST WAITS FOR THE GRAPPLE TO BE KNOWN (D0424, stranger 3). Legacy drew it from the first frame,
+## and legacy opened on the rope; this opening is six rungs on the surface whose lessons say "the RINGED
+## rock", "the RINGED forge" -- and the brightest ring on a fresh frame was this one, a hook's landing
+## point wandering beside a miner who had never heard of a hook. The third stranger's first hesitation
+## was which of the yellow circles the lesson meant. `paint`'s `ghost` says whether the player has met
+## the grapple (the lesson given, or a line thrown); the stack reads it off `Hints.grapple_known()`.
+## And the ring is HEMP now, the rope's own colour, so the tutorial's pale-gold ring is the only ring of
+## its ink on the screen.
 const AIM_STUB: float = 0.26
 const AIM_STUB_MAX: float = 74.0
 const AIM_DOTS: int = 4
 const AIM_RING: float = 6.0
 const AIM_LEAD := Color(0.86, 0.80, 0.62, 0.34)
-const AIM_MARK := Color(0.99, 0.88, 0.56, 0.88)
+const AIM_MARK := Color(0.80, 0.69, 0.51, 0.88)     ## HEMP.lightened(0.15): the rope's, not the tutorial's
 const AIM_MISS := Color(0.62, 0.64, 0.70, 0.16)
 const AIM_SHADE := Color(0.06, 0.05, 0.04, 0.55)
 const AIM_SHADE_W: float = 3.0
 const HOOK_LIT := Color(0.92, 0.86, 0.70)
 
 
-static func paint(frame: Frame, ci: CanvasItem) -> void:
+static func paint(frame: Frame, ci: CanvasItem, ghost: bool = true) -> void:
 	if frame == null or frame.obs == null:
 		return
 	_draw_ropes(frame, ci)
-	_draw_aim_ghost(frame, ci)
+	if ghost_visible(frame.obs, ghost):
+		_draw_aim_ghost(frame, ci)
 	_draw_grapple(frame, ci)
+
+
+## Whether the landing ring draws this frame: a stowed line with somewhere to land, and a player who
+## knows what the line is. Pure, so a suite can pin the gate without a canvas.
+static func ghost_visible(o: Interface.Observation, ghost: bool) -> bool:
+	return ghost and not o.grapple_live and not o.grapple_ghost.is_empty()
 
 
 static func px(fx: Vector2i) -> Vector2:
@@ -113,8 +129,6 @@ static func _draw_ropes(frame: Frame, ci: CanvasItem) -> void:
 
 static func _draw_aim_ghost(frame: Frame, ci: CanvasItem) -> void:
 	var o: Interface.Observation = frame.obs
-	if o.grapple_live or o.grapple_ghost.is_empty():
-		return
 	var from: Vector2 = px(o.hand)
 	var to: Vector2 = px(o.grapple_ghost["at"])
 	var hit: bool = bool(o.grapple_ghost["hit"])

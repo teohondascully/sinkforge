@@ -121,7 +121,8 @@ static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, cam
 	_mount_over_veil(view, glint)
 	_mount_scene_layers(view, falling, payouts)
 	_mount_light(view, falling, ore)
-	view.add_painter(RopePainter.paint).z_index = ROPE_Z
+	var hints: Hints = _mount_rope(view)   # the lessons are made with the rope: its ring waits on one (D0424)
+	stack.hints = hints
 	# CrumblePainter keeps state (a crumble outlives the tick that spawned it), so it goes in as an OBJECT
 	# rather than as a bound Callable. D0289: `add_painter(CrumblePainter.new().paint)` freed the painter
 	# at the end of that expression -- a Callable does not keep a RefCounted alive -- and this layer drew
@@ -133,15 +134,24 @@ static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, cam
 	# so the world is graded and the readouts stay crisp -- ordering enforced by the CanvasLayer indices,
 	# which `tests/test_post_fx.gd` asserts against each other rather than trusting this call order.
 	view.add_post_fx()
-	_mount_hud(view, stack)
+	_mount_hud(view, stack, hints)
 	return stack
+
+
+## THE LESSONS ARE MADE HERE, before the rope, because the rope's landing ring waits on one of them (D0424):
+## the ghost draws once the grapple is known. The dock takes this same object. The lambda captures `hints`,
+## which the stack and the dock hold -- a Callable alone would not keep it alive (D0289).
+static func _mount_rope(view: WorldView) -> Hints:
+	var hints: Hints = Hints.new()
+	view.add_painter(func(f: Frame, ci: CanvasItem) -> void: RopePainter.paint(f, ci, hints.grapple_known())).z_index = ROPE_Z
+	return hints
 
 
 ## The HUD, in draw order: the depth readout, the hotbar and the PACK FULL chip (6g, D0368), the
 ## objective banner, the minimap and the inspector under it (6h/6i), the lesson dock, the arrival plate
 ## over them, the legend, and the settings page (closed) over all of it so a ceremony never draws under it. The legend keeps state --
 ## which verbs the player has demonstrated -- and removes itself from the picture once it is done.
-static func _mount_hud(view: WorldView, stack: ViewStack) -> void:
+static func _mount_hud(view: WorldView, stack: ViewStack, hints: Hints = null) -> void:
 	var plate: ArrivalPlate = ArrivalPlate.new()
 	view.add_hud().add_chip(DepthChip.paint)
 	view.add_hud().add_chip(Hotbar.paint)
@@ -154,7 +164,7 @@ static func _mount_hud(view: WorldView, stack: ViewStack) -> void:
 	# The inspector and the dock consult the plate: both stand down while it is on screen (D0369, D0370);
 	# the inspector also stacks under the corner map (6i, D0371).
 	view.add_hud().add_stateful_chip(Inspector.new(plate, minimap), &"paint")
-	var dock: LessonDock = LessonDock.new(plate)   # the lessons off the body, at one place (D0413)
+	var dock: LessonDock = LessonDock.new(plate, hints)   # the lessons off the body, at one place (D0413)
 	view.add_hud().add_stateful_chip(dock, &"paint")
 	view.add_hud().add_stateful_chip(plate, &"paint")
 	var legend: KeyLegend = KeyLegend.new()

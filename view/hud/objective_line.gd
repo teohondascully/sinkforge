@@ -22,6 +22,12 @@ const GOAL_FADE: float = 1.2          ## how long reactive guidance takes to arr
 const ACK_HOLD: float = 1.6           ## seconds a just-finished rung shows its tick before the next goal
 const GOAL_SIZE: int = 11   ## legacy 13: the banner was the largest thing in the frame (VISUAL_QUEUE v2 V22)
 const HOWTO_SIZE: int = 9   ## legacy 10
+## THE HOW-TO WRAPS BEFORE IT GIVES (D0424, stranger 3): the smelt rung's sentence ends "then wait: the
+## ingots come to you", and at 1280 wide it was elided at "the ingo…" -- the clause that says the ingots
+## are collected for you was the one cut. A lesson may take a second line; only past HOWTO_LINES does the
+## tail give with an ellipsis, so a squeezed banner still degrades and never grows past the corner chips.
+const HOWTO_LINES: int = 2
+const HOWTO_LINE_H: float = 11.0   ## authored px between how-to lines
 const PAD: float = 12.0
 const TOP: float = 8.0
 const GOAL_INK := Color(0.97, 0.93, 0.78)
@@ -79,11 +85,14 @@ static func layout(obj: Objectives, font: Font, corner_w: float) -> Dictionary:
 	var pad: float = UiTheme.px(PAD)
 	var free_w: float = UiTheme.CANVAS.x - (corner_w + UiTheme.px(18.0)) * 2.0
 	text = Inspector.fit_text(font, text, UiTheme.pt(GOAL_SIZE), free_w - pad * 2.0 - UiTheme.px(14.0))
-	howto = Inspector.fit_text(font, howto, UiTheme.pt(HOWTO_SIZE), free_w - pad * 2.0)
+	var lines: PackedStringArray = wrap_howto(font, howto, UiTheme.pt(HOWTO_SIZE), free_w - pad * 2.0)
+	howto = "\n".join(lines)
 	var tw: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(GOAL_SIZE)).x + UiTheme.px(14.0)
-	var hw: float = font.get_string_size(howto, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(HOWTO_SIZE)).x if howto != "" else 0.0
+	var hw: float = 0.0
+	for line: String in lines:
+		hw = maxf(hw, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(HOWTO_SIZE)).x)
 	var w: float = minf(maxf(tw, hw) + pad * 2.0, free_w)
-	var h: float = UiTheme.px(24.0) + (UiTheme.px(13.0) if howto != "" else 0.0)
+	var h: float = UiTheme.px(24.0) + (UiTheme.px(13.0) + UiTheme.px(HOWTO_LINE_H) * float(lines.size() - 1) if howto != "" else 0.0)
 	var rect := Rect2((UiTheme.CANVAS.x - w) * 0.5, UiTheme.px(TOP), w, h)
 	var cy: float = rect.position.y + UiTheme.px(12.0)
 	return {"rect": rect, "text": text, "ink": ink, "goal_a": a["goal"], "howto": howto, "hint_a": a["hint"],
@@ -110,4 +119,30 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 		ci.draw_circle(l["bullet"], UiTheme.px(3.0), Color(ink, ink.a * float(l["goal_a"])))
 	ci.draw_string(font, l["text_at"], l["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(GOAL_SIZE), Color(ink, ink.a * float(l["goal_a"])))
 	if String(l["howto"]) != "":
-		ci.draw_string(font, l["howto_at"], l["howto"], HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(HOWTO_SIZE), Color(UiTheme.UI_TEXT_DIM, float(l["hint_a"])))
+		var at: Vector2 = l["howto_at"]
+		for line: String in String(l["howto"]).split("\n"):
+			ci.draw_string(font, at, line, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(HOWTO_SIZE), Color(UiTheme.UI_TEXT_DIM, float(l["hint_a"])))
+			at.y += UiTheme.px(HOWTO_LINE_H)
+
+
+## The how-to as at most HOWTO_LINES lines of `max_w`, greedy on words; the last line gives with an
+## ellipsis when the rest will not fit. An empty how-to is no lines.
+static func wrap_howto(font: Font, text: String, size: int, max_w: float) -> PackedStringArray:
+	var out := PackedStringArray()
+	if text == "":
+		return out
+	var words: PackedStringArray = text.split(" ", false)
+	var line: String = ""
+	var i: int = 0
+	while i < words.size() and out.size() < HOWTO_LINES - 1:
+		var trial: String = words[i] if line == "" else line + " " + words[i]
+		if line != "" and font.get_string_size(trial, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > max_w:
+			out.append(line)
+			line = ""
+			continue
+		line = trial
+		i += 1
+	var rest: PackedStringArray = words.slice(i)
+	var tail: String = line if rest.is_empty() else (line + " " if line != "" else "") + " ".join(rest)
+	out.append(Inspector.fit_text(font, tail, size, max_w))
+	return out

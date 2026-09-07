@@ -30,8 +30,12 @@ var _plate: ArrivalPlate = null
 var _last_time: float = 0.0
 
 
-func _init(plate: ArrivalPlate = null) -> void:
+## `p_hints` lets the stack share the lessons with a world painter that waits on one (the rope painter's
+## landing ring waits on the grapple being known, D0424); a bare dock owns its own.
+func _init(plate: ArrivalPlate = null, p_hints: Hints = null) -> void:
 	_plate = plate
+	if p_hints != null:
+		hints = p_hints
 
 
 static func box(font: Font, text: String) -> Vector2:
