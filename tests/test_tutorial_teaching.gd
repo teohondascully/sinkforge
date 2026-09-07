@@ -76,7 +76,7 @@ func _test_the_ladder_rides_the_save() -> void:
 	_check(obj.done_ids() == two, "the latched rungs, in ladder order: %s" % [obj.done_ids()])
 	var later: Objectives = Objectives.new()
 	later.restore_done(obj.done_ids())
-	_check(later.is_done(&"mine") and later.is_done(&"smelt") and later.current_id() == &"wood", "a fresh ladder restored from them stands on rung 3")
+	_check(later.is_done(&"mine") and later.is_done(&"smelt") and later.current_id() == &"deliver", "a fresh ladder restored from them stands on rung 3, the delivery (D0485)")
 	var stack: ViewStack = ViewStack.new()
 	stack.objectives = later
 	var env: Dictionary = {}
@@ -86,9 +86,9 @@ func _test_the_ladder_rides_the_save() -> void:
 	var again: ViewStack = ViewStack.new()
 	again.objectives = third
 	SeatHud.restore(again, env)
-	_check(third.current_id() == &"wood", "...and reads them back")
+	_check(third.current_id() == &"deliver", "...and reads them back")
 	SeatHud.restore(again, {})
-	_check(third.current_id() == &"wood", "an empty session leaves the ladder as it is")
+	_check(third.current_id() == &"deliver", "an empty session leaves the ladder as it is")
 
 
 func _test_the_ring_finds_the_real_targets() -> void:
@@ -128,11 +128,7 @@ func _test_the_ring_finds_the_real_targets() -> void:
 	_check(first == vein and second == first and TargetGuide.scan_visits == after_first and after_first > 0, "the chip searches once per (rung, cell, terrain) and reuses it: %d visits, then none" % after_first)
 	var forge: Vector2 = TargetGuide.target(&"smelt", o)
 	_check(forge != TargetGuide.NONE and forge.x < body_px.x and body_px.distance_to(forge) < 4.0 * 16.0, "SMELT rings the forge three metres left (%.1f m off)" % (body_px.distance_to(forge) / 16.0))
-	var drill: Vector2 = TargetGuide.target(&"build", o)
-	_check(drill != TargetGuide.NONE and drill.x > body_px.x and drill.y > body_px.y, "BUILD rings the crew's drill, below and to the right (%.1f m off)" % (body_px.distance_to(drill) / 16.0))
-	_cut_mark_pins(o, drill, vein, forge)
-	_cut_through_pins(door, world, drill)
-	_shaft_mouth_pins(o, drill)
+	_rig_and_drill_pins(door, world, o, body_px, vein, forge)
 	var coal: Vector2 = TargetGuide.target(&"fuel", o)
 	_check(coal != TargetGuide.NONE and coal.x > body_px.x, "FUEL rings the coal seam to the right")
 	_check(TargetGuide.target(&"auto", o) == TargetGuide.NONE, "a rung with nothing to point at rings nothing")
@@ -238,13 +234,33 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 ## D0443's WRONG STACK on a REAL journey, not a hand-built observation (the second auditor's ask): a stranger
 ## digs a clay cell, mines the vein, walks beside the forge with the CLAY selected and presses DROP. The
 ## pack's fall and `drop_went` arrive in the same observe; the lesson names clay and ore.
+## D0485: DELIVER rings the rig; BUILD rings nothing until the rig has paid, then the drill at its foot; the
+## cut mark's buried target is the crew's cache, seven metres under the spawn.
+func _rig_and_drill_pins(door: Interface, world: World, o: Interface.Observation, body_px: Vector2, vein: Vector2, forge: Vector2) -> void:
+	var rig: Vector2 = TargetGuide.target(&"deliver", o)
+	_check(rig != TargetGuide.NONE and rig.x > body_px.x and body_px.distance_to(rig) < 3.0 * 16.0, "DELIVER rings the crew's rig two metres right (%.1f m off) (D0485)" % (body_px.distance_to(rig) / 16.0))
+	_check(TargetGuide.target(&"build", o) == TargetGuide.NONE, "BUILD rings nothing before the rig has paid: no drill lies anywhere (D0485)")
+	var items: Items = door.services()["items"]
+	var foot: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS["tutorial"]) + Vector2i(2, 2)   # the open cell under the rig
+	items.piles.pile(foot)[&"drill"] = 1                                     # the paid drill, posed where the rig sets it down
+	var paid: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	var drill: Vector2 = TargetGuide.target(&"build", paid)
+	_check(drill != TargetGuide.NONE and drill.x > body_px.x and drill.y > body_px.y and body_px.distance_to(drill) < 3.5 * 16.0, "...and rings the drill at the rig's foot once it lies there (%.1f m off)" % (body_px.distance_to(drill) / 16.0))
+	var cache: Vector2 = TargetGuide.target(&"hopper", o)
+	_check(cache != TargetGuide.NONE and cache.y > body_px.y + 5.0 * 16.0, "the crew's cache is the guide's buried target, seven metres down (%.1f m)" % ((cache.y - body_px.y) / 16.0))
+	_cut_mark_pins(o, cache, vein, forge)
+	_cut_through_pins(door, world, cache)
+	_shaft_mouth_pins(paid, drill)
+	items.piles.pile(foot).erase(&"drill")
+
+
 ## D0458 (T038's second answer): the drill lies in the roofed adit; the cut mark is the roof's top metre,
 ## straight above it at the surface; the surface vein and the forge, under open air, get no cut mark.
 func _cut_mark_pins(o: Interface.Observation, drill: Vector2, vein: Vector2, forge: Vector2) -> void:
 	var cut: Rect2 = TargetGuide.cut_metre(o, drill)
 	var drill_m := Vector2i(int(floorf(drill.x / 16.0)), int(floorf(drill.y / 16.0)))
 	_check(cut.size == Vector2(24.0, 16.0) and cut.position.x == float(drill_m.x) * 16.0 - 4.0 and cut.position.y < drill.y - 16.0 and not o.solid_at(Vector2i(drill_m.x * 4 + 2, int(cut.position.y / 4.0) - 2)),
-		"BUILD's cut mark is the top of the roof over the drill, its column and a cell either side (D0468), under open air (%s over %s)" % [cut, drill_m])
+		"the cut mark over a buried target is the top of the roof over it, its column and a cell either side (D0468), under open air (%s over %s)" % [cut, drill_m])
 	_check(TargetGuide.cut_metre(o, vein).size == Vector2.ZERO and TargetGuide.cut_metre(o, forge).size == Vector2.ZERO, "the surface vein and the forge, under open air, get no cut mark")
 
 

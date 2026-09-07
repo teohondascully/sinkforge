@@ -51,9 +51,14 @@ func _test_the_first_frame_primes_and_gains_are_rises() -> void:
 func _test_the_pack_steps() -> void:
 	var obj: Objectives = Objectives.new()
 	obj.refresh(_obs(), 0.016)
-	obj.refresh(_obs([["ore", 4], ["iron_ingot", 1], ["ingot", 1], ["wood", 1]]), 0.016)
-	_check(obj.is_done(&"mine") and obj.is_done(&"smelt") and obj.is_done(&"wood"), "ore, two ingots of either kind, and wood complete the first three")
-	_check(obj.current_id() == &"build", "next is the drill (%s)" % obj.current_id())
+	obj.refresh(_obs([["ore", 4], ["iron_ingot", 1], ["ingot", 1]]), 0.016)
+	_check(obj.is_done(&"mine") and obj.is_done(&"smelt") and not obj.is_done(&"deliver"), "ore and two ingots of either kind complete the first two; the delivery waits on the rig")
+	_check(obj.current_id() == &"deliver" and obj.progress(&"deliver") == "0/2", "next is the delivery, counted 0/2 with no rig in sight (%s %s)" % [obj.current_id(), obj.progress(&"deliver")])
+	# D0485: the deliver rung reads the rig, not the pack -- one ingot in its mouth is 1/2, a met demand (stage 1) is done.
+	obj.refresh(_obs([["ore", 4], ["ingot", 1]], [_m(&"rig", Vector2i(4, 6), {"input": {&"ingot": 1}, "stage": 0})]), 0.016)
+	_check(not obj.is_done(&"deliver") and obj.progress(&"deliver") == "1/2", "one ingot in the rig: 1/2, not done (%s)" % obj.progress(&"deliver"))
+	obj.refresh(_obs([["ore", 4]], [_m(&"rig", Vector2i(4, 6), {"input": {}, "stage": 1})]), 0.016)
+	_check(obj.is_done(&"deliver") and obj.progress(&"deliver") == "2/2" and obj.current_id() == &"build", "the demand met: 2/2, and next is the drill (%s)" % obj.current_id())
 
 
 func _test_the_machine_steps() -> void:
@@ -108,9 +113,9 @@ func _test_the_clock_and_the_finish() -> void:
 	_check(obj.step_age == 0.0 and obj.current_index() == 1, "advancing resets the step clock")
 	_check(obj.done_for() < 0.0 and not obj.all_done(), "not finished: done_for is -1")
 	var all: Array = []
-	for m: Dictionary in [_m(&"drill", Vector2i(5, 6), {"fuel": 1}), _m(&"processor", Vector2i(5, 8)), _m(&"hopper", Vector2i(5, 5), {"filter": &"coal"}), _m(&"generator", Vector2i(8, 6), {"fuel": 1}), _m(&"winch_head", Vector2i(9, 9), {"status": &"working"})]:
+	for m: Dictionary in [_m(&"drill", Vector2i(5, 6), {"fuel": 1}), _m(&"processor", Vector2i(5, 8)), _m(&"hopper", Vector2i(5, 5), {"filter": &"coal"}), _m(&"generator", Vector2i(8, 6), {"fuel": 1}), _m(&"winch_head", Vector2i(9, 9), {"status": &"working"}), _m(&"rig", Vector2i(2, 6), {"stage": 1})]:
 		all.append(m)
-	var o: Interface.Observation = _obs([["ore", 4], ["ingot", 2], ["wood", 1]], all)
+	var o: Interface.Observation = _obs([["ore", 4], ["ingot", 2]], all)
 	o.rates = [{"item": &"ingot", "rate_centi": 50}]
 	obj.refresh(o, 0.5)
 	obj.refresh(o, 0.5)

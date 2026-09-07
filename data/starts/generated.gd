@@ -165,13 +165,6 @@ const RECORDS: Dictionary = {
 				"amount": 3,
 			},
 			{
-				"kind": "pile",
-				"item": "drill",
-				"count": 1,
-				"dx": 4,
-				"dy": 3,
-			},
-			{
 				"kind": "lode",
 				"dx": 5,
 				"dy": 5,
@@ -199,6 +192,20 @@ const RECORDS: Dictionary = {
 			},
 			{
 				"kind": "solid",
+				"dx": 13,
+				"dy": 0,
+				"material": "clay",
+				"off_pad": true,
+			},
+			{
+				"kind": "solid",
+				"dx": 13,
+				"dy": 1,
+				"material": "clay",
+				"off_pad": true,
+			},
+			{
+				"kind": "solid",
 				"dx": 14,
 				"dy": 0,
 				"material": "clay",
@@ -210,6 +217,60 @@ const RECORDS: Dictionary = {
 				"dy": 1,
 				"material": "clay",
 				"off_pad": true,
+			},
+			{
+				"kind": "solid",
+				"dx": 15,
+				"dy": 0,
+				"material": "clay",
+				"off_pad": true,
+			},
+			{
+				"kind": "solid",
+				"dx": 15,
+				"dy": 1,
+				"material": "clay",
+				"off_pad": true,
+			},
+			{
+				"kind": "solid",
+				"dx": 16,
+				"dy": 0,
+				"material": "clay",
+				"off_pad": true,
+			},
+			{
+				"kind": "solid",
+				"dx": 16,
+				"dy": 1,
+				"material": "clay",
+				"off_pad": true,
+			},
+			{
+				"kind": "open",
+				"cells": [
+					[
+						2,
+						0,
+					],
+					[
+						2,
+						1,
+					],
+				],
+			},
+			{
+				"kind": "solid",
+				"dx": 2,
+				"dy": 2,
+				"material": "clay",
+				"deposit": 0,
+			},
+			{
+				"kind": "machine",
+				"id": "rig",
+				"dx": 2,
+				"dy": 0,
 			},
 			{
 				"kind": "open",

@@ -133,7 +133,7 @@ func _test_wrong_spot_pins() -> void:
 	var h: Hints = Hints.new()
 	h.objectives = Objectives.new()
 	h.objectives.refresh(_hint_obs(), 0.016)
-	for id: StringName in [&"mine", &"smelt", &"wood"]:
+	for id: StringName in [&"mine", &"smelt", &"deliver"]:
 		h.objectives._done[id] = true
 	_check(h.objectives.current_id() == &"build", "control: the ladder is at BUILD (%s)" % h.objectives.current_id())
 	var off: Interface.Observation = _hint_obs()
@@ -202,8 +202,9 @@ func _test_mined_wrong_pins() -> void:
 	h3.restore_taught([&"way_down"])
 	h3.observe(clay, 0.016)
 	_check(h3.active_id() == &"" and h3.queued() == 0, "control: after THE WAY DOWN a clay break is the asked-for cut, not a miss (%s)" % h3.active_id())
-	# D0458: with the ladder attached the rung decides, not the pack -- wood felled on the wood rung with
-	# the ore long spent in the forge teaches nothing; the same break on the mine rung does.
+	# D0458: with the ladder attached the rung decides, not the pack -- wood felled on a later rung with
+	# the ore long spent in the forge teaches nothing; the same break on the mine rung does. (The ladder's
+	# third rung is the delivery since D0485; the pin's point is the rung, not the material.)
 	var h4: Hints = Hints.new()
 	h4.objectives = Objectives.new()
 	h4.objectives.restore_done([&"mine", &"smelt"])
@@ -211,7 +212,7 @@ func _test_mined_wrong_pins() -> void:
 	wood.mining_broke = true
 	wood.mining_broke_material = &"wood"
 	h4.observe(wood, 0.016)
-	_check(h4.objectives.current_id() == &"wood" and h4.active_id() == &"" and h4.queued() == 0, "on the wood rung, an empty pack and a wood break teach nothing (%s)" % h4.active_id())
+	_check(h4.objectives.current_id() == &"deliver" and h4.active_id() == &"" and h4.queued() == 0, "on the deliver rung, an empty pack and a wood break teach nothing (%s)" % h4.active_id())
 	var h5: Hints = Hints.new()
 	h5.objectives = Objectives.new()
 	h5.observe(wood, 0.016)

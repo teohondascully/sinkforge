@@ -10,7 +10,7 @@ extends "res://tests/test_base.gd"
 ## suite proves the WORLD can satisfy it, which is the thing that was false: the vein yielded `ore_iron`,
 ## the ladder and the forge wanted `ore`, nothing pressed collect, and no drill existed to build.
 ##
-## Rungs 1-6 (mine, smelt, wood, build, fuel, first automation) are driven to completion. Rungs 7-9
+## Rungs 1-6 (mine, smelt, deliver, build, fuel, first automation) are driven to completion. Rungs 7-9
 ## (hopper, power, winch) need the crew's cache, which lies behind rock beside the ingot cell; this suite
 ## asserts the cache is THERE with every machine those rungs name, and leaves the winch's link to the
 ## human -- stated here so the gap is a fact and not a hope.
@@ -126,7 +126,7 @@ func _test_a_stranger_completes_the_starter_loop() -> void:
 	_tick(_frame())
 	_check(obj.current_id() == &"mine" and items.pack.slots().is_empty(), "a new game opens on the first rung with an empty pack")
 	_rungs_mine_and_smelt()
-	_rungs_wood_and_build()
+	_rungs_deliver_and_build()
 	_rungs_fuel_and_automation()
 	_the_cache_is_in_the_world()
 	_check(world.state_signature() == world.recomputed_signature(), "the world's signature agrees with its rebuild after %d ticks" % ticks)
@@ -165,23 +165,19 @@ func _rungs_mine_and_smelt() -> void:
 	_check(obj.is_done(&"smelt"), "rung 2 latches: %d ingots collected off the pocket floor by walking near it (no key)" % obj.gained(&"ingot"))
 
 
-## 3. WOOD: the nearest trunk stands fifteen metres west; walk to it and fell it. 4. BUILD: back east, dig
-## down into the adit where the crew's drill lies, take it, climb out, set it in the shaft mouth.
-func _rungs_wood_and_build() -> void:
-	var trunk: Vector2i = _nearest_wood()
-	_check(trunk != Vector2i(-1, -1), "a tree stands within reach of the spawn pad (%s)" % [trunk])
-	var arrived: bool = _walk_to(float(trunk.x) / 4.0 + 1.25)
-	_check(arrived, "the body walks to the trunk (%.1f m from spawn, at x %.1f m)" % [absf(float(trunk.x) / 4.0 - float(ANCHOR.x)), _body_m().x])
-	var felled: int = _fell(trunk)
-	_check(obj.is_done(&"wood"), "rung 3 latches: wood in the pack (%d) after %d trunk cells felled -- sixteen cells make a block" % [items.pack.count(&"wood"), felled])
-	# Centred on the metre, tightly: arriving from the tree's side with the loose tolerance left the body's
-	# edge over the coal metre beside it, which held it up when the metre under it opened (D0425).
-	_walk_to(float(ANCHOR.x) + 4.5, 900, 0.1)
-	_check(items.pack.count(&"drill") == 0, "the drill lies in the adit below, not in the pack: nothing was stocked")
-	_dig_down_to(ANCHOR + Vector2i(4, 3))
-	_wait(30, func() -> bool: return items.pack.count(&"drill") > 0)
-	_check(items.pack.count(&"drill") == 1, "the crew's drill is picked up by walking over it in the adit (body at %s, %.2f m)" % [Aim.logic_cell_of(body.pos_x, body.pos_y), _body_m().y])
-	_climb_out(ANCHOR + Vector2i(4, 3))
+## 3. DELIVER (D0485): the ingots to the crew's rig two metres right of spawn; the rig pays the drill into
+## the well under it and the walk-over collect takes it. 4. BUILD: east to the shaft, set the drill in its mouth.
+func _rungs_deliver_and_build() -> void:
+	_check(obj.current_id() == &"deliver" and items.pack.count(&"ingot") >= 2, "the ladder asks for the delivery with %d ingots in hand" % items.pack.count(&"ingot"))
+	var rig: MachineState = machines.machine_at(ANCHOR + Vector2i(2, 0))
+	_check(rig != null and rig.def.id == &"rig" and rig.stage == 0, "the crew's rig stands two metres right of spawn, asking")
+	_walk_to(float(ANCHOR.x) + 2.5)
+	_tick(_frame(), [Command.select(_slot_of(&"ingot"))])
+	var rd: Interface.Result = door.apply(Command.drop())
+	_check(rd.ok and int(rig.input_buffer.get(&"ingot", 0)) + (2 if rig.stage >= 1 else 0) >= 2, "drop feeds the rig in reach: %s" % rd.detail)
+	_wait(120, func() -> bool: return items.pack.count(&"drill") > 0)
+	_check(rig.stage == 1 and obj.is_done(&"deliver"), "rung 3 latches: the demand is met, the rig stands at stage 1")
+	_check(items.pack.count(&"drill") == 1, "the paid drill fell into the well under the rig and the walk-over collect took it (body at %s)" % [Aim.logic_cell_of(body.pos_x, body.pos_y)])
 	_walk_to(float(ANCHOR.x) + 6.5)
 	_tick(_frame(), [Command.select(_slot_of(&"drill"))])
 	var rb: Interface.Result = door.apply(Command.build(ANCHOR + Vector2i(7, 1)))
@@ -214,37 +210,6 @@ func _the_cache_is_in_the_world() -> void:
 		if cache.has(m) or items.pack.count(m) > 0:
 			supplied += 1
 	_check(supplied == 4, "the machines rungs 7-9 name are in the world -- the crew's cache under the spawn, or already scooped (%d of 4; piles %s, pack %s)" % [supplied, cache.keys(), items.pack.slots()])
-
-
-func _nearest_wood() -> Vector2i:
-	var best := Vector2i(-1, -1)
-	for col: int in range(ANCHOR.x * 4 - 120, ANCHOR.x * 4 + 120):
-		for row: int in range(ANCHOR.y * 4 - 60, ANCHOR.y * 4 + 4):
-			var c := Vector2i(col, row)
-			if world.grid.get_material(c) == &"wood" and (best == Vector2i(-1, -1) or absi(c.x - ANCHOR.x * 4) < absi(best.x - ANCHOR.x * 4)):
-				best = c
-	return best
-
-
-## Fell the trunk `wood_cell` stands in: every wood cell in its column and the one beside it, bottom up,
-## each held until it breaks. Returns the cells broken.
-func _fell(wood_cell: Vector2i) -> int:
-	var cols: Array[int] = [wood_cell.x]
-	for dx: int in [-1, 1]:
-		if world.grid.get_material(Vector2i(wood_cell.x + dx, wood_cell.y)) == &"wood":
-			cols.append(wood_cell.x + dx)
-	var broken: int = 0
-	for row: int in range(ANCHOR.y * 4 + 3, ANCHOR.y * 4 - 60, -1):
-		for col: int in cols:
-			var c := Vector2i(col, row)
-			if world.grid.get_material(c) != &"wood":
-				continue
-			_mine(c, func() -> bool: return not world.grid.is_solid(c), 300)
-			if not world.grid.is_solid(c):
-				broken += 1
-			if obj.is_done(&"wood"):
-				return broken
-	return broken
 
 
 ## Dig straight down from where the body stands until it rests in `logic`: the first solid metre under

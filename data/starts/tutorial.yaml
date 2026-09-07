@@ -18,10 +18,8 @@ fixtures:
   - {kind: lode, dx: 5, dy: 2, material: ore_iron, amount: 3}
   - {kind: lode, dx: 5, dy: 3, material: ore_iron, amount: 3}
   - {kind: lode, dx: 5, dy: 4, material: ore_iron, amount: 3}
-  # THE CREW'S DRILL (D0409): legacy sold the drill at the Bazaar, which this game refuses (D0346); the
-  # GDD's answer for the forge -- found in the world, cold and ancient -- is the answer for the drill too.
-  # It lies on the adit floor where the face is, a pile the player walks over, then places in the shaft.
-  - {kind: pile, item: drill, count: 1, dx: 4, dy: 3}
+  # THE CREW'S DRILL used to lie here for free (D0409); the rig pays it for the first delivery now (D0482,
+  # D0485). The adit keeps its face and its lodes as a place to dig on into.
   # The same vein continues behind rock, straight down off the bottom of the face (ADIT_DEEP_AMOUNT 120).
   - {kind: lode, dx: 5, dy: 5, material: ore_iron, amount: 8}
   - {kind: lode, dx: 5, dy: 6, material: ore_iron, amount: 8}
@@ -40,8 +38,22 @@ fixtures:
   # (vertical_passes.gd) -- and six of eight strangers walked into it before the third rung. Two metres of
   # clay over its mouth: the descent is a dig, not a blind fall, and the world beneath is untouched. Off
   # the pad by design (`off_pad` exempts it from the pad-width pin). Delete these two lines to reverse.
+  # The mouth FLARES (pow 2.2) to three metres either side of the chimney, and one metre of cap left the
+  # rest open: seven strangers fell in at +15 after the cap (D0485). Four metres of clay now, +13 to +16.
+  - {kind: solid, dx: 13, dy: 0, material: clay, off_pad: true}
+  - {kind: solid, dx: 13, dy: 1, material: clay, off_pad: true}
   - {kind: solid, dx: 14, dy: 0, material: clay, off_pad: true}
   - {kind: solid, dx: 14, dy: 1, material: clay, off_pad: true}
+  - {kind: solid, dx: 15, dy: 0, material: clay, off_pad: true}
+  - {kind: solid, dx: 15, dy: 1, material: clay, off_pad: true}
+  - {kind: solid, dx: 16, dy: 0, material: clay, off_pad: true}
+  - {kind: solid, dx: 16, dy: 1, material: clay, off_pad: true}
+  # THE CREW'S RIG (D0485): the bore's surface head and the demand side (D0484), two metres right of the
+  # spawn in a well shaped like the forge's, so what it pays lands in the open cell under it and the scoop
+  # takes it the way it takes the forge's ingots. Between the pad and the coal seam, in the opening frame.
+  - {kind: open, cells: [[2, 0], [2, 1]]}
+  - {kind: solid, dx: 2, dy: 2, material: clay, deposit: 0}
+  - {kind: machine, id: rig, dx: 2, dy: 0}
   # The bootstrap forge pocket (MINESHAFT_FORGE_CELL 46): a shallow one-deep well off the drill shaft.
   - {kind: open, cells: [[-3, 0], [-3, 1]]}
   - {kind: solid, dx: -3, dy: 2, material: clay, deposit: 0}

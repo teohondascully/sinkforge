@@ -18755,3 +18755,29 @@ a lift: legacy sold the drill at a bazaar this game refused (D0346), and the rig
 machine comes from. Its placement in the world and the ladder's deliver rung are D0485-D0486.
 
 **Reverse cost:** the record, the `Demands` file, the runner case and the `stage` field.
+
+## D0485 · 2026-09-07 · The opening's world and ladder: the rig at +2, no free drill, deliver replaces wood, the mouth capped
+
+**Decided:** `data/starts/tutorial.yaml`: the crew's rig stands two metres right of the spawn in a well
+shaped like the forge's (open [2,0],[2,1], clay under), so what it pays lands in the open cell beneath it
+and the scoop takes it as it takes the forge's ingots; the crew's drill pile in the adit is gone (the rig
+pays it, D0484); the chimney's cap is four metres of clay (+13 to +16) instead of one -- the mouth flares
+three metres either side of its chimney and seven strangers fell in at +15 past the one-metre cap. The
+ladder (`Objectives.STEPS`): mine, smelt (the label names ORE and COAL and the seam to the right), deliver
+("Carry the ingots to the WHITE-RINGED rig beside you, hold them and press [DROP]: the crew's rig pays in
+machines"; done when a rig in the window stands at stage 1; counted from the rig's mouth, "1/2"), build
+("The rig set a DRILL down at its foot..."), fuel, auto (ore and coal into the forge below), hopper, power,
+winch. The wood rung is out of the ladder (D0482: it paid for nothing); the tree stays in the world and
+`TargetGuide.target(&"wood")` still finds it for the day torches or supports ask. The guide rings the rig
+for deliver, nothing for build until a drill lies somewhere, then the drill at the rig's foot, then the
+shaft's mouth with the drill in hand (D0459, unchanged). The ceiling script plays the new route: ore
+1.3 s, coal 3.4 s, two ingots 9.6 s, the drill in hand 17.7 s, on a fresh seat. Suites: the playthrough
+drives mine, smelt with coal, deliver (the rig pays, the walk-over collect takes the drill), build, fuel,
+first automation; the teaching suite rings the rig, rings nothing for BUILD until the drill lies at the
+rig's foot, and takes the crew's cache as the guide's buried target; the seeder counts three machines
+and no drill pile; the ladder's save pins stand on "deliver".
+
+**Why:** D0482. The first five minutes are the loop in miniature only if the drill is earned; the cap is a
+data fix for a frame-and-input cause with nine strangers behind it, taken with the record it lives in.
+
+**Reverse cost:** the record's lines and the STEPS table; `delivered`/`rig_stage` in objectives.gd.

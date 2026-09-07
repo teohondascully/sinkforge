@@ -3,7 +3,7 @@
     python3 playtest/ceiling.py <session-dir> [--mission-note "..."]
 
 Establishes that the route and the adapter work on this build and how fast the game itself lets the
-first three rungs go: ore from the ringed block, ingots from the forge, wood from the tree. It is the
+first three rungs go: ore from the ringed block, ingots from the coal-fed forge, the drill from the rig (D0485). It is the
 denominator for a stranger's time and nothing more: a script that knows the layout says nothing about
 what a stranger can see (the director's rule 10). The seat is pinned like a stranger's (`stranger.py
 start` with this file as the mission), the inputs are the same physical bursts, and every rung is read
@@ -94,7 +94,7 @@ def main():
     parser.add_argument("session_dir")
     parser.add_argument("--hold", action="store_true", help="leave the seat up at the end (for a look at the BUILD rung)")
     parser.add_argument("--save-to", default="", help="after the third rung, write the session here: the rung-4 mission variant's save (D0462)")
-    parser.add_argument("--save-after", default="wood", choices=["ore", "wood"], help="which rung --save-to follows: 'ore' writes the rung-2 variant (the forge rung's door, D0479) and stops there")
+    parser.add_argument("--save-after", default="drill", choices=["ore", "drill"], help="which rung --save-to follows: 'ore' writes the rung-2 variant (the forge rung's door, D0479) and stops there; 'drill' (default) writes BUILD's door")
     parser.add_argument("--rung4", default="", help="open this rung-4 save and play the fourth rung only: the drill placed at the shaft's mouth (D0467)")
     args = parser.parse_args()
     session = Path(args.session_dir).resolve()
@@ -125,43 +125,54 @@ def main():
         if not args.hold:
             burst(session, {"quit": True}, "ceiling: done at the smelt rung's door")
         return 0 if r.get("saved") else 1
-    # Rung 2: select the ore's slot, walk left to stand beside the forge (dx -3; beside means within a
-    # body length: dx -1.5), drop, and stand there while the ingots come.
-    slots = list((results["ore"].get("state") or {}).get("slots") or [])   # the bar's order: slot N is key N
-    ore_key = str(slots.index("ore") + 1) if "ore" in slots else "1"
-    burst(session, {"ticks": 3, "keys": [ore_key]}, "ceiling: select the ore")
-    burst(session, {"ticks": 10, "keys": ["A"]}, "ceiling: a step left, beside the forge")
+    # Rung 2 (D0483): the forge takes ore AND coal. The seam is five metres right of the spawn: walk to it,
+    # hold MINE on it, come back beside the forge (dx -3; beside means within a body length) and drop each
+    # stack by its slot key, then stand there while the ingots come.
+    resp = burst(session, {"ticks": 18, "keys": ["D"]}, "ceiling: walk to the coal seam")
+    body_cell = (resp.get("state") or {}).get("cell") or [130, 75]
+    seam = [BODY_X + (150.5 - (body_cell[0] + 0.5)) * PX_PER_M / 4.0, FEET_Y + 0.3 * PX_PER_M]
+
+    def mine_coal(i):
+        resp = burst(session, {"ticks": 120, "mouse": seam, "buttons": [1], "until": "event"}, "ceiling: hold MINE on the coal seam")
+        return resp, pack(resp, "coal") >= 4
+    results["coal"] = rung(session, "coal", 6, mine_coal)
+    if results["coal"] is None:
+        return 1
+    resp = burst(session, {"ticks": 30, "keys": ["A"]}, "ceiling: back to the forge")
+    body_cell = (resp.get("state") or {}).get("cell") or body_cell
+    while body_cell[0] > 124:
+        resp = burst(session, {"ticks": 2, "keys": ["A"]}, "ceiling: a nudge beside the forge")
+        body_cell = (resp.get("state") or {}).get("cell") or body_cell
+    slots = list((resp.get("state") or {}).get("slots") or [])          # the bar's order: slot N is key N
+    for item in ("ore", "coal"):
+        key = str(slots.index(item) + 1) if item in slots else "1"
+        burst(session, {"ticks": 3, "keys": [key]}, "ceiling: select the %s" % item)
+        burst(session, {"ticks": 3, "keys": ["Q"]}, "ceiling: drop the %s into the forge" % item)
 
     def smelt(i):
-        if i == 0:
-            resp = burst(session, {"ticks": 3, "keys": ["Q"]}, "ceiling: drop the ore into the forge")
-            return resp, pack(resp, "ingot") >= 2
         resp = burst(session, {"ticks": 90, "until": "event"}, "ceiling: wait beside the forge")
         return resp, pack(resp, "ingot") >= 2
     results["ingots"] = rung(session, "ingots", 8, smelt)
     if results["ingots"] is None:
         return 1
-    # Rung 3: the tree at dx -6 m of the spawn (a two-metre trunk above the surface, two cells wide). Walk
-    # left until the body's cell is within a reach of the trunk, then aim by cell: the receipts carry the
-    # body's terrain cell, and the screen is 6.4 px a cell around the body at rest.
-    trunk_cell_x = 130 - 6 * 4 + 2                                # the spawn column's cell 130; the trunk's right cell
-    resp = burst(session, {"ticks": 12, "keys": ["A"]}, "ceiling: walk to the tree")
-    body_cell = (resp.get("state") or {}).get("cell") or [130, 75]
-    while body_cell[0] - trunk_cell_x > 8:
-        resp = burst(session, {"ticks": 4, "keys": ["A"]}, "ceiling: a step nearer the tree")
+    # Rung 3 (D0485): the delivery. The rig stands two metres right of the spawn; beside it, select the
+    # ingots and drop; the rig pays the drill into the well under it and the walk-over collect takes it.
+    resp = burst(session, {"ticks": 12, "keys": ["D"]}, "ceiling: walk to the rig")
+    body_cell = (resp.get("state") or {}).get("cell") or body_cell
+    while body_cell[0] < 136:
+        resp = burst(session, {"ticks": 2, "keys": ["D"]}, "ceiling: a nudge beside the rig")
         body_cell = (resp.get("state") or {}).get("cell") or body_cell
-    px_per_cell = PX_PER_M / 4.0
-    trunk = [BODY_X + (trunk_cell_x + 0.5 - (body_cell[0] + 0.5)) * px_per_cell, FEET_Y - 3.5 * px_per_cell]
+    slots = list((resp.get("state") or {}).get("slots") or [])
+    burst(session, {"ticks": 3, "keys": [str(slots.index("ingot") + 1) if "ingot" in slots else "1"]}, "ceiling: select the ingots")
 
-    def wood(i):
-        resp = burst(session, {"ticks": 120, "mouse": trunk, "buttons": [1], "until": "event"}, "ceiling: hold MINE on the trunk")
-        if pack(resp, "wood") >= 1:
-            return resp, True
-        if resp.get("refusal") == "air":                        # a cell off the trunk: try one cell left
-            trunk[0] -= px_per_cell
-        return resp, False
-    results["wood"] = rung(session, "wood", 12, wood)
-    if args.save_to and results["wood"] is not None:
+    def deliver(i):
+        if i == 0:
+            resp = burst(session, {"ticks": 3, "keys": ["Q"]}, "ceiling: drop the ingots into the rig")
+        else:
+            resp = burst(session, {"ticks": 60, "until": "event"}, "ceiling: wait by the rig for the drill")
+        return resp, pack(resp, "drill") >= 1
+    results["drill"] = rung(session, "drill", 6, deliver)
+    if args.save_to and results["drill"] is not None:
         burst(session, {"ticks": 3, "keys": ["D"]}, "ceiling: face the pad")
         r = burst(session, {"save": str(Path(args.save_to).resolve())}, "ceiling: the rung-4 save")
         print(json.dumps({"saved": r.get("saved"), "path": r.get("path"), "tick": r.get("tick")}))

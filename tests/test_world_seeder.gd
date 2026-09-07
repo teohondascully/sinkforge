@@ -62,9 +62,12 @@ func _test_tutorial_stamps_every_kind_at_the_record_cells() -> void:
 	_check(forge != null and forge.def.id == &"processor", "the bootstrap forge sits in the pocket")
 	_check(world.logic_air(Vector2i(39, 20)) and world.logic_air(Vector2i(39, 21)) and _metre_yield(Vector2i(39, 22)) == 400, "the drill shaft: an open mouth and drill cell over a 400-unit vein (25 a cell)")
 	_check(world.logic_air(Vector2i(39, 24)) and world.logic_solid(Vector2i(39, 25)) and machines.machine_at(Vector2i(39, 23)) != null, "the auto forge under the vein, a gap for ingots, a floor")
-	_check(machines.count() == 2 and machines.machines[0] == forge, "two machines, in file order")
+	var rig: MachineState = machines.machine_at(Vector2i(34, 20))
+	_check(rig != null and rig.def.id == &"rig" and world.logic_air(Vector2i(34, 21)) and WorldMaterials.is_soil(world.grid.get_material(Vector2i(136, 88))), "the crew's rig sits two metres right of the spawn in a well like the forge's (D0485)")
+	_check(machines.count() == 3 and machines.machines[0] == rig and machines.machines[1] == forge, "three machines, in file order: the rig, the forge, the auto forge")
+	_check(items.piles.count_at(Vector2i(36, 23), &"drill") == 0, "no free drill in the adit any more: the rig pays it (D0485)")
 	_check(Invariants.check_placed_not_in_rock(world, 0) == null and Invariants.check_item_conservation(items, 0) == null, "nothing placed in rock; the ledger balances (no pack fixture in the tutorial)")
-	_check(not WorldSeeder.stamp(world, items, machines, &"tutorial") and WorldSeeder.last_refusal.begins_with("machine processor at (29, 20)"), "stamping twice: the forge cell is taken, refused with the cell named")
+	_check(not WorldSeeder.stamp(world, items, machines, &"tutorial") and WorldSeeder.last_refusal.begins_with("machine rig at (34, 20)"), "stamping twice: the rig's cell is taken, refused with the cell named")
 
 
 func _test_dev_kit_stocks_the_pack_and_conserves() -> void:
@@ -112,7 +115,7 @@ func _test_twins_sign_the_same_and_the_real_site_takes_it() -> void:
 	_check(real.grid.width == 256 and real.logic_in_bounds(Vector2i(39, 27)), "the real site is 64 metres wide and deep enough for every fixture")
 	_check(WorldSeeder.stamp(real, real_items, real_machines, &"tutorial", &"shallow_clay"), "the generated shallow_clay world takes the tutorial start")
 	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS["tutorial"])
-	_check(real.logic_air(spawn) and real.logic_solid(spawn + Vector2i(0, 1)) and real_machines.count() == 2, "on the real world too: the body spawns on solid ground, both forges placed")
+	_check(real.logic_air(spawn) and real.logic_solid(spawn + Vector2i(0, 1)) and real_machines.count() == 3, "on the real world too: the body spawns on solid ground, the rig and both forges placed")
 
 
 ## D0407: a `room` is a w x h rectangle of open metres from (dx, dy); with `floor` the row under it is

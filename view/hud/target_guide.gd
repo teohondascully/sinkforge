@@ -105,6 +105,8 @@ static func target(id: StringName, o: Interface.Observation) -> Vector2:
 	match id:
 		&"smelt":
 			return _nearest_machine(o, body, &"processor")
+		&"deliver":
+			return _nearest_machine(o, body, &"rig")              # the crew's rig takes the ingots (D0485)
 		&"build":
 			# The drill in hand: the ring moves from the pile to the shaft's mouth (D0459), where [BUILD] goes.
 			if int(Payouts.pack_counts(o).get(&"drill", 0)) > 0:

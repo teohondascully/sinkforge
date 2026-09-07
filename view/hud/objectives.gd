@@ -23,11 +23,11 @@ const LINGER_DONE: float = 5.0
 ## the chip appends from `progress()`. "Grapple" is the line the body throws; "winch" is the machine.
 const STEPS: Array[Dictionary] = [
 	{"id": &"mine", "label": "POINT at the silver-flecked rock in the WHITE RING beside you and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
-	{"id": &"smelt", "label": "Stand beside the WHITE-RINGED forge holding ORE (its number key selects it), press [DROP]: the stack goes in, then wait — the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
-	{"id": &"wood", "label": "Hold [MINE] on a tree's brown TRUNK, not its leaves — sixteen cuts make a block", "goal": "Get wood", "count": &"wood", "need": 1},
-	{"id": &"build", "label": "The crew's drill lies in the WHITE RING: dig down at the WHITE SQUARE above it, walk over it, press its slot's key, [BUILD] where the ring moves", "goal": "Build the line"},
+	{"id": &"smelt", "label": "The WHITE-RINGED forge takes ORE and COAL: dig the black seam to your right too, stand beside the forge holding each stack (its number key selects it) and press [DROP]", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
+	{"id": &"deliver", "label": "Carry the ingots to the WHITE-RINGED rig beside you, hold them and press [DROP]: the crew's rig pays in machines", "goal": "Deliver 2 ingots"},
+	{"id": &"build", "label": "The rig set a DRILL down at its foot: walk over it, press its slot's key, [BUILD] over the vein in the WHITE RING", "goal": "Build the line"},
 	{"id": &"fuel", "label": "Hold [MINE] on the black coal seam by the shaft, select the coal, stand by the Drill and press [DROP]", "goal": "Fuel the Drill"},
-	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore into the forge below. First automation!", "goal": "First automation"},
+	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore and coal into the forge below. First automation!", "goal": "First automation"},
 	{"id": &"hopper", "label": "The crew's cache lies in the WHITE RING: dig down at the WHITE SQUARE above it, set the HOPPER over the Drill with [BUILD], drop coal in", "goal": "Automate the coal feed"},
 	{"id": &"power", "label": "Set the GENERATOR from the cache down with [BUILD] and press [DROP] to feed it coal — the deep needs power", "goal": "Burn coal for power"},
 	{"id": &"winch", "label": "Stand the WINCH HEAD on a lode with [BUILD], then press [LINK] on it and on its Station — the vein climbs on its own", "goal": "Raise the winch"},
@@ -43,6 +43,7 @@ var _drill_seen: bool = false           ## the line existed at some point, so a 
 var _all_done_time: float = -1.0
 var _shown_index: int = -1
 var step_age: float = 0.0               ## seconds the current step has been current
+var _last: Interface.Observation = null  ## the last refresh's observation: the deliver rung's count reads the rig (D0485)
 
 
 ## Call every frame: bank the pack's rises, latch any newly achieved step, run the clocks.
@@ -55,6 +56,7 @@ func refresh(o: Interface.Observation, delta: float) -> void:
 			_gained[g["item"]] = int(_gained.get(g["item"], 0)) + int(g["count"])
 	_prev_pack = now
 	_primed = true
+	_last = o
 	if _has_machine(o, &"drill"):
 		_drill_seen = true
 	for step: Dictionary in STEPS:
@@ -100,12 +102,37 @@ func gained(item: StringName) -> int:
 	return int(_gained.get(item, 0))
 
 
-## "2/4" for a counted rung, "" for the rest: what the goal chip appends (D0411).
+## "2/4" for a counted rung, "" for the rest: what the goal chip appends (D0411). The deliver rung counts
+## what the rig holds against its demand (D0485): the pack empties as the count rises.
 func progress(id: StringName) -> String:
 	for step: Dictionary in STEPS:
 		if step["id"] == id and step.has("count"):
 			return "%d/%d" % [mini(gained(step["count"]), int(step["need"])), int(step["need"])]
+	if id == &"deliver" and _last != null:
+		return delivered(_last)
 	return ""
+
+
+## THE RIG'S COUNT (D0485): "1/2" while the first demand is being filled; "2/2" once it has been met.
+static func delivered(o: Interface.Observation) -> String:
+	var want: Dictionary = Demands.wants(0)
+	if want.is_empty():
+		return ""
+	var item: StringName = want.keys()[0]
+	var need: int = int(want[item])
+	for rec: Dictionary in o.machines:
+		if rec.get("behavior", &"") == &"rig":
+			var held: int = need if int(rec.get("stage", 0)) >= 1 else int((rec.get("input", {}) as Dictionary).get(item, 0))
+			return "%d/%d" % [mini(held, need), need]
+	return "0/%d" % need
+
+
+## The first rig's stage in the window: demands met (D0485). 0 with no rig in sight.
+static func rig_stage(o: Interface.Observation) -> int:
+	for rec: Dictionary in o.machines:
+		if rec.get("behavior", &"") == &"rig":
+			return int(rec.get("stage", 0))
+	return 0
 
 
 ## The ladder's latched rungs, for the save (D0411): objectives lived only in the HUD and restarted on
@@ -139,7 +166,7 @@ func _achieved(id: StringName, o: Interface.Observation) -> bool:
 	match id:
 		&"mine": return gained(&"ore") >= 4
 		&"smelt": return _gained_any(INGOTS) >= 2
-		&"wood": return gained(&"wood") >= 1
+		&"deliver": return rig_stage(o) >= 1
 		&"build": return drill_on_line(o)
 		&"fuel": return _fuelled(o, &"drill")
 		&"auto": return _drill_seen and _rate_of_any(o, INGOTS) > 0
