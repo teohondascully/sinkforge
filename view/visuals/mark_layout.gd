@@ -55,6 +55,13 @@ static func _aim(o: Interface.Observation, t: float, look: MaterialLook, out: Ar
 	if o.aim_cell == NONE:
 		return
 	var rect: Rect2 = MarkPainter.mark_rect(MarkPainter.target_rect(o))
+	# THE HELD BUTTON THAT DOES NOTHING SAYS SO (D0421): the refusal square and bar at full weight -- the
+	# same grammar as standing in your own way. The first stranger to play held MINE on the right rock from
+	# a step too far, three times, and the frame did not change: the square sat at 0.18 and read as nothing.
+	# The mark says "not from here"; the WHY is the lesson dock's (`Hints` `too_far`), never text on the miner.
+	if o.aim_refusal != &"":
+		refusal(rect, 1.0, out)
+		return
 	if o.solid_at(o.aim_cell):
 		var a: float = 0.85 if o.aim_in_reach else 0.18
 		square(rect, Color(MarkPainter.CHROME.r, MarkPainter.CHROME.g, MarkPainter.CHROME.b, a), out)

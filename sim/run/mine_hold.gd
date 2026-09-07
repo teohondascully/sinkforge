@@ -14,9 +14,16 @@ extends RefCounted
 var last_aim: Vector2i = Vector2i(-1, -1)   # the last painted point's cell, for the drag
 var aim_cell: Vector2i = Vector2i(-1, -1)   # this tick's effective aim, for the door's observation
 var aim_is_lode: bool = false
+## WHY THE HELD BUTTON DID NOTHING (D0421): `&""` while it works or is not held; `&"far"` when the aim is
+## solid but past the reach; `&"sight"` when rock stands between; `&"air"` when there is nothing to dig
+## under the pointer and no marked cell to fall back to. The first stranger to play held the button on
+## the right rock from a step too far, three times, and the screen said nothing; the mark and the lesson
+## read this field.
+var refusal: StringName = &""
 
 
 func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: DigPlan, lode: LodeWork, body: Body, building: bool) -> void:
+	refusal = &""
 	if not frame.has_aim:
 		last_aim = Vector2i(-1, -1)
 		aim_cell = Vector2i(-1, -1)
@@ -40,6 +47,8 @@ func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: D
 			work = marked
 	aim_cell = work
 	aim_is_lode = world.deposits.lode_workable(world.grid, work)
+	if frame.mine_held and not _workable(world, body, work):
+		refusal = _why_not(world, body, work)
 	if aim_is_lode:
 		mining.mine(world.grid, body.pos_x, body.pos_y, Mining.NO_CELL, false)
 		lode.work(world, items, mining, body.pos_x, body.pos_y, work, frame.mine_held)
@@ -57,3 +66,14 @@ func _workable(world: World, body: Body, cell: Vector2i) -> bool:
 		return Mining.in_reach(body.pos_x, body.pos_y, cell) and LineOfSight.clear(world.grid, Aim.cell_of(body.pos_x, body.pos_y), cell)
 	return world.grid.in_bounds(cell) and world.grid.is_solid(cell) and Mining.in_reach(body.pos_x, body.pos_y, cell) \
 		and LineOfSight.clear(world.grid, Aim.cell_of(body.pos_x, body.pos_y), cell)
+
+
+## The one reason `_workable` said no, in the order a player would check: is there rock there at all, is
+## it in reach, can I see it.
+func _why_not(world: World, body: Body, cell: Vector2i) -> StringName:
+	var lode: bool = world.deposits.lode_workable(world.grid, cell)
+	if not lode and not (world.grid.in_bounds(cell) and world.grid.is_solid(cell)):
+		return &"air"
+	if not Mining.in_reach(body.pos_x, body.pos_y, cell):
+		return &"far"
+	return &"sight"

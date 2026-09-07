@@ -118,6 +118,18 @@ func _test_a_move_command_advances_exactly_one_tick() -> void:
 	_check(iface.observe(Interface.Envelope.oracle_over(grid)).tick == before_tick + 1,
 		"and advances the tick counter by exactly one")
 	_check(body.vel_x > 0, "and the body actually integrated the input (vel_x = %d)" % body.vel_x)
+	# D0421: a held MINE that does nothing names why, on the observation, through the door.
+	var far: InputFrame = InputFrame.new()
+	far.has_aim = true
+	far.aim_col = GRID_W - 2   # the far wall of the floor, well past a 3.2 m reach from the middle
+	far.aim_row = FLOOR_ROW
+	far.mine_held = true
+	iface.apply(Command.move(far))
+	var o: Interface.Observation = iface.observe(Interface.Envelope.oracle_over(grid))
+	_check(o.aim_refusal == &"far", "MINE held on rock past the reach reads `far` on the observation (%s, aim %s)" % [o.aim_refusal, o.aim_cell])
+	far.mine_held = false
+	iface.apply(Command.move(far))
+	_check(iface.observe(Interface.Envelope.oracle_over(grid)).aim_refusal == &"", "released, the refusal clears")
 
 
 ## Each rejection posed alone, with the other two conditions held valid, so no case can pass on another's

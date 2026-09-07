@@ -17363,3 +17363,36 @@ boundary the adapter keeps -- no simulation state, no target coordinates -- is u
 is still physical input over a fixed window.
 
 **Reverse cost:** one field, three functions in the bridge, six lines in the seat.
+
+## D0421 · 2026-09-06 · The first stranger's run: a held button that does nothing says so, the ring is the pointer, the trunk not the leaves
+
+**The run:** a fresh-context agent played the opening through the screen-led adapter with no source, no
+coordinates and no coaching (`docs/playtests/2026-09-06_stranger1.md`): first ore at 10.7 s of game time
+after three fruitless LMB holds from a step too far; first ingots at 26.1 s; a sapling cut for wood at
+35.5 s and mistaken for it; the deep and the grapple lesson at burst 44 of 44. Verdict: would keep
+playing; the biggest obstacle was mining from a step too far with nothing on screen saying so.
+
+**Decided:** (1) `MineHold.refusal` names why a held MINE did nothing this tick -- `far` (rock past the
+reach), `sight` (rock between), `air` (nothing to dig and no marked cell) -- and rides the observation as
+`aim_refusal`. The mark reads it: the aim square goes to the refusal red at full weight with the bar
+struck across it, the SAME grammar the game already uses for standing in your own way, only while the
+button is held; a pointer merely resting past the reach keeps its faint chrome. The WHY docks as a
+lesson (`Hints` `too_far`, after a third of a second of the refusal, once), never as text on the miner
+(D0413's rule). (2) The first three rungs re-worded: the ring is the pointer -- "Stand by the RINGED
+silver-flecked rock at your feet, point at it and hold [MINE]" -- with no compass word, because "two
+steps to your LEFT" was read as a walking instruction and taken away from the rock; the forge is "the
+RINGED forge"; wood is "a tree's brown TRUNK, not its leaves", because the leaves gave a sapling the
+player took for wood. (3) The lode tooltip keeps its key word ("57% to the next unit" was cut at "uni").
+
+**Pinned:** `test_interface` (the refusal on the observation through the door, cleared on release),
+`test_mark_painter` (the red square and bar while held past the reach; the resting pointer draws no bar;
+`air` on nothing; nothing in reach), `test_hints` (TOO FAR at the twentieth tick, not the nineteenth).
+
+**Named, not done:** the unlabelled hotbar slot (T029); the horizon silhouette floating where the near
+ground dips, and a godray beside a natural dip (V-queue); one run of one agent is one sample -- the second
+run after these fixes is their test.
+
+**Why:** the review's first recommendation was an unfamiliar player observed without coaching; the
+adapter made one possible, and its first three hesitations were each a field the game already knew.
+
+**Reverse cost:** one StringName on the hold and the observation; three sentences; one tooltip.

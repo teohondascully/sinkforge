@@ -371,3 +371,13 @@ on a straight warp; a face can read as ruled paper. **Where:** `RockTone.lamina`
 `shell/main.gd:new_game`, `Main.SEED`. Design: the director's.
 
 Acknowledged across both catalogues: 73 entries; executed in this round 17, re-judged 3, recognised 14.
+
+### V74 · The horizon silhouette floats where the near ground dips
+**What:** the sky painter's distant ridge is drawn at the surface datum; where the near terrain drops below
+it the line runs across open sky at the miner's feet and reads as a wire (stranger 1, frame 38, D0421).
+**Where:** `view/visuals/sky_painter.gd` (the horizon). Parallax or occlusion by the near surface.
+### V75 · A godray beside a natural dip
+**What:** a column whose surface is lower than its neighbours gets a beam even when the dip is the hill's
+own shape, not a dug shaft; a pale light in open air (stranger 1, frame 38). **Where:**
+`LightPainter._paint_godrays`, `godray()`: gate on the mouth being under an enclosing ceiling.
+

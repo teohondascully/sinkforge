@@ -289,6 +289,8 @@ var map_seen_recent: PackedInt32Array = PackedInt32Array()   # the indices the l
 var terrain_version: int = 0
 var map_machines: Array[Vector2i] = []
 var aim_is_lode: bool = false
+## Why a held MINE did nothing this tick (D0421): &"" / &"far" / &"sight" / &"air". See `MineHold.refusal`.
+var aim_refusal: StringName = &""
 ## The aim's affordances (6m, D0376), from the verbs' own predicates (`AimPlanes.fill`): what is held,
 ## whether the build press would land, which mouth a drop would feed, the nearest open cell while you
 ## stand in your own way, how far a rope would unroll, what a drill would bore.
