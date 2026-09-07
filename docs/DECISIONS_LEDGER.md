@@ -17325,3 +17325,22 @@ GPU timer (Xcode's Metal frame capture or the Metal HUD) on a machine doing noth
 honest result is a candidate and an instrument limit, not a name.
 
 **Reverse cost:** the flag and the switch are twenty lines; the shader change is one hint and three calls.
+
+## D0419 · 2026-09-06 · The playtest adapter's pointer is the seat's own, posed; vsync off so an unwatched window still runs
+
+**Decided:** two defects in the screen-led playtest adapter (3a6d0d54, the other session's handoff), each
+fixed with its failing test first. (1) The bridge pushed mouse motion into the viewport; a pushed event
+never moves `Viewport.get_mouse_position()`, and in a HEADED window that position is the operating
+system's cursor anyway, so the seat aimed where the tester's own hand was and every LMB burst mined
+nothing. The bridge now poses the seat's pointer (`Controls.pose_pointer`, the scripted hand's hook the
+`--act` captures already use) at the named viewport pixel through the canvas transform, and parses the
+motion through the Input singleton. The player still names a screen pixel; the system cursor is never
+touched, which the director requires while working on the same machine. (2) With vsync on, a window off
+the active Space waits on a display it cannot present to: a two-tick burst answered in 35 s, then never.
+`--disable-vsync` on the launch line; a 150-tick burst answers in 3 s. `command.py` waits 120 s, not 30.
+Verified end to end: one LMB burst on the ringed rock completes "Mine 4 ore".
+
+**Why:** a stranger driven through a broken actuator reports the actuator; the driver must be screened
+before the subject is judged.
+
+**Reverse cost:** two lines in the bridge, one flag.
