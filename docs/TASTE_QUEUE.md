@@ -284,7 +284,8 @@ is solid earth you carve into, and the only sentence that says so is the fourth 
 [MINE]") fired when the first rung is done and the body has crossed the pad without digging; or the
 first rung's own how-to naming the floor as rock; or leave it to the fourth rung and accept the walk.*
 
-**T038 · "Spawn" is a word the player does not have.** The fourth rung's how-to says "The crew's drill lies
+**T038 · "Spawn" is a word the player does not have.** *TAKEN provisionally (D0451): "buried in the WHITE
+RING, right of where you began"; the outline-on-the-surface and moved-pile answers stay open.* The fourth rung's how-to says "The crew's drill lies
 under the ground RIGHT of spawn -- dig down to it"; stranger 22, three rungs done in 41 s, stopped there:
 "I couldn't determine what spawn meant." The drill's ring is on the pile three metres down, under rock.
 *Question: "to the RIGHT of where you began", or the dig spot itself marked on the surface above the pile

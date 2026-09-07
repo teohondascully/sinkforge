@@ -18115,3 +18115,17 @@ forty bursts went to placing one. The card now says "hold to cut it, or stand a 
 veteran's sentence, or answers a miss with a tick and no correction, loses a player who did the reading.
 
 **Reverse cost:** one moment row and one function; four words on a card.
+
+## D0451 · 2026-09-06 · The fourth rung names the ring, not "spawn" (T038 taken provisionally)
+
+**Decided:** the BUILD how-to said "under the ground RIGHT of spawn"; stranger 22, three rungs done in 41 s,
+stopped on the word ("I couldn't determine what spawn meant"). The ring already stands on the drill pile
+three metres down (`_nearest_pile`, the one pile holding a drill), so the sentence uses the marker the
+first two rungs taught: "lies buried in the WHITE RING, right of where you began". The HOPPER rung's
+"under the spawn" is "under where you began". T038's other two answers (a second outline on the surface
+above the pile; the pile moved up under the adit floor) stay open: the wording is the cheap rung, and the
+next stranger who reaches BUILD says whether it was enough.
+
+**Why:** a stranger who did everything right lost the run to a developer's word.
+
+**Reverse cost:** two labels.
