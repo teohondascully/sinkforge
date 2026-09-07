@@ -110,6 +110,9 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	var font: Font = ThemeDB.fallback_font
 	var depth: Dictionary = DepthChip.layout(frame, font)
 	var corner_w: float = (depth["chip"] as Rect2).size.x if not depth.is_empty() else 0.0
+	# The corner map is a chart that fills its box now (D0430), the wider of the two corner chips.
+	if frame.obs.map_cells.x > 0 and frame.obs.map_cells.y > 0:
+		corner_w = maxf(corner_w, Minimap.frame_rect(frame.obs.map_cells, false).size.x)
 	var l: Dictionary = layout(objectives, font, corner_w)
 	if l.is_empty():
 		return
@@ -132,6 +135,22 @@ static func wrap_howto(font: Font, text: String, size: int, max_w: float) -> Pac
 	if text == "":
 		return out
 	var words: PackedStringArray = text.split(" ", false)
+	if font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= max_w:
+		out.append(text)
+		return out
+	# Two lines that both fit: the split that leaves them most even, so no line is a single orphaned word.
+	var best: int = -1
+	var best_w: float = INF
+	for i: int in range(1, words.size()):
+		var a: float = font.get_string_size(" ".join(words.slice(0, i)), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var b: float = font.get_string_size(" ".join(words.slice(i)), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		if a <= max_w and b <= max_w and maxf(a, b) < best_w:
+			best_w = maxf(a, b)
+			best = i
+	if best > 0 and HOWTO_LINES >= 2:
+		out.append(" ".join(words.slice(0, best)))
+		out.append(" ".join(words.slice(best)))
+		return out
 	var line: String = ""
 	var i: int = 0
 	while i < words.size() and out.size() < HOWTO_LINES - 1:

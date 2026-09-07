@@ -357,7 +357,7 @@ pins encoded legacy's silence, and I never ran the suite that enumerated the rul
 and the meter's lambdas on the `RenderingServer` signals crashed Godot at exit on every perf run until the
 seat node forwarded them (in D0414).
 
-### Astra's audit order, taken (2026-09-06; D0416–D0428, on main)
+### Astra's audit order, taken (2026-09-06; D0416–D0430, on main)
 
 **The audit (D0416)** tightened three conclusions -- the opening completes through first automation, not
 "end to end"; the GPU is a working hypothesis; the water fix at the warp may be avoided, not repaired --
@@ -398,7 +398,9 @@ twenty-five DROPs from 5 m and then from 50 m down the chimney, with the ring an
 whole surface span. Fixed: the ring holds at a floor for the rung's life; the first floor-landing drop
 docks DROPPED. **Astra's item 5 (D0427):** the lamp is occluded by the rock it crosses (a shader march,
 `VeilOcclusion.K` 0.5, `--lamp-occlusion=K` the dial); captures at 46 m show light on faces and dark mass;
-cost inside the noise on this machine. T031's mechanism named: the chimney at +14 m is the keepout clamp.
+cost inside the noise on this machine. T031's mechanism named: the chimney at +14 m is the keepout clamp. **Rank 9 (D0430):** the corner map is
+a local chart (the world's width by 48 m, scrolling) in a 128 x 96 box; the banner yields to it; the
+two-line how-to is balanced. **D0426 executed (D0429).**
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -426,7 +428,7 @@ T031 (the chimney at +14 m has taken three of five strangers; the mechanism is t
 at zero; the forks T024-T030.
 
 **Cheap next steps that need no ruling:** a sixth stranger to finally play the wood rung with the tree in
-place; the other sources (torches, machines) occluded the way the lamp is; rank 9 (the map's corner
-view, V34); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
+place; the other sources (torches, machines) occluded the way the lamp is; the large map as a wider
+window; the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
 instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
 bake (V32).

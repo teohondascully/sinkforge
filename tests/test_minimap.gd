@@ -35,8 +35,17 @@ func _test_the_frame_fits_the_aspect() -> void:
 	var small: Rect2 = Minimap.frame_rect(Vector2i(40, 30), false)
 	_check(small.size.x <= UiTheme.px(Minimap.MINI_W) + 0.01 and small.size.y <= UiTheme.px(Minimap.MINI_H) + 0.01, "the corner form fits its box (%s)" % str(small))
 	_check(is_equal_approx(small.end.x, UiTheme.CANVAS.x - UiTheme.px(Minimap.MARGIN_RIGHT)) and is_equal_approx(small.position.y, UiTheme.px(Minimap.MINI_TOP)), "top-right at legacy's margin")
+	# THE CORNER IS A LOCAL CHART (D0430 reversed the whole-world corner): a deep shaft world fills the box
+	# with a window of its own width and about fifty metres of its height, not a sliver of the whole.
 	var tall: Rect2 = Minimap.frame_rect(Vector2i(20, 200), false)
-	_check(is_equal_approx(tall.size.y, UiTheme.px(Minimap.MINI_H)) and tall.size.x < tall.size.y, "a deep shaft is height-bound in the corner, not a slab")
+	_check(is_equal_approx(tall.size.x, UiTheme.px(Minimap.MINI_W)) and is_equal_approx(tall.size.y, UiTheme.px(Minimap.MINI_H)), "a deep shaft world fills the corner box: a window, not a sliver (%s)" % str(tall))
+	var win: Rect2 = Minimap.corner_window(Vector2i(64, 300), Vector2(32.0, 150.0))
+	_check(is_equal_approx(win.size.x, 64.0) and absf(win.size.y - 64.0 * Minimap.MINI_H / Minimap.MINI_W) < 0.01 and is_equal_approx(win.get_center().y, 150.0), "the window is the world's width by the box's aspect, centred on the body (%s)" % str(win))
+	var top: Rect2 = Minimap.corner_window(Vector2i(64, 300), Vector2(32.0, 2.0))
+	var bottom: Rect2 = Minimap.corner_window(Vector2i(64, 300), Vector2(32.0, 299.0))
+	_check(top.position.y == 0.0 and is_equal_approx(bottom.end.y, 300.0), "clamped inside the world at the top and the bottom")
+	var wide: Rect2 = Minimap.corner_window(Vector2i(200, 40), Vector2(10.0, 20.0))
+	_check(is_equal_approx(wide.size.x, Minimap.CORNER_SPAN_M) and wide.position.x == 0.0 and is_equal_approx(wide.size.y, 40.0), "a wide world shows CORNER_SPAN_M of width, clamped at the left edge, the whole of a short height")
 	var big: Rect2 = Minimap.frame_rect(Vector2i(40, 30), true)
 	_check(big.get_center().is_equal_approx(UiTheme.CANVAS * 0.5) and big.size.x > small.size.x, "the large form is centred and larger")
 
@@ -79,6 +88,20 @@ func _test_the_overlays_land_by_the_scale() -> void:
 	_check(dots.size() == 2 and (dots[0] as Vector2).is_equal_approx(rect.position) and (dots[1] as Vector2).x < rect.end.x, "machine dots at their cells")
 	var view: Rect2 = l["view"]
 	_check(view.position.is_equal_approx(rect.position) and is_equal_approx(view.size.x, rect.size.x * 0.25), "the visible window is a quarter of the width from the origin")
+	# A body low in a tall world: the corner window slides down with it and the dots outside it are dropped.
+	var deep: Frame = Frame.new()
+	deep.obs = _obs(Vector2i(64, 300))
+	deep.obs.pos_x = 32 * 16 * S
+	deep.obs.pos_y = 200 * 16 * S
+	deep.obs.map_machines = [Vector2i(30, 200), Vector2i(30, 10)]
+	deep.view_world_rect = Rect2(0.0, 0.0, 10.0 * 16.0, 5.0 * 16.0)
+	var dl: Dictionary = m.layout(deep)
+	var dw: Rect2 = dl["window"]
+	_check(is_equal_approx(dw.get_center().y, 200.0) and (dl["you"] as Vector2).is_equal_approx((dl["rect"] as Rect2).get_center()), "200 m down, the window is centred on the body and the body marks the map's centre")
+	_check((dl["dots"] as Array).size() == 1, "the machine 190 m above the window is not drawn; the one beside the body is (%d)" % (dl["dots"] as Array).size())
+	m.large = true
+	_check((m.layout(deep)["dots"] as Array).size() == 2 and (m.layout(deep)["window"] as Rect2).size == Vector2(64.0, 300.0), "the large form is still the whole world with every machine")
+	m.large = false
 	m.shown = false
 	_check(m.layout(f).is_empty(), "hidden: nothing")
 	m.shown = true

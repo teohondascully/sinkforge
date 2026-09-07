@@ -20,8 +20,15 @@ extends RefCounted
 ## before it is asked. The director's ruling (T015): ore the player has already been near shows, ore they
 ## have not paints as the rock it sits in. `Observation.map_seen` is that memory (`SeenPlane`).
 
-const MINI_W: float = 150.0
-const MINI_H: float = 116.0
+const MINI_W: float = 128.0   ## D0430: 150 x 116 held a sliver; a chart that fills its box is trimmed to 4:3
+const MINI_H: float = 96.0
+## THE CORNER FORM IS A LOCAL CHART (D0430, Astra's rank 9, V34). Legacy fitted the WHOLE world into the
+## corner box; on a 64 m by 300 m shaft world that is a 24 px sliver, "a colour bar" (V34), and every
+## stranger's frames show it unread. The corner now shows a window: up to CORNER_SPAN_M metres of the
+## world's width at the box's full width, and as many metres of height as the box holds at that scale
+## (about 50 m at 64 m wide), centred on the body and clamped to the world's edges, so it scrolls with the
+## descent. The large form (the map key) is still the whole world.
+const CORNER_SPAN_M: float = 64.0
 const MINI_TOP: float = 34.0
 const MARGIN_RIGHT: float = 12.0
 const LARGE_BOX := Vector2(360.0, 272.0)
@@ -60,8 +67,19 @@ static func frame_rect(map_cells: Vector2i, is_large: bool) -> Rect2:
 	if is_large:
 		var big: Vector2 = fit(world, LARGE_BOX * UiTheme.UI_SCALE)
 		return Rect2((UiTheme.CANVAS - big) * 0.5, big)
-	var small: Vector2 = fit(world, Vector2(UiTheme.px(MINI_W), UiTheme.px(MINI_H)))
+	var small: Vector2 = fit(corner_window(map_cells, Vector2.ZERO).size, Vector2(UiTheme.px(MINI_W), UiTheme.px(MINI_H)))
 	return Rect2(Vector2(UiTheme.CANVAS.x - small.x - UiTheme.px(MARGIN_RIGHT), UiTheme.px(MINI_TOP)), small)
+
+
+## The corner's window over the world, in logic cells: the lesser of the world's width and CORNER_SPAN_M
+## wide, the box's height's worth at that scale tall (never more than the world), centred on `body`
+## (logic cells) and clamped inside the world. The large form's window is the whole world.
+static func corner_window(map_cells: Vector2i, body: Vector2) -> Rect2:
+	var world := Vector2(float(map_cells.x), float(map_cells.y))
+	var w: float = minf(world.x, CORNER_SPAN_M)
+	var h: float = minf(world.y, w * MINI_H / MINI_W)
+	var origin := Vector2(clampf(body.x - w * 0.5, 0.0, world.x - w), clampf(body.y - h * 0.5, 0.0, world.y - h))
+	return Rect2(origin, Vector2(w, h))
 
 
 ## The colour of one coarse class at one logic row, off the palette's band ladder. ORE PAINTS ONLY WHEN
@@ -122,15 +140,17 @@ func layout(frame: Frame) -> Dictionary:
 	if o.map_cells.x <= 0 or o.map_cells.y <= 0:
 		return {}
 	var rect: Rect2 = frame_rect(o.map_cells, large)
-	var scale := Vector2(rect.size.x / float(o.map_cells.x), rect.size.y / float(o.map_cells.y))
 	var px_per_logic: float = float(Interface.Observation.LOGIC_PX)
 	var body := Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE) / px_per_logic
+	var window: Rect2 = Rect2(Vector2.ZERO, Vector2(o.map_cells)) if large else corner_window(o.map_cells, body)
+	var scale := Vector2(rect.size.x / window.size.x, rect.size.y / window.size.y)
 	var view: Rect2 = frame.view_world_rect
-	var view_rect := Rect2(rect.position + view.position / px_per_logic * scale, view.size / px_per_logic * scale)
+	var view_rect := Rect2(rect.position + (view.position / px_per_logic - window.position) * scale, view.size / px_per_logic * scale)
 	var dots: Array[Vector2] = []
 	for cell: Vector2i in o.map_machines:
-		dots.append(rect.position + Vector2(cell) * scale)
-	return {"rect": rect, "scale": scale, "you": rect.position + body * scale,
+		if window.has_point(Vector2(cell) + Vector2(0.5, 0.5)):
+			dots.append(rect.position + (Vector2(cell) - window.position) * scale)
+	return {"rect": rect, "scale": scale, "window": window, "you": rect.position + (body - window.position) * scale,
 		"view": view_rect.intersection(rect) if view.size.x > 0.0 else Rect2(), "dots": dots,
 		"dot": Vector2(maxf(scale.x, 2.0), maxf(scale.y, 2.0)), "large": large}
 
@@ -147,7 +167,7 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	UiTheme.panel(ci, rect.grow(UiTheme.px(3.0)))
 	var tex: ImageTexture = ensure_texture(frame.obs, frame.look)
 	if tex != null:
-		ci.draw_texture_rect(tex, rect, false)
+		ci.draw_texture_rect_region(tex, rect, l["window"])   # one texel per logic cell: the window IS the region
 	for d: Vector2 in l["dots"]:
 		ci.draw_rect(Rect2(d, l["dot"]), UiTheme.UI_ACCENT)
 	var view: Rect2 = l["view"]

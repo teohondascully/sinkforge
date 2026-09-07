@@ -17659,3 +17659,28 @@ tag kept. D0419's and D0426's hash references stay as written; this entry is the
 **Why:** the personal address was public in fourteen commits and the authorship job blocked every green.
 
 **Reverse cost:** none worth taking; the old commits are the same trees under the wrong name.
+
+## D0430 · 2026-09-06 · The corner map is a local chart, not the whole world in a sliver (Astra's rank 9, V34)
+
+**Decided:** legacy fitted the whole world into the corner box; on this 64 m by 300 m shaft world that
+was a 24 px sliver, "a colour bar" (V34), unread in every stranger's frames. `Minimap.corner_window`
+shows a window instead: the lesser of the world's width and `CORNER_SPAN_M` (64 m) at the box's full
+width, the box's height's worth at that scale (48 m at 64 m wide), centred on the body and clamped
+inside the world, drawn with `draw_texture_rect_region` off the same one-texel-per-metre image; machine
+dots outside the window are dropped; the large form (the map key) is still the whole world. The box is
+trimmed 150 x 116 -> 128 x 96 authored (4:3), and the objective banner now yields to the wider of the two
+corner chips -- the map at 256 canvas px, not the depth chip -- so it wraps its how-to rather than run
+under the map. The two-line wrap is balanced (the even split, so "LMB" is not an orphan). One pin
+reversed with its reason: "a deep shaft is height-bound in the corner, not a slab" encoded the sliver.
+
+**Seen:** `tests/body/recordings/round15_2026-09-06/map/` -- at spawn the pad, the tree, the forge pocket
+and the chimney at +14 m read on the chart at 4 canvas px a metre; at 46 m the band, the seen ore and the
+voids; the large form unchanged.
+
+**Not done:** the large form is the whole world and so is itself a sliver at this aspect; a large form
+that is a wider window (the world's width by a screen's worth of height) is the next step if the key is
+to be a chart and not a ruler.
+
+**Why:** a map a stranger cannot read is a chip spending screen for nothing; the same box holds a chart.
+
+**Reverse cost:** one static function and one region draw.

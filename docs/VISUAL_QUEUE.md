@@ -217,6 +217,9 @@ port draws a flat 6. Needs the deposit plane readable from the bake.
 ### V34 · The minimap corner form is a thin sliver
 **What:** 24 px wide for a 64 m world, 300 px tall; unreadable as a map, reads as a colour bar.
 **Where:** `minimap.gd` (corner size), `ViewStack._mount_hud`.
+**Executed 2026-09-06 (D0430):** the corner is a local chart -- the world's width by 48 m, centred on the
+body, scrolling -- in a 128 x 96 box; the banner yields to it. The large form is still the whole world
+and so still a sliver at this aspect (named, not done).
 
 ### V35 · The overview zoom frames void
 **What:** at the 0.66 rung the 64 m world is a column with void either side (r19-r22); the default is
