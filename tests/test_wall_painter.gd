@@ -24,6 +24,7 @@ func _initialize() -> void:
 	_test_solid_cells_and_open_sky_are_both_left_alone()
 	_test_an_incomplete_frame_paints_nothing()
 	_test_the_wall_sits_between_the_sky_and_the_terrain()
+	_test_the_wall_is_stamped_one_level_below_solid()
 	_finish("wall_painter")
 
 
@@ -87,10 +88,14 @@ func _test_the_wall_reads_as_a_plane_behind_the_rock_not_as_the_rock() -> void:
 	_check(other != back,
 		"two materials still paint two different walls (%s vs %s) -- the recess tones the rock, it does "
 		% [back, other] + "not replace it")
-	# And the per-cell grain survives the tone, or a wall of one material is a flat slab of one colour.
-	_check(WallPainter.wall_color(look, &"clay", col + 1, row) != back
-			or WallPainter.wall_color(look, &"clay", col, row + 1) != back,
-		"and the wall keeps the per-cell grain the foreground has, rather than flattening to one value")
+	# REVERSED (D0422, rank 7): the wall used to keep the face's per-cell bedding tone, and a blind judge
+	# read the back of every cavity in the opening frame as "striped solid earth". Legacy's own word for the
+	# wall is FLATTER: the same rock a plane back, no laminae. Along a row the wall is one value; down a
+	# column it still darkens with depth, so the plane is flat, not dead.
+	_check(WallPainter.wall_color(look, &"clay", col + 1, row) == back,
+		"the wall is flat along a row: no bedding tone a plane back (%s vs %s)" % [WallPainter.wall_color(look, &"clay", col + 1, row), back])
+	_check(_luma(WallPainter.wall_color(look, &"clay", col, 300)) < _luma(WallPainter.wall_color(look, &"clay", col, 100)),
+		"and still darkens with depth down a column (5 m vs 55 m), so it is a plane and not a dead slab")
 
 
 ## Legacy's three constants exist to be told apart on screen: the key light comes from above, so a wall
@@ -273,3 +278,15 @@ func _test_the_wall_sits_between_the_sky_and_the_terrain() -> void:
 		% [ViewStack.WALL_Z, ViewStack.TERRAIN_Z])
 	_check(ViewStack.BACKDROP_Z < ViewStack.WALL_Z,
 		"and the backdrop is still below both (%d)" % ViewStack.BACKDROP_Z)
+
+
+## D0422 (rank 7): the tooth and the grit pass tell rock from wall by `step(0.998, alpha)`. The wall is
+## drawn ONCE with its cast composed in, at 254/255 -- legacy's VOID_ALPHA -- so the alpha is exact and
+## under the threshold; two blended draws landed it at 1.0 and grained every cave's back like a face.
+func _test_the_wall_is_stamped_one_level_below_solid() -> void:
+	var tone := Color(0.4, 0.3, 0.2, 1.0)
+	var flat: Color = WallPainter.stamped(tone, 0.0)
+	var cast: Color = WallPainter.stamped(tone, 0.5)
+	_check(flat.a < 0.998 and is_equal_approx(flat.a, 254.0 / 255.0), "the stamp's alpha is one level below solid (%.5f)" % flat.a)
+	_check(is_equal_approx(flat.r, 0.4) and is_equal_approx(cast.r, 0.2) and is_equal_approx(cast.a, flat.a), "the cast darkens the tone in the same stamp and leaves the alpha alone (%.2f -> %.2f)" % [flat.r, cast.r])
+	_check(WallPainter.stamped(tone, 1.5).r == 0.0 and WallPainter.stamped(tone, -1.0).r == flat.r, "the cast is clamped to 0..1")

@@ -98,10 +98,26 @@ static func wall_color(look: MaterialLook, material: StringName, col: int, row: 
 ## The wall's rock with no mark on it: what an OPENED LODE's cell is baked as, so the live pass can draw
 ## the metal left in it on top (`OrePainter.paint_lode`, D0374) and let it thin as the lode drains. The
 ## bake cannot see a drain -- only a dig rebakes a chunk -- so the metal is legacy's live pass again.
-static func socket_color(look: MaterialLook, material: StringName, col: int, row: int) -> Color:
+static func socket_color(look: MaterialLook, material: StringName, _col: int, row: int) -> Color:
 	if look == null:
 		return COOL
-	return look.matrix_color(material, col, row).darkened(RECESS).lerp(COOL, COOL_MIX)
+	# Flat (D0422): no bedding tone a plane back -- the laminae are the face's; the wall is the rock behind it.
+	return look.flat_color(material, row).darkened(RECESS).lerp(COOL, COOL_MIX)
+
+
+## THE WALL IS STAMPED ONE ALPHA LEVEL BELOW SOLID (D0422; legacy's `VOID_ALPHA` 254, the follow-up D0379
+## recorded rather than faked). The tooth and the grit pass read the bake's alpha with `step(0.998, a)` to
+## tooth the rock and not the wall; this build BLENDED the wall's tone and then its cast shadow in two
+## draws, so a wall cell's alpha landed at 1.0 and the back of every cave carried the same anisotropic
+## grain as a rock face -- a blind judge read all three cavity spots of the opening frame as "striped
+## solid earth" (rank 7). The cast is composed here and the cell drawn ONCE at 254/255, so the alpha is
+## exact and the two passes above the veil can tell a face from what stands a plane behind it.
+const WALL_ALPHA: float = 254.0 / 255.0
+
+
+static func stamped(tone: Color, ao: float) -> Color:
+	var k: float = 1.0 - clampf(ao, 0.0, 1.0)
+	return Color(tone.r * k, tone.g * k, tone.b * k, WALL_ALPHA)
 
 
 ## How dark the cast is on one wall cell, in 0..1. Split out of `paint` and returned as a number for the
@@ -162,7 +178,4 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 				continue
 			var box := Rect2(col * cell_px, row * cell_px, cell_px, cell_px)
 			var tone: Color = socket_color(frame.look, wall, col, row) if frame.obs.lodes.has(c) else wall_color(frame.look, wall, col, row)
-			ci.draw_rect(box, tone, true)
-			var ao: float = ao_alpha(frame.obs, c)
-			if ao > 0.0:
-				ci.draw_rect(box, Color(0.0, 0.0, 0.0, ao), true)
+			ci.draw_rect(box, stamped(tone, ao_alpha(frame.obs, c)), true)

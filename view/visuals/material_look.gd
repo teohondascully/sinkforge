@@ -165,6 +165,16 @@ func matrix_color(material: StringName, col: int, row: int) -> Color:
 	return BeddingTone.apply_tone(base, BeddingTone.cell_tone(col, row, country_rock, grammar_of(material)))
 
 
+## The rock's colour with NO bedding tone on it: base, depth-darkened, nothing per cell. The back wall
+## takes this (D0422, rank 7): the laminae are what a FACE wears, and a wall wearing the same stripes a
+## plane back read to a blind judge as "striped solid earth". Flatter is legacy's own word for the wall.
+func flat_color(material: StringName, row: int) -> Color:
+	var rec: Dictionary = MaterialsRecords.RECORDS.get(material, {})
+	if rec.is_empty() or not rec.has("base_color"):
+		return Color(0.42, 0.34, 0.24)
+	return _depth_darkened(_to_color(rec["base_color"]), rec, row)
+
+
 ## THE MATERIAL'S TEXTURE GRAMMAR, as a `RockTone.GRAM_*` index. Reads the `grammar:` field that
 ## `data/materials/*.yaml` has carried since Slice 0 and that **nothing has read until now** — the same
 ## shape as the depth chip before D0271, where the data was entirely present and only the consumer was
