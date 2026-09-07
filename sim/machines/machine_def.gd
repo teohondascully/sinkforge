@@ -22,6 +22,7 @@ var id: StringName = &""
 var display_name: String = ""
 var behavior: StringName = &""   # legacy's routing/look tag; empty = the default recipe-runner
 var recipe: RecipeDef = null     # null = runs no recipe
+var intake: StringName = &"pass" # pass | jam: what a recipe-runner does with an item its recipe does not want (D0490)
 
 var throughput: int = 0
 var powered_throughput: int = 0
@@ -70,5 +71,6 @@ func _read(record: Dictionary) -> void:
 	behavior = StringName(String(record.get("behavior", "")))
 	var recipe_id: String = String(record.get("recipe", ""))
 	recipe = RecipeDef.of(StringName(recipe_id)) if not recipe_id.is_empty() else null
+	intake = StringName(String(record.get("intake", "pass")))
 	for p: StringName in PARAMS:
 		set(p, int(record.get(String(p), 0)))

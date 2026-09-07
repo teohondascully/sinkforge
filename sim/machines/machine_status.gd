@@ -24,6 +24,8 @@ static func of(m: MachineState, world: World, machines: Machines) -> StringName:
 	var recipe: RecipeDef = m.def.recipe
 	if recipe == null:
 		return &"idle"
+	if Runners.jammed(m, recipe):
+		return &"blocked"                     # a `jam` intake holding what the recipe does not want (D0490)
 	return &"working" if Runners.has_inputs(m, recipe) else &"no_input"
 
 

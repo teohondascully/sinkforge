@@ -22,7 +22,42 @@ func _initialize() -> void:
 	_test_no_record_carries_a_craft_field()
 	_test_def_readings_are_cached_flyweights()
 	_test_machine_state_defaults_and_the_two_integer_rows()
+	_test_the_intake_rule_is_a_field_pass_by_default_and_jam_holds()
 	_finish("machine_defs")
+
+
+## D0490: the intake rule is a field of the record. Every shipped record reads `pass` (legacy's rule); a
+## def posed to `jam` holds a foreign item in its intake, runs nothing, reads `blocked`, and runs again
+## the tick the item is taken out. The control: the same feed under `pass` drops the clay through and
+## smelts.
+func _test_the_intake_rule_is_a_field_pass_by_default_and_jam_holds() -> void:
+	var passes: int = 0
+	for id: StringName in MachineDef.ids():
+		passes += 1 if MachineDef.of(id).intake == &"pass" else 0
+	_check(passes == MachineDef.ids().size(), "every shipped record's intake is pass (%d of %d): jam is a data diff away" % [passes, MachineDef.ids().size()])
+	for rule: StringName in [&"pass", &"jam"]:
+		var items: Items = _hub_items(16, 16)
+		var machines: Machines = _hub_machines(items)
+		var def: MachineDef = MachineDef.new()
+		def._read({"id": "processor", "display_name": "Forge", "recipe": "smelt_ingot", "intake": String(rule)})
+		var forge: MachineState = machines.place(items.world, def, Vector2i(5, 6))
+		_feed_machine(items, Vector2i(5, 6), &"ore", 2)
+		_feed_machine(items, Vector2i(5, 6), &"coal", 1)
+		_feed_machine(items, Vector2i(5, 6), &"clay", 1)
+		for _i: int in 40:
+			HubTick.step(items.world, items, machines)
+		var made: int = int(items.total_produced.get(&"ingot", 0))
+		var status: StringName = MachineStatus.of(forge, items.world, machines)
+		if rule == &"pass":
+			_check(made == 1 and not forge.input_buffer.has(&"clay"), "pass: the clay fell through and the forge smelted (%d ingots, clay held %s)" % [made, forge.input_buffer.has(&"clay")])
+		else:
+			_check(made == 0 and int(forge.input_buffer.get(&"clay", 0)) == 1 and forge.progress_ticks == 0 and status == &"blocked", "jam: the clay stays in the intake, nothing runs, the status is blocked (%d ingots, %s)" % [made, status])
+			forge.input_buffer.erase(&"clay")                                   # cleared by hand: the clay goes to the ground, not out of the world
+			items.piles.pile(Vector2i(5, 5))[&"clay"] = 1
+			for _i: int in 40:
+				HubTick.step(items.world, items, machines)
+			_check(int(items.total_produced.get(&"ingot", 0)) == 1, "...and the recipe runs once the intake is cleared (%d)" % int(items.total_produced.get(&"ingot", 0)))
+		_check(Invariants.check_item_conservation(items, 80) == null, "%s: the ledger balances" % rule)
 
 
 func _test_the_machine_population_is_exactly_the_lift_list() -> void:
@@ -114,7 +149,7 @@ func _test_no_record_carries_a_craft_field() -> void:
 	_check_over(records, clean == records, "no machine record carries craft_cost or craft_count (%d of %d clean); the schema forbids both and tools/schema_validator/test_schema_validator.py proves the refusal fires" % [clean, records])
 	var known: int = 0
 	var fields: int = 0
-	var schema_fields: Array = ["id", "display_name", "behavior", "recipe"]
+	var schema_fields: Array = ["id", "display_name", "behavior", "recipe", "intake"]
 	for p: StringName in MachineDef.PARAMS:
 		schema_fields.append(String(p))
 	for k: Variant in MachinesRecords.RECORDS:

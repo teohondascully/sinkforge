@@ -18870,3 +18870,24 @@ FLAT floor and the aim did not snap at all: from a body standing on a floor, the
 cell more than a few cells away grazes the nearer floor cells first, and `_nearest_visible` refuses an
 occluded cell (D0452). Legacy's rule, and why a stranger pointing along the ground gets TOO FAR where one
 pointing at a face gets the snap: the floor hides itself. The fixture is a pocket with a wall, as at the pad.
+
+## D0490 · 2026-09-07 · The intake rule is a field of the machine record: `pass` (shipped) or `jam`
+
+**Decided:** `data/machines/SCHEMA.yaml` gains `intake: pass | jam` for recipe-runners, read into
+`MachineDef.intake` (default `pass`). `pass` is the runner's behaviour since D0349: an item the recipe does
+not want moves to the output and falls on down the column. `jam` (`Runners.jammed`) holds it in the intake
+and runs nothing until it is taken out; the status reads `blocked` (the existing look: the clear mark). No
+shipped record sets it; the forge runs `pass`. The director's item 3 asked for the intake rule as a flag so
+the choice is a data diff; the spec-deviation audit named the pass-through as fixture behaviour, and D0482
+left it provisional.
+
+**Why a flag and not a choice:** the two rules are two games. Under `pass` a drill's mixed stream sorts
+itself down a stack and nothing needs tending; under `jam` an intake is a thing that fills with the wrong
+stuff and stops, which is the environment-as-antagonist thesis at the machine's mouth, and a reason to be
+there. The forge's rule is the director's; the flag makes the ruling a one-line diff with a suite behind it.
+
+**Verified:** `tests/test_machine_defs.gd` (41 asserted): every shipped record reads `pass`; a def posed to
+`jam` fed 2 ore, 1 coal, 1 clay makes nothing in 40 ticks, holds the clay, reads `blocked`, and smelts once
+the clay is taken out; the same feed under `pass` drops the clay and smelts; the ledger balances under both.
+The mutant that skips the jam check fails two. `test_machines` 113 and `test_looks` 29 unchanged; the
+schema validator passes with the field.

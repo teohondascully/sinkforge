@@ -84,10 +84,13 @@ static func _run_recipe(m: MachineState, items: Items) -> void:
 	var recipe: RecipeDef = m.def.recipe
 	if recipe == null:
 		return
-	# PASS-THROUGH: every machine is a filter for what its recipe WANTS; anything else moves through to
-	# the output and falls on down the column. A mixed drill stream therefore sorts itself down a machine
-	# stack (the forge keeps ore, the coal pours past into the generator below), and junk can never clog
-	# an input buffer. Conservation-neutral.
+	# THE INTAKE RULE (D0490), a field of the record. PASS: every machine is a filter for what its recipe
+	# WANTS; anything else moves through to the output and falls on down the column. A mixed drill stream
+	# therefore sorts itself down a machine stack (the forge keeps ore, the coal pours past into the
+	# generator below), and junk can never clog an input buffer. Conservation-neutral. JAM: the foreign item
+	# stays in the intake and nothing runs until the collect verb clears it -- the intake is a thing to tend.
+	if jammed(m, recipe):
+		return
 	for item: StringName in m.input_buffer.keys():
 		if not recipe.inputs.has(item):
 			m.output_buffer[item] = int(m.output_buffer.get(item, 0)) + int(m.input_buffer[item])
@@ -106,6 +109,16 @@ static func _run_recipe(m: MachineState, items: Items) -> void:
 		var n: int = int(recipe.outputs[item])
 		m.output_buffer[item] = int(m.output_buffer.get(item, 0)) + n
 		items.produced(item, n)
+
+
+## A `jam` intake holding an item the recipe does not want (D0490); a `pass` intake never jams.
+static func jammed(m: MachineState, recipe: RecipeDef) -> bool:
+	if m.def.intake != &"jam":
+		return false
+	for item: StringName in m.input_buffer:
+		if not recipe.inputs.has(item):
+			return true
+	return false
 
 
 static func has_inputs(m: MachineState, recipe: RecipeDef) -> bool:

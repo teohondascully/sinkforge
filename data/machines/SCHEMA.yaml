@@ -13,6 +13,11 @@ fields:
   behavior: {required: false, type: str}
   # A data/recipes id. Absent = runs no recipe (lift, pump, hopper, conduit, ...).
   recipe: {required: false, type: str}
+  # THE INTAKE RULE (D0490), recipe-runners only. `pass` (the default, legacy's): an item the recipe does
+  # not want moves through to the output and falls on down the column. `jam`: it stays in the intake and
+  # the recipe stops until it is cleared (the collect verb takes it). The director's item: which one the
+  # forge runs is a data diff, not a code change.
+  intake: {required: false, type: str}
 
   # --- per-type parameters, each only on the records that read it -----------------------------------
   throughput: {required: false, type: int}           # lift: items/tick unpowered (the brownout floor)
