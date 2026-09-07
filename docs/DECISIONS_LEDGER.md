@@ -17875,3 +17875,22 @@ game's quality.
 
 **Reverse cost:** one `_ranked`; the chevron block and two constants; one sentence; two seat constants;
 one constant and a reset; two hook lines and one file.
+
+## D0439 · 2026-09-06 · One round-trip a burst: the journal rides the command; the mission template tracked
+
+**Decided:** a stranger's burst cost three or four tool round-trips (send the command, read the frame,
+append the journal, sometimes read the mission again) for about 1.5 s of play -- roughly 20 s of wall a
+burst, a play-to-wall ratio near 1:13 over the last batch (`docs/audits/2026-09-06-update-for-codex.md`
+§10). `playtest/command.py --note "<entry>"` appends the entry to `JOURNAL.md` stamped with the burst's id
+and game time once the frame is back, so a burst is one call and one frame read. The mission text says so.
+The mission template, until now a scratch file, is `docs/playtests/MISSION_TEMPLATE.md` with its two
+substitutions and the three goals used so far, so the instrument is reproducible from the tree.
+
+**Not done:** the other rungs of §10 (downscaled frames, more seats, a scripted seat-driven stranger as a
+ceiling, a structured channel for a regression agent, a local fine-tuned tester) -- put to Codex and Astra
+as a question with costs, not built.
+
+**Why:** the director's observation that four hours produced little on the game side is correct, and the
+loop's latency, not the fixes, set the pace.
+
+**Reverse cost:** one optional argument; one file.
