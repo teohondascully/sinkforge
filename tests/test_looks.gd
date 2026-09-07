@@ -23,6 +23,7 @@ func _initialize() -> void:
 	_test_every_status_has_a_colour_and_a_mark_under_the_fix_rule()
 	_test_every_carried_item_has_a_colour_and_a_purpose()
 	_test_cold_iron_and_the_glyph_scale()
+	_test_a_carried_machine_wears_its_casing()
 	await _test_everything_draws_in_a_real_redraw()
 	_finish("looks")
 
@@ -161,6 +162,21 @@ func _test_cold_iron_and_the_glyph_scale() -> void:
 ## Every drawer runs inside a real draw pass: every machine kind at both states and both detail tiers,
 ## every status mark and fix glyph, every carried item. A missing member or a bad polygon is an engine
 ## ERROR the runner counts, which is what this exists to trip.
+## D0465 (stranger 44): a carried machine's colour is the casing it wears in the world, never the white
+## fallback, so the bar's slot and the ground pile read as the machine; the redraw test draws every one.
+func _test_a_carried_machine_wears_its_casing() -> void:
+	var wrong: Array = []
+	for id: String in MachinesRecords.RECORDS:
+		if ItemLook.COLORS.has(StringName(id)):
+			continue                                    # the rope and the torch have a look of their own
+		var rec: Dictionary = MachinesRecords.RECORDS[id]
+		var want: Color = MachineLook.color(StringName(rec.get("behavior", &"")), StringName(id), bool(rec.get("source", false)))
+		if ItemLook.color(StringName(id)) != want or want == Color.WHITE:
+			wrong.append(id)
+	_check(MachinesRecords.RECORDS.size() >= 8, "control: the machine population is real (%d records)" % MachinesRecords.RECORDS.size())
+	_check(wrong.is_empty(), "every machine item wears its world casing colour, never the white fallback (%s)" % [wrong])
+
+
 func _test_everything_draws_in_a_real_redraw() -> void:
 	var grid: TileGrid = _flat_grid(30, 40)
 	var view: WorldView = WorldView.new()
@@ -184,11 +200,14 @@ func _test_everything_draws_in_a_real_redraw() -> void:
 		for id: StringName in ids:
 			ItemLook.draw(ci, Vector2(float(i) * 24.0, 120.0), 20.0, id)
 			i += 1
+		for id: String in MachinesRecords.RECORDS:          # a carried machine's icon is its casing (D0465)
+			ItemLook.draw(ci, Vector2(float(i) * 24.0, 150.0), 20.0, StringName(id))
+			i += 1
 		drawn[0] = i)
 	await process_frame
 	view.refresh()
 	for _i: int in 3:
 		await process_frame
-	_check(int(drawn[0]) >= MachineGlyphs.KINDS.size() + StatusLook.LOOK.size() + ids.size(),
+	_check(int(drawn[0]) >= MachineGlyphs.KINDS.size() + StatusLook.LOOK.size() + ids.size() + MachinesRecords.RECORDS.size(),
 		"every kind, status and item drew to completion inside a real draw pass (%d draws)" % int(drawn[0]))
 	view.queue_free()

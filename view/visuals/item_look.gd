@@ -63,13 +63,17 @@ const PURPOSE: Dictionary = {
 }
 
 
-## A material's base colour off its record, or white for a thing that is neither material nor tabled.
+## A material's base colour off its record, a machine's casing colour (the same one it wears in the
+## world, D0465), or white for a thing that is none of these.
 static func color(item: StringName) -> Color:
 	if COLORS.has(item):
 		return COLORS[item]
 	var rec: Dictionary = MaterialsRecords.RECORDS.get(String(item), {})
 	if rec.has("base_color"):
 		return _rgb(rec["base_color"])
+	var machine: Dictionary = MachinesRecords.RECORDS.get(String(item), {})
+	if not machine.is_empty():
+		return MachineLook.color(StringName(machine.get("behavior", &"")), item, bool(machine.get("source", false)))
 	return Color.WHITE
 
 
@@ -131,7 +135,26 @@ static func draw(canvas: CanvasItem, center: Vector2, size: float, item: StringN
 			_block(canvas, center, size, color(item))
 			_seam(canvas, center, size, Color(0.87, 0.90, 1.0))
 		_:
-			_block(canvas, center, size, color(item))
+			if MachinesRecords.RECORDS.has(String(item)):
+				_machine(canvas, center, size, item)
+			else:
+				_block(canvas, center, size, color(item))
+
+
+## A carried machine is the machine: its casing and its kind's glyph at icon size, lit, so the drill in
+## slot six reads as the drill the objective names and not as a white block with a count (D0465,
+## stranger 44: five white squares in the bar, the drill among them, and the slot was never selected).
+static func _machine(canvas: CanvasItem, center: Vector2, size: float, item: StringName) -> void:
+	var rec: Dictionary = MachinesRecords.RECORDS[String(item)]
+	var behavior := StringName(rec.get("behavior", &""))   # the Forge (processor) carries none: the furnace kind by id
+	var source: bool = bool(rec.get("source", false))
+	var kind: String = MachineLook.kind(behavior, item, source)
+	var pos: Vector2 = center - Vector2(size, size) * 0.5
+	MachineLook.draw_casing(canvas, pos, size, MachineLook.color(behavior, item, source), true, false, kind)
+	var face: Rect2 = MachineLook.face(kind)
+	var face_px := Rect2(pos + face.position * size, face.size * size)
+	var glyph: float = MachineLook.glyph_cells_for(minf(face_px.size.x, face_px.size.y) * 0.9)
+	MachineGlyphs.draw(canvas, face_px.get_center(), kind, glyph, true, 0.0)
 
 
 ## Polygon helper: points as size-fractions from the centre (y+ down), filled with a crisp darker outline

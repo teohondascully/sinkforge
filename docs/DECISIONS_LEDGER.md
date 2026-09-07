@@ -18365,3 +18365,23 @@ The refusal has a lesson; the substitution had nothing.
 
 **Reverse cost:** one line (`tolerance` back to `REACH_PX_FX_NUM`) and the far pin. Provisional under the
 director's rule 11: the metre is a first value, not a measured one.
+
+## D0465 · 2026-09-07 · A carried machine's icon is its casing and glyph, not a white block
+
+**Decided:** `ItemLook.draw` fell through to a white `_block` for anything that was neither a material
+nor in its colour table, and every machine is neither: stranger 44 (the rung-4 variant), having dug to
+the crew's drill at 56.6 s and picked it up with the generator, hopper and both winch ends, carried five
+white squares in slots 6-0 (frame 47) and never selected one, though the objective line says "select it";
+the run ended with RMB pressed at five places, none with the drill in hand. A machine item now draws as
+the machine it becomes: `MachineLook.draw_casing` in the record's casing colour and `MachineGlyphs.draw`
+of its kind on the face, lit, at icon size; `ItemLook.color` gives a machine its casing colour, so the
+ground pile matches. The processor record carries no `behavior` (the furnace kind comes by id), read with
+a default. Pinned: every machine record's colour is its casing's and not white; the redraw test draws
+every machine icon. Checked by eye on a rendered sheet (scratchpad `icon_sheet.png`): the drill, the
+generator, the hopper, the winch ends and the Forge each read as a casing with their own glyph.
+
+**Why:** the slot is the only place the player meets the drill before placing it; a white square with a
+count says "a thing", and the objective's "select it" has nothing on the bar to point at. The world
+already knows what a drill looks like; the bar should say the same.
+
+**Reverse cost:** the `_machine` branch and the colour line.
