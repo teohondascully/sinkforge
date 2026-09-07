@@ -522,7 +522,14 @@ BUILD fired with no drill in hand and with clay; a hop taught HARD LANDING. **D0
 lesson at terminal speed. **D0472:** the BUILD refusal only with a machine in hand. **D0473:** TOO FAR
 DOWN for a far target two metres or more under the body ("dig at the WHITE SQUARE first"). The variant's
 tally: ten valid runs of twelve, the drill in hand 3, placed 1 (off the line), the ceiling 14.1 s.
-**Next: strangers 55-57 on the D0471-D0473 build.**
+**Strangers 55-57 (86ebbf60): 3 VALID, the drill in hand 0 of 3;** every press
+got its refusal or its cells and every lesson was the right one for its press; two bit near the square
+and walked off, two dropped the pack with Q "to the drill" (the smelt rung's verb). The variant over
+five batches: 13 valid of 15, the drill in hand 3, placed 1 (off the line), the ceiling 14.1 s. Six
+strangers ended in the sinkhole at dx +15 (a jump without a direction held does not leave it). **The variant
+loop ends here** (rule 13: the remaining failures have no game-side frame cause). **Next: strangers
+58-60 on the shipped seed, a fresh game, to re-measure the opening on the D0464+ build and read the
+forge's bubble question; then the wrap.**
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
