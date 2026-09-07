@@ -57,8 +57,21 @@ run to a third line and lost "press Q" to the ellipsis (CI's objective-line suit
 8c6fc9f4); three of six never found the coal seam (D0486 answers); one fed the rig. The next batch
 measures the fixed label and the seam ring together, after the next discoverability change.
 
-**For the director:** D2–D6's rewards (a data diff each); a machine's need-bubble while another is ringed
-(the rig asked for ingots during the smelt rung, the shaft forge during 67-69); the stride; the seam's size
-and colour (one black metre at +5 reads as shadow). **Verification cadence:** touched suites locally, gates
-once a push, the battery on CI. **Next:** the refusal slot (a short press's refusal seen on screen), the
-reticle-versus-effective-cell check, then D2 and the first rig reward beyond the drill.
+**The morning's three (D0488–D0490), against the director's list.** Item 2 is complete: the REFUSAL SLOT
+says the live refusal's headline (TOO FAR, NOTHING THERE, THAT IS A MACHINE...) on the dock from the press's
+first frame, 1.5 s after, on every press, unlatched, yielding to its own lesson (D0488; captured at tick 28
+and 70 with the new `--act=far`); the receipts leak was D0487; the RETICLE is pinned to the effective cell
+through the door and the mark layer on S61's geometry (D0489, no code change: S61's big square was the smelt
+rung's guide outline, the small chrome one stood on a broken vein cell). Item 3's flag: `intake: pass | jam`
+on the machine record, `pass` shipped, `jam` holds a foreign item and reads `blocked` (D0490). Item 3's
+elevated coal pocket is NOT built: hand-cutting yields into the pack, not a falling pile, so a coal cap over
+the forge would feed nothing; the falling route is the drill's stream (D0483). A finding on the way: from a
+body on a flat floor, floor cells a few metres off are occluded by the nearer floor (the grazing line of
+sight, D0452), which is why a pointer along the ground gets TOO FAR where one on a face gets the snap.
+
+**For the director:** the forge's intake rule (pass or jam: one line of `data/machines/processor.yaml`);
+D2–D6's rewards (a data diff each); a machine's need-bubble while another is ringed (the rig asked for
+ingots during the smelt rung); the stride; the seam's size and colour (one black metre at +5 reads as
+shadow). **Verification cadence:** touched suites locally, gates once a push, the battery on CI. **Next:**
+the six-seat batch on this head when the screen is free (it measures the label fix, the seam ring and the
+slot together), then D2's reward.
