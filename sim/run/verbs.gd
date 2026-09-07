@@ -119,7 +119,8 @@ func body_occupies(logic_cell: Vector2i) -> bool:
 func build(logic_cell: Vector2i) -> StringName:
 	last_build_refusal = &""
 	if not can_reach(logic_cell):
-		last_build_refusal = &"build_far"
+		if selected_machine_def() != null:
+			last_build_refusal = &"build_far"                          # only with a machine in hand to set there (D0472)
 		return &""
 	if machines.machine_at(logic_cell) != null:
 		return &"picked_up" if MachineVerbs.pickup_machine(items, machines, logic_cell) else &""

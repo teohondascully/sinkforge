@@ -25,6 +25,7 @@ const DEFS: Array[Dictionary] = [
 ## swing techniques so a player who is wading is told about the pump before being told how to swing.
 const MOMENTS: Array[Dictionary] = [
 	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
+	{"id": &"far_below", "text": "TOO FAR DOWN — what you point at lies under the ground, past your reach. Dig at the WHITE SQUARE first: the hole brings it into reach."},
 	{"id": &"cut_through", "text": "CUT THROUGH — the rock under the pointer is gone. Point at what is left of the WHITE SQUARE: a hole has to be a little wider than you before you drop in."},
 	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
 	{"id": &"build_far", "text": "TOO FAR — the ring is past your reach. Your reach is about a body length: step closer, then press [BUILD] on it."},

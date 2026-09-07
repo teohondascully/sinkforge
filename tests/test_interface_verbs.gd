@@ -114,12 +114,14 @@ func _short_drop_pins() -> void:
 ## placed nothing and said nothing. The refusal rides the observation's refusal channel, one observe wide.
 func _test_a_build_that_places_nothing_says_why() -> void:
 	_rig()
+	var empty: Interface.Result = iface.apply(Command.build(Vector2i(12, 9)))
+	_check(not empty.ok and _oracle().aim_refusal == &"", "control: RMB far off with nothing in hand is not a refusal to teach (D0472: two strangers took the ring's TOO FAR as the way in, with no drill yet)")
 	items.pack.add(&"hopper", 1)
 	items.produced(&"hopper", 1)
 	iface.apply(Command.select(0))
 	var r: Interface.Result = iface.apply(Command.build(Vector2i(12, 9)))
 	var o: Interface.Observation = _oracle()
-	_check(not r.ok and o.aim_refusal == &"build_far", "a BUILD seven metres off places nothing and the observation says build_far (%s)" % o.aim_refusal)
+	_check(not r.ok and o.aim_refusal == &"build_far", "a BUILD seven metres off with a machine in hand places nothing and the observation says build_far (%s)" % o.aim_refusal)
 	_check(_oracle().aim_refusal == &"", "...for one observe only (%s)" % _oracle().aim_refusal)
 	r = iface.apply(Command.build(Vector2i(5, 8)))
 	o = _oracle()
@@ -127,6 +129,10 @@ func _test_a_build_that_places_nothing_says_why() -> void:
 	r = iface.apply(Command.build(Vector2i(6, 9)))
 	o = _oracle()
 	_check(r.ok and o.aim_refusal == &"" and machines.count() == 1, "control: a placement beside the body carries no refusal (%s)" % o.aim_refusal)
+	items.pack.add(&"clay", 3)
+	items.produced(&"clay", 3)
+	iface.apply(Command.select(0))
+	_check(not iface.apply(Command.build(Vector2i(12, 9))).ok and _oracle().aim_refusal == &"", "...nor does a block far off: the lesson is about setting a machine in the ring (%s)" % _oracle().aim_refusal)
 
 
 func _test_the_mine_hold_rides_the_move_frame() -> void:

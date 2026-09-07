@@ -18487,3 +18487,50 @@ three header lines were rewrapped and one comment shortened to make the room.
 the third verb given a voice (MINE D0421, DROP D0428/D0434, BUILD now).
 
 **Reverse cost:** the field, the two lines in the door, the two moments.
+
+## D0471 · 2026-09-07 · HARD LANDING teaches on a long drop, not on a hop
+
+**Decided:** the HARD LANDING lesson ("a long drop costs your footing; a line fired on the way DOWN takes
+the fall") fired at the thud's threshold, `VoiceCues.LAND_HARD_PX_S` (240 px/s, a two-metre step), and a
+plain jump lands at its own takeoff speed (365): strangers 46, 52 and 54 pressed Space once on the flat
+pad and were taught the grapple, the dock's one slot taken while the BUILD rung's lessons waited. The
+lesson's threshold is now terminal speed (`Observation.MAX_FALL_PX_S`, 560: a fall of eleven metres or
+more); the thud keeps its own. Pinned: a landing at the jump's speed teaches nothing, a terminal one does,
+and the lesson's threshold is past the thud's.
+
+**Why:** the footing is lost at an eighteen-metre fall (`Gait.STAGGER_FALL_PX`) and the lesson is about
+that; a sound's threshold is not a lesson's.
+
+**Reverse cost:** one constant.
+
+## D0472 · 2026-09-07 · TOO FAR for BUILD only with something in hand to set
+
+**Decided:** D0470's `build_far` fired on any RMB past the reach. Strangers 52 and 54 (on 2739bed5, the
+first batch with it), with no drill yet, pressed RMB on the buried ring from the surface, read "the ring
+is past your reach: step closer, then press [BUILD] on it", and spent the rest of their sixty bursts
+trying to get nearer the ring instead of digging at the square the how-to names first; S52's report:
+"the objective required reaching [145-150, 92] to place a drill via RMB". The refusal now fires only
+when a machine is selected -- when there is a machine to set there -- and an RMB with nothing or a block in hand,
+far off, is silent as before (stranger 53 read the same lesson with clay selected). Pinned as the controls of the D0470 pin.
+
+**Why:** a lesson about the wrong verb for the moment outranks the how-to in a stranger's reading; the
+refusal has to be about what the press could have done.
+
+**Reverse cost:** one condition.
+
+## D0473 · 2026-09-07 · TOO FAR DOWN: a far target under the ground says dig, not step closer
+
+**Decided:** the mine's "far" refusal fires alike for a rock across the pad and for the crew's drill
+three metres under the feet, and TOO FAR's "step closer, then hold [MINE]" is right for one and
+impossible for the other. Strangers 52 and 54 (on 2739bed5) pointed at the ring from the surface over
+it, read TOO FAR, and spent their runs trying to get nearer a thing under the ground ("could not close
+the reach gap to the white ring"; S52 walked the pad for fifty bursts looking for a way down while
+standing on the square). When the aimed cell is `BELOW_CELLS` (8, two metres) or more under the body's
+centre the moment is TOO FAR DOWN instead: "what you point at lies under the ground, past your reach;
+dig at the WHITE SQUARE first: the hole brings it into reach." Pinned: far and two metres under is TOO
+FAR DOWN; far across, or under by less, keeps TOO FAR.
+
+**Why:** a lesson is advice; advice that cannot be followed from where the player stands is a wall.
+The rung's how-to already says dig first; the refusal now agrees with it.
+
+**Reverse cost:** the condition and the moment's line.

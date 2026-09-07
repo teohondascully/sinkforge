@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_sight_pins()
 	_test_cut_through_pins()
 	_test_wrong_spot_pins()
+	_test_far_below_pins()
 	_test_left_working_pins()
 	_finish("hints_moments")
 
@@ -155,6 +156,28 @@ func _test_wrong_spot_pins() -> void:
 		var once: Hints = Hints.new()
 		once.observe(pressed, 0.016)
 		_check(once.active_id() == pair[0] and once.active_text().begins_with(pair[1]), "a BUILD refused %s teaches on the press itself, one observe wide (D0470) (%s)" % [pair[0], once.active_id()])
+
+
+## D0473 (strangers 52 and 54): "far" with the pointer on the buried ring, three metres under the feet, is
+## TOO FAR DOWN (dig at the square first), never TOO FAR's "step closer"; a far cell at the body's level
+## keeps TOO FAR.
+func _test_far_below_pins() -> void:
+	var h: Hints = Hints.new()
+	var buried: Interface.Observation = _hint_obs()
+	buried.aim_refusal = &"far"
+	buried.cell = Vector2i(100, 75)
+	buried.aim_cell = Vector2i(100, 75 + Hints.BELOW_CELLS)
+	for _i: int in Hints.FAR_TICKS:
+		h.observe(buried, 0.016)
+	_check(h.active_id() == &"far_below" and h.active_text().begins_with("TOO FAR DOWN"), "far, two metres under the body: TOO FAR DOWN (%s)" % h.active_id())
+	var level: Hints = Hints.new()
+	var across: Interface.Observation = _hint_obs()
+	across.aim_refusal = &"far"
+	across.cell = Vector2i(100, 75)
+	across.aim_cell = Vector2i(120, 75 + Hints.BELOW_CELLS - 1)
+	for _i: int in Hints.FAR_TICKS:
+		level.observe(across, 0.016)
+	_check(level.active_id() == &"too_far", "control: far across, or under the feet by less than two metres, keeps TOO FAR (%s)" % level.active_id())
 
 
 func _test_mined_wrong_pins() -> void:

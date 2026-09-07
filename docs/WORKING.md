@@ -516,8 +516,13 @@ the line, so "First automation" never came. **D0468:** the cut mark is the metre
 drill set elsewhere; the lesson tables moved to `HintTexts`. **D0470:** a BUILD that places nothing says
 why (`build_far` / `build_here` on the refusal channel; TOO FAR for BUILD, STEP ASIDE). Noted: TOO FAR
 sends strangers a 4.5 m stride past the square (T035); the shaft's mouth cannot be walked into (a body
-a metre wide over a mouth a metre wide stands on both lips). **Next: strangers 52-54, the variant on the
-D0468-D0470 build.**
+a metre wide over a mouth a metre wide stands on both lips). **Strangers 52-54 (2739bed5): 3 VALID, the drill in
+hand 0 of 3;** two aimed at the ring under the ground and read TOO FAR's "step closer"; TOO FAR for
+BUILD fired with no drill in hand and with clay; a hop taught HARD LANDING. **D0471:** the landing
+lesson at terminal speed. **D0472:** the BUILD refusal only with a machine in hand. **D0473:** TOO FAR
+DOWN for a far target two metres or more under the body ("dig at the WHITE SQUARE first"). The variant's
+tally: ten valid runs of twelve, the drill in hand 3, placed 1 (off the line), the ceiling 14.1 s.
+**Next: strangers 55-57 on the D0471-D0473 build.**
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall

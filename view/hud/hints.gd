@@ -34,7 +34,10 @@ const BUSY_ARM: float = 1.25
 const BUSY_RELEASE: float = 0.9
 const CHAIN_SPEED_MULT: float = 1.4      ## a release below 1.4x a run was not going anywhere
 const PUMP_DOWN: float = 0.85            ## cos(~32 degrees): near enough the bottom of the arc
-const LAND_HARD_PX_S: float = VoiceCues.LAND_HARD_PX_S
+## The lesson's landing is a LONG drop: terminal speed, a fall of eleven metres or more (D0471). The
+## thud's threshold (`VoiceCues.LAND_HARD_PX_S`, 240) is a two-metre step; a plain jump lands at 365 and
+## taught the grapple to three strangers who had only hopped.
+const LAND_HARD_PX_S: float = float(Interface.Observation.MAX_FALL_PX_S)
 
 ## The lesson tables live in `HintTexts` (D0469); these aliases keep every reader's name.
 const DEFS: Array[Dictionary] = HintTexts.DEFS
@@ -79,6 +82,7 @@ var _max_x_m: float = -INF
 var _deepest_m: float = -INF
 var _broke_once: bool = false
 const FAR_TICKS: int = 20
+const BELOW_CELLS: int = 8          ## two metres under the body's centre: past the feet and into the ground (D0473)
 var _sight_ticks: int = 0
 var _coming_prev: int = 0
 var _ingots_prev: int = 0
@@ -259,7 +263,9 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 ## a cut, or a buried cell nothing visible stands near. Wordless before; stranger 29 met it four times.
 func _note_refusals(o: Interface.Observation) -> void:
 	_far_ticks = _far_ticks + 1 if o.aim_refusal == &"far" else 0
-	note(&"too_far", _far_ticks >= FAR_TICKS)
+	var below: bool = o.aim_cell.y - o.cell.y >= BELOW_CELLS          # a buried target: "step closer" cannot be done on foot (D0473)
+	note(&"too_far", _far_ticks >= FAR_TICKS and not below)
+	note(&"far_below", _far_ticks >= FAR_TICKS and below)
 	var on_machine: bool = o.aim_refusal == &"air" and not o.machine_at(Vector2i(o.aim_cell.x >> 2, o.aim_cell.y >> 2)).is_empty()
 	_air_ticks = 0 if o.mining_broke or on_machine else (_air_ticks + 1 if o.aim_refusal == &"air" else 0)
 	_since_break = 0 if o.mining_broke else _since_break + 1

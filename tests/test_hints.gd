@@ -31,7 +31,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_hint_obs([]), 0.016)
 	h.observe(_hint_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 19, "nine pack lessons and nineteen moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 20, "nine pack lessons and twenty moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -122,6 +122,12 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	_check(h.active_id() == &"wrapped", "a pivot fires the catch lesson (%s)" % h.active_id())
 	for _i: int in 30:
 		h.observe(wrapped, 0.5)
+	var hop: Interface.Observation = _hint_obs()
+	hop.on_floor = false
+	hop.vel_y = absi(Body.JUMP_VELOCITY_PX_S) * S                   # a plain jump lands at its own takeoff speed
+	h.observe(hop, 0.016)
+	h.observe(_hint_obs(), 0.016)
+	_check(h.active_id() != &"hard_landing" and Hints.LAND_HARD_PX_S > VoiceCues.LAND_HARD_PX_S, "a plain jump's landing teaches nothing: the lesson's threshold is past the thud's (D0471) (%s)" % h.active_id())
 	var fall: Interface.Observation = _hint_obs()
 	fall.on_floor = false
 	fall.vel_y = Interface.Observation.MAX_FALL_PX_S * S
