@@ -18429,3 +18429,22 @@ physics (a body one metre wide needs a hole a little wider); the mark cannot sho
 
 **Reverse cost:** the sixteen-cell test back to the centre cell; the moment's line and its three-line
 detector; `slots` is additive.
+
+## D0468 · 2026-09-07 · The cut mark is the metre and one cell either side: the hole a body actually needs
+
+**Decided:** the body is one metre wide and the roof metre is one metre wide; a body standing over the
+metre overlaps whichever neighbour column its centre is off toward, and rests its edge on it. By hand
+the drop took two bites on the rim columns after the metre itself was open (D0467), and stranger 50 (on
+10750f32, with the mark staying and CUT THROUGH read) bit the metre three times, at 630, 620 and 640
+px -- a cell and a half either side of centre -- stood on the rim, and walked away. `cut_metre` now
+returns the metre widened by one cell each side (24 x 16 world px) and reads that six-column region as
+roof while any cell of it stands, so the WHITE SQUARE is the hole to cut and stays until the body can
+fall through it wherever it stands. When the surface's six columns are clear the mark moves to the next
+rim below, or goes. Pinned in `test_tutorial_teaching` (the width, the rim keeping the mark after the
+metre is clear, the mark leaving the surface once the six are clear). Provisional (rule 11): the
+alternative is a support footprint narrower than the drawn body, a physics change the fuzz suites pin.
+
+**Why:** the mark is a promise ("dig here and you are through"); a promise the physics cannot keep at
+four cells is kept at six. The lesson can say "a little wider than you"; the mark should show it.
+
+**Reverse cost:** `rim` to zero and the range back to four.

@@ -242,8 +242,8 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 func _cut_mark_pins(o: Interface.Observation, drill: Vector2, vein: Vector2, forge: Vector2) -> void:
 	var cut: Rect2 = TargetGuide.cut_metre(o, drill)
 	var drill_m := Vector2i(int(floorf(drill.x / 16.0)), int(floorf(drill.y / 16.0)))
-	_check(cut.size == Vector2(16.0, 16.0) and cut.position.x == float(drill_m.x) * 16.0 and cut.position.y < drill.y - 16.0 and not o.solid_at(Vector2i(drill_m.x * 4 + 2, int(cut.position.y / 4.0) - 2)),
-		"BUILD's cut mark is the top of the roof over the drill, in its column, under open air (%s over %s)" % [cut, drill_m])
+	_check(cut.size == Vector2(24.0, 16.0) and cut.position.x == float(drill_m.x) * 16.0 - 4.0 and cut.position.y < drill.y - 16.0 and not o.solid_at(Vector2i(drill_m.x * 4 + 2, int(cut.position.y / 4.0) - 2)),
+		"BUILD's cut mark is the top of the roof over the drill, its column and a cell either side (D0468), under open air (%s over %s)" % [cut, drill_m])
 	_check(TargetGuide.cut_metre(o, vein).size == Vector2.ZERO and TargetGuide.cut_metre(o, forge).size == Vector2.ZERO, "the surface vein and the forge, under open air, get no cut mark")
 
 
@@ -253,7 +253,7 @@ func _cut_mark_pins(o: Interface.Observation, drill: Vector2, vein: Vector2, for
 func _cut_through_pins(door: Interface, world: World, drill: Vector2) -> void:
 	var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
 	var cut: Rect2 = TargetGuide.cut_metre(o, drill)
-	var col: int = int(cut.position.x / 4.0)
+	var col: int = int((cut.position.x + 4.0) / 4.0)                      # the metre's first column; the mark starts a cell left of it
 	var row: int = int(cut.position.y / 4.0)
 	for c: Vector2i in [Vector2i(col + 1, row), Vector2i(col + 2, row), Vector2i(col + 1, row + 1), Vector2i(col + 2, row + 1), Vector2i(col + 1, row + 2), Vector2i(col + 2, row + 2)]:
 		world.grid.excavate(c)                                             # a bite through the middle, the rim standing
@@ -263,8 +263,14 @@ func _cut_through_pins(door: Interface, world: World, drill: Vector2) -> void:
 	for dy: int in 4:
 		for dx: int in 4:
 			world.grid.excavate(Vector2i(col + dx, row + dy))
+	var metre_clear: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	_check(TargetGuide.cut_metre(metre_clear, drill) == cut, "the metre clear and the neighbour columns standing: the mark stays, the body's edges would rest on them (D0468) (%s)" % str(TargetGuide.cut_metre(metre_clear, drill)))
+	for dy: int in 4:
+		world.grid.excavate(Vector2i(col - 1, row + dy))
+		world.grid.excavate(Vector2i(col + 4, row + dy))
 	var clear: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
-	_check(TargetGuide.cut_metre(clear, drill).size == Vector2.ZERO, "...and goes once the metre is clear (%s)" % str(TargetGuide.cut_metre(clear, drill)))
+	var moved: Rect2 = TargetGuide.cut_metre(clear, drill)
+	_check(moved.size == Vector2.ZERO or moved.position.y > cut.position.y, "...and leaves the surface metre once its six columns are clear: the next rim to cut below, or nothing (%s)" % str(moved))
 
 
 ## D0459: the drill in hand moves BUILD's ring from the pile to the shaft's mouth -- the open metre over

@@ -298,14 +298,17 @@ static func cut_metre(o: Interface.Observation, at: Vector2) -> Rect2:
 		row -= 1
 	if top < 0:
 		return Rect2()
-	return Rect2(Vector2(float(col), float(top)) * m, Vector2(m, m))
+	var rim: float = m / 4.0                                                # one cell either side (D0468)
+	return Rect2(Vector2(float(col) * m - rim, float(top) * m), Vector2(m + 2.0 * rim, m))
 
 
-## A metre is roof while ANY of its sixteen cells stands (D0467): the first bite takes the centre and the
-## mark used to vanish with it, the body still on the rim; the mark stays until the metre is clear.
+## A metre is roof while ANY of its cells stands (D0467): the first bite takes the centre and the mark
+## used to vanish with it, the body still on the rim; the mark stays until the hole is clear. The hole
+## is the metre AND one cell either side (D0468): a body a metre wide rests its edges on whichever
+## neighbour column it overlaps, so four cells never drop it and six always do.
 static func _metre_has_rock(o: Interface.Observation, col: int, row: int) -> bool:
 	for dy: int in 4:
-		for dx: int in 4:
+		for dx: int in range(-1, 5):
 			if o.solid_at(Vector2i(col * 4 + dx, row * 4 + dy)):
 				return true
 	return false
