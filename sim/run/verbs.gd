@@ -28,7 +28,7 @@ var world: World
 var items: Items
 var machines: Machines
 var body: Body
-## Why the last BUILD placed nothing (D0470): &"build_far" past the reach, &"build_here" the body's own
+## Why the last BUILD placed nothing (D0470): &"build_far" past the reach, &"build_rock" a solid metre (D0493), &"build_here" the body's own
 ## cell with a machine in hand, &"" otherwise. The door hands it to the observation's refusal channel.
 var last_build_refusal: StringName = &""
 var selected: int = 0                  # hotbar index into `Pack.slots()`
@@ -149,6 +149,8 @@ func _place(logic_cell: Vector2i) -> StringName:
 		return &"machine" if MachineVerbs.build_from_pack(items, machines, def, logic_cell, body.facing) != null else &""
 	if def != null and body_occupies(logic_cell):
 		last_build_refusal = &"build_here"                              # a machine in hand, the cell the body stands in (D0470)
+	elif def != null and not placeable(logic_cell):
+		last_build_refusal = &"build_rock"                              # a machine in hand, the metre is rock: silent before (D0493, stranger 77)
 	var material: StringName = selected_build_material()
 	if material != &"" and placeable(logic_cell) and world.block_supported(logic_cell) and BuildVerbs.place_block(items, logic_cell, material):
 		return &"block"

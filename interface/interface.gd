@@ -101,7 +101,7 @@ var _hold: MineHold = MineHold.new()
 var _seen: SeenPlane                 ## what the map admits to: the cells the body has been near (D0400)
 var _events: Array[Dictionary] = []   # flow events since the last observe: the consumed channel
 var _drop_went: StringName = &""       # the last DROP's landing since the last observe (D0428)
-var _build_went: StringName = &""      # the last BUILD's refusal since the last observe (D0470): &"build_far" / &"build_here"
+var _build_went: StringName = &""      # the last BUILD's refusal since the last observe (D0470): &"build_far" / &"build_here" / &"build_rock"
 var _drop_short_cell: Vector2i = Vector2i(-1, -1)   # the machine a drop fell short of, and until which tick (D0434)
 var _drop_short_until: int = -1
 const DROP_SHORT_TICKS: int = 36

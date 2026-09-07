@@ -15,8 +15,8 @@ extends RefCounted
 ## digging never hears this; CUT THROUGH is the air run that began within half a second of your own bite
 ## (D0467). THAT IS A MACHINE: a machine under a held MINE is refused as "air" too (a machine is not
 ## terrain); it is not open air to the player (D0445, stranger 20 held MINE on the forge from six metres).
-## BEHIND ROCK: the "sight" refusal (D0452): rock in reach behind other rock. STEP ASIDE and BUILD's own
-## TOO FAR ride the same channel, one observe wide (D0470).
+## BEHIND ROCK: the "sight" refusal (D0452): rock in reach behind other rock. STEP ASIDE, IN THE ROCK and
+## BUILD's own TOO FAR ride the same channel, one observe wide (D0470, D0493).
 ##
 ## THE SLOT (D0488, strangers 61-75): the lessons are one-shots behind a hold. The second TOO FAR of a
 ## game, and every short press, showed the slashed square and nothing else; S66's report called a
@@ -61,6 +61,7 @@ func read(o: Interface.Observation, delta: float) -> void:
 		&"aim_sight": sight_ticks >= FAR_TICKS,
 		&"build_far": o.aim_refusal == &"build_far",
 		&"build_here": o.aim_refusal == &"build_here",
+		&"build_rock": o.aim_refusal == &"build_rock",
 	}
 	var live: StringName = lesson_of(o.aim_refusal, below, on_machine, own_cut)
 	if live != &"":
@@ -76,7 +77,7 @@ static func lesson_of(refusal: StringName, below: bool, on_machine: bool, own_cu
 		&"far": return &"far_below" if below else &"too_far"
 		&"air": return &"aim_machine" if on_machine else (&"cut_through" if own_cut else &"aim_air")
 		&"sight": return &"aim_sight"
-		&"build_far", &"build_here": return refusal
+		&"build_far", &"build_here", &"build_rock": return refusal
 	return &""
 
 

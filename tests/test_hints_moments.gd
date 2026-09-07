@@ -150,7 +150,7 @@ func _test_wrong_spot_pins() -> void:
 	var bare: Hints = Hints.new()
 	bare.observe(off, 0.016)
 	_check(bare.active_id() == &"", "control: with no ladder attached the lesson never fires (%s)" % bare.active_id())
-	for pair: Array in [[&"build_far", "TOO FAR"], [&"build_here", "STEP ASIDE"]]:
+	for pair: Array in [[&"build_far", "TOO FAR"], [&"build_here", "STEP ASIDE"], [&"build_rock", "IN THE ROCK"]]:
 		var pressed: Interface.Observation = _hint_obs()
 		pressed.aim_refusal = pair[0]
 		var once: Hints = Hints.new()

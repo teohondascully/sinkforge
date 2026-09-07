@@ -10,6 +10,18 @@ const W: int = 64
 const H: int = 64
 
 
+## D0493 (strangers 76-81): the card over a solid coal metre names COAL, not "Ore Vein"; four of six hunted
+## "black" past the seam while its card called it ore.
+func _coal_seam_pin() -> void:
+	var o: Interface.Observation = _obs()
+	o.legend = PackedStringArray(["", "clay", "ore_iron", "coal"])
+	o.ore_like_legend = PackedByteArray([0, 0, 1, 1])                   # the seam carries a deposit like a vein does (the seeder's deposit: 13)
+	o.materials[30 * W + 30] = 3
+	o.ore_yield[Vector2i(30, 30)] = 13
+	var d: Dictionary = Inspector.describe(o)
+	_check(d.get("name", "") == "Coal Seam" and String(d["mode"]).begins_with("13 coal — hold to cut it"), "a solid coal cell is a COAL SEAM, counted in coal, and says what burns it (%s)" % str(d))
+
+
 func _initialize() -> void:
 	_test_nothing_out_of_reach_or_off_the_hint_list()
 	_test_the_terrain_answers()
@@ -67,6 +79,7 @@ func _test_the_terrain_answers() -> void:
 	o.materials[30 * W + 30] = 2
 	var d: Dictionary = Inspector.describe(o)
 	_check(d.get("name", "") == "Ore Vein" and String(d["mode"]).begins_with("12 ore — hold to cut it"), "a solid ore cell is a vein with its default yield, the hand verb first (D0450) (%s)" % str(d))
+	_coal_seam_pin()
 	o.ore_yield[Vector2i(30, 30)] = 5
 	_check(String(Inspector.describe(o)["mode"]).begins_with("5 ore"), "an explicit yield overrides the default")
 	o.materials[30 * W + 30] = 0

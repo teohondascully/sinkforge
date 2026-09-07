@@ -18935,3 +18935,30 @@ the winch, and D2's grant is the pair. `tests/test_objectives.gd` (32): the winc
 rig, "" with the head in hand, 6/6 paid and lying. `tests/test_tutorial_teaching.gd` (67): WINCH rings the
 rig before the payout. `test_world_seeder` 50, `test_objective_line` 35 (the new label fits its two lines),
 `test_hints_moments` 28 unchanged.
+
+## D0493 · 2026-09-07 · Strangers 76-81: the seam's card says COAL, the smelt card says NUMBER, BUILD on rock says IN THE ROCK
+
+**Decided:** three fixes from the six-seat batch on D0488–D0492 (`docs/playtests/2026-09-07_strangers76-81_seam_slot.md`):
+(1) `Inspector._describe_terrain` names a solid metre with a deposit by its material record's `kind`: `fuel`
+reads "Coal Seam -- N coal -- hold to cut it; the forge burns it", anything else keeps "Ore Vein". (2) The
+smelt card: "by it, press each stack's NUMBER then [DROP]; the ingots come to you" (141 chars, two lines,
+the last clause kept). (3) `Verbs._place` names a third BUILD refusal, `build_rock`: a machine in hand, the
+pointed metre solid; its lesson IN THE ROCK points at the open metre in the ring above the vein. The
+refusal rides the observation's channel like `build_far` and `build_here` (D0470), the slot says it (D0488).
+
+**Why, by the receipts:** four of six strangers never held coal; the seam's card read "Ore Vein -- 13 ore"
+(any solid deposit did), S79 stood on the seam with the ring under its feet and strode on, three reports say
+they hunted "black" and pressed shadows and holes. S76 pressed Q eleven times before WRONG STACK taught the
+number key at burst 41; the card's "hold each stack" was the two-line compression. S77, the first stranger
+the rig ever paid (54.0 s), pressed RMB on the vein itself with the drill in hand and nothing happened on
+screen; BUILD had two refusals and this was neither.
+
+**Verified:** `tests/test_inspector.gd` (44): a solid coal cell with a deposit is COAL SEAM in coal, the
+iron cell still Ore Vein. `tests/test_interface_verbs.gd` (57): a BUILD on a solid metre in reach with a
+machine in hand says `build_rock` (the mutant that never sets it fails). `tests/test_hints_moments.gd` (29):
+IN THE ROCK fires on the refusal. `tests/test_objective_line.gd` (35): the new smelt card wraps to two lines
+and keeps "ingots come to you". `test_hints` 48 (twenty-one moments), `test_objectives` 32,
+`test_tutorial_teaching` 67, `test_lesson_dock` 35, `test_verbs` 46, `test_mark_painter` 64 unchanged.
+
+**Not changed, the director's:** the seam's look (a black metre beside a black hole); the stride (T035);
+the smelt card's "right of you", true at the spawn only.

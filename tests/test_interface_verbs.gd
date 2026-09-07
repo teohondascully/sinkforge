@@ -149,6 +149,9 @@ func _test_a_build_that_places_nothing_says_why() -> void:
 	r = iface.apply(Command.build(Vector2i(5, 8)))
 	o = _oracle()
 	_check(not r.ok and o.aim_refusal == &"build_here" and machines.count() == 0, "a BUILD on the body's own cell places nothing and says build_here (%s)" % o.aim_refusal)
+	r = iface.apply(Command.build(Vector2i(6, 10)))                         # the floor's metre under the body's right: rock, in reach
+	o = _oracle()
+	_check(not r.ok and o.aim_refusal == &"build_rock" and machines.count() == 0 and world.logic_solid(Vector2i(6, 10)), "a BUILD on a solid metre in reach with a machine in hand places nothing and says build_rock (D0493, stranger 77's RMB on the vein) (%s)" % o.aim_refusal)
 	r = iface.apply(Command.build(Vector2i(6, 9)))
 	o = _oracle()
 	_check(r.ok and o.aim_refusal == &"" and machines.count() == 1, "control: a placement beside the body carries no refusal (%s)" % o.aim_refusal)

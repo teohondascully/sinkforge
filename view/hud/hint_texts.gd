@@ -30,6 +30,7 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
 	{"id": &"build_far", "text": "TOO FAR — the ring is past your reach. Your reach is about a body length: step closer, then press [BUILD] on it."},
 	{"id": &"build_here", "text": "STEP ASIDE — a machine cannot stand where you stand. Step out of the ring, then press [BUILD] on it."},
+	{"id": &"build_rock", "text": "IN THE ROCK — a machine stands in the open, not inside rock. Point at the open metre in the WHITE RING, right above the vein, then press [BUILD]."},
 	{"id": &"wrong_spot", "text": "WRONG SPOT — a Drill bores what is under it and pours that into what is under THAT: it belongs in the WHITE RING, over the vein, over the forge. Press [BUILD] on it to take it back."},
 	{"id": &"aim_sight", "text": "BEHIND ROCK — that rock is in reach, but another rock is in the way of your pick. Cut the near one first, or point at a face you can see."},
 	{"id": &"aim_machine", "text": "THAT IS A MACHINE — [MINE] cuts rock, not machines. Stand beside it and press [DROP] to feed it what it takes; what it makes comes to you as you stand there."},
