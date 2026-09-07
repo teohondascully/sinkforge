@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_progress_and_the_reversed_reveal_rule()
 	_test_the_ladder_rides_the_save()
 	_test_the_ring_finds_the_real_targets()
+	_test_wrong_stack_through_the_door()
 	_finish("tutorial_teaching")
 
 
@@ -220,3 +221,57 @@ func _budgeted_walk_pins(o: Interface.Observation, body_px: Vector2) -> void:
 	_check(TargetGuide.near(beside) and TargetGuide.near(TargetGuide.NEAR_M) and not TargetGuide.near(3.0), "the block outline shows for a cell beside the boot (%.2f m from the centre), within %.1f m, and not beyond" % [beside, TargetGuide.NEAR_M])
 	var metre: Rect2 = TargetGuide.target_metre(Vector2(102.0, 322.0))
 	_check(metre == Rect2(96.0, 320.0, 16.0, 16.0) and metre.has_point(Vector2(102.0, 322.0)), "the outlined metre is the one the target cell lies in (%s)" % str(metre))
+
+
+## D0443's WRONG STACK on a REAL journey, not a hand-built observation (the second auditor's ask): a stranger
+## digs a clay cell, mines the vein, walks beside the forge with the CLAY selected and presses DROP. The
+## pack's fall and `drop_went` arrive in the same observe; the lesson names clay and ore.
+func _test_wrong_stack_through_the_door() -> void:
+	var door: Interface = Session.new_game(StrataData.SHALLOW_CLAY, SEED, &"tutorial")
+	if door == null:
+		_check(false, "the tutorial starts")
+		return
+	var world: World = door.services()["world"]
+	var items: Items = door.services()["items"]
+	var body: Body = door.services()["body"]
+	var oracle: Interface.Envelope = Interface.Envelope.oracle_over(world.grid)
+	var hints: Hints = Hints.new()
+	var anchor := Vector2i(32, 20)
+	var tick: Callable = func(f: InputFrame, verbs: Array) -> Interface.Observation:
+		door.apply(Command.move(f))
+		door.apply(Command.collect())
+		for c: Command in verbs:
+			door.apply(c)
+		var o: Interface.Observation = door.observe(oracle)
+		hints.observe(o, 1.0 / 60.0)
+		return o
+	var mine_until: Callable = func(cell: Vector2i, item: StringName, budget: int) -> void:
+		for _i: int in budget:
+			var f: InputFrame = InputFrame.new()
+			f.has_aim = true
+			f.aim_col = cell.x
+			f.aim_row = cell.y
+			f.mine_held = true
+			tick.call(f, [])
+			if items.pack.count(item) > 0:
+				return
+	mine_until.call(Vector2i(anchor.x * 4 + 1, anchor.y * 4 + 5), &"clay", 600)      # the pad under the spawn, a metre down
+	mine_until.call(Vector2i((anchor.x - 1) * 4 + 1, anchor.y * 4 + 1), &"ore", 600)  # the vein a step left
+	_check(items.pack.count(&"clay") > 0 and items.pack.count(&"ore") > 0, "control: the pack holds clay (%d) and ore (%d) after the two digs" % [items.pack.count(&"clay"), items.pack.count(&"ore")])
+	var clay_slot: int = -1
+	var slots: Array[Dictionary] = items.pack.slots()
+	for i: int in slots.size():
+		if slots[i]["item"] == &"clay":
+			clay_slot = i
+	var target_x: float = float(anchor.x - 2) * 16.0 + 8.0                             # a metre right of the forge pocket
+	for _i: int in 600:
+		var dx: float = target_x - float(body.pos_x) / float(Fx.SCALE)
+		if absf(dx) < 3.0:
+			break
+		var f: InputFrame = InputFrame.new()
+		f.move_dir = 1 if dx > 0.0 else -1
+		tick.call(f, [])
+	tick.call(InputFrame.new(), [Command.select(clay_slot)])
+	var o: Interface.Observation = tick.call(InputFrame.new(), [Command.drop()])
+	_check(o.drop_went == &"floor" and hints.active_id() == &"dropped_wrong" and hints.active_text().find("you dropped clay") >= 0 and hints.active_text().find("takes ore") >= 0,
+		"clay dropped beside the forge through the door: the drop went to the floor and WRONG STACK names clay and ore (%s: %s)" % [o.drop_went, hints.active_text().left(70)])
