@@ -440,6 +440,18 @@ pressing at the feet or a far rock while the outlined block sat 20 px off -- the
 (D0433) is the one visual change common to every failing batch since, and D0447 restores the 0.9 m ring
 with the outline inside it. The loop is measured per burst (`timing.jsonl`): the seat's share is ~1 s;
 the agent's think time is the rest. Astra's queue is tracked at `docs/VISUAL_REVIEW_QUEUE_2026-09-07.md`.
+**D0448:** `"until": "event"` cuts a burst at the first player-visible change (objective, pack, lesson,
+refusal, drop, landing), `ended_by` in the receipt. **Strangers 25-27 (on 8e80cebc, D0447's big ring):
+0 of 3 mined.** Two pressed a machine's gold need-bubble on the word RINGED (S25 the shaft's, nine metres
+off; S27 the forge's foot, where the vein card said "stand a Drill just above it" and S27 spent forty
+bursts placing one); S26 named the ring, pointed three metres right of it, cut clay, and left. **D0449
+(landed while they played):** the target is the one white mark, a reticle with compass ticks over a dark
+rim; every status that raises a bubble is chromatic (pinned); the two sentences say WHITE RING (T032 taken
+provisionally). **D0450:** NOT ORE, once, on a break whose yield is not ore while the pack holds none,
+naming what fell, never after THE WAY DOWN; the vein card says "hold to cut it, or stand a Drill just
+above it". The rope painter's pin on the old gold ink went red on CI and was re-stated (1622a422).
+Since D0433: 8 of 18 mined. **Strangers 28-30 are running on b0871cc4** (D0449 + D0450), the first
+batch on the white reticle.
 
 **Rank 7, first slice (D0422).** A blind judge (fresh-context vision agent, eight 120x120 crops with the
 grid's truth, three judges a condition): before, 13/24 spots right and 0/9 cavities seen; after the wall
@@ -463,12 +475,13 @@ and 8 of the integration pass, Astra's audit order through item 5, and five stra
 **The director's calls:** play the opening (`godot --path .`: the tree stands six metres left of spawn,
 the forge's ring stays for the rung, a floor drop docks DROPPED, the lamp lights faces in the deep);
 T031 (taken provisionally in D0434: the chimney capped; overrule by deleting two record lines); T032
-(four ring kinds); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
+(taken provisionally in D0449: the white reticle; overrule by two colours); T035 (RUN_SPEED), T036 (the
+world's edge), T038 ("spawn"), T039 (the hotbar's capacity); whether the lamp's occlusion (D0427) is the first line of Part B or a switch to leave
 at zero; the forks T024-T030.
 
-**Cheap next steps that need no ruling:** a batch on the D0447 build (the big ring with the outline;
-WRONG STACK and the "more coming" tick still unseen); Astra's testing-loop items 3-4 (event-triggered and
-composed bursts) and the seat-driven ceiling run (12); then Astra's visual P0s in order (the hotbar's
+**Cheap next steps that need no ruling:** read strangers 28-30 from their frames (the white reticle,
+NOT ORE and the vein card; WRONG STACK and the "more coming" tick still unseen); Astra's testing-loop
+item 4 (composed bursts; 3 is D0448) and the seat-driven ceiling run (12); then Astra's visual P0s in order (the hotbar's
 content-aware width, the objective card's rest height, the refusal slot); the wood ring on the miner's chest when the trunk stands behind the body; the blind-judge
 instrument re-run on the ore half of rank 7 once the richness-scaled nugget count can be read from the
 bake (V32).
