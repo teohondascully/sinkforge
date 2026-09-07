@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_test_the_grammar_constants()
 	_test_rock_wears_the_square_sized_to_the_blow()
 	_test_a_held_button_past_the_reach_is_slashed_and_named()
+	_test_the_cut_fills_the_square_from_the_floor_up()
 	_test_a_held_drill_ghosts_and_previews()
 	_test_standing_in_your_own_way_is_a_refusal_with_a_hint()
 	_test_a_machine_under_the_aim_pulses_in_its_colour()
@@ -53,6 +54,38 @@ func _test_a_held_button_past_the_reach_is_slashed_and_named() -> void:
 	_check(air.aim_refusal == &"air" or air.aim_cell == Vector2i(-1, -1), "held on nothing: `air`, unless the hold snapped to a face (%s -> %s)" % [air.aim_refusal, air.aim_cell])
 	var near: Interface.Observation = _aim(Vector2i(34, 101), true)
 	_check(near.aim_refusal == &"", "held on rock in reach: no refusal, the blow lands (%s)" % near.aim_refusal)
+
+
+## D0421 (stranger 2): wood takes sixteen blows and the stranger never saw one land. While the hold charges
+## a cell, its banked share rises as a wash inside the aim square from the floor up; before the first blow
+## banks, and once the pointer rests, there is none.
+func _test_the_cut_fills_the_square_from_the_floor_up() -> void:
+	_session()
+	var idle: Interface.Observation = _aim(Vector2i(34, 101), false)
+	_check(not idle.mining_is_charging, "control: a resting pointer charges nothing")
+	var o: Interface.Observation = idle
+	for _i: int in 40:   # hold on iron: blows bank as the swing lands
+		o = _aim(Vector2i(34, 101), true)
+		if o.mining_cracks.get(o.aim_cell, 0) > 0:
+			break
+	var share: int = int(o.mining_cracks.get(o.aim_cell, 0))
+	_check(o.mining_is_charging and share > 0 and share < 1000, "control: the hold has banked part of the cell (%d permille)" % share)
+	var marks: Array[Dictionary] = MarkLayout.build(o, 0.0, MaterialLook.new())
+	var sq: Rect2 = (_kinds(marks, &"square")[0])["rect"]
+	var gauge: Array[Dictionary] = []   # the dig plan the drag painted wears a wash of its own; the gauge is the one inside the square
+	for w: Dictionary in _kinds(marks, &"wash"):
+		if is_equal_approx((w["rect"] as Rect2).end.y, sq.end.y) and is_equal_approx((w["rect"] as Rect2).size.x, sq.size.x) and (w["rect"] as Rect2).size.y < sq.size.y:
+			gauge.append(w)
+	_check(gauge.size() == 1, "the charging cell wears one gauge wash inside its square (%d)" % gauge.size())
+	if gauge.size() == 1:
+		var w: Rect2 = gauge[0]["rect"]
+		_check(is_equal_approx(w.size.y, sq.size.y * float(share) / 1000.0), "...as tall as the banked share (%.2f of %.2f px for %d permille)" % [w.size.y, sq.size.y, share])
+	var idle_marks: Array[Dictionary] = MarkLayout.build(_aim(Vector2i(34, 101), false), 0.0, MaterialLook.new())
+	var idle_gauge: int = 0
+	for w: Dictionary in _kinds(idle_marks, &"wash"):
+		if is_equal_approx((w["rect"] as Rect2).end.y, sq.end.y) and (w["rect"] as Rect2).size.y < sq.size.y:
+			idle_gauge += 1
+	_check(idle_gauge == 0, "released, the gauge is gone (the plan's own wash may stay)")
 
 
 ## A hub session: iron from logic row 25 down, the body standing on it at logic column 8.

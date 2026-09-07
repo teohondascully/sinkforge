@@ -67,6 +67,7 @@ static func _aim(o: Interface.Observation, t: float, look: MaterialLook, out: Ar
 		square(rect, Color(MarkPainter.CHROME.r, MarkPainter.CHROME.g, MarkPainter.CHROME.b, a), out)
 		if o.aim_in_reach and o.deposit_at(o.aim_cell) > 0:
 			pulse(rect, ore_color(o.material_at(o.aim_cell)), t, out)
+		progress(o, rect, out)
 		return
 	if o.aim_is_lode:
 		if o.aim_in_reach:
@@ -157,6 +158,23 @@ static func _hint(o: Interface.Observation, t: float, out: Array[Dictionary]) ->
 	var pulse: float = 0.35 + 0.25 * sin(t * 2.5)
 	out.append({"kind": &"square", "rect": MarkPainter.mark_rect(MarkPainter.logic_rect(o.place_hint)),
 		"color": Color(MarkPainter.HINT.r, MarkPainter.HINT.g, MarkPainter.HINT.b, pulse), "width": MarkPainter.MARK_W, "hint": true})
+
+
+## THE CUT'S PROGRESS FILLS THE SQUARE FROM THE FLOOR UP (D0421, stranger 2): a block of wood takes sixteen
+## blows and the second stranger never held long enough for one -- "visible progress on trees but no
+## completion", twenty-two bursts, gave up -- because the only progress shown was a few grey crack pixels
+## (V31). The banked share of the cell being charged rises as a wash inside the aim square, in the chrome
+## the square is drawn in, so a hold that is working looks like a thing filling and a hold released halfway
+## shows what it kept.
+static func progress(o: Interface.Observation, rect: Rect2, out: Array[Dictionary]) -> void:
+	if not o.mining_is_charging or not o.mining_cracks.has(o.aim_cell):
+		return
+	var share: float = clampf(float(o.mining_cracks[o.aim_cell]) / 1000.0, 0.0, 1.0)
+	if share <= 0.0:
+		return
+	var h: float = rect.size.y * share
+	var fill := Rect2(Vector2(rect.position.x, rect.end.y - h), Vector2(rect.size.x, h))
+	out.append({"kind": &"wash", "rect": fill, "color": Color(MarkPainter.CHROME.r, MarkPainter.CHROME.g, MarkPainter.CHROME.b, 0.45)})
 
 
 static func square(rect: Rect2, col: Color, out: Array[Dictionary]) -> void:
