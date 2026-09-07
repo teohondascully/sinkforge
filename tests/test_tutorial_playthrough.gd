@@ -206,10 +206,11 @@ func _the_cache_is_in_the_world() -> void:
 		for item: Variant in items.piles.pile(c):
 			cache[item] = true
 	var supplied: int = 0
-	for m: StringName in [&"hopper", &"generator", &"winch_head", &"winch_station"]:
+	for m: StringName in [&"hopper", &"generator"]:
 		if cache.has(m) or items.pack.count(m) > 0:
 			supplied += 1
-	_check(supplied == 4, "the machines rungs 7-9 name are in the world -- the crew's cache under the spawn, or already scooped (%d of 4; piles %s, pack %s)" % [supplied, cache.keys(), items.pack.slots()])
+	_check(supplied == 2, "the machines rungs 7-8 name are in the world -- the crew's cache under the spawn, or already scooped (%d of 2; piles %s, pack %s)" % [supplied, cache.keys(), items.pack.slots()])
+	_check(not cache.has(&"winch_head") and not cache.has(&"winch_station") and Demands.grants(1) == {&"winch_head": 1, &"winch_station": 1}, "rung 9's winch pair lies in no cache: the rig's second demand pays it (D0492)")
 
 
 ## Dig straight down from where the body stands until it rests in `logic`: the first solid metre under

@@ -124,7 +124,14 @@ static func target(id: StringName, o: Interface.Observation) -> Vector2:
 		&"power":
 			return _nearest_pile(o, body, &"generator")
 		&"winch":
-			return _nearest_pile(o, body, &"winch_head")
+			# D2 (D0492): the rig pays the winch pair; the ring goes to the rig until the head is paid out, then
+			# to the head where it lies (at the rig's foot), then leaves the head in the player's hand.
+			var pile: Vector2 = _nearest_pile(o, body, &"winch_head")
+			if pile != NONE:
+				return pile
+			if int(Payouts.pack_counts(o).get(&"winch_head", 0)) == 0 and Objectives.rig_stage(o) < 2:
+				return _nearest_machine(o, body, &"rig")
+			return NONE
 	return NONE
 
 const NONE := Vector2(-1.0e9, -1.0e9)

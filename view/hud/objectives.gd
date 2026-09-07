@@ -30,7 +30,7 @@ const STEPS: Array[Dictionary] = [
 	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore and coal into the forge below. First automation!", "goal": "First automation"},
 	{"id": &"hopper", "label": "The crew's cache lies in the WHITE RING: dig down at the WHITE SQUARE above it, set the HOPPER over the Drill with [BUILD], drop coal in", "goal": "Automate the coal feed"},
 	{"id": &"power", "label": "Set the GENERATOR from the cache down with [BUILD] and press [DROP] to feed it coal — the deep needs power", "goal": "Burn coal for power"},
-	{"id": &"winch", "label": "Stand the WINCH HEAD on a lode with [BUILD], then press [LINK] on it and on its Station — the vein climbs on its own", "goal": "Raise the winch"},
+	{"id": &"winch", "label": "Carry 6 ingots to the WHITE-RINGED rig for the WINCH, then stand the WINCH HEAD on a lode with [BUILD] and press [LINK] on it and its Station", "goal": "Raise the winch"},
 ]
 
 const INGOTS: Array[StringName] = [&"ingot", &"iron_ingot"]
@@ -109,27 +109,31 @@ func progress(id: StringName) -> String:
 		if step["id"] == id and step.has("count"):
 			return "%d/%d" % [mini(gained(step["count"]), int(step["need"])), int(step["need"])]
 	if id == &"deliver" and _last != null:
-		return delivered(_last)
+		return delivered(_last, 1, FIRST_DEMAND_NEED)
+	if id == &"winch" and _last != null and Payouts.pack_counts(_last).get(&"winch_head", 0) == 0 and not _has_machine(_last, &"winch_head"):
+		return delivered(_last, 2, SECOND_DEMAND_NEED)                   # D2 (D0492): the rig's count until the head is in hand
 	return ""
 
 
-## THE RIG'S COUNT (D0485): "1/2" while the first demand is being filled; "2/2" once it has been met. The
-## observation carries what the rig wants (the view reads no ladder); the first demand's need is the
-## ladder's own first line, kept here as the card's number once the rig has moved on from it.
+## THE RIG'S COUNT (D0485, D0492): "1/2" while a demand is being filled; "2/2" once the rig's stage has
+## reached `met_stage`. The observation carries what the rig wants NOW (the view reads no ladder); `need`
+## is that demand's own count from the ladder's data, kept here as the card's number once the rig has
+## moved on from it.
 const FIRST_DEMAND_NEED: int = 2
-static func delivered(o: Interface.Observation) -> String:
+const SECOND_DEMAND_NEED: int = 6
+static func delivered(o: Interface.Observation, met_stage: int, need: int) -> String:
 	for rec: Dictionary in o.machines:
 		if rec.get("behavior", &"") != &"rig":
 			continue
 		var want: Dictionary = rec.get("wants", {})
-		if int(rec.get("stage", 0)) >= 1:
-			return "%d/%d" % [FIRST_DEMAND_NEED, FIRST_DEMAND_NEED]
+		if int(rec.get("stage", 0)) >= met_stage:
+			return "%d/%d" % [need, need]
 		if want.is_empty():
 			return ""
 		var item: StringName = want.keys()[0]
-		var need: int = int(want[item])
-		return "%d/%d" % [mini(int((rec.get("input", {}) as Dictionary).get(item, 0)), need), need]
-	return "0/%d" % FIRST_DEMAND_NEED
+		var asked: int = int(want[item])
+		return "%d/%d" % [mini(int((rec.get("input", {}) as Dictionary).get(item, 0)), asked), asked]
+	return "0/%d" % need
 
 
 ## The first rig's stage in the window: demands met (D0485). 0 with no rig in sight.

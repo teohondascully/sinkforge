@@ -66,11 +66,10 @@ fixtures:
   - {kind: open, cells: [[7, 3], [7, 4]]}
   - {kind: solid, dx: 7, dy: 5, material: clay, deposit: 0}
   - {kind: machine, id: processor, dx: 7, dy: 3}
-  # THE CREW'S CACHE (D0409): the ladder's later rungs ask for a hopper, a generator and a winch pair that
-  # nothing supplied. They lie in a floored pocket under the spawn, three metres below the adit's floor --
-  # inside the pad, out of the scoop's reach from the adit, found by digging on.
+  # THE CREW'S CACHE (D0409): the ladder's later rungs ask for a hopper and a generator that nothing
+  # supplied. They lie in a floored pocket under the spawn, three metres below the adit's floor -- inside
+  # the pad, out of the scoop's reach from the adit, found by digging on. The winch pair lay here too until
+  # the rig became its one source (D2, D0492): the way up is paid for, not found.
   - {kind: room, dx: 1, dy: 7, w: 3, h: 1, floor: clay}
   - {kind: pile, item: hopper, count: 1, dx: 1, dy: 7}
   - {kind: pile, item: generator, count: 1, dx: 2, dy: 7}
-  - {kind: pile, item: winch_head, count: 1, dx: 3, dy: 7}
-  - {kind: pile, item: winch_station, count: 1, dx: 3, dy: 7}

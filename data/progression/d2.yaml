@@ -1,0 +1,9 @@
+# D2 (the director, 2026-09-07): the winch pair for six ingots from the running line. The winch head and
+# station used to lie in the crew's cache under the spawn (D0409); the rig is their one source now, so the
+# ladder is the authoritative unlock path for the way UP. The count is provisional: three crafts of the
+# fuelled line, about two minutes of the auto rung.
+id: d2
+order: 2
+wants: {ingot: 6}
+grants: {winch_head: 1, winch_station: 1}
+goal: Deliver 6 ingots to the rig

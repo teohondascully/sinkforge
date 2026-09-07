@@ -18913,3 +18913,25 @@ to schedule. The ladder's texts name neither route as the other.
 **Why record rather than build:** the director's item 3 was written against the fixture opening; the shipped
 opening already carries the recipe, the record and the flag, and building the pocket under today's rule would
 ship a lesson the sim contradicts (the class D0464/D0467/D0470 exist to remove).
+
+## D0492 · 2026-09-07 · D2 pays the winch pair; the crew's cache no longer holds it
+
+**Decided (the director):** `data/progression/d2.yaml`: six ingots buy the winch head and station. The two
+winch piles leave the starter cache (`data/starts/tutorial.yaml`), which keeps the hopper and the generator;
+the rig is the way up's one source, so the ladder is the authoritative unlock path. The winch rung's card
+names the price and rings the rig until the head is paid out, then the head where it lies; its count reads
+the rig's second demand ("3/6") until the head is in hand or standing. The six is provisional: three crafts
+of the fuelled line, about two minutes of the auto rung.
+
+**Why the cache and not the rig would have been wrong:** two sources for one machine make the ladder a
+suggestion. With the winch found under the spawn, a player who dug down first would raise a winch without
+ever meeting the rig's second demand, and the demand would then pay a duplicate. One source, one story:
+the crew pays for the way up.
+
+**Verified:** `tests/test_rig.gd` (18): D2's record; six ingots at stage 1 set both machines down at the foot
+the same tick, stage 2, eight ingots consumed over the two demands, conserved; the ladder then reads idle
+and eats nothing. `tests/test_tutorial_playthrough.gd` (23): the cache holds hopper and generator, never
+the winch, and D2's grant is the pair. `tests/test_objectives.gd` (32): the winch rung reads 3/6 from the
+rig, "" with the head in hand, 6/6 paid and lying. `tests/test_tutorial_teaching.gd` (67): WINCH rings the
+rig before the payout. `test_world_seeder` 50, `test_objective_line` 35 (the new label fits its two lines),
+`test_hints_moments` 28 unchanged.

@@ -59,6 +59,13 @@ func _test_the_pack_steps() -> void:
 	_check(not obj.is_done(&"deliver") and obj.progress(&"deliver") == "1/2", "one ingot in the rig: 1/2, not done (%s)" % obj.progress(&"deliver"))
 	obj.refresh(_obs([["ore", 4]], [_m(&"rig", Vector2i(4, 6), {"input": {}, "stage": 1, "wants": {}})]), 0.016)
 	_check(obj.is_done(&"deliver") and obj.progress(&"deliver") == "2/2" and obj.current_id() == &"build", "the demand met: 2/2, and next is the drill (%s)" % obj.current_id())
+	# D0492: the winch rung counts the rig's SECOND demand until the head is in hand or standing.
+	obj.refresh(_obs([["ore", 4]], [_m(&"rig", Vector2i(4, 6), {"input": {&"ingot": 3}, "stage": 1, "wants": {&"ingot": 6}})]), 0.016)
+	_check(obj.progress(&"winch") == "3/6", "three ingots in the rig on its second demand: the winch rung reads 3/6 (%s)" % obj.progress(&"winch"))
+	obj.refresh(_obs([["winch_head", 1]], [_m(&"rig", Vector2i(4, 6), {"input": {}, "stage": 2, "wants": {}})]), 0.016)
+	_check(obj.progress(&"winch") == "", "the head in hand: the count leaves the card (%s)" % obj.progress(&"winch"))
+	obj.refresh(_obs([], [_m(&"rig", Vector2i(4, 6), {"input": {}, "stage": 2, "wants": {}})]), 0.016)
+	_check(obj.progress(&"winch") == "6/6", "paid and dropped, not yet picked up: 6/6 (%s)" % obj.progress(&"winch"))
 
 
 func _test_the_machine_steps() -> void:

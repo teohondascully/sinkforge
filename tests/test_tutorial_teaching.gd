@@ -249,6 +249,7 @@ func _rig_and_drill_pins(door: Interface, world: World, o: Interface.Observation
 	var rig: Vector2 = TargetGuide.target(&"deliver", o)
 	_check(rig != TargetGuide.NONE and rig.x > body_px.x and body_px.distance_to(rig) < 3.0 * 16.0, "DELIVER rings the crew's rig two metres right (%.1f m off) (D0485)" % (body_px.distance_to(rig) / 16.0))
 	_check(TargetGuide.target(&"build", o) == TargetGuide.NONE, "BUILD rings nothing before the rig has paid: no drill lies anywhere (D0485)")
+	_check(TargetGuide.target(&"winch", o) == rig, "WINCH rings the rig too, until its second demand has paid the head out (D0492)")
 	var items: Items = door.services()["items"]
 	var foot: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS["tutorial"]) + Vector2i(2, 2)   # the open cell under the rig
 	items.piles.pile(foot)[&"drill"] = 1                                     # the paid drill, posed where the rig sets it down

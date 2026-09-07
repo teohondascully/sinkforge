@@ -366,20 +366,6 @@ const RECORDS: Dictionary = {
 				"dx": 2,
 				"dy": 7,
 			},
-			{
-				"kind": "pile",
-				"item": "winch_head",
-				"count": 1,
-				"dx": 3,
-				"dy": 7,
-			},
-			{
-				"kind": "pile",
-				"item": "winch_station",
-				"count": 1,
-				"dx": 3,
-				"dy": 7,
-			},
 		],
 	},
 }

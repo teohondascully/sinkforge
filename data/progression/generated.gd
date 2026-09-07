@@ -18,4 +18,16 @@ const RECORDS: Dictionary = {
 		},
 		"goal": "Deliver 2 ingots to the rig",
 	},
+	"d2": {
+		"id": "d2",
+		"order": 2,
+		"wants": {
+			"ingot": 6,
+		},
+		"grants": {
+			"winch_head": 1,
+			"winch_station": 1,
+		},
+		"goal": "Deliver 6 ingots to the rig",
+	},
 }
