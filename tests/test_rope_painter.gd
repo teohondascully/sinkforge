@@ -109,6 +109,9 @@ func _test_the_landing_ring_waits_for_the_grapple_to_be_known() -> void:
 	o.grapple_live = false
 	o.grapple_ghost = {}
 	_check(not RopePainter.ghost_visible(o, true), "no landing, no ring")
+	# D0449: the tutorial's ring is the one achromatic mark; every other ring keeps a hue. The rope's landing
+	# ring is hemp (chromatic) and stands off the target's white; legacy's pale gold, which once shared the
+	# tutorial's ink, is chromatic too and reads as not-the-target under the same rule.
 	var d: float = Vector3(RopePainter.AIM_MARK.r, RopePainter.AIM_MARK.g, RopePainter.AIM_MARK.b).distance_to(Vector3(TargetGuide.INK.r, TargetGuide.INK.g, TargetGuide.INK.b))
-	var same: float = Vector3(0.99, 0.88, 0.56).distance_to(Vector3(TargetGuide.INK.r, TargetGuide.INK.g, TargetGuide.INK.b))
-	_check(d > 0.15 and same < 0.05, "the ring's ink stands off the tutorial ring's (%.2f) where legacy's pale gold did not (%.2f)" % [d, same])
+	var legacy := Color(0.99, 0.88, 0.56)
+	_check(d > 0.15 and RopePainter.AIM_MARK.s >= 0.3 and legacy.s >= 0.3 and TargetGuide.INK.s < 0.05, "the landing ring's hemp stands off the target's white (%.2f) and is chromatic (s %.2f), as legacy's pale gold is (s %.2f); the target's ink is not (s %.2f)" % [d, RopePainter.AIM_MARK.s, legacy.s, TargetGuide.INK.s])
