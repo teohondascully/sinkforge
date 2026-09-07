@@ -18269,3 +18269,18 @@ the banner draws (pinned at boot), and a bare `Hints` in a suite keeps the pack 
 is noise a stranger has to disprove.
 
 **Reverse cost:** one function and four lines in the guide; one field in the hints; two labels.
+
+## D0459 · 2026-09-07 · With the drill in hand, BUILD's ring moves to the shaft's mouth
+
+**Decided:** the BUILD rung rings the drill pile; once the pile is picked up (walked over) the rung has no
+target and the how-to's last clause, "press [BUILD] at the shaft's mouth", points at nothing. The line is a
+drill over a vein over a forge in one column, and the seeded shaft is the one place with a forge under
+ore under open air: `TargetGuide.shaft_mouth` finds, for each processor in the window, the topmost ore-like
+metre standing over it within four metres and the open metre above that, and rings the nearest. Pinned on
+the real world (ANCHOR + (7, 1)); the mutation returns NONE and fails it. Nobody has reached this step in
+a stranger run yet; it is the step after the cut mark (D0458), taken now so the next batch's evidence is
+not spent on a ring that vanishes.
+
+**Why:** a rung whose marker disappears halfway is two rungs with one sentence.
+
+**Reverse cost:** one function and three lines.

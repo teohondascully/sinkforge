@@ -105,6 +105,9 @@ static func target(id: StringName, o: Interface.Observation) -> Vector2:
 		&"smelt":
 			return _nearest_machine(o, body, &"processor")
 		&"build":
+			# The drill in hand: the ring moves from the pile to the shaft's mouth (D0459), where [BUILD] goes.
+			if int(Payouts.pack_counts(o).get(&"drill", 0)) > 0:
+				return shaft_mouth(o, body)
 			return _nearest_pile(o, body, &"drill")
 		&"hopper":
 			return _nearest_pile(o, body, &"hopper")
@@ -115,6 +118,42 @@ static func target(id: StringName, o: Interface.Observation) -> Vector2:
 	return NONE
 
 const NONE := Vector2(-1.0e9, -1.0e9)
+const SHAFT_ABOVE_M: int = 4              ## how far above a forge the shaft's vein and mouth are looked for
+
+
+## THE SHAFT'S MOUTH (D0459): "the line" is a drill over a vein over a forge in one column, and the seeded
+## shaft is the one place with a forge under ore under open air. The mouth is the open metre right above
+## the topmost ore-like metre that stands over a processor within SHAFT_ABOVE_M; the nearest such mouth to
+## the body by the ring's own ranking. NONE when the window holds no forge with ore over it.
+static func shaft_mouth(o: Interface.Observation, body: Vector2) -> Vector2:
+	var best: Vector2 = NONE
+	var best_d: float = 1.0e18
+	for rec: Dictionary in o.machines:
+		if rec.get("id", &"") != &"processor":
+			continue
+		var col: int = (rec["cell"] as Vector2i).x
+		var row: int = (rec["cell"] as Vector2i).y - 1
+		var vein_row: int = -1
+		for _step: int in SHAFT_ABOVE_M:
+			var c := Vector2i(col * 4 + 2, row * 4 + 2)
+			if not o.in_window(c):
+				break
+			if o.is_ore_like_at(c):
+				vein_row = row
+			elif vein_row >= 0 and not o.solid_at(c):
+				break
+			row -= 1
+		if vein_row < 0:
+			continue
+		var mouth := Vector2i(col * 4 + 2, (vein_row - 1) * 4 + 2)
+		if not o.in_window(mouth) or o.solid_at(mouth):
+			continue
+		var at: Vector2 = (Vector2(col, vein_row - 1) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+		var d: float = _ranked(at, body)
+		if d < best_d:
+			best_d = d
+			best = at
+	return best
 
 
 ## Rings outward from the body's cell. A ring at Chebyshev radius r holds no point nearer than (r - 1)
