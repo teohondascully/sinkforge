@@ -7,6 +7,7 @@ var bridge: RefCounted = Bridge.new()
 var game: Main
 var session_dir: String = ""
 var launcher: String = "direct"    ## who started the process: `playtest/seat.sh` says launchservices
+var load_from: String = ""         ## a save to open instead of a new game: the rung-N mission variant (D0462)
 var remaining: int = -1
 var request_id: int = 0
 var capturing: bool = false
@@ -43,6 +44,8 @@ func _initialize() -> void:
 			session_dir = arg.trim_prefix("--session-dir=")
 		elif arg.begins_with("--launcher="):
 			launcher = arg.trim_prefix("--launcher=")
+		elif arg.begins_with("--load="):
+			load_from = arg.trim_prefix("--load=")
 	if not session_dir.is_absolute_path() or not DirAccess.dir_exists_absolute(session_dir):
 		printerr("playtest: supply an existing absolute --session-dir")
 		quit(2)
@@ -65,19 +68,21 @@ func _start() -> void:
 	Settings.path = session_dir.path_join("settings.cfg")
 	game = Main.new()
 	game.autoboot = false
-	game.save_path = session_dir.path_join("save.json")
+	game.save_path = load_from if load_from != "" else session_dir.path_join("save.json")
 	root.add_child(game)
 	Settings.muted = true   # a seat plays on a machine somebody is using; the stranger reads a screen (D0437)
-	if not game.boot(false):
+	if not game.boot(load_from != ""):
 		quit(2)
 		return
+	game.save_path = session_dir.path_join("save.json")   # never write back over the variant's save
 	Settings.apply_audio()
 	# The adapter named in full (D0452): a local macOS launcher is not a CI assumption, and a seat that ran
 	# at background priority is a harness fact the batch report must carry, not a game finding.
 	_write("receipt.json", {"engine": Engine.get_version_info(), "mode": "screen-only settled-between-bursts",
 		"viewport": [1280, 720], "session_dir": session_dir, "pid": OS.get_process_id(), "muted": AudioServer.is_bus_mute(0),
 		"platform": OS.get_name(), "launcher": launcher, "max_fps": Engine.max_fps, "vsync": DisplayServer.window_get_vsync_mode(),
-		"nice": _nice(), "priority": "foreground" if _nice() == 0 else "background", "physics_hz": Engine.physics_ticks_per_second})
+		"nice": _nice(), "priority": "foreground" if _nice() == 0 else "background", "physics_hz": Engine.physics_ticks_per_second,
+		"loaded_from": load_from})
 	ready = true
 	remaining = 1
 
@@ -162,6 +167,9 @@ func _process(_delta: float) -> bool:
 		_write("response.json", {"id": request_id, "quit": true, "tick": game.tick})
 		quit()
 		return false
+	if String(command.get("save", "")) != "":
+		_save_to(String(command["save"]))
+		return false
 	var error: String = bridge.validate(command)
 	if error != "":
 		_write("response.json", {"id": request_id, "error": error})
@@ -213,6 +221,16 @@ func _state_now() -> Dictionary:
 	var f: Frame = game.view.current_frame()
 	var cell: Array = [f.obs.cell.x, f.obs.cell.y] if f != null and f.obs != null else []
 	return {"rung": String(now.get("rung", &"")), "progress": String(now.get("progress", "")), "pack": pack, "lesson": String(now.get("lesson", &"")), "cell": cell}
+
+
+## The session written to a named path (the ceiling run makes the rung-N variant's save, D0462); the seat's
+## own save path is untouched, so a stranger's run never writes a save.
+func _save_to(path: String) -> void:
+	var keep: String = game.save_path
+	game.save_path = path
+	var ok: bool = game.save()
+	game.save_path = keep
+	_write("response.json", {"id": request_id, "saved": ok, "path": path, "tick": game.tick})
 
 
 ## The process's nice value as the OS reports it (macOS: 5 under a background clamp, 0 foreground); -1

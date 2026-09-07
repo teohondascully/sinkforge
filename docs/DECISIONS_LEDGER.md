@@ -18314,3 +18314,20 @@ after the forge emptied into the pack teaches nothing (pinned).
 told a stranger the wait was over.
 
 **Reverse cost:** one moment row and one function; one constant on the observation.
+
+## D0462 · 2026-09-07 · The rung-N mission variant: a seat opened from a save the ceiling run wrote
+
+**Decided:** no stranger has reached BUILD with budget to spare (31-34 arrived at 42-105 s with a dozen
+bursts left and dug elsewhere), so D0458's cut mark and D0459's moving ring have no evidence. The seat
+takes `--load=<save>` (opens the session instead of a new game, then points its own save path back at
+the session directory so a run never writes over the variant), and a `{"save": "<path>"}` command writes
+the session to a named path; `playtest/ceiling.py --save-to` writes one after its third rung, standing by
+the felled tree with two ingots and a block of wood, the ladder at BUILD. `stranger.py start --load`
+records the save's path and SHA-256 in the pin; the receipt says `loaded_from`; the validator notes the
+variant. A stranger opened there is a mission variant under the director's rule 7, not the opening: its
+first three rungs are the script's, and its report says so. The save for f298443d is tracked at
+`tests/body/saves/rung4_f298443d.json`; a save belongs to its build.
+
+**Why:** a rung nobody reaches in sixty bursts cannot be read from the sixty bursts.
+
+**Reverse cost:** one seat argument and one command.

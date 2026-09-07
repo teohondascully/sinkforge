@@ -53,6 +53,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("session_dir")
     parser.add_argument("--hold", action="store_true", help="leave the seat up at the end (for a look at the BUILD rung)")
+    parser.add_argument("--save-to", default="", help="after the third rung, write the session here: the rung-4 mission variant's save (D0462)")
     args = parser.parse_args()
     session = Path(args.session_dir).resolve()
     rc = subprocess.run([sys.executable, str(HERE / "stranger.py"), "start", str(session), "--mission", str(Path(__file__).resolve()), "--model", "script:ceiling"]).returncode
@@ -105,6 +106,10 @@ def main():
             trunk[0] -= px_per_cell
         return resp, False
     results["wood"] = rung(session, "wood", 12, wood)
+    if args.save_to and results["wood"] is not None:
+        burst(session, {"ticks": 3, "keys": ["D"]}, "ceiling: face the pad")
+        r = burst(session, {"save": str(Path(args.save_to).resolve())}, "ceiling: the rung-4 save")
+        print(json.dumps({"saved": r.get("saved"), "path": r.get("path"), "tick": r.get("tick")}))
     if not args.hold:
         burst(session, {"quit": True}, "ceiling: done")
     done = {k: v is not None for k, v in results.items()}
