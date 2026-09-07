@@ -219,3 +219,8 @@ has a consumer (D0410). *Question: worth its boot cost before any music is autho
 green block appear beside the ingots, and believed it was wood; the counter stayed 0/1 and read as a bug
 (D0421). *Question: a name under every slot (clutter), a name on hover only, or the item's name flashed
 beside the miner as it lands in the pack?*
+
+**T030 · The drag paints a dig plan a stranger cannot name.** Holding MINE while the pointer moves marks
+cells for later digging (legacy's plan); the second stranger left yellow dashes on distant canopies and a
+trunk and had no word for them or a way to clear them it knew (D0423). *Question: gate the plan behind a
+modifier, teach it as a lesson when the first dash lands, or make CLEAR_PLAN a visible control?*

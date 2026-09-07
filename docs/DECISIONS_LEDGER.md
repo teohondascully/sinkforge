@@ -17396,3 +17396,26 @@ run after these fixes is their test.
 adapter made one possible, and its first three hesitations were each a field the game already knew.
 
 **Reverse cost:** one StringName on the hold and the observation; three sentences; one tooltip.
+
+## D0423 · 2026-09-06 · The second stranger: the cut's progress fills the aim square; what the red bar did and did not say
+
+**The run** (`docs/playtests/2026-09-06_stranger2.md`, after D0421): first ore at 6.5 s of game time
+(stranger 1: 10.7), first ingots at 11.4 s (26.1), "Forge 2 ingots" complete at 15.7 s; then twenty-two
+bursts on trees and a stop with wood at 0/1. Verdict reversed from stranger 1: "would not continue
+without clearer mechanical feedback." The frames say the stall had one cause: wood takes sixteen blows,
+no hold was long enough for one, and the only progress shown was the crack pixels (V31). The red refusal
+bar (D0421) was read as "targeting confirmation", and the TOO FAR words docked where the eye was not.
+
+**Decided:** the banked share of the cell being charged rises as a wash inside the aim square, from the
+floor up, in the square's own chrome at 0.45: a hold that is working looks like a thing filling; released
+halfway it shows what it kept; a resting pointer shows nothing. Pinned in `test_mark_painter` against
+the dig plan's own wash, which shares the kind.
+
+**Named, not done:** the wood ring on the miner's chest when the trunk stands behind the body; the drag-
+painted dig plan a stranger cannot name or clear (T030); the selected slot's label read as the
+inventory's contents (T029); the refusal's words arriving in the dock where the eye is not (T024, now
+with evidence). And two runs of two agents are two samples: the numbers above are a direction, not a rate.
+
+**Why:** "sixteen cuts make a block" was in the sentence and nowhere on the screen.
+
+**Reverse cost:** one function, one wash.
