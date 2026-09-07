@@ -370,7 +370,7 @@ posed. **The profile (D0418):** `--mute=<stems>` ablates world layers; the only 
 own terms (the post lens's screen mip chain removed, `filter_linear`). A resolved profile needs a GPU
 timer on an idle machine.
 
-**The stranger protocol.** The other session's screen-led adapter (`playtest/`, 3a6d0d54) fixed twice:
+**The stranger protocol.** The other session's screen-led adapter (`playtest/`, 3a6d0d54 -- its hash moves with D0426's rewrite) fixed twice:
 the bridge poses the seat's own pointer, never the OS cursor, and the seat runs with vsync off so an
 unwatched window keeps stepping (**D0419**); composed moves -- timed segments inside one burst, one
 screenshot at the end (**D0420**). A fresh-context haiku agent plays with no source, no coordinates and no
@@ -404,6 +404,10 @@ Not started: ore's sparkle (V32).
 
 **Not touched since the wrap:** Part B (the signature look), the lighting experiment (Astra's item 5),
 ranks 9-13.
+
+**BLOCKED ON THE DIRECTOR (D0426):** nine commits on `main` (3a6d0d54..af3e1c70) carry the personal git
+identity; the authorship CI job is red on every push until they are rewritten, and `main`'s branch
+protection refused the force-push. The procedure is in D0426; it takes a minute with force pushes allowed.
 
 ### Next action
 
