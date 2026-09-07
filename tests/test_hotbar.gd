@@ -42,7 +42,8 @@ func _font() -> Font:
 
 func _test_labels() -> void:
 	_check(Hotbar.item_label(&"drill") == "Drill", "a machine item is its record's display name (%s)" % Hotbar.item_label(&"drill"))
-	_check(Hotbar.item_label(&"ore_iron") == "Ore iron", "a resource is its id, spaced and capitalised (%s)" % Hotbar.item_label(&"ore_iron"))
+	_check(Hotbar.item_label(&"ore_copper") == "Copper ore" and Hotbar.item_label(&"ore_iron") == String(MaterialsRecords.RECORDS["ore_iron"]["display_name"]), "a material is its record's display name -- \"Copper ore\", not \"Ore copper\" (D0463) (%s)" % Hotbar.item_label(&"ore_copper"))
+	_check(Hotbar.item_label(&"no_such_thing") == "No such thing", "an item with no record is its id, spaced and capitalised (%s)" % Hotbar.item_label(&"no_such_thing"))
 	_check(Hotbar.item_label(&"coal") == "Coal", "(%s)" % Hotbar.item_label(&"coal"))
 
 

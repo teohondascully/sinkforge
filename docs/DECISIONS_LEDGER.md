@@ -18331,3 +18331,15 @@ first three rungs are the script's, and its report says so. The save for f298443
 **Why:** a rung nobody reaches in sixty bursts cannot be read from the sixty bursts.
 
 **Reverse cost:** one seat argument and one command.
+
+## D0463 · 2026-09-07 · An item's label is its material record's display name
+
+**Decided:** `Hotbar.item_label` named a machine by its record and everything else by its id spaced and
+capitalised, so the copper lode's yield read "Ore copper" in the bar and "NOT ORE — that was ore copper"
+in the lesson (stranger 41, the holdout). A material record's `display_name` ("Copper ore", "Iron ore",
+"Clay") is read first now; an item with no record keeps the spaced id. Pinned; the WRONG STACK and NOT
+ORE pins read the same.
+
+**Why:** a name the data already carries should not be re-derived worse.
+
+**Reverse cost:** two lines.

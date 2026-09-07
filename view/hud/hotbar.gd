@@ -43,8 +43,10 @@ static func bottom_furniture_fraction() -> float:
 ## Human-readable name for a carried item.
 static func item_label(item: StringName) -> String:
 	var rec: Dictionary = MachinesRecords.RECORDS.get(String(item), {})
-	if not rec.is_empty():
-		return String(rec.get("display_name", String(item)))
+	if rec.is_empty():
+		rec = MaterialsRecords.RECORDS.get(String(item), {})   # a material's own name: "Copper ore", not "Ore copper" (D0463)
+	if not rec.is_empty() and String(rec.get("display_name", "")) != "":
+		return String(rec["display_name"])
 	var s: String = String(item).replace("_", " ")
 	return s.substr(0, 1).to_upper() + s.substr(1)
 
