@@ -302,3 +302,22 @@ draws only the slots carried, with a floor of one (legacy's rule, D0368) -- and 
 cap bites. *Question: does the director want the cap visible before it bites (a "5 of 10" under the bar,
 or one dim empty well past the last full one), or does legacy's rule stand?* Two strangers (14, 20) said
 they could not tell what they held from the bar; none said they wanted to know how much more it takes.
+
+**T040 · The terrain's per-cell shading: on the CPU as it is, or a data texture with the tone in a shader.**
+The director, playing 2fe07582: "the whole world freezes every single time I mine a block; if I jump down a
+shaft it glitches as it loads another part of the world". Measured (D0522, D0524): the sim costs 0.3 ms a
+tick; every stall was the terrain bake, and the bake's unit cost is the molded shading, 18-25 us a SOLID
+cell (`TerrainPainter.cell_fill` -> `RockTone.shade` probes each cell's neighbours out to FORM_REACH + 1
+through a Callable, then one `draw_rect`; air cells are near free). Three fixes landed around that cost
+without touching it: a dig repaints its own dilated rectangle (a blow 419 ms -> 60 ms worst), chunks went
+128 -> 32 -> 16 cells, and the streaming lane paints at most 512 solid cells a tick (a shaft fall's worst
+frames 80-90 ms -> 22-23 ms). What remains is the floor that cost sets: 512 cells is 11-13 ms of bake in a
+16.7 ms frame, so a fall into solid ground still runs 17-25 ms frames (34-37 of the first 2000, at 512
+and at 384 alike); the only way under it is fewer cells a tick, which is chunks arriving later. *The
+fork: keep the CPU tone and accept the stutter on new ground, or bake per chunk a small data texture
+(material id, grammar, distance-to-air as the shader's inputs, ~1 us a cell to build) and move the molded
+tone into the rock shader beside the tooth (`rock_tooth.gdshader` already samples the grammar map, D0398,
+D0511). The second is the "molded vs crisp" question the underground-legibility work parked: the tone's
+LOOK would be re-derived in GLSL, and a capture comparison would decide whether it is the same picture.
+A worker can do the first half (the data texture, the shader reading it) as a bounded ticket once the
+director says the look may move by a capture's difference.*

@@ -182,5 +182,10 @@ eighteen seats before. The strangers named the state ("RIG-IN-REACH, MOUTH-IN-RE
 (14 of 24), the ceremony card read as the end (2), a self-dug pit (1). **D0523:** the spider cracks removed
 at the director's ask. **In flight:** the director's freeze on every blow, measured: a blow costs a 17-27 ms
 frame and the first blows 178-417 ms, all on the view side (the sim is 0.3 ms a tick headless); W9 (D0522)
-repaints the bite's own rectangle, shrinks chunks to 32 cells and budgets the window lane. **Next:** D0522
-lands with its after-numbers, battery, push.
+repaints the bite's own rectangle, shrinks chunks to 32 cells and budgets the window lane. **D0522 and D0524 landed:** a blow repaints its own dilated rectangle (worst blow frame 419 ms -> 60 ms;
+later blows under a frame), chunks are 16 cells, and the streaming lane paints at most 512 solid cells a
+tick (a shaft fall's worst frames 80-90 ms -> 22-23 ms; a 384 budget measured the same, the floor is the
+per-cell cost). The first frame is byte-identical. What remains is the per-cell shading itself, 18-25 us
+a solid cell on the CPU: T040 in the taste queue puts the fork (a per-chunk data texture with the tone in
+the rock shader) to the director with the numbers. **Next:** the director's read of T040; the batch queue
+resumes on the next discoverability change.
