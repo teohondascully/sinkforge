@@ -19189,3 +19189,71 @@ where the ring's centre sits within about 36 px of the bottom edge the guide sti
 word falls off. Clamping it up would put it over the ringed metre, which is the harder rule, so it is left
 and named. (3) The seam's look -- one black metre beside a black hole -- stays the director's, as D0493 left
 it; this names the thing, it does not make it look like coal.
+## D0494 · 2026-09-07 · The coal seam reads as solid coal, not as a hole
+
+**Decided:** three values in `data/materials/coal.yaml`'s appearance block stop being legacy-verbatim, and
+each is a measurement rather than a taste. `base_color` [0.15, 0.16, 0.19] -> [0.21, 0.22, 0.26];
+`nugget_count` 7 -> 17; `nugget_color` [0.34, 0.37, 0.44] -> [0.37, 0.40, 0.48]. `glitters` STAYS FALSE --
+legacy's warning ("glittering coal was being mistaken for a blue crystal") is untouched, and no glint
+flare is added; `grammar`, `depth_darken` and `grain` are untouched. D0493 left "the seam's look (a black
+metre beside a black hole)" to the director; this is that, taken on the numbers below.
+
+**Why, by the numbers, not by eye.** D0493's batch is the evidence: four of six strangers never held coal,
+three hunted "black" and pressed open shafts, and S79 stood on the seam and strode past it
+(`docs/playtests/2026-09-07_strangers76-81_seam_slot.md`). Two independent defects, and both were
+invisible to every green suite:
+
+1. **Coal was the colour of a hole, by construction.** Its matrix sat **0.0141** from
+   `BackdropPainter.COLOR_BG`, dug space's own fill, over 64 columns at the seam's row -- against 0.0943
+   for deepstone, 0.2180 for the clay beside it, and a palette-wide closest-rock-pair of 0.0769. Coal was
+   five times closer to a hole than any rock in this palette is to any other rock. It is 0.0933 now.
+2. **A metre of coal could carry no facet at all.** `nugget_count` 7 is a mark on 10.9% of CELLS, which
+   made the mean cell fine and left **16.042% of coal METRES markless** -- and the tutorial seam is one of
+   them: sixteen cells, not one mark, a luma spread of 0.0009, a dead flat fill. 17 is the smallest count
+   putting that under one metre in a hundred (16 -> 1.155%, 17 -> 0.828%; measured over 40,000 metres).
+   Over the same 14,400-metre population the rate is 16.042% -> 0.778% and marks a metre 1.74 -> 4.27.
+
+The third value is the first one's consequence, found by a suite rather than by looking: lifting the matrix
+squeezed coal's own mark to **0.243** in the wall plane, under `test_wall_lode`'s 0.25 mark-vs-own-matrix
+floor -- the one material of seven to fail it. `nugget_color` scales away from the new matrix along legacy's
+own axis, back to 0.290 (mark-vs-other-rock 0.150 -> 0.198, reported not gated).
+
+**Verified.** MaterialLook, by the new pin in `tests/test_material_palette.gd` (21 -> **25 asserted**):
+coal matrix vs dug space 0.0141 -> **0.0933** against a live floor of 0.0769; matrix luma 0.1522 -> 0.2099
+with clay's 0.2749 unchanged, so coal is still the darker rock at the seam and 0.1593 from it; the
+1st-percentile coal metre's luma spread 0.0008 -> **0.0770** against clay's median metre of 0.0194. On
+screen, the shipped opening at 1280x720 zoom 2.00 tick 30, one metre = 32x32 px (row 80 begins at screen
+y=400, not the 407 estimated): the seam metre 0.1833 -> **0.2473** mean luma (sd 0.1090 -> 0.1110); the
+shaft's open mouth two metres right **0.117538 unchanged to six decimals**; the clay metre one metre left
+**0.216443 unchanged to six decimals** -- only coal moved. Seam-minus-hole 0.0658 -> 0.1297. On the rock
+rows alone (81-83, no cap or moss): seam 0.1399 -> 0.2156, hole 0.1155 and clay 0.1305 unchanged, so the
+coal body went from 0.024 above an open hole to 0.100 above it. **Mutation-tested:** reverting
+`coal.yaml` + its generated file to HEAD turns exactly the two new pins red (0.0141 < 0.0769; p1 0.0008 <
+0.0194) while the "still the darker rock" guard stays green; restored, green. `test_wall_lode` 173
+asserted went red at 0.243 and green at 0.290. Full CI suite set **136 of 136** (`tools/run_suites.sh`,
+231 s); `test_terrain_painter` 18, `test_rock_tone` 24, `test_surface_tone` 29, `test_rock_grit` 6, all
+unchanged; the four gates pass.
+
+**Also changed, because my change made its basis stale:** `tests/test_rock_tone.gd`'s black-clipping bound
+said "3%, measured off coal's 1.0-1.5%" and named coal "the darkest thing shipped (base luma 0.160)". Coal
+is still the worst clipper and every other material still reads 0.0%, but its fraction is **0.08%** now, so
+a 3% bound was thirty times the observation. Ratcheted to 1% with the new measurement stated; the clamp's
+own control still fires (1223 channels).
+
+**Provisional / not changed, and the honest limits.** (1) Coal still does not clear the closest-rock-pair
+distance measured AT THE SEAM'S OWN ROW -- 0.0923 against 0.1675 -- and cannot: `COLOR_BG` is itself a
+mid-dark blue-grey (luma 0.1614), so a rock cannot get far from it and stay dark, and the blue direction
+that would buy distance cheaply is the one legacy's crystal warning forbids. **The remaining ceiling is the
+backdrop's colour, not coal's**, and `view/visuals/backdrop_painter.gd` was another worker's file this
+session. (2) Clay darkens faster with depth than coal (`depth_darken` 0.38 against 0.22), so below ~37 m a
+coal metre reads BRIGHTER than the clay beside it. That crossover already existed (worst -0.0214 at row
+636, measured on the pre-change record) and this deepens it to -0.0896; the seam and every coal metre in
+the first 37 m are unaffected, and no evidence asks for a deep-coal change. (3) `grammar: clastic` is left
+alone: coal is a bedded rock and `bedded` is switched off for it by `matrix_color`'s
+`not rec.has("nugget_color")` test, which conflates "carries a mineral mark" with "is not bedded" -- a
+real question, with a blast radius across all four nugget materials, and nothing measured here needs it.
+(4) `MaterialLook.LEGACY_CELL_SUBCELLS` is 64, the PIXEL-area ratio between legacy's 32px cell and this
+world's 4px cell; legacy's cell is one METRE and a metre here is 16 cells, so the constant preserves
+legacy's mark COVERAGE (its grain quad is ~6.2 px² of a 1024 px² cell) and not its mark COUNT. Both
+readings are defensible, it moves every nugget material, and `nugget_count` fixed coal alone without
+touching it.

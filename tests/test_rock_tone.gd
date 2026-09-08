@@ -265,7 +265,7 @@ func _check_the_probe_is_optional_and_additive(tone: RockTone, base: Color, soli
 ##
 ## **SWEPT OVER THE REAL SHIPPED MATERIALS, not an invented dark colour.** The first version of this test
 ## used a hand-written `Color(0.10, 0.11, 0.13)` and called it "the darkest shipped rock"; the darkest
-## material this build actually ships is coal at luma 0.160, and the invented value was darker than
+## material this build actually ships is coal (base luma 0.160 then, 0.2308 since D0494), and the invented value was darker than
 ## anything real. It still found a genuine defect — the additive drift carried channels NEGATIVE, 3,013 of
 ## 36,000 samples, worst luma -0.14, because the port had omitted the clamp legacy performs structurally
 ## at its byte write (`fine_terrain.gd:1105`). But a bound derived from an invented fixture is not a bound
@@ -286,12 +286,14 @@ func _test_no_stack_of_darkeners_punches_a_hole_in_the_rock() -> void:
 	_check_over(checked, out_of_gamut == 0,
 		"no channel over %d samples of %d real materials leaves [0,1] -- %d did"
 			% [checked, materials, out_of_gamut])
-	# MEASURED, not guessed. Coal is the darkest thing shipped (base luma 0.160) and reads 1.0-1.5% fully
-	# black depending on the rows sampled; every other material reads 0.0%. Coal rendering black is coal,
-	# not a defect, so the bound is set from that measurement with headroom rather than at zero -- a bound
-	# at zero would be a bound on nothing, since it is already true of six of the seven materials.
-	_check(worst_black_frac < 0.03,
-		"the worst material (%s) is %.1f%% fully black, under the 3%% bound measured off coal's 1.0-1.5%%"
+	# MEASURED, not guessed, AND RE-MEASURED WHEN ITS SUBJECT MOVED (D0494). Coal is still the worst
+	# clipper and every other material still reads 0.0%, but coal's base went 0.160 -> 0.2308 luma to get
+	# out of the colour of a hole, and its black fraction went 1.0-1.5% -> 0.08% with it. A 3% bound set
+	# off a coal that no longer exists is a bound on nothing, so it ratchets to 1% -- ten times the
+	# observation, still generous, and no longer thirty times it. A bound at zero would be a bound on
+	# nothing too, since it is already true of six of the seven materials.
+	_check(worst_black_frac < 0.01,
+		"the worst material (%s) is %.2f%% fully black, under the 1%% bound measured off coal's own 0.08%%"
 			% [worst_id, 100.0 * worst_black_frac])
 	# CONTROL: the clamp actually FIRES. If it never did, `min` would sit above zero and the invariant
 	# above would be true of an expression that never needed clamping -- a guard that cannot be observed

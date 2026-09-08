@@ -41,6 +41,7 @@ func _initialize() -> void:
 	_test_the_band_ladder_is_ordered_and_total()
 	_test_the_two_depth_conversions_agree_at_every_row()
 	_test_the_depth_boost_keeps_bedding_legible_under_the_veil()
+	_test_coal_reads_as_coal_and_not_as_a_hole()
 	_finish("material_palette")
 
 
@@ -106,12 +107,10 @@ func _test_host_rocks_are_distinguishable_from_each_other() -> void:
 	var pair: String = ""
 	for i: int in HOSTS.size():
 		for j: int in range(i + 1, HOSTS.size()):
-			for a: Color in _both_branches(look, HOSTS[i], 400):
-				for b: Color in _both_branches(look, HOSTS[j], 400):
-					var d: float = _dist(a, b)
-					if d < closest:
-						closest = d
-						pair = "%s vs %s" % [HOSTS[i], HOSTS[j]]
+			var d: float = _worst_pair(_both_branches(look, HOSTS[i], 400), _both_branches(look, HOSTS[j], 400))
+			if d < closest:
+				closest = d
+				pair = "%s vs %s" % [HOSTS[i], HOSTS[j]]
 	print("  [OBSERVED] closest host-rock pair (the noise floor this palette actually has): %.3f (%s)"
 		% [closest, pair])
 	_check(closest > 0.0, "the host rocks are not all one colour (closest pair %.3f, %s)" % [closest, pair])
@@ -322,3 +321,80 @@ func _test_the_depth_boost_keeps_bedding_legible_under_the_veil() -> void:
 		+ "measurement gives with the boost REMOVED. The floor is that residual, measured, not a number "
 		+ "chosen to be cleared: it is what deep bedding looks like under the veil when nothing "
 		+ "compensates for it.")
+
+
+## COAL MUST NOT BE THE COLOUR OF A HOLE, AND A COAL METRE MUST CARRY A FACET (D0494). Four of six
+## strangers (`docs/playtests/2026-09-07_strangers76-81_seam_slot.md`) never held coal, three hunting
+## "black" and pressing open shafts. Coal's worst column sat **0.0141** from `BackdropPainter.COLOR_BG`,
+## dug space's own colour (its matrix 0.0191, against deepstone's 0.0943 and clay's 0.2180); and
+## `nugget_count` 7 marked 10.9% of CELLS while **16.0% of coal METRES drew no facet at all** -- the
+## tutorial seam among them: sixteen cells, not one mark, spread 0.0009 -- a flat fill, which is what
+## an open hole is. NEITHER FLOOR IS PICKED: the ink's is this palette's own closest rock pair
+## (`_rock_floor`), the facet's is clay's median metre, and both read at their WORST -- a mean sees neither.
+func _test_coal_reads_as_coal_and_not_as_a_hole() -> void:
+	var look := MaterialLook.new()
+	var row: int = MaterialLook.SURFACE_ROW + 2
+	var lum := Vector2(look.matrix_color(&"coal", 0, row).get_luminance(), look.matrix_color(&"clay", 0, row).get_luminance())
+	var open_d: float = _worst_distance(look, row, [COLOR_BG] as Array[Color])
+	var clay_d: float = _worst_distance(look, row, _both_branches(look, &"clay", row))
+	var floor_d: float = _rock_floor(look)
+	var coal: Array[float] = _metre_spreads(look, &"coal")
+	var worst_metre: float = coal[coal.size() / 100]  ## the worst coal metre in a hundred
+	var clay_metre: float = _metre_spreads(look, &"clay")[coal.size() / 2]  ## clay's median metre
+	print("  [OBSERVED] coal matrix luma %.4f (clay %.4f) | worst vs dug space %.4f | vs clay %.4f | rock floor %.4f"
+		% [lum.x, lum.y, open_d, clay_d, floor_d] + " | coal metre spread p1 %.4f p50 %.4f, clay p50 %.4f, %d metres each"
+		% [worst_metre, coal[coal.size() / 2], clay_metre, coal.size()])
+	_check(floor_d > 0.0,
+		"CONTROL: the rock floor is a real distance (%.4f), not two identical colours -- at zero the two assertions below would be true of anything" % floor_d)
+	_check(open_d > floor_d,
+		"coal sits %.4f from dug space, past the %.4f two rocks in this palette cost each other. It was "
+		% [open_d, floor_d] + "0.0141, five times closer to a hole than any other rock, and the "
+		+ "strangers who hunted black pressed holes.")
+	_check(clay_d > floor_d and lum.x < lum.y,
+		"...and coal is still the DARKER rock at the seam (%.4f against clay's %.4f), %.4f from it: "
+		% [lum.x, lum.y, clay_d] + "lifting it out of a hole must not walk it into the clay.")
+	_check_over(coal.size(), worst_metre > clay_metre,
+		"the worst coal metre in a HUNDRED carries %.4f of luma spread, past the %.4f clay's median "
+		% [worst_metre, clay_metre] + "metre manages. It was 0.0008 -- a flat fill, drawn by the 16% "
+		+ "of coal metres that carried no facet at all.")
+
+
+## The tightest separation this palette calls "two different rocks": the same computation and row that
+## `_test_host_rocks_are_distinguishable_from_each_other` prints above as "the noise floor this palette
+## actually has", so the two numbers in one log are comparable. At the SEAM's own row the hosts sit
+## 0.1675 apart and coal clears only 0.0923 -- dug space is a mid-dark blue-grey itself, so a dark rock
+## cannot get far from it and stay dark; D0494 records that ceiling as the backdrop's, not coal's.
+func _rock_floor(look: MaterialLook) -> float:
+	var closest: float = 999.0
+	for i: int in HOSTS.size():
+		for j: int in range(i + 1, HOSTS.size()):
+			closest = minf(closest, _worst_pair(_both_branches(look, HOSTS[i], 400), _both_branches(look, HOSTS[j], 400)))
+	return closest
+
+
+## The nearest coal comes to `others`: every colour it paints at this row against every one of theirs.
+func _worst_distance(look: MaterialLook, row: int, others: Array[Color]) -> float:
+	return _worst_pair(_both_branches(look, &"coal", row), others)
+
+
+func _worst_pair(a: Array[Color], b: Array[Color]) -> float:
+	var worst: float = 999.0
+	for x: Color in a:
+		for y: Color in b:
+			worst = minf(worst, _dist(x, y))
+	return worst
+
+
+## The luma spread of every whole METRE of one material over a slab of the world, sorted.
+func _metre_spreads(look: MaterialLook, mat: StringName) -> Array[float]:
+	var out: Array[float] = []
+	for mc: int in range(0, 120):
+		for mr: int in range(20, 140):
+			var band := Vector2(2.0, -1.0)  ## (darkest, lightest) luma in this metre
+			for dc: int in 4:
+				for dr: int in 4:
+					var l: float = look.cell_color(mat, mc * 4 + dc, mr * 4 + dr).get_luminance()
+					band = Vector2(minf(band.x, l), maxf(band.y, l))
+			out.append(band.y - band.x)
+	out.sort()  ## read by percentile: the defect this measures lives in the tail, not at the mean
+	return out
