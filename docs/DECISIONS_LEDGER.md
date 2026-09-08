@@ -19302,3 +19302,16 @@ The adapter, the controls and the pointer needed no change: each seat poses its 
 tree through FileAccess and `Image.load_from_file`, which it does not affect); the import cache rebuilt in
 3.09 s at 3.0 MB. The batch command's first live run is the next batch's boot line, read from each seat's
 own log.
+
+## D0502 · 2026-09-07 · The card's lines fit the card: the vein's line reworded, the lode's line trimmed, the fit pinned
+
+**Decided:** the vein's mode line is "N ore — hold to cut it; a Drill sits in the air above" (535 px of the
+card's 564 at 400 ore) and the lode's "N left — hold to work the face; next unit P%" (D0349's ran to 565 at
+400 and 99%); `tests/test_inspector.gd` pins that every terrain card's mode line fits the card whole at 400
+a metre, the largest count the seeder ships.
+
+**Why:** the first capture from `batch.py` (seat 88) showed D0495's line ellipsized at "stand a Drill in the
+open…": 691 px against 564, and the words that carried the fix were the ones cut. D0495's pin read the
+string, not its width; a card that says less than its text is the quiet form of a missing lesson.
+
+**Verified:** 47 asserted; the mutant restoring a long line fails the fit pin (1 of 3 cut).

@@ -29,8 +29,36 @@ func _vein_drill_pin() -> void:
 	var o: Interface.Observation = _obs()
 	o.materials[30 * W + 30] = 2
 	var mode: String = String(Inspector.describe(o)["mode"])
-	_check(mode.find("open metre above") >= 0, "the vein's card stands the Drill in the OPEN metre above it (%s)" % mode)
+	_check(mode.find("in the air above") >= 0 and mode.find("hold to cut it") >= 0, "the vein's card keeps the hand verb first and stands the Drill in the AIR above it (%s)" % mode)
 	_check(mode.find("just above it") < 0, "and legacy's 'just above it', which S77 read as the vein itself, is gone (%s)" % mode)
+	_every_terrain_line_fits()
+
+
+## D0502 (batch.py's first capture): D0495's vein line ran to 691 px against the card's 564 and ellipsized at
+## "in the open…", the words that carried the fix. Every terrain card's name and mode line, at the largest
+## count the seeder ships (400 a metre), must fit the card's widest line whole.
+func _every_terrain_line_fits() -> void:
+	var font: Font = ThemeDB.fallback_font
+	var budget: float = UiTheme.px(Inspector.MAX_W) - 2.0 * UiTheme.px(Inspector.PAD)
+	var cases: Array = []
+	for material: int in [2, 3]:                                   # ore_iron, coal
+		var o: Interface.Observation = _obs()
+		o.legend = PackedStringArray(["", "clay", "ore_iron", "coal"])
+		o.ore_like_legend = PackedByteArray([0, 0, 1, 1])
+		o.materials[30 * W + 30] = material
+		o.ore_yield[Vector2i(30, 30)] = 400
+		cases.append(Inspector.describe(o))
+	var lode: Interface.Observation = _obs()
+	lode.lodes[Vector2i(30, 30)] = {"material": &"ore_iron", "amount": 400, "permille": 999}
+	cases.append(Inspector.describe(lode))
+	var cut: int = 0
+	var widest: float = 0.0
+	for d: Dictionary in cases:
+		for text: String in [String(d.get("mode", ""))]:
+			var px: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(Inspector.LINE_SIZE)).x
+			widest = maxf(widest, px)
+			cut += 1 if px > budget else 0
+	_check(cases.size() == 3 and cut == 0, "every terrain card's mode line fits the card whole at 400 a metre: %d of %d cut, widest %.0f of %.0f px" % [cut, cases.size(), widest, budget])
 
 
 func _initialize() -> void:
