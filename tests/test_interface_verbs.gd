@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_a_build_that_places_nothing_says_why()
 	_test_the_mine_hold_rides_the_move_frame()
 	_test_a_machine_cell_in_reach_is_exact_and_its_pocket_out_of_reach_snaps()
+	_test_a_side_blow_spares_the_boots()
 	_test_the_session_round_trips_through_the_door()
 	_test_a_new_game_stands_on_the_spawn()
 	_test_the_world_ends_in_a_wall()
@@ -228,6 +229,37 @@ func _released_plan_pins(air: Vector2i) -> void:
 		dug += 0 if world.grid.is_solid(c) else 1
 	_check(dug == 0, "a later hold on air digs none of the released marks (%d of %d dug)" % [dug, painted.size()])
 	iface.apply(Command.move(_frame(air, false)))
+
+## D0509 (strangers 65, 90, 100): a blow beside the feet no longer takes the four cells under the boots, so the
+## body does not drop into the hole it did not mean to dig; a blow AIMED under the boots still opens the floor.
+func _test_a_side_blow_spares_the_boots() -> void:
+	_rig()
+	for _i: int in 3:
+		iface.apply(Command.move(_frame(Vector2i(0, 0), false)))          # settle onto the floor
+	var feet: Array[Vector2i] = Footing.of_body(body)
+	_check(body.on_floor and feet.size() == 4 and feet[0].y == 40 and feet[0].x == 20 and feet[3].x == 23, "control: the body stands on row 40 with its boots over cells 20-23 (%s)" % str(feet))
+	var beside := Vector2i(18, 40)                                        # the floor two cells left of the boots, in reach
+	var broke: Array = []
+	for _i: int in 300:
+		iface.apply(Command.move(_frame(beside, true)))
+		var o: Interface.Observation = _oracle()
+		if o.mining_broke:
+			broke = o.mining_broke_cells
+			break
+	iface.apply(Command.move(_frame(beside, false)))
+	_check(broke.has(beside) and broke.has(Vector2i(17, 40)) and broke.has(Vector2i(19, 40)), "the side blow took the aimed cell and its neighbours (%d cells)" % broke.size())
+	_check(not broke.has(Vector2i(20, 40)) and world.grid.is_solid(Vector2i(20, 40)) and world.grid.is_solid(Vector2i(21, 40)) and body.on_floor, "...and spared the boots' cells, which are inside its two-cell disc: the body still stands (%s)" % str(broke))
+	var under := Vector2i(21, 40)
+	broke = []
+	for _i: int in 300:
+		iface.apply(Command.move(_frame(under, true)))
+		var o: Interface.Observation = _oracle()
+		if o.mining_broke:
+			broke = o.mining_broke_cells
+			break
+	iface.apply(Command.move(_frame(under, false)))
+	_check(broke.has(under) and not world.grid.is_solid(under), "a blow AIMED under the boots opens the floor: THE WAY DOWN is untouched")
+
 
 func _test_the_session_round_trips_through_the_door() -> void:
 	_rig()

@@ -19407,3 +19407,23 @@ on a dropped stack and the lesson's "the WHITE RING marks the one this step want
 
 **Verified:** `test_hints` 48, `test_lesson_dock` 44, `test_hints_moments` 31, `test_objective_line` 42, the
 DROPPED pins re-pointed at the new headline.
+
+## D0509 · 2026-09-07 · A blow spares the four cells under a standing body's boots unless it is aimed at one
+
+**Decided:** `Footing.of_body` names a standing body's support cells (the row its bottom edge rests on,
+the four columns its width covers; nothing while airborne); `MineHold` hands them to `Mining.spare` each
+tick and `_clear_bite` skips them. The AIMED cell is never spared, so a blow at the ground under you still
+opens it (THE WAY DOWN, D0440); only what a sideways blow's two-cell disc reaches under the boots changes.
+
+**Why (strangers 65, 90 and 100, three batches):** the first press of a run lands beside the feet -- the
+vein one metre left, or the screen's centre a little low -- the disc reaches under the boots, the floor
+goes, the body drops a metre into a hole it did not mean to dig, and the stranger never presses SPACE:
+S100 pressed D at cell 130 for thirty seconds and read TOO FAR at the seam from its pit; S90 the same,
+S65 before them. A pick swung sideways does not undercut its own footing.
+
+**Verified:** `tests/test_interface_verbs.gd` (61): a standing body over cells 20-23 on row 40; a hold on
+(18,40) breaks eight cells of its disc and not (20,40), the body still standing; a hold AIMED at (21,40)
+opens it. The mutant that drops the spare check fails the boots pin. `test_mining_blocks` 62 (the pure
+suite's body is airborne, nothing spared), `test_recorded_sessions` 5, `test_tutorial_playthrough` 23,
+`test_first_rung_door` 9, `test_verbs` 46, `test_save_game` 45 unchanged. **Provisional:** the director
+listed the first press at the screen's centre as theirs; this is the sim-side half, reversible in one line.

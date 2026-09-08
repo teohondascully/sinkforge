@@ -105,6 +105,7 @@ var _rhythm_idle: int = 0
 ## same inputs at different radii diverge on the first break, so a recording that cannot restate it cannot
 ## be replayed (`tests/body/reveal_replay_driver.gd` reads it back out of the log header).
 var bite_radius: int = DEFAULT_BITE_RADIUS
+var spare: Array[Vector2i] = []   ## cells no blow takes unless aimed: a standing body's footing (`Footing`, D0509)
 
 ## Per-tick telemetry, read by the caller, not auto-cleared -- same contract `body.gd`'s own flags have.
 var charging_cell: Vector2i = NO_CELL  ## the cell this tick's hold advanced, if any
@@ -376,7 +377,7 @@ func _clear_bite(grid: TileGrid, target: Vector2i) -> void:
 			if dx * dx + dy * dy > bite_radius * bite_radius:
 				continue
 			var cell: Vector2i = target + Vector2i(dx, dy)
-			if cell == target or not grid.in_bounds(cell) or not grid.is_solid(cell):
+			if cell == target or not grid.in_bounds(cell) or not grid.is_solid(cell) or spare.has(cell):
 				continue
 			_cracks.erase(cell)  ## a cell that no longer exists may not keep banked charge
 			broke_materials.append(grid.get_material(cell))

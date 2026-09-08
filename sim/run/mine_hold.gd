@@ -63,6 +63,7 @@ func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: D
 		return
 	lode.work(world, items, mining, body.pos_x, body.pos_y, Mining.NO_CELL, false)
 	var visible: bool = LineOfSight.clear(world.grid, Aim.cell_of(body.pos_x, body.pos_y), work)
+	mining.spare = Footing.of_body(body)                                # the boots' four cells, spared unless aimed (D0509)
 	mining.mine(world.grid, body.pos_x, body.pos_y, work, frame.mine_held and visible)
 	if mining.broke_this_tick:
 		items.yield_break(mining.broke_cells, mining.broke_materials)
