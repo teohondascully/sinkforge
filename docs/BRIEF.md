@@ -114,7 +114,14 @@ import cache 2.9 GB -> 3 MB, `--import` minutes -> 3 s); six seats boot in 13 s.
 between bursts by design (the sim runs only for a stranger's ticks). The ring's word is pinned on the real
 draw pass (D0500, the 137th suite) and the card's lines fit the card (D0502).
 
-**For the director:** the stride (T035: one 60-tick D is nine metres; S94 overshot the rig by six, S92
-walked to +31 m); the first press at the screen's centre (S90, S65); the hotbar when the pack is empty;
-D3–D6's rewards. **Next:** a batch on this head measures D0504 and D0505; the world snapshot for the boot's
-2.8 s if a loaded fresh game can be shown to sign as a generated one.
+**Strangers 97-102 on D0504/D0505 (all VALID; `docs/playtests/2026-09-07_strangers97-102_feet.md`):** ore
+6 of 6 under 3.3 s, coal 4 of 6, two ingots 2 of 6, delivered 0 of 6. TOO FAR DOWN at the seam is gone. The
+delivery card was the wall (S97 at the shaft's lip, S101 at the forge, both quoting "beside you" and "hold
+them"; fixed D0507) and DROPPED read as success (S98, S102; the headline is NO MACHINE HERE, D0508). The boot
+measured: ready at 3.8 s, then 6.2 s drawing the FIRST frame under every renderer -- the terrain bake paints
+the whole world at boot; a worker is making it bake the chunks in view first (D0506).
+
+**For the director:** the pit under the spawn (S65, S90, S100: a first press at the screen's centre cuts
+the floor beside the feet and the stranger never jumps out; a blow that spares the two cells under the feet
+unless aimed is the sim-side candidate); the stride (T035); D3–D6's rewards. **Next:** D0506 lands, a batch
+on D0507/D0508.
