@@ -23,6 +23,13 @@ extends RefCounted
 ##                           control of a lighting comparison. Unset: `VeilOcclusion.K`.
 ##   --muted                 the Master bus muted for this boot, whatever the settings file says: a
 ##                           scripted seat on a machine somebody is using (D0437)
+##   --shader-tone           the terrain's molded tone from a per-chunk data texture in
+##                           `view/visuals/rock_tone.gdshader` instead of per-cell on the CPU (D0528,
+##                           T040's evidence). NOT PARSED HERE, and that is the layer rule rather than an
+##                           omission: its only consumer is `BakeChunk.shader_tone()`, and `view` may
+##                           depend on `interface`, `core` and `data` alone, so it reads the flag off
+##                           `OS.get_cmdline_args()` directly. Listed here because this header is the
+##                           seat's command-line manual and a flag missing from it is a flag nobody finds.
 
 const NO_WARP: Vector2i = Vector2i(-1, -1)
 

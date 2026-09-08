@@ -47,6 +47,45 @@ var gram: GramMap = null
 ## entry as it draws; no entry means the whole rect. Replaced by every bake, so none outlives its tick.
 var partial: Dictionary = {}
 
+## THE SHADER TONE, OFF (D0528, T040's evidence). False is the shipped picture: `TerrainPainter.paint`
+## fills every solid cell with `RockTone`/`SurfaceTone` on the CPU, 18-25 us a solid cell. True pulls that
+## one painter out of the baked list and replaces it with `BakeData`'s texture and `rock_tone.gdshader`.
+## The look is NOT the same -- eleven `FastNoiseLite` fields are re-derived in GLSL and the tufts are lost
+## -- so this ships off and the ledger carries the capture diff the director rules on.
+const SHADER_TONE: bool = false
+const SHADER_TONE_FLAG: String = "--shader-tone"
+const TONE_SHADER_PATH: String = "res://view/visuals/rock_tone.gdshader"
+
+## `BakeData` when the flag is on, else null: the object that builds the shader's per-chunk texture. Null
+## IS the off state, and every branch below tests it rather than re-reading the flag.
+var data: BakeData = null
+## Was the CPU terrain painter left in `painters`? Read by `tests/test_bake_data.gd`.
+var cpu_tone: bool = true
+## Chunk paints that ran the CPU terrain painter, and data textures built. The pin these counters serve is
+## "with the flag off, nothing builds a texture": a claim about a path taken, not about a pixel.
+var cpu_paints: int = 0
+var data_builds: int = 0
+
+## Chunk index -> [image, span origin, paint rect], handed from `paint` to `paint_tone` inside one frame.
+var _pending: Dictionary = {}
+## Chunk index -> the child `LightLayer` that draws its quad, and its own texture.
+var _tone_layers: Dictionary = {}
+var _tone_textures: Dictionary = {}
+
+
+## Is the shader tone on for this run? The const is the default; `--shader-tone` on the command line turns
+## it on for one boot. READ OFF `OS` RATHER THAN OFF `SeatFlags`, and the reason is the layer rule:
+## `view` may depend on `interface`, `core` and `data` only (`tools/layer_lint/layer_lint.py`), so naming
+## `shell/seat_flags.gd` from here would be a lint failure. That file documents the flag; this reads it.
+##
+## BOTH LISTS, and the second is the one that actually carries it: the seat's flags are passed after the
+## UNIX `--`, and Godot puts those in `get_cmdline_user_args()` ALONE -- `get_cmdline_args()` came back as
+## just `["--script", ...]` for a run whose own `--shader-tone` was sitting in the user args. Reading only
+## the first would have been a flag that parses, documents and never fires.
+static func shader_tone() -> bool:
+	return (SHADER_TONE or OS.get_cmdline_user_args().has(SHADER_TONE_FLAG)
+		or OS.get_cmdline_args().has(SHADER_TONE_FLAG))
+
 
 func setup(w: BakeWindow, observe_rect: Callable, material_look: MaterialLook, rock_tone: RockTone,
 		baked: Array[Callable], gram_map: GramMap) -> void:
@@ -56,6 +95,33 @@ func setup(w: BakeWindow, observe_rect: Callable, material_look: MaterialLook, r
 	tone = rock_tone
 	painters = baked
 	gram = gram_map
+	var split: Array = tone_painters(baked, shader_tone())
+	painters = split[0]
+	cpu_tone = bool(split[1])
+	data = null
+	if cpu_tone:
+		return
+	data = BakeData.new()
+	data.setup()
+
+
+## WHICH PAINTERS A CHUNK RUNS, and whether the CPU tone is still among them, as `[painters, cpu_tone]`.
+##
+## THE SWAP IS BY IDENTITY, NOT BY POSITION: `Callable` equality is (object, method), so this finds the one
+## baked painter that IS `TerrainPainter.paint` and leaves `WallPainter.paint` exactly where it sits. A
+## list that does not carry it -- a fixture's own painters -- keeps the CPU path rather than losing a pass.
+##
+## Pure and static so BOTH sides are assertable. `shader_tone()` reads the process's command line, which a
+## headless suite cannot pose, so the ON branch is reachable only here.
+static func tone_painters(baked: Array[Callable], on: bool) -> Array:
+	if not on:
+		return [baked, true]
+	var at: int = baked.find(TerrainPainter.paint)
+	if at < 0:
+		return [baked, true]
+	var kept: Array[Callable] = baked.duplicate()
+	kept.remove_at(at)
+	return [kept, false]
 
 
 ## The rect chunk `i` paints in this bake: its partial if the plan left one, else `rect` (its whole rect).
@@ -100,5 +166,65 @@ func paint(ci: CanvasItem, i: int, rect: Rect2) -> void:
 		return
 	for p: Callable in painters:
 		p.call(f, ci)
+	if cpu_tone:
+		cpu_paints += 1
 	if gram != null:
 		gram.fill_rect(f.obs, window.cells_of(r), look)
+	if data == null:
+		return
+	# BUILT HERE, WHERE THE OBSERVATION IS ALREADY IN HAND, so the shader path pays for exactly one
+	# observation a chunk, as the CPU path does. The child layer's own `_draw` only uploads and draws.
+	var img: Image = data.build(f.obs, window.cells_of(r), look)
+	if img == null:
+		return
+	_pending[i] = [img, data.span.position, r, f.obs.world_seed, f.obs.cell_px]
+	data_builds += 1
+
+
+## THE CHILD LAYER THAT DRAWS ONE CHUNK'S QUAD, added under the chunk's own layer so the parent's
+## visibility governs both and the quad draws AFTER the wall plane the parent paints (same effective z,
+## children after parents). Null when the flag is off. Called once a chunk by `TerrainBake._build_chunks`.
+func tone_layer_for(parent: Node2D, i: int, rect: Rect2) -> LightLayer:
+	if data == null:
+		return null
+	var layer := LightLayer.new()
+	layer.setup(0, paint_tone.bind(i, rect))
+	var mat := ShaderMaterial.new()
+	mat.shader = load(TONE_SHADER_PATH)
+	mat.set_shader_parameter("palette", data.palette())
+	mat.set_shader_parameter("unknown_index", data.unknown_index())
+	layer.material = mat
+	parent.add_child(layer)
+	_tone_layers[i] = layer
+	return layer
+
+
+## A chunk's quad follows its own layer into a bake: `queue_redraw` on the parent does not reach a child.
+func queue_tone(i: int) -> void:
+	var layer: LightLayer = _tone_layers.get(i)
+	if layer != null:
+		layer.queue_redraw()
+
+
+## ONE QUAD OVER THE PAINT RECT, sampling the texture `paint` built for this chunk this frame. Consuming:
+## a stale entry would draw last bake's rock over a rect the eraser has since cleared.
+func paint_tone(ci: CanvasItem, i: int, _rect: Rect2) -> void:
+	var e: Array = _pending.get(i, [])
+	_pending.erase(i)
+	if e.is_empty() or ci.material == null:
+		return
+	var img: Image = e[0]
+	var tex: ImageTexture = _tone_textures.get(i)
+	if tex == null or tex.get_size() != Vector2(img.get_size()):
+		tex = ImageTexture.create_from_image(img)
+		_tone_textures[i] = tex
+	else:
+		tex.update(img)
+	var mat: ShaderMaterial = ci.material
+	mat.set_shader_parameter("data_tex", tex)
+	mat.set_shader_parameter("span_origin", e[1])
+	mat.set_shader_parameter("world_seed", BakeData.seed32(e[3]))
+	mat.set_shader_parameter("cell_px", e[4])
+	# UNTEXTURED: the plane is `data_tex`, a uniform, because the shader compiler will not let a built-in
+	# sampler cross a function boundary. The fill colour is overwritten wholesale by `fragment`.
+	ci.draw_rect(e[2], Color.WHITE, true)

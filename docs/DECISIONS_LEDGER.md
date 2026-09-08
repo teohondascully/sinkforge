@@ -20513,3 +20513,125 @@ ran 2.9-4.2 ms and tick 14's clouds 1.2-2.4 ms once each (first-use costs), unre
 (f) `perf_probe.sh`'s still numbers across trees (D0522 before/after, D0524, this) mix paced and unpaced
 runs; only the `fps_wall` column separates them. (g) The host during these runs: WindowServer 30.6%, a
 browser renderer 12.4% (`/usr/bin/top -l 2`, before run 1); no seat, no Godot, no Ableton.
+## D0528 · 2026-09-08 · The molded tone in a shader from a per-chunk data texture, off by default; what the capture diff says
+
+**Decided:** T040's fork is now a thing the director can look at rather than reason about, and it ships
+**OFF**. (1) `view/visuals/bake_data.gd` (NEW) builds, per paint rect, one `FORMAT_RGBA8` texel a cell over
+the rect grown by `MARGIN` = `RockTone.FORM_REACH + 1` = 7: **R** the material's index in
+`MaterialsRecords.RECORDS` order (0 air, 1..N a record, N + 1 an `unknown` slot), **G** the grammar in bits
+0-1 with the speck in bit 2 and the lit facet in bit 3, **B** the Manhattan distance to the nearest open
+cell clamped to 7, **A** the soil-depth code `row - surface_row + 1` clamped to `SOIL_ROWS + 2` with the
+root column in bit 7. Filled straight off `obs.materials` by byte, never through `material_at`. A
+`FORMAT_RGBAF` palette carries each record's base colour with `depth_darken` in alpha, its nugget colour
+with a has-nugget flag in alpha, and its cap. (2) `view/visuals/rock_tone.gdshader` (NEW) reads that plane
+and reproduces `TerrainPainter.cell_fill` term by term. (3) `BakeChunk.shader_tone()` is the flag: the const
+`SHADER_TONE` (false) or `--shader-tone` on the command line. On, `BakeChunk.tone_painters` pulls
+`TerrainPainter.paint` out of the baked list BY CALLABLE IDENTITY and a child `LightLayer` under each
+chunk's own layer draws one quad with the shader, so the parent's visibility governs both and the quad
+draws after the wall plane. Off, the list is returned unchanged and no `BakeData` is ever constructed.
+
+**Why:** `docs/TASTE_QUEUE.md` T040, and D0522/D0524's measurement behind it: three fixes landed AROUND
+the CPU tone's 18-25 us a solid cell without touching it, and what remains is the floor that cost sets.
+The director has not ruled that the look may move, so this ticket produces the ruling's evidence and
+changes no shipped pixel.
+
+**Four calls the ticket did not dictate.** (a) THE DATA PLANE IS A UNIFORM, NOT `TEXTURE`: Godot's shader
+compiler refuses a built-in sampler passed as a function argument (`_dump_node_code`,
+`shader_compiler.cpp:1294`), and every neighbour probe takes the plane as an argument -- so the quad is
+drawn UNTEXTURED and the plane arrives as `data_tex`. The shader loaded and listed its uniforms with that
+error printed, which is the shape of a quiet green: the instrument that caught it was
+`Shader.get_shader_uniform_list`, not a picture. (b) THE TEXEL IS DERIVED FROM THE WORLD POSITION, not from
+UV: the quad covers the paint rect while the image covers that rect plus the margin, so a UV-derived texel
+would be wrong by exactly the margin. (c) THE FLAG IS READ OFF `OS`, not off `SeatFlags`: `view` may depend
+on `interface`, `core` and `data` alone, so `shell/seat_flags.gd` documents the flag and this reads it --
+and it must read `get_cmdline_user_args()`, because the seat's flags sit after the UNIX `--` and
+`get_cmdline_args()` came back as `["--script", ...]` for a run whose own `--shader-tone` was in the user
+args. Reading only the first list would have been a flag that parses, documents and never fires. (d) THE
+SPECK AND THE FACET ARE DECIDED ON THE CPU and travel as G bits, because `MaterialLook._hash01` is 64-bit
+integer arithmetic and GLSL has 32-bit ints; `bake_data.gd` CALLS that function rather than copying its
+three multipliers, since a second copy of a hash is how two renderers come to disagree about which cells
+glint.
+
+**What is NOT exact, stated as a limit rather than a caveat.** The eleven `FastNoiseLite` fields.
+FastNoiseLite's OpenSimplex2, OpenSimplex2S and value noise are not in GLSL and were not transcribed: each
+field keeps its FREQUENCY, its OCTAVE COUNT (FBM, lacunarity 2, gain 0.5, with FastNoiseLite's fractal
+bounding) and its SEED SALT on a standard 2D simplex or an integer-hashed value noise, so the feature sizes
+and the grammar directions carry and the sample values do not. Everything else IS exact and was checked
+line by line against the file it ports: `BeddingTone`'s sines, `apply_tone`, the depth darkening, all of
+`RockTone.shade`'s arithmetic and its four neighbour terms, all of `SurfaceTone.soil` and `shade`, the cap
+and the root. `BedSequence` is exact including its hashes -- `_unit` masks `& 0xFFFFFFFF` at every step, so
+GLSL `uint` arithmetic IS the CPU's, and `BakeData.seed32` hands the shader the low 32 bits signed so
+`uint(world_seed)` recovers the pattern. **THE TUFTS ARE LOST**: `TerrainPainter._paint_tuft` draws a
+sub-cell blade in an AIR cell, where this shader writes `vec4(0.0)`, and the function is private to a file
+this ticket may not move.
+
+**Verified:** `tests/test_bake_data.gd` NEW, **24 asserted**. The B pin ranges over every solid cell of a
+3x3-chunk posed world (48 cells a side from cell (16, 80), a walked clay surface at row 84, hardrock at
+100, a 7x7 ore blob and a 7x5 dug pocket) and compares B against an EXHAUSTIVE RING SCAN off
+`Observation.material_at` -- a different algorithm from the chamfer under test, and a different source from
+the legend table: **3127 solid cells, 0 disagreed**, with the field spanning its range (2551 at DIST_MAX,
+576 strictly between) so the agreement is not an agreement about one value. R over all **3844** texels
+against `index_of(material_at(cell))`, 0 wrong, 4 distinct materials. G over 3127, 0 wrong, **6 specks of
+which 3 lit**. A over **62 walked columns**, 0 wrong (the surface row codes 1, the air above 0, the row 42
+below codes BEYOND), **12 of 62 rooting**. The palette over all **9 records** (4 with a nugget, 1 with a
+cap). `seed32` at 7, 2^32 + 7, 0xFFFFFFFF and 0x80000000. The flag off: `cpu_tone` true, `data` null, the
+terrain painter still in the list, and a chunk driven through `paint` counted **1 CPU paint, 0 data
+builds**; the split asserted both ways as the pure function it is, including a painter list with no terrain
+painter (keeps the CPU path rather than losing a pass). MUTATION TEST: the forward chamfer pass's vertical
+step changed 1 -> 2, **444 cells disagreed and exactly the B pin went red** ("cell (9, 84): B=2, ring scan
+says 1"), every other assertion still passing; restored byte-for-byte and green again. Suites, all
+unchanged: `test_terrain_bake` **24**, `test_bake_lanes` **33**, `test_bake_budget` **22**,
+`test_world_view` **28**, `test_gram_map` **23**, `test_rock_grit` **6**, `test_main_boot` **65**,
+`test_flat_planes` **35**. Gates: size limits, layer lint, duplication, schema validator, formatter, test
+naming, test isolation, coverage (65.8% over a 61.8% floor), untracked files, LOC ratio, suite coverage, CI
+suite count and CI-not-shrunk (143 suites, was 142): all PASS. `harness.yml` gained the suite's line, its
+catalogue entry and the label 141 -> 142.
+
+**THE SHIPPED PICTURE DOES NOT MOVE, and that is measured rather than argued.** Three headed boots at
+`--quit-after=120 --screenshot-tick=90`, `--fresh --muted`: this tree with the flag off, the same tree
+again, and this tree with `bake_chunk.gd` and `terrain_bake.gd` reverted to 1c063a0f. All three captures
+are **BYTE-IDENTICAL, md5 19d94b1d602f8bc0e5c32a89a63cacb8**. That also establishes the diff's noise floor
+as **exactly zero** at this pose, which is what makes the changed-pixel count below readable at all -- the
+remembered ~38% run-to-run figure is a live-frame number and does not apply to this one.
+
+**THE CAPTURE DIFF (the ruling's evidence).** Flag on against flag off, 1920x1080, same tick, same seed:
+**721,211 pixels changed of 2,073,600 -- 34.78%**. By magnitude, on the max per-channel delta: 65.22% of the
+frame identical, 0.90% at 1, 2.70% at 2-3, 6.32% at 4-7, 10.06% at 8-15, 8.50% at 16-31, 3.61% at 32-51,
+2.27% at 52-102, 0.41% at 103-255 -- so **only 6.29% of the frame moves by more than 0.20 of full scale**,
+worst channel delta 186. The move is NOT a brightness shift: over the changed pixels the mean signed luma
+delta is **-2.07/255**, with **343,229 lighter against 377,982 darker**. What that reads as, in the 4x zooms
+(a 96x110 px region at (1520, 590), an exposed cliff face under the grass line): the same world, the same
+structure, the same grammar and bedding direction, with whole faces re-rolled -- this one broadly LIGHTER
+and flatter, its molding softer. The tufts along the grass line are gone, as stated above.
+`w14/zoom_cpu_4x.png` and `w14/zoom_shader_4x.png` beside `off.png` and `on.png` in this run's scratchpad.
+
+**THE COST, both ways, on the same 96 chunk paints over the same 9758 solid cells** (a temporary timer
+around the painter loop, removed before this commit; the shipped boot, 120 ticks): CPU painters
+**474,597 us** total, median 4074 us a chunk. Shader path: **86,122 us** of painters (the wall plane alone)
+plus **37,556 us** of `BakeData.build` = **123,678 us**, median 594 us a chunk. **48.6 us -> 12.7 us a solid
+cell, 3.84x less CPU painter time.** `BakeData.build` on its own, measured headless over 400 builds of one
+solid 16-cell chunk (256 solid cells, a 30x30 span): **204.4 us a build, 0.80 us a chunk cell** -- the
+ticket's "~1 us a cell" estimate holds, measured.
+
+**THE FRAME METER on the shaft fall** (`--perf --perf-drive --warp=184,120 --quit-after=600`, D0524's own
+pose, vsync ON so these p50s are not comparable with D0524's; two runs each, same host, back to back).
+First window: CPU p50 12.61 / 12.29, p99 31.19 / 30.55, max 91.26 / 83.42, **46 / 49 frames over 16.7 ms**;
+shader p50 11.38 / 11.23, p99 25.02 / 21.64, max 101.76 / 104.54, **28 / 28 over 16.7 ms**. Second window:
+CPU p50 8.78 / 7.23, p99 17.14 / 21.22, max 42.88 / 413.80 (that last an OS spike, not the bake), 7 / 13
+over; shader p50 **3.92 / 4.11**, p99 16.73 / 16.62, max **20.68 / 20.50**, 7 / 6 over. So the stutter
+halves and the worst frame of a settled fall drops from 42.9 ms to 20.5 ms -- while the FIRST window's max
+goes UP (83-91 -> 102-105 ms), because the first bake now also pays the shader's first-use compile.
+
+**Provisional / not changed.** (a) `rock_tone.gd`, `terrain_painter.gd`, `material_look.gd` and
+`surface_tone.gd` are untouched: the CPU path is the reference and the shipped picture. (b) NOTHING HERE
+ASSERTS A COLOUR. `rock_tone.gdshader` runs on a GPU and `TerrainBake.setup` declines under `--headless`,
+so the suite pins the BYTES the shader reads and the capture diff is the only witness to what it draws with
+them; a wrong term inside the shader would show as a picture nobody pinned. (c) The `unknown` palette slot
+is unreachable today -- all nine `data/materials` records carry `base_color` -- so the uniform that keeps it
+untoned is correct by reading and not by exercise. (d) One ShaderMaterial and one `ImageTexture` per chunk
+is 1104 of each on the shipped world when the flag is on; not measured for memory, and it costs nothing
+while the flag is off because neither is constructed. (e) The 34.78% is ONE pose, the tutorial opening at
+tick 90. A deep-rock pose, where the veil takes most of the range, would very likely read differently and
+was not captured. (f) `--shader-tone` is documented in `shell/seat_flags.gd`'s header but deliberately NOT
+added to `SeatFlags.parse`'s dictionary: nothing in `shell/` reads it, and a returned key nobody consumes
+is dead code.

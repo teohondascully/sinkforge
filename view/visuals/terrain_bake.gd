@@ -187,6 +187,9 @@ func _build_chunks() -> void:
 			layer.setup(-10, _chunk.paint.bind(_chunks.size(), rect))
 			layer.visible = false
 			_viewport.add_child(layer)
+			# The shader-tone quad, when the flag is on (D0528): a CHILD of this layer, so hiding the chunk
+			# hides its quad and the quad draws after the wall plane this layer paints. Null when off.
+			_chunk.tone_layer_for(layer, _chunks.size(), rect)
 			_chunks.append(layer)
 
 
@@ -218,6 +221,7 @@ func bake_full() -> void:
 	for i: int in _chunks.size():
 		_chunks[i].visible = true
 		_chunks[i].queue_redraw()
+		_chunk.queue_tone(i)
 		_shown.append(i)
 	_window.note_all_painted()
 	_erase_rects.clear()
@@ -299,6 +303,7 @@ func _bake_partial(p: BakeWindow.Plan) -> void:
 func _show(i: int, rect: Rect2) -> void:
 	_chunks[i].visible = true
 	_chunks[i].queue_redraw()
+	_chunk.queue_tone(i)
 	_shown.append(i)
 	_erase_rects.append(rect)
 
