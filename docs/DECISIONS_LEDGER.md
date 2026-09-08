@@ -19315,3 +19315,27 @@ open…": 691 px against 564, and the words that carried the fix were the ones c
 string, not its width; a card that says less than its text is the quiet form of a missing lesson.
 
 **Verified:** 47 asserted; the mutant restoring a long line fails the fit pin (1 of 3 cut).
+
+## D0503 · 2026-09-07 · A seat is a 3 MB copy-on-write copy of the runtime tree, not a worktree; the batch boots in parallel
+
+**Decided (the director: "mitigate exploding worktree sizes ... i dont have too much storage"):** `batch.py`
+copies only the game's runtime directories (`project.godot`, `core`, `sim`, `view`, `shell`, `interface`,
+`data`, `playtest`, `assets`, `.godot`) per seat by APFS clonefile (`cp -Rc`): 6.2 MB apparent, no blocks
+of its own until written, and a seat never writes its tree. A git worktree was 589 MB (docs 326, history
+229) and six were 3.5 GB on a laptop with 16 GB free. The batch refuses a dirty checkout (the copies are of
+the working tree). All N seats boot at once: 13.4 s wall for the set instead of about 12 s each in series.
+
+**Measured on one seat:** launch to `receipt.json` 6.7 s (`new_game` 2.77 s of it, the rest LaunchServices,
+Metal and the first draws), receipt to the first frame 6.6 s (the first frames stall on shader compilation;
+the settle itself is at most 2 s). `boot_wall_s` is in every batch manifest now. The next cut, not taken
+tonight: a world snapshot for the shipped seed loaded instead of generated, which would take the 2.8 s off,
+if a loaded fresh game can be shown to sign identically to a generated one.
+
+**Why the tiles look still (the director asked):** by design. The seat pauses the sim between bursts and
+runs it only for the ticks a stranger sends, then holds once the body is at rest (D0420); a stranger thinks
+20-60 s and plays 0.5-5 s. Free-running time between bursts would run the forge and the drill while the
+agent thinks and the budget is in ticks. A watch-only free-run flag is possible; not built.
+
+**Verified:** the smoke seat (96) booted from its copy, answered a 30-tick command with a 1280x720 capture,
+and `stop` removed the copy. The six seats of 90-95 were booted from worktrees (D0501's cut) before this
+change and play on.
