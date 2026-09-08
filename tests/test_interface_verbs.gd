@@ -87,29 +87,41 @@ func _test_every_verb_command_answers_with_a_detail_or_a_named_reason() -> void:
 	_short_drop_pins()
 
 
-## D0434: a drop that falls short of a machine in sight names that machine for DROP_SHORT_TICKS, so the mark
-## can flash it in the refusal's grammar; a drop with no eater around names nothing.
+## D0434: a drop short of a machine in sight names that machine for DROP_SHORT_TICKS, so the mark can flash
+## it in the refusal's grammar; a drop with no eater around names nothing. D0513 REVERSED the fall itself:
+## with an eater in sight but out of reach the drop is REFUSED and the stack stays in hand (strangers
+## 103-108 read the fall as the stack consumed); only with no eater within FAR_EATER_M does it reach the floor.
 func _short_drop_pins() -> void:
 	_rig()
 	items.pack.add(&"ore", 3)
 	items.produced(&"ore", 3)
 	iface.apply(Command.select(0))
-	iface.apply(Command.drop())
-	_check(_oracle().drop_short_cell == Vector2i(-1, -1), "a floor drop with no machine in sight names no machine")
+	var r: Interface.Result = iface.apply(Command.drop())
+	var o: Interface.Observation = _oracle()
+	_check(r.ok and o.drop_went == &"floor" and o.drop_short_cell == Vector2i(-1, -1) and items.pack.count(&"ore") == 0 and o.pile_at(Vector2i(6, 9)) == {&"ore": 3}, "no eater within FAR_EATER_M: the stack falls to the floor and no machine is named (%s, pack 3 -> %d, pile %s)" % [o.drop_went, items.pack.count(&"ore"), o.pile_at(Vector2i(6, 9))])
 	items.pack.add(&"ore", 3)
 	items.produced(&"ore", 3)
 	world.set_solid(Vector2i(11, 9), &"")
 	machines.place(world, MachineDef.of(&"processor"), Vector2i(11, 9))   # six metres right: in sight, out of the 3.2 m reach
 	iface.apply(Command.select(0))
-	var r: Interface.Result = iface.apply(Command.drop())
-	var o: Interface.Observation = _oracle()
-	_check(r.ok and o.drop_went == &"floor" and o.drop_short_cell == Vector2i(11, 9), "the stack fell to the floor and the forge six metres off is named as what it fell short of (%s)" % o.drop_short_cell)
+	var before: String = iface.state_signature()
+	var held: int = items.pack.count(&"ore")
+	r = iface.apply(Command.drop())
+	o = _oracle()
+	_check(not r.ok and r.reason == Interface.REJECT_OUT_OF_REACH and r.detail == &"short", "D0513: with the forge six metres off the drop is REFUSED, TOO FAR's own reason and the word short (ok=%s, %s, %s)" % [r.ok, r.reason, r.detail])
+	_check(held == 3 and items.pack.count(&"ore") == held and iface.state_signature() == before, "...and nothing left the pack: %d ore before, %d after, the signature unmoved" % [held, items.pack.count(&"ore")])
+	_check(o.drop_went == &"short" and o.drop_short_cell == Vector2i(11, 9), "the observation says short and names the forge (%s, %s)" % [o.drop_went, o.drop_short_cell])
+	_check(_oracle().drop_went == &"", "short rides one observe, as fed and floor do")
 	for _i: int in Interface.DROP_SHORT_TICKS - 2:
 		iface.apply(Command.move(InputFrame.new()))
 	_check(_oracle().drop_short_cell == Vector2i(11, 9), "the name holds through the flash")
 	for _i: int in 4:
 		iface.apply(Command.move(InputFrame.new()))
 	_check(_oracle().drop_short_cell == Vector2i(-1, -1), "and is gone after DROP_SHORT_TICKS")
+	var near: MachineState = machines.place(world, MachineDef.of(&"processor"), Vector2i(7, 9))   # two metres right: in reach
+	r = iface.apply(Command.drop())
+	o = _oracle()
+	_check(r.ok and r.detail == &"dropped" and o.drop_went == &"fed" and o.drop_short_cell == Vector2i(-1, -1) and items.pack.count(&"ore") == 0 and int(near.input_buffer.get(&"ore", 0)) == 3, "a forge in reach still takes the stack: fed, no machine named (%s, pack 3 -> %d, mouth %d)" % [o.drop_went, items.pack.count(&"ore"), int(near.input_buffer.get(&"ore", 0))])
 
 
 ## Legacy's seam, verbatim through D0474 (strangers 61 and 66): a MINE hold on a machine's own cell IN reach

@@ -293,11 +293,11 @@ var map_machines: Array[Vector2i] = []
 var aim_is_lode: bool = false
 ## Why a held MINE did nothing (D0421): &"far" / &"sight" / &"air"; or why a BUILD placed nothing, one observe wide (D0470): &"build_far" / &"build_here".
 var aim_refusal: StringName = &""
-## Where a DROP since the last observe went (D0428): &"fed" a machine, &"floor" a pile, &"" no drop. One
-## observe wide, like the flow events. See `Verbs.last_drop`.
+## Where a DROP since the last observe went, one of {&"", &"fed", &"floor", &"short"}: &"fed" a machine (D0428),
+## &"floor" a pile, &"short" REFUSED with the stack in hand for the machine `drop_short_cell` names (D0513), &"" no drop. One observe wide; see `Verbs.last_drop`.
 var drop_went: StringName = &""
-## The machine a drop fell short of (D0434): the drop's own TOO FAR, held for DROP_SHORT_TICKS after the
-## press so the mark can flash it; NONE otherwise.
+## The machine a drop was refused for (D0434, D0513): the drop's own TOO FAR, held for DROP_SHORT_TICKS
+## after the press so the mark can flash it; NONE otherwise.
 var drop_short_cell: Vector2i = Vector2i(-1, -1)
 ## The aim's affordances (6m, D0376), from the verbs' own predicates (`AimPlanes.fill`): what is held,
 ## whether the build press would land, which mouth a drop would feed, the nearest open cell while you

@@ -35,26 +35,9 @@ const Observation = preload("res://interface/observation.gd")
 const HubPlanes = preload("res://interface/hub_planes.gd")
 
 
-## `apply()`'s answer. `reason` is empty exactly when `ok` is true, and §5 makes it telemetry rather than
-## a debugging aid: "a command is submitted, validated, and either applied or rejected with a reason.
-## Rejection reasons are part of the telemetry." So the reasons are a closed vocabulary of `StringName`s
-## a counter can be keyed on, not free prose.
-class Result:
-	var ok: bool
-	var reason: StringName
-	var detail: StringName = &""   ## what an accepted verb did (`machine`, `picked_up`, `armed`, ...)
-
-	static func accepted() -> Result:
-		var r: Result = Result.new()
-		r.ok = true
-		r.reason = &""
-		return r
-
-	static func rejected(why: StringName) -> Result:
-		var r: Result = Result.new()
-		r.ok = false
-		r.reason = why
-		return r
+## `Interface.Result`, `apply()`'s answer: split into its own file at D0513 as `Envelope` was at D0294,
+## when this file stood at its cap. Reached through this `const`, so no call site moved.
+const Result = preload("res://interface/result.gd")
 
 
 ## The terrain grid's pixel size, RE-EXPORTED for `view/` (D0244). A painter sizes world-space drawing in
@@ -320,13 +303,7 @@ func apply(command: Command) -> Result:
 			_build_went = _verbs.last_build_refusal
 			return _outcome(built)
 		Command.Kind.DROP:
-			var dropped: bool = _verbs.drop() > 0
-			if dropped:
-				_drop_went = _verbs.last_drop
-				if _verbs.last_drop_short != Verbs.NONE:
-					_drop_short_cell = _verbs.last_drop_short
-					_drop_short_until = _tick + DROP_SHORT_TICKS
-			return _outcome(&"dropped" if dropped else &"")
+			return _apply_drop()
 		Command.Kind.COLLECT:
 			return _outcome(&"collected" if _verbs.collect() > 0 else &"")
 		Command.Kind.CONFIGURE:
@@ -342,6 +319,25 @@ func apply(command: Command) -> Result:
 			_plan.clear()
 			return Result.accepted()
 	return Result.rejected(REJECT_UNKNOWN_KIND)
+
+
+## DROP through the door: the landing rides `drop_went` one observe wide (D0428) and the machine a drop
+## fell short of is held DROP_SHORT_TICKS for the mark (D0434). Since D0513 the short case is a REFUSAL:
+## nothing left the pack, so the verb's own `last_drop` (not the count) says where it went, and the Result
+## is TOO FAR's reason with the word a HUD reads in `detail` -- the shape strangers learn from, not a spill.
+func _apply_drop() -> Result:
+	var dropped: bool = _verbs.drop() > 0
+	if _verbs.last_drop != &"":
+		_drop_went = _verbs.last_drop
+	if _verbs.last_drop_short != Verbs.NONE:
+		_drop_short_cell = _verbs.last_drop_short
+		_drop_short_until = _tick + DROP_SHORT_TICKS
+	if _verbs.last_drop != &"short":
+		return _outcome(&"dropped" if dropped else &"")
+	_drain_events()
+	var refused: Result = Result.rejected(REJECT_OUT_OF_REACH)
+	refused.detail = &"short"
+	return refused
 
 
 ## A situated verb's outcome as a Result: what happened rides `detail`; nothing is a named rejection.

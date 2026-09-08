@@ -19572,3 +19572,60 @@ the bare base d7fbafcf (`_test_wrong_stack_through_the_door()` 52 lines against 
 the card text. **Provisional:** the winch card names no NUMBER or [DROP] (it never did; the deliver rung
 teaches them six rungs earlier), and the smelt card's "ingots come to you" lost its article to the
 margin -- a wider card, or the live "Q" measured instead of "DROP", would give it back.
+## D0513 · 2026-09-07 · A drop with its eater in sight but out of reach is refused, not spilled
+
+**Decided:** `Verbs.drop()`: when `reachable_eater(item)` finds nothing, it asks `nearest_eater_in_sight(item)`
+BEFORE the floor drop. A cell back (an eater within `FAR_EATER_M`, 12 m) means the drop is REFUSED: nothing
+leaves the pack, it returns 0, `last_drop = &"short"`, `last_drop_short` = that cell. Only with no eater in
+sight does the stack fall as before (`last_drop = &"floor"`, `last_drop_short = NONE`); a mouth in reach
+still feeds (`fed`). The door's DROP arm became `Interface._apply_drop()`: it copies `last_drop` whenever
+it is set (not only when units left the pack, as D0428's arm did), holds `drop_short_cell` for
+`DROP_SHORT_TICKS` exactly as D0434 did, and answers a refusal with `Result.rejected(REJECT_OUT_OF_REACH)`
+carrying `detail = &"short"`. `Observation.drop_went` is now one of `{"", "fed", "floor", "short"}`,
+documented on the field. The HUD's reading of `short` is W3's.
+
+**The Result's shape, a judgment call:** the ticket said keep the convention an empty-pack drop uses (a
+rejection through `_outcome`, `nothing_to_do`) and add a detail, inventing no constant. I kept the
+rejection and the detail but chose the EXISTING `REJECT_OUT_OF_REACH` (`target_out_of_reach`, MINE's TOO
+FAR) over `nothing_to_do`: the drop found its target and refused it for reach, which is that reason's
+literal meaning, and a telemetry counter keyed on it now separates "refused for reach" from "pressed with
+nothing in hand" -- the class strangers 103-108 are evidence about. Reversing it is one constant.
+
+**`Interface.Result` moved to `interface/result.gd`:** `interface/interface.gd` stood at exactly 400 lines
+and `_apply_drop()` is twelve lines of body on its own; `docs/QUALITY.md` §2 says a cap met by trimming WHY-comments is the
+wrong move, and `Envelope` (D0294) and `Observation` (D0356) left the same file the same way. It is reached
+as `Interface.Result` through a `const` preload, so none of the 11 uses outside the file moved; it carries
+`class_name Result` for D0294's reason (the static factories name their own return type). `interface.gd`
+went to 396. `interface/MODULE.md`'s one line about which classes live in their own files now says all three.
+
+**Why:** strangers 103-108 (the orchestrator's batch report of 2026-09-07, cited by the ticket): 44 DROP presses across six seats, the
+first drop of every seat on the floor and none within reach of the forge (S103 cell 202, S104 166, S105 184,
+S106 130, S107 130, S108 147; forge pocket 116-119, rig 136-139). Six of six read the fall under NO MACHINE
+HERE as the stack CONSUMED (S107 "coal disappeared but objective stayed 0/2", S108 "resources disappeared
+anyway", S106 "materials transformed into clay"); S106 dropped six times at 137 beside the rig holding coal
+and ore. D0428 let the stack fall and D0434 marked the machine it fell short of; the mark did not read as a
+refusal. The refusal family strangers DO learn from is TOO FAR on the pointer (S103: "TOO FAR means reach
+is about a body length"), so the drop's short case now has that shape: nothing moves, the machine is named.
+
+**Verified** (this worktree on d7fbafcf, before -> after): `test_interface_verbs` 61 -> 65 (the D0434 pin
+"the stack fell to the floor and the forge six metres off is named" REVERSED: same pose, `not r.ok`,
+reason `target_out_of_reach`, detail `short`, pack 3 ore before and 3 after, `state_signature` unmoved,
+`drop_went == short`, `drop_short_cell == (11, 9)`, the name held through the flash and gone after
+DROP_SHORT_TICKS as before; a drop with no eater within 12 m still falls, pack 3 -> 0, pile {ore: 3}, no
+cell named; a forge in reach still takes the stack, `fed`, mouth 3). Unchanged: `test_first_rung_door` 9,
+`test_verbs` 46, `test_tutorial_playthrough` 23, `test_tutorial_teaching` 70 (its wrong-stack clay drop has
+no clay-eater anywhere: nothing in `data/` eats clay and the rig wants ingots), `test_hints` 48,
+`test_hints_moments` 31, `test_interface` 49. Gates: size (only the pre-existing
+`test_tutorial_teaching.gd:349` 52-line function from D0512, not this change), layer lint PASS, duplication
+PASS, formatter PASS on the five files.
+
+**Mutation-tested, each restored to the same md5:** (1) the pre-D0513 floor drop restored (the in-sight
+branch removed, `last_drop_short` set on the floor drop): 4 FAILURE(S) of 65, the refused pin reading
+"3 ore before, 0 after"; (2) refuse with no eater in sight too (`if true`): 6 of 65, the floor pin reading
+"short, pack 3 -> 3, pile {}"; (3) the reach feed disabled (`mouth = null`): 1 of 65, the fed pin reading
+"short, pack 3 -> 3, mouth 0". Also the unmodified suite against the fixed code: exactly the reversed pin red.
+
+**Not changed:** a reachable mouth whose `deposit` takes nothing still falls through to the floor as
+before (unreachable in practice: buffers are unbounded and every `Machines` wires `machine_buffer`); the
+seat events' `drop` field carries `short` as a new value untouched. **Kind:** rule reversal (D0428/D0434's
+fall), provisional on the next stranger batch.

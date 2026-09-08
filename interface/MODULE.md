@@ -52,8 +52,8 @@ every owned state's signature: the replay contract for the whole session.
 - `services() -> Dictionary` / `reset_transients()` — THE SHELL'S HANDLE: the owned services for
   `shell/session.gd`'s save and boot (`Session.capture`/`restore`/`new_game`), and nothing else above
   L2. The layer lint lets only the shell reach `sim/`; the view reads observations.
-- `Envelope`, `Observation`, `Result` are reached as `Interface.X`; `Envelope` and `Observation` live
-  in their own files behind a `const` preload (one name, no second door).
+- `Envelope`, `Observation`, `Result` are reached as `Interface.X`; all three live in their own files
+  behind a `const` preload (one name, no second door).
 - `Observation` carries the hub's planes as window-bounded COPIES (`interface/hub_planes.gd`): water
   per terrain cell, lodes with amount and per-mille, seeded ore yields plus `ore_default` and an
   ore-like legend, the placed layers and saplings per metre, machine records (id, behavior, status,

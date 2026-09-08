@@ -40,10 +40,11 @@ var followed: StringName = &""
 var auto_pickup: bool = true
 var pending_winch_head: Vector2i = NONE
 var _drop_grace: Dictionary = {}       # logic_cell -> ticks remaining
-## Where the last drop went (D0428): &"fed" into a machine's mouth, &"floor" to a pile or the sink, &""
-## when nothing left the pack. A view reads it to say so; the sim does not. `last_drop_short` is the
-## nearest machine that WOULD have eaten the stack had the body stood beside it, when a floor drop had one
-## within FAR_EATER_M (D0434): the drop's own TOO FAR, drawn on the machine.
+## Where the last drop went (D0428): &"fed" into a machine's mouth, &"floor" to a pile or the sink,
+## &"short" REFUSED with the stack still in hand (D0513), &"" when there was nothing to drop. A view reads
+## it to say so; the sim does not. `last_drop_short` is the nearest machine within FAR_EATER_M that eats
+## the stack, out of reach, when a drop was refused for it (D0434's TOO FAR drawn on the machine); NONE
+## for a fed or a floor drop.
 var last_drop: StringName = &""
 var last_drop_short: Vector2i = NONE
 const FAR_EATER_M: int = 12
@@ -158,8 +159,12 @@ func _place(logic_cell: Vector2i) -> StringName:
 
 
 ## Q: drop the selected stack. Gravity is the conveyor, so feeding is dropping. When a machine in reach
-## genuinely eats what you hold, the toss goes in; else it tosses forward into the facing column when
-## that is not solid, else straight down your own column. Returns the units that left the pack.
+## genuinely eats what you hold, the toss goes in. When none is in reach but one that eats it stands in
+## sight (within FAR_EATER_M), the drop is REFUSED and that machine named (D0513): D0428 let the stack fall
+## and D0434 marked the machine it fell short of, and six strangers of six read the fall as the stack
+## consumed; the refusal they do learn from is the pointer's TOO FAR, so the short case takes that shape.
+## Only with no eater in sight does it toss forward into the facing column when that is not solid, else
+## straight down your own column. Returns the units that left the pack; 0 for a refusal.
 func drop() -> int:
 	last_drop = &""
 	last_drop_short = NONE
@@ -173,6 +178,12 @@ func drop() -> int:
 		if fed > 0:
 			last_drop = &"fed"
 			return fed
+	else:
+		var short: Vector2i = nearest_eater_in_sight(item)
+		if short != NONE:
+			last_drop = &"short"
+			last_drop_short = short
+			return 0
 	var here: Vector2i = body_logic_cell()
 	var face: Vector2i = here + Vector2i(body.facing, 0)
 	var target: Vector2i = face if (world.logic_in_bounds(face) and not world.logic_solid(face)) else here
@@ -180,7 +191,6 @@ func drop() -> int:
 	if dropped > 0:
 		_drop_grace[items.last_drop_landing] = DROP_GRACE_TICKS
 		last_drop = &"floor"
-		last_drop_short = nearest_eater_in_sight(item)
 	return dropped
 
 
