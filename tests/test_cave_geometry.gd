@@ -12,9 +12,18 @@ extends "res://tests/test_base.gd"
 ## a check that cannot be nonzero is not evidence. `Body.FLOOR_SCAN_ROWS` (D0044) widened the real,
 ## wired window to 48 rows, sized from re-measuring D0042's own reachability analysis for the actual
 ## row-gap distribution between genuinely-reachable stacked floors (min 11, p50 16, p99 36, max 36
-## across 197 samples over the same 4,800-column run). This file now proves the corrected window
-## actually detects the case it was built for, using the real `Body.FLOOR_SCAN_ROWS` constant
-## throughout rather than an arbitrary test-only widening.
+## across 197 samples over the same 4,800-column run). This file then proved the corrected window
+## detects the shelf-over-a-pocket shape, using the real `Body.FLOOR_SCAN_ROWS` constant throughout.
+##
+## D0516 turned that half of this file around. A shelf over a pocket 16 rows down is a shape of the
+## TERRAIN, not an ambiguity of the resolver's CHOICE: `resolve_floor` lands only on a surface the feet
+## have reached (`_bottom_y() < surface`, the verification D0044 itself recorded), so a body on the shelf
+## was never choosing between the shelf and a floor 16 rows under its feet, and the check reporting it --
+## 40-190 times a session on the pockets the world seeder authors under the tutorial pad -- was an
+## instrument with no subject. The check now bounds itself to the rows the feet reached; the shelf here
+## is its negative case, and `tests/test_floor_ambiguity.gd` owns the positive (two surfaces a cell apart,
+## both reached), the caller's rate limit (moved there with `fixture_settle_violation_probe.gd`), and the
+## seeded opening walk whose count is the ledger's number.
 
 const CELL: int = Heightfield.TERRAIN_CELL_PX
 
@@ -25,10 +34,9 @@ func _initialize() -> void:
 	_test_local_window_resolves_the_lower_floor_when_body_lands_there()
 	_test_a_body_partly_over_the_shelf_catches_on_it_instead_of_clipping_through()
 	_test_invariant_check_is_silent_on_a_normal_single_floor_column()
-	_test_real_wired_window_detects_the_case_standing_on_the_shelf()
-	_test_real_wired_window_detects_the_case_standing_on_the_lower_floor()
-	_test_a_real_settle_actually_trips_the_guard()
-	_test_a_real_settle_rate_limits_the_guard_to_one_report()
+	_test_standing_on_the_shelf_over_a_pocket_is_not_ambiguous()
+	_test_standing_on_the_lower_floor_under_the_shelf_is_not_ambiguous()
+	_test_a_real_settle_on_the_shelf_does_not_trip_the_guard()
 	_finish("cave_geometry")
 
 
@@ -141,81 +149,52 @@ func _test_invariant_check_is_silent_on_a_normal_single_floor_column() -> void:
 	var col: int = HostileChamber.CAVE_START + 2  ## plain tunnel span, one floor only
 	var v: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
 		grid, col, HostileChamber.CAVE_FLOOR_ROW - 2, Body.FLOOR_SCAN_ROWS,
-		HostileChamber.CAVE_FLOOR_ROW, Body.HEIGHT_PX / CELL)
+		HostileChamber.CAVE_FLOOR_ROW, HostileChamber.CAVE_FLOOR_ROW)
 	_check(v == null,
 		"negative control: an ordinary single-floor tunnel column never trips the guard, even with the real (now-widened) window -- no false positive from widening alone")
 
 
-## The corrected version of what this file originally found silent. `body.gd::_resolve_floor()` now
-## passes `check_floor_selection` a 48-row window (`Body.FLOOR_SCAN_ROWS`, D0044), sized from a real
-## measurement of the row-gap distribution between genuinely-reachable stacked floors, not an arbitrary
-## widening. This fixture's own 16-row gap (median of that same distribution is 16) is well inside it.
-func _test_real_wired_window_detects_the_case_standing_on_the_shelf() -> void:
+## Until D0516 this test asserted the OPPOSITE -- that standing on the shelf fired the guard, naming the
+## lower floor 16 rows down as the competing surface -- and it was wrong about what the guard is for. A
+## body on the shelf has its feet at `CAVE_FLOOR_ROW`; `resolve_floor` refuses every surface the feet
+## have not reached, so the lower floor was never a candidate it could have chosen. The old pin proved
+## the WINDOW sees the pocket (`tests/test_floor_ambiguity.gd` keeps that as a control, with a reach no
+## body can have); it did not prove a choice was ambiguous, and every stranger seat paid for the
+## difference in 40-190 reports a session over the tutorial pad.
+func _test_standing_on_the_shelf_over_a_pocket_is_not_ambiguous() -> void:
 	var grid: TileGrid = HostileChamber.build()
 	var col: int = HostileChamber.CAVE_OVERHANG_START + 1
 	var scan_from: int = HostileChamber.CAVE_FLOOR_ROW - 2  ## the exact window _resolve_floor computes
 	var v: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
-		grid, col, scan_from, Body.FLOOR_SCAN_ROWS, HostileChamber.CAVE_FLOOR_ROW, Body.HEIGHT_PX / CELL)
-	_check(v != null,
-		"standing on the shelf, with body.gd's REAL wired window (Body.FLOOR_SCAN_ROWS=%d, not a widened test-only value), the guard now DOES see the lower floor -- the case D0042/D0043 measured is now actually reproducible in real play, not just in a synthetic wide-window call" %
-		Body.FLOOR_SCAN_ROWS)
-	if v != null:
-		_check(v.chosen_floor_row == HostileChamber.CAVE_FLOOR_ROW and v.competing_floor_row == HostileChamber.CAVE_LOWER_FLOOR_ROW,
-			"and reports the correct pair: chosen row %d, competing row %d (got %d, %d)" %
-			[HostileChamber.CAVE_FLOOR_ROW, HostileChamber.CAVE_LOWER_FLOOR_ROW, v.chosen_floor_row, v.competing_floor_row])
+		grid, col, scan_from, Body.FLOOR_SCAN_ROWS, HostileChamber.CAVE_FLOOR_ROW, HostileChamber.CAVE_FLOOR_ROW)
+	_check(v == null,
+		"standing on the shelf (feet at row %d) over the lower floor %d rows down, with body.gd's real window (Body.FLOOR_SCAN_ROWS=%d): silent -- the pocket is below the feet, so it was never a surface the resolver could have landed on" %
+		[HostileChamber.CAVE_FLOOR_ROW, HostileChamber.CAVE_LOWER_FLOOR_ROW - HostileChamber.CAVE_FLOOR_ROW, Body.FLOOR_SCAN_ROWS])
 
 
-func _test_real_wired_window_detects_the_case_standing_on_the_lower_floor() -> void:
+func _test_standing_on_the_lower_floor_under_the_shelf_is_not_ambiguous() -> void:
 	var grid: TileGrid = HostileChamber.build()
 	var col: int = HostileChamber.CAVE_GAP_START + 1
 	var scan_from: int = HostileChamber.CAVE_LOWER_FLOOR_ROW - 2  ## the exact window _resolve_floor computes
 	var v: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
-		grid, col, scan_from, Body.FLOOR_SCAN_ROWS, HostileChamber.CAVE_LOWER_FLOOR_ROW, Body.HEIGHT_PX / CELL)
+		grid, col, scan_from, Body.FLOOR_SCAN_ROWS, HostileChamber.CAVE_LOWER_FLOOR_ROW, HostileChamber.CAVE_LOWER_FLOOR_ROW)
 	_check(v == null,
-		"symmetric check standing on the LOWER floor: the shelf is 16 rows ABOVE, outside check_floor_selection's own downward-only scan (it only looks from chosen_floor_row+1 down, matching what _resolve_floor could ever mis-pick -- a floor already below the one just chosen), so silence here is correct, not a coverage gap")
+		"symmetric check standing on the LOWER floor: the shelf is 16 rows ABOVE, outside the window _resolve_floor scans from (two rows above the feet), so it was not a candidate either -- silence here is correct, not a coverage gap")
 
 
-## The most direct proof available: not a synthetic direct call with hand-picked parameters, but a real
-## `Body` actually settling through real `tick()` physics, with `push_error` genuinely firing during the
-## run (visible in this suite's own stderr) -- the same code path a real playthrough would exercise.
-func _test_a_real_settle_actually_trips_the_guard() -> void:
+## The real `Body` settling through real `tick()` physics onto the shelf, the scenario that used to fire
+## `push_error` in this suite's own stderr on every run: it no longer does, and the check re-derived
+## from the settled body's own column and window agrees.
+func _test_a_real_settle_on_the_shelf_does_not_trip_the_guard() -> void:
 	var body: Body = _settle(_col_center_x(HostileChamber.CAVE_OVERHANG_START + 1))
+	_check(not body.floor_selection_violation_this_tick and body.on_floor,
+		"a 400-tick settle onto the shelf ends on the floor with the violation flag clear on its last tick (on_floor %s, flagged %s)" %
+		[str(body.on_floor), str(body.floor_selection_violation_this_tick)])
 	var grid: TileGrid = HostileChamber.build()
 	var check_col: int = Body._px_to_cell(body.pos_x)
 	var row: int = int(floor(float(body._bottom_y()) / float(Fx.SCALE) / float(CELL)))
 	var scan_from: int = maxi(0, row - 2)
 	var v: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
-		grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS, HostileChamber.CAVE_FLOOR_ROW, Body.HEIGHT_PX / CELL)
-	_check(v != null,
-		"re-deriving the same check with the settled body's own real column/window (not a hand-picked one) still finds the violation -- confirms _test_local_window_resolves_the_shelf_when_body_lands_there's settle above is the exact scenario that fires the guard live, matching the push_error the test run's own stderr shows")
-
-
-## D0052. Before rate-limiting, this exact ~400-tick settle produced 778 near-identical push_error
-## lines (measured directly while building the fix, by temporarily reverting body.gd's rate-limit
-## gate to unconditional reporting and re-running this same probe) -- not merely once per tick, since
-## `body.gd::_move_and_resolve_vertical` calls `_resolve_floor` twice on most resting ticks (once
-## inside its substep loop, once via its own trailing catch-all). `body.gd::_resolve_floor()` now
-## suppresses a repeat report while the resolved (column, floor) pair is unchanged, however many times
-## it runs in a tick; this proves that in the real tick() path, not just against a direct
-## check_floor_selection() call, which cannot observe rate-limiting at all since it holds no state
-## across calls. Stock GDScript has no in-process way to count `push_error()` calls from the same
-## script that made them (the same reason `fixture_div_by_zero_probe.gd` exists), so this spawns
-## `tests/fixture_settle_violation_probe.gd` as a real subprocess and counts occurrences of the
-## violation's own message text in its actual stderr.
-func _test_a_real_settle_rate_limits_the_guard_to_one_report() -> void:
-	var project_root: String = ProjectSettings.globalize_path("res://")
-	var output: Array = []
-	var exit_code: int = OS.execute(OS.get_executable_path(),
-		["--headless", "--path", project_root, "--script", "res://tests/fixture_settle_violation_probe.gd"],
-		output, true)
-	_check(exit_code == 0, "the probe subprocess itself exits cleanly (got %d)" % exit_code)
-	var combined: String = "\n".join(output)
-	# D0115/D0117: exit_code==0 is not enough on its own -- a mid-run SCRIPT ERROR could abort the
-	# 400-tick settle early, before or after the one report this test expects, and still land the
-	# count on exactly 1 by coincidence rather than by the rate-limit actually holding.
-	_check(not combined.contains("SCRIPT ERROR:"),
-		"the probe's own output contains no SCRIPT ERROR (docs/DECISIONS_LEDGER.md D0117)")
-	var occurrences: int = combined.count("ambiguous floor selection")
-	_check(occurrences == 1,
-		"a 400-tick settle on the ambiguous shelf logs the violation exactly ONCE, not once per tick -- got %d occurrences in the probe's own stderr (captured output: %s)" %
-		[occurrences, combined])
+		grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS, HostileChamber.CAVE_FLOOR_ROW, row)
+	_check(v == null,
+		"re-deriving the check with the settled body's own real column, window and feet row (%d, not a hand-picked one) finds nothing: the shelf is the only surface those feet reached" % row)

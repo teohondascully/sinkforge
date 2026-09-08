@@ -4,18 +4,21 @@ extends RefCounted
 ## Continuous checking module (`sim/invariants/MODULE.md`): reads other submodules' state after
 ## they've acted, flags violations, produces no gameplay state itself. First real check: whether
 ## `sim/body`'s floor resolution picked between two competing standing surfaces without either of
-## them knowing it. First measured at 0.85% of columns / 12% of shafts in real generated terrain
-## (D0042) -- since superseded: that terrain shape was substantially an artifact of a `ValueNoise`
-## calibration bug (D0045), and the corrected generator measures 0 of 4,800 columns (D0046,
-## `docs/adr/0005-heightfield-local-window.md` has the full finding, including why 0/4,800 is a null
-## result at this sample's resolution, not proof the case cannot occur). This check turns a silent
-## "standing on the wrong floor, no error" bug report into a reproducible, position-and-seed-logged
-## one; its purpose now is not measuring a known cost but watching for this case to reappear after a
-## future noise, threshold, or site-config change. The window this check is called with must actually
-## be wide enough to see the case it exists to catch -- `Body.FLOOR_SCAN_ROWS` (D0044) is sized from a
-## real re-measurement of the row-gap distribution between genuinely-reachable stacked floors, not the
-## original 6-row window, which could not see it by construction and reported zero regardless of real
-## incidence.
+## them knowing it -- AMBIGUOUS, meaning the surface it did not pick could have been the right floor.
+##
+## What that means was narrowed at D0516, and the narrowing is the resolver's own rule, not a taste.
+## `vertical_resolve.gd::resolve_floor` lands the body only on a surface its feet have already reached
+## (`_bottom_y() < surface` refuses every other candidate, however wide the scan window is -- D0044's
+## own verification), so the only surfaces it ever chooses BETWEEN are the ones at or above the feet.
+## A second surface deeper than the feet was never a candidate: the body could not have been standing
+## on it this tick. The check before D0516 counted any second floor with a body-height of clearance
+## anywhere in the 48-row window, which is a different question -- "does this column hold a second
+## walkable pocket" -- asked of the resolver's scan rather than of the terrain. It was built to watch
+## generated terrain for the stacked-floor shape docs/adr/0005 measured (0.85% of columns, D0042; then
+## 0 of 4,800 after D0045/D0046), and once the world seeder authored pockets under the tutorial's pad it
+## reported that legitimate geometry 40-190 times a session, on every seat, with no wrong floor in any
+## of them: an instrument that could not register its subject. A stacked-pocket census of the
+## generator belongs to `sim/terrain_gen`'s own suites, not to the body's per-tick resolver.
 ##
 ## `report_floor_selection` itself logs unconditionally, every call, by design -- it stays exactly as
 ## cheap and stateless as `check_floor_selection`, which this module's own MODULE.md requires ("produces
@@ -50,56 +53,54 @@ class FloorSelectionViolation:
 	var pos_y: int  ## Fx
 
 	func _to_string() -> String:
-		return ("Invariants: body resolved to floor row %d in column %d, but a second standing " +
-			"surface (row %d) is also visible inside the same local scan window -- ambiguous floor " +
+		return ("Invariants: body resolved to floor row %d in column %d, but its feet had also reached " +
+			"a second standing surface (row %d) inside the same local scan window -- ambiguous floor " +
 			"selection. seed=%d pos=(%d,%d)") % [chosen_floor_row, column, competing_floor_row, seed, pos_x, pos_y]
 
 
-## `body_height_cells`/`step_up_cells` etc. are passed in rather than read from `Body`'s own
-## constants -- this checking module has no reason to depend on `sim/body` (it would be the callee,
-## not the caller, in every real use), so the caller hands over the numbers it already has.
+## `reach_row` etc. are passed in rather than read from `Body`'s own state -- this checking module has
+## no reason to depend on `sim/body` (it would be the callee, not the caller, in every real use), so the
+## caller hands over the numbers it already has.
 ##
-## Detects whether `column`'s scan window [scan_from_row, scan_from_row + max_rows) can see more
-## than one real standing floor: the one `_resolve_floor` actually chose (`chosen_floor_row`), and a
-## second, DISTINCT one whose own boundary also falls inside that window and which has genuine
-## clearance (>= body_height_cells of open air) above it, wherever that clearance actually ends --
-## the clearance check is not itself bounded by the window, only the second floor's boundary row is,
-## matching what makes a shelf actually walkable rather than a random thin ledge glimpsed in passing.
+## Detects whether `column`'s scan window [scan_from_row, scan_from_row + max_rows) held more than one
+## standing surface the resolver could have chosen: the one it did (`chosen_floor_row`, the topmost
+## blocked cell in the window) and a second, DISTINCT one below it -- a blocked cell with an open cell
+## directly above it, so a thick floor's own interior never counts -- whose top face the body's feet had
+## also reached. `reach_row` is the terrain row of the body's bottom edge before the snap: a surface at
+## row r has its top face at or above the feet iff r <= reach_row, and that is exactly the set
+## `resolve_floor`'s landing gate would accept (D0516). The window is the resolver's own; the check
+## bounds itself to the reached part of it, so a pocket further down -- which the resolver could see but
+## never land on -- is not reported (it was, before D0516, on every tick a body stood over one).
 ## `solid` (A' step 5c, D0360): the body's own blocking predicate over a terrain cell, so the check reads
 ## the floor the way the resolver did (a machine's tile is ground, a trunk is not); invalid reads the grid.
 static func check_floor_selection(grid: TileGrid, column: int, scan_from_row: int, max_rows: int,
-		chosen_floor_row: int, body_height_cells: int, solid: Callable = Callable()) -> FloorSelectionViolation:
-	var window_end: int = scan_from_row + max_rows
+		chosen_floor_row: int, reach_row: int, solid: Callable = Callable()) -> FloorSelectionViolation:
+	var window_end: int = mini(scan_from_row + max_rows, reach_row + 1)
 	var row: int = chosen_floor_row + 1
 	while row < window_end:
-		if _solid_at(grid, Vector2i(column, row), solid):
-			var clearance: int = 0
-			var probe: int = row - 1
-			while probe >= 0 and not _solid_at(grid, Vector2i(column, probe), solid):
-				clearance += 1
-				probe -= 1
-			if clearance >= body_height_cells:
-				var v: FloorSelectionViolation = FloorSelectionViolation.new()
-				v.column = column
-				v.chosen_floor_row = chosen_floor_row
-				v.competing_floor_row = row
-				return v
+		if _solid_at(grid, Vector2i(column, row), solid) and not _solid_at(grid, Vector2i(column, row - 1), solid):
+			var v: FloorSelectionViolation = FloorSelectionViolation.new()
+			v.column = column
+			v.chosen_floor_row = chosen_floor_row
+			v.competing_floor_row = row
+			return v
 		row += 1
 	return null
+
+
+## The caller's blocking predicate when it handed one over, the bare grid when it did not.
+static func _solid_at(grid: TileGrid, terrain_cell: Vector2i, solid: Callable) -> bool:
+	return bool(solid.call(terrain_cell)) if solid.is_valid() else grid.is_solid(terrain_cell)
 
 
 ## Runs `check_floor_selection`, and if it fires, logs it (position/seed included) per this file's
 ## "log always, never assert" policy above. Returns the violation (or null) so a caller/test can
 ## also count occurrences without re-deriving them from log output.
-static func _solid_at(grid: TileGrid, terrain_cell: Vector2i, solid: Callable) -> bool:
-	return bool(solid.call(terrain_cell)) if solid.is_valid() else grid.is_solid(terrain_cell)
-
-
 static func report_floor_selection(grid: TileGrid, column: int, scan_from_row: int, max_rows: int,
-		chosen_floor_row: int, body_height_cells: int, seed: int, pos_x: int, pos_y: int,
+		chosen_floor_row: int, reach_row: int, seed: int, pos_x: int, pos_y: int,
 		solid: Callable = Callable()) -> FloorSelectionViolation:
 	var v: FloorSelectionViolation = check_floor_selection(
-		grid, column, scan_from_row, max_rows, chosen_floor_row, body_height_cells, solid)
+		grid, column, scan_from_row, max_rows, chosen_floor_row, reach_row, solid)
 	if v != null:
 		v.seed = seed
 		v.pos_x = pos_x

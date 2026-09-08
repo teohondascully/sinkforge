@@ -19769,3 +19769,94 @@ suite count / coverage / not-shrunk / naming / isolation / formatter PASS; the s
 
 **Kind:** the instrumentation is permanent; the snapshot's home is a recommendation, provisional until
 `playtest/`'s owner takes it.
+## D0516 · 2026-09-07 · The floor-selection invariant reports ambiguity only when the body's feet had reached the second surface too
+
+**Decided:** `Invariants.check_floor_selection` and `report_floor_selection` take `reach_row` -- the
+terrain row of the body's bottom edge before the snap -- in place of `body_height_cells`, and report a
+second standing surface below the chosen floor (a blocked cell with an open cell directly above it, so a
+thick floor's interior never counts) only when its row is `<= reach_row`. The window is still the
+resolver's own 48 rows; the check bounds itself to the reached part of it. `vertical_resolve.gd::
+resolve_floor` hands over `row`, the value its own landing gate is computed from; its diagnostic block is
+now `_report_floor_ambiguity`, a pure extract, the floor choice untouched. **Kind:** instrument.
+
+**Why -- the evidence.** Every stranger seat since batch 90 logs `body resolved to floor row 80 in
+column 144, but a second standing surface (row 96) is also visible ...` (seats 103-108: 57, 154, 109,
+137, 38, 98 reports; batches 90-95: 130, 163, 64, 16, 64, 184; 97-102: 98, 91, 93, 0, 189, 127). Row 96 is
+16 rows under the pad the body stands on. `resolve_floor` lands only on a surface whose top face the
+feet have reached -- `_bottom_y() < surface` returns before any landing, and D0044 itself verified that
+the window never decides one -- and its scan starts two rows above the feet, so the surfaces it ever
+chooses BETWEEN lie in three rows, `[row-2, row]`. A floor 16 rows down was never a candidate; reporting
+it was not reporting an ambiguous choice. The old criterion (a second floor with >= 10 cells of clearance
+anywhere in 48 rows) could by construction fire only on a surface at least 11 rows below the chosen one,
+which is never one the feet could have reached: it measured the TERRAIN -- a stacked pocket in the column,
+docs/adr/0005's own census (D0042, then 0 of 4,800 at D0046) -- not the resolver, and once the world seeder
+authored pockets under the tutorial pad (44a5e8dd) it measured those on every seat. The house class: an
+instrument that cannot register its subject, arriving as a red so loud nobody reads it.
+
+**Why not the ticket's expected rule** ("within the body's height of the chosen floor, or above it"),
+which is also why this entry's title is not the one the ticket proposed. A second surface within ten
+rows below the chosen floor in the same column is one the body can NEVER stand on: its ten-cell box would
+overlap the chosen floor's own cell. So it is not a plausible alternative floor either, and the rule would
+report every one-cell shelf over a crack -- a terrain shape again, a narrower one. Above the chosen floor
+there is nothing in the window by construction (the chosen row is its topmost blocked cell). The reach
+bound is narrower than both, and it is the resolver's own rule rather than a heuristic about it.
+
+**The one geometry the check fires on** (`tests/fixture_settle_violation_probe.gd`): a shelf one cell
+thick, one open cell, a floor; the feet on the floor, the shelf through the shins. Two rows apart is the
+only spacing -- a thick floor's second row is interior, three rows is outside the lookback. A body never
+arrives there by its own movement (the wall sweep refuses the embedding; `embedded` is a hard-zero fuzz
+invariant), so this is a post-condition of a depenetration with an expected count of zero: the check now
+has a subject, and the subject is rare. Said plainly rather than dressed up as coverage.
+
+**Existing pins changed, and why each was wrong** (`tests/test_cave_geometry.gd`, 20 -> 17 asserted):
+1. `_test_real_wired_window_detects_the_case_standing_on_the_shelf` asserted the shelf FIRED, naming the
+   floor 16 rows down as the competitor. It proved the window sees 16 rows (true; kept as a control in the
+   new suite, with a reach no body can have) and called that an ambiguous selection (false: the feet were
+   at row 60, the floor at 76). Now `_test_standing_on_the_shelf_over_a_pocket_is_not_ambiguous`, 2 -> 1.
+2. `_test_a_real_settle_actually_trips_the_guard` re-derived the same call from a settled body and
+   asserted non-null; the same error. Now `_test_a_real_settle_on_the_shelf_does_not_trip_the_guard`,
+   1 -> 2 (the settled body's own flag clear, and the re-derived check null at the body's real feet row).
+3. `_test_a_real_settle_rate_limits_the_guard_to_one_report` counted D0052's rate limit on a settle that
+   no longer fires. Moved to `tests/test_floor_ambiguity.gd::_test_a_held_ambiguity_is_reported_once`,
+   the probe rewritten to hold the real pose for 30 re-embedded landings on one (column, floor) pair.
+4. `_test_invariant_check_is_silent_on_a_normal_single_floor_column` and `..._standing_on_the_lower_floor`:
+   signature only (the feet's row where the body height was), verdicts unchanged.
+
+**The measurement -- the ledger's number.** `tests/fixture_seeded_walk_probe.gd`: `Session.new_game(
+SHALLOW_CLAY, 20260826, &"tutorial")`, 600 ticks through the door -- 120 standing, then 10 m right, 20 m
+left, 10 m back (walked 174.4 px right and 184.2 px left of the spawn, spawn column 130, final leg 4:
+returned and standing). BEFORE: **19 reports, 39 flagged ticks** -- all nineteen the pad at row 80 over
+pockets at rows 92-100 (gaps 12, 15, 16, 20) in columns 144-151 and 172-173, the seats' own row 80 / row
+96 at column 144 among them. AFTER: **0 reports, 0 flagged ticks** on the identical trajectory. Pinned as
+`_test_the_seeded_opening_walk_reports_nothing`, with the walk's extent asserted so a zero has a frame.
+
+**Mutation-tested** (each restored to green after): M1, the reach bound removed -> `floor_ambiguity`
+5 FAILURE(S) of 18 (the seeded walk at 342 flagged ticks / 91 reports), `cave_geometry` 3 of 17. M2, a
+floor's interior counted as a surface -> `floor_ambiguity` 3 of 18. M3, D0052's caller gate reverted to
+unconditional reporting -> 1 of 18, the held pose reporting 30 times for 30 landings. M4, the check
+silenced -> 5 of 17 (the pair-naming assert is skipped on null), including the ticket's "two surfaces a
+cell apart must fire" and the probe's frame at `flagged_ticks=0`.
+
+**Verified:** 38 suites through `tools/run_gd_test.sh`, before and after, every one ALL PASS with no
+SCRIPT ERROR: `floor_ambiguity` new at 18; `cave_geometry` 20 -> 17 as itemised above; unchanged at
+their counts `bounds_invariant` 11, `economy` 19, `corner_consent` 13, `items` 78, `interface_verbs` 61,
+`machine_defs` 41, `machines` 113, `mining_blocks` 62, `reveal_spawn_bounds` 14, `rig` 18, `save_game`
+45, `transport` 59, `verbs` 46, `water_flow` 45, `world_verbs` 89, `world_seeder` 55 (every suite that
+references `Invariants`), and `body` 17, `body_acceptance` 10, `body_dig` 18, `body_fuzz_fast` 10,
+`body_medium` 35, `floor_source_telemetry` 10, `footprint_grounding` 18, `gait` 34, `grapple_body` 34,
+`hostile_chamber` 64, `movement_course` 21, `reachability_sweep` 1, `recorded_sessions` 5,
+`shaft_replay_determinism` 21 (the golden hashes unmoved: the change is diagnostic only),
+`step_up_grounding` 18, `interface` 49, `interface_hub` 26, `tutorial_teaching` 70,
+`tutorial_playthrough` 23, `first_rung_door` 9. Gates: layer lint, duplication, formatter, suite count
+(138), suite coverage, CI-not-shrunk, test naming, isolation, coverage ratchet (65.3% over 61.8%) all
+PASS; size limits red only on the pre-existing `test_tutorial_teaching.gd:349`.
+
+**Not changed, and provisional.** `Body.FLOOR_SCAN_ROWS = 48` and its docstring (D0044 sized it so
+the CHECK could see 16-row gaps): the resolver's own landing needs only its 3-row lookback, and
+`_has_deferred_floor_below` reads the 48; not narrowed here -- `body.gd` is not this ticket's file and
+the resolver's choice is not its subject. `docs/ARCHITECTURE.md` §9 and `docs/adr/0005` still describe
+the guard's purpose as watching generated terrain for stacked floors; both want a pointer note to this
+entry (§9 needs an ADR to change) -- flagged, not edited. A stacked-pocket census of generated terrain, if
+anyone wants one, is a `sim/terrain_gen` suite. `test_body_fuzz_fast`'s `floor_selection` count stays
+printed and ungated (D0241). The size gate is red at the base on `tests/test_tutorial_teaching.gd:349`
+(52 lines, D0512's commit), byte-identical here; not this change's.

@@ -242,46 +242,52 @@ static func resolve_floor(body: Body, grid: TileGrid) -> bool:
 	if surface == Heightfield.NO_FLOOR or body._bottom_y() < surface:
 		body.on_floor = false
 		return false
-	# Diagnostic only -- does not change which floor gets picked. docs/adr/0005 measured this
-	# ambiguity in real terrain and accepted it as a documented limitation rather than building
-	# stateful floor tracking; this is what turns a silent wrong-floor bug report into a reproducible,
-	# position-and-seed-logged one. Checks the column nearest `pos_x` only, not every column the three
-	# foot samples straddle -- a scoped first pass, not full coverage (docs/DECISIONS_LEDGER.md D0043).
-	# Shares FLOOR_SCAN_ROWS with the resolve calls above on purpose (D0044) -- this check exists to
-	# answer "did the query that just picked a floor also see another one," which is only a true answer
-	# if it's given the SAME window that query used.
-	var check_col: int = Body._px_to_cell(body.pos_x)
-	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS,
-		body.surroundings)
-	var solid: Callable = func(c: Vector2i) -> bool: return body._blocked(grid, c)
-	if chosen_row >= 0:
-		var violation: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
-			grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS, chosen_row, Body.HEIGHT_PX / Body.CELL_PX, solid)
-		# Rate-limited HERE, at the caller, not inside Invariants (D0052) -- sim/invariants stays
-		# stateless by design, and body.gd already tracks its own position every tick, so the memory
-		# for "have I already reported THIS (column, floor) pair" belongs where the context already is.
-		# Without this, a body resting on one ambiguous floor logs the identical violation on nearly
-		# every call to this block -- measured directly by mutation-testing this exact gate (temporarily
-		# reverting it to unconditional reporting): 778 push_errors from one ~400-tick settle in
-		# tests/test_cave_geometry.gd, not merely once per tick -- `move_and_resolve` calls
-		# `resolve_floor` twice on most resting ticks (once inside the substep loop, once via its own
-		# trailing catch-all), and this gate suppresses both, not just inter-tick repeats. A real
-		# occurrence would bury itself in its own repetition, and the log volume would make a genuine
-		# incidence count impossible to derive from real play. Clearing to -1 when the violation clears
-		# (not just remembering the LAST reported pair) means a resolve-then-recur at the exact same
-		# (column, floor) is a fresh occurrence, correctly: it did stop and start again, not continue.
-		body.floor_selection_violation_this_tick = violation != null
-		if violation == null:
-			body._last_violation_col = -1; body._last_violation_row = -1
-		elif violation.column != body._last_violation_col or violation.chosen_floor_row != body._last_violation_row:
-			Invariants.report_floor_selection(grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS,
-				chosen_row, Body.HEIGHT_PX / Body.CELL_PX, grid.seed, body.pos_x, body.pos_y, solid)
-			body._last_violation_col = check_col
-			body._last_violation_row = chosen_row
+	_report_floor_ambiguity(body, grid, scan_from, row)
 	body.pos_y = surface - (Body.HEIGHT_PX * Fx.SCALE) / 2
 	body.vel_y = 0
 	body.on_floor = true; body.floor_source_this_tick = &"resolve_floor"
 	return true
+
+
+## Diagnostic only -- does not change which floor gets picked. docs/adr/0005 measured floor ambiguity
+## in real terrain and accepted it as a documented limitation rather than building stateful floor
+## tracking; this is what turns a silent wrong-floor bug report into a reproducible, position-and-seed-
+## logged one. Checks the column nearest `pos_x` only, not every column of the footprint -- a scoped
+## first pass, not full coverage (docs/DECISIONS_LEDGER.md D0043). Shares FLOOR_SCAN_ROWS with the
+## resolve calls on purpose (D0044): the check answers "did the query that just picked a floor also see
+## another one it could have picked," and that needs the SAME window. Since D0516 the check bounds
+## itself to the rows the landing gate above could accept: `reach_row` is the feet's row (`row`, the
+## value the gate itself was computed from), so a surface deeper than the feet -- one the query saw but
+## could never have landed on this tick -- is no longer reported. It used to be, 40-190 times a session
+## on the pockets the world seeder authors under the pad, with no wrong floor in any of them.
+##
+## Rate-limited HERE, at the caller, not inside Invariants (D0052) -- sim/invariants stays stateless by
+## design, and body.gd already tracks its own position every tick, so the memory for "have I already
+## reported THIS (column, floor) pair" belongs where the context already is. Without this, a body held
+## on one ambiguous floor logs the identical violation on every call -- measured by mutation-testing
+## this exact gate (temporarily reverting it to unconditional reporting): 778 push_errors from one
+## ~400-tick settle before D0516, `move_and_resolve` calling `resolve_floor` twice on most resting ticks
+## (once inside the substep loop, once via its trailing catch-all), and the gate suppressing both. A real
+## occurrence would bury itself in its own repetition. Clearing to -1 when the violation clears (not
+## just remembering the LAST reported pair) means a resolve-then-recur at the exact same (column, floor)
+## is a fresh occurrence, correctly: it did stop and start again, not continue.
+static func _report_floor_ambiguity(body: Body, grid: TileGrid, scan_from: int, reach_row: int) -> void:
+	var check_col: int = Body._px_to_cell(body.pos_x)
+	var chosen_row: int = Heightfield._column_top_row(grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS,
+		body.surroundings)
+	if chosen_row < 0:
+		return
+	var solid: Callable = func(c: Vector2i) -> bool: return body._blocked(grid, c)
+	var violation: Invariants.FloorSelectionViolation = Invariants.check_floor_selection(
+		grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS, chosen_row, reach_row, solid)
+	body.floor_selection_violation_this_tick = violation != null
+	if violation == null:
+		body._last_violation_col = -1; body._last_violation_row = -1
+	elif violation.column != body._last_violation_col or violation.chosen_floor_row != body._last_violation_row:
+		Invariants.report_floor_selection(grid, check_col, scan_from, Body.FLOOR_SCAN_ROWS,
+			chosen_row, reach_row, grid.seed, body.pos_x, body.pos_y, solid)
+		body._last_violation_col = check_col
+		body._last_violation_row = chosen_row
 
 
 ## Legacy `_snap_to_floor` (A' step 5c, D0360): hug a descending step. After a grounded horizontal move

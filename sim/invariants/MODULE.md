@@ -46,10 +46,16 @@ and `telemetry` (see their MODULE.md files).
 ## Public API
 
 `invariants.gd`, `class_name Invariants`:
-- `check_floor_selection(grid, column, scan_from_row, max_rows, chosen_floor_row, body_height_cells) -> FloorSelectionViolation`
-  — pure, no logging. Returns a violation if a second real standing floor is
-  visible inside the same scan window as the one already chosen, or `null`.
-- `report_floor_selection(grid, column, scan_from_row, max_rows, chosen_floor_row, body_height_cells, seed, pos_x, pos_y) -> FloorSelectionViolation`
+- `check_floor_selection(grid, column, scan_from_row, max_rows, chosen_floor_row, reach_row, solid) -> FloorSelectionViolation`
+  — pure, no logging. Returns a violation if the scan window holds, below the
+  floor already chosen, a second standing surface (a blocked cell with an open
+  cell directly above it) whose top face the body's feet had also reached
+  (`reach_row`, the feet's terrain row before the snap; a surface at row `r` is
+  reached iff `r <= reach_row`), or `null`. Bounded to the reached rows since
+  D0516: a pocket deeper than the feet is terrain, not an ambiguous choice,
+  because the resolver never lands on a surface the feet have not reached.
+  `solid` is the caller's blocking predicate (D0360); invalid reads the grid.
+- `report_floor_selection(grid, column, scan_from_row, max_rows, chosen_floor_row, reach_row, seed, pos_x, pos_y, solid) -> FloorSelectionViolation`
   — runs the check above and `push_error()`s if it fires (this module's own
   "log always, never `assert()`" policy — see the file header for why).
 

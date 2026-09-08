@@ -447,6 +447,7 @@ jobs:
       #   test_hostile_chamber.gd                        test_hostile_chamber
       #   test_shaft_replay_determinism.gd               test_shaft_replay_determinism (QUALITY gate 8 — real ShaftGenerator+TileGrid+Body sim, two-process replay)
       #   test_cave_geometry.gd                          test_cave_geometry
+      #   test_floor_ambiguity.gd                        test_floor_ambiguity (what an ambiguous floor choice IS: both surfaces reached -- the positive, the reach-vs-window control, the rate limit, the seeded opening walk, D0516)
       #   test_body_acceptance.gd                        test_body_acceptance (QUALITY gate 11 — movement acceptance suite)
       #   test_bounds_invariant.gd                       test_bounds_invariant (QUALITY gate 24 — body never leaves the grid)
       #   test_reachability_sweep.gd                     test_reachability_sweep (QUALITY gate 25 — full reachable extent, not just the scripted route)
@@ -593,6 +594,7 @@ jobs:
             res://tests/test_hostile_chamber.gd \
             res://tests/test_shaft_replay_determinism.gd \
             res://tests/test_cave_geometry.gd \
+            res://tests/test_floor_ambiguity.gd \
             res://tests/test_body_acceptance.gd \
             res://tests/test_bounds_invariant.gd \
             res://tests/test_reachability_sweep.gd \
