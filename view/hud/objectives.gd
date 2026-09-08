@@ -21,9 +21,15 @@ const LINGER_DONE: float = 5.0
 ## Each label is ONE actionable sentence (D0411, the review's rank 3): the binding in brackets, filled by
 ## `BindingLabels` with whatever the verb is bound to now; the target where a stranger stands; the progress
 ## the chip appends from `progress()`. "Grapple" is the line the body throws; "winch" is the machine.
+##
+## THE TARGET IS THE RING, NOT A BEARING FROM THE SPAWN (D0495, strangers 76-81): the smelt rung said
+## "the black seam right of you", true only where the game starts you -- 79 stood ON the seam with the
+## ring under its feet and strode further right, 78 and 81 hunted shadows. A label names what the WHITE
+## RING is on and the order it moves in (D0486: the coal seam until the pack holds coal, the forge
+## after), never left or right of a body that has walked.
 const STEPS: Array[Dictionary] = [
 	{"id": &"mine", "label": "POINT at the silver-flecked rock in the WHITE RING beside you and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
-	{"id": &"smelt", "label": "The WHITE-RINGED forge takes ORE and COAL (the black seam right of you): by it, press each stack's NUMBER then [DROP]; the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
+	{"id": &"smelt", "label": "The WHITE RING finds the coal seam first, the ORE-and-COAL forge after: by it, press each stack's NUMBER then [DROP]; the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
 	{"id": &"deliver", "label": "Carry the ingots to the WHITE-RINGED rig beside you, hold them and press [DROP]: the crew's rig pays in machines", "goal": "Deliver 2 ingots"},
 	{"id": &"build", "label": "The rig set a DRILL down at its foot: walk over it, press its slot's key, [BUILD] over the vein in the WHITE RING", "goal": "Build the line"},
 	{"id": &"fuel", "label": "Hold [MINE] on the black coal seam by the shaft, select the coal, stand by the Drill and press [DROP]", "goal": "Fuel the Drill"},

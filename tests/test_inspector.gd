@@ -22,6 +22,17 @@ func _coal_seam_pin() -> void:
 	_check(d.get("name", "") == "Coal Seam" and String(d["mode"]).begins_with("13 coal — hold to cut it"), "a solid coal cell is a COAL SEAM, counted in coal, and says what burns it (%s)" % str(d))
 
 
+## D0495 (stranger 77): the vein's card said "stand a Drill just above it" and S77, drill in hand, pressed
+## BUILD on the vein's OWN solid metre and got silence. A machine stands in open air, never in rock, so
+## the card names the metre: the open one above the vein, which is where the ring already stands.
+func _vein_drill_pin() -> void:
+	var o: Interface.Observation = _obs()
+	o.materials[30 * W + 30] = 2
+	var mode: String = String(Inspector.describe(o)["mode"])
+	_check(mode.find("open metre above") >= 0, "the vein's card stands the Drill in the OPEN metre above it (%s)" % mode)
+	_check(mode.find("just above it") < 0, "and legacy's 'just above it', which S77 read as the vein itself, is gone (%s)" % mode)
+
+
 func _initialize() -> void:
 	_test_nothing_out_of_reach_or_off_the_hint_list()
 	_test_the_terrain_answers()
@@ -80,6 +91,7 @@ func _test_the_terrain_answers() -> void:
 	var d: Dictionary = Inspector.describe(o)
 	_check(d.get("name", "") == "Ore Vein" and String(d["mode"]).begins_with("12 ore — hold to cut it"), "a solid ore cell is a vein with its default yield, the hand verb first (D0450) (%s)" % str(d))
 	_coal_seam_pin()
+	_vein_drill_pin()
 	o.ore_yield[Vector2i(30, 30)] = 5
 	_check(String(Inspector.describe(o)["mode"]).begins_with("5 ore"), "an explicit yield overrides the default")
 	o.materials[30 * W + 30] = 0

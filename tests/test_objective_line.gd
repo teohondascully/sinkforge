@@ -14,6 +14,7 @@ const S: int = Fx.SCALE
 func _initialize() -> void:
 	_test_the_alphas()
 	_test_the_layout()
+	_test_the_smelt_card_points_at_the_ring()
 	await _test_paint_runs_through_the_hud_host()
 	_finish("objective_line")
 
@@ -96,6 +97,27 @@ func _wrap_pins(later: Objectives, font: Font) -> void:
 	_check(ObjectiveLine.wrap_howto(font, "", UiTheme.pt(9), 400.0).is_empty(), "an empty how-to is no lines")
 	var one: PackedStringArray = ObjectiveLine.wrap_howto(font, "short", UiTheme.pt(9), 400.0)
 	_check(one.size() == 1 and one[0] == "short", "a how-to that fits is one line, untouched")
+
+
+## D0495 (strangers 76-81): the smelt rung said "the black seam right of you", a bearing true only where
+## the game starts you -- S79 stood ON the seam with the WHITE RING under its own feet and strode further
+## right; 78 and 81 pressed shadows. The card names the RING and the order it moves in (D0486: the coal
+## seam until the pack holds coal, the forge after), and keeps D0493's number key and its last clause.
+func _test_the_smelt_card_points_at_the_ring() -> void:
+	var smelt: String = ""
+	for def: Dictionary in Objectives.STEPS:
+		if def["id"] == &"smelt":
+			smelt = String(def["label"])
+	_check(smelt.find("WHITE RING") >= 0, "the smelt card names the WHITE RING, the instrument every stranger has followed since D0447 (%s)" % smelt)
+	_check(smelt.find("coal seam first") >= 0 and smelt.find("forge after") >= 0, "and the ORDER the ring moves in: the coal seam first, the forge after (D0486) (%s)" % smelt)
+	_check(smelt.find("NUMBER then [DROP]") >= 0 and smelt.ends_with("the ingots come to you"), "D0493's number key and the last clause survive the rewording (%s)" % smelt)
+	_check(smelt.length() <= 141, "no longer than the card that already wrapped to two lines (%d <= 141 chars)" % smelt.length())
+	var bearings: PackedStringArray = PackedStringArray()
+	for def: Dictionary in Objectives.STEPS:
+		var lab: String = String(def["label"])
+		if lab.find("right of you") >= 0 or lab.find("left of you") >= 0:
+			bearings.append(String(def["id"]))
+	_check(bearings.is_empty(), "no rung's label carries a bearing from the spawn (%d such rungs: %s)" % [bearings.size(), str(bearings)])
 
 
 func _test_paint_runs_through_the_hud_host() -> void:

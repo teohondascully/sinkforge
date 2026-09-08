@@ -169,10 +169,12 @@ static func _describe_terrain(o: Interface.Observation, aim: Vector2i, logic: Ve
 		# The hand verb first (D0450, stranger 27): the card over the first rung's own target said only "stand a
 		# Drill", and the stranger spent the run trying to place one. THE SEAM IS NAMED BY ITS KIND (D0493,
 		# strangers 76-81): the card over the coal metre said "Ore Vein", and four of six hunted "black" past it.
+		# THE DRILL'S METRE IS OPEN AIR (D0495): "just above it" read as the rock above, and S77, drill in hand,
+		# pressed BUILD on the vein itself -- solid, and silent at the time (the refusal came with D0493).
 		var rec: Dictionary = MaterialsRecords.RECORDS.get(String(o.material_at(aim)), {})
 		if String(rec.get("kind", "")) == "fuel":
 			return {"name": "Coal Seam", "mode": "%d coal — hold to cut it; the forge burns it" % o.deposit_at(aim)}
-		return {"name": "Ore Vein", "mode": "%d ore — hold to cut it, or stand a Drill just above it" % o.deposit_at(aim)}
+		return {"name": "Ore Vein", "mode": "%d ore — hold to cut it, or stand a Drill in the open metre above it" % o.deposit_at(aim)}
 	if o.is_climbable(logic):
 		return {"name": "Rope", "mode": "a hung line — climb it"}
 	if o.has_torch(logic):

@@ -18962,3 +18962,43 @@ and keeps "ingots come to you". `test_hints` 48 (twenty-one moments), `test_obje
 
 **Not changed, the director's:** the seam's look (a black metre beside a black hole); the stride (T035);
 the smelt card's "right of you", true at the spawn only.
+
+## D0495 · 2026-09-07 · The smelt card points at the ring, not "right of you"; the vein's card says the open metre above
+
+**Decided:** (1) The smelt rung's how-to (`Objectives.STEPS`) drops the bearing and names the instrument:
+"The WHITE RING finds the coal seam first, the ORE-and-COAL forge after: by it, press each stack's NUMBER
+then [DROP]; the ingots come to you" -- 140 characters against the old card's 141, so it still wraps to two
+lines whole at the live span. It states the ring's ORDER (D0486: the coal seam while the pack holds no coal,
+the forge once it does) instead of a direction, keeps D0493's number key, and keeps the last clause the
+ellipsis took from stranger 3 (D0424). (2) `Inspector._describe_terrain`'s Ore Vein mode line reads
+"N ore -- hold to cut it, or stand a Drill in the open metre above it": a machine stands in open air, never
+in rock, and that open metre is where the ring already is.
+
+**Why, by the receipts** (`docs/playtests/2026-09-07_strangers76-81_seam_slot.md`): "the black seam right of
+you" is true only where the game starts you. S79's `frame_0013.png` at 21.0 s has the body standing ON the
+seam's metre with the WHITE RING and its outline under its own feet while the card says the seam is to its
+right; the next burst is a 60-tick stride right to cell 185 and the run never returns. 78 and 81 pressed
+shadows and holes on rows the seam does not occupy. Four of six never held coal. The ring is the one
+instrument every stranger has followed since D0447, and the card was sending them away from it. Separately,
+S77 -- the first stranger the rig ever paid -- read "stand a Drill just above it" over the shaft's vein and
+pressed BUILD on the vein's own solid metre; D0493 gave that press a refusal (IN THE ROCK), and this names
+the metre in the card that produced the mistake, so the refusal is the backstop rather than the teacher.
+
+**Verified** (this worktree, `tools/run_gd_test.sh`, counts read off each run): `test_objective_line` 35
+asserted before, 40 after; `test_inspector` 44 before, 46 after; `test_objectives` 32 before and after,
+unchanged. The pre-existing D0424/D0493 wrap pin -- the smelt how-to at exactly two lines, keeping "ingots
+come to you", every rung whole at the live span -- passes on the new card without being touched.
+`check_size_limits`, `layer_lint` and `duplication` PASS.
+
+**Mutation-tested, both pins:** restoring the old label turns `test_objective_line` red with 3 FAILURES of
+40 -- the WHITE RING check, the seam-first/forge-after order check, and the categorical sweep naming the
+offending rung ("1 such rungs: [smelt]"); the number-key and 141-character pins correctly stay green, since
+the old card also satisfied them. Restoring "just above it" turns `test_inspector` red with 2 FAILURES of 46.
+Both restored and re-run green at 40 and 46.
+
+**Not changed, named:** the `mine` and `deliver` rungs say "beside you" and the `mine` rung "in the WHITE
+RING beside you". These are proximity claims anchored to a ring that tracks the NEAREST target, not bearings
+that invert when the body walks, so they are not the same defect; they are recorded here rather than
+reworded, since whether "beside you" survives a thirty-metre stride (T035) is the director's call. The
+seam's look -- one black metre beside a black hole -- stays the director's (D0493). Nothing here touches the
+ring's own behaviour: `TargetGuide` already moved to the seam at D0486; only the words changed.
