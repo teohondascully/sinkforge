@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_test_the_layout()
 	_test_the_smelt_card_points_at_the_ring()
 	_test_the_cards_lead_with_the_walk()
+	_test_the_acknowledged_card_names_the_next()
 	await _test_paint_runs_through_the_hud_host()
 	_finish("objective_line")
 
@@ -62,7 +63,7 @@ func _test_the_layout() -> void:
 	o.pack = [{"item": &"ore", "count": 4}]
 	later.refresh(o, 0.016)
 	var ack: Dictionary = ObjectiveLine.layout(later, font, 0.0)
-	_check(String(ack["text"]).begins_with("✓") and String(ack["text"]).find("Mine 4 ore") >= 0, "rung 1 just latched: the plate acknowledges it first (%s)" % ack["text"])
+	_check(String(ack["text"]).begins_with("✓  Mine 4 ore") and String(ack["text"]).find("next: Forge 2 ingots") > 0, "rung 1 just latched: the plate acknowledges it AND names the next goal (D0525) (%s)" % ack["text"])
 	later.refresh(o, 5.0)
 	var second: Dictionary = ObjectiveLine.layout(later, font, 0.0)
 	_check(not second.is_empty() and String(second["text"]).begins_with("Forge 2 ingots") and String(second["howto"]) != "", "the second step at 5 s: its goal and its how-to, not an empty sky (%s)" % second.get("text", ""))
@@ -147,6 +148,57 @@ func _test_the_cards_lead_with_the_walk() -> void:
 	var winch: String = labels[&"winch"]
 	_check(winch.begins_with("WALK") and winch.find("STAND") > 0 and winch.find("Then") > winch.find("STAND") and winch.find("6 ingots") >= 0, "the winch card names a place, so it is WALK, STAND, Then as well, and keeps its 6 ingots (WALK at %d, STAND at %d, Then at %d)" % [winch.find("WALK"), winch.find("STAND"), winch.find("Then")])
 	_check(labels[&"smelt"].find("STAND beside the forge") >= 0, "the smelt card says WHICH machine to stand beside: the forge, not the ring that may be on the seam (%s)" % labels[&"smelt"])
+
+
+## D0525 (strangers 113 and 124): "✓ Forge 2 ingots" alone on the plate for the ACK_HOLD beat read as the end
+## of the game -- "No new objectives appeared. Per instructions, I quit" -- while the state was already on the
+## deliver rung. The tick card carries the next rung's goal after "next:", in the goal's ink (the `tail`
+## paint draws in GOAL_INK); the last rung latched shows the all-done text; and every rung's acknowledged
+## line fits whole at the live span (D0502's shape: count the cut, report the widest against the budget).
+func _test_the_acknowledged_card_names_the_next() -> void:
+	var font: Font = ThemeDB.fallback_font
+	var mid: Objectives = Objectives.new()
+	mid.restore_done(["mine", "smelt"])
+	mid.refresh(Interface.Observation.new(), 0.0)
+	var l: Dictionary = ObjectiveLine.layout(mid, font, 0.0)
+	var text: String = String(l["text"])
+	_check(text.begins_with("✓  Forge 2 ingots") and text.find(ObjectiveLine.NEXT_SEP + "Deliver 2 ingots") > 0, "the smelt rung just latched: its tick, then next: the deliver goal (%s)" % text)
+	_check(String(l["tail"]) == ObjectiveLine.NEXT_SEP + "Deliver 2 ingots" and text == "✓  Forge 2 ingots" + String(l["tail"]), "the tail paint draws in GOAL_INK is the separator and the next goal, and the line is the tick's part plus it (tail \"%s\")" % l["tail"])
+	_check((l["ink"] as Color) == ObjectiveLine.DONE_INK, "the tick and the finished goal keep DONE_INK")
+	var plain: Dictionary = ObjectiveLine.layout(Objectives.new(), font, 0.0)
+	_check(plain.is_empty() or String(plain.get("tail", "x")) == "", "control: a goal line that is not an acknowledgement has no tail")
+	var last: Objectives = Objectives.new()
+	var ids: Array = []
+	for def: Dictionary in Objectives.STEPS:
+		ids.append(String(def["id"]))
+	last.restore_done(ids)
+	last.refresh(Interface.Observation.new(), 0.0)
+	var done: Dictionary = ObjectiveLine.layout(last, font, 0.0)
+	_check(String(done["text"]).begins_with("✓  All set") and String(done["text"]).find("next:") < 0 and String(done["tail"]) == "", "the last rung latched: the all-done text, no next (%s)" % done["text"])
+	# The fit pin: every rung's acknowledged line, whole, at the live span the how-to pin measures.
+	var live_corner: float = maxf(UiTheme.px(88.0), Minimap.frame_rect(Vector2i(256, 1120), false).size.x)
+	var budget: float = UiTheme.CANVAS.x - (live_corner + UiTheme.px(18.0)) * 2.0 - UiTheme.px(ObjectiveLine.PAD) * 2.0 - UiTheme.px(14.0)
+	var cut: int = 0
+	var widest: float = 0.0
+	var lines: int = 0
+	for i: int in range(1, Objectives.STEPS.size()):
+		var obj: Objectives = Objectives.new()
+		obj.restore_done(ids.slice(0, i))
+		obj.refresh(Interface.Observation.new(), 0.0)
+		var line: String = String(ObjectiveLine.layout(obj, font, live_corner)["text"])
+		var whole: String = "✓  " + String(Objectives.STEPS[i - 1]["goal"]) + ObjectiveLine.NEXT_SEP + String(Objectives.STEPS[i]["goal"])
+		widest = maxf(widest, font.get_string_size(whole, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(ObjectiveLine.GOAL_SIZE)).x)
+		lines += 1
+		cut += 1 if line != whole else 0
+	_check(lines == Objectives.STEPS.size() - 1 and cut == 0, "every rung's acknowledged line fits the card whole at the live span: %d of %d cut, widest %.0f of %.0f px" % [cut, lines, widest, budget])
+	_check(ObjectiveLine.first_clause("Raise the winch, then rest") == "Raise the winch" and ObjectiveLine.first_clause("Fuel: the Drill") == "Fuel" and ObjectiveLine.first_clause("Build the line") == "Build the line", "the first clause stops at a comma or a colon and is the whole goal without one")
+	# Squeezed to the width of "...next: Forge 2 in": the line gives from its END, so the finished goal and
+	# "next:" both survive and the next goal is what is cut.
+	var room: float = font.get_string_size("✓  Mine 4 ore" + ObjectiveLine.NEXT_SEP + "Forge 2 in", HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(ObjectiveLine.GOAL_SIZE)).x
+	var squeezed: Dictionary = ObjectiveLine.acknowledged(1, font, room)
+	var st: String = squeezed["text"]
+	_check(st.begins_with("✓  Mine 4 ore" + ObjectiveLine.NEXT_SEP + "F") and st.ends_with("…") and st.length() < ("✓  Mine 4 ore" + ObjectiveLine.NEXT_SEP + "Forge 2 ingots").length(), "squeezed to %.0f px the line gives from the end and keeps next: (%s)" % [room, st])
+	_check(String(squeezed["tail"]).begins_with(ObjectiveLine.NEXT_SEP) and st == "✓  Mine 4 ore" + String(squeezed["tail"]), "and the GOAL_INK tail is still the separator onward (%s)" % squeezed["tail"])
 
 
 func _test_paint_runs_through_the_hud_host() -> void:

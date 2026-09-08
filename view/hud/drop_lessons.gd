@@ -119,11 +119,23 @@ static func takes(rec: Dictionary) -> Array[StringName]:
 	return out
 
 
-## A machine's word on the plate: its record's name in caps, the inspector's own path ("FORGE"; the rig
-## reads "CREW RIG"); "MACHINE" for a record that resolves nothing.
+## THE RECEIPT USES THE RING'S WORD (D0525, W3's flag in D0517): the ring under the rig says RIG and the
+## receipt over it said CREW RIG, two words for one machine in one glance. `RingWord.word` is keyed by the
+## rung and what the ring stands on, so this is that table read the other way, by the machine's record id,
+## for the machines a ring stands on; `tests/test_hints_moments.gd` pins each word against `RingWord.word`
+## so the two cannot drift. A machine with no ring word keeps its record's name.
+const RING_WORDS: Dictionary = {&"processor": "FORGE", &"rig": "RIG", &"drill": "DRILL", &"hopper": "HOPPER",
+	&"generator": "GENERATOR", &"winch_head": "WINCH HEAD"}
+
+
+## A machine's word on the plate: the ring's word for it when the ring has one (RIG, FORGE...), else its
+## record's name in caps, the inspector's own path; "MACHINE" for a record that resolves nothing.
 static func eater_label(rec: Dictionary) -> String:
 	if rec.is_empty():
 		return "MACHINE"
+	var id := StringName(String(rec.get("id", "")))
+	if RING_WORDS.has(id):
+		return RING_WORDS[id]
 	return String(rec.get("name", String(rec.get("id", "machine")).replace("_", " "))).to_upper()
 
 

@@ -20372,3 +20372,66 @@ measured threshold. (iv) Not run: any seat or headed capture; the lesson's plate
 `LessonDock` unchanged (W13's file) and was not looked at on screen. (v) The ticket's "S104 and S120",
 "S121 and S126" and "fourteen of twenty-four" are the ticket's numbers, carried here, not re-counted
 against the recordings.
+## D0525 · 2026-09-08 · The acknowledged rung's card carries the next rung's goal; the receipt uses the ring's word
+
+**Decided:** (1) During `ObjectiveLine.ACK_HOLD` the plate reads "✓  <finished goal>   ·   next: <next goal>":
+`ObjectiveLine.NEXT_SEP` ("   ·   next: ") and the next rung's `goal` in `GOAL_INK` after the tick and the
+finished goal in `DONE_INK`, drawn as two strings on one baseline (`layout` returns `tail`, the GOAL_INK
+part; `paint` offsets it by the head's measured width). The last rung latched shows the all-done text as
+before; the how-to during the hold stays empty as before. When the whole line will not fit the card's text
+budget the next goal gives first, to its first clause (`first_clause`: up to the first comma or colon), and
+only then does `Inspector.fit_text`'s ellipsis cut -- from the END, so "next:" survives it. No goal on
+today's ladder has a comma or a colon, so the clause rule is a no-op on the shipped text and is exercised
+by its own unit pin only; the widest acknowledged line at the live span is 589 px of a 620 px budget (31 px
+of room), and the fit pin reports that number. `layout` was 47 lines and could not take the branch: the
+wording moved to `wording` and `acknowledged` (both static, pure over the ladder). `objectives.gd` is
+untouched -- during the hold `current_index()` is already the next rung, so no field was needed. (2)
+`DropLessons.eater_label` prefers the RING's word for a machine: `RING_WORDS` keyed by the machine's record
+id (`processor` FORGE, `rig` RIG, `drill` DRILL, `hopper` HOPPER, `generator` GENERATOR, `winch_head` WINCH
+HEAD), falling back to the record's `name` in caps as before (IRON FORGE, BLAST FURNACE, MACHINE for an
+empty record). The receipt reads "2 INGOT → RIG"; the TOO FAR lesson's `{eater}` takes the same word.
+`RingWord.word` is keyed by the rung and what the ring stands on, not by machine, and `ring_word.gd` was
+read-only for this ticket, so the table is that match read the other way; `tests/test_drop_lessons.gd`
+pins every entry against `RingWord.word` for the rung whose ring stands on that machine (the drill and the
+winch head as the pile the build and winch rungs' rings find), so the two cannot drift. Of the six, only
+the rig's word actually changes what is shown (the other five equal the record's name in caps). (3) THE
+SPLIT: `tests/test_hints_moments.gd` was 395 lines and the new pins took it to 434 against the 400-line
+gate, so the DROP family -- `_drop_obs`, `_test_short_drop_pins`, `_test_fed_receipt_pins`,
+`_test_fed_receipt_eater_pins` and the new `_test_receipt_ring_word_pins` -- is `tests/test_drop_lessons.gd`
+(172 lines), mirroring D0517's own split of `drop_lessons.gd` out of `hints.gd`; `test_hints_moments.gd`
+is 278. The suite is named in `.github/workflows/harness.yml` (two added lines, the comment row and the
+run list), which the ticket's file list did not include; `check_suite_coverage` reads 143 of 143 and
+`check_ci_not_shrunk` 142 -> 143 suites, 199 -> 200 work tokens, nothing removed.
+
+**Why:** the ticket's strangers, S113 of batch 115-120 and S124 of batch 121-126. S113 (`stranger-113/frame_0030`): "✓ Forge 2
+ingots" alone on the plate while the state was already on the deliver rung; the journal: "No new objectives
+appeared. Per instructions, I quit when the game said everything was done". S124, at 43.6 s with the drill
+in the pack: "Game concluded. No further tasks presented". Two of the three strangers who finished a rung
+on its acknowledgement card read the card as the end of the game. A person waits the 1.6 s beat; a stranger
+reading one frame does not, and a person who looks away for the beat sees the same. W3 (D0517) flagged the
+FED receipt naming the rig CREW RIG (the record's `name`) where the ring's word under the same machine says
+RIG: two words for one machine in one glance.
+
+**Verified:** `test_objective_line` 48 -> 57 (one pin re-aimed: "rung 1 just latched" now requires "next:
+Forge 2 ingots"; nine added, among them the fit pin "0 of 8 cut, widest 589 of 620 px" and the squeeze at
+345 px reading "✓  Mine 4 ore   ·   next: Forge 2…"); `test_hints_moments` 47 -> 31 and the new
+`test_drop_lessons` 19 (16 moved, 3 added: the six-way `RingWord.word` agreement, the IRON FORGE control,
+the short lesson's eater; one re-aimed: "2 INGOT → RIG"); `test_objectives` 32 -> 32; `test_lesson_dock`
+50 -> 50; `test_tutorial_teaching` 70 (its own acknowledgement pin now prints "✓  Mine 4 ore   ·   next:
+Forge 2 ingots"); `test_hints` 48; `test_ring_word` 22 (after only). Four mutations, each restored
+byte-identical (`cmp`/`git diff` empty): (A) the next rung dropped from `acknowledged` -> 6 of 57 red
+("8 of 8 cut" among them); (B) the winch goal lengthened to "Raise the winch head on its lode and link it
+home" in `Objectives.STEPS` -> exactly 1 of 57 red, the fit pin alone, "1 of 8 cut, widest 861 of 620
+px", every "next:" pin still green; (C) `eater_label` ignoring the table -> 2 of 19 red, both reading CREW
+RIG; (D) the table's rig entry set to CREW RIG -> 3 of 19 red, the cross-check reading "5 of 6 agree (...
+rig: ring RIG, table CREW RIG ...)". Gates: `check_size_limits` PASS, `layer_lint` PASS, `duplication`
+no clusters, `check_suite_coverage` PASS, `check_ci_not_shrunk` PASS.
+
+**Provisional / not changed:** the separator and "next:" take GOAL_INK with the next goal (the ticket
+named the two inks, not the separator's). A save restored mid-ladder shows the acknowledgement card, now
+with "next:", for ACK_HOLD seconds on its first frame -- `Objectives.refresh`'s first index change, as
+before this entry. The squeeze pin poses the width of "...next: Forge 2 in", not a real corner chip; at
+any budget narrower than the tick's own head the ellipsis reaches the finished goal, which no shortening
+rule can avoid. Whether the drill's word for a PLACED drill should be DRILL (the ring says DRILL over the
+pile and COAL over the fuel rung's seam) is moot today, since the record's name is Drill either way. No
+seat was opened and no capture taken; the card was not seen on a screen. **Kind:** HUD content, structure.

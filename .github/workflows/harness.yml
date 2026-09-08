@@ -373,6 +373,7 @@ jobs:
       #   test_settings_live.gd                          test_settings_live (every setting has a consumer: the zoom the rig reads, the three audio layers' levels and the mounted score, the shake kicked and decayed, the large map deafening the hands -- D0410)
       #   test_tutorial_teaching.gd                      test_tutorial_teaching (binding tokens filled with the live key, progress on the chip, the how-to at once and on a stall, the acknowledgement, the ladder in the save, the ring on the real targets -- D0411)
       #   test_hints_moments.gd                          test_hints_moments (THE WAY DOWN, STILL WORKING, BEHIND ROCK, NOT ORE, WRONG STACK: the situation-read moments' pins, split from test_hints)
+      #   test_drop_lessons.gd                           test_drop_lessons (the DROP's outcomes on the HUD: TOO FAR, the receipt, the plate let go, the eater's word as the ring's -- D0517, D0525; split from test_hints_moments)
       #   test_first_rung_door.gd                        test_first_rung_door (the first rungs through the door as a stranger's hands drive them: a held MINE snaps whatever the hand holds, the ingots come to the drop spot -- D0452, D0456)
       #   test_flat_planes.gd                            test_flat_planes (TileGrid's flat index planes mirror the dictionaries, WindowPlanes.of_plane equals the per-cell reference, VeilLayer's metre field and packing, SeatFlags -- D0390)
       #   test_state_hash.gd                             test_state_hash (the two-lane mixer extracted from TileGrid, literal pins -- D0344)
@@ -525,6 +526,7 @@ jobs:
             res://tests/test_tutorial_teaching.gd \
             res://tests/test_first_rung_door.gd \
             res://tests/test_hints_moments.gd \
+            res://tests/test_drop_lessons.gd \
             res://tests/test_flat_planes.gd \
             res://tests/test_state_hash.gd \
             res://tests/test_machine_defs.gd \
