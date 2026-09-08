@@ -86,7 +86,19 @@ says COAL SEAM in coal; the smelt card says "press each stack's NUMBER then [DRO
 to the number key); BUILD on a solid metre says IN THE ROCK (S77's RMB on the vein itself was silent). The
 slot could not be isolated: no seat repeated a refusal on one cell after a release.
 
-**For the director:** the seam's look (one black metre reads as shadow; a texture or a glint would do what
-no card can); the stride (T035: four D bursts took S79 31 m past the pad); the smelt card's "right of you";
-D3–D6's rewards; the rig's need-bubble during the smelt rung. **Verification cadence:** touched suites
-locally, gates once a push, the battery on CI. **Next batch** after the next discoverability change.
+**The fleet on the batch's findings (D0494–D0499), six workers in six worktrees, cherry-picked and pushed
+as d7a6eeda.** The coal seam reads as a solid block: its matrix sat 0.014 from dug space's own colour
+(five times closer to a hole than any two rocks are to each other) and 16% of coal metres carried no facet;
+lifted to anthracite, 17 facets a metre, the seam's on-screen luma 0.183 -> 0.247 with the hole and the clay
+unchanged to six places (D0494). The smelt card points at the ring, the vein's card at the open metre above
+(D0495). The refusal slot names every floor drop and every wrong stack (D0496; its worker found two
+unguarded reads in D0488's pins, now guarded). The seam is two metres wide, +5 and +6 (D0497). A need
+bubble the rung does not ring stands down to 0.30 while the ladder runs, on terrain rungs every bubble
+(D0498, the worker's reading of the strangers' case). The ring carries the target's word: ORE, COAL SEAM,
+FORGE, RIG, DRILL, MOUTH (D0499). One capture of the pad shows all six together. Every worker's commit was
+re-run here before the pick; gates 28 of 28.
+
+**For the director:** the stride (T035: four D bursts took S79 31 m past the pad); D3–D6's rewards; the
+seam's new grey-blue against the vein's blue-white (a stranger may read both as ore; the next batch
+decides). **Verification cadence:** touched suites locally, gates once a push, the battery on CI. **Next
+batch** on this head: it measures the six at once.
