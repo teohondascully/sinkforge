@@ -53,7 +53,7 @@ static func word(id: StringName, o: Interface.Observation, at: Vector2) -> Strin
 		&"smelt":
 			return "FORGE" if machine_at(o, at, &"processor") else "COAL SEAM"
 		&"deliver":
-			return "RIG"
+			return "INGOTS" if pile_holds(o, at, &"ingot") else "RIG"   # the dropped stack first (D0505)
 		&"build":
 			return "DRILL" if pile_holds(o, at, &"drill") else "MOUTH"
 		&"fuel":

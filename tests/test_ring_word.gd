@@ -15,7 +15,27 @@ var machines: Machines
 
 func _initialize() -> void:
 	await _test_the_word_is_drawn_by_the_real_pass()
+	_test_the_deliver_ring_goes_to_a_dropped_stack_first()
 	_finish("ring_word")
+
+
+## D0505 (stranger 94): three ingots dropped 8 m past the rig, the pack empty, seventeen Q presses at a ring on
+## the rig. With no ingot in the pack and a pile of them on the ground the ring goes to the pile, its word
+## INGOTS; with an ingot in hand it goes to the rig, its word RIG.
+func _test_the_deliver_ring_goes_to_a_dropped_stack_first() -> void:
+	var door: Interface = _seeded()
+	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS["tutorial"])
+	var o: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	var rig: Vector2 = TargetGuide.target(&"deliver", o)
+	_check(rig != TargetGuide.NONE and RingWord.word(&"deliver", o, rig) == "RIG", "control: nothing dropped, no ingot in hand: the ring is on the rig, the word RIG (%s)" % RingWord.word(&"deliver", o, rig))
+	items.piles.pile(spawn + Vector2i(8, 0))[&"ingot"] = 3               # S94's stack, 8 m right on the surface
+	var dropped: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	var at: Vector2 = TargetGuide.target(&"deliver", dropped)
+	var pile_px: Vector2 = (Vector2(spawn + Vector2i(8, 0)) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+	_check(at == pile_px and RingWord.word(&"deliver", dropped, at) == "INGOTS", "the pack empty and ingots on the ground: the ring goes to the pile, the word INGOTS (%s at %s)" % [RingWord.word(&"deliver", dropped, at), str(at)])
+	items.pack.add(&"ingot", 1)
+	var holding: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
+	_check(TargetGuide.target(&"deliver", holding) == rig and RingWord.word(&"deliver", holding, rig) == "RIG", "an ingot in hand again: the ring is back on the rig (%s)" % RingWord.word(&"deliver", holding, TargetGuide.target(&"deliver", holding)))
 
 
 func _seeded() -> Interface:

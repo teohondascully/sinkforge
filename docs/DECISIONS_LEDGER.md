@@ -19356,3 +19356,20 @@ S93 the same shape). A target is under the ground when it is two metres under th
 **Verified:** `tests/test_hints_moments.gd` (31): the seam's bottom row four metres across, three cells under
 the feet, is TOO FAR; two metres under the feet is still TOO FAR DOWN; D0473's two pins re-posed from the
 feet. `tests/test_lesson_dock.gd` (44) re-posed. The mutant restoring the centre rule fails two.
+
+## D0505 · 2026-09-07 · The deliver ring goes to a dropped stack of ingots before the rig
+
+**Decided:** on the deliver rung, with no ingot in the pack and a pile of ingots on the ground in the window,
+the WHITE RING goes to the pile, its word INGOTS; with an ingot in hand it goes to the rig as before (D0485).
+
+**Why (stranger 94, batch 90-95):** the fastest forge of any stranger (two ingots at 19.4 s), then one D
+burst of 60 ticks from cell 126 to 162, nine metres, past the rig at 136-139; Q at 162 dropped all three
+ingots on the floor (the slot said DROPPED); a walk back to 135 with an EMPTY pack and seventeen presses
+of Q at a ring that stood on the rig. The report calls the inventory "invisible": the hotbar was empty and
+nothing on screen pointed back at the stack on the ground. The ring now does, the way the BUILD rung's ring
+finds the paid drill where it lies (D0459).
+
+**Verified:** `tests/test_ring_word.gd` (10): on the seeded world, nothing dropped is RIG; a pile of three
+ingots eight metres right with the pack empty is the pile and INGOTS; an ingot back in hand is RIG again.
+The mutant that never returns the pile fails one. `test_tutorial_teaching` 70 unchanged. **Not changed:**
+the stride (T035) that put the stack eight metres past the rig.

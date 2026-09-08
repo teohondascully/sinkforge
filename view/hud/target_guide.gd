@@ -113,6 +113,13 @@ static func target(id: StringName, o: Interface.Observation) -> Vector2:
 					return seam
 			return _nearest_machine(o, body, &"processor")
 		&"deliver":
+			# THE DROPPED STACK FIRST (D0505, stranger 94): with no ingot in the pack and a pile of them on the
+			# ground, the ring goes to the pile -- S94 dropped three ingots 8 m past the rig, walked back to the
+			# rig with an empty pack and pressed Q seventeen times at a ring that pointed at the rig.
+			if int(Payouts.pack_counts(o).get(&"ingot", 0)) == 0:
+				var dropped: Vector2 = _nearest_pile(o, body, &"ingot")
+				if dropped != NONE:
+					return dropped
 			return _nearest_machine(o, body, &"rig")              # the crew's rig takes the ingots (D0485)
 		&"build":
 			# The drill in hand: the ring moves from the pile to the shaft's mouth (D0459), where [BUILD] goes.
