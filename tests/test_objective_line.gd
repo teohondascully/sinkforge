@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_test_the_alphas()
 	_test_the_layout()
 	_test_the_smelt_card_points_at_the_ring()
+	_test_the_cards_lead_with_the_walk()
 	await _test_paint_runs_through_the_hud_host()
 	_finish("objective_line")
 
@@ -110,7 +111,7 @@ func _test_the_smelt_card_points_at_the_ring() -> void:
 			smelt = String(def["label"])
 	_check(smelt.find("WHITE RING") >= 0, "the smelt card names the WHITE RING, the instrument every stranger has followed since D0447 (%s)" % smelt)
 	_check(smelt.find("coal seam first") >= 0 and smelt.find("forge after") >= 0, "and the ORDER the ring moves in: the coal seam first, the forge after (D0486) (%s)" % smelt)
-	_check(smelt.find("NUMBER then [DROP]") >= 0 and smelt.ends_with("the ingots come to you"), "D0493's number key and the last clause survive the rewording (%s)" % smelt)
+	_check(smelt.find("NUMBER and [DROP]") >= 0 and smelt.ends_with("ingots come to you."), "D0493's number key and the last clause survive the rewording (%s)" % smelt)
 	_check(smelt.length() <= 141, "no longer than the card that already wrapped to two lines (%d <= 141 chars)" % smelt.length())
 	var bearings: PackedStringArray = PackedStringArray()
 	var holds: PackedStringArray = PackedStringArray()
@@ -126,7 +127,26 @@ func _test_the_smelt_card_points_at_the_ring() -> void:
 	for def: Dictionary in Objectives.STEPS:
 		if def["id"] == &"deliver":
 			deliver = String(def["label"])
-	_check(deliver.find("WHITE RING") >= 0 and deliver.find("NUMBER then [DROP]") >= 0 and deliver.length() <= 141, "the deliver card names the ring and the number key within the two-line length (%d chars: %s)" % [deliver.length(), deliver])
+	_check(deliver.find("WHITE RING") >= 0 and deliver.find("NUMBER and [DROP]") >= 0 and deliver.length() <= 141, "the deliver card names the ring and the number key within the two-line length (%d chars: %s)" % [deliver.length(), deliver])
+
+
+## D0515 (strangers 103-108): the smelt card opened on the ring's route and ended "press NUMBER then
+## [DROP]"; six of six pressed NUMBER then Q where they stood (the spawn, cells 147, 166, 184, 202; the
+## forge at 116-119), and the deliver card sent S104 past the rig to the world's edge. A card that names a
+## place leads with WALK, then STAND beside the machine, THEN the keys -- in that order, so the key
+## sequence cannot be read before the walk it needs. The winch card names a place too and takes the shape.
+func _test_the_cards_lead_with_the_walk() -> void:
+	var labels: Dictionary = {}
+	for def: Dictionary in Objectives.STEPS:
+		labels[def["id"]] = String(def["label"])
+	for id: StringName in [&"smelt", &"deliver"]:
+		var lab: String = labels[id]
+		var at: Array[int] = [lab.find("STAND"), lab.find("NUMBER"), lab.find("[DROP]")]
+		_check(lab.begins_with("WALK"), "%s: the card's first word is WALK, not the ring or the keys (%s)" % [id, lab.left(24)])
+		_check(at[0] > 0 and at[1] > at[0] and at[2] > at[1], "%s: STAND, NUMBER, [DROP] in that order after WALK (at %d, %d, %d)" % [id, at[0], at[1], at[2]])
+	var winch: String = labels[&"winch"]
+	_check(winch.begins_with("WALK") and winch.find("STAND") > 0 and winch.find("Then") > winch.find("STAND") and winch.find("6 ingots") >= 0, "the winch card names a place, so it is WALK, STAND, Then as well, and keeps its 6 ingots (WALK at %d, STAND at %d, Then at %d)" % [winch.find("WALK"), winch.find("STAND"), winch.find("Then")])
+	_check(labels[&"smelt"].find("STAND beside the forge") >= 0, "the smelt card says WHICH machine to stand beside: the forge, not the ring that may be on the seam (%s)" % labels[&"smelt"])
 
 
 func _test_paint_runs_through_the_hud_host() -> void:

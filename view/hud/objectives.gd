@@ -27,16 +27,22 @@ const LINGER_DONE: float = 5.0
 ## ring under its feet and strode further right, 78 and 81 hunted shadows. A label names what the WHITE
 ## RING is on and the order it moves in (D0486: the coal seam until the pack holds coal, the forge
 ## after), never left or right of a body that has walked.
+##
+## THE WALK COMES FIRST, THE KEYS LAST (D0515, strangers 103-108): a card that opened on the ring's route
+## and ended "press NUMBER then [DROP]" was read as the keys alone -- six of six pressed NUMBER then Q
+## where they stood, none at the forge; the one who fed it did so after a lesson said "Stand beside it
+## and press Q". A card that names a place is WALK there, STAND beside the machine, THEN the keys, in
+## that order, so the key sequence cannot be read before the walk it needs.
 const STEPS: Array[Dictionary] = [
 	{"id": &"mine", "label": "POINT at the silver-flecked rock in the WHITE RING beside you and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
-	{"id": &"smelt", "label": "The WHITE RING finds the coal seam first, the ORE-and-COAL forge after: by it, press each stack's NUMBER then [DROP]; the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
-	{"id": &"deliver", "label": "Carry the ingots to the rig in the WHITE RING: stand by it, press their NUMBER then [DROP]; the crew's rig pays in machines", "goal": "Deliver 2 ingots"},
+	{"id": &"smelt", "label": "WALK to the WHITE RING: coal seam first, forge after. STAND beside the forge. Then press each stack's NUMBER and [DROP]; ingots come to you.", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
+	{"id": &"deliver", "label": "WALK to the rig in the WHITE RING and STAND beside it. Then press the ingots' NUMBER and [DROP]; the crew's rig pays in machines.", "goal": "Deliver 2 ingots"},
 	{"id": &"build", "label": "The rig set a DRILL down at its foot: walk over it, press its slot's key, [BUILD] over the vein in the WHITE RING", "goal": "Build the line"},
 	{"id": &"fuel", "label": "Hold [MINE] on the black coal seam by the shaft, select the coal, stand by the Drill and press [DROP]", "goal": "Fuel the Drill"},
 	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore and coal into the forge below. First automation!", "goal": "First automation"},
 	{"id": &"hopper", "label": "The crew's cache lies in the WHITE RING: dig down at the WHITE SQUARE above it, set the HOPPER over the Drill with [BUILD], drop coal in", "goal": "Automate the coal feed"},
 	{"id": &"power", "label": "Set the GENERATOR from the cache down with [BUILD] and press [DROP] to feed it coal — the deep needs power", "goal": "Burn coal for power"},
-	{"id": &"winch", "label": "Carry 6 ingots to the WHITE-RINGED rig for the WINCH, then stand the WINCH HEAD on a lode with [BUILD] and press [LINK] on it and its Station", "goal": "Raise the winch"},
+	{"id": &"winch", "label": "WALK 6 ingots to the rig in the WHITE RING and STAND beside it. Then set the WINCH HEAD on a lode with [BUILD] and [LINK] it to its Station.", "goal": "Raise the winch"},
 ]
 
 const INGOTS: Array[StringName] = [&"ingot", &"iron_ingot"]

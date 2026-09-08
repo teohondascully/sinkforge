@@ -19522,3 +19522,53 @@ the spawn broke 15 clay cells across two bites; the three cells that used to mak
 footing, which D0509 now spares. The rule is right (the pit under the spawn was the finding); the
 fixture's control was one cell from its floor. CI on 68e1bd05 went red on it because D0509 shipped after
 a gates-only local run; the suites run before the next push. **Kind:** fixture.
+
+## D0515 · 2026-09-07 · The smelt and deliver cards lead with WALK and STAND; the key sequence comes last
+
+**Decided:** a card that names a place is WALK there, STAND beside the machine, THEN the keys, in that
+order. The smelt card reads "WALK to the WHITE RING: coal seam first, forge after. STAND beside the forge.
+Then press each stack's NUMBER and [DROP]; ingots come to you." (140 chars); the deliver card "WALK to
+the rig in the WHITE RING and STAND beside it. Then press the ingots' NUMBER and [DROP]; the crew's rig
+pays in machines." (129, the ticket's text verbatim); the winch card, which names the rig, "WALK 6 ingots
+to the rig in the WHITE RING and STAND beside it. Then set the WINCH HEAD on a lode with [BUILD] and
+[LINK] it to its Station." (140; "set" is the hopper and generator cards' verb, chosen over "stand" so the
+keyword STAND is not two words in one card; "[LINK] it to its Station" is the winch-head lesson's own
+phrase). `tests/test_objective_line.gd` pins that the smelt and deliver cards begin with WALK and carry
+STAND, NUMBER, [DROP] at rising offsets; that the winch card is WALK, STAND, Then; and that the smelt card
+says "STAND beside the forge", the machine by name, since the ring it could have said "beside it" of stands
+on the seam until the pack holds coal (D0486).
+
+**Why (strangers 103-108):** the smelt card (D0507) opened on where the ring goes and ended "press each
+stack's NUMBER then [DROP]"; six of six pressed NUMBER then Q where they stood -- S106 and S107 at the
+spawn, S108 at cell 147, S104 at 166, S105 at 184, S103 at 202, the forge at 116-119. S107 quoted the
+card and named "whether I should stand AT the machine or just nearby" as the first hesitation, S108 "ON
+the ring vs BESIDE it vs WITHIN RANGE". The one who fed the forge (S104) did so after a different text
+said "Stand beside it and press Q". The deliver card sent S104 thirty metres past the rig to the world's
+edge, where the ingots were dropped. A card whose key sequence can be read before its walk is read as
+the keys alone; the walk has to be the first word and the keys the last clause.
+
+**The ticket's smelt text did not fit the card:** "WALK to the WHITE RING: the coal seam first, then the
+forge. STAND beside the forge. Then press a stack's NUMBER and [DROP], both stacks; the ingots come to
+you." is 161 chars and 1415 px of how-to against the 1296 the card's two lines hold at the live span (648
+px a line, the corner map's 256 px frame either side, `HOWTO_SIZE` 9 pt); D0457's fit pin cuts it at
+"both stacks; t…". Shortened by "coal seam first, forge after" (D0486's own order words, which keeps that
+pin green unchanged), "each stack's" for "a stack's ... both stacks", and the article before "ingots": the
+final text wraps 619 / 614 px, a 29 px margin on the wider line against the shipped card's 20 (628 / 594).
+The deliver text wraps 584 / 551, the winch 605 / 586. Measured with the pin's own computation
+(`ObjectiveLine.wrap_howto` on `BindingLabels.fill` at the fallback, "DROP" for the live "Q", so the pin's
+case is the wider one); `ObjectiveLine.paint` draws with the same `ThemeDB.fallback_font` the pin measures.
+
+**Verified:** `test_objective_line` 42 -> 48 (the six pins above; D0493's and D0507's re-pointed from
+"NUMBER then [DROP]" to "NUMBER and [DROP]", the smelt tail to "ingots come to you."). Mutant 1, STAND
+moved after [DROP] in the smelt card, [DROP] before NUMBER in the deliver card, the winch back to
+"Carry": 4 of 48 fail -- the three order pins, printing the offsets (smelt STAND at 97 after [DROP] at 89;
+deliver [DROP] at 66 before NUMBER at 89; winch WALK at -1), and D0507's number-key pin on the deliver
+swap. Mutant 2, the ticket's 161-char smelt text restored: 3 of 48 fail -- the fit pin, the 141-char pin
+(161) and D0486's order pin. `test_objectives` 32, `test_lesson_dock` 44, `test_tutorial_teaching` 70
+(read-only, it loops the rungs) unchanged.
+
+**Not changed:** `tests/test_tutorial_teaching.gd` (another worker's), where the size gate already fails on
+the bare base d7fbafcf (`_test_wrong_stack_through_the_door()` 52 lines against 50); no pin there quotes
+the card text. **Provisional:** the winch card names no NUMBER or [DROP] (it never did; the deliver rung
+teaches them six rungs earlier), and the smelt card's "ingots come to you" lost its article to the
+margin -- a wider card, or the live "Q" measured instead of "DROP", would give it back.
