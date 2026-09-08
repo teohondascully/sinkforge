@@ -138,6 +138,8 @@ const RIM_WARM: float = 0.03
 const FORM_REACH: int = 6
 const FORM_LIFT: float = 0.22
 const FORM_SINK: float = 0.13
+const ORTHOGONAL: Array[Vector2i] = [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]
+const DIAGONAL: Array[Vector2i] = [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
 
 var _drift: FastNoiseLite
 var _grain: FastNoiseLite
@@ -240,7 +242,7 @@ func shade(base: Color, col: int, row: int, gram: int, solid_at: Callable = Call
 			var lip: float = 1.0 - float(top) / float(RIM_DEPTH)
 			rim = RIM_LIGHT * lip
 			rim_warm = RIM_WARM * lip
-	var lam: float = lamina(x, y) * GRAM_LAMINA[g]
+	var lam: float = lamina(x, y) * GRAM_LAMINA[g] if GRAM_LAMINA[g] != 0.0 else 0.0
 	var vmul: float = _value(ao, grain, form, lam)
 	drift -= LAM_ADD * lam
 	# CLAMPED, exactly where legacy clamps. Legacy's `_paint_fine` writes bytes -- `clampf(out.r, 0, 1)`
@@ -299,10 +301,10 @@ func _value(ao: float, grain: float, form: float, lam: float) -> float:
 ## carved. Out of the probe's reach counts as AIR, exactly as legacy counts out-of-grid as air.
 func _air_weight(solid_at: Callable, col: int, row: int) -> float:
 	var w: float = 0.0
-	for d: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+	for d: Vector2i in ORTHOGONAL:
 		if not bool(solid_at.call(col + d.x, row + d.y)):
 			w += 1.0
-	for d: Vector2i in [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]:
+	for d: Vector2i in DIAGONAL:
 		if not bool(solid_at.call(col + d.x, row + d.y)):
 			w += 0.5
 	return w

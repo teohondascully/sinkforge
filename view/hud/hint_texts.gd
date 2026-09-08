@@ -21,8 +21,15 @@ const DEFS: Array[Dictionary] = [
 	{"id": &"winch_station", "item": &"winch_station", "text": "WINCH STATION — the head's drain. Collect from it."},
 ]
 
+## THE EDGE (D0526, strangers 103-126): fourteen of twenty-four walked to the world's right edge and kept
+## pressing D under the clamped camera; nothing on screen said the world had ended. One text, one row a
+## side below, because a moment latches by id and the lesson is owed once at EACH edge. `{dir}` is the way
+## BACK, filled by `Hints`: LEFT at the world's right edge, RIGHT at its left.
+const EDGE_TEXT: String = "THE EDGE — the world ends here; there is nothing past it. Everything this step wants is behind you, to your {dir}: the WHITE RING marks it."
+
 ## State-edge hints: the rising edge fires once and latches like a pack hint. `in_water` sits above the
-## swing techniques so a player who is wading is told about the pump before being told how to swing.
+## swing techniques so a player who is wading is told about the pump before being told how to swing. The
+## refusals and the drop lessons sit above THE EDGE, so a hold on air at the boundary is answered first.
 const MOMENTS: Array[Dictionary] = [
 	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
 	{"id": &"far_below", "text": "TOO FAR DOWN — what you point at lies under the ground, past your reach. Dig at the WHITE SQUARE first: the hole brings it into reach."},
@@ -40,6 +47,8 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"dropped_floor", "text": "NO MACHINE HERE — nothing in sight takes that stack, so it fell at your feet; walk over it to pick it up again. A machine takes a drop from within a body length; the WHITE RING marks the one this step wants."},
 	{"id": &"dropped_short", "text": "TOO FAR — the {eater} that takes {item} is {dist} m to your {dir}; your stack stays with you. Walk into its WHITE RING, stand beside it, then press the stack's NUMBER and [DROP]."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
+	{"id": &"world_edge_right", "text": EDGE_TEXT},
+	{"id": &"world_edge_left", "text": EDGE_TEXT},
 	{"id": &"way_down", "text": "THE WAY DOWN — the ground is rock you can cut. Point at the ground under you and hold [MINE]: the metre opens and you drop into it. One metre at a time is a safe fall."},
 	{"id": &"deep_enough", "text": "GRAPPLE — POINT at rock above you and press [GRAPPLE] to throw your line there. Hold [REEL] to climb it, press [GRAPPLE] again to let go and fly."},
 	{"id": &"pump", "text": "PUMP IT — hold [REEL] at the bottom of the arc, [LOWER] at the top."},

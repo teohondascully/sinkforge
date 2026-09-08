@@ -473,6 +473,7 @@ jobs:
       #   test_bake_lanes.gd                             test_bake_lanes (the bake's two lanes: a dig repaints its dilated rect per chunk, 16-cell chunks, whole chunks only when they cost fewer cells than the rect, the painters visit exactly what the eraser clears -- D0522, D0524)
       #   test_bake_budget.gd                            test_bake_budget (the window lane's budget in SOLID CELLS a tick off the observation, the view promised, the first bake exempt -- D0524)
       #   test_rock_tone.gd                              test_rock_tone (legacy's molded-rock shading + the texture grammar — D0327, PORT_ORDER V2)
+      #   test_terrain_shading_cost.gd                  discarded bedding work and byte-probe equivalence
       #   test_rock_laminae.gd                           test_rock_laminae (bedded rock's parting planes on the shared bedding coordinate — D0398)
       #   test_seen_plane.gd                             test_seen_plane (the map's memory: ore paints only where the player has been — D0400)
       #   test_post_fx.gd                                test_post_fx (the lens + palette grade, and its deterministic grain clock — D0328, PORT_ORDER V3)
@@ -505,10 +506,11 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 141 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 142 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
+            res://tests/test_body_fuzz_regression_d0122.gd \
             res://tests/test_fixed_point.gd \
             res://tests/test_split_rng.gd \
             res://tests/test_entity_id_pool.gd \
@@ -602,7 +604,6 @@ jobs:
             res://tests/test_bounds_invariant.gd \
             res://tests/test_reachability_sweep.gd \
             res://tests/test_body_fuzz_fast.gd \
-            res://tests/test_body_fuzz_regression_d0122.gd \
             res://tests/test_reveal_metric.gd \
             res://tests/test_reveal_replay_driver.gd \
             res://tests/test_floor_source_telemetry.gd \
@@ -625,6 +626,7 @@ jobs:
             res://tests/test_bake_lanes.gd \
             res://tests/test_bake_budget.gd \
             res://tests/test_rock_tone.gd \
+            res://tests/test_terrain_shading_cost.gd \
             res://tests/test_rock_laminae.gd \
             res://tests/test_seen_plane.gd \
             res://tests/test_post_fx.gd \

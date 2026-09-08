@@ -1,4 +1,69 @@
-# Performance — the 120 Hz programme
+# Performance — current target and historical programme
+
+## September 8 update: 360 fps is a frame-time target, not a universal guarantee
+
+The director now requests 360 fps: **2.78 ms per rendered frame**, on a declared host, resolution and
+workload. An average above 360 is insufficient while excavation or streaming stalls. Do not replace
+the older measured 120 Hz criteria silently, or assert that every device can meet the new target.
+
+**D0526, following D0522/D0524:** retain dirty rectangles, small chunks and the solid-cell streaming
+budget. Remove three costs without changing the shading formula: solidity reads the observation's
+bounded byte plane instead of decoding a material name; zero-weight bedding is not evaluated; the
+eight AO offsets are constants rather than arrays allocated per shaded cell. This is not the GPU port.
+
+The repeatable CPU probe is:
+
+```sh
+godot --headless --path . --script res://tests/test_terrain_shading_cost.gd -- --profile-shading
+```
+
+Apple M4 Pro, 24 GiB, Godot 4.6.2; 2,560 samples per grammar, five timed repetitions. Median shading
+time, excluding setup/hash work (not the complete paint/upload/render cost):
+
+| Grammar | Before, ms | After, ms | Reduction |
+|---|---:|---:|---:|
+| Clastic | 37.381 | 16.597 | 55.6% |
+| Bedded | 37.184 | 22.299 | 40.0% |
+| Massive | 37.223 | 16.417 | 55.9% |
+
+All 2,560 floating-point colours per grammar hash identically before/after. Hashes respectively:
+`06aa373873696b2505bf028bb2479fde2b26ee87c4317cde7b2577b5acddedab`,
+`9a18425eeafe5bf9f09df1d02cac47f9c8dbee8b80a0583850930d6e59e2fb5b`,
+`f55ade486217892b491e4cb3d5020a3f7248b1789d23370df75ebc256f1c2e23`.
+
+The headed comparison used `--resolution 1280x720 --disable-vsync --max-fps 0 -- --fresh --muted
+--zoom=2 --perf-drive --warp=184,120 --quit-after=600`. Two runs each, sequential, baseline 5151e8ac
+versus the byte-probe/bedding changes (before hoisting AO arrays). Warm repeat: first five-second
+segment p99 22.54 → 20.47 ms; second p99 17.87 → 14.59 ms, average 388.6 → 454.3 fps. **Not a stable
+360 fps result.** The first baseline was much slower (93.6/117.2 fps), so do not use it to claim a
+whole-game speedup; launch/shader/scheduling state was not isolated. Worst frames do not consistently
+improve. Tick-120 screenshots were inspected: terrain appears consistent, moving effects differ, and
+whole-frame hashes differ. Only the sampled shading colours are proven byte-identical here.
+Local raw logs/captures remain at `/tmp/sinkforge-shading-ab.Y912sX-*`; this paragraph preserves their
+scoped results, not a portable archived benchmark.
+
+### Remaining work, in dependency order
+
+1. Establish a repeatable warm/cold performance fixture at named zooms with dig, shaft-fall, water and
+   large-factory workloads. Separate shader startup, terrain preparation, upload, dynamic painters and
+   draw time; Metal's reported zero GPU time is unsupported timing, not free rendering. Stop repetitions
+   when host/scheduler variation dominates; do not use blind-agent batches for renderer benchmarking.
+2. Bound visible streaming too: D0524 explicitly admits visible missing chunks beyond its budget.
+   Shrinking the background budget alone cannot bound that frame. Inspect prefetch coverage and upload
+   cost before adding more scheduling rules; never accept holes or stale dig silhouettes as a speedup.
+3. Prototype the T040 data-texture/shader path behind a comparison switch, one representative region
+   first. Keep sim/observations unchanged. Measure data preparation, upload and GPU cost separately;
+   compare surface, cave lips, bedded rock and moving-camera edges against the current CPU reference.
+   A shader is not automatically cheap, and a changed noise implementation is an art change, not exact
+   parity. Preserve the current look before making it default. No unmeasured “near-free” upload claim.
+4. Retain/cull dynamic draw work that does not change; profile veil, sky, ore and HUD separately.
+   The sampled scene still has physics/update frames costing more than the entire 2.78 ms budget.
+5. Add presentation-only body/camera interpolation: `Main._process` currently meters while
+   `_physics_process` refreshes the view at 60 Hz. Preserve deterministic ticks, action aims and mining
+   targets; test camera reversals, contacts and teleports. Rendering unchanged poses faster is not
+   equivalent to smoother movement. Do not raise the sim tick rate to chase the render target.
+
+## Historical 120 Hz programme
 
 > **Status: REFERENCE (2026-09-03, D0342).** The measurements and rules stand and `docs/A_PRIME_REFACTOR_PLAN.md`
 > §7 restates the ones the executor holds to. Two hypotheses to measure before the next perf change are

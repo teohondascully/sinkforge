@@ -20279,3 +20279,96 @@ not snapshotted, so receipts are explicitly historical and never release certifi
 **Reverse cost:** tooling-only. Disable optional receipt/image paths and select jobs=1 without changing
 game state, saves, observation semantics, or suite coverage. Source: the director's sequential assignment
 and `docs/superpowers/plans/2026-09-07-iteration-efficiency.md`.
+
+## D0526 · 2026-09-08 · Reduce the terrain shader's CPU work without changing its colours
+
+**Decided:** keep D0522/D0524's bake lanes. Make `Observation.solid_at` the bounded byte comparison its
+documented zero-is-air encoding permits; the terrain painter uses it instead of material-name decoding.
+Do not evaluate laminae with zero grammar weight, and hoist the AO offset arrays out of the per-cell
+loop. No sim mutation, colour constant, save format, budget or renderer backend changes.
+
+**Why this before a shader port:** the CPU path contained avoidable work. The choice is not exclusively
+“accept stutter” versus “change the art.” A GPU implementation remains a separate measured experiment,
+not an automatic win or permission to flatten the current molded look.
+
+**Evidence:** new `test_terrain_shading_cost` first failed on discarded bedding work and then on
+material decoding. Both guards now pass, with a real byte/string comparison over 42 inside/outside
+coordinates, including negative origin and row boundaries. Nine focused Godot suites passed. Five
+repetitions of 2,560 CPU shading samples per grammar on M4 Pro/Godot 4.6.2 give median reductions
+55.6% clastic, 40.0% bedded, 55.9% massive; all sampled floating-point colour hashes are unchanged.
+`docs/PERF_PLAN.md` records commands, times, hashes and the headed comparison's limits. These are
+shading costs, NOT whole-frame costs. The headed run still has 14-20 ms p99 frames in its warm repeat;
+360 fps sustained is not achieved. Whole-frame screenshot hashes differ (moving effects).
+
+**Verification correction:** adding the suite made CI's declared count stale at 141 while the actual
+population became 142. The full battery's count gate and its mutation test caught this; the label is
+corrected rather than weakening the gate. Final verification belongs to the closing brief.
+
+**Reverse cost:** three small production edits and the new cost guard/profile suite; no stored state
+migration. Source: the director's instruction to improve D0522 toward a measured 360 fps target while
+retaining visual quality. No universal-hardware performance guarantee is made.
+## D0526 · 2026-09-08 · A lesson at the world's edge: the world ends here, what you were sent to is behind you
+
+**Decided:** (1) A STATE-EDGE lesson, THE EDGE, in `view/hud/hint_texts.gd`: "THE EDGE — the world ends
+here; there is nothing past it. Everything this step wants is behind you, to your {dir}: the WHITE RING
+marks it." `{dir}` is LEFT at the world's right edge and RIGHT at its left. (2) ONE TEXT, TWO MOMENT ROWS
+(`world_edge_right`, `world_edge_left`, named for the edge reached), because a moment latches by id in
+`_done` and the ticket owes the lesson once per session at EACH side; the text is authored once as
+`HintTexts.EDGE_TEXT` and the two rows point at it. `{dir}` is filled through the existing `_subs`
+mechanism (`mined_wrong`, `dropped_short`), set once in `Hints._init` since the way back is fixed per id.
+The rows sit after `in_water` and before `way_down`: below every refusal and drop lesson in the table, so
+a hold on air at the boundary is answered first on a shared frame, and the edge queues behind. (3) THE
+CELL TEST ALONE: `Hints._note_edge` fires a side when `o.cell.x` is among the `EDGE_CELLS` = 4 outermost
+cells of `o.world_cells.x` on that side (`cell.x >= world_cells.x - 4`, or `cell.x < 4`). The ticket's
+camera condition (the body's screen offset from the view centre past a quarter of the view under the
+clamp) is not tested because `Interface.Observation` carries no camera field (read in full: no camera,
+view or screen field exists), and it is IMPLIED: the terrain cell is 4 px, the viewport 1280 px, the
+closest zoom `CameraRig.ZOOM_LEVELS[0]` = 2.0, so the view is 160 cells wide and a body 4 cells from the
+edge sits 76 or more cells off the view's centre under D0333's clamp, against a quarter-view of 40. That
+is the SMALLEST offset over the four zoom levels: at 1.4 the half-view is 114 cells and the clamped offset
+110; at 1.0 and 0.66 the view (320 and 485 cells) exceeds the world, D0333 centres it, and the body at
+cell 252 is 124 off centre. (4) A GUARD, `o.world_cells.x > 0`: an observation that names no world (every `_hint_obs()`
+fixture, `Vector2i.ZERO`) has no edge and never fires. (5) The moment count pin in `test_hints.gd` goes
+22 -> 24; `Refusals.headline(&"world_edge_right")` reads "THE EDGE" from the text's own dash, so the slot
+headline the ticket names comes for free.
+
+**Why (strangers 103-126, batches 103-126):** the shipped world is 256 cells (64 m) wide with the spawn at
+its centre and everything but the forge to the right of it. Fourteen of twenty-four strangers walked to the
+right edge (cells 240-254): the camera clamps there (D0333), the body sits at the screen's right, and the
+stranger keeps pressing D. S104 and S120 carried their ingots there and dropped them into the pond with
+the ring on the rig 30 m behind them; S121 and S126 ended their runs there dropping stacks with nothing in
+sight. No text on screen said the world had ended. The layout and the clamp are the director's; a lesson
+is not. `world_cells` is the field D0302 added so a consumer can tell the edge of the world from a hole in
+it; this is its second consumer after the veil.
+
+**Verified:** `test_hints` 48 -> 57 (9 new pins: cell 128 of 256 teaches nothing over 3 frames; cell 253
+teaches `world_edge_right` with "to your LEFT" and cell 128 had not (the pin carries the id active BEFORE
+the step); the headline is THE EDGE; back at 128 after SHOW_SECONDS the plate clears and nothing waits;
+cell 2 teaches `world_edge_left` with "to your RIGHT"; a second pass over 253, 128, 2, 128, 255, 0
+re-fires nothing and queues nothing; both ids are in `taught_ids()`; the boundary is exact, cell 251 is
+not the edge and 252 is; control: a 0-wide observation at cell 253 never fires). `test_hints_moments` 47
+-> 47 (untouched, see below). `test_lesson_dock` 50 -> 50; the tallest lesson is still NO MACHINE HERE at
+160 px, so the new text moves no layout bound. Gates: `check_size_limits` PASS (`hints.gd` 378 lines,
+`test_hints.gd` 330), `layer_lint` PASS (192 files), `duplication` PASS (0 clusters).
+
+**Mutation-tested:** (a) the ticket's mutation, `0` in place of `o.world_cells.x` in the right-edge test:
+`test_hints` 3 FAIL of 57 -- "cell 128 ... teaches nothing (world_edge_right, 0 queued)", "cell 253 ...
+and cell 128 had not (world_edge_right -> world_edge_right)", "the boundary is exact: cell 251 is not the
+edge (world_edge_right, world_edge_right)"; restored, 57 green. (b) the guard `world_cells.x > 0` replaced
+by `true`: `test_hints_moments` 36 FAIL of 56 (run while the pins still lived there), every fixture in the
+suite firing `world_edge_right` on its 0-wide world, the control pin among them; restored, green. The
+mutation (a) was run twice, once in each file the pins lived in.
+
+**Provisional / not changed:** (i) THE PINS LIVE IN `test_hints.gd`, NOT `test_hints_moments.gd` as the
+ticket asked: that suite was 395 lines before this ticket and the 50-line function put it at 448 against
+the 400 cap (`check_size_limits` FAIL, seen), and the other functions in it are W11's to move, not this
+worker's. `test_hints_moments.gd` is restored to HEAD byte-for-byte, so W11's RECEIPT edits have no merge
+point here. (ii) The lesson does not read the objective ladder: "everything this step wants" is true for
+every rung on the shipped layout (the forge stands at the spawn, everything else to the right), and a
+future layout with a machine at an edge would need the text or a rung gate revisited. (iii) `EDGE_CELLS`
+= 4 is the ticket's number, one metre; the strangers stood at cells 240-254, so 4 catches the ones who
+reached the boundary and not the ones who stopped 3 m short, which is the ticket's intent as read, not a
+measured threshold. (iv) Not run: any seat or headed capture; the lesson's plate rendering rides
+`LessonDock` unchanged (W13's file) and was not looked at on screen. (v) The ticket's "S104 and S120",
+"S121 and S126" and "fourteen of twenty-four" are the ticket's numbers, carried here, not re-counted
+against the recordings.

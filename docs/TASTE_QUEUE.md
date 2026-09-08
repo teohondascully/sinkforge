@@ -321,3 +321,9 @@ D0511). The second is the "molded vs crisp" question the underground-legibility 
 LOOK would be re-derived in GLSL, and a capture comparison would decide whether it is the same picture.
 A worker can do the first half (the data texture, the shader reading it) as a bounded ticket once the
 director says the look may move by a capture's difference.*
+
+**September 8 update (D0526):** the director authorized performance improvements, and an exact-colour
+CPU slice removes 40-56% of sampled `RockTone.shade` time before any GPU port. The binary fork above is
+therefore too strong: the CPU path had redundant work. The GPU experiment remains unimplemented, and
+its estimated ~1 us data-build cost is not a measurement. See [the current performance plan](PERF_PLAN.md)
+for scope, actual timings and the remaining visible-streaming/interpolation work. No art change landed.

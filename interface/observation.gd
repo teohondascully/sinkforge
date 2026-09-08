@@ -151,7 +151,7 @@ var mining_blow_px: int = 0
 ## be reading `in_window` first. Deliberately not an error, because a renderer legitimately probes
 ## the ring just past its own window when deciding edges.
 func solid_at(c: Vector2i) -> bool:
-	return material_at(c) != &""
+	return window.has_point(c) and materials[(c.y - window.position.y) * window.size.x + c.x - window.position.x] != 0
 
 func material_at(c: Vector2i) -> StringName:
 	return _plane_at(legend, materials, c)

@@ -68,6 +68,15 @@ var _refusals: Refusals = Refusals.new()   ## the held verb's refusals and the s
 ## who got there.
 const WAY_DOWN_RANGE_M: float = 24.0
 const WAY_DOWN_DEPTH_M: float = 4.0
+## THE EDGE (D0526, strangers 103-126): the world is 256 cells wide with the spawn at its centre and every
+## machine but the forge to the right of it; fourteen of twenty-four strangers walked to the right edge, where
+## the camera clamps (D0333) and the body sits at the screen's side, and kept pressing D -- S104 and S120
+## dropped their ingots into the pond there with the ring 30 m behind them. The lesson fires when the body's
+## cell is among the EDGE_CELLS outermost on either side of `world_cells` -- the field that exists so a
+## consumer can tell the edge of the world from a hole in it (D0302). The cell test alone: the observation
+## carries no camera, and at the closest zoom the view is 160 cells wide, so a body this near the edge sits
+## 76 or more cells off the view's centre under the clamp. A bare observation with no world size never fires.
+const EDGE_CELLS: int = 4
 ## THE DROP'S OUTCOMES live in `DropLessons` (D0443's WRONG STACK, D0517's short lesson and receipt); this
 ## class applies what it decides to the plate, the queue and the slot.
 var _drops: DropLessons = DropLessons.new()
@@ -149,6 +158,15 @@ func _init() -> void:
 	for def: Dictionary in DEFS:
 		if def.has("when"):
 			_gate_of[def["id"]] = def["when"]
+	_subs[&"world_edge_right"] = {"{dir}": "LEFT"}    # the way BACK from each edge is fixed per side (D0526)
+	_subs[&"world_edge_left"] = {"{dir}": "RIGHT"}
+
+
+## The body among the EDGE_CELLS outermost cells of the world's right or left side, one moment a side (D0526).
+func _note_edge(o: Interface.Observation) -> void:
+	var known: bool = o.world_cells.x > 0                  # a bare observation names no world, so it has no edge
+	note(&"world_edge_right", known and o.cell.x >= o.world_cells.x - EDGE_CELLS)
+	note(&"world_edge_left", known and o.cell.x < EDGE_CELLS)
 
 
 func note(id: StringName, on: bool) -> void:
@@ -195,6 +213,7 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 		_let_go(drop["receipt"])
 	note(&"left_working", _left_working(o, counts))
 	note(&"in_water", o.wet)
+	_note_edge(o)
 	note(&"way_down", _way_down_wanted(o))
 	note(&"deep_enough", float(MaterialLook.depth_m(o.cell.y)) >= DEPTH_HINT_M)
 	if o.grapple_live:

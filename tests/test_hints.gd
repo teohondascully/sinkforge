@@ -3,7 +3,8 @@ extends "res://tests/test_base.gd"
 ## acquisition edge fires once per world and never on the first frame; one bubble at a time with a queue
 ## in table order; the moments are rising edges read off the observation; busy freezes the clock and
 ## hides; a ceremony holds a lesson intact; the linger cap; taught ids survive a save and unknown ids
-## are dropped; resync re-arms.
+## are dropped; resync re-arms. THE EDGE's pins (D0526) are here rather than in `test_hints_moments.gd`
+## because that suite stands at the size limit.
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_hints.gd
 const S: int = Fx.SCALE
@@ -19,6 +20,7 @@ func _initialize() -> void:
 	_test_a_waiting_lesson_makes_the_active_one_yield_on_wall_time()
 	_test_the_grapple_is_known_by_lesson_or_by_throw()
 	_test_a_drop_that_hits_the_floor_teaches_once()
+	_test_world_edge_pins()
 	_finish("hints")
 
 
@@ -31,7 +33,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_hint_obs([]), 0.016)
 	h.observe(_hint_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 22, "nine pack lessons and twenty-two moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 24, "nine pack lessons and twenty-four moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -274,3 +276,55 @@ func _test_a_drop_that_hits_the_floor_teaches_once() -> void:
 		h.observe(_hint_obs(), 0.5)
 	h.observe(floor, 0.016)
 	_check(h.active_id() == &"" and h.queued() == 0, "a second floor drop is not taught again")
+
+
+## D0526 (strangers 103-126, fourteen of twenty-four at the world's right edge under the clamped camera): a
+## body within EDGE_CELLS of the right boundary of a 256-wide world teaches THE EDGE with the way back LEFT,
+## and not a frame before; the middle of the world teaches nothing however long it stands there; the left
+## boundary teaches it again with RIGHT, since the lesson is owed once at EACH edge; a second visit to a side
+## already taught re-fires nothing. The observation the fixtures pose names no world size, and never fires.
+func _test_world_edge_pins() -> void:
+	var h: Hints = Hints.new()
+	var o: Interface.Observation = _hint_obs()
+	o.world_cells = Vector2i(256, 128)
+	o.cell.x = 128
+	for i: int in 3:
+		h.observe(o, 0.016)
+	var mid: StringName = h.active_id()
+	_check(mid == &"" and h.queued() == 0, "cell 128 of a 256-wide world teaches nothing (%s, %d queued)" % [mid, h.queued()])
+	o.cell.x = 253
+	h.observe(o, 0.016)
+	_check(mid == &"" and h.active_id() == &"world_edge_right" and h.active_text().find("to your LEFT") >= 0,
+		"cell 253 of 256 teaches THE EDGE with the way back LEFT, and cell 128 had not (%s -> %s)" % [mid, h.active_id()])
+	_check(h.active_text().begins_with("THE EDGE — ") and Refusals.headline(&"world_edge_right") == "THE EDGE",
+		"its headline is THE EDGE (%s)" % h.active_text().left(24))
+	o.cell.x = 128
+	h.observe(o, Hints.SHOW_SECONDS + 1.0)                     # read out in the middle; the plate clears
+	_check(h.active_id() == &"" and h.queued() == 0, "back at cell 128 the plate clears and nothing waits (%s)" % h.active_id())
+	o.cell.x = 2
+	h.observe(o, 0.016)
+	_check(h.active_id() == &"world_edge_left" and h.active_text().find("to your RIGHT") >= 0,
+		"cell 2 teaches THE EDGE again with the way back RIGHT (%s)" % h.active_id())
+	o.cell.x = 128
+	h.observe(o, Hints.SHOW_SECONDS + 1.0)
+	for x: int in [253, 128, 2, 128, 255, 0]:
+		o.cell.x = x
+		h.observe(o, 0.016)
+	_check(h.active_id() == &"" and h.queued() == 0, "a second visit to either side re-fires nothing (%s, %d queued)" % [h.active_id(), h.queued()])
+	_check(h.taught_ids() == ["world_edge_left", "world_edge_right"], "both sides latch in the taught ids (%s)" % str(h.taught_ids()))
+	var h2: Hints = Hints.new()
+	var line: Interface.Observation = _hint_obs()
+	line.world_cells = Vector2i(256, 128)
+	line.cell.x = 256 - Hints.EDGE_CELLS - 1                    # the first cell NOT among the outermost EDGE_CELLS
+	h2.observe(line, 0.016)
+	var outside: StringName = h2.active_id()
+	line.cell.x = 256 - Hints.EDGE_CELLS
+	h2.observe(line, 0.016)
+	_check(outside == &"" and h2.active_id() == &"world_edge_right",
+		"the boundary is exact: cell %d is not the edge, cell %d is (%s, %s)" % [256 - Hints.EDGE_CELLS - 1, 256 - Hints.EDGE_CELLS, outside, h2.active_id()])
+	var h3: Hints = Hints.new()
+	var bare: Interface.Observation = _hint_obs()                # world_cells is (0, 0): the fixture every suite poses
+	bare.cell.x = 253
+	for i: int in 3:
+		h3.observe(bare, 0.016)
+	_check(h3.active_id() == &"" and h3.queued() == 0, "control: an observation with no world size (0 wide) never fires at cell 253 (%s)" % h3.active_id())

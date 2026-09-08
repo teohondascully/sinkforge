@@ -45,6 +45,10 @@ Focused tests and the real-engine runner self-test pass; no whole-battery speedu
 latency improvement is claimed. Fresh checks and existing actor protocol remain the defaults.
 Active director assignment: optimize the terrain shading hot path after the engineer's D0522/D0524,
 preserving appearance. 360 fps is a measured host-specific target, not a hardware-independent guarantee.
+Implemented D0526: bounded byte solidity, skip zero-weight bedding, reuse AO offsets. The focused
+shading sample costs 40-56% less with identical colour hashes; this is not a full-frame speedup claim.
+The CPU slice is under full verification; the GPU port and presentation interpolation remain undone.
+Reproduction and next bottlenecks: [performance plan](PERF_PLAN.md).
 The gameplay section above was reconciled by the engineer at their 2026-09-07 late checkpoint
 (after strangers 115-120); the batch queue is theirs, the tooling queue is this section's.
 

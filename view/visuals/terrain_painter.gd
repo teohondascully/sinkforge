@@ -75,7 +75,7 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 	# grow a false lit rim along every screen edge. `WorldView.WINDOW_MARGIN_CELLS` is 9 and the deepest
 	# probe here reaches FORM_REACH + 1 = 7, so the ring these terms read is inside the observation.
 	var solid: Callable = func(c: int, rw: int) -> bool:
-		return frame.obs.material_at(Vector2i(c, rw)) != &""
+		return frame.obs.solid_at(Vector2i(c, rw))
 	for col: int in range(r.position.x, r.end.x):
 		# THE COLUMN'S WALKED SURFACE, once per column (6o, D0378): the soil profile follows it and the cap
 		# sits on it. NONE for a hole column, and then neither applies.
