@@ -100,6 +100,13 @@ const RECORDS: Dictionary = {
 				"deposit": 13,
 			},
 			{
+				"kind": "solid",
+				"dx": 6,
+				"dy": 0,
+				"material": "coal",
+				"deposit": 13,
+			},
+			{
 				"kind": "open",
 				"cells": [
 					[

@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_twins_sign_the_same_and_the_real_site_takes_it()
 	_test_a_room_fixture_opens_a_rectangle_and_floors_it()
 	_test_the_tutorial_tree_is_planted_by_the_worlds_own_pass()
+	_test_the_surface_seam_is_two_metres_wide()
 	_finish("world_seeder")
 
 
@@ -173,3 +174,31 @@ func _test_the_tutorial_tree_is_planted_by_the_worlds_own_pass() -> void:
 			leaf_cells += 1
 	_check(trunk_cells == int(g["trunk_w"]) * per and leaf_cells > 0 and leaf_cells < per * per,
 		"the trunk metre is %d of 16 cells wood (the site's trunk width), the canopy's edge metre part leaves (%d): cells, not metres" % [trunk_cells, leaf_cells])
+
+
+## D0497 (strangers 76-81, `docs/playtests/2026-09-07_strangers76-81_seam_slot.md`): the surface seam is TWO
+## metres of coal, +5 and +6 -- four of six never held any, and one black metre beside the shaft's black
+## mouth at +7 reads as shadow. The WIDTH IN METRES is the number a one-metre seam differs on; the mouth
+## still open at +7 and the untouched metre at +4 say which way it grew.
+func _test_the_surface_seam_is_two_metres_wide() -> void:
+	_flat()
+	_check(WorldSeeder.stamp(world, items, machines, &"tutorial", &"shallow_clay"), "the tutorial stamps for the seam pins (%s)" % WorldSeeder.last_refusal)
+	var coal_cells: int = 0
+	var metres: Array[int] = []
+	for col_m: int in range(32, 40):
+		var full: int = 0
+		for tc: Vector2i in world.terrain_cells_of(Vector2i(col_m, WorldSeeder.SURFACE_ROW_M)):
+			if world.grid.is_solid(tc) and world.grid.get_material(tc) == &"coal":
+				full += 1
+		coal_cells += full
+		if full == LogicGrid.TERRAIN_PER_LOGIC * LogicGrid.TERRAIN_PER_LOGIC:
+			metres.append(col_m - 32)
+	_check(metres == ([5, 6] as Array[int]) and coal_cells == 32,
+		"the surface seam is %d metres of solid coal at dx %s (%d cells over dx 0..7): two, not the one metre that read as shadow"
+		% [metres.size(), str(metres), coal_cells])
+	_check(_metre_yield(Vector2i(37, 20)) == 208 and _metre_yield(Vector2i(38, 20)) == 208,
+		"both metres carry legacy's stock, 13 a cell (%d and %d a metre)" % [_metre_yield(Vector2i(37, 20)), _metre_yield(Vector2i(38, 20))])
+	_check(world.logic_air(Vector2i(39, 20)) and world.logic_air(Vector2i(39, 21)),
+		"the shaft's mouth at +7 is still open: the seam stops a metre short of it")
+	_check(world.grid.get_material(Vector2i(144, 80)) == ROCK and _metre_yield(Vector2i(36, 20)) == 0,
+		"and the metre at +4 is untouched rock with no stock: the seam grew RIGHT, into the gap by the mouth")

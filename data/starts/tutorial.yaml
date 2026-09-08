@@ -8,8 +8,13 @@ fixtures:
   # The surface ore vein beside spawn (STARTER_VEIN_CELL 47 and 48): the bootstrap ore you hand-mine.
   - {kind: solid, dx: -2, dy: 0, material: ore_iron, deposit: 13}
   - {kind: solid, dx: -1, dy: 0, material: ore_iron, deposit: 13}
-  # The guaranteed surface coal (TUTORIAL_COAL_CELLS 54): the drill's fuel.
+  # The guaranteed surface coal (TUTORIAL_COAL_CELLS 54): the drill's fuel. TWO METRES WIDE (D0497): one
+  # black metre beside the shaft's black mouth at +7 read as shadow, and four of six strangers (76-81)
+  # never held coal. The seam runs +5 and +6, between the rig's well at +2 and the shaft's lip at +7; the
+  # adit's cells are all a row or more below it, so nothing else stands at +6 in the surface row. Each
+  # metre keeps legacy's per-cell stock. Delete the second line to reverse.
   - {kind: solid, dx: 5, dy: 0, material: coal, deposit: 13}
+  - {kind: solid, dx: 6, dy: 0, material: coal, deposit: 13}
   # The starter adit (ADIT_COLS 52, 53; chamber 54; ADIT_ROOF 1): a stepped cut, each column two rows
   # tall and opening a row deeper than the last, so the body walks through at whatever height it arrives.
   - {kind: open, cells: [[3, 1], [3, 2], [4, 1], [4, 2], [4, 3], [5, 2], [5, 3], [5, 4]]}

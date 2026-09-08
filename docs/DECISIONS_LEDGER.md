@@ -19045,3 +19045,38 @@ should win is unmeasured, and the order is the cheap one rather than a judged on
 **Not changed:** the lessons stay one-shots; no text in `HintTexts`; the linger, the fade and the rule's
 red are D0488's, still unread by a batch. NOT ORE (`mined_wrong`) is still slot-less: it is a MINE
 outcome, not a refusal, and no receipt yet shows a stranger repeating it.
+## D0497 · 2026-09-07 · The tutorial's coal seam is two metres wide
+
+**Decided:** `data/starts/tutorial.yaml` stamps the guaranteed surface coal at BOTH dx +5 and dx +6, each
+metre keeping `deposit: 13` (208 a metre). The seam now runs from a metre past the rig's well at +2 up to
+the shaft's lip at +7, and stops one metre short of the mouth so the two blacks are not adjacent. Nothing
+else stands at +6 in the surface row: the adit's open cells are all at dy 1 or below, and the pad covers it
+(`pad_half_m` 8, the farthest non-`off_pad` fixture still the shaft at +7, so the pad-width pin in
+`test_shallow_clay_content.gd` is unmoved and no `off_pad` flag is needed).
+
+**Why, by the receipts:** `docs/playtests/2026-09-07_strangers76-81_seam_slot.md`. Four of six strangers
+never held coal; the two who did (S77 at 13.1 s, S80 at 19.8 s) were standing ON the seam by accident of a
+stride and cut down into it, neither having pressed the ring on purpose. S79 stood on the seam's metre with
+the white ring under its own feet at 21.0 s, strode right to cell 185 and never came back. In S79's
+`frame_0013.png` the seam's one metre (cells 148-151) and the shaft's open mouth two metres right of it are
+the same black: a solid black metre beside a black hole. D0493 fixed what the seam SAYS when hovered ("Coal
+Seam -- N coal"); this is the other half -- how much of it there is to hit. A stride that lands anywhere in
+a two-metre seam still lands on coal.
+
+**Verified:** `test_world_seeder` 50 -> 55 asserted, four new pins in
+`_test_the_surface_seam_is_two_metres_wide`: the surface seam is 2 metres of solid coal at dx [5, 6] (32
+cells scanned over dx 0..7), both metres at 208 a metre, the shaft's mouth at +7 still open, the metre at
++4 still untouched rock with no stock. MUTATION-TESTED: deleting the `dx: 6` line and regenerating turns
+two of them red -- "1 metres of solid coal at dx [5] (16 cells)" and "208 and 0 a metre" -- and the suite
+never prints its ALL PASS line; restored, 55 again. Unchanged at the same counts with the wider seam:
+`test_tutorial_playthrough` 23, `test_tutorial_teaching` 67, `test_shallow_clay_content` 17,
+`test_first_rung_door` 9, `test_interface_verbs` 57. `schema_validator` PASS (49 files); size, layer and
+duplication gates PASS.
+
+**Provisional and reversible:** delete the one `- {kind: solid, dx: 6, dy: 0, material: coal, deposit: 13}`
+line and re-run `tools/data_codegen/generate.py`; the seam pin above goes red and says by how much.
+
+**Not changed:** the seam's LOOK (still the director's, D0493 -- black on black is a rendering question a
+second metre only narrows); the stride length that skipped it (T035); `playtest/ceiling.py`, whose rung 2
+aims at terrain cell 150.5, inside the +5 metre (cells 148-151) and so unmoved -- not re-run here, no seat.
+Whether two metres is enough is a question only the next batch of strangers answers.
