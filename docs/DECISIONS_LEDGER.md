@@ -20435,3 +20435,81 @@ any budget narrower than the tick's own head the ellipsis reaches the finished g
 rule can avoid. Whether the drill's word for a PLACED drill should be DRILL (the ring says DRILL over the
 pile and COAL over the fuel rung's seam) is moot today, since the record's name is Drill either way. No
 seat was opened and no capture taken; the card was not seen on a screen. **Kind:** HUD content, structure.
+## D0527 · 2026-09-08 · The standing-still spikes are the host running the main thread slow under display pacing, not a painter's work; no fix in the sky painter, the redraw-every-tick site named
+
+**Decided:** NO CHANGE to `view/visuals/sky_painter.gd`, `view/hud/lesson_dock.gd` or `view/hud/minimap.gd`.
+The ticket (W13) asked which sky term grows at ticks 400-550 while the body stands still. None does. Every
+term of the sky painter, every other painter, the HUD chips, `observe` (sim-side, no draw call) and a
+fixed-work calibration loop with no draw call and no allocation all slow by the SAME factor in the same
+frames: the CPU executing the main thread ran ~3x slower, intermittently, and a still frame's constant
+~3 ms of work became ~9-11 ms. The painters are the biggest constant terms in that frame, the sky the
+biggest of them, which is the whole of why `sky_painter.paint` led every SLOW line. Caching the sky's
+layout per camera cell would trim its hashing and sines and leave its draw calls and the ridges' polygon
+triangulation, and would not move a frame that is over budget because the core is slow; not done. THE
+GAME-SIDE LEVER IS NOT IN THIS TICKET'S FILES: `WorldView.refresh()` (`view/world_view.gd`:325-326) calls
+`layer.queue_redraw()` on every world layer every tick whether or not the camera or the observation moved,
+so a still tick re-issues ~20 painters' draw commands (2.7-3.5 ms on a fast core in these runs, 5.0-8.2 ms
+in the slow frames, the ticket's 6.6-7.5). A still frame that redrew only what changed would be the
+physics tick (quiet p50 0.6 ms), `refresh` (0.2-0.7) and the HUD (0.5-1.5): under 8.33 ms at 3x. Stopped
+and reported per the ticket's rule rather than edited.
+
+**Why:** THE FRAME. Three headed still runs on this worktree at 1c063a0f (`--resolution 1280x720
+--disable-vsync --perf --quit-after=900`, the body at the spawn, nothing pressed), `sky_painter.gd`
+carrying a temporary instrument (a 4000-iteration `sin` loop timed at the top of `paint`, ~0.1 ms, and a
+timer round each term; printed when the paint ran past 1.6 ms, when the loop ran past 250 us, and every
+120th frame; removed before this commit, the file restored to md5 1d64e535e2b44bdd22ace9bbfbcafb89).
+Meter, three windows of 300 ticks, run 1 / 2 / 3: first window p50 2.39 / 3.00 / 2.44, p99 15.97 / 15.99
+/ 17.58, max 55.24 / 51.07 / 42.04 (tick 16, the first bake), over 16.7 ms 8 / 6 / 9 of 892 / 686 / 752
+frames; second p50 4.65 / 3.33 / 4.72, p99 16.01 / 19.28 / 15.64, max 16.47 / 21.05 / 15.91, over 16.7
+**0 / 18 / 0** of 600; third p50 6.31 / 5.40 / 6.80, p99 16.15 / 15.98 / 19.77, max 23.46 / 28.55 / 20.38,
+over 16.7 **2 / 3 / 27** of 599 / 598 / 600. 5927 frames in all. TWO THINGS THE LINES SAY THAT THE TICKET
+DID NOT: (1) THE SECOND AND THIRD WINDOWS ARE PACED. Every one reads 598-600 frames in 5 s (`fps_wall`
+119.8-120.0) with 298-300 of them over 8.33 ms: the display holds the process at 120 Hz in spite of
+`--disable-vsync` (no `max_fps` or vsync key in `project.godot`; the mechanism, drawable availability
+under the compositor or window visibility, not determined), and a frame over 16.7 ms under that pacing is
+a frame that missed one 8.33 ms slot. All 21 of the 21 SLOW frames after tick 300 in the three runs carry
+`draw` >= 8.0 ms, a whole slot of waiting inside `RenderingServer.draw`. D0524's still run on the same
+flags (`perf_w10after_still.log`) read `fps_wall` 561.7 / 580.2 with 3 / 0 frames over 16.7: unpaced.
+So the still run's over-16.7 count is a property of whether the run was paced, and `fps_wall` is the
+line that says which; two still runs are not comparable without it. (2) THE SLOW FRAMES ARE SLOW
+EVERYWHERE. Classified by the calibration loop alone (fast <= 130 us, slow >= 250 us; 34 and 38 frames
+from tick 20 on), medians slow / fast in microseconds: **loop 326 / 107**, sky total 2817 / 1271, the
+gradient (two rects and one quad) 158 / 43, the stars 1226 / 424, the moon (three `draw_circle`) 63 / 25,
+the clouds 279 / 109, the crown 272 / 131, the ridges 818 / 440; `frame.marks` 0 and the view size the
+same in every line. A three-call term cannot do 2.5x the work; a loop that draws nothing cannot be slowed
+by a renderer. Slow-loop frames by window, run 1 / 2 / 3: 0-0-0 / 0-10-3 / 0-0-25, against over-16.7 of
+0-2 / 18-3 / 0-27 in the paced windows: the two counts travel together, and the run with none of either
+(run 1) has its two late long frames at `draw` 17.1 and 12.8 with the painters at 4.0 ms, the compositor
+holding the drawable. The phases land at different ticks in every run (321-491 and 650-705; 719-898; the
+ticket's 472-543), so they are not a game event at a tick. THE MECHANISM, TESTED HEADLESS: a `--script`
+process running the same loop eight times a `_process` for 15 s. Left on Godot's headless frame delay it
+runs 146 `_process`/s (n = 584 loops a half-second): the loop's half-second median sat at **295-462 us in
+23 of 29 half-seconds** and 85-223 in the other six. The same script with
+`OS.low_processor_usage_mode_sleep_usec = 0` (spinning, ~12,000 loops/s): **p50 83-84, p90 85-87 in all 29
+half-seconds**, 56 samples over 250 us of ~179,000, 42 of them in the first half-second. Same code, same
+host, same minute; the one difference is whether the thread sleeps between its bursts. That is the shape
+the paced game has: 4-10 ms of `draw` wait a frame, then a 3 ms burst, and this host runs such a thread's
+bursts ~3x slower (a slow core or a low clock; which of the two was not observed, `powermetrics` needs
+root). It is why the first window, unpaced at 136-188 fps, never shows the slow loop and the paced
+windows do, and why the still run that was clean on this tree (D0524's, 580 fps) was clean.
+
+**Verified:** `tests/test_sky_painter.gd` **12 -> 12** asserted on the restored tree (no code changed; no
+pin added, so no mutation test -- there is no game property here to pin). Gates on the unchanged tree:
+size, layer lint, duplication PASS. The instrumented build was booted headed five times (three base runs,
+two under `taskpolicy -a -t 0 -l 0`), exit 0 each; the headless control was run three times (sleeping,
+sleeping under the same `taskpolicy`, spinning).
+
+**Provisional / not changed:** (a) `taskpolicy -a -t 0 -l 0` on the headed game (two runs) read 0 / 1 and
+2 / 0 frames over 16.7 in the paced windows and one slow-loop frame in 1800 ticks; fewer than runs 2 and 3
+but not than run 1, n = 2, and the headless control under the identical policy did NOT improve (p50
+292-538 in 27 of 29 half-seconds), so QoS is not claimed as a lever. (b) One frame in 5927 (run 2, tick
+656) read `sky_painter.paint` 11.24 ms in the DrawCost line against 2.56 + 0.33 ms inside the painter's
+own timers: an ~8.3 ms gap at the call boundary, a single discrete preemption, not a work pattern. (c)
+The ticket's "the sky at 2.6-4.5 ms against 0.85" is these slow frames; the per-frame DrawCost sky cost
+in this worktree's 21 late SLOW frames ran 1.04-5.83 ms (and the 11.24 above). (d) The redraw-skip lever
+would need `Frame` to say what changed (camera, observation, marks) and the animated layers (`_anim_ticks`,
+the lens) to be excepted; sized here from the meter only, not designed. (e) Boot frames: tick 3's stars
+ran 2.9-4.2 ms and tick 14's clouds 1.2-2.4 ms once each (first-use costs), unrelated to the still tail.
+(f) `perf_probe.sh`'s still numbers across trees (D0522 before/after, D0524, this) mix paced and unpaced
+runs; only the `fps_wall` column separates them. (g) The host during these runs: WindowServer 30.6%, a
+browser renderer 12.4% (`/usr/bin/top -l 2`, before run 1); no seat, no Godot, no Ableton.
