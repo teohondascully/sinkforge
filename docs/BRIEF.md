@@ -155,3 +155,12 @@ head and every seat opens it: 2733 ms to 701 ms a seat, first frame byte-identic
 the spawn, the RIG at +2 is the machine strangers find and feed first); D3–D6's rewards; the hotbar when
 the pack is empty (D0412's history); the receipt names the rig CREW RIG where the ring says RIG (W3's flag).
 **Next:** strangers 109-114 on this head.
+
+**Strangers 109-114 on D0513–D0519 (all VALID; `docs/playtests/2026-09-07_strangers109-114_stride.md`):**
+six seats in 5.4 s wall from the snapshot; four ore 6 of 6, coal 5 of 6, two ingots 2 of 6, delivered 1 of
+6 (S111 held the drill at 28.6 s, the fastest run recorded); nobody lost a stack; three quoted the TOO FAR
+lesson's metres and direction and one the FED receipt; zero floor-ambiguity reports in six logs. The wall
+moved to where the body STOPS: the receipts give 36 cells a 60-tick press (9 m/s) and the mission's own
+text set the shortest walk at 30 ticks (4.4 m) against a 22-cell reach band, so strangers landed in reach
+by luck. The template now says what a tick moves (D0520, the adapter's calibration). **Next:** strangers
+115-120 on the calibrated mission, same head.

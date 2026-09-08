@@ -37,11 +37,11 @@ To finish, send '{"quit":true}' as your last command.
 
 ## How to play
 
-Read what the game shows you and do what it seems to be asking. When something works, notice what changed on screen. When something does not work, try to understand why from the screen, then try something else. Use the mouse pointer position deliberately: point at the thing you mean before pressing a button. The character is a small figure with a yellow hard hat; the world scrolls around it, so after you walk, look again at where things are relative to the figure before deciding a direction. A short walk (30 ticks) moves the figure a few body-lengths; check the screenshot before walking further.
+Read what the game shows you and do what it seems to be asking. When something works, notice what changed on screen. When something does not work, try to understand why from the screen, then try something else. Use the mouse pointer position deliberately: point at the thing you mean before pressing a button. The character is a small figure with a yellow hard hat; the world scrolls around it, so after you walk, look again at where things are relative to the figure before deciding a direction. The figure runs fast: a tap of 5 ticks moves it about a third of a body length, 30 ticks about two body lengths, 60 ticks about four and a half. To stand beside something that is already on screen, tap (5 to 10 ticks) and look; a 30-tick walk overshoots anything closer than two body lengths. Check the screenshot before walking further.
 
 The screenshot is taken once the figure has come to rest after your burst (a walk ends, a fall lands), so what you see is where things are when your next burst begins. Momentum does not carry between bursts; use a COMPOSED MOVE for a run-up into a jump.
 
-Budget: at most 60 bursts, or stop earlier if you finish your goal, or if you have been completely stuck for 12 bursts in a row with nothing changing. Keep bursts short enough (30 to 120 ticks) that you can see what happened; if something seems to be slowly working, it is fine to hold longer (up to 300).
+Budget: at most 60 bursts, or stop earlier if you finish your goal, or if you have been completely stuck for 12 bursts in a row with nothing changing. Keep bursts short enough (5 to 120 ticks) that you can see what happened; if something seems to be slowly working, it is fine to hold longer (up to 300).
 
 ## The journal
 

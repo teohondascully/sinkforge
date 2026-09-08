@@ -19887,3 +19887,29 @@ The snapshot itself: generate 2.7 s, write 0.34 s, 14 MB, once a batch.
 **Provisional:** the six-seat wall with the snapshot is the next batch's number (8.1 s before it, D0510's
 batch). Whether a seat opened from a snapshot behaves identically past the first frame rests on D0518's
 signature pins, not on a stranger comparison.
+
+## D0520 · 2026-09-07 · The mission template says what a tick moves; the stranger's stride was the mission's
+
+**Decided:** `docs/playtests/MISSION_TEMPLATE.md`'s adapter section (and the scratch mission every batch
+substitutes from) tells the stranger the body's speed in the adapter's own unit: a 5-tick tap is about a
+third of a body length, 30 ticks about two, 60 about four and a half; "to stand beside something already
+on screen, tap and look; a 30-tick walk overshoots anything closer than two body lengths". The burst range
+the text recommends is 5 to 120 ticks, not 30 to 120.
+
+**Why (strangers 109-114):** the receipts give the body 36 cells a 60-tick press and 17-18 a 30-tick press
+(S109: 166 to 130, 111 to 128, 128 to 146), 9 m/s. A drop reaches a machine within 3.2 m of the body's
+centre to the machine cell's centre, a 22-cell band at foot level (cells 107-128 for the forge; a headless
+probe passes at px 514 and fails at 515). The template said "A short walk (30 ticks) moves the figure a few
+body-lengths" and "keep bursts 30 to 120 ticks": the smallest move it recommended, 4.4 m, is wider than
+the band's half, so a stranger lands in reach by the luck of its burst length and presses Q where it
+stands. S109 pressed from 130 and 128; S112 and S114 from the spawn; S111 aimed the drill at the shaft's
+mouth from 171, 3.5 m off; S110 read "9 m to your LEFT" and searched twenty bursts. The two who fed the
+forge stood at 123 (walked left until the machine stopped them) and 111. A person watching the body move
+has the speed; a stranger reading stills does not; the adapter already allowed a 5-tick tap. This is the
+instrument's calibration (the section is titled "the adapter, not the game"), so the game's stride (T035)
+stays the director's question, now with its number: 9 m/s against a 3.2 m reach.
+
+**Not changed:** the game's speed, reach, or any copy. **Provisional:** the calibration is measured by the
+next batch; if the strangers still press from outside the band with taps available, the wall is the
+game's, and the drop reach (measured from the body's centre, not its trunk, unlike D0456's
+`_dist_sq_to_metre`) is the next candidate.
