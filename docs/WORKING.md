@@ -12,19 +12,22 @@ The rig-as-consumer economy (A′ step 7) remains unimplemented.
 
 **Reconciled 2026-09-07 late from the engineer's verified batches (D0506-D0520).** The opening is measured
 by six-seat blind batches on the shipped seed, all seats VALID, reports under [playtests](playtests/):
-103-108 (`2026-09-07_strangers103-108_drop.md`), 109-114 (`..._stride.md`), 115-120 (`..._reach.md`).
+103-108 (`2026-09-07_strangers103-108_drop.md`), 109-114 (`..._stride.md`), 115-120 (`..._reach.md`),
+121-126 (`..._inreach.md`).
 
-Where the opening stands, by rung, over the last three batches (18 seats): four ore 18 of 18 (all but one
-under 8.5 s); coal in the pack 16 of 18; two ingots 5 of 18; delivered 1 of 18; the drill placed 0 (S111
-held it at 28.6 s, the fastest run). The forge is now fed only from within 3.2 m of its cell's centre
-and nothing on screen says which side of that line the body is on: that is D0521, in a worker.
+Where the opening stands, by rung, over the last four batches (24 seats): four ore 24 of 24; coal in the
+pack 21 of 24; two ingots 8 of 24; delivered 4 of 24; the drill placed 2 of 24; the fuel rung reached by 2.
+The last batch alone (D0521, the ring reads IN REACH by the drop's own rule): smelt 3 of 6, delivered 3 of
+6, the drill placed 2 of 6, against 1 delivery in the 18 seats before it. The walls left in it: the world's
+east edge (14 of 24 seats walked to it), the ceremony card read as the end (2 seats), a self-dug pit.
 
 Landed since the first-rung brief: the boots' footing (D0509), the lazy terrain bake and the tooth's
 grammar texture (D0506, D0511), the drop refused with the stack in hand when its eater is in sight but
 out of reach (D0513), the FED receipt and the TOO FAR lesson with metres and direction (D0517), the cards
 leading with WALK and STAND (D0515), the floor-ambiguity check bounded to its subject (D0516: 0 reports a
 seat, from 38-168), new_game's phases and the batch's fresh-game snapshot (D0518, D0519: a seat boots in
-0.7 s, six in 5.4 s wall), the mission's tick calibration (D0520: it did not change the actor's walks).
+0.7 s, six in 5.4 s wall), the mission's tick calibration (D0520: it did not change the actor's walks), the ring's IN REACH state
+(D0521), the spider cracks removed at the director's ask (D0523).
 
 For the director (numbers in the reports): the stride at 9 m/s against a 3.2 m reach (T035); the layout
 (the forge alone lies left of the spawn; eleven of eighteen seats walked to the world's right edge, 30 m,

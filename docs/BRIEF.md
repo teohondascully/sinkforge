@@ -176,5 +176,11 @@ Eleven of eighteen seats across the three batches walked to the world's right ed
 the layout and the clamp). **D0521 landed:** `core/reach.gd` holds the one reach rule (16/5 tiles), `Aim` and `Mining` delegate to it,
 and the ring on a machine target draws a solid rim, a filled disc and "FORGE · IN REACH" by that same
 test from the body's centre (`view/hud/ring_painter.gd`; `RingWord.last_drawn` carries the suffix, 22
-pins). Mutating the constant reddens both the sim's reach pins and the ring's. 140 suites. **Next:**
-battery, push, strangers 121-126 on it.
+pins). Mutating the constant reddens both the sim's reach pins and the ring's. 140 suites. **Strangers 121-126 on D0521 (all VALID; `docs/playtests/2026-09-07_strangers121-126_inreach.md`):** two
+ingots 3 of 6, delivered 3 of 6, the drill placed 2 of 6, two seats into the fuel rung; one delivery in the
+eighteen seats before. The strangers named the state ("RIG-IN-REACH, MOUTH-IN-REACH"). Left: the east edge
+(14 of 24), the ceremony card read as the end (2), a self-dug pit (1). **D0523:** the spider cracks removed
+at the director's ask. **In flight:** the director's freeze on every blow, measured: a blow costs a 17-27 ms
+frame and the first blows 178-417 ms, all on the view side (the sim is 0.3 ms a tick headless); W9 (D0522)
+repaints the bite's own rectangle, shrinks chunks to 32 cells and budgets the window lane. **Next:** D0522
+lands with its after-numbers, battery, push.
