@@ -29,6 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
+GODOT = os.environ.get("GODOT", "/opt/homebrew/bin/godot")
 
 
 def _run(cmd, **kw):
@@ -85,6 +86,23 @@ def _dirty_lines():
     return lines
 
 
+def _snapshot(root, head, seed):
+    """One fresh game for this head and seed, written as a save every seat opens (D0519). Generation is
+    2.1 s of a seat's 2.7 s `new_game` (D0518); the restored door signs identically to a generated one."""
+    path = root / ("snapshot_%s_%d.json" % (head[:8], seed or 0))
+    if path.exists():
+        return path, 0.0
+    t0 = time.time()
+    cmd = [GODOT, "--headless", "--path", str(REPO), "-s", "playtest/snapshot.gd", "--", "--out=%s" % path]
+    if seed:
+        cmd.append("--seed=%d" % seed)
+    out = _run(cmd, env=dict(os.environ, SF_HEADLESS="1")).stdout
+    line = [l for l in out.splitlines() if l.startswith("SINKFORGE_SNAPSHOT")]
+    if not line or "ok=true" not in line[0] or not path.exists():
+        raise SystemExit("batch: the snapshot was not written; the script said:\n" + out[-2000:])
+    return path, time.time() - t0
+
+
 def start(args):
     root = Path(args.root).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -93,6 +111,7 @@ def start(args):
         raise SystemExit("batch: the checkout is dirty; a batch copies the working tree, so commit or stash first:\n"
                          + "\n".join(dirty[:8]))
     head = _run(["git", "rev-parse", "HEAD"], cwd=REPO).stdout.strip()
+    snapshot, snapshot_s = (None, 0.0) if args.no_snapshot else _snapshot(root, head, args.seed)
     numbers = _next_numbers(root, args.n)
     seats = []
     procs = []
@@ -109,6 +128,8 @@ def start(args):
                "--model", args.model, "--seat", str(tree / "playtest" / "seat.sh")]
         if args.seed:
             cmd += ["--seed", str(args.seed)]
+        if snapshot is not None:
+            cmd += ["--load", str(snapshot), "--load-kind", "snapshot"]
         procs.append(subprocess.Popen(cmd, env=env, stdout=open(root / ("start_%d.log" % number), "w"), stderr=subprocess.STDOUT))
         seats.append({"number": number, "session": str(session), "mission": str(mission), "copy": str(tree), "tile": i})
     t0 = time.time()
@@ -129,10 +150,12 @@ def start(args):
                             "--interval", "30", "--patience", "150"],
                            stdout=open(sup_log, "w"), stderr=subprocess.STDOUT, start_new_session=True)
     manifest = {"head": head, "seats": seats, "supervisor_pid": sup.pid, "supervisor_log": str(sup_log),
-                "started_at": int(time.time()), "boot_wall_s": boot_s}
+                "started_at": int(time.time()), "boot_wall_s": boot_s,
+                "snapshot": str(snapshot) if snapshot is not None else "", "snapshot_s": round(snapshot_s, 1)}
     path = root / ("batch_%d-%d.json" % (numbers[0], numbers[-1]))
     path.write_text(json.dumps(manifest, indent=1))
-    print(json.dumps({"batch": str(path), "booted": sum(1 for s in seats if s["booted"]), "of": len(seats), "boot_wall_s": boot_s}))
+    print(json.dumps({"batch": str(path), "booted": sum(1 for s in seats if s["booted"]), "of": len(seats), "boot_wall_s": boot_s,
+                      "snapshot_s": round(snapshot_s, 1)}))
     return 0 if all(s["booted"] for s in seats) else 1
 
 
@@ -169,6 +192,7 @@ def main():
     s.add_argument("--mission", required=True, help="a mission text naming one stranger-<n> session path to substitute")
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--model", default="claude-haiku-4-5")
+    s.add_argument("--no-snapshot", action="store_true", help="every seat generates its own world (the pre-D0519 boot)")
     p = sub.add_parser("stop")
     p.add_argument("--root", required=True)
     p.add_argument("--batch", required=True)

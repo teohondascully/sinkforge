@@ -59,6 +59,7 @@ def start(args):
         env["LOAD"] = str(load)
         manifest["loaded_from"] = str(load)
         manifest["loaded_from_sha256"] = hashlib.sha256(load.read_bytes()).hexdigest()
+        manifest["loaded_from_kind"] = args.load_kind
     rc = subprocess.run(["bash", args.seat, str(session)], env=env).returncode
     if rc != 0:
         manifest["seat_boot"] = "FAILED rc=%d" % rc
@@ -142,7 +143,9 @@ def validate(session):
     if (session / "save.json").exists():
         void.append("save.json was written: unexpected save access")
     if manifest.get("loaded_from"):
-        notes.append("a mission variant: opened from %s (sha256 %s)" % (os.path.basename(manifest["loaded_from"]), str(manifest.get("loaded_from_sha256"))[:12]))
+        kind = manifest.get("loaded_from_kind", "variant")
+        what = "the batch's fresh-game snapshot (D0519)" if kind == "snapshot" else "a mission variant"
+        notes.append("%s: opened from %s (sha256 %s)" % (what, os.path.basename(manifest["loaded_from"]), str(manifest.get("loaded_from_sha256"))[:12]))
     seat_out = session / "seat.out"
     invariants = 0
     script_errors = 0
@@ -186,6 +189,8 @@ def main():
     s.add_argument("--seat", default=str(Path(__file__).with_name("seat.sh")))
     s.add_argument("--seed", type=int, default=0, help="boot another world (the holdout run); 0 keeps the shipped seed")
     s.add_argument("--load", default="", help="open this save instead of a new game (a rung-N mission variant)")
+    s.add_argument("--load-kind", default="variant", choices=["variant", "snapshot"],
+                   help="what --load is: a rung-N mission variant, or the batch's fresh-game snapshot of this head (D0519)")
     v = sub.add_parser("validate")
     v.add_argument("session_dir")
     v.add_argument("--json", action="store_true")

@@ -19860,3 +19860,30 @@ entry (§9 needs an ADR to change) -- flagged, not edited. A stacked-pocket cens
 anyone wants one, is a `sim/terrain_gen` suite. `test_body_fuzz_fast`'s `floor_selection` count stays
 printed and ungated (D0241). The size gate is red at the base on `tests/test_tutorial_teaching.gd:349`
 (52 lines, D0512's commit), byte-identical here; not this change's.
+
+## D0519 · 2026-09-07 · The batch makes one fresh-game snapshot per head and every seat opens it
+
+**Decided:** `playtest/batch.py start` runs `playtest/snapshot.gd` once (headless: `Session.new_game` for
+the batch's seed and start, `Session.capture`, `SaveGame.write` to `<root>/snapshot_<head8>_<seed>.json`)
+and hands every seat `--load <that file> --load-kind snapshot`, which is D0462's lane (`LOAD=`, the seat's
+`--load=`, `Main.boot(true)`, `Session.from_save`). `--no-snapshot` restores the per-seat generation. The
+manifest carries `snapshot` and `snapshot_s`; `stranger.py` records `loaded_from_kind` and `validate` words
+a snapshot as "the batch's fresh-game snapshot", not "a mission variant".
+
+**Why:** D0518 measured `new_game` at 2.7 s a seat, 2.1 s of it world generation, and proved a restored
+door signs identically to a generated one at t0 and after 600 ticks. Six seats generating six identical
+worlds at once is the boot the director asked to cut (the 20 s seats). The key is the head by construction:
+the file is named by HEAD and the batch refuses a dirty checkout (D0510), so a generator change without a
+data change (D0397, D0405, D0291) cannot serve a stale world, which is why the cache lives in the batch's
+root and not in `user://` (W7's reasoning: one `user://` for every seat of every batch and the director's
+own game, and `SaveGame.write`'s tmp-then-rename under six concurrent writers is unmeasured).
+
+**Evidence:** on 71c9fb6b, one fresh seat and one `LOAD=` seat from the same tree: `frame_0000.png` md5
+`6287d89b47052a06b4ce421c0937f057` for both (byte-identical; the HUD is not in the envelope, so a loaded
+seat's hints and ladder start fresh, `SeatHud.restore` finds no keys). Receipt phases: fresh
+`new_game 2663 (generate 2054, settle 560) ... total 2733`; loaded `read 62, restore 578 ... total 701`.
+The snapshot itself: generate 2.7 s, write 0.34 s, 14 MB, once a batch.
+
+**Provisional:** the six-seat wall with the snapshot is the next batch's number (8.1 s before it, D0510's
+batch). Whether a seat opened from a snapshot behaves identically past the first frame rests on D0518's
+signature pins, not on a stranger comparison.
