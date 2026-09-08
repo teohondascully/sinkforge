@@ -128,6 +128,20 @@ The pit under the spawn is closed sim-side: a blow spares the four cells under a
 unless aimed at one (`sim/mining/footing.gd`, D0509). The batch's dirty check reads only the runtime
 tree it copies, so the harness's untracked recordings no longer block a batch (D0510).
 
-**For the director:** the stride (T035); D3–D6's rewards; the hotbar when the pack is empty (D0412's
-history); a world snapshot for new_game's 2.8 s. **Next:** strangers 103-108 on D0506–D0509 (running
-at the time of writing), their report, then the improvement workers on the findings.
+**Strangers 103-108 on D0506–D0509 (all VALID; `docs/playtests/2026-09-07_strangers103-108_drop.md`):**
+six seats booted in 8.1 s wall, played in parallel, last report at 12.5 min. Ore 6 of 6, coal 6 of 6 (the
+first batch with every seat fuelled; TOO FAR DOWN at the seam never appeared), two ingots 1 of 6, delivered
+0 of 6. The pit under the spawn is closed. One wall: 44 DROP presses and not one first drop within reach of
+the forge; the stack falling at the feet read as LOSS ("resources disappeared", "materials respawned"), and
+NO MACHINE HERE beside the RIG read as a contradiction. S104 alone fed the forge, after the aim_machine
+lesson said "stand beside it", then carried the ingots 30 m past the rig to the world's edge (the stride:
+10.5 m/s measured, 84 cells in 120 ticks). Workers on it: D0513 (a drop with its eater in sight but out of
+reach is REFUSED, stack in hand), D0517 (a FED receipt, a TOO FAR lesson that points, the plate lets go),
+D0515 (the cards lead with WALK and STAND), D0516 (the floor-ambiguity invariant's 40-170 reports a session),
+D0518 (new_game's 2.8 s by sub-phase). Found by reading G's report: D0506 left the tooth's grammar texture
+blank for the session (created from an empty image at mount, never uploaded); fixed D0511, evidenced by a
+GPU readback (2439 non-clastic cells on the CPU, 0 on the GPU before, 2439 after).
+
+**For the director:** the stride (T035, the number above); the layout (the forge is the only thing LEFT of
+the spawn, the RIG at +2 is the machine strangers find and feed first); D3–D6's rewards; the hotbar when
+the pack is empty (D0412's history). **Next:** the five workers land, a batch on D0513/D0517/D0515.
