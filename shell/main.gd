@@ -139,7 +139,7 @@ func _open_session(load_save: bool, phases: Dictionary) -> Dictionary:
 			push_warning("boot: the slot was refused (%s); a new game instead" % SaveGame.last_invalid)
 	if door == null:
 		t = Time.get_ticks_msec()
-		door = Session.new_game(StrataData.get_site(SITE), world_seed(), SeatFlags.start_id(flags, START))
+		door = Session.new_game(StrataData.get_site(SITE), world_seed(), SeatFlags.start_id(flags, START), phases)   # its sub-phases too (D0518)
 		phases["new_game"] = Time.get_ticks_msec() - t
 	return env
 

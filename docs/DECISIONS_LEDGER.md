@@ -19686,3 +19686,86 @@ produces; left as the ticket asked. The rig's word CREW RIG vs the ring's RIG is
 the director. `tools/layer_lint/check_size_limits.py` is red on the base for
 `tests/test_tutorial_teaching.gd:349` (52 lines, W4's file, not touched here). **Kind:** HUD content,
 structure.
+## D0518 · 2026-09-07 · new_game's boot phases measured; the cut is a batch-made snapshot handed to the seats as LOAD=, not a cache inside the game
+
+**Decided:** (1) `Session.new_game(site, seed, start_id, phases)` composes `WorldSeeder.load_world`'s
+three steps itself and clocks each one into the caller's dictionary -- `generate`, `enrich`, `settle`
+(with `settle_ticks`, the count), then `stamp` and `door` -- and `Main._open_session` passes its own
+dictionary through, so every seat receipt now reads `SINKFORGE_BOOT phases_ms { "generate": 2051,
+"enrich": 46, "settle_ticks": 89, "settle": 567, "stamp": 3, "door": 0, "new_game": 2667, "stack": 6,
+"audio": 50, "total": 2724 }` (a headless `Main.boot` through `test_main_boot`). The sim may not read a
+clock (`docs/ARCHITECTURE.md` §3), so the composition lives in the shell; `tests/test_boot_snapshot.gd`
+pins its world equal to `load_world`'s by signature and its settle count equal to the seeder's, so the
+two cannot drift apart silently. `WorldSeeder.load_world` stays the sim's door for its own suites;
+nothing in production read `WorldSeeder.settled_ticks` (`test_water_active` calls `load_world` itself).
+(2) NO cache inside the game. The snapshot is prototyped and proven below; the cut that is safe lives
+in `playtest/`, which this ticket does not own, and needs no game code.
+
+**Measured, the shipped instrumentation, three cold headless processes (ms):** `new_game` 2733 / 2741 /
+2753 = `generate` 2090 / 2112 / 2103 (76-77%) + `settle` 592 / 578 / 598 at 89 ticks each (21-22%) +
+`enrich` 48 / 48 / 49 + `stamp` 3 / 3 / 3 + `door` 0. The ticket's other suspects are closed at those
+numbers: the seeder stamping through the verbs is 3 ms and the door 0. Inside `generate` (a scratch copy
+of its body with a lap per pass, its grid pinned equal to the real `generate`'s by signature in every
+run; three runs): `_fill_base` 596 / 581 / 570, `_carve_caves` 443 / 425 / 425, studding 351 / 393 / 357,
+copper 346 / 357 / 347, coal 159 / 162 / 159, iron 94 / 93 / 92, tunnels 74 / 75 / 73, vertical 45 / 45 /
+45, big caverns 26 / 28 / 26, trees 1, ruins 0, relief and richness 0 (sum 2142 / 2167 / 2100 against the
+whole 2130 / 2137 / 2094). Purity: the world signed `31747a45266f3963` (sha256 prefix) in all three
+processes, the step-by-step reconstruction equal to the real `new_game`'s world every time.
+
+**The snapshot, proven (the director's gate on it):** a fresh game captured (`Session.capture`, 221 ms),
+written (`SaveGame.write`, 115 ms, 14,290,712 bytes), read back and rebuilt through `Session.from_save`
+in three cold processes: read 63 / 77 / 63 + from_save 559 / 670 / 579 = **622 / 747 / 642 ms** against
+`new_game` 2643 / 2667 / 2866 in the same processes -- 1.9-2.2 s off, 72-78%. The restored world's
+`state_signature() == recomputed_signature()` in every run; the restored DOOR (all eight parts) signs as
+the generated one, `a753759491238ceb` both, and after 600 empty-input ticks `49953b2c8054fd8a` both --
+the signature moved, so the equality is not a no-op. `tests/test_boot_snapshot.gd` pins all of it, 14
+asserted, CI 137 -> 138 suites. Mutations, each restored and re-run green: `enrich` dropped from the
+composition -> 2 FAIL (`238548a5fd76` vs `31747a45266f`, settle 1 vs 89 ticks); the settle capped at 10
+-> 2 FAIL (10 vs 89); `_stage_world` skipping the water plane -> 2 FAIL (t0 `a75375949123` vs
+`f1fcca986c65`, t600 `49953b2c8054` vs `bac154b65c7d`); `_stage_world` building the grid with seed+1 ->
+survived BOTH signature pins (the grid's seed is a label after generation -- the observation's
+`world_seed`, the envelope, the invariants' records -- that no signature covers and no tick draws from),
+so it is pinned by name -> 1 FAIL (20260827 vs 20260826). Seed+1 in `from_save`'s own `TileGrid.new` is
+a no-op by construction (`_commit` swaps in `_stage_world`'s grid), not a hole.
+
+**Where a cache could live, and why not in the game:** `user://` for a seat is
+`~/Library/Application Support/Godot/app_userdata/Sinkforge/` -- keyed by the project name alone, so one
+directory for every seat of every batch and for the director's own game. A seat CAN read it (D0503's
+copies never write their tree; this is outside it). Three reasons against: (a) D0503 boots all N seats at
+once, so a cold cache is N misses and N writers of one `.tmp` through `SaveGame.write`, whose
+readback-then-rename assumes one writer -- by reading `write`, a second writer's truncating `open`
+between the first's readback and rename promotes a truncated file (which then fails `_read_file` /
+`_valid_envelope` and degrades to generation, never a wrong world -- but the batch that paid gains
+nothing); the fix is per-process tmp names, a change to the real slot's protocol. (b) The ticket's key
+(seed, site, start, a data-record hash) cannot see the generator's CODE: D0397, D0405, D0291 and
+D0382-D0387 each changed the world for the same seed with no data change, and a data-keyed cache would
+have served the previous world under the batch's new HEAD -- the instrument reporting on a world the
+code no longer generates, the quiet-green class. A source hash over `core/`, `sim/` and `data/` would
+close it at a boot cost not measured here; the batch's HEAD is the right key and a seat cannot see it
+(the copy has no `.git`). (c) The first batch after any change gains nothing.
+
+**The cut that needs no game code (for `playtest/`'s owner):** the seat's `LOAD=<save>` path (D0462) IS
+`SaveGame.read` + `Session.from_save`, printing `read` and `restore` phases; `stranger.py --load` sets it
+and records `loaded_from` with its sha256 in the manifest. `batch.py` can generate ONE envelope per
+(HEAD, seed, start) before copying -- a headless script of `Session.new_game`, `Session.capture`,
+`SaveGame.write(path)`, about 3 s once -- and hand every seat `LOAD=`. One writer, before the seats; the
+key is the batch's HEAD by construction; every seat boots in about 0.65 s instead of about 2.75. Two
+things to settle there: `stranger.py:145` words `loaded_from` as "a mission variant" and a fresh-game
+snapshot must not read as one; `boot(true)` sets `Settings.persist = true`, which the variant seats
+already run with (`Settings.path` is the session directory).
+
+**Not changed:** `sim/terrain_gen` (no cut lives there: `_fill_base`, the carve, studding and copper are
+1.7 s of the 2.1 and each is RNG-ordered accretion under gate 8's golden; D0397 already took the loader
+and the FbmField); `WorldSeeder.load_world`; `WaterFlow.settle` (0.6 s; D0405's "generation on a worker
+thread" is the shape of that cut, not this ticket's).
+
+**Verified:** suites before -> after, on d7fbafcf and on this change: test_save_game 45 -> 45,
+test_world_seeder 55 -> 55, test_tutorial_playthrough 23 -> 23, test_beacon_probe 13 -> 13, test_main_boot
+65 -> 65, test_water_active 29 -> 29, test_interface_verbs 61 -> 61, test_first_rung_door 9 -> 9,
+test_shallow_clay_content 17 -> 17, test_tutorial_teaching 70 -> 70, test_water_painter 43 -> 43,
+test_plane_passes 31 -> 31; test_boot_snapshot new at 14. Gates: layer lint PASS, duplication 0 clusters,
+suite count / coverage / not-shrunk / naming / isolation / formatter PASS; the size gate's one FAIL
+(`tests/test_tutorial_teaching.gd:349` at 52 lines) is on the base, untouched here.
+
+**Kind:** the instrumentation is permanent; the snapshot's home is a recommendation, provisional until
+`playtest/`'s owner takes it.

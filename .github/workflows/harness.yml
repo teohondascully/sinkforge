@@ -386,6 +386,7 @@ jobs:
       #   test_transport.gd                              test_transport (the flow phase, the lift's rise and updraft, the Freight Winch lifecycle -- A' step 3e, D0350)
       #   test_economy.gd                                test_economy (the production-rate ring buffer in centi-items a minute: derived, windowed, never state -- A' step 3f, D0351)
       #   test_save_game.gd                              test_save_game (the v3 envelope round-tripped and ticked, through disk, every refusal, winch reconciliation, the durability protocol -- A' step 3g, ADR 0010, D0352)
+      #   test_boot_snapshot.gd                          test_boot_snapshot (new_game's clocked phases compose load_world's world exactly; a fresh game's snapshot restores to the same session and the same future -- D0518)
       #   test_world_seeder.gd                           test_world_seeder (legacy's tutorial opening as a start record stamped through the sim's verbs; refusals before stamping; the real site takes it -- A' step 3h, D0353)
       #   test_mining_blocks.gd                          test_mining_blocks (the integer line of sight against legacy's float DDA, the aim snap, the dig plan, the break's yield, the hand on a lode -- A' step 3i, D0354)
       #   test_verbs.gd                                  test_verbs (the situated verbs: build and pick up every kind, drop into an eater or forward or down with its grace, scoop, configure, the two-press winch link -- A' step 3i, D0355)
@@ -501,7 +502,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 137 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 138 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -531,6 +532,7 @@ jobs:
             res://tests/test_transport.gd \
             res://tests/test_economy.gd \
             res://tests/test_save_game.gd \
+            res://tests/test_boot_snapshot.gd \
             res://tests/test_world_seeder.gd \
             res://tests/test_mining_blocks.gd \
             res://tests/test_verbs.gd \

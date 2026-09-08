@@ -65,17 +65,42 @@ static func from_save(env: Dictionary) -> Interface:
 	return door
 
 
+## The keys `new_game` writes into its `phases` dictionary, milliseconds each, in the order they run;
+## `PHASE_SETTLE_TICKS` is the one count among them (how many ticks the aquifers took to rest).
+const PHASES: Array[String] = ["generate", "enrich", "settle", "stamp", "door"]
+const PHASE_SETTLE_TICKS: String = "settle_ticks"
+
+
 ## A new game: the shaft generated, the start stamped, the body standing on the spawn. Null when the
 ## start refuses (`WorldSeeder.last_refusal` says why).
-static func new_game(site: Dictionary, seed: int, start_id: StringName) -> Interface:
-	var world: World = WorldSeeder.load_world(site, seed)
+##
+## `phases` takes each step's milliseconds for the boot line (D0518): `WorldSeeder.load_world`'s three
+## steps are composed HERE, with a clock between them, because the sim may not read a clock
+## (`docs/ARCHITECTURE.md` §3) and the boot line is the shell's. `tests/test_boot_snapshot.gd` pins
+## this composition's world equal to `load_world`'s by signature, so the two cannot drift apart
+## silently. `Time.get_ticks_msec` is the same clock `Main.boot` reads for the outer phases.
+static func new_game(site: Dictionary, seed: int, start_id: StringName, phases: Dictionary = {}) -> Interface:
+	var t: int = Time.get_ticks_msec()
+	var world: World = World.new(ShaftGenerator.generate(site, seed))
+	phases["generate"] = Time.get_ticks_msec() - t
+	t = Time.get_ticks_msec()
+	ShaftGenerator.enrich(world, site, seed)   # the planes: aquifers and lodes (D0385)
+	phases["enrich"] = Time.get_ticks_msec() - t
+	t = Time.get_ticks_msec()
+	phases[PHASE_SETTLE_TICKS] = WaterFlow.settle(world.water, world.grid, WorldSeeder.SETTLE_TICKS)   # at rest (D0405)
+	phases["settle"] = Time.get_ticks_msec() - t
+	t = Time.get_ticks_msec()
 	var items: Items = Items.new(world)
 	var machines: Machines = Machines.new()
 	machines.attach_to(items)
 	if not WorldSeeder.stamp(world, items, machines, start_id, StringName(str(site.get("id", "")))):
 		return null
+	phases["stamp"] = Time.get_ticks_msec() - t
+	t = Time.get_ticks_msec()
 	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS[String(start_id)])
 	var body: Body = Body.new(
 		spawn.x * Aim.LOGIC_FX + Aim.LOGIC_FX / 2,
 		(spawn.y + 1) * Aim.LOGIC_FX - Body.HEIGHT_PX * Fx.SCALE / 2)
-	return Interface.new(world.grid, body, Mining.new(), world, items, machines)
+	var door: Interface = Interface.new(world.grid, body, Mining.new(), world, items, machines)
+	phases["door"] = Time.get_ticks_msec() - t
+	return door
