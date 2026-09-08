@@ -59,7 +59,7 @@ var _viewport: SubViewport = null
 var _chunks: Array[LightLayer] = []
 var _eraser: LightLayer = null
 var _erase_rects: Array[Rect2] = []
-## The chunks the last bake left visible, so the next hides exactly those and not all 3008 (D0522).
+## The chunks the last bake left visible, so the next hides exactly those and not the whole grid (D0522).
 var _shown: Array[int] = []
 ## Chunk index -> the rect it repaints THIS bake instead of its whole rect (D0522). `_paint_chunk` consumes
 ## an entry as it draws; no entry means the whole rect. Replaced by every bake, so none outlives its tick.

@@ -20094,3 +20094,42 @@ not at the eraser. (d) Step 4's after-numbers (the three headed `--perf` runs) l
 (e) `tests/test_terrain_bake.gd` and `view/visuals/terrain_bake.gd` were both at 400 lines; the lane tests
 moved and `TerrainBake.chunk_count()` (no caller) went, leaving 307 and 399. (f) `harness.yml` gained the
 new suite's line and catalogue entry (gate 31 refuses an unrun suite); nothing removed.
+
+**Measured (step 4, second commit) -- and a correction.** The SHIPPED world is 256x1104 cells (1024x4416
+px), **280 chunks** at 128 px; the "3008 chunks on the seat's world" above is Worker G's 3000x1000-cell
+fixture, not the seat's, and the two comments that said so are corrected in this commit. Three headed
+`--perf` runs on 0cd43b31 plus a temporary microsecond timer inside `_paint_chunk` (observe / painters /
+`fill_rect`, printed under `--perf`, removed before this commit), same flags as the before-runs, 600 ticks,
+vsync off. **THE HOST WAS CONTENDED** -- WindowServer at 47% and a browser renderer at 23% for the dig and
+walk runs -- and the untouched per-frame painters show it: `sky_painter.paint` 2.70 ms against 0.90 ms in
+the before-run's slow frames, `machine_painter` 2.19 against 0.72, p50 3.8-6.8 ms against 1.4. Under
+QUALITY gate 19 the dig and walk p50/p99/over-budget counts are VOID, not after-numbers; the still run's
+p50 (1.28 / 0.82 ms) matched the before-run's and is reported. What survives contention as an UPPER bound
+is every timer inside `_paint_chunk`. Before -> after: still p99 6.46/15.55 -> 18.49/14.85 ms, max 42.64
+(tick 16) -> 53.55 (tick 16, the first bake), over 16.7 ms 15 of 4496 -> 42 of 3169; dig p99 19.43/15.36
+-> 21.23/19.66 (VOID), **max 417.27 / 371.2 / 177.9 ms -> 60.34 ms** (tick 37, the first bite), over 16.7
+ms 41 of 3597 -> 72 of 1389 (VOID); walk p99 17.35/19.81 -> 19.55/19.19 (VOID), max 40.44 -> 98.51 ms
+(tick 21), over 16.7 ms 49 of 3750 -> 87 of 1153 (VOID).
+
+**The split, 95 whole 32x32 chunks and 8 partials across the three runs:** `observe` median 0.25 ms, max
+1.08 ms; `fill_rect` median 0.99 ms, max 2.50 ms; `paint` min 2.08 ms, p25 3.02 ms (sky), **median 19.3
+ms, p75 34.5 ms, max 55.6 ms (solid ground)** -- 53 of 95 chunks over 16.7 ms on their paint alone. So the
+orchestrator's hypothesis that the observation over 16k cells was the cost is refuted: the observation
+is ~1% of a chunk; the two baked painters' per-cell work is the cost, ~20-55 us a solid cell here (under
+contention; the 417 ms before-frame at 16,384 cells is ~25 us a cell, so the clean number is of that
+order). A corner blow (`--act=mine`, 22x22-cell rect over four chunks, 11x21 + 11x21 + 11x1 + 11x1 cells)
+costs **7.43 ms and 7.09 ms** for its four partials together (observe 1.3 / 0.7, paint 5.8 / 6.1, fill
+0.3 / 0.3) -- what
+the 178-417 ms frames were. THE WINDOW LANE IS THE REMAINING HITCH, and the budget is in the wrong unit:
+at this run's zoom (not the seat's) a 32x32 chunk of solid ground paints in 20-55 ms, so four of them in
+one tick are 80-220 ms -- the walk run's 98.5 ms frame at tick 21 is chunks 7, 15, 23 and 31 (5.9 + 6.2 +
+7.6 + 52.9 = 72.6 ms of bake) entering as the drive walks right. Five to ten times better than a 128-cell
+chunk (16x the cells), not under budget. A budget in cells painted, or a time budget, or a cheaper
+painter is the next step; with the margin at 9 cells and `MAX_FALL` at 2.33 cells a tick, a budget of 2
+chunks still drains a 4-column row in 2 ticks (4.7 cells of fall). The first bake at this zoom painted
+30 chunks whose timers sum to **690.7 ms**, while the meter's worst frame read 53.5 ms at tick 16; the
+two cannot both be whole-frame truths and I did not determine which frame the meter attributes the first
+bake to. `setup` on the shipped world: 280 chunks built in **6.2 / 2.9 / 3.0 ms** (three boots); the boot
+`stack` phase read 36 ms against the before-run's 21. On the 3008-chunk fixture the headless proxy above
+says ~3 ms more. Logs: `perf_after_{still,dig,walk}.log` in the scratchpad beside the before-logs; the
+orchestrator's `perf_probe.sh after <worktree>` re-runs all three on a quiet display.

@@ -14,7 +14,8 @@ extends "res://tests/test_base.gd"
 ## Run: tools/run_gd_test.sh <godot-binary> res://tests/test_bake_lanes.gd
 
 const CELL_PX: int = 4
-## The seat's world (3000x1000 cells) so the chunk counts are the shipped ones: 12000x4000px tiles 94x32.
+## Worker G's fixture (3000x1000 cells): 12000x4000px tiles 94x32 = 3008 chunks, wide enough that no
+## window covers a telling share of it. The SHIPPED world is smaller -- 256x1104 cells, 280 chunks (D0522).
 const W_CELLS: int = 3000
 const H_CELLS: int = 1000
 const CHUNK: int = BakeWindow.CHUNK_PX
@@ -37,7 +38,7 @@ func _initialize() -> void:
 	_finish("bake_lanes")
 
 
-## The planner as `WorldView` wires it: the seat's world and the observation margin.
+## The planner as `WorldView` wires it: the fixture's world and the observation margin.
 func _lanes() -> BakeWindow:
 	var w := BakeWindow.new()
 	w.plan(Vector2i(W_CELLS, H_CELLS), CELL_PX)
