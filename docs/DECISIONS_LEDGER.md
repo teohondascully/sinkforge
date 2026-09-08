@@ -19002,3 +19002,46 @@ that invert when the body walks, so they are not the same defect; they are recor
 reworded, since whether "beside you" survives a thirty-metre stride (T035) is the director's call. The
 seam's look -- one black metre beside a black hole -- stays the director's (D0493). Nothing here touches the
 ring's own behaviour: `TargetGuide` already moved to the seam at D0486; only the words changed.
+## D0496 · 2026-09-07 · The refusal slot names every floor drop and every wrong stack, latched by nothing
+
+**Decided:** the DROP's refusals ride D0488's slot. `Refusals.drop(id)` takes the slot for the frame, and
+`Hints.observe` hands it the drop lesson TRUE this observe -- `dropped_wrong` when `_wrong_stack` fires,
+else `dropped_floor` when `drop_went == &"floor"` -- after its own detectors have run, so the headline is
+DROPPED or WRONG STACK on EVERY press and not the first alone. The same channel, the same 1.5 s linger,
+the same yield: silent while that lesson itself holds the plate, whose first words are the same headline.
+`Hints` owns the two detectors and `Refusals` owns the slot, so the hand-off is one call and a four-line
+method; neither file gained a state machine, and neither moved toward the 400-line cap.
+
+**Why:** D0488 read only `aim_refusal`, and said so under Provisional. The verb with no aim went on
+failing silently. `docs/playtests/2026-09-07_strangers76-81_seam_slot.md`: S80's first Q at 37.9 s came
+from cell 153, 5.7 m off the forge, DROPPED on the floor -- and its next Q, from that same cell 153, had
+nothing to say, the moment being a one-shot; the report calls the forge "unreachable". S76 pressed Q
+eleven times at cells 150-173 on the smelt rung, every drop landing on the floor or into the shaft
+forge's range, and the screen named the refusal ONCE, at 67.0 s, when WRONG STACK finally fired at burst
+41. A verb that answers the first press and no other is read as a broken verb -- D0428's fifth stranger
+read exactly that and called the forge broken -- and a pile at the feet is not an answer.
+
+**Alternatives:** (a) unlatch the DROPPED and WRONG STACK lessons -- nine seconds of plate on every stray
+Q, the objection D0488 already weighed; (b) a second slot for the drop -- two words competing for one
+line. The drop is one observe wide where an aim refusal is a hold, which is why the id comes from `Hints`
+rather than from `Refusals` reading the observation itself: only `Hints` knows which drop moment is true.
+
+**Verified:** `tests/test_lesson_dock.gd` 35 -> 44 asserted, two pin sets added. The FIRST floor drop is
+still the lesson's (active `dropped_floor`, slot ""); once it has read out, the SECOND says DROPPED in
+the slot at once at full alpha with no plate under it, seated at the dock's foot; still up 0.9 s after
+the drop; gone 1.9 s after it (linger 1.5 s); a THIRD floor drop past the linger says it AGAIN. The wrong
+stack on `test_hints_moments`'s own fixture (clay dropped beside a forge that takes ore, ore still in the
+pack): the first is its lesson's, the next says WRONG STACK. `test_hints_moments` 29 and `test_hints` 48
+unchanged. Three mutants, each run to red: latching `drop()` per id -> 5 red of 44; removing the hand-off
+from `Hints.observe` -> the same 5; dropping `active == slot_id` from `slot_text` -> 3 red, the two new
+yield pins plus D0488's own, and those messages print the slot as WOULD-say DROPPED and WRONG STACK, so
+it is the yield silencing the first drop and not an absent hand-off. `check_size_limits` (hints.gd 372,
+refusals.gd 122, test_lesson_dock.gd 326), `layer_lint` and `duplication` all PASS.
+
+**Provisional:** a drop takes the slot from a live aim refusal for its one frame, the held refusal
+re-claiming it the next. No stranger has yet pressed Q while holding a refused MINE, so which of the two
+should win is unmeasured, and the order is the cheap one rather than a judged one.
+
+**Not changed:** the lessons stay one-shots; no text in `HintTexts`; the linger, the fade and the rule's
+red are D0488's, still unread by a batch. NOT ORE (`mined_wrong`) is still slot-less: it is a MINE
+outcome, not a refusal, and no receipt yet shows a stranger repeating it.

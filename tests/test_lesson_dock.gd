@@ -24,6 +24,8 @@ func _initialize() -> void:
 	_test_the_dock_is_stable_and_clear_of_the_action_area()
 	_test_the_layout_follows_the_lesson()
 	_test_the_slot_names_every_refusal()
+	_test_the_slot_names_every_floor_drop()
+	_test_the_slot_names_a_wrong_stack()
 	_test_the_slot_stacks_over_a_lesson_and_yields_to_its_own()
 	_test_the_dock_clears_a_full_hotbar_and_the_whole_legend()
 	await _test_paint_runs_through_the_hud_host()
@@ -172,6 +174,63 @@ func _test_the_slot_names_every_refusal() -> void:
 	var hs: Hints = Hints.new()
 	hs.observe(sight.obs, 0.016)
 	_check(hs.slot_text() == "BEHIND ROCK", "a sight refusal says BEHIND ROCK (%s)" % hs.slot_text())
+
+
+## D0496 (strangers 76-81): the DROP's refusals ride the slot too, where D0488 read only `aim_refusal`.
+## Stranger 76 pressed Q eleven times far from the forge: the first drop taught DROPPED, and the ten after
+## it showed the pile at their feet and nothing else. The first floor drop is still the LESSON's (the slot
+## yields to the plate whose first word it would repeat); every drop after it says DROPPED again, latched
+## by nothing, for the same linger.
+func _test_the_slot_names_every_floor_drop() -> void:
+	var font: Font = ThemeDB.fallback_font
+	var f: Frame = _frame()
+	var h: Hints = Hints.new()
+	var calm: Interface.Observation = _hint_obs()
+	var fell: Interface.Observation = _hint_obs()
+	fell.drop_went = &"floor"
+	h.observe(calm, 0.016)
+	h.observe(fell, 0.016)
+	_check(h.active_id() == &"dropped_floor" and h.slot_text() == "", "the FIRST floor drop is its own lesson's: the plate says it and the slot yields (active %s, slot \"%s\")" % [h.active_id(), h.slot_text()])
+	for _i: int in 3:
+		h.observe(calm, 4.0)                                   # the lesson reads out and leaves the plate
+	_check(h.active_id() == &"" and LessonDock.layout(h, f, font).is_empty(), "...and once it has read out, nothing is up (active %s)" % h.active_id())
+	h.observe(fell, 0.016)
+	var second: Dictionary = LessonDock.layout(h, f, font)
+	_check(second.has("slot") and not second.has("rect") and String(second["slot"]["text"]) == "DROPPED" and float(second["slot"]["alpha"]) > 0.99,
+		"the SECOND floor drop -- the lesson spent, no plate -- says DROPPED in the slot at once (\"%s\")" % str(second.get("slot", {}).get("text", "")))
+	var srect: Rect2 = second.get("slot", {}).get("rect", Rect2())   # `.get` so a red above does not crash the run and shrink the count
+	_check(absf(srect.end.y - UiTheme.px(Hotbar.HOTBAR_BAND_TOP - LessonDock.BAND_GAP)) < 0.01, "...seated at the dock's foot, no lesson under it (foot %.0f px)" % srect.end.y)
+	h.observe(calm, Refusals.SLOT_LINGER - Refusals.SLOT_FADE - 0.1)
+	_check(h.slot_text() == "DROPPED", "still up a second after the drop, inside the linger (\"%s\")" % h.slot_text())
+	h.observe(calm, Refusals.SLOT_FADE + 0.5)
+	_check(h.slot_text() == "" and LessonDock.layout(h, f, font).is_empty(), "%.1f s past the drop (linger %.1f s): no slot, no dock (\"%s\")" % [Refusals.SLOT_LINGER + 0.4, Refusals.SLOT_LINGER, h.slot_text()])
+	h.observe(fell, 0.016)
+	_check(h.slot_text() == "DROPPED", "a THIRD floor drop after the linger says it AGAIN: the slot latches nothing (\"%s\")" % h.slot_text())
+
+
+## The wrong stack (D0443, D0496): the same fixture as `test_hints_moments._test_wrong_stack_pins` --
+## clay dropped on the floor beside a forge that takes ore, ore still in the pack. Stranger 76's eleventh
+## press was the one that finally fired the lesson; every press before and after it now says the words.
+func _test_the_slot_names_a_wrong_stack() -> void:
+	var forge: Dictionary = {"cell": Vector2i(11, 10), "id": &"processor", "recipe": &"smelt_ingot", "input": {}, "output": {}}
+	var typed: Array[Dictionary] = [forge]
+	var h: Hints = Hints.new()
+	var held: Interface.Observation = _hint_obs([["clay", 3], ["ore", 4]])
+	held.pos_x = 10 * 16 * S
+	held.pos_y = 10 * 16 * S
+	held.machines = typed
+	var fell: Interface.Observation = _hint_obs([["ore", 4]])
+	fell.pos_x = held.pos_x
+	fell.pos_y = held.pos_y
+	fell.machines = typed
+	fell.drop_went = &"floor"
+	h.observe(held, 0.016)
+	h.observe(fell, 0.016)
+	_check(h.active_id() == &"dropped_wrong" and h.slot_text() == "", "the first wrong stack is its own lesson's: the slot yields (active %s, slot \"%s\")" % [h.active_id(), h.slot_text()])
+	for _i: int in 3:
+		h.observe(held, 4.0)                                   # reads out, and the pack holds clay again
+	h.observe(fell, 0.016)
+	_check(h.slot_text() == "WRONG STACK" and h.active_id() == &"", "the next wrong stack says WRONG STACK in the slot, the lesson spent (\"%s\", active %s)" % [h.slot_text(), h.active_id()])
 
 
 ## The slot over a lesson: when another lesson holds the plate the slot sits a gap above it; when the

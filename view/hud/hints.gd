@@ -222,6 +222,8 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	var wrong: bool = _wrong_stack(o, counts)
 	note(&"dropped_wrong", wrong)
 	note(&"dropped_floor", o.drop_went == &"floor" and not wrong)   # the drop's own TOO FAR (D0428, stranger 5)
+	if o.drop_went == &"floor":
+		_refusals.drop(&"dropped_wrong" if wrong else &"dropped_floor")   # the slot names every drop, not just the first (D0496)
 	note(&"left_working", _left_working(o, counts))
 	note(&"in_water", o.wet)
 	note(&"way_down", _way_down_wanted(o))
@@ -251,8 +253,8 @@ func _note_refusals(o: Interface.Observation, delta: float) -> void:
 		note(id, _refusals.fired[id])
 
 
-## THE REFUSAL SLOT (D0488): the live refusal's headline, on every press, latched by nothing; "" while the
-## refusal's own lesson holds the plate.
+## THE REFUSAL SLOT (D0488, D0496): the live refusal's headline -- an aim's or a drop's -- on every press,
+## latched by nothing; "" while that refusal's own lesson holds the plate.
 func slot_text() -> String:
 	return _refusals.slot_text(_active)
 

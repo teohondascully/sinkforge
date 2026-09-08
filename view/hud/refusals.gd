@@ -24,6 +24,13 @@ extends RefCounted
 ## word for either. The slot is the lesson's headline (its words before the dash) from the first frame of
 ## the refusal, up while it is live and SLOT_LINGER after, and silent while that lesson itself is on the
 ## plate, since the plate's first words are the same headline.
+##
+## THE DROP'S REFUSALS ride the same slot (D0496, strangers 76-81). D0488 read only `aim_refusal`, so the
+## verb that has no aim -- DROP -- stayed silent past its own one-shot: S76 pressed Q eleven times far
+## from the forge and saw the pile at its feet and nothing else after the first, S80 dropped from 5.7 m
+## twice and the second time had no word at all. A floor drop and a wrong stack are one observe wide, not
+## a hold, and their detectors live in `Hints`, so `Hints` hands the live one to `drop()` after its own
+## detectors have run. Same linger, same yield, latched by nothing.
 
 const FAR_TICKS: int = 20
 const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
@@ -69,6 +76,17 @@ func read(o: Interface.Observation, delta: float) -> void:
 		slot_since = 0.0
 	else:
 		slot_since += delta
+
+
+## A DROP's refusal takes the slot for this frame (D0496): `id` is the drop lesson TRUE this observe --
+## `dropped_wrong` or `dropped_floor` -- decided by `Hints`, which owns those detectors. It comes after
+## `read()`, so a drop refused while a MINE is also being refused says the drop's word for that frame and
+## the aim's again the next, when the held refusal re-claims the slot. `&""` leaves the slot alone.
+func drop(id: StringName) -> void:
+	if id == &"":
+		return
+	slot_id = id
+	slot_since = 0.0
 
 
 ## The lesson a refusal names on its FIRST frame, before any count: what the slot says.

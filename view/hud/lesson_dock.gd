@@ -24,10 +24,10 @@ const MARGIN_X: float = 10.0            ## the legend's and the depth chip's lef
 const BAND_GAP: float = 8.0             ## above the hotbar band
 const RISE: float = 4.0                 ## authored px the plate rises over its fade-in
 const INK := Color(0.92, 0.88, 0.74)
-## THE REFUSAL SLOT (D0488): a one-line plate in the dock's place that says the live refusal's headline --
-## TOO FAR, NOTHING THERE, THAT IS A MACHINE -- on every refused press, for the short linger `Refusals`
-## keeps, above the lesson plate when one is up. Its rule is the refusal's red, the slashed square's own,
-## so the word and the mark read as one answer.
+## THE REFUSAL SLOT (D0488, D0496): a one-line plate in the dock's place that says the live refusal's
+## headline -- TOO FAR, NOTHING THERE, THAT IS A MACHINE for an aim, DROPPED and WRONG STACK for a drop --
+## on every refused press, for the short linger `Refusals` keeps, above the lesson plate when one is up.
+## Its rule is the refusal's red, the slashed square's own, so the word and the mark read as one answer.
 const SLOT_GAP: float = 4.0             ## authored px between the slot and the lesson plate under it
 
 var hints: Hints = Hints.new()
