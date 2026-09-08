@@ -43,3 +43,25 @@ under a subdirectory — it's general git hygiene with no sim/game coupling, por
 from the pre-pivot `tools/` rather than archived with the rest of it.
 
 Counts toward the instrument side of the LOC ratio (`docs/QUALITY.md` gate 7), except `scratch/`.
+# Iteration runner additions (2026-09-07)
+
+- `bash tools/run_local_battery.sh /absolute/path/to/godot 2`: gates followed by the exact CI suite
+  population with two workers. Default remains one; accepted range is 1-16. Do not benchmark beside
+  active playtest seats. The runner fails on duplicate requests, absent results or worker failures.
+- Gate logs and parsed lists are invocation-local; a parser's partial output never becomes a suite list.
+- Optional recording: `LOCAL_GATE_RECEIPTS=/absolute/external/receipts bash tools/run_local_battery.sh godot 2`.
+  Dirty/changed checkouts do not produce reusable receipts. Store them outside the repository.
+- Optional reporting: `python3 tools/gate_status.py --local-receipts /absolute/external/receipts`.
+  Missing, stale, mismatched or damaged receipts fall back to fresh local execution. Reused evidence is
+  explicitly historical; CI is still fetched fresh and skipped/absent CI never becomes PASS.
+  Fresh local execution remains the default without this option.
+
+Receipts match HEAD/index, clean state, command, Python/packages, platform, executable hashes and
+environment (excluding shell bookkeeping `_`, `SHLVL`, `PWD`, `OLDPWD` and the runner controls
+`LOCAL_GATE_RECEIPTS`, `GATES_ONLY`). They expire after one hour and verify their retained log hash.
+This is NOT a snapshot of network services, ignored files or arbitrary external dependencies. For
+checks sensitive to those or to excluded variables, use fresh reporting. Never reuse receipts as a
+release gate or replace full-battery-before-push policy. Logs can contain diagnostics; keep them local.
+
+Focused tests: `python3 -m unittest discover -s tools -p 'test_*receipt.py'` and
+`python3 tools/test_runner_contracts.py`. The standard CI Python-test discovery includes these files.

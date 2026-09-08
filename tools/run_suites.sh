@@ -56,6 +56,10 @@ set -uo pipefail
 
 GODOT="${1:?usage: run_suites.sh <godot-binary> [jobs] [suite ...]}"
 JOBS="${2:-1}"
+case "$JOBS" in
+  [1-9]|1[0-6]) ;;
+  *) echo "run_suites: jobs must be an integer from 1 to 16" >&2; exit 2 ;;
+esac
 shift 2 2>/dev/null || shift 1
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -83,29 +87,46 @@ else
 fi
 [ "${#SUITES[@]}" -gt 0 ] || { echo "run_suites: no suites found -- refusing to report a green over an empty population" >&2; exit 2; }
 
+for (( i=0; i<${#SUITES[@]}; i++ )); do
+  [[ "${SUITES[$i]}" =~ ^res://[a-zA-Z0-9_./-]+\.gd$ ]] || { echo "run_suites: invalid suite path" >&2; exit 2; }
+  for (( j=0; j<i; j++ )); do
+    [ "${SUITES[$i]}" != "${SUITES[$j]}" ] || { echo "run_suites: duplicate suite ${SUITES[$i]}" >&2; exit 2; }
+  done
+done
+
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
 run_one() {
-  local suite="$1" out="$2" godot="$3"
-  local name; name="$(basename "$suite")"
+  local index="$1" out="$2" godot="$3"
+  local suite; suite="$(sed -n "$((index + 1))p" "$out/suites")"
   local t0; t0=$(date +%s)
-  if "$ROOT/tools/run_gd_test.sh" "$godot" "$suite" > "$out/$name.log" 2>&1; then
-    echo "PASS $(( $(date +%s) - t0 )) $suite" > "$out/$name.result"
+  if "$ROOT/tools/run_gd_test.sh" "$godot" "$suite" > "$out/$index.log" 2>&1; then
+    echo "PASS $(( $(date +%s) - t0 )) $suite" > "$out/$index.result"
   else
-    echo "FAIL $(( $(date +%s) - t0 )) $suite" > "$out/$name.result"
+    echo "FAIL $(( $(date +%s) - t0 )) $suite" > "$out/$index.result"
   fi
 }
 export -f run_one
 export ROOT
 
 START=$(date +%s)
-printf '%s\n' "${SUITES[@]}" | xargs -P "$JOBS" -I{} bash -c 'run_one "$@"' _ {} "$OUT" "$GODOT"
+printf '%s\n' "${SUITES[@]}" > "$OUT/suites"
+for (( i=0; i<${#SUITES[@]}; i++ )); do echo "$i"; done | xargs -P "$JOBS" -I{} bash -c 'run_one "$@"' _ {} "$OUT" "$GODOT"
+SCHEDULER_RC=$?
 ELAPSED=$(( $(date +%s) - START ))
 
 PASSED=0; FAILED=0
-for f in "$OUT"/*.result; do
-  read -r verdict secs suite < "$f"
+for (( i=0; i<${#SUITES[@]}; i++ )); do
+  verdict=""; secs=""; suite=""
+  if [ ! -f "$OUT/$i.result" ] || ! read -r verdict secs suite < "$OUT/$i.result"; then
+    echo "FAIL  ${SUITES[$i]} -- missing worker result"
+    FAILED=$((FAILED+1)); continue
+  fi
+  if [ "$suite" != "${SUITES[$i]}" ] || [[ ! "$secs" =~ ^[0-9]+$ ]] || { [ "$verdict" != PASS ] && [ "$verdict" != FAIL ]; }; then
+    echo "FAIL  ${SUITES[$i]} -- malformed worker result"
+    FAILED=$((FAILED+1)); continue
+  fi
   echo "$secs $suite" >> "$OUT/timings"
   if [ "$verdict" = "PASS" ]; then
     PASSED=$((PASSED+1))
@@ -113,7 +134,7 @@ for f in "$OUT"/*.result; do
   else
     FAILED=$((FAILED+1))
     echo "FAIL  $suite -- its FULL output follows:"
-    sed 's/^/        /' "$OUT/$(basename "$suite").log"
+    sed 's/^/        /' "$OUT/$i.log"
   fi
 done
 
@@ -122,4 +143,4 @@ done
 echo "run_suites: slowest suites:"
 sort -rn "$OUT/timings" 2>/dev/null | head -6 | sed 's/^/    /'
 echo "run_suites: ${PASSED} passed, ${FAILED} failed, of ${#SUITES[@]} in ${ELAPSED}s (jobs=${JOBS})"
-[ "$FAILED" -eq 0 ]
+[ "$SCHEDULER_RC" -eq 0 ] && [ "$FAILED" -eq 0 ] && [ "$PASSED" -eq "${#SUITES[@]}" ]

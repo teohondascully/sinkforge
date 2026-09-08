@@ -1,6 +1,6 @@
 # Working state
 
-**Last updated: 2026-09-07 (gameplay section reconciled late that day).**
+**Last updated: 2026-09-08 (tooling; gameplay section reconciled September 7).**
 
 ## Current stage
 
@@ -38,9 +38,13 @@ unimplemented; the rig pays the drill for two ingots (D0485) and the winch pair 
 
 ## Repository cleanup (director-approved)
 
-Active tooling assignment (2026-09-07): Astra executes timing summaries, runner accounting/optional
-battery parallelism, provenance-checked reporting receipts, parser/log isolation, then an opt-in
-command-plus-image pilot. [Execution plan](superpowers/plans/2026-09-07-iteration-efficiency.md).
+Tooling implementation complete (D0525): timing summaries, runner accounting/optional battery
+parallelism, provenance-checked reporting receipts, parser/log isolation, and an opt-in
+command-plus-image pilot. [Execution evidence and rollout limits](superpowers/plans/2026-09-07-iteration-efficiency.md).
+Focused tests and the real-engine runner self-test pass; no whole-battery speedup or live-agent
+latency improvement is claimed. Fresh checks and existing actor protocol remain the defaults.
+Active director assignment: optimize the terrain shading hot path after the engineer's D0522/D0524,
+preserving appearance. 360 fps is a measured host-specific target, not a hardware-independent guarantee.
 The gameplay section above was reconciled by the engineer at their 2026-09-07 late checkpoint
 (after strangers 115-120); the batch queue is theirs, the tooling queue is this section's.
 

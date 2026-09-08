@@ -20252,3 +20252,30 @@ world's; the headed fall's per-bake `lane_solid` (361-512, printed under the tem
 before this commit) is the real-world witness that the count runs on the live observation. (g) The seat's
 `frame_0000.png` md5 was not checked here (no seats may be opened by this worker); the shipped chunk
 binding was booted headed once (120 ticks, exit 0, a 44.7 ms first-bake frame).
+
+## D0525 · 2026-09-08 · Iteration tools: complete runner accounting, timing summaries and opt-in evidence/image paths
+
+**Decided:** the local battery delegates its unchanged suite population to `run_suites.sh`, jobs 1 by
+default and explicitly 1-16. Results are indexed by request position and checked against every expected
+suite identity; duplicate requests, missing results and scheduler failures fail. Gate logs and parser
+outputs are invocation-local, and parser failure rejects partial output. New Python tests join CI's
+existing discovery. `playtest/timing_report.py` aggregates existing artifacts with interval overlap and
+provenance warnings. `verification_receipt.py` offers opt-in historical local evidence for gate reporting,
+with clean source, command, tool/environment identity, log integrity and a one-hour age bound. CI status
+remains independent. `playtest/step_tool.py` is an opt-in, single-seat MCP stdio image-returning pilot.
+
+**Alternative and why:** keep serial suites and independent image opens, or build a new orchestration
+platform. The existing tools already contain the useful seams. Tests reproduced two suites collapsing
+to one basename result with exit zero, duplicate requests passing, a partial suite parser succeeding and
+another invocation's gate.log being overwritten. The fixes address those before adding concurrency.
+
+**Evidence:** `tools/test_runner_contracts.py` 9 tests, `test_timing_report.py` 1, `test_verification_receipt.py`
+2, `test_step_tool.py` 3, all passing; existing gate-status cases 26/26. Real fixed-point/item suites pass
+with jobs=2. The image pilot uses the real command adapter with disposable seat responses, proving
+original PNG bytes and player-field filtering; no live-model speed claim. Full-battery speed is unmeasured.
+Receipt environment excludes documented shell bookkeeping/runner controls; external dependencies are
+not snapshotted, so receipts are explicitly historical and never release certification.
+
+**Reverse cost:** tooling-only. Disable optional receipt/image paths and select jobs=1 without changing
+game state, saves, observation semantics, or suite coverage. Source: the director's sequential assignment
+and `docs/superpowers/plans/2026-09-07-iteration-efficiency.md`.

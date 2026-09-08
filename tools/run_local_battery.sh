@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs locally exactly the suites CI runs per commit -- no more, and no fewer.
 #
-#     bash tools/run_local_battery.sh [path-to-godot]
+#     bash tools/run_local_battery.sh [path-to-godot] [jobs=1, maximum 16]
 #
 # WHY THIS IS A TRACKED TOOL AND NOT A SCRATCH SCRIPT (docs/DECISIONS_LEDGER.md D0230, NEEDS_DIRECTOR
 # P007). Every session that wants "run what CI runs" writes this by hand, and the obvious way to write it
@@ -22,10 +22,17 @@
 set -euo pipefail
 
 GODOT="${1:-$(command -v godot || echo ./godot)}"
+JOBS="${2:-1}"
+case "$JOBS" in
+	[1-9]|1[0-6]) ;;
+	*) echo "run_local_battery: jobs must be an integer from 1 to 16" >&2; exit 2 ;;
+esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKFLOW="$ROOT/.github/workflows/harness.yml"
 PARSER="$ROOT/tools/list_ci_suites.py"
 GATE_PARSER="$ROOT/tools/list_ci_gates.py"
+BATTERY_TMP="$(mktemp -d)"
+trap 'rm -rf "$BATTERY_TMP"' EXIT
 
 if ! command -v "$GODOT" >/dev/null 2>&1 && [ ! -x "$GODOT" ]; then
 	echo "run_local_battery: FAIL - no godot binary at '$GODOT'" >&2
@@ -47,9 +54,14 @@ fi
 # of it as a command. `read -d ''` is in bash 3.2, which is what macOS ships (see the note below on
 # `mapfile`, which is not).
 GATES=()
+if ! python3 "$GATE_PARSER" "$WORKFLOW" > "$BATTERY_TMP/gates"; then
+	echo "run_local_battery: gate parser failed; refusing partial output" >&2
+	exit 2
+fi
+printf '\0' >> "$BATTERY_TMP/gates"
 while IFS= read -r -d '' gate; do
 	[ -n "$gate" ] && GATES+=("$gate")
-done < <(python3 "$GATE_PARSER" "$WORKFLOW"; printf '\0')
+done < "$BATTERY_TMP/gates"
 
 if [ "${#GATES[@]}" -eq 0 ]; then
 	echo "run_local_battery: FAIL - parsed the workflow and found ZERO gate steps in the 'gates' job" >&2
@@ -63,11 +75,13 @@ for gate in "${GATES[@]}"; do
 	# actually runs rather than by its first housekeeping line.
 	label="$(printf '%s' "$gate" | grep -vE '^[[:space:]]*(set |#|$)' | head -1)"
 	[ -n "$label" ] || label="$(printf '%s' "$gate" | head -1)"
-	if ( cd "$ROOT" && eval "$gate" ) >"${TMPDIR:-/tmp}/gate.log" 2>&1; then
+	if ( cd "$ROOT"; if [ -n "${LOCAL_GATE_RECEIPTS:-}" ]; then
+		python3 tools/verification_receipt.py --store "$LOCAL_GATE_RECEIPTS" "$gate"
+	else bash -c "$gate"; fi ) >"$BATTERY_TMP/gate.log" 2>&1; then
 		echo "PASS  gate: $label"
 	else
 		echo "FAIL  gate: $label"
-		tail -20 "${TMPDIR:-/tmp}/gate.log"
+		cat "$BATTERY_TMP/gate.log"
 		GATE_FAILED=$((GATE_FAILED + 1))
 	fi
 done
@@ -79,9 +93,13 @@ if [ "${GATES_ONLY:-}" = "1" ]; then
 fi
 
 SUITES=()
+if ! python3 "$PARSER" "$WORKFLOW" > "$BATTERY_TMP/suites"; then
+	echo "run_local_battery: suite parser failed; refusing partial output" >&2
+	exit 2
+fi
 while IFS= read -r line; do
 	[ -n "$line" ] && SUITES+=("$line")
-done < <(python3 "$PARSER" "$WORKFLOW")
+done < "$BATTERY_TMP/suites"
 
 if [ "${#SUITES[@]}" -eq 0 ]; then
 	echo "run_local_battery: FAIL - parsed the workflow and found ZERO suites in the 'tests' job" >&2
@@ -89,26 +107,9 @@ if [ "${#SUITES[@]}" -eq 0 ]; then
 fi
 
 echo "run_local_battery: ${#SUITES[@]} suite(s) from harness.yml's 'tests' job (the nightly sweep is excluded by construction)"
-LOG="$(mktemp)"
-FAILED=()
-for suite in "${SUITES[@]}"; do
-	if bash "$ROOT/tools/run_gd_test.sh" "$GODOT" "$suite" >"$LOG" 2>&1; then
-		echo "PASS  $suite"
-		grep -E "^[[:space:]]+>" "$LOG" || true
-	else
-		echo "FAIL  $suite"
-		tail -25 "$LOG"
-		FAILED+=("$suite")
-	fi
-done
-rm -f "$LOG"
-
-echo
-echo "run_local_battery: $(( ${#SUITES[@]} - ${#FAILED[@]} ))/${#SUITES[@]} passed"
-if [ "${#FAILED[@]}" -gt 0 ]; then
-	printf '  FAILED: %s\n' "${FAILED[@]}"
-	exit 1
-fi
+SUITE_RC=0
+bash "$ROOT/tools/run_suites.sh" "$GODOT" "$JOBS" "${SUITES[@]}" || SUITE_RC=$?
+if [ "$SUITE_RC" -ne 0 ]; then exit "$SUITE_RC"; fi
 if [ "$GATE_FAILED" -gt 0 ]; then
 	exit 1
 fi

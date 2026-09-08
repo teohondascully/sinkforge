@@ -302,6 +302,9 @@ def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str], local_resul
     statuses = []
     for s in gate_steps:
         status, detail = classify_step(s, ci_steps, local_results)
+        provenance = getattr(local_results, "provenance", {}).get((s["job"], s["name"], s["run"]))
+        if provenance:
+            detail += " [" + provenance + "]"
         details.append(detail)
         statuses.append(status)
 
@@ -314,7 +317,7 @@ def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str], local_resul
     return "PASS", details
 
 
-def main() -> int:
+def main(receipts=None) -> int:
     gates = parse_gates()
     # Contiguous 1..N, not a hardcoded total -- QUALITY.md's own gate count grows over the project's
     # life (D0175 added gate 30), and a fixed literal here would FATAL on every future addition the
@@ -331,6 +334,9 @@ def main() -> int:
     head = git_head()
     ci_conclusion, ci_note, ci_steps = fetch_ci_state(head)
     local_results: dict[tuple[str, str, str], str] = {}
+    if receipts is not None:
+        from verification_receipt import ReceiptResults, ReceiptStore
+        local_results = ReceiptResults(ReceiptStore(ROOT, receipts))
 
     print("gate_status: commit=%s" % head)
     print("gate_status: CI %s" % ci_note)
@@ -410,4 +416,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import argparse
+    parser = argparse.ArgumentParser(description="CI-first gate report; fresh local checks by default")
+    parser.add_argument("--local-receipts", type=Path, help="reuse eligible historical local evidence; never a fresh-check claim")
+    raise SystemExit(main(parser.parse_args().local_receipts))
