@@ -35,7 +35,12 @@ extends RefCounted
 const FAR_TICKS: int = 20
 const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
 const CUT_TICKS: int = 30           ## half a second on air right after your own bite opened the pointer's cell (D0467)
-const BELOW_CELLS: int = 8          ## two metres under the body's centre: past the feet and into the ground (D0473)
+## TWO METRES UNDER THE FEET (D0504; strangers 92 and 93). D0473 measured "buried" from the body's CENTRE,
+## and the centre stands five cells over the feet: the surface coal seam's bottom row, four metres across
+## from the pad, sat exactly eight cells under the centre and read as BURIED, so TOO FAR DOWN sent two
+## strangers digging squares at a seam they could have walked to. A target is under the ground when it is
+## two metres under the ground you stand on.
+const BELOW_CELLS: int = 8
 const SLOT_LINGER: float = 1.5      ## seconds the slot outlives the refusal: long enough to read after the release
 const SLOT_FADE: float = 0.5        ## the last of those, fading
 
@@ -52,7 +57,7 @@ var slot_since: float = 0.0         ## seconds since that refusal was last live
 ## One frame: advance the counts, decide which lessons' holds are long enough, and name the slot.
 func read(o: Interface.Observation, delta: float) -> void:
 	far_ticks = far_ticks + 1 if o.aim_refusal == &"far" else 0
-	var below: bool = o.aim_cell.y - o.cell.y >= BELOW_CELLS          # a buried target: "step closer" cannot be done on foot (D0473)
+	var below: bool = o.aim_cell.y - feet_row(o) >= BELOW_CELLS       # a buried target: two metres under the FEET (D0473, D0504)
 	var on_machine: bool = o.aim_refusal == &"air" and not o.machine_at(Vector2i(o.aim_cell.x >> 2, o.aim_cell.y >> 2)).is_empty()
 	air_ticks = 0 if o.mining_broke or on_machine else (air_ticks + 1 if o.aim_refusal == &"air" else 0)
 	since_break = 0 if o.mining_broke else since_break + 1
@@ -87,6 +92,11 @@ func drop(id: StringName) -> void:
 		return
 	slot_id = id
 	slot_since = 0.0
+
+
+## The terrain row the body's feet stand in: the bottom edge, in cells (the observation's `bottom_y` is Fx px).
+static func feet_row(o: Interface.Observation) -> int:
+	return int(floor(float(o.bottom_y) / float(Fx.SCALE) / float(Interface.Observation.CELL_PX)))
 
 
 ## The lesson a refusal names on its FIRST frame, before any count: what the slot says.

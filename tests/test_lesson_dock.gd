@@ -40,6 +40,7 @@ func _frame(body_px: Vector2 = Vector2(320.0, 180.0)) -> Frame:
 	f.obs.pos_y = int(body_px.y) * S
 	f.obs.top_y = int(body_px.y - 20.0) * S
 	f.obs.cell = Vector2i(int(body_px.x) / 4, Interface.Observation.SKY_ROWS)
+	f.obs.bottom_y = (f.obs.cell.y + 5) * Interface.Observation.CELL_PX * S   # the feet five cells under the centre's cell: the buried rule measures from them (D0504)
 	f.view_world_rect = Rect2(0.0, 0.0, 640.0, 360.0)
 	return f
 
@@ -166,7 +167,7 @@ func _test_the_slot_names_every_refusal() -> void:
 	_check(far2.slot_text() == "TOO FAR", "the SAME refusal a second time says it again: nothing latches (%s)" % far2.slot_text())
 	var below: Frame = _frame()
 	below.obs.aim_refusal = &"far"
-	below.obs.aim_cell = below.obs.cell + Vector2i(0, Refusals.BELOW_CELLS)
+	below.obs.aim_cell = Vector2i(below.obs.cell.x, Refusals.feet_row(below.obs) + Refusals.BELOW_CELLS)   # two metres under the FEET (D0504)
 	var hb: Hints = Hints.new()
 	hb.observe(below.obs, 0.016)
 	_check(hb.slot_text() == "TOO FAR DOWN", "a far press on a buried cell says TOO FAR DOWN (%s)" % hb.slot_text())

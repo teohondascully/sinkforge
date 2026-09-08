@@ -19339,3 +19339,20 @@ agent thinks and the budget is in ticks. A watch-only free-run flag is possible;
 **Verified:** the smoke seat (96) booted from its copy, answered a 30-tick command with a 1280x720 capture,
 and `stop` removed the copy. The six seats of 90-95 were booted from worktrees (D0501's cut) before this
 change and play on.
+
+## D0504 · 2026-09-07 · "Buried" is two metres under the FEET, not under the body's centre
+
+**Decided:** `Refusals` measures a far target's depth from the body's feet (`feet_row`, the observation's
+`bottom_y` in cells) rather than its centre; `BELOW_CELLS` stays 8. The fixtures carry `bottom_y` (feet five
+cells under the centre for the 40 px body).
+
+**Why (strangers 92 and 93, batch 90-95):** D0473's rule counted eight cells under the CENTRE, and the
+centre stands five cells over the feet. The surface coal seam's bottom row (83) is exactly eight under a
+body standing on the pad (centre row 75), so a press on the seam from four metres across was TOO FAR DOWN --
+"dig at the WHITE SQUARE first" -- and both strangers spent their runs digging squares at a seam they could
+have walked to (S92: eight presses at rows 83-86 from cells 166-202, every one far_below or cut_through;
+S93 the same shape). A target is under the ground when it is two metres under the ground you stand on.
+
+**Verified:** `tests/test_hints_moments.gd` (31): the seam's bottom row four metres across, three cells under
+the feet, is TOO FAR; two metres under the feet is still TOO FAR DOWN; D0473's two pins re-posed from the
+feet. `tests/test_lesson_dock.gd` (44) re-posed. The mutant restoring the centre rule fails two.

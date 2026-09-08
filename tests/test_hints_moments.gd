@@ -166,18 +166,40 @@ func _test_far_below_pins() -> void:
 	var buried: Interface.Observation = _hint_obs()
 	buried.aim_refusal = &"far"
 	buried.cell = Vector2i(100, 75)
-	buried.aim_cell = Vector2i(100, 75 + Hints.BELOW_CELLS)
+	buried.bottom_y = 80 * Interface.Observation.CELL_PX * Fx.SCALE                 # the feet on row 80
+	buried.aim_cell = Vector2i(100, 80 + Hints.BELOW_CELLS)
 	for _i: int in Hints.FAR_TICKS:
 		h.observe(buried, 0.016)
-	_check(h.active_id() == &"far_below" and h.active_text().begins_with("TOO FAR DOWN"), "far, two metres under the body: TOO FAR DOWN (%s)" % h.active_id())
+	_check(h.active_id() == &"far_below" and h.active_text().begins_with("TOO FAR DOWN"), "far, two metres under the feet: TOO FAR DOWN (%s)" % h.active_id())
 	var level: Hints = Hints.new()
 	var across: Interface.Observation = _hint_obs()
 	across.aim_refusal = &"far"
 	across.cell = Vector2i(100, 75)
-	across.aim_cell = Vector2i(120, 75 + Hints.BELOW_CELLS - 1)
+	across.bottom_y = 80 * Interface.Observation.CELL_PX * Fx.SCALE
+	across.aim_cell = Vector2i(120, 80 + Hints.BELOW_CELLS - 1)
 	for _i: int in Hints.FAR_TICKS:
 		level.observe(across, 0.016)
 	_check(level.active_id() == &"too_far", "control: far across, or under the feet by less than two metres, keeps TOO FAR (%s)" % level.active_id())
+	# D0504 (strangers 92, 93): the surface seam's bottom row, eight cells under the CENTRE but three under the
+	# feet, four metres across: TOO FAR, never TOO FAR DOWN. The body stands on row 80 (feet), centre row 75.
+	var seam: Hints = Hints.new()
+	var at_seam: Interface.Observation = _hint_obs()
+	at_seam.aim_refusal = &"far"
+	at_seam.cell = Vector2i(100, 75)
+	at_seam.bottom_y = 80 * Interface.Observation.CELL_PX * Fx.SCALE
+	at_seam.aim_cell = Vector2i(116, 83)
+	for _i: int in Hints.FAR_TICKS:
+		seam.observe(at_seam, 0.016)
+	_check(Refusals.feet_row(at_seam) == 80 and seam.active_id() == &"too_far", "a surface seam's bottom row, four metres across and three cells under the feet, is TOO FAR, not TOO FAR DOWN (feet row %d, %s)" % [Refusals.feet_row(at_seam), seam.active_id()])
+	var deep: Hints = Hints.new()
+	var under: Interface.Observation = _hint_obs()
+	under.aim_refusal = &"far"
+	under.cell = Vector2i(100, 75)
+	under.bottom_y = 80 * Interface.Observation.CELL_PX * Fx.SCALE
+	under.aim_cell = Vector2i(100, 88)
+	for _i: int in Hints.FAR_TICKS:
+		deep.observe(under, 0.016)
+	_check(deep.active_id() == &"far_below", "control: two metres under the feet is still TOO FAR DOWN (%s)" % deep.active_id())
 
 
 func _test_mined_wrong_pins() -> void:
