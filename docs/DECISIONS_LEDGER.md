@@ -20001,3 +20001,96 @@ z-order table in `view_stack.gd` are reworded).
 
 **Not changed:** `Observation.mining_cracks` and its consumers; the cell-denominated size question (WG-4)
 the painter's header carried is moot for it and open elsewhere.
+## D0522 · 2026-09-07 · A dig repaints its dilated rectangle, chunks are 32 cells, the window lane paints at most N chunks a tick
+
+**Decided:** three changes to the terrain bake, in `view/visuals/bake_window.gd` (the planner, headless) and
+`view/visuals/terrain_bake.gd` (the render target). (1) THE DIG LANE IS A RECTANGLE: `BakeWindow.dig_rect`
+takes the tick's dug cells as one bounding box grown by the margin (9 cells) and clamped to the world;
+`partials_of` clips it to each chunk it crosses; `_paint_chunk` (now bound to its chunk INDEX as well as its
+rect) consumes the chunk's partial from `_partial` and observes, paints and `fill_rect`s only that rect;
+the eraser erases the partial rects. A chunk the target does not hold yet -- dug before it ever entered
+the window, or entering in the tick it is dug -- paints whole (never a partial over unpainted pixels). A
+dig whose bounding rect exceeds one chunk's area (`is_scattered`) falls back to today's whole chunks by
+`influenced_chunks`. `would_rebake_all` keeps reading the dug set's influenced chunks, as before. (2)
+`BakeWindow.CHUNK_PX` 512 -> 128: a chunk is 32 cells (8 m), not legacy's 512 px AREA (which D0326 carried
+across and which was 128 cells = 16,384 cells a chunk at this build's grain). The seat's 3000x1000-cell
+world tiles 94x32 = 3008 chunks. (3) THE WINDOW LANE IS BUDGETED: `BakeWindow.WINDOW_LANE_BUDGET` = 4
+never-painted chunks a tick, nearest the window's centre first (ties by index), the rest next tick; the
+dig lane is never budgeted and does not spend the budget. THE SESSION'S FIRST BAKE IS EXEMPT (my call, not
+the ticket's): the seat captures `frame_0000.png` within a few ticks of `ready` once the body is still
+(`playtest/seat.gd`), a window of the seat's size covers 6 to 12 chunks at this chunk size depending on
+alignment (12 at the suite's position, printed), and a budget of 4 would have put holes in the first
+frame for up to two ticks; 12 chunks of 32 cells are 12,288 cells, fewer than ONE of the 128-cell chunks
+the old first bake painted four of. `plan_tick` returns a `Plan` (`full`, `whole`, `partial`) so
+all three decisions are assertable headless; `_bake_partial` hides only the chunks it last showed
+(`_shown`) instead of walking all 3008. (4) A FOURTH CHANGE THE DESIGN FORCED: the painters are handed
+`paint_rect(rect)` = the rect shrunk by `TerrainPainter.OVERDRAW_CELLS`, so `visit_rect` is exactly the
+rect's cells (32 for a chunk, not 34; 19 for a dig, not 21). Before, every chunk painted one cell into
+each neighbour, which the eraser never cleared -- redundant at best, and by the blend equation a wall
+cell (stamped at `WALL_ALPHA` 254/255 so the tooth can tell it from rock, D0422) painted twice lands at
+254.996/255, which round-to-nearest stores as 1.0: a two-cell line along every chunk edge where a wall
+toothed like rock. A partial rect erased at 19 cells and painted at 21 would have drawn that line around
+every dig. Now erase and paint cover the same pixels.
+
+**Why:** the director, playing: "the whole world freezes every single time I mine a block; if I jump down a
+shaft it glitches as it quickly loads another part of the world". The orchestrator's three headed
+`--perf` runs on 2fe07582 (600 ticks each, vsync off): still -- p99 6.5 ms in the first window then
+15.6 ms, max 42.6 ms at tick 16 (the first bake), 15 frames over 16.7 ms of 4496; `--act=mine` -- p99
+19.4 ms, worst frames 417 ms (tick 39), 371 ms (tick 55), 178 ms (tick 35), later blows 17-27 ms each,
+41 frames over 16.7 ms of 3597; `--perf-drive` -- p99 17-20 ms, 17-26 ms frames throughout, 49 over
+16.7 ms of 3750. Headless null (same dig, sim only): 0.30 ms a tick mean, one 14.8 ms tick on the first
+bite. So the 178-417 ms stalls are the view side of a dig: `_bake_partial` repainted WHOLE chunks (the
+erase rect was the chunk rect, `_paint_chunk` was bound to it) through every baked painter at per-cell
+grain, and one blow near a corner repainted up to four 128x128-cell chunks -- each `_observe.call(rect)`
+building an observation over 16k cells plus margin before painting. Worker G: ~23 ms a chunk. A 19x19
+partial observes and paints 361 cells.
+
+**The late-arrival bound the ticket asked for:** a chunk enters the grown window `margin` = 9 cells before
+the view reaches it. The seat's view (214x120 px at the shell's zoom) grown by the margin spans 3-4 chunk
+columns, so a falling body scrolls a row of at most 4 chunks in at once, drained in one tick at budget 4.
+A chunk arrives late when the body covers the margin in fewer ticks than the row takes to drain: v_late =
+9 cells / ceil(columns / 4) ticks = 9 cells a tick = 540 cells/s = **2160 px/s** for up to 4 columns
+(1080 px/s for 5-8). `Body.MAX_FALL_PX_S` = 560 px/s = 2.33 cells a tick is 3.9x under it; the swing's
+6.6x `RUN_SPEED` (990 px/s) is 2.2x under. Rows are 32 cells apart, so a backlog cannot form below 32
+cells a tick.
+
+**Verified:** `tests/test_bake_lanes.gd` NEW, **37 asserted** (prints every partial rect and the per-tick
+counts): one cell dug at a chunk's centre plans exactly one partial, its own chunk, 19x19 cells starting
+at cell - 9; a dig at a chunk's first column plans two partials (36 + 40 px wide), at a corner four, whose
+union is `dig_rect` and whose areas sum to its 5776 px^2 (no overlap); a dig in a never-painted chunk
+plans it whole and the same dig once painted plans a partial; a chunk entering the window and dug in the
+same tick is whole and never partial; two cells three chunks apart are scattered and plan those two chunks
+whole, two cells 3 apart plan one partial; 1022 chunks dug (the 0.34 fraction of 3008, truncated) plan
+whole and partial-free (scattered) and 1023 plan a full rebake; the first bake plans all 12 chunks of a
+window the seat's size at the suite's position; 12 fresh chunks entering at
+once paint **[4, 4, 4]** nearest-first (independently ranked by distance), `painted_count` +12 in three
+ticks; a dig into an entering chunk makes 5 whole (4 budgeted + 1 dug); `visit_rect` of `paint_rect` is
+exactly `cells_of` for a 32-cell chunk and a 19-cell partial, and of the raw rect is 34x34 (the old
+overdraw). The three D0506 window-lane pins moved here from `test_terrain_bake.gd` (adapted to
+`BakeWindow`), which is why that suite reads **32 -> 24** and this one 29 + 8 = 37: 61 assertions either
+way, none lost. `test_terrain_bake` 24: the 300x300-cell fixture re-derived to 10x10 chunks from the
+constants, the edge and centre probes derived (the old row 200 was 8 cells from a 32-cell row boundary,
+inside the margin), and the legacy-AREA pin reversed into "32 cells a side, against the real cell size",
+with legacy's 16,384 cells as the control. `test_world_view` 28, `test_gram_map` 23, `test_rock_grit` 6,
+`test_beacon_probe` 13, `test_main_boot` 65 -- all unchanged. Six mutants each go red: the partial made
+the chunk rect (6 fail: "got (32, 32)" against 19x19, union 32768 px^2 against 5776); the budget removed
+(2 fail: "got [12]"); `paint_rect` unshrunk (2 fail: visits 34x34, erases 32x32); a partial over an
+unpainted chunk (3 fail); the first bake budgeted (3 fail: "4 planned" of 12); `unpainted_in` ignoring the
+painted set (8 fail, three of them the moved D0506 pins). Headless cost, scratch probe: building 3008
+chunk nodes 2.9-3.6 ms against 0.18-0.25 ms for 192 (one-off at boot); `plan_tick` 9.3 us on a dig tick,
+3.2 us quiet; `plan` 9 us. `MAX_TARGET_PX` is untouched (the target is still 12000x4000).
+
+**Provisional / not changed:** (a) THE FIRST FRAME'S MD5 MAY MOVE, and if it does it is change (4) and not a
+regression: the old first bake painted a 2x2 block of 128-cell chunks, and every wall cell on the two-cell
+lines where they met was double-painted; the new bake paints every cell once. Under round-to-nearest
+those cells differ by one LSB in RGB and alpha (and in the tooth's wall/rock read); under truncation
+nothing differs. Whether one of those lines crosses the seat's opening view AND lands on a wall cell in
+the shipped seed I did not measure -- the opening frame has cavities (D0422), so it may. (b) The GPU
+rounding is
+arithmetic, not observed. (c) What the plan says is what `_bake_partial` shows, erases and paints, but that
+wiring (`_show(i, p.partial[i])`) runs past `setup`'s headless decline, as D0506 said of the lane itself;
+the ticket's mutant "erase the chunk rect instead of the partial" is run at the planner (mutant 1 above),
+not at the eraser. (d) Step 4's after-numbers (the three headed `--perf` runs) land in a second commit.
+(e) `tests/test_terrain_bake.gd` and `view/visuals/terrain_bake.gd` were both at 400 lines; the lane tests
+moved and `TerrainBake.chunk_count()` (no caller) went, leaving 307 and 399. (f) `harness.yml` gained the
+new suite's line and catalogue entry (gate 31 refuses an unrun suite); nothing removed.

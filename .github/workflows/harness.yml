@@ -470,6 +470,7 @@ jobs:
       #   test_veil_painter.gd                           test_veil_painter (mass occlusion + the key light — D0302, T1 #2)
       #   test_veil_map.gd                               test_veil_map (the lightmap that replaced 14,080 draw calls — D0336)
       #   test_terrain_bake.gd                           test_terrain_bake (the static terrain baked once, not per frame — D0326, PORT_ORDER V1)
+      #   test_bake_lanes.gd                             test_bake_lanes (the bake's two lanes: a dig repaints its dilated rect per chunk, 32-cell chunks, the window lane budgeted 4 a tick nearest first, the painters visit exactly what the eraser clears -- D0522)
       #   test_rock_tone.gd                              test_rock_tone (legacy's molded-rock shading + the texture grammar — D0327, PORT_ORDER V2)
       #   test_rock_laminae.gd                           test_rock_laminae (bedded rock's parting planes on the shared bedding coordinate — D0398)
       #   test_seen_plane.gd                             test_seen_plane (the map's memory: ore paints only where the player has been — D0400)
@@ -620,6 +621,7 @@ jobs:
             res://tests/test_veil_painter.gd \
             res://tests/test_veil_map.gd \
             res://tests/test_terrain_bake.gd \
+            res://tests/test_bake_lanes.gd \
             res://tests/test_rock_tone.gd \
             res://tests/test_rock_laminae.gd \
             res://tests/test_seen_plane.gd \

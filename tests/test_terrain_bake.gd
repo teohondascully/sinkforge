@@ -15,134 +15,34 @@ extends "res://tests/test_base.gd"
 ## that the baked picture matches the per-frame picture (that is a capture comparison, on a headed run), and
 ## that the bake is faster (that is a timing layer, which must run alone — see `add_excl`).
 ##
+## THE TWO LANES -- the window selection (D0506) and the dig rectangle, the budget and the exact-cell
+## visit (D0522) -- are `tests/test_bake_lanes.gd`'s; this suite is the tiling, the threshold and the
+## fallback.
+##
 ## Run: tools/run_gd_test.sh <godot-binary> res://tests/test_terrain_bake.gd
 
 const CELL_PX: int = 4
-## A world big enough to need several chunks on both axes: 512px chunks over 4px cells is 128 cells a side,
-## so 300x300 cells is 1200x1200px and tiles 3x3. Chosen so a row-major index bug cannot pass by symmetry.
+## A world big enough to need several chunks on both axes: 128px chunks over 4px cells is 32 cells a side
+## (D0522), so 300x300 cells is 1200x1200px and tiles 10x10 with a partial last column and row. Chosen so
+## a row-major index bug cannot pass by symmetry.
 const W_CELLS: int = 300
 const H_CELLS: int = 300
+## Cells a chunk side holds, and the grid the fixture above tiles -- DERIVED from the constants, never
+## written, so a change to the chunk size moves every pin below with the code rather than against it.
+const CELLS_PER_CHUNK: int = TerrainBake.CHUNK_PX / CELL_PX
+const GRID_W: int = (W_CELLS * CELL_PX + TerrainBake.CHUNK_PX - 1) / TerrainBake.CHUNK_PX
+const GRID_H: int = (H_CELLS * CELL_PX + TerrainBake.CHUNK_PX - 1) / TerrainBake.CHUNK_PX
 
 
 func _initialize() -> void:
 	_test_every_cell_lands_in_exactly_one_chunk_and_every_chunk_is_used()
 	_test_a_cell_outside_the_world_has_no_chunk()
 	_test_a_dig_near_a_chunk_edge_dirties_the_neighbouring_chunk()
-	_test_a_chunk_spans_legacys_world_AREA_not_legacys_cell_COUNT()
+	_test_a_chunk_is_32_cells_not_legacys_area()
 	_test_plan_refuses_a_world_it_cannot_tile()
 	_test_the_full_rebake_threshold_decides_both_ways()
 	_test_when_the_bake_declines_the_painters_still_get_mounted()
-	_test_the_first_bake_chooses_the_window_and_not_the_world()
-	_test_a_chunk_entering_the_window_bakes_once_and_not_again()
-	_test_the_dig_path_does_not_read_the_painted_set()
 	_finish("terrain_bake")
-
-
-## A WORLD MUCH WIDER THAN THE VIEW, and a view the size the seat renders: 3000x1000 cells of 4px is
-## 12000x4000px, tiling 24x8 = 192 chunks, against a 1280x720 seat at the shell's zoom (~214x120 world px,
-## smaller than one 512px chunk). A world the window mostly covered could not tell the two bakes apart.
-const WIDE_W_CELLS: int = 3000
-const WIDE_H_CELLS: int = 1000
-const VIEW_PX := Rect2(4000.0, 1000.0, 214.0, 120.0)
-
-
-## The bake as `WorldView` builds it -- through `setup`, with the coordinator's own margin, which `setup`
-## sets before it declines headless. The real wiring, not a hand-posed grid. **The caller must `free()`.**
-func _wide() -> TerrainBake:
-	var bake := TerrainBake.new()
-	bake.setup(Vector2i(WIDE_W_CELLS, WIDE_H_CELLS), CELL_PX, Callable(), null, null, [],
-		WorldView.WINDOW_MARGIN_CELLS)
-	return bake
-
-
-## Every chunk whose own rect overlaps the grown window, by INTERSECTING RECTANGLES rather than the index
-## arithmetic under test -- an off-by-one in the selection's `ceil`/`floor` cannot hide behind itself.
-func _window_chunks_by_intersection(w: BakeWindow, view: Rect2) -> Array[int]:
-	var grown: Rect2 = view.grow(float(w.margin() * CELL_PX))
-	var out: Array[int] = []
-	for i: int in w.chunk_count():
-		if w.chunk_rect(i).intersects(grown):
-			out.append(i)
-	return out
-
-
-## **THE FIRST BAKE PAINTS THE VIEW, NOT THE WORLD** (D0506). Ported with legacy's `_bake_terrain_full`,
-## boot made every chunk visible and queued its redraw, so the first render painted every solid cell of the
-## world at once: measured on a playtest seat, **6.17 s** between the seat writing its receipt and its first
-## frame, no physics tick between, the same under Forward+, Mobile and gl_compatibility -- so neither shader
-## compilation nor the painters, which cost 2 ms a frame. Asserted as a SELECTION rather than through
-## pixels: `setup` declines under `--headless` (D0186), so no suite CI runs has a target to inspect, and the
-## selection IS the decision that cost the six seconds.
-func _test_the_first_bake_chooses_the_window_and_not_the_world() -> void:
-	var bake: TerrainBake = _wide()
-	var w: BakeWindow = bake.window()
-	var chosen: Array[int] = w.unpainted_in(VIEW_PX)
-	var expected: Array[int] = _window_chunks_by_intersection(w, VIEW_PX)
-	chosen.sort()
-	expected.sort()
-	_check(chosen == expected, "the first bake selects the chunks the window+%d-cell margin covers: chose "
-		% w.margin() + "%s, the rects that overlap say %s" % [str(chosen), str(expected)])
-	_check(chosen.size() * 8 < w.chunk_count(), "and that is %d chunks of the world's %d -- the full-world "
-		% [chosen.size(), w.chunk_count()] + "first bake this replaces chose every one")
-	# CONTROL: a window over the whole world selects every chunk. Without it the row above passes on a
-	# selection returning a handful of chunks for ANY rect -- which would leave the player looking at
-	# unpainted target the moment the camera moved, and would read here as a very good number.
-	var all_of_it: Array[int] = w.unpainted_in(Rect2(Vector2.ZERO, Vector2(w.world_px())))
-	_check(all_of_it.size() == w.chunk_count(), "CONTROL: a window over the whole world selects all %d of "
-		% w.chunk_count() + "its chunks (got %d), so %d above is the window and not a cap"
-			% [all_of_it.size(), chosen.size()])
-	bake.free()
-
-
-## SCROLLING PAINTS THE NEW GROUND ONCE. The window lane's whole risk is bookkeeping: a chunk re-selected
-## every tick would repaint the world continuously and cost more than the boot bake it replaced, and one
-## never selected would be a permanent hole. The expectation is DERIVED from the two windows rather than
-## written down, so a change to the chunk size or the margin moves the test with the code, not against it.
-func _test_a_chunk_entering_the_window_bakes_once_and_not_again() -> void:
-	var bake: TerrainBake = _wide()
-	var w: BakeWindow = bake.window()
-	for i: int in w.unpainted_in(VIEW_PX):
-		w.note_painted(i)
-	var moved: Rect2 = VIEW_PX
-	moved.position.x += float(TerrainBake.CHUNK_PX)   # one whole chunk to the right
-	var before: Dictionary = {}
-	for i: int in w.chunks_in(VIEW_PX):
-		before[i] = true
-	var entered: Array[int] = []
-	for i: int in w.chunks_in(moved):
-		if not before.has(i):
-			entered.append(i)
-	var fresh: Array[int] = w.unpainted_in(moved)
-	fresh.sort()
-	entered.sort()
-	_check(fresh == entered and not entered.is_empty(), "one chunk of camera motion bakes exactly the %d "
-		% entered.size() + "chunk(s) that entered the window, %s -- it chose %s" % [str(entered), str(fresh)])
-	for i: int in fresh:
-		w.note_painted(i)
-	_check(w.unpainted_in(moved).is_empty(), "and the NEXT refresh at that window bakes nothing (%d chosen)"
-		% w.unpainted_in(moved).size() + ", so a stationary camera does not repaint the ground under it")
-	_check(w.unpainted_in(VIEW_PX).is_empty(), "and scrolling BACK bakes nothing either (%d chosen) -- the "
-		% w.unpainted_in(VIEW_PX).size() + "target keeps the pixels of a chunk that has scrolled off")
-	bake.free()
-
-
-## THE DIG PATH IS UNCHANGED (D0326/D0330) and must not learn about the window. `bake_cells` dilates a dug
-## cell to every chunk whose shading it reaches; filtering that by what the window has painted would leave a
-## neighbouring chunk stale and seam along the boundary as D0330 describes -- visible only after mining.
-func _test_the_dig_path_does_not_read_the_painted_set() -> void:
-	var bake: TerrainBake = _wide()
-	var w: BakeWindow = bake.window()
-	var per_chunk: int = TerrainBake.CHUNK_PX / CELL_PX
-	var edge := Vector2i(per_chunk * 8, 300)          # the first cell of a chunk, its neighbours next door
-	var unpainted: Array[int] = bake.influenced_chunks(edge)
-	_check(unpainted.size() >= 2 and unpainted.has(bake.chunk_index(edge)), "a dig at a chunk's first cell "
-		+ "dirties its own chunk and the one its shading reaches into (%d)" % unpainted.size())
-	for i: int in w.chunk_count():
-		w.note_painted(i)
-	var painted: Array[int] = bake.influenced_chunks(edge)
-	_check(painted == unpainted, "and the same dig dirties the same %s once every chunk is painted -- got "
-		% str(unpainted) + "%s. The dig lane reads the dilation, never what the window has done" % str(painted))
-	bake.free()
 
 
 ## A planned bake, and **the caller must `free()` it**. `TerrainBake` is a `Node2D` and a Node outside the
@@ -175,8 +75,9 @@ func _test_every_cell_lands_in_exactly_one_chunk_and_every_chunk_is_used() -> vo
 	_check_over(checked, out_of_range == 0,
 		"every cell in a %dx%d world maps to a chunk index inside [0,%d) -- %d did not"
 			% [W_CELLS, H_CELLS, total, out_of_range])
-	_check(bake.chunk_grid() == Vector2i(3, 3),
-		"a 1200x1200px world tiles 3x3 at %dpx chunks, got %s" % [TerrainBake.CHUNK_PX, bake.chunk_grid()])
+	_check(bake.chunk_grid() == Vector2i(GRID_W, GRID_H),
+		"a %dx%dpx world tiles %dx%d at %dpx chunks, got %s" % [W_CELLS * CELL_PX, H_CELLS * CELL_PX,
+			GRID_W, GRID_H, TerrainBake.CHUNK_PX, bake.chunk_grid()])
 	_check(seen.size() == total,
 		"every one of the %d chunks is addressed by some cell -- %d were reachable" % [total, seen.size()])
 	bake.free()
@@ -236,10 +137,13 @@ func _test_a_dig_near_a_chunk_edge_dirties_the_neighbouring_chunk() -> void:
 	# setup() declines headless BEFORE building chunks, but `plan` and the margin are set first by design.
 	_check(b.rebake_margin() == WorldView.WINDOW_MARGIN_CELLS,
 		"the dilation is the observation margin (%d), not a written literal" % b.rebake_margin())
-	# A cell one inside a chunk's left edge. 512px chunks over 4px cells = 128 cells per chunk, so column
-	# 128 is the first cell of chunk column 1 and its left neighbours live in chunk column 0.
-	var per_chunk: int = TerrainBake.CHUNK_PX / CELL_PX
-	var edge := Vector2i(per_chunk, 200)
+	# A cell at a chunk's left edge, at the chunk's vertical CENTRE so only the horizontal neighbour is in
+	# reach: 128px chunks over 4px cells = 32 cells per chunk, so column 32 is the first cell of chunk
+	# column 1 and its left neighbours live in chunk column 0. The row is derived, not written -- at 32
+	# cells a chunk the old row 200 was 8 cells from a row boundary, inside the 9-cell margin.
+	var per_chunk: int = CELLS_PER_CHUNK
+	var centre_row: int = per_chunk * (H_CELLS / per_chunk / 2) + per_chunk / 2
+	var edge := Vector2i(per_chunk, centre_row)
 	var touched: Array[int] = b.influenced_chunks(edge)
 	_check(touched.size() >= 2,
 		"a dig at the first cell of a chunk dirties %d chunks, not just its own" % touched.size())
@@ -249,11 +153,12 @@ func _test_a_dig_near_a_chunk_edge_dirties_the_neighbouring_chunk() -> void:
 	# CONTROL: a cell deep inside a chunk dirties exactly one. Without this the row above passes on an
 	# `influenced_chunks` that returned every chunk in the world, which would silently make every dig a
 	# full rebake and undo the entire per-dig fast lane while looking correct.
-	var middle := Vector2i(per_chunk / 2, 200)
+	var middle := Vector2i(per_chunk / 2, centre_row)
 	var one: Array[int] = b.influenced_chunks(middle)
 	_check(one.size() == 1,
-		"CONTROL: a dig in a chunk's interior dirties exactly 1 chunk (got %d), so the dilation is "
-			% one.size() + "targeted and has not quietly become a full rebake")
+		"CONTROL: a dig at a chunk's centre %s dirties exactly 1 chunk (got %d) with a %d-cell margin in "
+			% [str(middle), one.size(), b.rebake_margin()] + "a %d-cell chunk, so the dilation is "
+			% per_chunk + "targeted and has not quietly become a full rebake")
 	b.free()
 
 
@@ -284,22 +189,24 @@ func _check_the_coordinator_actually_passes_the_dilation() -> void:
 	view.free()
 
 
-## THE ONE CONSTANT IN THIS FILE THAT IS NOT LEGACY'S NUMBER, and the WG-4 regime question (D0305) in
-## miniature. Legacy's `CHUNK` is 16 cells of 32px. Copying the CELL COUNT would give 16 cells of 4px here —
-## a chunk 8x smaller on each side, 64x as many of them, and 64x the per-dig bookkeeping for the same world.
-## What must be conserved is the AREA a chunk covers, so the constant is held in world pixels.
-func _test_a_chunk_spans_legacys_world_AREA_not_legacys_cell_COUNT() -> void:
-	const LEGACY_CHUNK_CELLS: int = 16
-	const LEGACY_CELL_PX: int = 32
-	_check(TerrainBake.CHUNK_PX == LEGACY_CHUNK_CELLS * LEGACY_CELL_PX,
-		"a chunk spans legacy's own %dpx (%d cells x %dpx), not its cell count"
-			% [TerrainBake.CHUNK_PX, LEGACY_CHUNK_CELLS, LEGACY_CELL_PX])
-	# CONTROL: the cell-count reading gives a different, much smaller answer. Stated as a number so the
-	# claim above is a comparison rather than a restatement of the constant it reads.
-	var naive: int = LEGACY_CHUNK_CELLS * CELL_PX
-	_check(naive != TerrainBake.CHUNK_PX,
-		"CONTROL: porting the CELL COUNT instead would give %dpx chunks, %dx smaller on a side"
-			% [naive, TerrainBake.CHUNK_PX / naive])
+## A CHUNK IS 32 CELLS A SIDE, NOT LEGACY'S AREA (D0522, reversing D0326's reading). D0326 carried legacy's
+## `CHUNK` across as the AREA it covered -- 16 cells of 32px = 512px -- which at this build's 4px cells made
+## a chunk 128 cells a side, 16,384 cells that every baked painter re-ran over on a dig at its corner:
+## measured ~23 ms a chunk against a 16.7 ms frame, "the whole world freezes every single time I mine a
+## block". The unit is now 32 cells (8 m); the dig lane repaints a dilated rect anyway, and the chunk is
+## what the window lane paints and budgets. Pinned against the REAL cell size, not this file's constant.
+func _test_a_chunk_is_32_cells_not_legacys_area() -> void:
+	const CELLS: int = 32
+	var per_side: int = TerrainBake.CHUNK_PX / Heightfield.TERRAIN_CELL_PX
+	_check(per_side == CELLS, "a chunk is %d cells a side (%dpx at %dpx cells), not %d"
+		% [per_side, TerrainBake.CHUNK_PX, Heightfield.TERRAIN_CELL_PX, CELLS])
+	# CONTROL: legacy's area is a different, much larger answer. Stated as cells so the claim above is a
+	# comparison, and the number is the one a dig's cost scales with.
+	const LEGACY_AREA_PX: int = 16 * 32
+	var legacy_cells: int = (LEGACY_AREA_PX / Heightfield.TERRAIN_CELL_PX) ** 2
+	_check(legacy_cells == 16 * per_side * per_side,
+		"CONTROL: legacy's %dpx area would be %d cells a chunk, 16x this build's %d -- the cells a corner "
+			% [LEGACY_AREA_PX, legacy_cells, per_side * per_side] + "dig used to repaint four times over")
 
 
 ## `plan` returns false rather than tiling a world it cannot represent, and the control is that an ordinary
