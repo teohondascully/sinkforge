@@ -173,4 +173,8 @@ capture. The ring outlines its target within 2.2 m (D0443's rule for the block),
 centre to centre (the sim's rule): two rules, and the eye sees the wrong one. Worker W8 (D0521): one
 reach function in core, used by the verb and the ring, and the ring reads "FORGE · IN REACH" as a state.
 Eleven of eighteen seats across the three batches walked to the world's right edge (the director's:
-the layout and the clamp). **Next:** D0521 lands, battery, push, a batch on it.
+the layout and the clamp). **D0521 landed:** `core/reach.gd` holds the one reach rule (16/5 tiles), `Aim` and `Mining` delegate to it,
+and the ring on a machine target draws a solid rim, a filled disc and "FORGE · IN REACH" by that same
+test from the body's centre (`view/hud/ring_painter.gd`; `RingWord.last_drawn` carries the suffix, 22
+pins). Mutating the constant reddens both the sim's reach pins and the ring's. 140 suites. **Next:**
+battery, push, strangers 121-126 on it.
