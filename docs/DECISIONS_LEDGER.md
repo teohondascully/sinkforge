@@ -20636,7 +20636,7 @@ was not captured. (f) `--shader-tone` is documented in `shell/seat_flags.gd`'s h
 added to `SeatFlags.parse`'s dictionary: nothing in `shell/` reads it, and a returned key nobody consumes
 is dead code.
 
-## D0529 · 2026-09-08 · The world's layers redraw only when the camera, the observation or their own state moved
+## D0531 · 2026-09-08 · The world's layers redraw only when the camera, the observation or their own state moved
 
 **Decided:** `WorldView.refresh()` no longer calls `queue_redraw()` on every world layer every tick.
 `add_painter` / `add_stateful_painter` gained `animated: bool = true`, so every existing call site keeps

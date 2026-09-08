@@ -92,7 +92,7 @@ var _bake: TerrainBake = null
 var _owned: Array[RefCounted] = []
 var _frame: Frame = null
 var _hud: HudLayer = null
-## THE FRAME BUILDER AND THE REDRAW GATE (`view/frame_gate.gd`, D0529): it turns the interface and the
+## THE FRAME BUILDER AND THE REDRAW GATE (`view/frame_gate.gd`, D0531): it turns the interface and the
 ## camera into one `Frame`, holds the `RockTone` that frame carries, and answers whether a layer
 ## registered `animated: false` still has the picture it drew. Held from construction rather than built
 ## on the first frame, because `bake_static` asks it for the tone before any `refresh()` has run.
@@ -123,7 +123,7 @@ func setup(iface: Interface, look: MaterialLook, camera: Camera2D) -> void:
 ## canvases and a coordinator is only one; a painter that receives its canvas is testable with no
 ## coordinator at all; and it is already the convention of the two painters actually being lifted.
 ##
-## `animated` DEFAULTS TRUE so that adding the parameter changed nothing (D0529): a layer redraws every
+## `animated` DEFAULTS TRUE so that adding the parameter changed nothing (D0531): a layer redraws every
 ## tick unless its call site argues, in one line, that its painter is a pure function of the camera rect
 ## and the observation. `PaintLayer.animated` carries what that costs to get wrong.
 func add_painter(paint: Callable, animated: bool = true) -> PaintLayer:
@@ -188,7 +188,7 @@ func bake_static(z: int) -> bool:
 		_bake.free()
 		_bake = null
 		# STATIC ON THIS PATH TOO, by the definition that put them in `_baked_painters` at all: their
-		# picture cannot change unless the terrain does (D0529), and here they are the expensive layers.
+		# picture cannot change unless the terrain does (D0531), and here they are the expensive layers.
 		for paint: Callable in _baked_painters:
 			add_painter(paint, false).z_index = z
 		return false
@@ -330,7 +330,7 @@ func refresh() -> void:
 	# ONE call for both lanes: each sets chunk visibility across the grid, and a second would hide the first's.
 	if _bake != null:
 		_bake.bake_tick(_frame.view_world_rect, _frame.obs.mining_broke_cells, _frame.obs)
-	# A STILL FRAME REDRAWS ONLY WHAT MOVED (D0529). Every layer used to be queued here every tick, moved
+	# A STILL FRAME REDRAWS ONLY WHAT MOVED (D0531). Every layer used to be queued here every tick, moved
 	# or not, so a standing-still tick re-issued about twenty painters' draw commands. An ANIMATED layer
 	# still is; a painter that is a pure function of the camera rect and the observation is queued only
 	# when `FrameGate` says one of those moved, and `layer.queues` counts what was actually issued.

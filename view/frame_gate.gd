@@ -1,7 +1,7 @@
 class_name FrameGate
 extends RefCounted
 
-## THE TICK'S FRAME, AND WHETHER A STATIC PAINTER STILL HOLDS THE PICTURE IT DREW (D0529). Split out of
+## THE TICK'S FRAME, AND WHETHER A STATIC PAINTER STILL HOLDS THE PICTURE IT DREW (D0531). Split out of
 ## `view/world_view.gd` when that file stood at exactly 400 lines against `docs/QUALITY.md` §2's cap --
 ## SPLIT rather than trimmed, which is the rule that exists because `sim/body/body.gd` sat at exactly 400
 ## for three commits running.

@@ -36,7 +36,7 @@ var last_draw_usec: int = 0
 ## callable itself, so a layer cannot be mislabelled by a caller passing the wrong string.
 var label: StringName = &"?"
 
-## CAN THIS LAYER'S PICTURE CHANGE WHILE THE CAMERA AND THE OBSERVATION HOLD STILL? (D0529.) True means
+## CAN THIS LAYER'S PICTURE CHANGE WHILE THE CAMERA AND THE OBSERVATION HOLD STILL? (D0531.) True means
 ## `Frame.anim_time` is one of the painter's inputs -- the sky's drifting cloud, the machine's pulsing
 ## glyph, a crumble retiring -- and `WorldView.refresh()` queues it every tick, as it queued every layer
 ## before. False means the painter is a pure function of the camera rect and the observation, and the
@@ -58,7 +58,7 @@ var queues: int = 0
 ## number a redraw-skipping coordinator can be judged on. `last_draw_usec` is a snapshot of one frame and
 ## `queues` counts calls rather than work; only an accumulated total says how much painter CPU a run
 ## actually paid. Over a run it also survives the confound that ruined the frame-rate comparison in
-## D0529: this is time spent inside the painters, so it does not move when the display paces the process.
+## D0531: this is time spent inside the painters, so it does not move when the display paces the process.
 var sum_draw_usec: int = 0
 
 

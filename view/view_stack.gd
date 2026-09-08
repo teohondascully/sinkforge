@@ -25,7 +25,7 @@ extends RefCounted
 ##     10  the HUD    (a `CanvasLayer`, so the camera does not move it): the depth chip, then the
 ##                     stratum arrival plate over it (D0288)
 ##
-## **AND WHICH OF THEM ARE STATIC** (D0529). Every `add_painter` here defaults to ANIMATED, which is what
+## **AND WHICH OF THEM ARE STATIC** (D0531). Every `add_painter` here defaults to ANIMATED, which is what
 ## all of them were before that decision, and the three that opt out -- the backdrop, the lode and the
 ## seam -- carry a one-line reason at their own call site. The test is not "is it cheap" but "can its
 ## picture change while the camera rect and the observation both hold still", so a painter reading
@@ -113,7 +113,7 @@ static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, cam
 	if sky:
 		view.add_painter(SkyPainter.paint).z_index = SKY_Z   # ANIMATED: the clouds drift, the stars twinkle, the crown pulses
 	else:
-		# STATIC: one `draw_rect` whose colour is `look.band_color(obs.cell.y)` and nothing else (D0529).
+		# STATIC: one `draw_rect` whose colour is `look.band_color(obs.cell.y)` and nothing else (D0531).
 		view.add_painter(BackdropPainter.paint, false).z_index = BACKDROP_Z
 	# THE TWO STATIC PAINTERS GO INTO THE BAKE, not onto a per-frame layer (D0326, `docs/PORT_ORDER.md` V1).
 	# They are the only two on this stack whose picture cannot change unless the terrain does, and they are

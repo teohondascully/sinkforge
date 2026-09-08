@@ -245,7 +245,7 @@ func _test_the_frame_asks_for_walls_exactly_when_a_per_frame_painter_reads_them(
 		+ "observation itself")
 
 
-## THE REDRAW GATE (D0529), and the measurement it answers. `refresh()` used to call `queue_redraw()` on
+## THE REDRAW GATE (D0531), and the measurement it answers. `refresh()` used to call `queue_redraw()` on
 ## every world layer every tick, moved or not, so a standing-still tick re-issued about twenty painters'
 ## draw commands -- D0527 measured 2.7-3.5 ms of them on a fast core and 5.0-8.2 ms in the slow frames,
 ## and named this call site as the lever it was not allowed to touch.

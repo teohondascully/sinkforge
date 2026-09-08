@@ -56,13 +56,13 @@ static func frame_report(layers: Array[PaintLayer], hud: Array[PaintLayer], refr
 	if not hud.is_empty():
 		chips = " | hud " + report(hud)
 	# THE REDRAWS ACTUALLY ISSUED against the redraws a queue-everything coordinator would have issued
-	# (D0529). It cannot be read off the costs above: a layer whose redraw was skipped still reports what
+	# (D0531). It cannot be read off the costs above: a layer whose redraw was skipped still reports what
 	# it cost the last time it DID draw, which is the honest answer to a different question.
 	var queued: int = 0
 	# AND THE PAINTER CPU THAT ACTUALLY BOUGHT, per rendered tick, accumulated over the whole run. The
 	# per-frame costs ranked above cannot answer it: a skipped layer reports the last frame it DID draw.
 	# It is also the one painter number that does not move when the display paces the process, which the
-	# frame rate does by a factor of four (D0527, D0529).
+	# frame rate does by a factor of four (D0527, D0531).
 	var drawn_usec: int = 0
 	for layer: PaintLayer in layers:
 		queued += layer.queues
