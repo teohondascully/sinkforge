@@ -19427,3 +19427,46 @@ opens it. The mutant that drops the spare check fails the boots pin. `test_minin
 suite's body is airborne, nothing spared), `test_recorded_sessions` 5, `test_tutorial_playthrough` 23,
 `test_first_rung_door` 9, `test_verbs` 46, `test_save_game` 45 unchanged. **Provisional:** the director
 listed the first press at the screen's centre as theirs; this is the sim-side half, reversible in one line.
+## D0506 · 2026-09-07 · The terrain bake paints the chunks in view first; the rest as they arrive
+
+**Decided:** the first bake paints only the chunks the camera's window plus `WINDOW_MARGIN_CELLS` covers;
+every other chunk is built hidden and unpainted. `WorldView.refresh` calls `TerrainBake.bake_tick(window,
+dug)` once a tick, which unions the chunks that have just entered the window and have never been painted
+with the dilated dig set, and shows them together. A chunk already in the target is never selected again,
+so scrolling back over painted ground costs nothing and nothing rebakes a chunk that has not been dug.
+`bake_static` no longer bakes at all: `Main.boot` positions the camera AFTER `ViewStack.build_stack`
+returns, so `view_world_rect()` there is still the identity rect at the world origin, and a bake from it
+would paint the wrong chunks. The grid, the dilation and the painted set moved into a new
+`view/visuals/bake_window.gd`, so all of it is reachable headless -- the same split that put `plan`
+outside `setup`.
+
+**Why (D0503's seat measurement):** a seat was ready 3.8 s after launch and then produced no frame for
+6.2 s with no physics tick in between, identically under Forward+, Mobile and gl_compatibility -- so
+neither shader compilation nor the GDScript painters, which cost 2 ms a frame. `bake_full()` at boot made
+every chunk of the world visible and queued its redraw, so the first render of the target painted every
+solid cell of the world at `fine_terrain`'s per-cell grain, once, before anything could be shown.
+
+**Verified:** two seats booted from this worktree, `receipt.json` mtime to `frame_0000.png` mtime:
+**6.17 s before, 1.67 s after** -- 4.50 s off the first frame. The two `frame_0000.png` are BYTE-IDENTICAL
+(md5 6287d89b47052a06b4ce421c0937f057), so the picture is unchanged and only the time to reach it moved.
+`tests/test_terrain_bake.gd` 24 asserted -> 32; on a 3000x1000-cell world tiling 192 chunks, the first bake
+selects **4** of them (indices 31, 32, 55, 56), matched against the chunks whose rects actually intersect
+the grown window -- a second algorithm, not the index arithmetic under test. One chunk of camera motion
+selects exactly the 2 that entered; the refresh after that selects 0, and scrolling back selects 0.
+`test_gram_map` 23, `test_rock_grit` 6, `test_world_view` 28, all unchanged. Three mutants each go red:
+the selection returning every chunk (3 fail), `unpainted_in` ignoring the painted set (3 fail), and the
+dig dilation filtered by the painted set (1 fail).
+
+**Not covered, and this is the honest gap:** restoring `bake_full()` in `bake_static` -- the mutation this
+ticket names -- leaves the suite GREEN at 32 asserted. `TerrainBake.setup` declines under `--headless`
+(D0186), so `_bake` is null in every suite CI can run and no headless assertion can register which lane
+the coordinator chose at boot. What is pinned is the SELECTION, which is the decision that cost the six
+seconds; the lane itself is evidenced only by the two boot measurements above.
+
+**Provisional:** no frame can show a blank chunk, but that rests on reading `PaintLayer._draw` rather than
+on a capture -- it returns early while `current_frame()` is null, so no painter draws until the tick that
+queues the first bake, and a SubViewport's `UPDATE_ONCE` renders before its parent inside one frame (the
+lane `bake_cells` has used for a dug chunk since D0326). The settled capture is several ticks in and could
+not have shown a one-frame hole either way. **Not changed:** the dig path, the eraser, and the full-rebake
+threshold, which still reads the dug set only -- the window lane is deliberately not subject to it, since
+its cost is bounded by the window and routing it through a full bake would reintroduce the boot paint.

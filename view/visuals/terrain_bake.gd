@@ -19,14 +19,16 @@ extends Node2D
 ## every frame; the sim itself costs almost nothing."** Legacy measured the coarse terrain at **~72% of the
 ## frame's draw calls, ~11,882 of them** — issued ONCE into a bake, not per frame.
 ##
-## This build ran every one of those per-cell loops on every rendered frame. Same pixels, ~100x the cost.
-## Measured before this landed: 600 ticks at the 40-metre framing took 21.6 s of tick time, **22.5 ticks/s
-## against a 120 Hz bar** — 5.3x out of budget on a world legacy ran at speed.
+## This build ran every one of those per-cell loops on every rendered frame. Same pixels, ~100x the cost:
+## 600 ticks at the 40-metre framing took 21.6 s of tick time, **22.5 ticks/s against a 120 Hz bar** --
+## 5.3x out of budget on a world legacy ran at speed.
 ##
 ## **HOW IT WORKS, and every line of the shape is legacy's.** A world-sized `SubViewport` with a transparent
 ## background holds one `LightLayer` per chunk of the world. It never re-renders on its own
 ## (`UPDATE_DISABLED`); a dig flips it to `UPDATE_ONCE` for exactly the chunks that changed. Between
-## changes the GPU replays a single textured quad.
+## changes the GPU replays a single textured quad. **The one departure from legacy is WHEN the first paint
+## happens: `bake_window` paints the chunks in view and leaves the rest until they arrive there (D0506),
+## because painting the whole world at boot cost 6.17 s of first frame. See `bake_window.gd`'s header.**
 ##
 ## **THE ERASER IS NOT OPTIONAL.** A partial re-render can only ADD coverage — alpha blending cannot take
 ## rock away — so a cell dug open to the sky would keep its old pixels forever. `erase.gdshader`
@@ -38,55 +40,30 @@ extends Node2D
 ## VALUE covering one window — and `Observation.material_at` answers `&""` for any cell outside the window
 ## it was given, not "unknown". So handing a chunk the CAMERA's frame would paint every chunk off-screen as
 ## empty and bake a mostly-blank world, silently, with every gate green. The bake therefore takes an
-## `observe(rect)` callable and builds its own `Frame` per chunk. The cost is one observation per chunk at
-## bake time — bounded, paid once, and on the dig path paid only for dirty chunks.
+## `observe(rect)` callable and builds its own `Frame` per chunk -- one observation per chunk, paid once.
 
-## Legacy `CHUNK` is 16 cells of 32px = 512 world px per chunk side. Held as world px and divided by this
-## build's cell size, so the same PHYSICAL area is covered whatever the cell size becomes. Counting cells
-## instead would make a chunk 8x smaller here and multiply the chunk count by 64.
-const CHUNK_PX: int = 512
+## THE CHUNK GRID, THE DIG DILATION AND THE RECORD OF WHICH CHUNKS THE TARGET HOLDS all live in
+## `view/visuals/bake_window.gd`, split out so every one of those decisions is reachable from a headless
+## suite -- `setup` below declines under `--headless`, so a decision left inside this object is covered by
+## nothing. That file's header carries legacy's chunk constant, the dilation's reasoning, and the boot
+## measurement the window lane exists for (D0506).
+var _window: BakeWindow = BakeWindow.new()
 
-## A dig touching more than this fraction of the world's chunks rebakes everything instead. A full bake
-## replays every chunk over the whole target; a partial bake replays the dirty ones PLUS an erase pass.
-## Past roughly a third of the world the partial path is doing more work than the full one for no benefit.
-const FULL_REBAKE_CHUNK_FRACTION: float = 0.34
-
-## HOW FAR A DIG'S INFLUENCE SPREADS, in cells, and this is not a tuning knob.
-##
-## **A PATCHED REGION MUST BE BYTE-IDENTICAL TO A FULL BAKE, and without this it is not.** The baked
-## painters all read NEIGHBOURS: `WallPainter.ao_alpha` probes `AO_RAMP_CELLS` (2) out, `TerrainPainter`
-## draws one cell past its rect so a straddling cell is whole, and `RockTone`'s carved-edge terms reach
-## `FORM_REACH + 1` (7). So digging one cell changes the painted colour of cells up to seven away — and if
-## that cell sits near a chunk boundary, the affected cells live in a chunk this bake never marked dirty.
-##
-## The result is a permanent seam along chunk edges that appears only after mining, only near a boundary,
-## and never in a fresh bake — so a screenshot of a newly generated world looks perfect and the defect
-## accumulates as the player digs. Legacy carries the same constant for the same reason and states it
-## exactly (`fine_terrain.gd:481`): *"It must cover the widest neighbour reach any paint term reads, or a
-## patched region stops being byte-identical to a full bake."*
-##
-## SET FROM THE OBSERVATION MARGIN rather than from the painters' own constants, and deliberately. The
-## bake does not know which painters it was handed — that is the caller's business — so deriving from a
-## specific painter would silently under-dilate the moment a different set is baked. The observation
-## margin is the widest ring any painter could POSSIBLY read, because a painter reading past it is already
-## reading `&""` for cells it was never given. Over-dilating costs at most a few extra chunks per dig;
-## under-dilating is a permanent visual defect.
-var _rebake_margin: int = 0
-
-## Refuse to build a render target larger than this on either axis. Godot's own limit is driver-dependent
-## and a target past it fails at RENDER time, not at construction — which would surface as a blank world
-## rather than as an error. Declining here instead keeps the caller on its per-frame path, which is always
-## correct and only slower. 16384 is the smallest maximum-texture-size on any target this project builds for.
-const MAX_TARGET_PX: int = 16384
+## Re-exported from `BakeWindow` so a caller still reads them off the object that uses them, and so each
+## has exactly one definition.
+const CHUNK_PX: int = BakeWindow.CHUNK_PX
+const FULL_REBAKE_CHUNK_FRACTION: float = BakeWindow.FULL_REBAKE_CHUNK_FRACTION
+const MAX_TARGET_PX: int = BakeWindow.MAX_TARGET_PX
 
 var _viewport: SubViewport = null
 var _chunks: Array[LightLayer] = []
-var _chunk_cols: int = 0
-var _chunk_rows: int = 0
 var _eraser: LightLayer = null
 var _erase_rects: Array[Rect2] = []
-var _cell_px: int = 0
-var _world_px: Vector2i = Vector2i.ZERO
+
+## Has the target been cleared yet? Exactly one bake per session clears it and every bake after it must
+## not, or it would wipe the chunks already painted. That used to be `bake_full` at boot, unconditionally;
+## since D0506 it is whichever bake runs first, which is normally the first window bake.
+var _cleared: bool = false
 
 ## The painters baked into the target, in draw order. STATIC ONLY — anything that changes without the
 ## terrain changing (the veil's lamp, a glint's animation, crumble, the seam at the worked cell) must stay
@@ -137,7 +114,7 @@ func setup(world_cells: Vector2i, cell_px: int, observe: Callable, look: Materia
 	if not plan(world_cells, cell_px):
 		return false
 	_gram.setup(world_cells)
-	_rebake_margin = maxi(rebake_margin, 0)
+	_window.set_margin(rebake_margin)
 	_painters = painters
 	_observe = observe
 	_look = look
@@ -153,37 +130,25 @@ func setup(world_cells: Vector2i, cell_px: int, observe: Callable, look: Materia
 	return true
 
 
-## THE TILING, COMPUTED WITHOUT A RENDER TARGET, and split out of `setup` so it can be tested at all.
-##
-## `setup` declines under `--headless` — it must, since SubViewport tools hang there rather than erroring
-## (D0186) — which would leave `chunk_index`, the chunk grid and the full-rebake threshold reachable by no
-## headless suite and therefore covered by nothing. That is this repository's own dominant failure class:
-## an instrument that cannot register its subject, arriving as a quiet green. Everything here is integer
-## arithmetic over the world's dimensions and none of it needs pixels, so it is computed first and
-## separately, and `tests/test_terrain_bake.gd` drives it directly.
-##
-## Returns false for a world that cannot be tiled: non-positive dimensions, or a target past the smallest
-## maximum texture size this project builds for. A too-large target fails at RENDER time rather than at
-## construction, which would surface as a blank world instead of an error.
+## THE TILING, COMPUTED WITHOUT A RENDER TARGET, and called before `setup` can decline so `chunk_index`,
+## the chunk grid, the full-rebake threshold and the window selection are reachable by a headless suite
+## instead of being covered by nothing. `BakeWindow`'s header states the rule; `tests/test_terrain_bake.gd`
+## drives it directly. False for a world that cannot be tiled -- see `BakeWindow.plan`.
 func plan(world_cells: Vector2i, cell_px: int) -> bool:
-	_cell_px = cell_px
-	_world_px = Vector2i(world_cells.x * cell_px, world_cells.y * cell_px)
-	_chunk_cols = 0
-	_chunk_rows = 0
-	if world_cells.x <= 0 or world_cells.y <= 0 or cell_px <= 0:
-		return false
-	if _world_px.x > MAX_TARGET_PX or _world_px.y > MAX_TARGET_PX:
-		return false
-	_chunk_cols = ceili(float(_world_px.x) / float(CHUNK_PX))
-	_chunk_rows = ceili(float(_world_px.y) / float(CHUNK_PX))
-	return true
+	return _window.plan(world_cells, cell_px)
+
+
+## The grid, the painted set and the selection, for a caller or a suite that wants to assert the decision
+## rather than infer it from pixels there is no render target to produce.
+func window() -> BakeWindow:
+	return _window
 
 
 ## Would `bake_cells` take the full-rebake path for this many dirty chunks? Public and pure so the
 ## threshold is assertable without a render target — the decision is the expensive one and a test that
 ## could only observe it through pixels could not observe it at all.
 func would_rebake_all(dirty_chunks: int, total_chunks: int) -> bool:
-	return float(dirty_chunks) / float(maxi(total_chunks, 1)) > FULL_REBAKE_CHUNK_FRACTION
+	return _window.would_rebake_all(dirty_chunks, total_chunks)
 
 
 ## Is the bake actually running? The caller draws `texture()` as one quad when true, and keeps its
@@ -199,7 +164,7 @@ func texture() -> Texture2D:
 
 ## The target's size in world pixels, so the caller can draw the quad at 1:1 without re-deriving it.
 func world_px() -> Vector2i:
-	return _world_px
+	return _window.world_px()
 
 
 ## Legacy `:410-427`. Transparent background so sky above ground stays see-through and the backdrop shows;
@@ -209,7 +174,7 @@ func world_px() -> Vector2i:
 ## the terrain compounded 1.18^n and the surface line read as a neon band.
 func _build_viewport() -> void:
 	_viewport = SubViewport.new()
-	_viewport.size = _world_px
+	_viewport.size = _window.world_px()
 	_viewport.transparent_bg = true
 	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	_viewport.disable_3d = true
@@ -230,13 +195,19 @@ func _build_eraser() -> void:
 
 
 ## One `LightLayer` per chunk, each bound to its own world rect. Legacy `:428-433`.
+##
+## BUILT HIDDEN since D0506. Every bake sets visibility across the whole grid for itself, so this decides
+## only what the FIRST render replays -- and a chunk left visible here would go into the target whether or
+## not the window selected it, which is the full-world paint coming back through the side door.
 func _build_chunks() -> void:
-	for cy: int in _chunk_rows:
-		for cx: int in _chunk_cols:
+	var grid: Vector2i = _window.grid()
+	for cy: int in grid.y:
+		for cx: int in grid.x:
 			var rect := Rect2(float(cx * CHUNK_PX), float(cy * CHUNK_PX),
 				float(CHUNK_PX), float(CHUNK_PX))
 			var chunk := LightLayer.new()
 			chunk.setup(-10, _paint_chunk.bind(rect))
+			chunk.visible = false
 			_viewport.add_child(chunk)
 			_chunks.append(chunk)
 
@@ -270,10 +241,7 @@ func _paint_chunk(ci: CanvasItem, rect: Rect2) -> void:
 
 ## A pixel rect as the terrain cells it covers.
 func cells_of(rect: Rect2) -> Rect2i:
-	var px: int = maxi(_cell_px, 1)
-	var lo := Vector2i(int(floor(rect.position.x / float(px))), int(floor(rect.position.y / float(px))))
-	var hi := Vector2i(int(ceil(rect.end.x / float(px))), int(ceil(rect.end.y / float(px))))
-	return Rect2i(lo, hi - lo)
+	return _window.cells_of(rect)
 
 
 ## The grammar map's texture, for the tooth's `gram_tex`; updated in place across rebakes.
@@ -288,19 +256,21 @@ func _paint_erase(layer: LightLayer) -> void:
 
 
 ## Legacy `_bake_terrain_full` `:703-711`. Every chunk visible, target cleared once, one render.
-##
 ## CLEAR_MODE_ONCE rather than ALWAYS: the target is retained from here on, and clearing it again would
-## undo every partial bake that follows.
+## undo every partial bake that follows. NO LONGER THE BOOT LANE (D0506) -- it is now only the safety valve
+## `bake_cells` reaches for when one dig dirties more of the world than a full replay costs.
 func bake_full() -> void:
 	if not _live:
 		return
 	for chunk: LightLayer in _chunks:
 		chunk.visible = true
 		chunk.queue_redraw()
+	_window.note_all_painted()
 	_erase_rects.clear()
 	_eraser.queue_redraw()
 	_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ONCE
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_cleared = true
 
 
 ## Legacy `_bake_terrain_chunks` `:715-735` — the per-dig fast lane, and the fix for the mining hitch.
@@ -309,27 +279,63 @@ func bake_full() -> void:
 ## chunk keeps the pixels already in the target. Chunks stay hidden afterwards, which is safe because the
 ## viewport re-renders only when a bake asks it to and every bake sets visibility for itself first.
 func bake_cells(cells: Array) -> void:
-	if not _live or cells.is_empty():
+	bake_tick(Rect2(), cells)
+
+
+## ONE BAKE PER TICK, OVER BOTH LANES AT ONCE, and that is why it is one call and not two (D0506).
+##
+## THE WINDOW LANE IS THE FIRST BAKE AND EVERY CHUNK THAT SCROLLS IN AFTER IT. `BakeWindow` grows
+## `window_rect` by the observation margin and answers which of those chunks the target does not hold yet;
+## they are painted ONCE, in the tick they enter the window. `UPDATE_ONCE` on a SubViewport renders before
+## its parent inside one frame -- the lane `bake_cells` has used for a dug chunk since D0326 -- so the quad
+## samples them already painted and no frame shows a hole. Nothing rebakes a chunk that has not been dug.
+##
+## `dug` is the cells this tick broke, dilated to the chunks whose shading they reach. Each bake sets
+## visibility across the WHOLE grid, so two calls in one tick would have the second hide what the first had
+## just made visible -- a player mining while walking into fresh ground would see that chunk as a hole for
+## exactly one frame. Unioned here instead, they cannot.
+##
+## The full-rebake threshold reads the DUG set only. A full replay is bounded by the world and answers
+## "is this scattered dig cheaper replayed whole"; the window's cost is bounded by the window, which is
+## the whole point, so sending it through a full bake would reintroduce the boot paint to save nothing.
+func bake_tick(window_rect: Rect2, dug: Array) -> void:
+	if not _live:
 		return
 	var dirty: Dictionary = {}
-	for cell: Vector2i in cells:
+	for cell: Vector2i in dug:
 		for i: int in influenced_chunks(cell):
 			dirty[i] = true
-	if dirty.is_empty():
-		return
-	if would_rebake_all(dirty.size(), _chunks.size()):
+	if not dirty.is_empty() and would_rebake_all(dirty.size(), _chunks.size()):
 		bake_full()
 		return
+	for i: int in _window.unpainted_in(window_rect):
+		dirty[i] = true
+	if dirty.is_empty():
+		return
+	_bake_partial(dirty)
+
+
+## Shows exactly `dirty`, erases each of them, and asks the target for one render.
+##
+## EVERY CHUNK SHOWN IS ERASED FIRST, and that is what makes showing a superset safe: `erase.gdshader` is
+## `blend_disabled`, so erase-then-repaint is byte-identical to a fresh paint. The dig lane and the window
+## lane can therefore be unioned in one tick without either compounding the other's pixels. A chunk the
+## target has never held is transparent already, so erasing it costs one degenerate rect and no accuracy.
+func _bake_partial(dirty: Dictionary) -> void:
 	_erase_rects.clear()
 	for i: int in _chunks.size():
 		var on: bool = dirty.has(i)
 		_chunks[i].visible = on
 		if on:
 			_chunks[i].queue_redraw()
-			_erase_rects.append(Rect2(float((i % _chunk_cols) * CHUNK_PX),
-				float((i / _chunk_cols) * CHUNK_PX), float(CHUNK_PX), float(CHUNK_PX)))
+			_window.note_painted(i)
+			_erase_rects.append(_window.chunk_rect(i))
 	_eraser.queue_redraw()
-	_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_NEVER
+	# The first bake of a session clears the target once; every one after it must not, or it would wipe
+	# the chunks already painted. Before D0506 that first bake was always `bake_full` at boot.
+	_viewport.render_target_clear_mode = (SubViewport.CLEAR_MODE_NEVER if _cleared
+		else SubViewport.CLEAR_MODE_ONCE)
+	_cleared = true
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
@@ -337,32 +343,20 @@ func bake_cells(cells: Array) -> void:
 ##
 ## Returned as a list rather than folded into `bake_cells` so it is assertable directly: the failure this
 ## guards is a seam that appears only after digging near a boundary, which no fresh-world capture can
-## show and no test that only inspects a picture would catch.
+## show and no test that only inspects a picture would catch. Reads nothing about which chunks are already
+## painted -- the dig path is the same path it was before D0506.
 func influenced_chunks(cell: Vector2i) -> Array[int]:
-	var out: Array[int] = []
-	var seen: Dictionary = {}
-	for dx: int in [-_rebake_margin, 0, _rebake_margin]:
-		for dy: int in [-_rebake_margin, 0, _rebake_margin]:
-			var i: int = chunk_index(Vector2i(cell.x + dx, cell.y + dy))
-			if i >= 0 and not seen.has(i):
-				seen[i] = true
-				out.append(i)
-	return out
+	return _window.influenced_chunks(cell)
 
 
 ## The dilation actually in force, for a test that wants to assert it rather than infer it.
 func rebake_margin() -> int:
-	return _rebake_margin
+	return _window.margin()
 
 
 ## Legacy `:745-748`. The row-major index of the chunk owning `cell`, or -1 outside the world.
 func chunk_index(cell: Vector2i) -> int:
-	if cell.x < 0 or cell.y < 0:
-		return -1
-	var px: Vector2i = cell * _cell_px
-	if px.x >= _world_px.x or px.y >= _world_px.y:
-		return -1
-	return (px.y / CHUNK_PX) * _chunk_cols + (px.x / CHUNK_PX)
+	return _window.chunk_index(cell)
 
 
 ## THE ONE QUAD THAT REPLACES THE WHOLE STATIC PASS. Legacy `:1370-1377`. A `(frame, ci)` painter like any
@@ -377,7 +371,7 @@ func draw_quad(_frame: Frame, ci: CanvasItem) -> void:
 	var tex: Texture2D = texture()
 	if tex == null:
 		return
-	ci.draw_texture_rect(tex, Rect2(Vector2.ZERO, Vector2(_world_px)), false)
+	ci.draw_texture_rect(tex, Rect2(Vector2.ZERO, Vector2(_window.world_px())), false)
 
 
 ## Chunks actually CONSTRUCTED. Zero when the bake declined, which is why it is not the number a tiling
@@ -389,8 +383,8 @@ func chunk_count() -> int:
 ## Chunks the tiling CALLS FOR, from `plan` alone. Non-zero even headless, so a test can check the grid
 ## against the world's own dimensions on the one path CI can actually run.
 func planned_chunk_count() -> int:
-	return _chunk_cols * _chunk_rows
+	return _window.chunk_count()
 
 
 func chunk_grid() -> Vector2i:
-	return Vector2i(_chunk_cols, _chunk_rows)
+	return _window.grid()

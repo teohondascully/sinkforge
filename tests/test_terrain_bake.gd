@@ -32,7 +32,117 @@ func _initialize() -> void:
 	_test_plan_refuses_a_world_it_cannot_tile()
 	_test_the_full_rebake_threshold_decides_both_ways()
 	_test_when_the_bake_declines_the_painters_still_get_mounted()
+	_test_the_first_bake_chooses_the_window_and_not_the_world()
+	_test_a_chunk_entering_the_window_bakes_once_and_not_again()
+	_test_the_dig_path_does_not_read_the_painted_set()
 	_finish("terrain_bake")
+
+
+## A WORLD MUCH WIDER THAN THE VIEW, and a view the size the seat renders: 3000x1000 cells of 4px is
+## 12000x4000px, tiling 24x8 = 192 chunks, against a 1280x720 seat at the shell's zoom (~214x120 world px,
+## smaller than one 512px chunk). A world the window mostly covered could not tell the two bakes apart.
+const WIDE_W_CELLS: int = 3000
+const WIDE_H_CELLS: int = 1000
+const VIEW_PX := Rect2(4000.0, 1000.0, 214.0, 120.0)
+
+
+## The bake as `WorldView` builds it -- through `setup`, with the coordinator's own margin, which `setup`
+## sets before it declines headless. The real wiring, not a hand-posed grid. **The caller must `free()`.**
+func _wide() -> TerrainBake:
+	var bake := TerrainBake.new()
+	bake.setup(Vector2i(WIDE_W_CELLS, WIDE_H_CELLS), CELL_PX, Callable(), null, null, [],
+		WorldView.WINDOW_MARGIN_CELLS)
+	return bake
+
+
+## Every chunk whose own rect overlaps the grown window, by INTERSECTING RECTANGLES rather than the index
+## arithmetic under test -- an off-by-one in the selection's `ceil`/`floor` cannot hide behind itself.
+func _window_chunks_by_intersection(w: BakeWindow, view: Rect2) -> Array[int]:
+	var grown: Rect2 = view.grow(float(w.margin() * CELL_PX))
+	var out: Array[int] = []
+	for i: int in w.chunk_count():
+		if w.chunk_rect(i).intersects(grown):
+			out.append(i)
+	return out
+
+
+## **THE FIRST BAKE PAINTS THE VIEW, NOT THE WORLD** (D0506). Ported with legacy's `_bake_terrain_full`,
+## boot made every chunk visible and queued its redraw, so the first render painted every solid cell of the
+## world at once: measured on a playtest seat, **6.17 s** between the seat writing its receipt and its first
+## frame, no physics tick between, the same under Forward+, Mobile and gl_compatibility -- so neither shader
+## compilation nor the painters, which cost 2 ms a frame. Asserted as a SELECTION rather than through
+## pixels: `setup` declines under `--headless` (D0186), so no suite CI runs has a target to inspect, and the
+## selection IS the decision that cost the six seconds.
+func _test_the_first_bake_chooses_the_window_and_not_the_world() -> void:
+	var bake: TerrainBake = _wide()
+	var w: BakeWindow = bake.window()
+	var chosen: Array[int] = w.unpainted_in(VIEW_PX)
+	var expected: Array[int] = _window_chunks_by_intersection(w, VIEW_PX)
+	chosen.sort()
+	expected.sort()
+	_check(chosen == expected, "the first bake selects the chunks the window+%d-cell margin covers: chose "
+		% w.margin() + "%s, the rects that overlap say %s" % [str(chosen), str(expected)])
+	_check(chosen.size() * 8 < w.chunk_count(), "and that is %d chunks of the world's %d -- the full-world "
+		% [chosen.size(), w.chunk_count()] + "first bake this replaces chose every one")
+	# CONTROL: a window over the whole world selects every chunk. Without it the row above passes on a
+	# selection returning a handful of chunks for ANY rect -- which would leave the player looking at
+	# unpainted target the moment the camera moved, and would read here as a very good number.
+	var all_of_it: Array[int] = w.unpainted_in(Rect2(Vector2.ZERO, Vector2(w.world_px())))
+	_check(all_of_it.size() == w.chunk_count(), "CONTROL: a window over the whole world selects all %d of "
+		% w.chunk_count() + "its chunks (got %d), so %d above is the window and not a cap"
+			% [all_of_it.size(), chosen.size()])
+	bake.free()
+
+
+## SCROLLING PAINTS THE NEW GROUND ONCE. The window lane's whole risk is bookkeeping: a chunk re-selected
+## every tick would repaint the world continuously and cost more than the boot bake it replaced, and one
+## never selected would be a permanent hole. The expectation is DERIVED from the two windows rather than
+## written down, so a change to the chunk size or the margin moves the test with the code, not against it.
+func _test_a_chunk_entering_the_window_bakes_once_and_not_again() -> void:
+	var bake: TerrainBake = _wide()
+	var w: BakeWindow = bake.window()
+	for i: int in w.unpainted_in(VIEW_PX):
+		w.note_painted(i)
+	var moved: Rect2 = VIEW_PX
+	moved.position.x += float(TerrainBake.CHUNK_PX)   # one whole chunk to the right
+	var before: Dictionary = {}
+	for i: int in w.chunks_in(VIEW_PX):
+		before[i] = true
+	var entered: Array[int] = []
+	for i: int in w.chunks_in(moved):
+		if not before.has(i):
+			entered.append(i)
+	var fresh: Array[int] = w.unpainted_in(moved)
+	fresh.sort()
+	entered.sort()
+	_check(fresh == entered and not entered.is_empty(), "one chunk of camera motion bakes exactly the %d "
+		% entered.size() + "chunk(s) that entered the window, %s -- it chose %s" % [str(entered), str(fresh)])
+	for i: int in fresh:
+		w.note_painted(i)
+	_check(w.unpainted_in(moved).is_empty(), "and the NEXT refresh at that window bakes nothing (%d chosen)"
+		% w.unpainted_in(moved).size() + ", so a stationary camera does not repaint the ground under it")
+	_check(w.unpainted_in(VIEW_PX).is_empty(), "and scrolling BACK bakes nothing either (%d chosen) -- the "
+		% w.unpainted_in(VIEW_PX).size() + "target keeps the pixels of a chunk that has scrolled off")
+	bake.free()
+
+
+## THE DIG PATH IS UNCHANGED (D0326/D0330) and must not learn about the window. `bake_cells` dilates a dug
+## cell to every chunk whose shading it reaches; filtering that by what the window has painted would leave a
+## neighbouring chunk stale and seam along the boundary as D0330 describes -- visible only after mining.
+func _test_the_dig_path_does_not_read_the_painted_set() -> void:
+	var bake: TerrainBake = _wide()
+	var w: BakeWindow = bake.window()
+	var per_chunk: int = TerrainBake.CHUNK_PX / CELL_PX
+	var edge := Vector2i(per_chunk * 8, 300)          # the first cell of a chunk, its neighbours next door
+	var unpainted: Array[int] = bake.influenced_chunks(edge)
+	_check(unpainted.size() >= 2 and unpainted.has(bake.chunk_index(edge)), "a dig at a chunk's first cell "
+		+ "dirties its own chunk and the one its shading reaches into (%d)" % unpainted.size())
+	for i: int in w.chunk_count():
+		w.note_painted(i)
+	var painted: Array[int] = bake.influenced_chunks(edge)
+	_check(painted == unpainted, "and the same dig dirties the same %s once every chunk is painted -- got "
+		% str(unpainted) + "%s. The dig lane reads the dilation, never what the window has done" % str(painted))
+	bake.free()
 
 
 ## A planned bake, and **the caller must `free()` it**. `TerrainBake` is a `Node2D` and a Node outside the

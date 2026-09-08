@@ -165,9 +165,9 @@ func bake_static(z: int) -> bool:
 		return false
 	var probe: Interface.Observation = _iface.observe(
 		Interface.Envelope.covering(Rect2(), WINDOW_MARGIN_CELLS))
-	# Built here rather than waiting for `_build_frame`, because the bake paints BEFORE the first
-	# `refresh()` and a bake that ran with a null tone would burn the flat fill into a retained target --
-	# permanently, since nothing re-bakes a chunk that has not been dug.
+	# Built here rather than in `_build_frame`: the bake holds this object for the life of the session, and a
+	# chunk painted with a null tone would burn the flat fill into a retained target permanently, since
+	# nothing re-bakes a chunk that has not been dug.
 	if _tone == null:
 		_tone = RockTone.new(probe.world_seed)
 	_bake_margin = WINDOW_MARGIN_CELLS
@@ -204,7 +204,10 @@ func bake_static(z: int) -> bool:
 		var mat := ShaderMaterial.new()
 		mat.shader = grit
 		quad.material = mat
-	_bake.bake_full()
+	# NO `bake_full()` HERE ANY MORE (D0506): painting every chunk of the world at boot was 6.17 s of first
+	# frame, and it could not happen here anyway -- `Main.boot` positions the camera AFTER `build_stack`
+	# returns, so `view_world_rect()` is the identity rect at the world origin. `refresh()` owns the first
+	# bake, and costs no frame: `PaintLayer._draw` returns early while `current_frame()` is null.
 	return true
 
 
@@ -311,13 +314,14 @@ func refresh() -> void:
 	var began: int = Time.get_ticks_usec()
 	_anim_ticks += 1
 	_frame = _build_frame()
-	# THE BAKE IS TOLD WHAT CHANGED HERE, not at the dig site, and deliberately: a retained target is
-	# retained, so a mined cell keeps its rock pixels until something invalidates its chunk. Doing it from
-	# the frame the coordinator already built means no caller can forget it, and there is exactly one place
-	# to look when a dig leaves a ghost. `mining_broke_cells` is empty on the overwhelming majority of ticks,
-	# so this costs an `is_empty()` per tick on the common path.
-	if _bake != null and not _frame.obs.mining_broke_cells.is_empty():
-		_bake.bake_cells(_frame.obs.mining_broke_cells)
+	# THE BAKE IS TOLD WHAT CHANGED HERE, not at the dig site: a retained target is retained, so a mined
+	# cell keeps its rock pixels until something invalidates its chunk, and driving it from the frame the
+	# coordinator already built means no caller can forget it. SINCE D0506 IT IS ALSO TOLD WHERE THE CAMERA
+	# IS, on the same call -- this is the FIRST bake, and a chunk that has just entered the window is painted
+	# in this tick, before the quad samples it. ONE call for both lanes, because each sets chunk visibility
+	# across the whole grid and a second call in the same tick would hide what the first had shown.
+	if _bake != null:
+		_bake.bake_tick(_frame.view_world_rect, _frame.obs.mining_broke_cells)
 	for layer: PaintLayer in _layers:
 		layer.queue_redraw()
 	if _hud != null:
