@@ -141,7 +141,8 @@ func _test_the_slot_names_every_refusal() -> void:
 	var first: Dictionary = LessonDock.layout(h, far, font)
 	_check(first.has("slot") and not first.has("rect") and String(first["slot"]["text"]) == "TOO FAR" and float(first["slot"]["alpha"]) > 0.99,
 		"the first frame of a far press: the slot says TOO FAR at full alpha, no lesson yet (%s)" % str(first.get("slot", {}).get("text", "")))
-	_check(((first["slot"]["rect"] as Rect2).end.y - UiTheme.px(Hotbar.HOTBAR_BAND_TOP - LessonDock.BAND_GAP)) < 0.01, "...seated at the dock's foot")
+	var first_rect: Rect2 = (first.get("slot", {}) as Dictionary).get("rect", Rect2())   # guarded: a red pin above must not shrink the count (D0496's finding)
+	_check(first.has("slot") and (first_rect.end.y - UiTheme.px(Hotbar.HOTBAR_BAND_TOP - LessonDock.BAND_GAP)) < 0.01, "...seated at the dock's foot")
 	f.obs = calm
 	h.observe(calm, 0.016)                              # released after a 2-frame brush: the lesson never fired
 	_check(h.active_id() == &"", "control: a two-frame brush fires no lesson")
@@ -251,7 +252,7 @@ func _test_the_slot_stacks_over_a_lesson_and_yields_to_its_own() -> void:
 	var l: Dictionary = LessonDock.layout(h, far, font)
 	_check(l.has("rect") and String(l["text"]).begins_with("ROPE") and l.has("slot"), "the rope lesson and the slot are both up")
 	var plate: Rect2 = l["rect"]
-	var slot: Rect2 = l["slot"]["rect"]
+	var slot: Rect2 = (l.get("slot", {}) as Dictionary).get("rect", Rect2())   # guarded, as above
 	_check(is_equal_approx(slot.end.y, plate.position.y - UiTheme.px(LessonDock.SLOT_GAP)) and is_equal_approx(slot.position.x, plate.position.x), "the slot sits a gap above the lesson plate, at its left")
 	var own: Hints = Hints.new()
 	for _i: int in Hints.FAR_TICKS:
