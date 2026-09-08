@@ -113,11 +113,20 @@ func _test_the_smelt_card_points_at_the_ring() -> void:
 	_check(smelt.find("NUMBER then [DROP]") >= 0 and smelt.ends_with("the ingots come to you"), "D0493's number key and the last clause survive the rewording (%s)" % smelt)
 	_check(smelt.length() <= 141, "no longer than the card that already wrapped to two lines (%d <= 141 chars)" % smelt.length())
 	var bearings: PackedStringArray = PackedStringArray()
+	var holds: PackedStringArray = PackedStringArray()
 	for def: Dictionary in Objectives.STEPS:
 		var lab: String = String(def["label"])
-		if lab.find("right of you") >= 0 or lab.find("left of you") >= 0:
-			bearings.append(String(def["id"]))
-	_check(bearings.is_empty(), "no rung's label carries a bearing from the spawn (%d such rungs: %s)" % [bearings.size(), str(bearings)])
+		if lab.find("right of you") >= 0 or lab.find("left of you") >= 0 or (lab.find("beside you") >= 0 and def["id"] != &"mine"):
+			bearings.append(String(def["id"]))                              # D0507: "beside you" is a bearing too (S97 pressed at the shaft, 6 m from the ring); the FIRST rung alone is played from the spawn, where it is true (6 of 6 in three batches)
+		if lab.find("hold them") >= 0 or lab.find("hold each") >= 0:
+			holds.append(String(def["id"]))                                 # D0507: "hold" never taught the number key (S94, S97); NUMBER does
+	_check(bearings.is_empty(), "no rung's label carries a bearing from the spawn, 'beside you' included (%d such rungs: %s)" % [bearings.size(), str(bearings)])
+	_check(holds.is_empty(), "no rung's label says 'hold' a stack where it means the NUMBER key (%d such rungs: %s)" % [holds.size(), str(holds)])
+	var deliver: String = ""
+	for def: Dictionary in Objectives.STEPS:
+		if def["id"] == &"deliver":
+			deliver = String(def["label"])
+	_check(deliver.find("WHITE RING") >= 0 and deliver.find("NUMBER then [DROP]") >= 0 and deliver.length() <= 141, "the deliver card names the ring and the number key within the two-line length (%d chars: %s)" % [deliver.length(), deliver])
 
 
 func _test_paint_runs_through_the_hud_host() -> void:

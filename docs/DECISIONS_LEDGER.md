@@ -19373,3 +19373,22 @@ finds the paid drill where it lies (D0459).
 ingots eight metres right with the pack empty is the pile and INGOTS; an ingot back in hand is RIG again.
 The mutant that never returns the pile fails one. `test_tutorial_teaching` 70 unchanged. **Not changed:**
 the stride (T035) that put the stack eight metres past the rig.
+
+## D0507 · 2026-09-07 · The deliver card names the ring and the number key, not "beside you" and "hold them"
+
+**Decided:** the deliver rung's card reads "Carry the ingots to the rig in the WHITE RING: stand by it, press
+their NUMBER then [DROP]; the crew's rig pays in machines" (123 chars, two lines). The objective-line
+suite's bearing pin now counts "beside you" as a bearing for every rung but the first (the only one played
+from the spawn, where it is true: 6 of 6 in three batches), and refuses "hold them" / "hold each" where the
+NUMBER key is meant.
+
+**Why (strangers 94 and 97, batches 90-95 and 97-102):** S94 made two ingots at 19.4 s, read "the
+WHITE-RINGED rig beside you", strode nine metres past it and dropped the stack on the floor; S97 made two
+ingots at the shaft's forge, read the same card at the shaft's lip six metres from the ring, and pressed Q
+there eleven times (WRONG STACK, the shaft forge below wanting ore), never walking to the ring; both
+reports say the card's "hold them" never explained the number key. D0495 took the same defect out of the
+smelt card; this is the deliver card's turn.
+
+**Verified:** `tests/test_objective_line.gd` (42): the deliver card names the ring and NUMBER within 141
+chars; no rung past the first says "beside you"; none says "hold them". `test_objectives` 32,
+`test_tutorial_teaching` 70 unchanged.

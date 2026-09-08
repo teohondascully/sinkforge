@@ -30,7 +30,7 @@ const LINGER_DONE: float = 5.0
 const STEPS: Array[Dictionary] = [
 	{"id": &"mine", "label": "POINT at the silver-flecked rock in the WHITE RING beside you and hold [MINE]", "goal": "Mine 4 ore", "count": &"ore", "need": 4},
 	{"id": &"smelt", "label": "The WHITE RING finds the coal seam first, the ORE-and-COAL forge after: by it, press each stack's NUMBER then [DROP]; the ingots come to you", "goal": "Forge 2 ingots", "count": &"ingot", "need": 2},
-	{"id": &"deliver", "label": "Carry the ingots to the WHITE-RINGED rig beside you, hold them and press [DROP]: the crew's rig pays in machines", "goal": "Deliver 2 ingots"},
+	{"id": &"deliver", "label": "Carry the ingots to the rig in the WHITE RING: stand by it, press their NUMBER then [DROP]; the crew's rig pays in machines", "goal": "Deliver 2 ingots"},
 	{"id": &"build", "label": "The rig set a DRILL down at its foot: walk over it, press its slot's key, [BUILD] over the vein in the WHITE RING", "goal": "Build the line"},
 	{"id": &"fuel", "label": "Hold [MINE] on the black coal seam by the shaft, select the coal, stand by the Drill and press [DROP]", "goal": "Fuel the Drill"},
 	{"id": &"auto", "label": "Stand back — the fuelled Drill bores the vein and pours ore and coal into the forge below. First automation!", "goal": "First automation"},
