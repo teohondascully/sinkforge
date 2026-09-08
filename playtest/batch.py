@@ -73,11 +73,25 @@ def _mission(template, session, number):
     return text.replace(src.group(1), str(session))
 
 
+def _dirty_lines():
+    """What would make a seat's copy differ from HEAD: any tracked change, or an untracked file INSIDE the
+    runtime tree. Untracked files elsewhere (the recordings the reveal harness writes) are never copied."""
+    lines = []
+    for line in _run(["git", "status", "--porcelain"], cwd=REPO).stdout.splitlines():
+        path = line[3:].split(" -> ")[-1]
+        if line.startswith("??") and not any(path == r or path.startswith(r + "/") for r in RUNTIME):
+            continue
+        lines.append(line)
+    return lines
+
+
 def start(args):
     root = Path(args.root).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    if _run(["git", "status", "--porcelain"], cwd=REPO).stdout.strip():
-        raise SystemExit("batch: the checkout is dirty; a batch copies the working tree, so commit or stash first")
+    dirty = _dirty_lines()
+    if dirty:
+        raise SystemExit("batch: the checkout is dirty; a batch copies the working tree, so commit or stash first:\n"
+                         + "\n".join(dirty[:8]))
     head = _run(["git", "rev-parse", "HEAD"], cwd=REPO).stdout.strip()
     numbers = _next_numbers(root, args.n)
     seats = []

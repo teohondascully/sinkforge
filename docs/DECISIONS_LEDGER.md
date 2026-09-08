@@ -19470,3 +19470,22 @@ lane `bake_cells` has used for a dug chunk since D0326). The settled capture is 
 not have shown a one-frame hole either way. **Not changed:** the dig path, the eraser, and the full-rebake
 threshold, which still reads the dug set only -- the window lane is deliberately not subject to it, since
 its cost is bounded by the window and routing it through a full bake would reintroduce the boot paint.
+
+## D0510 · 2026-09-07 · The batch's dirty check reads the tree it copies, not the whole checkout
+
+**Decided:** `batch.py start` refuses the checkout when `git status --porcelain` shows a tracked change
+anywhere, or an untracked file under a `RUNTIME` entry (`project.godot`, `core`, `sim`, `view`, `shell`,
+`interface`, `data`, `playtest`, `assets`, `.godot`). An untracked file anywhere else no longer counts.
+
+**Why:** D0503's check refused on any porcelain line. The reveal harness leaves its recordings untracked
+under `tests/body/recordings/`, and `tests/` is not in the copy, so the refusal was about files no seat
+could see, and the first batch after D0503 could not start on a clean head. The narrower rule keeps
+the property the check exists for: a seat's copy IS the head. A tracked edit changes the copy;
+an untracked file inside the runtime tree ships in the copy under a head hash that does not contain
+it; an untracked file outside it does neither.
+
+**Evidence:** on 68e1bd05 with 60-odd recording logs untracked, `_dirty_lines()` returned only the
+edit to `batch.py` itself; `touch view/zz_probe.tmp` added `?? view/zz_probe.tmp` to the list and
+removing it took it away.
+
+**Kind:** provisional.
