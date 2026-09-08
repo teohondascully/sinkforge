@@ -322,6 +322,21 @@ LOOK would be re-derived in GLSL, and a capture comparison would decide whether 
 A worker can do the first half (the data texture, the shader reading it) as a bounded ticket once the
 director says the look may move by a capture's difference.*
 
+**T040's evidence is in (D0528, behind a flag that is off; the shipped picture is byte-identical).** The
+cost: 48.6 -> 12.7 microseconds a solid cell, and a shaft fall's settled frames p50 7.2-8.8 -> 3.9-4.1 ms,
+max 42.9 -> 20.5 ms. The picture, one pose (the tutorial opening, tick 90, 1920x1080): 34.78% of pixels
+changed, 6.29% by more than 0.20 of full scale, mean luma -2.07 of 255 with 343k lighter and 378k darker,
+so a re-roll rather than a brightness shift. Two 4x crops of the same rock were sent to the director:
+`scratchpad/w14/zoom_cpu_4x.png` and `zoom_shader_4x.png`. **The orchestrator's own read of those crops:
+the shader's rock is paler and flatter than the CPU's, its block-to-block contrast is weaker, and it
+carries a red seam down the left edge of the cut that the CPU picture does not.** The seam reads as a
+defect (a chamfer or an edge-material term), not as a taste difference, and no assertion covers a colour:
+the suite pins the data texture's bytes, and D0528 says plainly that "a wrong term inside the shader would
+show as a picture nobody pinned". The tufts are also lost under the flag. *So the fork is not yet a fair
+comparison: the honest question for the director is whether to spend a worker on making the shader's
+picture match the CPU's term for term (then re-diff), or to rule the whole direction out and keep the CPU
+tone with the D0522/D0524 budgets as its ceiling.*
+
 **September 8 update (D0526):** the director authorized performance improvements, and an exact-colour
 CPU slice removes 40-56% of sampled `RockTone.shade` time before any GPU port. The binary fork above is
 therefore too strong: the CPU path had redundant work. The GPU experiment remains unimplemented, and
