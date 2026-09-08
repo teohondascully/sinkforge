@@ -31,7 +31,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_hint_obs([]), 0.016)
 	h.observe(_hint_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 21, "nine pack lessons and twenty-one moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 22, "nine pack lessons and twenty-two moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -265,9 +265,11 @@ func _test_a_drop_that_hits_the_floor_teaches_once() -> void:
 	h.observe(floor, 0.016)
 	_check(h.active_id() == &"dropped_floor" and h.active_text().begins_with("NO MACHINE HERE"), "the first drop to the floor docks DROPPED (%s)" % h.active_id())
 	# D0481 (strangers 61, 67): "stand BESIDE it" sent one stranger off the forge's own column, which takes the
-	# drop, and named no machine while a second machine's bubble stood on screen; the lesson says over or
-	# beside, and points at the WHITE RING.
-	_check("over it or beside it" in h.active_text() and "WHITE RING" in h.active_text() and "BESIDE it" not in h.active_text(), "DROPPED allows standing over the machine and names the ring (%s)" % h.active_text())
+	# drop, and named no machine while a second machine's bubble stood on screen; the lesson points at the
+	# WHITE RING and never says BESIDE. D0517 (strangers 103-108): `floor` now means no machine in sight takes
+	# the stack, so the headline is true and the text says so, and says the pile is the player's to walk over.
+	_check("nothing in sight takes that stack" in h.active_text() and "walk over it to pick it up" in h.active_text() and "WHITE RING" in h.active_text() and "BESIDE it" not in h.active_text(),
+		"NO MACHINE HERE says nothing in sight takes it, the pile is yours to walk over, and names the ring (%s)" % h.active_text())
 	for _i: int in 30:
 		h.observe(_hint_obs(), 0.5)
 	h.observe(floor, 0.016)

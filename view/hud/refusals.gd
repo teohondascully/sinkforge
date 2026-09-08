@@ -31,6 +31,13 @@ extends RefCounted
 ## twice and the second time had no word at all. A floor drop and a wrong stack are one observe wide, not
 ## a hold, and their detectors live in `Hints`, so `Hints` hands the live one to `drop()` after its own
 ## detectors have run. Same linger, same yield, latched by nothing.
+##
+## THE RECEIPT (D0517, strangers 103-108): a drop that FED a machine says so in the same slot -- "6 COAL →
+## FORGE" -- for the same linger, in the plate's own ink rather than the refusal's red (the dock reads
+## `slot_kind()`). S107 and S108 first hesitated over "whether anything happened"; the slot had a word for
+## every refused press and none for the press that worked. The receipt is one entry of a second KIND, not a
+## lesson: no headline table row, nothing latches, and the plate yields to it the other way round -- `Hints`
+## ends a drop lesson the tick a drop feeds, so a refusal and a receipt never show together.
 
 const FAR_TICKS: int = 20
 const AIR_TICKS: int = 90           ## a second and a half: past any re-aim after a metre breaks under the pointer
@@ -43,6 +50,8 @@ const CUT_TICKS: int = 30           ## half a second on air right after your own
 const BELOW_CELLS: int = 8
 const SLOT_LINGER: float = 1.5      ## seconds the slot outlives the refusal: long enough to read after the release
 const SLOT_FADE: float = 0.5        ## the last of those, fading
+const RECEIPT: StringName = &"receipt"   ## the slot entry's KIND for a fed drop (D0517); every other entry is `REFUSAL`
+const REFUSAL: StringName = &"refusal"
 
 var far_ticks: int = 0
 var air_ticks: int = 0
@@ -50,8 +59,9 @@ var machine_ticks: int = 0
 var sight_ticks: int = 0
 var since_break: int = 100000
 var fired: Dictionary = {}          ## lesson id -> its hold has run long enough THIS frame
-var slot_id: StringName = &""       ## the lesson whose headline names the refusal live now, or last live
+var slot_id: StringName = &""       ## the lesson whose headline names the refusal live now, or last live; or RECEIPT
 var slot_since: float = 0.0         ## seconds since that refusal was last live
+var slot_receipt: String = ""       ## the receipt's own words while `slot_id` is RECEIPT ("6 COAL → FORGE")
 
 
 ## One frame: advance the counts, decide which lessons' holds are long enough, and name the slot.
@@ -94,6 +104,26 @@ func drop(id: StringName) -> void:
 	slot_since = 0.0
 
 
+## A drop that FED a machine takes the slot with its receipt (D0517): `text` is the words themselves,
+## composed by `Hints`, which knows the pack's fall and the eater. Same linger as a refusal.
+func receipt(text: String) -> void:
+	slot_id = RECEIPT
+	slot_receipt = text
+	slot_since = 0.0
+
+
+## A drop that fed with no receipt to give (D0517): a drop refusal still inside the slot's linger is over.
+func drop_done() -> void:
+	if DropLessons.LESSONS.has(slot_id):
+		slot_id = &""
+
+
+## Which kind of entry holds the slot: RECEIPT for a fed drop, REFUSAL for everything else. The dock
+## picks the rule's colour by this, never by the words.
+func slot_kind() -> StringName:
+	return RECEIPT if slot_id == RECEIPT else REFUSAL
+
+
 ## The terrain row the body's feet stand in: the bottom edge, in cells (the observation's `bottom_y` is Fx px).
 static func feet_row(o: Interface.Observation) -> int:
 	return int(floor(float(o.bottom_y) / float(Fx.SCALE) / float(Interface.Observation.CELL_PX)))
@@ -118,11 +148,11 @@ static func headline(id: StringName) -> String:
 
 
 ## The slot's text, "" when no refusal is live or within its linger, or when `active` (the plate's lesson)
-## is the refusal's own lesson.
+## is the refusal's own lesson. A receipt's text is its own words (D0517).
 func slot_text(active: StringName) -> String:
 	if slot_id == &"" or slot_since > SLOT_LINGER or active == slot_id:
 		return ""
-	return headline(slot_id)
+	return slot_receipt if slot_id == RECEIPT else headline(slot_id)
 
 
 ## Full while the refusal is live and through most of the linger; out over the last SLOT_FADE.

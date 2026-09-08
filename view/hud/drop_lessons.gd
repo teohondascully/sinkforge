@@ -1,0 +1,136 @@
+class_name DropLessons
+extends RefCounted
+
+## THE DROP'S OUTCOMES ON THE HUD (out of `Hints` in D0517, for the size gate; `Hints` owns the plate and
+## the queue and applies what this decides). `o.drop_went` is `fed`, `floor` or `short` (D0513): `short` is
+## a drop REFUSED for a machine in sight that takes the stack but is out of reach, the pack unchanged,
+## `drop_short_cell` that machine's cell; `floor` means NO machine in sight takes it; `fed` as before.
+##
+## THE WRONG STACK (D0443, stranger 16). Q drops the SELECTED stack; the sixteenth stranger, holding clay
+## from the pit they had dug, pressed Q beside the forge a dozen times, read DROPPED each time ("stand
+## BESIDE it"), stepped closer and dropped clay again. When a floor drop's item is one no machine within
+## the drop's own far range takes, and the pack holds one such a machine does, the lesson names both.
+##
+## THE SHORT LESSON AND THE RECEIPT (D0517, strangers 103-108). S104 fed the forge six coal while NO
+## MACHINE HERE still held the plate from a floor drop eighteen seconds before; S107 and S108 first
+## hesitated over "whether anything happened"; S106 dropped six times beside the rig, the forge nineteen
+## cells off, and read NO MACHINE HERE each time. So the short drop has a lesson that points (the eater's
+## word, the metres, the way), a fed drop puts a RECEIPT on the slot ("6 COAL → FORGE", in the plate's own
+## ink), and the plate lets go of any drop lesson the tick a drop feeds: a receipt and a refusal never show
+## together.
+
+const WANTED_RANGE_M: float = 12.0        ## `Verbs.FAR_EATER_M`, the range the drop's TOO FAR already uses
+const LESSONS: Array[StringName] = [&"dropped_floor", &"dropped_wrong", &"dropped_short"]
+
+var _prev_counts: Dictionary = {}
+
+
+## One observe: the pack's fall, then which drop lesson is TRUE, what the slot says, and the receipt.
+## Returns `{"wrong": bool, "short": bool, "slot": StringName, "receipt": String}` -- `slot` is the drop
+## lesson whose headline the slot repeats (`&""` for no drop), `receipt` the fed drop's words ("" for
+## none). Fills `subs` (lesson id -> {placeholder: text}) for the lessons that fire.
+func read(o: Interface.Observation, counts: Dictionary, subs: Dictionary) -> Dictionary:
+	var fell: Dictionary = _pack_fell(counts)
+	var wrong: bool = _wrong_stack(o, counts, fell, subs)
+	var short: bool = _short_drop(o, subs)
+	var slot: StringName = &""
+	if short:
+		slot = &"dropped_short"
+	elif o.drop_went == &"floor":
+		slot = &"dropped_wrong" if wrong else &"dropped_floor"
+	return {"wrong": wrong, "short": short, "slot": slot, "receipt": _receipt(o, fell)}
+
+
+## The pack's fall this observe: `{item, n}` for the item whose count fell (the last such, in pack order),
+## `{}` for none. The `_prev_counts` edge every drop detector reads.
+func _pack_fell(counts: Dictionary) -> Dictionary:
+	var fell: Dictionary = {}
+	for item: StringName in _prev_counts:
+		var n: int = int(_prev_counts[item]) - int(counts.get(item, 0))
+		if n > 0:
+			fell = {"item": item, "n": n}
+	_prev_counts = counts
+	return fell
+
+
+## A floor drop of an item no machine in range takes, while the pack holds one a machine does: the dropped
+## item is the one whose count fell this frame; the wanted one is the first recipe input a machine within
+## WANTED_RANGE_M asks for that the pack still holds. Fills the lesson's placeholders.
+func _wrong_stack(o: Interface.Observation, counts: Dictionary, fell: Dictionary, subs: Dictionary) -> bool:
+	if o.drop_went != &"floor" or fell.is_empty():
+		return false
+	var dropped: StringName = fell["item"]
+	var body: Vector2 = body_px(o)
+	var wanted: StringName = &""
+	for rec: Dictionary in o.machines:
+		if cell_px(rec["cell"]).distance_to(body) > WANTED_RANGE_M * float(Interface.Observation.LOGIC_PX):
+			continue
+		var inputs: Dictionary = RecipesRecords.RECORDS.get(String(rec.get("recipe", &"")), {}).get("inputs", {})
+		for need: Variant in inputs:
+			var item := StringName(String(need))
+			if item == dropped:
+				return false                         # the machine takes what fell: that is the BESIDE lesson's case
+			if wanted == &"" and int(counts.get(item, 0)) > 0:
+				wanted = item
+	if wanted == &"":
+		return false
+	subs[&"dropped_wrong"] = {"{dropped}": Hotbar.item_label(dropped).to_lower(), "{wanted}": Hotbar.item_label(wanted).to_lower()}
+	return true
+
+
+## A drop REFUSED for a machine in sight but out of reach (D0517): TOO FAR's placeholders are the eater's
+## word at `drop_short_cell`, the selected stack's item, the whole metres from the body to that cell, and
+## the way to it -- LEFT/RIGHT, or ABOVE/BELOW when the rise outweighs the run.
+func _short_drop(o: Interface.Observation, subs: Dictionary) -> bool:
+	if o.drop_went != &"short":
+		return false
+	var d: Vector2 = cell_px(o.drop_short_cell) - body_px(o)
+	var way: String = ("BELOW" if d.y > 0.0 else "ABOVE") if absf(d.y) > absf(d.x) else ("RIGHT" if d.x > 0.0 else "LEFT")
+	subs[&"dropped_short"] = {"{eater}": eater_label(o.machine_at(o.drop_short_cell)), "{item}": Hotbar.item_label(o.held_item).to_lower(),
+		"{dist}": str(roundi(d.length() / float(Interface.Observation.LOGIC_PX))), "{dir}": way}
+	return true
+
+
+## The receipt for a drop that FED a machine (D0517): "6 COAL → FORGE" -- the pack's fall in that item and
+## the nearest machine in the window that takes it, "MACHINE" if none resolves. "" for any other drop, and
+## for a fed drop with no fall in the pack (a pickup of the same item in the same tick).
+func _receipt(o: Interface.Observation, fell: Dictionary) -> String:
+	if o.drop_went != &"fed" or fell.is_empty():
+		return ""
+	var item: StringName = fell["item"]
+	var body: Vector2 = body_px(o)
+	var eater: Dictionary = {}
+	var best: float = INF
+	for rec: Dictionary in o.machines:
+		var gap: float = cell_px(rec["cell"]).distance_to(body)
+		if gap < best and takes(rec).has(item):
+			best = gap
+			eater = rec
+	return "%d %s → %s" % [int(fell["n"]), Hotbar.item_label(item).to_upper(), eater_label(eater)]
+
+
+## What a machine takes: its recipe's inputs, and the rig's current demand (`wants`, on the record so the
+## view reads no ladder).
+static func takes(rec: Dictionary) -> Array[StringName]:
+	var out: Array[StringName] = []
+	var inputs: Dictionary = (RecipesRecords.RECORDS.get(String(rec.get("recipe", &"")), {}) as Dictionary).get("inputs", {})
+	for need: Variant in inputs.keys() + (rec.get("wants", {}) as Dictionary).keys():
+		out.append(StringName(String(need)))
+	return out
+
+
+## A machine's word on the plate: its record's name in caps, the inspector's own path ("FORGE"; the rig
+## reads "CREW RIG"); "MACHINE" for a record that resolves nothing.
+static func eater_label(rec: Dictionary) -> String:
+	if rec.is_empty():
+		return "MACHINE"
+	return String(rec.get("name", String(rec.get("id", "machine")).replace("_", " "))).to_upper()
+
+
+## The body's centre and a logic cell's centre, in world px.
+static func body_px(o: Interface.Observation) -> Vector2:
+	return Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
+
+
+static func cell_px(cell: Vector2i) -> Vector2:
+	return (Vector2(cell) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)

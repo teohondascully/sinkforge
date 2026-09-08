@@ -28,6 +28,8 @@ const INK := Color(0.92, 0.88, 0.74)
 ## headline -- TOO FAR, NOTHING THERE, THAT IS A MACHINE for an aim, NO MACHINE HERE and WRONG STACK for a drop --
 ## on every refused press, for the short linger `Refusals` keeps, above the lesson plate when one is up.
 ## Its rule is the refusal's red, the slashed square's own, so the word and the mark read as one answer.
+## A RECEIPT in the same slot (D0517, "6 COAL → FORGE" for a drop that fed) takes the lesson plate's own
+## rule instead: the press worked, and the one red on the screen stays the refusal's.
 const SLOT_GAP: float = 4.0             ## authored px between the slot and the lesson plate under it
 
 var hints: Hints = Hints.new()
@@ -55,7 +57,8 @@ static func dock_rect(font: Font, text: String) -> Rect2:
 
 
 ## Everything the dock decides: `{}` for no lesson and no refusal; the lesson's `rect`/`text`/`alpha`/
-## `text_at` when one is up; a `slot` dictionary of the same keys when a refusal is live (D0488).
+## `text_at` when one is up; a `slot` dictionary of the same keys plus its `kind` (`Refusals.REFUSAL` or
+## `Refusals.RECEIPT`) when a refusal or a receipt is live (D0488, D0517).
 static func layout(h: Hints, frame: Frame, font: Font) -> Dictionary:
 	if h == null or frame == null or frame.obs == null or font == null:
 		return {}
@@ -72,8 +75,14 @@ static func layout(h: Hints, frame: Frame, font: Font) -> Dictionary:
 	var sa: float = h.slot_alpha()
 	if word != "" and sa > 0.01:
 		var srect: Rect2 = slot_rect(font, word, foot)
-		out["slot"] = {"rect": srect, "text": word, "alpha": sa, "text_at": srect.position + Vector2(UiTheme.px(8.0), UiTheme.px(13.0))}
+		out["slot"] = {"rect": srect, "text": word, "alpha": sa, "text_at": srect.position + Vector2(UiTheme.px(8.0), UiTheme.px(13.0)), "kind": h.slot_kind()}
 	return out
+
+
+## The slot's rule colour by the entry's kind (D0517): a receipt takes the lesson plate's own rule, every
+## refusal the slashed square's red.
+static func slot_rule(kind: StringName) -> Color:
+	return UiTheme.UI_EDGE_HI if kind == Refusals.RECEIPT else MarkPainter.REFUSE
 
 
 ## The slot's rect for `word`, its foot at `foot` (the dock's foot, or a gap above the lesson plate).
@@ -93,7 +102,7 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	if l.has("rect"):
 		_plate_draw(ci, font, l, UiTheme.UI_EDGE_HI)
 	if l.has("slot"):
-		_plate_draw(ci, font, l["slot"], MarkPainter.REFUSE)
+		_plate_draw(ci, font, l["slot"], slot_rule(l["slot"]["kind"]))
 
 
 ## One plate: shadow, ground, the left rule in `rule`, the text.

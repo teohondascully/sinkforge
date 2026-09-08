@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_the_slot_names_every_refusal()
 	_test_the_slot_names_every_floor_drop()
 	_test_the_slot_names_a_wrong_stack()
+	_test_the_slot_shows_a_receipt_in_the_plates_own_ink()
 	_test_the_slot_stacks_over_a_lesson_and_yields_to_its_own()
 	_test_the_dock_clears_a_full_hotbar_and_the_whole_legend()
 	await _test_paint_runs_through_the_hud_host()
@@ -233,6 +234,61 @@ func _test_the_slot_names_a_wrong_stack() -> void:
 		h.observe(held, 4.0)                                   # reads out, and the pack holds clay again
 	h.observe(fell, 0.016)
 	_check(h.slot_text() == "WRONG STACK" and h.active_id() == &"", "the next wrong stack says WRONG STACK in the slot, the lesson spent (\"%s\", active %s)" % [h.slot_text(), h.active_id()])
+
+
+## D0517 (strangers 103-108): a drop that FED the forge six coal puts "6 COAL → FORGE" in the slot as a
+## RECEIPT -- its rule the lesson plate's own, never the refusal's red -- for the slot's ordinary linger; and
+## a floor drop's lesson on the plate ends the tick a drop feeds, so the layout never carries a receipt
+## and a drop refusal together. S104 fed the forge while NO MACHINE HERE still held the plate.
+func _test_the_slot_shows_a_receipt_in_the_plates_own_ink() -> void:
+	var font: Font = ThemeDB.fallback_font
+	var f: Frame = _frame()
+	var forge: Array[Dictionary] = [{"cell": Vector2i(11, 10), "id": &"processor", "name": "Forge", "recipe": &"smelt_ingot", "input": {}, "output": {}}]
+	var h: Hints = Hints.new()
+	var held: Interface.Observation = _hint_obs([["coal", 6]])
+	held.pos_x = (10 * 16 + 8) * S
+	held.pos_y = (10 * 16 + 8) * S
+	held.machines = forge
+	var fell: Interface.Observation = _hint_obs([["coal", 6]])
+	fell.pos_x = held.pos_x
+	fell.pos_y = held.pos_y
+	fell.drop_went = &"floor"
+	h.observe(held, 0.016)
+	h.observe(fell, 0.016)
+	h.observe(held, 0.5)                                       # the plate fades in from dark; half a second on it is up
+	_check(h.active_id() == &"dropped_floor" and LessonDock.layout(h, f, font).has("rect"), "control: a floor drop's lesson holds the plate (%s)" % h.active_id())
+	var fed: Interface.Observation = _hint_obs()
+	fed.pos_x = held.pos_x
+	fed.pos_y = held.pos_y
+	fed.machines = forge
+	fed.drop_went = &"fed"
+	h.observe(fed, 0.016)
+	var l: Dictionary = LessonDock.layout(h, f, font)
+	var slot: Dictionary = l.get("slot", {})   # `.get` so a red above does not crash the run and shrink the count
+	_check(not l.has("rect") and String(slot.get("text", "")) == "6 COAL → FORGE" and float(slot.get("alpha", 0.0)) > 0.99,
+		"the fed drop: the plate let go of NO MACHINE HERE and the slot says 6 COAL → FORGE at full alpha (rect %s, \"%s\")" % [l.has("rect"), str(slot.get("text", ""))])
+	var kind: StringName = slot.get("kind", &"")
+	_check(kind == Refusals.RECEIPT and LessonDock.slot_rule(kind) == UiTheme.UI_EDGE_HI and LessonDock.slot_rule(kind) != MarkPainter.REFUSE,
+		"...as a RECEIPT, whose rule is the plate's own and not the refusal's red (kind %s, rule %s)" % [kind, LessonDock.slot_rule(kind)])
+	_check(LessonDock.slot_rule(Refusals.REFUSAL) == MarkPainter.REFUSE, "control: a refusal's rule is still the red")
+	var far: Frame = _frame()
+	far.obs.aim_refusal = &"far"
+	far.obs.aim_cell = Vector2i(far.obs.cell.x + 20, far.obs.cell.y)
+	var hr: Hints = Hints.new()
+	hr.observe(far.obs, 0.016)
+	var refused: Dictionary = LessonDock.layout(hr, far, font).get("slot", {})
+	_check(refused.get("kind", &"") == Refusals.REFUSAL and String(refused.get("text", "")) == "TOO FAR", "control: a far press's slot entry is a REFUSAL (%s)" % str(refused.get("kind", "")))
+	h.observe(_calm_like(fed), Refusals.SLOT_LINGER + 0.1)
+	_check(LessonDock.layout(h, f, font).is_empty(), "past the slot's linger the receipt is gone and nothing is up")
+
+
+## The same body and window as `o`, with no drop this observe.
+func _calm_like(o: Interface.Observation) -> Interface.Observation:
+	var c: Interface.Observation = _hint_obs()
+	c.pos_x = o.pos_x
+	c.pos_y = o.pos_y
+	c.machines = o.machines
+	return c
 
 
 ## The slot over a lesson: when another lesson holds the plate the slot sits a gap above it; when the

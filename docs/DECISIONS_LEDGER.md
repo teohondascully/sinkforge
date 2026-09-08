@@ -19629,3 +19629,60 @@ branch removed, `last_drop_short` set on the floor drop): 4 FAILURE(S) of 65, th
 before (unreachable in practice: buffers are unbounded and every `Machines` wires `machine_buffer`); the
 seat events' `drop` field carries `short` as a new value untouched. **Kind:** rule reversal (D0428/D0434's
 fall), provisional on the next stranger batch.
+## D0517 · 2026-09-07 · The drop's outcomes on the HUD: the receipt, the short lesson, the plate let go
+
+**Decided:** three outcomes of a DROP each get their own word on the HUD, over D0513's contract
+(`o.drop_went` is `fed`, `floor` or `short`; `short` is a refused drop for a machine in sight that takes
+the stack but is out of reach, the pack unchanged, `drop_short_cell` that machine's cell; `floor` means
+NO machine in sight takes it). (1) A new lesson `dropped_short`, "TOO FAR — the {eater} that takes {item}
+is {dist} m to your {dir}; your stack stays with you. Walk into its WHITE RING, stand beside it, then press
+the stack's NUMBER and [DROP]." -- the eater's word is its record's `name` in caps, the inspector's own
+path (FORGE; the rig reads CREW RIG, not the ring's RIG, since the ring's word is keyed by rung and the
+inspector's by machine), the item `o.held_item`'s label, the metres whole from the body's centre to the
+cell's, the way LEFT/RIGHT or ABOVE/BELOW when the rise outweighs the run; its slot headline is TOO FAR.
+(2) A RECEIPT in the refusal slot on `fed`: "{n} {ITEM} → {EATER}" ("6 COAL → FORGE") for the slot's
+ordinary 1.5 s, as a second KIND of slot entry (`Refusals.RECEIPT`) the dock rules in the lesson plate's
+`UI_EDGE_HI`, never `MarkPainter.REFUSE`; `n` is the pack's fall in that item across the observe, the
+eater the nearest machine in the window whose recipe inputs or `wants` (the rig's demand, already on the
+record) include it, MACHINE if none. (3) The plate lets go: on `fed`, an active `dropped_floor`,
+`dropped_wrong` or `dropped_short` ends that tick, and any of the three still QUEUED is dropped too --
+the queue would otherwise promote a stale NO MACHINE HERE onto the plate in the same refresh, beside the
+receipt, which is the pair this entry forbids. A fed drop with no fall in the pack (a pickup of the same
+item in the same tick) gives no receipt but still ends a drop refusal lingering in the slot. (4)
+`dropped_floor` keeps its headline, now true, and says the pile is the player's: "NO MACHINE HERE —
+nothing in sight takes that stack, so it fell at your feet; walk over it to pick it up again. A machine
+takes a drop from within a body length; the WHITE RING marks the one this step wants." D0481's "over it
+or beside it" phrase pin is re-aimed at this text (the ring is still named, BESIDE still absent).
+
+**Why:** strangers 103-108 (2026-09-07). S104 fed the forge six coal from cell 112 at 26.1 s (the badge
+read 6, the coal float rose) while the plate still showed NO MACHINE HERE latched from a floor drop at
+8.5 s -- the plate holds a lesson for 9 calm seconds capped at 27 wall seconds, and S104 walked the whole
+time. S107's and S108's first hesitation was "whether my key presses were registered / whether anything
+happened". S106 dropped six times at cell 137 beside the RIG holding coal, the forge 19 cells left in
+view, and read NO MACHINE HERE each time: a lesson whose headline was false for the case that produced it.
+
+**Verified:** `test_hints_moments` 31 -> 47 asserted, `test_hints` 48 -> 48 (two pins re-aimed: the
+moment count 21 -> 22, D0481's phrase pin), `test_lesson_dock` 44 -> 50, `test_inspector` 47 (D0502's
+categorical fit pin, read-only), `test_mark_painter` 64, `test_tutorial_teaching` 70 and `test_main_boot`
+65 (no before-count taken for the last two). Nine mutations, each restored byte-identical: the fed
+dismiss removed -> the plate pin red in both `hints_moments` (2) and `lesson_dock` (2, "rect true"); the
+queue purge removed -> 1 red ("1 queued"); the short detector never firing -> 4 red; `slot_rule` red for
+every kind -> 1 red (rule (0.95, 0.45, 0.4)); `slot_text` without the receipt's words -> 5 red; `drop_done`
+a no-op -> 1 red ("NO MACHINE HERE" lingering); `takes` without `wants` -> 1 red ("2 INGOT → MACHINE");
+LEFT/RIGHT swapped -> 2 red; the old `dropped_floor` text restored -> `test_hints` 1 red.
+
+**Structure:** `view/hud/hints.gd` reached 453 lines with the detectors in it; per QUALITY §2 (split,
+never trim the WHY) the drop family -- D0443's `_wrong_stack`, the new short detector, the receipt, the
+`_prev_counts` edge and the eater's word -- moved to `view/hud/drop_lessons.gd` (`DropLessons`), 136
+lines, pure over the observation and the `subs` it fills; `Hints` (359 lines) keeps the plate, the queue
+and the slot and applies what `DropLessons.read` returns. The ticket placed the detector "beside
+`_wrong_stack` in `hints.gd`"; it is beside `_wrong_stack`, in the file the size gate allowed.
+
+**Provisional / not changed:** `_wrong_stack`'s walk still reads recipe inputs only (the ticket said
+unchanged), so a rig in range does not make a floor drop of clay a WRONG STACK for ingots -- under D0513
+that walk's "machine takes what fell" branch cannot be reached (such a drop is `fed` or `short` now), and
+`test_hints_moments`'s "ore on the floor beside the forge" control poses a state the sim no longer
+produces; left as the ticket asked. The rig's word CREW RIG vs the ring's RIG is a judgment call for
+the director. `tools/layer_lint/check_size_limits.py` is red on the base for
+`tests/test_tutorial_teaching.gd:349` (52 lines, W4's file, not touched here). **Kind:** HUD content,
+structure.

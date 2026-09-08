@@ -68,12 +68,9 @@ var _refusals: Refusals = Refusals.new()   ## the held verb's refusals and the s
 ## who got there.
 const WAY_DOWN_RANGE_M: float = 24.0
 const WAY_DOWN_DEPTH_M: float = 4.0
-## THE WRONG STACK (D0443, stranger 16). Q drops the SELECTED stack; the sixteenth stranger, holding clay
-## from the pit they had dug, pressed Q beside the forge a dozen times, read DROPPED each time ("stand
-## BESIDE it"), stepped closer and dropped clay again. When a floor drop's item is one no machine within
-## the drop's own far range takes, and the pack holds one such a machine does, the lesson names both.
-const WANTED_RANGE_M: float = 12.0        ## `Verbs.FAR_EATER_M`, the range the drop's TOO FAR already uses
-var _prev_counts: Dictionary = {}
+## THE DROP'S OUTCOMES live in `DropLessons` (D0443's WRONG STACK, D0517's short lesson and receipt); this
+## class applies what it decides to the plate, the queue and the slot.
+var _drops: DropLessons = DropLessons.new()
 var _subs: Dictionary = {}                ## lesson id -> {placeholder: text}, filled when the moment is noted
 var _min_x_m: float = INF
 var _max_x_m: float = -INF
@@ -87,36 +84,6 @@ var _coming_prev: int = 0
 var _ingots_prev: int = 0
 var objectives: Objectives = null   ## the ladder, for the rung-gated lessons; a bare Hints reads the pack instead
 var _thrown: bool = false           ## a line has been live once this session; the grapple is known
-
-
-## A floor drop of an item no machine in range takes, while the pack holds one a machine does: the dropped
-## item is the one whose count fell this frame; the wanted one is the first recipe input a machine within
-## WANTED_RANGE_M asks for that the pack still holds. Fills the lesson's placeholders.
-func _wrong_stack(o: Interface.Observation, counts: Dictionary) -> bool:
-	var dropped: StringName = &""
-	for item: StringName in _prev_counts:
-		if int(counts.get(item, 0)) < int(_prev_counts[item]):
-			dropped = item
-	_prev_counts = counts
-	if o.drop_went != &"floor" or dropped == &"":
-		return false
-	var body := Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
-	var wanted: StringName = &""
-	for rec: Dictionary in o.machines:
-		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
-		if at.distance_to(body) > WANTED_RANGE_M * float(Interface.Observation.LOGIC_PX):
-			continue
-		var inputs: Dictionary = RecipesRecords.RECORDS.get(String(rec.get("recipe", &"")), {}).get("inputs", {})
-		for need: Variant in inputs:
-			var item := StringName(String(need))
-			if item == dropped:
-				return false                         # the machine takes what fell: that is the BESIDE lesson's case
-			if wanted == &"" and int(counts.get(item, 0)) > 0:
-				wanted = item
-	if wanted == &"":
-		return false
-	_subs[&"dropped_wrong"] = {"{dropped}": Hotbar.item_label(dropped).to_lower(), "{wanted}": Hotbar.item_label(wanted).to_lower()}
-	return true
 
 
 ## A cell broken whose yield is not ore while the MINE rung is open (D0450, stranger 26): the pointer was
@@ -219,11 +186,13 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	var counts: Dictionary = Payouts.pack_counts(o)
 	note(&"mined_wrong", _mined_wrong(o, counts))
 	note(&"wrong_spot", _wrong_spot(o))
-	var wrong: bool = _wrong_stack(o, counts)
-	note(&"dropped_wrong", wrong)
-	note(&"dropped_floor", o.drop_went == &"floor" and not wrong)   # the drop's own TOO FAR (D0428, stranger 5)
-	if o.drop_went == &"floor":
-		_refusals.drop(&"dropped_wrong" if wrong else &"dropped_floor")   # the slot names every drop, not just the first (D0496)
+	var drop: Dictionary = _drops.read(o, counts, _subs)
+	note(&"dropped_wrong", drop["wrong"])
+	note(&"dropped_floor", o.drop_went == &"floor" and not drop["wrong"])   # no machine in sight takes it (D0428, stranger 5; D0517)
+	note(&"dropped_short", drop["short"])
+	_refusals.drop(drop["slot"])                                              # the slot names every drop, not just the first (D0496)
+	if o.drop_went == &"fed":
+		_let_go(drop["receipt"])
 	note(&"left_working", _left_working(o, counts))
 	note(&"in_water", o.wet)
 	note(&"way_down", _way_down_wanted(o))
@@ -246,6 +215,19 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	refresh(counts, delta)
 
 
+## A drop that FED a machine (D0517): the plate lets go of any drop lesson -- the one up, and any queued,
+## since the queue would promote a stale NO MACHINE HERE onto the plate this same tick -- and the slot gets
+## the receipt. A receipt and a refusal never show together.
+func _let_go(receipt: String) -> void:
+	if _active in DropLessons.LESSONS:
+		_active = &""
+	_queue = _queue.filter(func(id: StringName) -> bool: return not DropLessons.LESSONS.has(id))
+	if receipt != "":
+		_refusals.receipt(receipt)
+	else:
+		_refusals.drop_done()
+
+
 ## The held verb's refusals, each on its own count in `Refusals`; BUILD's two ride the same channel (D0470).
 func _note_refusals(o: Interface.Observation, delta: float) -> void:
 	_refusals.read(o, delta)
@@ -261,6 +243,11 @@ func slot_text() -> String:
 
 func slot_alpha() -> float:
 	return _refusals.slot_alpha(_active)
+
+
+## The slot entry's kind (D0517): `Refusals.RECEIPT` for a fed drop's words, `Refusals.REFUSAL` otherwise.
+func slot_kind() -> StringName:
+	return _refusals.slot_kind()
 
 
 ## Detects acquisition edges against `counts` ({item: n}), fires the moments' rising edges, advances the
