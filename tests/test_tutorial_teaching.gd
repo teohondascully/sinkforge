@@ -375,10 +375,8 @@ func _test_wrong_stack_through_the_door() -> void:
 			tick.call(f, [])
 			if items.pack.count(item) > 0:
 				return
-	# The pad under the spawn, a metre down, then the cell beside it: clay banks a sixteenth a cell, and a blow
-	# spares the four cells under the boots (D0509), so one aim's bites come up a cell short of a block.
-	mine_until.call(Vector2i(anchor.x * 4 + 1, anchor.y * 4 + 5), &"clay", 600)
-	mine_until.call(Vector2i(anchor.x * 4 + 5, anchor.y * 4 + 5), &"clay", 600)
+	mine_until.call(Vector2i(anchor.x * 4 + 1, anchor.y * 4 + 5), &"clay", 600)      # the pad under the spawn, a metre down
+	mine_until.call(Vector2i(anchor.x * 4 + 5, anchor.y * 4 + 5), &"clay", 600)      # and beside it: a sixteenth a cell, the boots' cells spared (D0509, D0512)
 	mine_until.call(Vector2i((anchor.x - 1) * 4 + 1, anchor.y * 4 + 1), &"ore", 600)  # the vein a step left
 	_check(items.pack.count(&"clay") > 0 and items.pack.count(&"ore") > 0, "control: the pack holds clay (%d) and ore (%d) after the two digs" % [items.pack.count(&"clay"), items.pack.count(&"ore")])
 	var clay_slot: int = -1
