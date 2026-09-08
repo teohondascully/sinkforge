@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## acquisition edge fires once per world and never on the first frame; one bubble at a time with a queue
 ## in table order; the moments are rising edges read off the observation; busy freezes the clock and
 ## hides; a ceremony holds a lesson intact; the linger cap; taught ids survive a save and unknown ids
-## are dropped; resync re-arms. THE EDGE's pins (D0526) are here rather than in `test_hints_moments.gd`
+## are dropped; resync re-arms. THE EDGE's pins (D0529) are here rather than in `test_hints_moments.gd`
 ## because that suite stands at the size limit.
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_hints.gd
@@ -278,7 +278,7 @@ func _test_a_drop_that_hits_the_floor_teaches_once() -> void:
 	_check(h.active_id() == &"" and h.queued() == 0, "a second floor drop is not taught again")
 
 
-## D0526 (strangers 103-126, fourteen of twenty-four at the world's right edge under the clamped camera): a
+## D0529 (strangers 103-126, fourteen of twenty-four at the world's right edge under the clamped camera): a
 ## body within EDGE_CELLS of the right boundary of a 256-wide world teaches THE EDGE with the way back LEFT,
 ## and not a frame before; the middle of the world teaches nothing however long it stands there; the left
 ## boundary teaches it again with RIGHT, since the lesson is owed once at EACH edge; a second visit to a side

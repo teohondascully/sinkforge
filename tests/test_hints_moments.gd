@@ -2,7 +2,7 @@ extends "res://tests/test_base.gd"
 ## The moments of `view/hud/hints.gd` that read a situation off the observation, one pin set each: THE
 ## WAY DOWN (D0440), STILL WORKING (D0461), BEHIND ROCK (D0452), NOT ORE (D0450, D0458) and WRONG STACK
 ## (D0443). Split from `test_hints.gd` at the size limit; the queue, the edges and the clock stay there.
-## The DROP family (TOO FAR, the receipt, its eater's word -- D0517, D0525) is `test_drop_lessons.gd`,
+## The DROP family (TOO FAR, the receipt, its eater's word -- D0517, D0530) is `test_drop_lessons.gd`,
 ## split from here at the same limit.
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_hints_moments.gd

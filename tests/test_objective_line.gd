@@ -63,7 +63,7 @@ func _test_the_layout() -> void:
 	o.pack = [{"item": &"ore", "count": 4}]
 	later.refresh(o, 0.016)
 	var ack: Dictionary = ObjectiveLine.layout(later, font, 0.0)
-	_check(String(ack["text"]).begins_with("✓  Mine 4 ore") and String(ack["text"]).find("next: Forge 2 ingots") > 0, "rung 1 just latched: the plate acknowledges it AND names the next goal (D0525) (%s)" % ack["text"])
+	_check(String(ack["text"]).begins_with("✓  Mine 4 ore") and String(ack["text"]).find("next: Forge 2 ingots") > 0, "rung 1 just latched: the plate acknowledges it AND names the next goal (D0530) (%s)" % ack["text"])
 	later.refresh(o, 5.0)
 	var second: Dictionary = ObjectiveLine.layout(later, font, 0.0)
 	_check(not second.is_empty() and String(second["text"]).begins_with("Forge 2 ingots") and String(second["howto"]) != "", "the second step at 5 s: its goal and its how-to, not an empty sky (%s)" % second.get("text", ""))
@@ -150,7 +150,7 @@ func _test_the_cards_lead_with_the_walk() -> void:
 	_check(labels[&"smelt"].find("STAND beside the forge") >= 0, "the smelt card says WHICH machine to stand beside: the forge, not the ring that may be on the seam (%s)" % labels[&"smelt"])
 
 
-## D0525 (strangers 113 and 124): "✓ Forge 2 ingots" alone on the plate for the ACK_HOLD beat read as the end
+## D0530 (strangers 113 and 124): "✓ Forge 2 ingots" alone on the plate for the ACK_HOLD beat read as the end
 ## of the game -- "No new objectives appeared. Per instructions, I quit" -- while the state was already on the
 ## deliver rung. The tick card carries the next rung's goal after "next:", in the goal's ink (the `tail`
 ## paint draws in GOAL_INK); the last rung latched shows the all-done text; and every rung's acknowledged

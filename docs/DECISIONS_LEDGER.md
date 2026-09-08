@@ -20307,7 +20307,7 @@ corrected rather than weakening the gate. Final verification belongs to the clos
 **Reverse cost:** three small production edits and the new cost guard/profile suite; no stored state
 migration. Source: the director's instruction to improve D0522 toward a measured 360 fps target while
 retaining visual quality. No universal-hardware performance guarantee is made.
-## D0526 · 2026-09-08 · A lesson at the world's edge: the world ends here, what you were sent to is behind you
+## D0529 · 2026-09-08 · A lesson at the world's edge: the world ends here, what you were sent to is behind you
 
 **Decided:** (1) A STATE-EDGE lesson, THE EDGE, in `view/hud/hint_texts.gd`: "THE EDGE — the world ends
 here; there is nothing past it. Everything this step wants is behind you, to your {dir}: the WHITE RING
@@ -20372,7 +20372,7 @@ measured threshold. (iv) Not run: any seat or headed capture; the lesson's plate
 `LessonDock` unchanged (W13's file) and was not looked at on screen. (v) The ticket's "S104 and S120",
 "S121 and S126" and "fourteen of twenty-four" are the ticket's numbers, carried here, not re-counted
 against the recordings.
-## D0525 · 2026-09-08 · The acknowledged rung's card carries the next rung's goal; the receipt uses the ring's word
+## D0530 · 2026-09-08 · The acknowledged rung's card carries the next rung's goal; the receipt uses the ring's word
 
 **Decided:** (1) During `ObjectiveLine.ACK_HOLD` the plate reads "✓  <finished goal>   ·   next: <next goal>":
 `ObjectiveLine.NEXT_SEP` ("   ·   next: ") and the next rung's `goal` in `GOAL_INK` after the tick and the

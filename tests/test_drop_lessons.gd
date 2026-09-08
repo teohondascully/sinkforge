@@ -3,7 +3,7 @@ extends "res://tests/test_base.gd"
 ## short of a machine in sight (D0517, D0513's `short`), the RECEIPT a fed drop puts in the slot and the
 ## plate letting go of every drop lesson that tick (D0517), the receipt's eater -- the rig's demand counts,
 ## nothing in the window reads MACHINE -- and the eater's word being the RING's word for the machine, RIG
-## over CREW RIG (D0525). Split from `test_hints_moments.gd` at the size limit; the situation-read moments
+## over CREW RIG (D0530). Split from `test_hints_moments.gd` at the size limit; the situation-read moments
 ## (THE WAY DOWN, STILL WORKING, BEHIND ROCK, NOT ORE, WRONG STACK) stay there.
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_drop_lessons.gd
@@ -115,7 +115,7 @@ func _test_fed_receipt_eater_pins() -> void:
 	var paid: Interface.Observation = _drop_obs([], &"", rig)
 	paid.drop_went = &"fed"
 	h4.observe(paid, 0.016)
-	_check(h4.slot_text() == "2 INGOT → RIG", "two ingots fed to the rig, which wants them: 2 INGOT → RIG, the ring's word, not the record's CREW RIG (D0525) (\"%s\")" % h4.slot_text())
+	_check(h4.slot_text() == "2 INGOT → RIG", "two ingots fed to the rig, which wants them: 2 INGOT → RIG, the ring's word, not the record's CREW RIG (D0530) (\"%s\")" % h4.slot_text())
 	var h5: Hints = Hints.new()
 	h5.observe(_drop_obs([["clay", 3]], &"clay", forge), 0.016)
 	var odd: Interface.Observation = _drop_obs([], &"", forge)
@@ -134,7 +134,7 @@ func _test_fed_receipt_eater_pins() -> void:
 	_check(h6.active_id() == &"" and h6.slot_text() == "", "control: fed with no fall in the pack gives no receipt, and the plate still lets go (active %s, \"%s\")" % [h6.active_id(), h6.slot_text()])
 
 
-## D0525 (W3's flag in D0517): the receipt's word for a machine is the RING's word for it -- the ring under
+## D0530 (W3's flag in D0517): the receipt's word for a machine is the RING's word for it -- the ring under
 ## the rig says RIG, and "2 INGOT → CREW RIG" over it was two words for one machine. `DropLessons.RING_WORDS`
 ## is `RingWord.word` read by machine id, so each entry is pinned against the ring's own word for the rung
 ## whose ring stands on that machine (a pile of the item, for the two the ring finds lying on the ground); a
