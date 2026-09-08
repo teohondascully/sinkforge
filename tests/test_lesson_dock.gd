@@ -198,16 +198,16 @@ func _test_the_slot_names_every_floor_drop() -> void:
 	_check(h.active_id() == &"" and LessonDock.layout(h, f, font).is_empty(), "...and once it has read out, nothing is up (active %s)" % h.active_id())
 	h.observe(fell, 0.016)
 	var second: Dictionary = LessonDock.layout(h, f, font)
-	_check(second.has("slot") and not second.has("rect") and String(second["slot"]["text"]) == "DROPPED" and float(second["slot"]["alpha"]) > 0.99,
-		"the SECOND floor drop -- the lesson spent, no plate -- says DROPPED in the slot at once (\"%s\")" % str(second.get("slot", {}).get("text", "")))
+	_check(second.has("slot") and not second.has("rect") and String(second["slot"]["text"]) == "NO MACHINE HERE" and float(second["slot"]["alpha"]) > 0.99,
+		"the SECOND floor drop -- the lesson spent, no plate -- says NO MACHINE HERE in the slot at once (\"%s\")" % str(second.get("slot", {}).get("text", "")))
 	var srect: Rect2 = second.get("slot", {}).get("rect", Rect2())   # `.get` so a red above does not crash the run and shrink the count
 	_check(absf(srect.end.y - UiTheme.px(Hotbar.HOTBAR_BAND_TOP - LessonDock.BAND_GAP)) < 0.01, "...seated at the dock's foot, no lesson under it (foot %.0f px)" % srect.end.y)
 	h.observe(calm, Refusals.SLOT_LINGER - Refusals.SLOT_FADE - 0.1)
-	_check(h.slot_text() == "DROPPED", "still up a second after the drop, inside the linger (\"%s\")" % h.slot_text())
+	_check(h.slot_text() == "NO MACHINE HERE", "still up a second after the drop, inside the linger (\"%s\")" % h.slot_text())
 	h.observe(calm, Refusals.SLOT_FADE + 0.5)
 	_check(h.slot_text() == "" and LessonDock.layout(h, f, font).is_empty(), "%.1f s past the drop (linger %.1f s): no slot, no dock (\"%s\")" % [Refusals.SLOT_LINGER + 0.4, Refusals.SLOT_LINGER, h.slot_text()])
 	h.observe(fell, 0.016)
-	_check(h.slot_text() == "DROPPED", "a THIRD floor drop after the linger says it AGAIN: the slot latches nothing (\"%s\")" % h.slot_text())
+	_check(h.slot_text() == "NO MACHINE HERE", "a THIRD floor drop after the linger says it AGAIN: the slot latches nothing (\"%s\")" % h.slot_text())
 
 
 ## The wrong stack (D0443, D0496): the same fixture as `test_hints_moments._test_wrong_stack_pins` --

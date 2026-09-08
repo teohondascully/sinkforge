@@ -37,7 +37,7 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"mined_wrong", "text": "NOT ORE — that was {broke}, and the task wants ore. The ore is the silver-flecked rock inside the WHITE RING: cut that one."},
 	{"id": &"dropped_wrong", "text": "WRONG STACK — you dropped {dropped}; the machine beside you takes {wanted}. Press the number over the {wanted} in your bar to hold it, then [DROP]."},
 	{"id": &"left_working", "text": "STILL WORKING — the forge has more of your ore in it, and what it makes comes to you only while you stand beside it. Step back and wait: {more} more coming."},
-	{"id": &"dropped_floor", "text": "DROPPED — the stack fell at your feet, and you pick up what lies there as you stand. A machine takes a drop from within a body length, over it or beside it; the WHITE RING marks the one this step wants."},
+	{"id": &"dropped_floor", "text": "NO MACHINE HERE — the stack fell at your feet, and you pick up what lies there as you stand. A machine takes a drop from within a body length, over it or beside it; the WHITE RING marks the one this step wants."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
 	{"id": &"way_down", "text": "THE WAY DOWN — the ground is rock you can cut. Point at the ground under you and hold [MINE]: the metre opens and you drop into it. One metre at a time is a safe fall."},
 	{"id": &"deep_enough", "text": "GRAPPLE — POINT at rock above you and press [GRAPPLE] to throw your line there. Hold [REEL] to climb it, press [GRAPPLE] again to let go and fly."},

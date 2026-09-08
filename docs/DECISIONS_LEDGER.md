@@ -19392,3 +19392,18 @@ smelt card; this is the deliver card's turn.
 **Verified:** `tests/test_objective_line.gd` (42): the deliver card names the ring and NUMBER within 141
 chars; no rung past the first says "beside you"; none says "hold them". `test_objectives` 32,
 `test_tutorial_teaching` 70 unchanged.
+
+## D0508 · 2026-09-07 · The floor drop's headline is NO MACHINE HERE, not DROPPED
+
+**Decided:** the `dropped_floor` lesson (D0428) opens "NO MACHINE HERE — the stack fell at your feet..."; the
+refusal slot therefore says NO MACHINE HERE on every floor drop (D0496). The rest of the lesson is unchanged.
+
+**Why (strangers 98 and 102, batch 97-102):** both read the word DROPPED as the drop SUCCEEDING -- "First
+DROPPED ingot created from forge" (S98, five times, its ore on the floor at cells 166 and 134 the whole
+time); "+8 ore then +10 coal when items dropped at forge; ingots appeared" (S102, the floats of its own
+stacks scooped back up at cell 152, four metres from any forge). A word that names the action confirms it;
+the word has to name the miss. NO MACHINE HERE says why the stack is on the ground and, with D0505's ring
+on a dropped stack and the lesson's "the WHITE RING marks the one this step wants", where to go.
+
+**Verified:** `test_hints` 48, `test_lesson_dock` 44, `test_hints_moments` 31, `test_objective_line` 42, the
+DROPPED pins re-pointed at the new headline.
