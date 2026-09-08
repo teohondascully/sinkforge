@@ -16,11 +16,13 @@ SEED_ARG=""
 [ -n "${SEED:-}" ] && SEED_ARG="--seed=$SEED"      # SEED=<n> boots another world (the holdout, D0460)
 LOAD_ARG=""
 [ -n "${LOAD:-}" ] && LOAD_ARG="--load=$LOAD"      # LOAD=<save> opens a session instead of a new game (D0462)
+TILE_ARG=""
+[ -n "${TILE:-}" ] && TILE_ARG="--tile=$TILE"      # TILE=i,n puts the window in cell i of a grid of n (D0501)
 case "$DIR" in /*) ;; *) echo "seat.sh: the session dir must be absolute" >&2; exit 2 ;; esac
 mkdir -p "$DIR"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 open -n -a "$GODOT" --args --path "$ROOT" --resolution 1280x720 --disable-vsync --position 0,0 --always-on-top \
-	--log-file "$DIR/seat.out" --script res://playtest/seat.gd -- "--session-dir=$DIR" --launcher=launchservices $SEED_ARG $LOAD_ARG
+	--log-file "$DIR/seat.out" --script res://playtest/seat.gd -- "--session-dir=$DIR" --launcher=launchservices $SEED_ARG $LOAD_ARG $TILE_ARG
 for _ in $(seq 1 60); do
 	[ -f "$DIR/frame_0000.png" ] && exit 0
 	sleep 1

@@ -1,0 +1,2 @@
+# Godot must not import these: 3,462 recorded frames were 2.9 GB of import cache and most of every --import (D0501).
+# Suites and tools read this tree through FileAccess / Image.load_from_file, which .gdignore does not affect.

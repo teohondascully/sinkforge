@@ -45,6 +45,10 @@ func _initialize() -> void:
 			session_dir = arg.trim_prefix("--session-dir=")
 		elif arg.begins_with("--launcher="):
 			launcher = arg.trim_prefix("--launcher=")
+		elif arg.begins_with("--tile="):
+			var parts: PackedStringArray = arg.trim_prefix("--tile=").split(",")
+			if parts.size() == 2:
+				tile = Vector2i(int(parts[0]), int(parts[1]))
 		elif arg.begins_with("--load="):
 			load_from = arg.trim_prefix("--load=")
 	if not session_dir.is_absolute_path() or not DirAccess.dir_exists_absolute(session_dir):
@@ -58,8 +62,20 @@ func _initialize() -> void:
 	_start.call_deferred()
 
 
+## TILED SEATS (D0501): `--tile=i,n` puts this seat in cell i of a grid of n on the screen, its window
+## shrunk to the cell while the RENDER stays 1280x720 (viewport stretch at a fixed content size), so six
+## clients sit side by side, none covering another, none covering the director's whole screen, and every
+## capture and every pointer the agent sends keeps the same 1280x720 coordinates. Legacy's seat used the
+## project's canvas_items stretch, whose render follows the window: a small window would have meant a
+## small screenshot.
+var tile: Vector2i = Vector2i(-1, 0)
+const TILE_COLS: int = 3
+
+
 func _start() -> void:
 	root.size = Vector2i(1280, 720)
+	if tile.x >= 0:
+		_tile_window()
 	Input.use_accumulated_input = false
 	# D0452: the frame cap keeps an idle seat at ~2.5% of a core instead of spinning; the occluded-window
 	# sleep (the engine's own, when nothing can draw) is a millisecond, not seven. `playtest/seat.sh` is the
@@ -86,6 +102,22 @@ func _start() -> void:
 		"loaded_from": load_from})
 	ready = true
 	remaining = 1
+
+
+## The window into its cell: the screen split into TILE_COLS columns and as many rows as n needs, the
+## window sized to the cell keeping 16:9, the render pinned at 1280x720 and scaled into it.
+func _tile_window() -> void:
+	var screen: Vector2i = DisplayServer.screen_get_usable_rect().size
+	var origin: Vector2i = DisplayServer.screen_get_usable_rect().position
+	var rows: int = maxi((tile.y + TILE_COLS - 1) / TILE_COLS, 1)
+	var cell := Vector2i(screen.x / TILE_COLS, screen.y / rows)
+	var w: int = mini(cell.x, cell.y * 16 / 9)
+	var size := Vector2i(w, w * 9 / 16)
+	root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+	root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+	root.content_scale_size = Vector2i(1280, 720)
+	DisplayServer.window_set_size(size)
+	DisplayServer.window_set_position(origin + Vector2i((tile.x % TILE_COLS) * cell.x, (tile.x / TILE_COLS) * cell.y))
 
 
 func _physics_process(_delta: float) -> bool:

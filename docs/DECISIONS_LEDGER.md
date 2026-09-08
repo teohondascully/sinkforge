@@ -19275,3 +19275,30 @@ the word is still not clamped to the canvas (D0499's item 2 stands).
 **Verified:** 6 asserted; the mutant that removes the guide's call to `RingWord.draw_under` fails three
 (word, rect, alpha). `check_ci_suite_count` and `check_suite_coverage` pass with the suite tracked and the
 step's label at 137.
+
+## D0501 · 2026-09-07 · N clients at once: a worktree and a tile per seat, fresh directories by construction, the recordings unimported
+
+**Decided (the director: "each subagent able to play their respective client ... this is high priority"):**
+(1) `playtest/batch.py start N` is the one way to run a batch: it allocates stranger numbers past the highest
+under `--root` (a session directory is never reused), writes a mission per seat from a template, adds a
+detached git worktree per seat at the pinned head with `.godot/` cloned into it (APFS clonefile), boots each
+seat from its OWN worktree's `seat.sh` with `TILE=i,N`, reads the seat's own `seat.out` for the boot line
+(never `batch.json`, which a first boot wrote), starts the supervisor, and writes a batch manifest; `stop`
+kills the batch's seats and supervisor and removes its worktrees. (2) `--tile=i,n`: the seat pins its render
+at 1280x720 (viewport stretch, aspect kept) and shrinks its window into cell i of a three-column grid over
+the usable screen, so N clients sit side by side, none occluded, the director's screen not covered, and
+every capture and pointer keeps 1280x720 coordinates. (3) `tests/body/recordings/.gdignore`: Godot no longer
+imports the 3,462 recorded frames; `.godot/` fell from 2.9 GB to 3 MB and a full `--import` from minutes to
+3 s, which is what makes a cache clone per seat free.
+
+**Why:** nothing ever serialised the seats (six played at once for 70-75 and 76-81; the harness lock is the
+suite battery's), but three things bounded N: one shared checkout and import cache (an orchestrator edit or
+import during a batch is a hazard), session directories that must be fresh (batch 82-87 was VOID: a rejected
+tool call had already booted six seats into the directories, the second boot refused them, the supervisor
+read the old pids as death, one directory got two seats), and windows stacked at one corner at full size.
+The adapter, the controls and the pointer needed no change: each seat poses its own.
+
+**Verified:** `test_recorded_sessions` 5 and `test_beacon_probe` 13 pass with the `.gdignore` (they read the
+tree through FileAccess and `Image.load_from_file`, which it does not affect); the import cache rebuilt in
+3.09 s at 3.0 MB. The batch command's first live run is the next batch's boot line, read from each seat's
+own log.
