@@ -142,6 +142,16 @@ D0518 (new_game's 2.8 s by sub-phase). Found by reading G's report: D0506 left t
 blank for the session (created from an empty image at mount, never uploaded); fixed D0511, evidenced by a
 GPU readback (2439 non-clastic cells on the CPU, 0 on the GPU before, 2439 after).
 
+**The five landed (D0513, D0515, D0516, D0517, D0518) plus D0519:** a drop with its eater in sight but out
+of reach is refused with the stack in hand (`Interface.Result` moved to `interface/result.gd`); the smelt
+and deliver cards open with WALK and STAND; the HUD's slot prints a FED receipt ("6 COAL → FORGE"), a TOO
+FAR lesson names the machine, its metres and LEFT/RIGHT, and the plate lets a drop lesson go on a feed
+(`view/hud/drop_lessons.gd`); the floor-ambiguity check reports only a surface the feet had reached (19
+reports in a 600-tick walk to 0, three wrong pins turned around); `new_game` clocks its phases (generation
+2.1 s of 2.7 s) and the snapshot restore was proven by signature, so the batch now makes one snapshot per
+head and every seat opens it: 2733 ms to 701 ms a seat, first frame byte-identical. 139 suites.
+
 **For the director:** the stride (T035, the number above); the layout (the forge is the only thing LEFT of
 the spawn, the RIG at +2 is the machine strangers find and feed first); D3–D6's rewards; the hotbar when
-the pack is empty (D0412's history). **Next:** the five workers land, a batch on D0513/D0517/D0515.
+the pack is empty (D0412's history); the receipt names the rig CREW RIG where the ring says RIG (W3's flag).
+**Next:** strangers 109-114 on this head.
