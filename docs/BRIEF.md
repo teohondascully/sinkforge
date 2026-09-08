@@ -98,7 +98,23 @@ bubble the rung does not ring stands down to 0.30 while the ladder runs, on terr
 FORGE, RIG, DRILL, MOUTH (D0499). One capture of the pad shows all six together. Every worker's commit was
 re-run here before the pick; gates 28 of 28.
 
-**For the director:** the stride (T035: four D bursts took S79 31 m past the pad); D3–D6's rewards; the
-seam's new grey-blue against the vein's blue-white (a stranger may read both as ore; the next batch
-decides). **Verification cadence:** touched suites locally, gates once a push, the battery on CI. **Next
-batch** on this head: it measures the six at once.
+**Strangers 90-95 on the fleet's head (all VALID; `docs/playtests/2026-09-07_strangers90-95_fleet.md`):**
+ore 6 of 6, coal 3 (from 2), two ingots 3 (from 1), delivered 2 (from 1), the drill set, fuelled and the
+first automation 1 (from 0): **S91 is the first stranger through the automation rung (56 s) and the first
+to say it would keep playing;** S94 forged in 19 s. The seam is found and its word read; nobody hunted
+"black", nobody fed the rig. Two new walls with receipts, both fixed: TOO FAR DOWN at a surface seam
+(D0473 measured "buried" from the body's centre; now from the feet, D0504) and a stack of ingots dropped
+eight metres past the rig with the ring still on the rig (the ring goes to the dropped stack first, D0505).
+Batch 82-87 before it was VOID: a rejected boot had already run into the directories.
+
+**The harness, at the director's ask (D0501, D0503):** `playtest/batch.py` boots N clients at once, each
+from a 6 MB copy-on-write copy of the runtime tree (a worktree was 589 MB), tiled across the screen with the
+render pinned at 1280x720, into fresh directories by construction; the recordings are `.gdignore`d (the
+import cache 2.9 GB -> 3 MB, `--import` minutes -> 3 s); six seats boot in 13 s. The tiles hold still
+between bursts by design (the sim runs only for a stranger's ticks). The ring's word is pinned on the real
+draw pass (D0500, the 137th suite) and the card's lines fit the card (D0502).
+
+**For the director:** the stride (T035: one 60-tick D is nine metres; S94 overshot the rig by six, S92
+walked to +31 m); the first press at the screen's centre (S90, S65); the hotbar when the pack is empty;
+D3–D6's rewards. **Next:** a batch on this head measures D0504 and D0505; the world snapshot for the boot's
+2.8 s if a loaded fresh game can be shown to sign as a generated one.
