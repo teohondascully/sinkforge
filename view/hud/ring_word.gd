@@ -38,6 +38,12 @@ const RIM_STEPS: Array[Vector2] = [Vector2(-1.0, 0.0), Vector2(1.0, 0.0), Vector
 
 ## The word for the rung `id` whose ring stands on `at` (world px), or "" for a rung with no target and for
 ## a rung that points at nothing nameable. Pure over the observation.
+## What the last draw pass decided (word, rect, alpha), the one witness a suite has that `TargetGuide.paint`
+## reached this far: every pin over `word`/`label_rect` is pure, and a broken `draw_string` would be a quiet
+## green without it (D0499's own caveat).
+static var last_drawn: Dictionary = {}
+
+
 static func word(id: StringName, o: Interface.Observation, at: Vector2) -> String:
 	if o == null or at == TargetGuide.NONE:
 		return ""
@@ -123,6 +129,7 @@ static func draw_under(ci: CanvasItem, frame: Frame, id: StringName, at: Vector2
 	var text: String = word(id, frame.obs, at)
 	var font: Font = ThemeDB.fallback_font
 	var rect: Rect2 = label_rect(font, text, centre, r, clearances(frame, TargetGuide.target_metre(at)))
+	last_drawn = {"word": text, "rect": rect, "alpha": alpha}   # the draw pass's own receipt, for `tests/test_ring_word.gd`
 	if rect.size == Vector2.ZERO:
 		return
 	var pen := Vector2(rect.position.x + UiTheme.px(PAD), rect.position.y + font.get_ascent(UiTheme.pt(FS)))

@@ -19257,3 +19257,21 @@ world's 4px cell; legacy's cell is one METRE and a metre here is 16 cells, so th
 legacy's mark COVERAGE (its grain quad is ~6.2 px² of a 1024 px² cell) and not its mark COUNT. Both
 readings are defensible, it moves every nugget material, and `nugget_count` fixed coal alone without
 touching it.
+
+## D0500 · 2026-09-07 · The ring's word is pinned on the real draw pass; `RingWord.last_drawn` is the pass's receipt
+
+**Decided:** `tests/test_ring_word.gd` (registered as the 137th suite) hosts `TargetGuide.paint` through a real
+`WorldView` over the seeded tutorial world, the camera on the body at play zoom as the shell puts it, a fresh
+ladder on rung MINE: the pass reaches the word, it is ORE, its rect lies on the canvas, at the ring's full
+alpha; then the ladder finished, the receipt stays empty. `RingWord.draw_under` writes `last_drawn` (word,
+rect, alpha) before it draws: one static the suite reads, the only witness that the pass got that far.
+
+**Why:** D0499 said so under Provisional: every pin over `RingWord` was pure, and a broken `draw_string`
+would have been a quiet green; the worker verified the pass once with a throwaway probe. The first run of
+this suite found the worker's other caveat live: with the camera at the origin the ring stood at the
+canvas's edge and the word's rect ran off it (y 709 of 720). The suite puts the camera where the shell does;
+the word is still not clamped to the canvas (D0499's item 2 stands).
+
+**Verified:** 6 asserted; the mutant that removes the guide's call to `RingWord.draw_under` fails three
+(word, rect, alpha). `check_ci_suite_count` and `check_suite_coverage` pass with the suite tracked and the
+step's label at 137.
