@@ -51,8 +51,10 @@ scoped results, not a portable archived benchmark.
 2. Bound visible streaming too: D0524 explicitly admits visible missing chunks beyond its budget.
    Shrinking the background budget alone cannot bound that frame. Inspect prefetch coverage and upload
    cost before adding more scheduling rules; never accept holes or stale dig silhouettes as a speedup.
-3. Prototype the T040 data-texture/shader path behind a comparison switch, one representative region
-   first. Keep sim/observations unchanged. Measure data preparation, upload and GPU cost separately;
+3. Continue the T040 data-texture/shader prototype now implemented by the engineer in D0528,
+   behind `--shader-tone` and off by default. Do not build a second adapter. Resolve the seam and
+   appearance differences reported in T040 before enabling it. Keep sim/observations unchanged.
+   Measure data preparation, upload and GPU cost separately;
    compare surface, cave lips, bedded rock and moving-camera edges against the current CPU reference.
    A shader is not automatically cheap, and a changed noise implementation is an art change, not exact
    parity. Preserve the current look before making it default. No unmeasured “near-free” upload claim.

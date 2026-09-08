@@ -1,6 +1,28 @@
 # Brief
 
-**Last updated: 2026-09-07.** Repository cleanup Batches 1–2, starting at `61b50fa4`; D0480.
+**Last updated: 2026-09-08.** Tooling/CPU-shading verification reconciled through 41f00226; prior entries retained.
+
+## What was learned — tooling and terrain closeout, September 8 (D0525/D0526/D0532)
+
+The existing CPU shading contained avoidable work: name decoding for solidity, zero-weight bedding,
+and per-cell AO arrays. Removing those reduces the sampled shading cost 40-56%, with identical colour
+hashes; it does not establish sustained 360 fps. The headed runs still have long-tail stalls, and
+presentation updates on the physics tick. Commands and bounded results live in [PERF_PLAN](PERF_PLAN.md).
+
+The iteration tools are committed at 5151e8ac: complete runner accounting, optional parallel battery,
+timing summaries, explicitly historical reporting receipts, and the original-PNG tool-response pilot.
+The pilot is not a measured live-model speedup. The long fuzz regression now starts first; one jobs=2
+comparison fell from 290 to 270 seconds without removing any of its 747,000 ticks.
+
+Verification: all 28 gates and 142 suites passed in the completed full battery after correcting the
+stale suite-count label. During the pause the engineer incorporated the CPU work in c8385ca3 and
+advanced main to 41f00226. Its additional work raises the suite population to 144; twelve focused
+integration suites pass there, but the earlier full run is not certification of that later head.
+D0528's shader prototype exists and stays off by default; resolve its reported seam/appearance
+differences before enabling it. D0531's redraw optimization is also present. Do not duplicate either.
+The closing gate-status report completed on 41f00226: no unnumbered FAIL/SKIPPED steps; the Linux
+display-install command fails locally on macOS while CI reports success. This is not a full local
+144-suite rerun. The reconciliation below is documentation-only and has not been pushed by this session.
 
 ## Delivered
 

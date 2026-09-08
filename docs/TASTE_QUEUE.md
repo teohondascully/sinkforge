@@ -339,6 +339,7 @@ tone with the D0522/D0524 budgets as its ceiling.*
 
 **September 8 update (D0526):** the director authorized performance improvements, and an exact-colour
 CPU slice removes 40-56% of sampled `RockTone.shade` time before any GPU port. The binary fork above is
-therefore too strong: the CPU path had redundant work. The GPU experiment remains unimplemented, and
+therefore too strong: the CPU path had redundant work. D0528 subsequently implemented the GPU experiment
+behind an off-by-default flag; its appearance differences remain unresolved, and
 its estimated ~1 us data-build cost is not a measurement. See [the current performance plan](PERF_PLAN.md)
 for scope, actual timings and the remaining visible-streaming/interpolation work. No art change landed.

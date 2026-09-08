@@ -32,7 +32,7 @@ lesson at the world boundary (D0529) and the acknowledged rung's card naming the
 receipt using the ring's word (D0530) -- the last two answer the walls 121-126 left and are UNMEASURED:
 the next batch is their test.
 
-The director's freeze, measured and fixed: every stall was the terrain bake, not the sim (0.3 ms a tick
+The director's freeze, measured and mitigated: the investigated blow stalls were terrain bake work, not the sim (0.3 ms a tick
 headless). A blow repaints its own dilated rectangle, chunks are 16 cells, and the streaming lane budgets
 solid cells a tick (D0522, D0524: worst blow frame 419 -> 60 ms, a shaft fall's worst 80-90 -> 22-23 ms);
 a still frame redraws only the layers whose input moved (D0531, ~5% of the still tick; the 18 ms still
@@ -57,7 +57,11 @@ Active director assignment: optimize the terrain shading hot path after the engi
 preserving appearance. 360 fps is a measured host-specific target, not a hardware-independent guarantee.
 Implemented D0526: bounded byte solidity, skip zero-weight bedding, reuse AO offsets. The focused
 shading sample costs 40-56% less with identical colour hashes; this is not a full-frame speedup claim.
-The CPU slice is under full verification; the GPU port and presentation interpolation remain undone.
+The CPU slice was incorporated in c8385ca3. Its full verification passed 28 gates and 142 suites before
+the engineer's subsequent additions; that run is not certification of the now-144-suite tree.
+D0528 subsequently added the GPU prototype, off by default; appearance parity and presentation
+interpolation remain undone. Twelve focused integration suites pass on 41f00226 (D0532), including
+the shader-data path, world view and main boot; the current full 144-suite battery was not rerun here.
 Reproduction and next bottlenecks: [performance plan](PERF_PLAN.md).
 The gameplay section above was reconciled by the engineer at their 2026-09-07 late checkpoint
 (after strangers 115-120); the batch queue is theirs, the tooling queue is this section's.

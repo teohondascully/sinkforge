@@ -20730,3 +20730,24 @@ recomputed -- 0.93 of the 2.14 ms is there, and it needs `view/visuals/sky_paint
 `sum_draw_usec` total counts engine-initiated redraws (a resize, a focus change) as well as the
 coordinator's, identically in both arms. (g) All numbers here are from this worktree at 5f72b802 + this
 change; no comparison is made to D0527's, whose runs were partly paced and carried an instrumented sky.
+
+## D0532 · 2026-09-08 · Schedule the long regression first; reconcile concurrent integration
+
+**Decided:** move the existing D0122 fuzz-regression suite to the front of the workflow's parallel
+list. No suite, seed or assertion is removed. It replays 498 × 1,500 ticks and was the final worker
+still running while the second slot was idle. The shared-tree engineer incorporated this reorder and
+D0526's CPU changes in c8385ca3; do not create a second implementation commit for them.
+
+**Evidence:** at jobs=2, the first 142-suite run passed all suites in 290 s, its slowest suite 165 s;
+the reordered run passed all 142 in 270 s, with the same slowest suite at 165 s. The latter full battery
+also passed all 28 gates. This is one local comparison, not a general CI-speed guarantee. Logs:
+`/tmp/sinkforge-shading-battery.log` and `/tmp/sinkforge-shading-battery-final.log`.
+
+**Scope correction:** main advanced to 41f00226 during the pause, adding D0528's disabled shader
+prototype and D0531's redraw work. Its workflow has 144 suites; the earlier 142-suite run does not
+certify it. Twelve focused integration suites passed on this new head, including shader data, world
+view and main boot. The suite-count and ledger-integrity checks also pass. Reconciled the performance
+plan and working state so they no longer call the now-existing GPU prototype unimplemented.
+
+**Reverse cost:** reorder one workflow argument list. The regression remains mandatory, and the runner
+still accounts for every requested result. No persistent timing cache or new scheduling service.
