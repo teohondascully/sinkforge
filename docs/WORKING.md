@@ -26,14 +26,24 @@ grammar texture (D0506, D0511), the drop refused with the stack in hand when its
 out of reach (D0513), the FED receipt and the TOO FAR lesson with metres and direction (D0517), the cards
 leading with WALK and STAND (D0515), the floor-ambiguity check bounded to its subject (D0516: 0 reports a
 seat, from 38-168), new_game's phases and the batch's fresh-game snapshot (D0518, D0519: a seat boots in
-0.7 s, six in 5.4 s wall), the mission's tick calibration (D0520: it did not change the actor's walks), the ring's IN REACH state
-(D0521), the spider cracks removed at the director's ask (D0523).
+0.7 s, six in 5.4 s wall), the mission's tick calibration (D0520: it did not change the actor's walks),
+the ring's IN REACH state (D0521), the spider cracks removed at the director's ask (D0523), THE EDGE
+lesson at the world boundary (D0529) and the acknowledged rung's card naming the next rung with the
+receipt using the ring's word (D0530) -- the last two answer the walls 121-126 left and are UNMEASURED:
+the next batch is their test.
+
+The director's freeze, measured and fixed: every stall was the terrain bake, not the sim (0.3 ms a tick
+headless). A blow repaints its own dilated rectangle, chunks are 16 cells, and the streaming lane budgets
+solid cells a tick (D0522, D0524: worst blow frame 419 -> 60 ms, a shaft fall's worst 80-90 -> 22-23 ms);
+a still frame redraws only the layers whose input moved (D0531, ~5% of the still tick; the 18 ms still
+frames themselves are display pacing and a slow host, D0527, not a painter). The floor left is the CPU
+molded tone at 18-25 microseconds a solid cell: T040 in the taste queue carries the shader evidence
+(D0528, behind a flag that is OFF) and the orchestrator's read that its picture is not yet the CPU's.
 
 For the director (numbers in the reports): the stride at 9 m/s against a 3.2 m reach (T035); the layout
-(the forge alone lies left of the spawn; eleven of eighteen seats walked to the world's right edge, 30 m,
-and dropped things there); D3-D6's rewards; the hotbar with an empty pack (D0412); the receipt's CREW RIG
-against the ring's RIG. Unresolved and unchanged: the running stride, the grapple, wood, the sinkholes
-near the pad, evaluator diagnostics in observations. The rig-as-consumer economy (A' step 7) is still
+(the forge alone lies left of the spawn, and everything else right of it); D3-D6's rewards; the hotbar
+with an empty pack (D0412); T040's fork. Unresolved and unchanged: the grapple, wood, the sinkholes near
+the pad, evaluator diagnostics in observations. The rig-as-consumer economy (A' step 7) is still
 unimplemented; the rig pays the drill for two ingots (D0485) and the winch pair for six (D0492).
 
 ## Repository cleanup (director-approved)
