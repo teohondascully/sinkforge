@@ -7,7 +7,8 @@ extends RefCounted
 ## SMELT, a trunk for WOOD, the crew's drill for BUILD, the coal seam for FUEL, the cache for the later rungs
 ## -- with the same alpha the rung's how-to has, so it arrives when the lesson does, fades when the lesson
 ## fades, and comes back when the player has stalled. It never highlights what is not on screen: the search
-## is the observation's own window.
+## is the observation's own window. This file finds the target; `RingPainter` draws it, and on a machine
+## target draws the drop's own reach as a state (D0521).
 
 const TREE: Array[StringName] = [&"wood", &"leaves"]   ## a tree over its own trunk is not roof (D0478)
 const RING_M: float = 0.9              ## the ring's radius, metres
@@ -236,6 +237,8 @@ static func _nearest_pile(o: Interface.Observation, body: Vector2, item: StringN
 	return best
 
 
+## The chip's own pass: what to ring, at what alpha; the drawing is `RingPainter`'s (out of this file for
+## the size gate, D0521), which also reads the drop's reach for a machine target and draws it as a state.
 func paint(frame: Frame, ci: CanvasItem) -> void:
 	if frame == null or frame.obs == null or objectives == null or objectives.all_done():
 		return
@@ -245,34 +248,7 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	var at: Vector2 = _cached_target(objectives.current_id(), frame.obs)
 	if at == NONE:
 		return
-	var canvas: Vector2 = frame.canvas_of(at)
-	if not Rect2(Vector2.ZERO, UiTheme.CANVAS).has_point(canvas):
-		return
-	var breath: float = 0.55 + 0.45 * sin(frame.anim_time * TAU * BREATH_HZ)
-	var body: Vector2 = Vector2(float(frame.obs.pos_x), float(frame.obs.pos_y)) / float(Fx.SCALE)
-	var r: float = ring_m(body.distance_to(at) / float(Interface.Observation.LOGIC_PX)) * float(o_px_per_m(frame)) * (0.92 + 0.08 * breath)
-	var ink: float = alpha * (0.55 + 0.4 * breath)
-	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(RIM, alpha * 0.6), RING_WIDTH + 2.0, true)
-	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(INK, ink), RING_WIDTH, true)
-	for d: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
-		ci.draw_line(canvas + d * (r + 2.0), canvas + d * (r + 2.0 + TICK_LEN), Color(RIM, alpha * 0.6), RING_WIDTH + 2.0, true)
-		ci.draw_line(canvas + d * (r + 2.0), canvas + d * (r + 2.0 + TICK_LEN), Color(INK, ink), RING_WIDTH, true)
-	if near(body.distance_to(at) / float(Interface.Observation.LOGIC_PX)):
-		_outline(frame, ci, target_metre(at), alpha, ink, breath)
-	var cut: Rect2 = cut_metre(frame.obs, at)
-	if cut.size != Vector2.ZERO:
-		_outline(frame, ci, cut, alpha, ink, breath)
-	# THE RING SAYS WHICH THING (D0499, stranger 79 stood inside the seam's ring and strode past): one word
-	# under it, in this ink, laid out by `RingWord` -- the table and the layout are out of this file's cap.
-	RingWord.draw_under(ci, frame, objectives.current_id(), at, canvas, r, alpha)
-
-
-## The target's metre, or the metre to cut, drawn as the one white square with its rim.
-func _outline(frame: Frame, ci: CanvasItem, metre: Rect2, alpha: float, ink: float, breath: float) -> void:
-	var rect := Rect2(frame.canvas_of(metre.position), frame.canvas_of(metre.end) - frame.canvas_of(metre.position))
-	ci.draw_rect(rect, Color(INK, alpha * NEAR_FILL * breath))
-	ci.draw_rect(rect.grow(1.0), Color(RIM, alpha * 0.6), false, RING_WIDTH + 2.0)
-	ci.draw_rect(rect, Color(INK, ink), false, RING_WIDTH)
+	RingPainter.draw(frame, ci, objectives.current_id(), at, alpha)
 
 
 ## THE CUT MARK (T038's second answer, D0458): a target under the ground -- the crew's drill three metres
@@ -320,7 +296,8 @@ static func target_metre(at: Vector2) -> Rect2:
 	return Rect2(Vector2(floorf(at.x / m), floorf(at.y / m)) * m, Vector2(m, m))
 
 
-## Whether the target is close enough that the ring has tightened to a speck and the block's outline carries it.
+## Whether the target is close enough that the block's outline carries it: the POINTER's rule (D0443), for
+## the block a hold must land on. The drop's rule is `Reach`'s and is read by `RingPainter.in_reach`.
 static func near(dist_m: float) -> bool:
 	return dist_m <= NEAR_M
 

@@ -25,10 +25,11 @@ const LOGIC_TILE_PX: int = Body.LOGIC_TILE_PX     ## 16 -- one metre, on both si
 
 ## REACH. Legacy `REACH_CELLS = 3.2` at its own 32px cell is 102.4px -- but legacy's 32px cell and this
 ## world's 16px logic tile are both ONE METRE, so the portable quantity is 3.2 METRES, not 102.4 pixels.
-## That is 51.2px here, or 12.8 terrain cells. Held as a rational so the squared comparison below stays in
-## exact integers: 3.2 == 16/5.
-const REACH_NUM: int = 16
-const REACH_DEN: int = 5
+## That is 51.2px here, or 12.8 terrain cells. Held as a rational so the squared comparison stays in exact
+## integers: 3.2 == 16/5. The rational and the compare are `core/reach.gd`'s since D0521, so the ring can
+## draw the drop's own line (`view` may not read this file); these are the sim's names for them.
+const REACH_NUM: int = Reach.NUM
+const REACH_DEN: int = Reach.DEN
 
 ## CHARGE. Legacy accumulates `delta * speed * (1 + rhythm * RHYTHM_SPEED)` seconds and breaks at the
 ## material's hardness, also in seconds. `speed` is always exactly 1.0 there -- legacy's own

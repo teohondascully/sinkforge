@@ -29,22 +29,14 @@ const SPAN: int = (Mining.REACH_NUM * Mining.LOGIC_TILE_PX + Mining.REACH_DEN * 
 ## THE ONE REACH RULE (`Mining.REACH_NUM/DEN` metres, Euclidean, inclusive, compared squared): is the
 ## `Fx` point within reach of the body? `Mining.in_reach` delegates here for a terrain cell's centre and
 ## `in_reach_logic` for a metre's, so the verbs that work at the metre share the primitive's circle.
-## Squared, never `sqrt`. The axis reject first BOUNDS the operands: without it a body at the bottom of a
-## 4096 px world squaring a full-height delta runs near int64's headroom; after it both terms are bounded.
+## The arithmetic is `core/reach.gd`'s since D0521 -- the ring has to draw the drop's own line, and `view`
+## may not read this file -- so this is the sim's name for it, with the sim's tile; nothing else changed.
 static func in_reach_point(body_x: int, body_y: int, point_x: int, point_y: int) -> bool:
-	var dx: int = point_x - body_x
-	var dy: int = point_y - body_y
-	var bound: int = ((Mining.REACH_NUM * Mining.LOGIC_TILE_PX) / Mining.REACH_DEN + 1) * Fx.SCALE
-	if absi(dx) > bound or absi(dy) > bound:
-		return false
-	var radius_px_fx: int = Mining.LOGIC_TILE_PX * Fx.SCALE
-	return (Mining.REACH_DEN * Mining.REACH_DEN) * (dx * dx + dy * dy) <= \
-		(Mining.REACH_NUM * Mining.REACH_NUM) * (radius_px_fx * radius_px_fx)
+	return Reach.in_reach(body_x, body_y, point_x, point_y, Mining.LOGIC_TILE_PX)
 
 
 static func in_reach_logic(body_x: int, body_y: int, logic_cell: Vector2i) -> bool:
-	var half: int = LOGIC_FX / 2
-	return in_reach_point(body_x, body_y, logic_cell.x * LOGIC_FX + half, logic_cell.y * LOGIC_FX + half)
+	return Reach.in_reach_metre(body_x, body_y, logic_cell, Mining.LOGIC_TILE_PX)
 
 
 ## The terrain cell an `Fx` world point is in (floor division, so a point just left of zero is cell -1).

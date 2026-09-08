@@ -34,6 +34,11 @@ const RIM_PX: float = 1.0              ## canvas px the rim is offset by, in eac
 ## draws NOTHING and says so nowhere, and this rim is what keeps the word off a lit rock face.
 const RIM_STEPS: Array[Vector2] = [Vector2(-1.0, 0.0), Vector2(1.0, 0.0), Vector2(0.0, -1.0), Vector2(0.0, 1.0),
 	Vector2(-1.0, -1.0), Vector2(1.0, -1.0), Vector2(-1.0, 1.0), Vector2(1.0, 1.0)]
+## THE WORD SAYS WHICH SIDE OF THE LINE (D0521, strangers 103-120): when the ring is on a machine or the
+## shaft's mouth and the body's centre is within the drop's own reach of it (`RingPainter.in_reach`), the
+## word reads "FORGE · IN REACH". S119 stood at the band's last cell and pressed Q eleven times at TOO FAR;
+## S111: "the game showed me I was always too far but never showed me where close enough was".
+const IN_REACH: String = " · IN REACH"
 
 
 ## The word for the rung `id` whose ring stands on `at` (world px), or "" for a rung with no target and for
@@ -83,6 +88,28 @@ static func machine_at(o: Interface.Observation, at: Vector2, id: StringName) ->
 	return false
 
 
+## Whether a machine of any record stands on the metre the ring is on.
+static func machine_on(o: Interface.Observation, at: Vector2) -> bool:
+	var m: Vector2i = metre_of(at)
+	for rec: Dictionary in o.machines:
+		if rec.get("cell", Vector2i(-1, -1)) == m:
+			return true
+	return false
+
+
+## Whether the verb this ring asks for lands on the ringed METRE by the one reach rule (`Reach`, from the
+## body's centre to the metre's centre): a drop into a machine (smelt's forge, deliver's and winch's rig)
+## and BUILD at the shaft's mouth (`Verbs.build` gates on the same `can_reach`). A cell target (ore, the
+## seam, coal, a trunk) is the pointer's, snapped by the aim; a pile is scooped by the trunk's own
+## distance (D0456). Neither is this rule's, and the ring on them says nothing about reach (D0521).
+static func metre_target(id: StringName, o: Interface.Observation, at: Vector2) -> bool:
+	if o == null or at == TargetGuide.NONE:
+		return false
+	if machine_on(o, at):
+		return true
+	return id == &"build" and word(id, o, at) == "MOUTH"
+
+
 ## Whether the pile on the ringed metre holds this item: how the word tells the drill lying at the rig's
 ## foot from the shaft's mouth, and the paid winch head from the rig that owes it.
 static func pile_holds(o: Interface.Observation, at: Vector2, item: StringName) -> bool:
@@ -123,10 +150,13 @@ static func canvas_rect(frame: Frame, world: Rect2) -> Rect2:
 	return Rect2(p, frame.canvas_of(world.end) - p)
 
 
-## The whole chip, called from the guide's own paint: the rung's word under the ring at `centre` of radius
-## `r` (canvas px), at the ring's alpha, or nothing at all.
-static func draw_under(ci: CanvasItem, frame: Frame, id: StringName, at: Vector2, centre: Vector2, r: float, alpha: float) -> void:
+## The whole chip, called from the ring's own paint: the rung's word under the ring at `centre` of radius
+## `r` (canvas px), at the ring's alpha, or nothing at all. `reached` (a metre target within the drop's
+## reach, D0521) appends IN_REACH to the word, and to the receipt.
+static func draw_under(ci: CanvasItem, frame: Frame, id: StringName, at: Vector2, centre: Vector2, r: float, alpha: float, reached: bool = false) -> void:
 	var text: String = word(id, frame.obs, at)
+	if reached and text != "":
+		text += IN_REACH
 	var font: Font = ThemeDB.fallback_font
 	var rect: Rect2 = label_rect(font, text, centre, r, clearances(frame, TargetGuide.target_metre(at)))
 	last_drawn = {"word": text, "rect": rect, "alpha": alpha}   # the draw pass's own receipt, for `tests/test_ring_word.gd`

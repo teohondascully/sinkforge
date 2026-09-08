@@ -3,9 +3,8 @@
 ## Purpose
 
 Fixed-point arithmetic (i32, 16 fractional bits), a seeded splittable RNG (one stream per subsystem;
-streams are serialized state, not wall-clock seeded), generational-index entity IDs, the seam/grain hash
-and the state-signature mixer. Small, pure, fully unit-tested. Every other layer in the stack (sim,
-interface, harness, experiment, view, shell) depends on this one; this one depends on nothing.
+streams are serialized state, not wall-clock seeded), generational-index entity IDs, the seam/grain hash,
+the state-signature mixer and the reach rule. Small, pure, fully unit-tested.
 
 ## Dependencies
 
@@ -17,13 +16,11 @@ Every other layer: sim, interface, harness, experiment, view, shell.
 
 ## Invariants
 
-- No engine imports (no Godot types, nodes, or singletons).
-- No file IO.
+- No engine imports (no Godot types, nodes, or singletons). No file IO.
 - No wall clock — no `OS.get_ticks_*`, no `Time` singleton, nothing that reads real-world time on a state path.
 - No global mutable state. RNG streams are values the caller owns and threads through explicitly, not statics.
-- No `sin`/`cos`/`pow` (or any other transcendental/floating-point-only
-  function) on a path that affects simulation state. Determinism across
-  platforms depends on this module staying pure fixed-point integer math.
+- No `sin`/`cos`/`pow` (or any other transcendental/floating-point-only function) on a path that affects
+  simulation state. Determinism across platforms depends on this module staying pure fixed-point integer math.
 
 ## Public API
 
@@ -55,6 +52,9 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   directly; that's a `mul()` property, not a `length()` one.
 - `Seams` (`seams.gd`) — the rock's grain as a pure function of `(coordinate, world_seed)`. `.at()`,
   `.terrain_axis()`, `.aligned()`, `.grain()`. Moved from `sim/world/` so `view/` can reach `grain()` (D0237).
+- `Reach` (`reach.gd`, D0521) — the one reach rule: `NUM/DEN` (16/5, 3.2 metres) and the squared, inclusive
+  Euclidean compare over `Fx` points: `.in_reach()`, `.in_reach_metre()`, `.metre_centre_fx()`; the metre's px is
+  a parameter (this module may not know `Body`'s tile). `Aim.in_reach_point` delegates here; `RingPainter` reads it.
 
 ## Gotchas
 

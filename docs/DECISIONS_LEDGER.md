@@ -19913,3 +19913,72 @@ stays the director's question, now with its number: 9 m/s against a 3.2 m reach.
 next batch; if the strangers still press from outside the band with taps available, the wall is the
 game's, and the drop reach (measured from the body's centre, not its trunk, unlike D0456's
 `_dist_sq_to_metre`) is the next candidate.
+
+## D0521 · 2026-09-07 · The ring on a machine reads IN REACH by the drop's own rule; that rule lives in core
+
+**Decided:** (1) ONE REACH RULE, IN CORE. The arithmetic of `Aim.in_reach_point` (`sim/mining/aim.gd`) is
+`core/reach.gd` now (`class_name Reach`): `NUM/DEN` = 16/5 (3.2 metres) and the squared, inclusive Euclidean
+compare over `Fx` points, `in_reach(body_x, body_y, point_x, point_y, tile_px)`, `in_reach_metre(body_x,
+body_y, cell, tile_px)` and `metre_centre_fx(cell, tile_px)`; the metre's px is a parameter because core may
+not know `Body`'s tile. `Aim.in_reach_point` and `Aim.in_reach_logic` keep their signatures and delegate
+with `Mining.LOGIC_TILE_PX`; every sim call site is unchanged. THE RATIONAL MOVED TOO, and this is the one
+step past the ticket's file list: `Mining.REACH_NUM/DEN` are `Reach.NUM/DEN` now (two right-hand sides in
+`sim/mining/mining.gd`). The view may read `core` and `interface` and never `sim`; the only reach number the
+view could already see was `Observation.REACH_PX`, an integer 51 for a 51.2 px circle, and a ring drawn on it
+would disagree with the drop at an offset of (51, 4) px (2617 px^2: inside 51.2^2, outside 51^2). A literal
+16/5 in the view would have been the second copy this entry exists to remove. (2) THE RING'S STATE.
+`TargetGuide.paint` decides what is ringed and at what alpha and hands the drawing to a new
+`view/hud/ring_painter.gd` (`RingPainter.draw`; `_outline` went with it; `target_guide.gd` 387 -> 364 lines).
+When the ring's target is a METRE-VERB target -- a machine stands on the ringed metre (smelt's forge,
+deliver's and winch's rig), or the rung is `build` and the ring is on the MOUTH -- the painter asks
+`Reach.in_reach_metre(obs.pos_x, obs.pos_y, metre, LOGIC_PX)`, the same call and inputs as `Verbs.can_reach`
+through `Aim.in_reach_logic`. IN REACH: the ring does not breathe (its rim and radius are held at the
+pulse's top), the disc is filled at `NEAR_FILL`, and the word under it is "FORGE · IN REACH" (`RingWord.IN_REACH`
+appended by `draw_under`, which now takes `reached`). Out of reach: the ring as it was. A cell target (the
+ore, the seam, coal, a trunk) is the pointer's, and a pile is scooped by the trunk's distance (D0456):
+neither changes, and `near`/the outline stay as D0443 wrote them. `Verbs.build` gates on `can_reach`, the
+same rule, so the MOUTH gets the state; checked in the source, not pinned by a posed draw (see Provisional).
+(3) THE RECEIPT AGREES: `RingWord.last_drawn["word"]` carries the suffix when drawn.
+
+**Why (strangers 103-120):** a drop feeds a machine within 3.2 m of the body's centre to the machine cell's
+centre, a 22-cell band at foot level for the forge (cells 107-128; D0520's probe passes at px 514 and fails
+at 515), and nothing on screen said which side of that line the body was on. The guide outlined the target's
+metre within `NEAR_M` = 2.2 m (D0443), a rule written for the block the POINTER must land on, and a different
+number from the drop's: at cell 123 the body is 2.23 m from the forge's centre, in reach by the drop and out
+by the outline. S119 (`scratchpad/stranger-119`, `frame_0029`) stood at cell 128, the band's last, and pressed
+1 then Q eleven times: every press TOO FAR, the once-only lesson already shown, the 1.5 s slot flash gone by
+the capture. S109 the same at 128 and 130. S111: "the game showed me I was always too far but never showed
+me where close enough was". The walks are 30-60 ticks and did not change when told to tap (D0520), so the
+state has to be readable at rest, in any frame.
+
+**Verified:** `test_reach` (new, the 140th suite in the parallel step; `check_ci_suite_count`,
+`check_suite_coverage` at 141 on disk = 141 referenced, and `check_ci_not_shrunk` PASS) -- 8 asserted: `Reach`
+and `Aim.in_reach_logic` agree at all 400 body centres on a 20 x 20 grid round the forge (29, 20) (columns
+115-134, rows 66-85, cells 128-130 at row 75 among them; the first disagreement is printed); the same grid
+against an independent float compare is the inclusive 51.2 px circle, 233 in and 167 out; row 75 px 514 in
+and 515 out; cells 106, 107, 128, 129, 130 out, in, in, out, out; (51, 4) px in and `Observation.REACH_PX`
+== 51; `Mining.REACH_NUM/DEN` == `Reach.NUM/DEN` == 16/5. `test_ring_word` 10 -> 22: the real draw pass with
+the body posed at cell 123, row 75 (centre px (494, 300)) and coal in the pack draws "FORGE · IN REACH" and
+at cell 132 "FORGE"; DELIVER with an ingot draws "RIG · IN REACH" at cell 143 and "RIG" at 152; the ore cell
+1.38 m off draws "ORE" with no suffix; each pin prints `Aim.in_reach_logic`'s own answer beside the word.
+Unchanged: `test_tutorial_teaching` 70, `test_machine_painter` 50, `test_verbs` 46, `test_interface_verbs`
+65, `test_mining` 41, `test_mining_blocks` 62, `test_interface` 49, `test_mark_painter` 64,
+`test_lesson_dock` 50. Gates: size (`core/MODULE.md` gained the `Reach` bullet and stays at its 100-line cap
+by re-wrapping two invariants and dropping the Purpose paragraph's last sentence, which restated the
+Dependencies and Consumers sections under it), layer lint, duplication, formatter, naming, isolation,
+coverage ratchet (65.6%).
+
+**Mutation-tested:** `Reach.NUM` 16 -> 15, `Reach` alone: `test_reach` 6 FAIL (first disagreement px
+(462, 278) at 50.99 px), `test_verbs` 2 FAILURE(S) of 46 with "reach at the metre: 3 metres over is in, 4 is
+out (the one reach rule)" red, `test_mining` 1 FAILURE of 41 (the 50.9 px diagonal); `test_interface_verbs`
+STAYED GREEN at 65 -- its reach pins are not on the circle's edge, so it is not evidence for this rule.
+`RingPainter` reading `TargetGuide.near` (NEAR_M) instead of `Reach`: `test_ring_word` 2 FAILURE(S) of 22, the
+cell-123 and cell-143 pins, both 2.23 m. The suffix dropped from `draw_under`: the same two. Each mutant was
+restored and the restore checked byte-identical.
+
+**Provisional / not changed:** the MOUTH and the winch's rig share the rule by the same code path
+(`RingWord.metre_target`, `RingPainter.in_reach`) but no posed draw pins them; a pin needs the drill in hand
+over a seeded shaft, and the rig stage at 2 with no head paid out. Within `NEAR_M` a machine target still
+gets the block outline, now unbreathing with the ring while in reach. No copy, no reach number, no sim
+behaviour changed. The ticket's path `tools/check_suite_coverage.py` does not exist; the gate is
+`tools/layer_lint/check_suite_coverage.py` (QUALITY gate 31).
