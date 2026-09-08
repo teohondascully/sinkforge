@@ -189,3 +189,15 @@ per-cell cost). The first frame is byte-identical. What remains is the per-cell 
 a solid cell on the CPU: T040 in the taste queue puts the fork (a per-chunk data texture with the tone in
 the rock shader) to the director with the numbers. **Next:** the director's read of T040; the batch queue
 resumes on the next discoverability change.
+
+**The four-hour window while the peer session was rate-limited (D0528-D0531, plus D0529/D0530 renumbered):**
+THE EDGE lesson fires at the world boundary (fourteen of twenty-four seats had walked to it); the
+acknowledged rung's card now names the next rung and the FED receipt says RIG, not CREW RIG (two of three
+seats that finished a rung on its tick card had quit reading it as the end); the standing-still 18 ms
+frames were measured and are NOT a painter (display pacing at 120 Hz plus an intermittently ~3x slower
+host: a null result, D0527), which named the redraw lever now shipped as D0531 (the two static world
+layers queue 0 of 600 in a settled window; ~5% off the still tick, no walk regression, the seat's first
+frame byte-identical). T040's evidence landed behind a flag that is off (D0528): 48.6 -> 12.7 microseconds
+a solid cell and a shaft fall's settled p50 halved, but the shader's rock is paler and flatter than the
+CPU's and carries a red seam the CPU picture does not; the taste queue records that read and the fork.
+Three workers died mid-ticket on a model rate limit: two were finished from their worktrees, one relaunched.
