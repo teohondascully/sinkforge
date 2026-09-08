@@ -41,6 +41,12 @@ var _seen: Dictionary = {}
 var _primed: bool = false
 var _last_time: float = 0.0
 var _label_plan: Dictionary = {}
+## THE LADDER, the same `Objectives` the guide and the dock hold (`ViewStack`), or null. It decides which
+## need bubble may shout: while a rung is open, every bubble but the ringed machine's stands down (D0498,
+## `BubbleRule`). Null-safe on purpose -- a debug stack or a suite's bare painter draws every bubble full.
+var objectives: Objectives = null
+var _bubbles := BubbleRule.new()
+var _ringed: Vector2i = BubbleRule.NO_METRE
 
 
 func paint_frame(frame: Frame, ci: CanvasItem) -> void:
@@ -50,6 +56,7 @@ func paint_frame(frame: Frame, ci: CanvasItem) -> void:
 	var dt: float = clampf(frame.anim_time - _last_time, 0.0, 0.1)
 	_last_time = frame.anim_time
 	track_construction(o, dt)
+	read_ladder(o)
 	var font: Font = ThemeDB.fallback_font
 	var view: Rect2 = frame.view_world_rect.grow(2.0 * CELL)
 	var aim: Vector2i = aim_logic(o)
@@ -83,6 +90,18 @@ func track_construction(o: Interface.Observation, dt: float) -> void:
 			_construct.erase(cell)
 	_seen = now
 	_primed = true
+
+
+## Which machine the objectives ring is standing on this frame, if any: read once here rather than per
+## machine, because the answer is a search over the whole observation (`BubbleRule.ringed`).
+func read_ladder(o: Interface.Observation) -> void:
+	_ringed = _bubbles.ringed(objectives, o)
+
+
+## The alpha the machine at `cell` draws its need bubble at: full for the ringed one and whenever no rung
+## is open, STAND_DOWN for every other machine while the ladder runs (D0498).
+func bubble_alpha(cell: Vector2i) -> float:
+	return BubbleRule.alpha(objectives, cell == _ringed)
 
 
 ## Is a machine visibly working this tick? Behaviour-aware, so the glyph animates truthfully: a generator
@@ -302,11 +321,13 @@ func _draw_status(frame: Frame, ci: CanvasItem, rec: Dictionary, face: Rect2, sh
 	StatusLook.draw_mark(ci, lamp_c, r, look["mark"], lamp)
 	if StringName(look["fix"]) == &"none" or status == &"spent":
 		return
+	# The one voice rule (D0498): while a rung is open, only the ringed machine's need speaks at full.
+	var dim: float = bubble_alpha(rec["cell"])
 	if not show_bubble:
 		var alarm: float = 0.40 + 0.60 * absf(sin(frame.anim_time * 2.6))
-		ci.draw_rect(Rect2(face.position - Vector2(0.75, 0.75), face.size + Vector2(1.5, 1.5)), Color(lamp.r, lamp.g, lamp.b, 0.80 * alarm), false, 1.0)
+		ci.draw_rect(Rect2(face.position - Vector2(0.75, 0.75), face.size + Vector2(1.5, 1.5)), Color(lamp.r, lamp.g, lamp.b, 0.80 * alarm * dim), false, 1.0)
 		return
-	var pulse: float = 0.62 + 0.38 * sin(frame.anim_time * 6.5)
+	var pulse: float = (0.62 + 0.38 * sin(frame.anim_time * 6.5)) * dim
 	var bob: float = sin(frame.anim_time * 3.0) * 1.5 * CHROME_SCALE
 	var br: float = 9.0 * CHROME_SCALE
 	var bc := Vector2(face.get_center().x, face.position.y - 24.0 * CHROME_SCALE + bob)
@@ -316,6 +337,11 @@ func _draw_status(frame: Frame, ci: CanvasItem, rec: Dictionary, face: Rect2, sh
 	ci.draw_line(foot - Vector2(br * 0.4, 0.0), foot + Vector2(br * 0.4, 0.0), stem, 0.75)
 	ci.draw_circle(bc, br, Color(0.05, 0.04, 0.06, 0.82 * pulse))
 	ci.draw_arc(bc, br, 0.0, TAU, 20, Color(lamp.r, lamp.g, lamp.b, pulse), 0.8)
+	# A stood-down bubble keeps its ring and loses its contents. The glyph is what makes a bubble legible
+	# at a glance, and `ItemLook.draw` takes no alpha to fade it with; the dim ring still says "this one
+	# wants something", which is all a machine the rung is not pointing at has to say.
+	if dim < BubbleRule.FULL:
+		return
 	if not bool(look["feeds"]):
 		StatusLook.draw_fix_glyph(ci, bc, 11.0 * CHROME_SCALE, look["fix"], Color(lamp.r, lamp.g, lamp.b, 0.55 + 0.45 * pulse))
 		return

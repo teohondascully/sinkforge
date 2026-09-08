@@ -19080,3 +19080,48 @@ line and re-run `tools/data_codegen/generate.py`; the seam pin above goes red an
 second metre only narrows); the stride length that skipped it (T035); `playtest/ceiling.py`, whose rung 2
 aims at terrain cell 150.5, inside the +5 metre (cells 148-151) and so unmoved -- not re-run here, no seat.
 Whether two metres is enough is a question only the next batch of strangers answers.
+## D0498 · 2026-09-07 · A need bubble on a machine the rung does not ring stands down while the ladder runs
+
+**Decided:** `view/visuals/bubble_rule.gd` (`BubbleRule`), and `MachinePainter` takes an `Objectives`. While
+a rung is open, a machine whose metre does not hold the rung's ring draws its need bubble at
+`STAND_DOWN = 0.30` of its alpha -- stem, disc and ring dimmed, and no item or fix glyph inside, because
+`ItemLook.draw` carries no alpha to fade a glyph with and a dim ring already says "this one wants
+something". The ringed machine's bubble is untouched, and a finished ladder (or a painter mounted without
+one, which is null-safe) draws every bubble full as before. The zoomed-out alarm rect takes the same factor:
+it is the same channel at a zoom where the white reticle is still drawn. "The ringed one" is
+`TargetGuide.target(objectives.current_id(), o)` floored to a logic cell -- the guide's own search, called
+rather than restated -- and a rung whose target is a terrain cell (`cell_predicate` answers it) rings no
+machine, so every bubble stands down. The ladder reaches the painter in `ViewStack._mount_hud`, on the line
+after the dock's, so the guide, the dock and the factory hold one `Objectives`; `_mount_over_veil` returns
+the painter and the stack keeps it as a handle.
+
+**Why:** D0449 made the target ring white with compass ticks because strangers 25 and 26, told to point at
+the RINGED rock, pressed the forge's need bubble and the drill shaft's, six and nine metres off; in batch
+70-75 a stranger fed the rig during the smelt rung. Ink and form separated the two shapes and did not stop
+the gold ones competing for the eye: from the first frame the opening carries the crew's rig at +2 asking
+for ingots (D0484/D0485) and the shaft's forge asking for ore, beside one white reticle. The director listed
+"a machine's need-bubble while another is ringed" as a defect.
+
+**Verified:** `tests/test_machine_painter.gd` 39 -> 50 asserted. On the deliver rung (a real `Objectives`
+walked to it, with the guide's own target asserted to land inside the rig's metre as a control) the rig
+reads 1.00 and the forge 0.30; on the mine rung both read 0.30; a ladder driven to `all_done` and a bare
+painter both read 1.00 everywhere; and a stack built through `ViewStack.build_stack` holds
+`stack.machines.objectives == stack.objectives`. Three mutants, each red on the pins named: `alpha()`
+returning FULL always (2 red, "stands down to 0.30 (1.00)"), `ringed_metre` never finding a machine (1 red,
+the rig at 0.30), and the `_mount_hud` wiring line removed (1 red, the stack pin -- the field is null-safe,
+so without that pin a painter that never receives the ladder leaves every other assertion green).
+Unchanged: `test_looks` 29, `test_mark_painter` 64, `test_tutorial_teaching` 67, `test_terrain_painter` 18,
+`test_wall_painter` 35. Gates: size limits, layer lint, duplication all PASS.
+
+**Provisional, and the reading it rests on:** the ticket's "when no rung targets a machine ... every bubble
+is full" is read as "when there is no open rung at all". The literal alternative -- leave every bubble full
+whenever the rung's target is not a machine -- would leave the reported case (the rig's bubble beside a
+white ring on the ore vein) exactly where it was found. 0.30 is a first number, not a measured one; no
+stranger has run against it yet.
+
+**Not changed:** the status lamp on the casing (the machine's own readout, not a floating claim on the
+eye); `StatusLook`; the bubble's geometry, pulse and bob; the guide (`view/hud/target_guide.gd` untouched,
+its statics called). The painter caches the ring's metre on the guide's own key -- rung, body cell, terrain
+version, pile and machine counts -- and asks for it only on frames where some machine is actually asking for
+something, so the search is not paid twice a frame; on the smelt rung with no coal in the pack that key
+still costs one terrain scan per cell walked, as the guide's own cache does.

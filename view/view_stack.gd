@@ -77,6 +77,10 @@ var minimap: Minimap = null
 var hints: Hints = null
 var objectives: Objectives = null
 var legend: KeyLegend = null
+## The factory painter. A handle because its ladder is WIRED rather than constructed (D0498): the field is
+## null-safe by design, so a painter that never receives one draws every bubble full and every suite over
+## the rule stays green -- the wiring itself has to be assertable from outside.
+var machines: MachinePainter = null
 
 
 ## Builds the coordinator, attaches it to `scene`, and hangs every painter and the HUD off it.
@@ -118,7 +122,7 @@ static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, cam
 	_mount_body(view)
 	_mount_veil(view, ore, falling)
 	_mount_haze(view)
-	_mount_over_veil(view, glint)
+	stack.machines = _mount_over_veil(view, glint)
 	_mount_scene_layers(view, falling, payouts)
 	_mount_light(view, falling, ore)
 	var hints: Hints = _mount_rope(view)   # the lessons are made with the rope: its ring waits on one (D0424)
@@ -134,7 +138,7 @@ static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, cam
 	# so the world is graded and the readouts stay crisp -- ordering enforced by the CanvasLayer indices,
 	# which `tests/test_post_fx.gd` asserts against each other rather than trusting this call order.
 	view.add_post_fx()
-	_mount_hud(view, stack, hints)
+	_mount_hud(view, stack, hints, stack.machines)
 	return stack
 
 
@@ -151,7 +155,7 @@ static func _mount_rope(view: WorldView) -> Hints:
 ## objective banner, the minimap and the inspector under it (6h/6i), the lesson dock, the arrival plate
 ## over them, the legend, and the settings page (closed) over all of it so a ceremony never draws under it. The legend keeps state --
 ## which verbs the player has demonstrated -- and removes itself from the picture once it is done.
-static func _mount_hud(view: WorldView, stack: ViewStack, hints: Hints = null) -> void:
+static func _mount_hud(view: WorldView, stack: ViewStack, hints: Hints = null, machines: MachinePainter = null) -> void:
 	var plate: ArrivalPlate = ArrivalPlate.new()
 	view.add_hud().add_chip(DepthChip.paint)
 	view.add_hud().add_chip(Hotbar.paint)
@@ -166,6 +170,8 @@ static func _mount_hud(view: WorldView, stack: ViewStack, hints: Hints = null) -
 	view.add_hud().add_stateful_chip(Inspector.new(plate, minimap), &"paint")
 	var dock: LessonDock = LessonDock.new(plate, hints)   # the lessons off the body, at one place (D0413)
 	dock.hints.objectives = line.objectives                # NOT ORE reads the rung, not the pack (D0458)
+	if machines != null:
+		machines.objectives = line.objectives              # a bubble the rung does not ring stands down (D0498)
 	view.add_hud().add_stateful_chip(dock, &"paint")
 	view.add_hud().add_stateful_chip(plate, &"paint")
 	var legend: KeyLegend = KeyLegend.new()
@@ -256,14 +262,18 @@ static func _mount_additive(view: WorldView, painter: RefCounted) -> void:
 ## The readouts that sit over the veil because the veil must not dim them: the glint (STATEFUL for its
 ## sparse cache, D0337: the per-frame scan of every visible cell was 11.83 ms), the rock's grain, the
 ## cracks, the machines.
-static func _mount_over_veil(view: WorldView, glint: GlintPainter) -> void:
+## Returns the machine painter, because its ladder does not exist yet: `_mount_hud` makes the Objectives
+## and hands the same one to the guide, the dock and this painter (D0498).
+static func _mount_over_veil(view: WorldView, glint: GlintPainter) -> MachinePainter:
 	view.add_stateful_painter(glint, &"paint_frame").z_index = GLINT_Z
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
 	view.add_painter(CrackPainter.paint_frame)
 	view.add_painter(AmbiencePainter.paint_under).z_index = DROP_PATH_Z
-	view.add_stateful_painter(MachinePainter.new(), &"paint_frame").z_index = MACHINE_Z
+	var machines: MachinePainter = MachinePainter.new()
+	view.add_stateful_painter(machines, &"paint_frame").z_index = MACHINE_Z
 	view.add_painter(AmbiencePainter.paint).z_index = AMBIENCE_Z
 	view.add_painter(MarkPainter.paint).z_index = MARKS_Z
+	return machines
 
 
 ## The scene OWNS the falling-item layer (6e, D0365): it consumes the landings for its particle pops, so

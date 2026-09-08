@@ -17,6 +17,9 @@ func _initialize() -> void:
 	_test_the_aim_and_the_gates()
 	_test_plates_collapse_runs_and_pack_shelves()
 	_test_the_construction_flash()
+	_test_the_bubble_stands_down_while_the_ladder_runs()
+	_test_a_finished_ladder_leaves_every_bubble_full()
+	await _test_the_real_stack_hands_the_painter_the_ladder()
 	await _test_paint_runs_against_a_real_frame_with_a_factory()
 	_finish("machine_painter")
 
@@ -136,6 +139,104 @@ func _test_the_construction_flash() -> void:
 	o.machines = [_rec(&"hopper", {"cell": Vector2i(1, 1)})]
 	p.track_construction(o, 0.016)
 	_check(not p._construct.has(Vector2i(5, 1)), "a machine picked up mid-flash takes its flash with it")
+
+
+## An observation carrying a factory, a pack and a body: enough for the ladder to read and for the guide's
+## machine search to answer. The body stands at (72, 150) px, a step left of the rig's metre.
+func _ladder_obs(machines: Array[Dictionary], pack: Array = []) -> Interface.Observation:
+	var o: Interface.Observation = Interface.Observation.new()
+	o.pos_x = 72 * S
+	o.pos_y = 150 * S
+	for m: Dictionary in machines:
+		o.machines.append(m)
+	var typed: Array[Dictionary] = []
+	for p: Array in pack:
+		typed.append({"item": StringName(p[0]), "count": int(p[1])})
+	o.pack = typed
+	return o
+
+
+func _rig(stage: int) -> Dictionary:
+	return _rec(&"rig", {"cell": Vector2i(4, 9), "status": &"no_input", "stage": stage, "wants": {&"ingot": 2}})
+
+
+func _forge() -> Dictionary:
+	return _rec(&"processor", {"cell": Vector2i(5, 8), "status": &"no_input", "recipe": &"smelt_ingot"})
+
+
+## D0498: ONE VOICE WHILE THE LADDER RUNS. The rig asks for ingots from the first frame and the shaft's
+## forge asks for ore, so the opening carries two gold bubbles beside the one white reticle -- strangers 25
+## and 26 pressed a bubble reading "RINGED", and one of 70-75 fed the rig during the smelt rung. The ringed
+## machine keeps its bubble; every other one stands down, the terrain rungs included, where nothing on the
+## screen is the target and the bubbles were the loudest thing on it.
+func _test_the_bubble_stands_down_while_the_ladder_runs() -> void:
+	var o: Interface.Observation = _ladder_obs([_rig(0), _forge()])
+	var obj: Objectives = Objectives.new()
+	obj.refresh(_ladder_obs([]), 0.016)
+	obj.refresh(_ladder_obs([_rig(0), _forge()], [["ore", 4], ["ingot", 2]]), 0.016)
+	_check(obj.current_id() == &"deliver", "control: four ore and two ingots gained put the ladder on the deliver rung (%s)" % obj.current_id())
+	_check(TargetGuide.target(&"deliver", o) == (Vector2(4, 9) + Vector2(0.5, 0.5)) * CELL,
+		"control: the deliver rung's ring lands inside the rig's own metre (%v)" % TargetGuide.target(&"deliver", o))
+	var p: MachinePainter = MachinePainter.new()
+	p.objectives = obj
+	p.read_ladder(o)
+	_check(is_equal_approx(p.bubble_alpha(Vector2i(4, 9)), BubbleRule.FULL),
+		"the ringed rig keeps its bubble at full (%.2f)" % p.bubble_alpha(Vector2i(4, 9)))
+	_check(is_equal_approx(p.bubble_alpha(Vector2i(5, 8)), BubbleRule.STAND_DOWN),
+		"...and the forge, which the rung is not ringing, stands down to %.2f (%.2f)" % [BubbleRule.STAND_DOWN, p.bubble_alpha(Vector2i(5, 8))])
+	var early: Objectives = Objectives.new()
+	early.refresh(_ladder_obs([]), 0.016)
+	_check(early.current_id() == &"mine", "control: the ladder opens on the mine rung, whose ring is on rock (%s)" % early.current_id())
+	p.objectives = early
+	p.read_ladder(o)
+	_check(is_equal_approx(p.bubble_alpha(Vector2i(4, 9)), BubbleRule.STAND_DOWN) and is_equal_approx(p.bubble_alpha(Vector2i(5, 8)), BubbleRule.STAND_DOWN),
+		"a rung that rings rock stands BOTH bubbles down: no machine is the target (%.2f, %.2f)" % [p.bubble_alpha(Vector2i(4, 9)), p.bubble_alpha(Vector2i(5, 8))])
+
+
+## The rule ends with the ladder: a veteran's screen, and a painter mounted without one, are as before.
+func _test_a_finished_ladder_leaves_every_bubble_full() -> void:
+	var all: Array[Dictionary] = [_rig(1), _forge(),
+		_rec(&"drill", {"cell": Vector2i(5, 6), "fuel": 1}),
+		_rec(&"hopper", {"cell": Vector2i(5, 5), "filter": &"coal"}),
+		_rec(&"generator", {"cell": Vector2i(8, 6), "fuel": 1}),
+		_rec(&"winch_head", {"cell": Vector2i(9, 9), "status": &"working"})]
+	var o: Interface.Observation = _ladder_obs(all, [["ore", 4], ["ingot", 2]])
+	o.rates = [{"item": &"ingot", "rate_centi": 50}]
+	var obj: Objectives = Objectives.new()
+	obj.refresh(_ladder_obs([]), 0.016)
+	obj.refresh(o, 0.016)
+	obj.refresh(o, 0.016)
+	_check(obj.all_done(), "control: this factory finishes every rung of the ladder (%d done)" % obj.current_index())
+	var p: MachinePainter = MachinePainter.new()
+	p.objectives = obj
+	p.read_ladder(o)
+	_check(is_equal_approx(p.bubble_alpha(Vector2i(4, 9)), BubbleRule.FULL) and is_equal_approx(p.bubble_alpha(Vector2i(5, 8)), BubbleRule.FULL),
+		"a finished ladder puts every bubble back to full (%.2f, %.2f)" % [p.bubble_alpha(Vector2i(4, 9)), p.bubble_alpha(Vector2i(5, 8))])
+	var bare: MachinePainter = MachinePainter.new()
+	bare.read_ladder(o)
+	_check(is_equal_approx(bare.bubble_alpha(Vector2i(5, 8)), BubbleRule.FULL),
+		"and a painter mounted with no ladder at all draws every bubble full (%.2f)" % bare.bubble_alpha(Vector2i(5, 8)))
+
+
+## THE WIRING IS HALF THE RULE (D0498). `MachinePainter.objectives` is null-safe on purpose, so a painter
+## that never receives the ladder draws every bubble full -- and every assertion above it stays green while
+## the picture is unchanged. Only the real `ViewStack` build can say the field is actually filled, and that
+## the object it holds is the one the guide rings and the dock reads, not a second ladder of its own.
+func _test_the_real_stack_hands_the_painter_the_ladder() -> void:
+	var items: Items = _hub_items(20, 20)
+	var machines: Machines = _hub_machines(items)
+	var body: Body = Body.new(Fx.from_int(40), Fx.from_int(200))
+	var door: Interface = Interface.new(items.world.grid, body, Mining.new(), items.world, items, machines)
+	var scene: Node2D = Node2D.new()
+	root.add_child(scene)
+	var cam: Camera2D = Camera2D.new()
+	scene.add_child(cam)
+	var stack: ViewStack = ViewStack.build_stack(scene, door, MaterialLook.new(), cam, false)
+	await process_frame
+	_check(stack.machines != null and stack.objectives != null, "control: the real stack mounts a machine painter and a ladder")
+	_check(stack.machines.objectives == stack.objectives,
+		"the machine painter holds the SAME Objectives the guide rings and the dock reads, not one of its own")
+	scene.queue_free()
 
 
 func _test_paint_runs_against_a_real_frame_with_a_factory() -> void:
