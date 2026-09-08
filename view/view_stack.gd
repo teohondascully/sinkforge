@@ -19,7 +19,7 @@ extends RefCounted
 ##    -45  veil       (D0302) -- mass occlusion + key light, and the lamp that cuts it (D0306)
 ##    -40  glint      (D0300) -- the discovery twinkle, ABOVE the veil for a measured reason below
 ##    -35  seam       (D0308) -- the grain at the worked cell, above the veil so it stays readable
-##      0  cracks     (D0275) -- over the terrain it cracks, under the body doing the cracking
+##      0  (cracks: D0275, removed D0523 -- the sub-cell bite is the progress)
 ##      0  crumble    (D0278) -- debris from a cell that has just gone, so it sits over the hole
 ##      0  the scene's own `_draw`: the body sprite and the mining overlay
 ##     10  the HUD    (a `CanvasLayer`, so the camera does not move it): the depth chip, then the
@@ -261,13 +261,12 @@ static func _mount_additive(view: WorldView, painter: RefCounted) -> void:
 
 ## The readouts that sit over the veil because the veil must not dim them: the glint (STATEFUL for its
 ## sparse cache, D0337: the per-frame scan of every visible cell was 11.83 ms), the rock's grain, the
-## cracks, the machines.
+## the machines (the cracks went with D0523).
 ## Returns the machine painter, because its ladder does not exist yet: `_mount_hud` makes the Objectives
 ## and hands the same one to the guide, the dock and this painter (D0498).
 static func _mount_over_veil(view: WorldView, glint: GlintPainter) -> MachinePainter:
 	view.add_stateful_painter(glint, &"paint_frame").z_index = GLINT_Z
 	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
-	view.add_painter(CrackPainter.paint_frame)
 	view.add_painter(AmbiencePainter.paint_under).z_index = DROP_PATH_Z
 	var machines: MachinePainter = MachinePainter.new()
 	view.add_stateful_painter(machines, &"paint_frame").z_index = MACHINE_Z

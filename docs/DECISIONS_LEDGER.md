@@ -19982,3 +19982,22 @@ over a seeded shaft, and the rig stage at 2 with no head paid out. Within `NEAR_
 gets the block outline, now unbreathing with the ring while in reach. No copy, no reach number, no sim
 behaviour changed. The ticket's path `tools/check_suite_coverage.py` does not exist; the gate is
 `tools/layer_lint/check_suite_coverage.py` (QUALITY gate 31).
+
+## D0523 · 2026-09-07 · The spider cracks on worked rock are removed; the sub-cell bite is the mining's own progress
+
+**Decided (the director's call, 2026-09-07 night):** `view/visuals/crack_painter.gd` (D0275, legacy
+`_draw_mine_cracks`, LEGACY_GAP T1 #5) and its suite are deleted and the painter is no longer mounted in
+`ViewStack._mount_over_veil`. The director: "remove the mining animation ... if we're doing the sub-cell
+mining anyway, that already is incremental mining animation in its own way; remove the spiral". The
+radial fractures fanning from the worked cell, growing from two to seven with the banked charge, read as a
+spiral. What stays: the sim's per-cell charge (`Mining._cracks`, `Observation.mining_cracks`) and the
+reticle's rising wash of it inside the aim square (`MarkLayout.progress`, D0421), which is the progress
+readout a stranger learned from; and the bite itself, cells leaving one at a time.
+
+**Verified:** `test_main_boot` 65, `test_world_view` 28 unchanged; suite count 139 (`check_ci_suite_count`
+PASS, `check_suite_coverage` PASS); the removal declared to `check_ci_not_shrunk` by the commit's
+`CI-Check-Removed:` trailer. No other file referenced the painter (a comment in `veil_painter.gd` and the
+z-order table in `view_stack.gd` are reworded).
+
+**Not changed:** `Observation.mining_cracks` and its consumers; the cell-denominated size question (WG-4)
+the painter's header carried is moot for it and open elsewhere.

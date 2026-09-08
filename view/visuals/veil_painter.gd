@@ -29,7 +29,7 @@ const KEY_GAIN: float = 3.0          ## how fast the vertical openness gradient 
 const OPENNESS_SATURATE: float = 2.2 ## legacy's `clampf(_open_field[i] * 2.2, 0, 1)` — a face barely dims
 
 ## Legacy's `MASS_REACH = 2` is 2 of ITS cells, and its cell is one metre. Held in metres so the grid can
-## change under it — the same discipline `WallPainter.AO_DEPTH_M` and `CrackPainter` follow, and the
+## change under it — the same discipline `WallPainter.AO_DEPTH_M` follows, and the
 ## reason WG-4's re-denomination cannot silently rescale the veil.
 const MASS_REACH_M: float = 2.0
 const REACH_CELLS: int = int(MASS_REACH_M) * MaterialLook.CELLS_PER_METRE
