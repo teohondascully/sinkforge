@@ -162,5 +162,15 @@ six seats in 5.4 s wall from the snapshot; four ore 6 of 6, coal 5 of 6, two ing
 lesson's metres and direction and one the FED receipt; zero floor-ambiguity reports in six logs. The wall
 moved to where the body STOPS: the receipts give 36 cells a 60-tick press (9 m/s) and the mission's own
 text set the shortest walk at 30 ticks (4.4 m) against a 22-cell reach band, so strangers landed in reach
-by luck. The template now says what a tick moves (D0520, the adapter's calibration). **Next:** strangers
-115-120 on the calibrated mission, same head.
+by luck. The template now says what a tick moves (D0520, the adapter's calibration).
+
+**Strangers 115-120 on the calibrated mission (all VALID; `docs/playtests/2026-09-07_strangers115-120_reach.md`):**
+four ore 6 of 6 at 2.2 s, coal 5 of 6, two ingots 2 of 6, delivered 0 of 6. The calibration did not change
+the actor: 126 of 140 walks were still 30 ticks or longer. The wall, read from the receipts: nothing
+persistent on screen says whether the body is within the drop's reach. S119 pressed 1 then Q eleven times
+from cell 128, the reach band's last cell, every press refused, the 1.5 s slot flash gone before each
+capture. The ring outlines its target within 2.2 m (D0443's rule for the block), the drop reaches 3.2 m
+centre to centre (the sim's rule): two rules, and the eye sees the wrong one. Worker W8 (D0521): one
+reach function in core, used by the verb and the ring, and the ring reads "FORGE · IN REACH" as a state.
+Eleven of eighteen seats across the three batches walked to the world's right edge (the director's:
+the layout and the clamp). **Next:** D0521 lands, battery, push, a batch on it.
