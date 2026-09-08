@@ -256,6 +256,10 @@ func _rig_and_drill_pins(door: Interface, world: World, o: Interface.Observation
 	var paid: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
 	var drill: Vector2 = TargetGuide.target(&"build", paid)
 	_check(drill != TargetGuide.NONE and drill.x > body_px.x and drill.y > body_px.y and body_px.distance_to(drill) < 3.5 * 16.0, "...and rings the drill at the rig's foot once it lies there (%.1f m off)" % (body_px.distance_to(drill) / 16.0))
+	# D0499 (stranger 79 stood inside the seam's ring and strode past): the word under the ring names WHICH thing it rings, sits below the ring's centre and never over the ringed metre.
+	_check(RingWord.word(&"mine", o, vein) == "ORE" and RingWord.word(&"smelt", o, TargetGuide.target(&"smelt", o)) == "COAL SEAM" and RingWord.word(&"smelt", o, forge) == "FORGE" and RingWord.word(&"deliver", o, rig) == "RIG" and RingWord.word(&"build", paid, drill) == "DRILL" and RingWord.word(&"fuel", o, TargetGuide.target(&"fuel", o)) == "COAL" and RingWord.word(&"winch", o, rig) == "RIG" and RingWord.word(&"auto", o, vein) == "", "the ring's word is the target's own: ORE on the vein, COAL SEAM while SMELT stands on the seam and FORGE once it moves to the forge, RIG on the rig, DRILL on the paid pile, COAL on the fuel rung, and nothing on a rung with no target (D0499)")
+	var word_at: Rect2 = RingWord.label_rect(ThemeDB.fallback_font, "COAL SEAM", Vector2(100.0, 100.0), TargetGuide.RING_M * 25.6, [Rect2(87.2, 87.2, 25.6, 25.6)])
+	_check(word_at.position.y > 100.0 and not word_at.intersects(Rect2(87.2, 87.2, 25.6, 25.6)) and is_equal_approx(word_at.get_center().x, 100.0) and RingWord.label_rect(ThemeDB.fallback_font, "COAL SEAM", Vector2(100.0, 100.0), TargetGuide.RING_M * 25.6, [Rect2(87.2, 87.2, 25.6, 120.0)]).position.y > 207.2, "the word's rect %s sits below the ring's centre, centred on it, clear of the ringed metre at play zoom; a keep-out reaching to y 207.2 pushes it to %.1f, not the ring's own %.1f" % [str(word_at), RingWord.label_rect(ThemeDB.fallback_font, "COAL SEAM", Vector2(100.0, 100.0), TargetGuide.RING_M * 25.6, [Rect2(87.2, 87.2, 25.6, 120.0)]).position.y, word_at.position.y])
 	var cache: Vector2 = TargetGuide.target(&"hopper", o)
 	_check(cache != TargetGuide.NONE and cache.y > body_px.y + 5.0 * 16.0, "the crew's cache is the guide's buried target, seven metres down (%.1f m)" % ((cache.y - body_px.y) / 16.0))
 	_cut_mark_pins(o, cache, vein, forge)
@@ -338,6 +342,7 @@ func _shaft_mouth_pins(o: Interface.Observation, drill: Vector2) -> void:
 	var anchor: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS["tutorial"]) + Vector2i(0, 1)
 	var want: Vector2 = (Vector2(anchor + Vector2i(7, 1)) + Vector2(0.5, 0.5)) * 16.0
 	_check(mouth == want and mouth != drill, "with the drill in the pack BUILD rings the shaft's mouth %s, not the pile (%s)" % [mouth, want])
+	_check(RingWord.word(&"build", held, mouth) == "MOUTH" and RingWord.word(&"build", held, drill) == "DRILL", "...and the word under it is MOUTH, the word over the pile still DRILL (D0499)")
 	held.pack = [] as Array[Dictionary]
 
 

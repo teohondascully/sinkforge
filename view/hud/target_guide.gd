@@ -255,6 +255,9 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	var cut: Rect2 = cut_metre(frame.obs, at)
 	if cut.size != Vector2.ZERO:
 		_outline(frame, ci, cut, alpha, ink, breath)
+	# THE RING SAYS WHICH THING (D0499, stranger 79 stood inside the seam's ring and strode past): one word
+	# under it, in this ink, laid out by `RingWord` -- the table and the layout are out of this file's cap.
+	RingWord.draw_under(ci, frame, objectives.current_id(), at, canvas, r, alpha)
 
 
 ## The target's metre, or the metre to cut, drawn as the one white square with its rim.

@@ -19125,3 +19125,67 @@ its statics called). The painter caches the ring's metre on the guide's own key 
 version, pile and machine counts -- and asks for it only on frames where some machine is actually asking for
 something, so the search is not paid twice a frame; on the smelt rung with no coal in the pack that key
 still costs one terrain scan per cell walked, as the guide's own cache does.
+## D0499 · 2026-09-07 · The target ring carries the target's word
+
+**Decided:** one word under the WHITE RING, naming what the ring stands on, in the guide's own ink
+(`TargetGuide.INK` over `RIM`, D0449) at the ring's alpha and never a status colour. The table is by rung
+and by TARGET, not by rung alone: mine ORE, deliver RIG, fuel COAL, hopper HOPPER, power GENERATOR, and
+three forks that read the ring's own answer back rather than re-deciding it -- smelt says COAL SEAM while
+the ring is on the seam and FORGE once a processor's metre holds it (D0486), build says DRILL while a pile
+under the ring holds a drill and MOUTH otherwise (D0459), winch says WINCH HEAD while a pile holds the head
+and RIG otherwise (D0492). A rung with no target draws nothing (`auto`, and any rung whose target is NONE).
+
+The word sits BELOW the ring's centre, centred on it, outside the compass ticks, and is pushed further DOWN
+past the ringed metre or the body's own box when it would cross either -- never sideways, so its place under
+the ring is the same place every time. That is the dock's rule (`LessonDock`'s header) applied to the one
+readable thing allowed near the body: nothing may cover the metre the pointer has to land on. The ring stays
+a pointer that does not read (D0428) -- its geometry still answers WHERE; the word only answers WHICH.
+
+The table and the layout are a new file, `view/hud/ring_word.gd` (`RingWord`, static, pure over the
+observation and the rung id), the way `ShaftMouth` left `TargetGuide` at D0492: the guide was at 377 of the
+400-line cap and is at 380 now, three lines being the call and its comment.
+
+**Why, by the receipts** (`docs/playtests/2026-09-07_strangers76-81_seam_slot.md`): four of six strangers
+never held coal. S79's `frame_0013.png` at 21.0 s has the body standing ON the seam's metre with the white
+ring and its outline under its own boots; the next burst is a 60-tick stride right and the run never comes
+back. The card said "the black seam right of you" and the ring said nothing about what it ringed -- and in
+that frame the seam's solid black metre and the shaft's open black mouth two metres right are the same
+black. S78, S79 and S81 all pressed dark areas and got NOTHING THERE or TOO FAR DOWN; none of their presses
+landed on the seam's four rows. D0493 fixed the hover card, which a stranger has to seek; this is on the
+mark they are already looking at.
+
+**Three judgment calls, none dictated:** (1) the word reads the target position BACK (is a processor on this
+metre, does this pile hold a drill) instead of re-running `target`'s own branch conditions, so the word can
+never disagree with the ring it sits under -- one search decides both. (2) The word does NOT breathe with the
+ring: the ring's pulse is what finds the eye, and a word whose contrast moves is a word that gets read twice.
+It takes the ring's alpha flat, its rim at the ring's own 0.6. (3) The rim is eight offset draws rather than
+`draw_string_outline`, which draws NOTHING and says so nowhere when the font has no outline cache -- the
+house failure class, and this rim is what keeps the word legible over a lit rock face.
+
+**Verified:** `tests/test_tutorial_teaching.gd` 67 -> 70 asserted, ALL PASS, on the real seeded tutorial
+world: ORE on the vein, COAL SEAM while SMELT stands on the seam and FORGE once it moves to the forge, RIG
+on the rig, DRILL on the paid pile, MOUTH with the drill in the pack (and DRILL still over the pile in the
+same observation), COAL on the fuel rung, RIG on the winch rung before the payout, "" on `auto`. The layout
+pin at play zoom: for a ring of radius `RING_M * 25.6` centred at (100, 100) the word's rect is
+[P: (56.5, 136.04), S: (87.0, 20.0)] -- below the centre, centred on it, clear of the ringed metre -- and a
+keep-out reaching to y 207.2 moves it to 213.20 rather than sideways. `tests/test_rope_painter.gd` 21
+asserted, unchanged (it names `TargetGuide.INK`). Gates: `check_size_limits` PASS, `layer_lint` PASS,
+`duplication` 0 clusters, `formatter` PASS.
+
+**Mutation-tested, both pins:** `RingWord.word` returning "" unconditionally -> 2 FAILURES of 70 (the word
+pin and the MOUTH pin), the layout pin still green, which is correct -- it does not test the table. Removing
+the keep-out push from `label_rect` -> 1 FAILURE of 70, the word's top at 136.04 where the pin demands past
+207.2, so the number the failure leads with is the one the two explanations differ on.
+
+**Provisional / not changed:** (1) NO SUITE PINS THE DRAW PASS. `TargetGuide.paint` is called by no suite in
+this tree, and the three new pins are all pure over `RingWord`'s own functions, so a broken `draw_string`
+call would be a quiet green. It was verified ONCE by a throwaway probe (not committed) that ran
+`TargetGuide.paint` through a real `WorldView` draw pass on the seeded tutorial world and asserted the pass
+did not take an early return -- ring alpha 1.00, the target on canvas, the word ORE, its rect non-empty.
+That is one sample, not a gate. It is not a committed suite because `tests/test_tutorial_teaching.gd` is at
+397 of the 400-line cap and a dedicated `tests/test_ring_word.gd` would need registering in
+`.github/workflows/harness.yml`, which this change does not own. (2) The word is NOT clamped to the canvas:
+where the ring's centre sits within about 36 px of the bottom edge the guide still draws the ring and the
+word falls off. Clamping it up would put it over the ringed metre, which is the harder rule, so it is left
+and named. (3) The seam's look -- one black metre beside a black hole -- stays the director's, as D0493 left
+it; this names the thing, it does not make it look like coal.
