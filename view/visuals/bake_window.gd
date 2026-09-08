@@ -28,25 +28,18 @@ extends RefCounted
 ## view must have been painted, or the outermost drawn column loses its neighbour terms. Holding one
 ## number means the two cannot drift apart.
 
-## A CHUNK IS 32 CELLS A SIDE (128 world px at 4 px a cell, 8 m), and no longer legacy's AREA (D0522).
-## Legacy's `CHUNK` was 16 cells of 32 px = 512 world px, and D0326 carried that area across so a chunk
-## covered the same ground; at this build's per-cell grain that made a chunk 128 cells a side, and one
-## blow near a chunk corner repainted up to four of them through every baked painter -- Worker G measured
-## ~23 ms a chunk at boot, against a 16.7 ms frame. The director, playing: "the whole world freezes every
-## single time I mine a block". A 32-cell chunk holds a sixteenth of the cells, and the dig lane below
-## repaints only the dilated rect anyway; the chunk is now the unit the window lane paints and budgets.
+## A CHUNK IS 16 CELLS A SIDE (64 world px at 4 px a cell, 4 m) since D0524; 32 cells from D0522, and
+## before that legacy's AREA (D0326: legacy's `CHUNK` was 16 cells of 32 px = 512 world px, which at this
+## build's per-cell grain made a chunk 128 cells a side). The chunk is the unit the window lane paints
+## and budgets, and its size sets the GRAIN of that budget: a solid 32-cell chunk measured 35-52 ms of
+## painter time on the shaft fall (D0524), so a lane that admits chunks whole could not land inside a
+## frame at that size whatever it counted. At 16 cells the largest thing the lane can admit is 256 cells.
 ## Held in world px still, and divided by the cell size, so `chunk_index` stays legacy's arithmetic.
-const CHUNK_PX: int = 128
+const CHUNK_PX: int = 64
 
-## THE WINDOW LANE'S BUDGET (D0522): at most this many never-painted chunks are painted for the window in
-## one tick, nearest the window's centre first; the rest wait for the next tick. A fall can scroll a whole
-## row of chunks into the window at once, and painting them all in that tick is the hitch the director
-## called "it glitches as it quickly loads another part of the world". The margin ring is the prefetch
-## that hides the wait: a chunk enters the grown window `_margin_cells` before the view reaches it. THE
-## FIRST BAKE OF A SESSION IS NOT BUDGETED -- nothing is painted yet, so there is no prefetch to hide
-## behind, the player is looking at the whole window at once, and a seat's first frame must not show a
-## hole. Digs are never budgeted: a dug cell must never show stale for a frame.
-const WINDOW_LANE_BUDGET: int = 4
+## THE WINDOW LANE'S BUDGET -- what the lane may paint in one tick, in SOLID CELLS -- is `BakeLane`'s
+## (`view/visuals/bake_lane.gd`, D0524), with the first-bake exemption and the view promise. This file
+## owns the grid, the painted set, the dig lane's geometry and the tick's plan.
 
 ## A dig touching more than this fraction of the world's chunks rebakes everything instead. A full bake
 ## replays every chunk over the whole target; a partial bake replays the dirty ones PLUS an erase pass.
@@ -74,12 +67,15 @@ var _world_cells: Vector2i = Vector2i.ZERO
 ## ONE TICK'S PLAN, both lanes in one answer (D0522). `whole` paints whole chunks (the window lane, a
 ## scattered dig, or a dug chunk the target does not hold yet); `partial` maps a chunk index to the rect
 ## in world px it repaints -- the tick's dilated dig rect clipped to that chunk. `full` means the dig
-## dirtied so much of the world that replaying the whole target is cheaper. Pure data, so the decision is
-## assertable headless.
+## dirtied so much of the world that replaying the whole target is cheaper. `lane_solid` is the solid
+## cells the window lane's chunks hold this tick -- the number the budget is spent in (D0524), so a suite
+## can assert what was spent and not only how many chunks. Pure data, so every decision is assertable
+## headless.
 class Plan extends RefCounted:
 	var full: bool = false
 	var whole: Array[int] = []
 	var partial: Dictionary = {}
+	var lane_solid: int = 0
 
 ## HOW FAR A DIG'S INFLUENCE SPREADS, and how far past the camera the first bake reaches, in cells. Not a
 ## tuning knob: a PATCHED REGION MUST BE BYTE-IDENTICAL TO A FULL BAKE, and without this it is not. The
@@ -283,12 +279,16 @@ func dig_rect(dug: Array) -> Rect2:
 	return Rect2(Vector2(cells.position * _cell_px), Vector2(cells.size * _cell_px))
 
 
-## A SCATTERED DIG falls back to whole chunks: when the dug cells' bounding rect covers more than one
-## chunk's area, the rect is mostly ground nothing touched (two cells at opposite ends of the world would
-## make it the world), and `influenced_chunks` per cell is the tighter answer. Pure, so the cut is
-## assertable.
-func is_scattered(rect: Rect2) -> bool:
-	return rect.get_area() > float(CHUNK_PX * CHUNK_PX)
+## WHOLE CHUNKS, OR THE RECT: whichever paints fewer cells (D0524). D0522 called a dig "scattered" when its
+## rect out-areaed one chunk, which at 16-cell chunks is every dig -- a chunk is 256 cells and one cell's
+## dilation alone is (1 + 2 x 9)^2 = 361 -- and would have sent every blow back to whole chunks. The two
+## candidate plans are both known here, so the cut is their cell counts and not a literal: `influenced`
+## whole chunks against the rect's own cells. A dig at a chunk's centre paints its one chunk whole (256 <
+## 361); at an edge or a corner the rect wins (361 against 512 or 1024). Two cells at opposite ends of the
+## world still fall to their own chunks, since the rect would be the world. Ties go to whole chunks.
+func cheaper_whole(rect: Rect2, influenced: int) -> bool:
+	var per: int = CHUNK_PX / maxi(_cell_px, 1)
+	return influenced * per * per <= cells_of(rect).get_area()
 
 
 ## The rect clipped to each chunk it crosses: chunk index -> `rect` ∩ that chunk's rect, in world px. The
@@ -308,32 +308,14 @@ func partials_of(rect: Rect2) -> Dictionary:
 	return out
 
 
-## THE WINDOW LANE, BUDGETED: the never-painted chunks of the grown window, minus `exclude` (the chunks
-## the dig lane already paints whole this tick, which do not spend the budget), nearest the window's
-## centre first, at most `WINDOW_LANE_BUDGET` of them -- except on the session's first bake, which paints
-## the whole window (see the constant). Ties in distance break by index so the order is deterministic.
-func window_lane(rect: Rect2, exclude: Dictionary) -> Array[int]:
-	var pending: Array[int] = []
-	for i: int in unpainted_in(rect):
-		if not exclude.has(i):
-			pending.append(i)
-	if _painted.is_empty() or pending.size() <= WINDOW_LANE_BUDGET:
-		return pending
-	var centre: Vector2 = rect.get_center()
-	pending.sort_custom(func(a: int, b: int) -> bool:
-		var da: float = chunk_rect(a).get_center().distance_squared_to(centre)
-		var db: float = chunk_rect(b).get_center().distance_squared_to(centre)
-		return da < db if da != db else a < b)
-	return pending.slice(0, WINDOW_LANE_BUDGET)
-
-
-## ONE TICK'S PLAN OVER BOTH LANES (D0506, D0522). The full-rebake threshold reads the dug set as it
+## ONE TICK'S PLAN OVER BOTH LANES (D0506, D0522, D0524). The full-rebake threshold reads the dug set as it
 ## always has -- the chunks the dilation reaches -- and never the window. Otherwise the dig lane is the
-## dilated rect, clipped per chunk, for every chunk the target already holds; a dug chunk the target does
-## NOT hold yet paints whole (a partial over unpainted pixels would leave the rest of it a hole), and so
-## does every chunk of a scattered dig. The window lane comes last and is budgeted. The two maps are
-## disjoint by construction: partials go only to painted chunks, the window lane only to unpainted ones.
-func plan_tick(window_rect: Rect2, dug: Array) -> Plan:
+## dilated rect, clipped per chunk, for every chunk the target already holds, unless its influenced chunks
+## painted whole would cost fewer cells (`cheaper_whole`); a dug chunk the target does NOT hold yet paints
+## whole either way (a partial over unpainted pixels would leave the rest of it a hole). The window lane
+## comes last, budgeted by `BakeLane` against `obs`, the tick's own observation. The two maps are disjoint
+## by construction: partials go only to painted chunks, the window lane only to unpainted ones.
+func plan_tick(window_rect: Rect2, dug: Array, obs: Interface.Observation = null) -> Plan:
 	var p := Plan.new()
 	var influenced: Dictionary = {}
 	for cell: Vector2i in dug:
@@ -344,7 +326,7 @@ func plan_tick(window_rect: Rect2, dug: Array) -> Plan:
 		return p
 	var whole: Dictionary = {}
 	var rect: Rect2 = dig_rect(dug)
-	if rect.has_area() and not is_scattered(rect):
+	if rect.has_area() and not cheaper_whole(rect, influenced.size()):
 		var parts: Dictionary = partials_of(rect)
 		for i: int in parts:
 			if _painted.has(i):
@@ -354,7 +336,7 @@ func plan_tick(window_rect: Rect2, dug: Array) -> Plan:
 	else:
 		for i: int in influenced:
 			whole[i] = true
-	for i: int in window_lane(window_rect, whole):
+	for i: int in BakeLane.choose(self, window_rect, whole, obs, p):
 		whole[i] = true
 	p.whole.assign(whole.keys())
 	p.whole.sort()

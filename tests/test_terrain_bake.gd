@@ -22,9 +22,9 @@ extends "res://tests/test_base.gd"
 ## Run: tools/run_gd_test.sh <godot-binary> res://tests/test_terrain_bake.gd
 
 const CELL_PX: int = 4
-## A world big enough to need several chunks on both axes: 128px chunks over 4px cells is 32 cells a side
-## (D0522), so 300x300 cells is 1200x1200px and tiles 10x10 with a partial last column and row. Chosen so
-## a row-major index bug cannot pass by symmetry.
+## A world big enough to need several chunks on both axes: 64px chunks over 4px cells is 16 cells a side
+## (D0524; 32 from D0522), so 300x300 cells is 1200x1200px and tiles 19x19 with a partial last column and
+## row. Chosen so a row-major index bug cannot pass by symmetry.
 const W_CELLS: int = 300
 const H_CELLS: int = 300
 ## Cells a chunk side holds, and the grid the fixture above tiles -- DERIVED from the constants, never
@@ -38,7 +38,7 @@ func _initialize() -> void:
 	_test_every_cell_lands_in_exactly_one_chunk_and_every_chunk_is_used()
 	_test_a_cell_outside_the_world_has_no_chunk()
 	_test_a_dig_near_a_chunk_edge_dirties_the_neighbouring_chunk()
-	_test_a_chunk_is_32_cells_not_legacys_area()
+	_test_a_chunk_is_16_cells_not_legacys_area()
 	_test_plan_refuses_a_world_it_cannot_tile()
 	_test_the_full_rebake_threshold_decides_both_ways()
 	_test_when_the_bake_declines_the_painters_still_get_mounted()
@@ -137,10 +137,10 @@ func _test_a_dig_near_a_chunk_edge_dirties_the_neighbouring_chunk() -> void:
 	# setup() declines headless BEFORE building chunks, but `plan` and the margin are set first by design.
 	_check(b.rebake_margin() == WorldView.WINDOW_MARGIN_CELLS,
 		"the dilation is the observation margin (%d), not a written literal" % b.rebake_margin())
-	# A cell at a chunk's left edge, at the chunk's vertical CENTRE so only the horizontal neighbour is in
-	# reach: 128px chunks over 4px cells = 32 cells per chunk, so column 32 is the first cell of chunk
-	# column 1 and its left neighbours live in chunk column 0. The row is derived, not written -- at 32
-	# cells a chunk the old row 200 was 8 cells from a row boundary, inside the 9-cell margin.
+	# A cell at a chunk's left edge, at the chunk's vertical CENTRE: column `per_chunk` is the first cell of
+	# chunk column 1 and its left neighbours live in chunk column 0. The row is derived, not written -- at 32
+	# cells a chunk the old row 200 was 8 cells from a row boundary, inside the 9-cell margin. (At 16 cells a
+	# chunk the margin reaches the vertical neighbours too; the set below is checked by intersection.)
 	var per_chunk: int = CELLS_PER_CHUNK
 	var centre_row: int = per_chunk * (H_CELLS / per_chunk / 2) + per_chunk / 2
 	var edge := Vector2i(per_chunk, centre_row)
@@ -150,15 +150,24 @@ func _test_a_dig_near_a_chunk_edge_dirties_the_neighbouring_chunk() -> void:
 	_check(touched.has(b.chunk_index(edge)) and touched.has(b.chunk_index(edge - Vector2i(1, 0))),
 		"and the set contains BOTH its own chunk and the one holding the cells its shading reaches into")
 	_check_the_coordinator_actually_passes_the_dilation()
-	# CONTROL: a cell deep inside a chunk dirties exactly one. Without this the row above passes on an
-	# `influenced_chunks` that returned every chunk in the world, which would silently make every dig a
-	# full rebake and undo the entire per-dig fast lane while looking correct.
-	var middle := Vector2i(per_chunk / 2, centre_row)
+	# CONTROL: a cell deep inside a chunk dirties EXACTLY the chunks its dilation rect crosses, found here
+	# by intersecting rectangles rather than by the sampling under test. Without this the row above passes
+	# on an `influenced_chunks` that returned every chunk in the world, which would silently make every dig
+	# a full rebake and undo the entire per-dig fast lane while looking correct. At 16-cell chunks and a
+	# 9-cell margin that is a 3x3 block (D0524) -- never one chunk, since the margin is past half a chunk.
+	var middle := Vector2i(per_chunk + per_chunk / 2, centre_row)
 	var one: Array[int] = b.influenced_chunks(middle)
-	_check(one.size() == 1,
-		"CONTROL: a dig at a chunk's centre %s dirties exactly 1 chunk (got %d) with a %d-cell margin in "
-			% [str(middle), one.size(), b.rebake_margin()] + "a %d-cell chunk, so the dilation is "
-			% per_chunk + "targeted and has not quietly become a full rebake")
+	one.sort()
+	var reach: Rect2 = Rect2(Vector2(middle - Vector2i.ONE * b.rebake_margin()) * float(CELL_PX),
+		Vector2.ONE * float((1 + 2 * b.rebake_margin()) * CELL_PX))
+	var crossed: Array[int] = []
+	for i: int in b.planned_chunk_count():
+		if b.window().chunk_rect(i).intersects(reach):
+			crossed.append(i)
+	_check(one == crossed and one.size() < b.planned_chunk_count(),
+		"CONTROL: a dig at a chunk's centre %s dirties exactly the %d chunks its %d-cell reach crosses (got %s"
+			% [str(middle), crossed.size(), 1 + 2 * b.rebake_margin(), str(one)] + " against %s) of the world's %d"
+			% [str(crossed), b.planned_chunk_count()] + ", so the dilation is targeted and not a full rebake")
 	b.free()
 
 
@@ -189,24 +198,28 @@ func _check_the_coordinator_actually_passes_the_dilation() -> void:
 	view.free()
 
 
-## A CHUNK IS 32 CELLS A SIDE, NOT LEGACY'S AREA (D0522, reversing D0326's reading). D0326 carried legacy's
-## `CHUNK` across as the AREA it covered -- 16 cells of 32px = 512px -- which at this build's 4px cells made
-## a chunk 128 cells a side, 16,384 cells that every baked painter re-ran over on a dig at its corner:
-## measured ~23 ms a chunk against a 16.7 ms frame, "the whole world freezes every single time I mine a
-## block". The unit is now 32 cells (8 m); the dig lane repaints a dilated rect anyway, and the chunk is
-## what the window lane paints and budgets. Pinned against the REAL cell size, not this file's constant.
-func _test_a_chunk_is_32_cells_not_legacys_area() -> void:
-	const CELLS: int = 32
+## A CHUNK IS 16 CELLS A SIDE, NOT LEGACY'S AREA (D0524; 32 at D0522, reversing D0326's reading). D0326
+## carried legacy's `CHUNK` across as the AREA it covered -- 16 cells of 32px = 512px -- which at this
+## build's 4px cells made a chunk 128 cells a side, 16,384 cells that every baked painter re-ran over on a
+## dig at its corner: measured ~23 ms a chunk against a 16.7 ms frame, "the whole world freezes every
+## single time I mine a block". At 32 cells a solid chunk still painted in 35-52 ms, and a row of them
+## entering on a fall 69-83 ms in one tick (D0524). The unit is now 16 cells (4 m), the largest thing the
+## window lane's solid-cell budget can admit at once being 256 cells. Pinned against the REAL cell size,
+## not this file's constant.
+func _test_a_chunk_is_16_cells_not_legacys_area() -> void:
+	const CELLS: int = 16
 	var per_side: int = TerrainBake.CHUNK_PX / Heightfield.TERRAIN_CELL_PX
 	_check(per_side == CELLS, "a chunk is %d cells a side (%dpx at %dpx cells), not %d"
 		% [per_side, TerrainBake.CHUNK_PX, Heightfield.TERRAIN_CELL_PX, CELLS])
 	# CONTROL: legacy's area is a different, much larger answer. Stated as cells so the claim above is a
-	# comparison, and the number is the one a dig's cost scales with.
+	# comparison, and the number is the one a dig's cost scales with; the ratio is derived from the two
+	# pixel sizes, not written.
 	const LEGACY_AREA_PX: int = 16 * 32
 	var legacy_cells: int = (LEGACY_AREA_PX / Heightfield.TERRAIN_CELL_PX) ** 2
-	_check(legacy_cells == 16 * per_side * per_side,
-		"CONTROL: legacy's %dpx area would be %d cells a chunk, 16x this build's %d -- the cells a corner "
-			% [LEGACY_AREA_PX, legacy_cells, per_side * per_side] + "dig used to repaint four times over")
+	var ratio: int = (LEGACY_AREA_PX / TerrainBake.CHUNK_PX) ** 2
+	_check(ratio > 1 and legacy_cells == ratio * per_side * per_side,
+		"CONTROL: legacy's %dpx area would be %d cells a chunk, %dx this build's %d -- the cells a corner "
+			% [LEGACY_AREA_PX, legacy_cells, ratio, per_side * per_side] + "dig used to repaint four times over")
 
 
 ## `plan` returns false rather than tiling a world it cannot represent, and the control is that an ordinary

@@ -20133,3 +20133,122 @@ bake to. `setup` on the shipped world: 280 chunks built in **6.2 / 2.9 / 3.0 ms*
 `stack` phase read 36 ms against the before-run's 21. On the 3008-chunk fixture the headless proxy above
 says ~3 ms more. Logs: `perf_after_{still,dig,walk}.log` in the scratchpad beside the before-logs; the
 orchestrator's `perf_probe.sh after <worktree>` re-runs all three on a quiet display.
+
+## D0524 · 2026-09-08 · The window lane paints by a budget of solid cells a tick over 16-cell chunks; a shaft fall measured
+
+**Decided:** (1) `BakeWindow.CHUNK_PX` 128 -> 64: a chunk is 16 cells (4 m). The shipped 256x1104-cell
+world tiles 16x69 = 1104 chunks; Worker G's 3000x1000 fixture 188x63 = 11,844. (2) THE WINDOW LANE'S
+BUDGET IS IN SOLID CELLS, NOT CHUNKS: `BakeLane.WINDOW_LANE_SOLID_CELLS` = 512 (two solid 16-cell chunks),
+spent on `BakeLane.solid_cells_in(chunk, obs)` -- a byte count over the chunk's rows of the tick's own
+observation (`obs.materials`, 0 is air by `TileGrid.legend[0]`), so an air chunk costs 0 and always fits;
+nearest the window's centre first; a chunk that does not fit is SKIPPED, not a stop, so a nearer solid
+chunk never holds up a farther air one. The session's first bake stays exempt (D0522's rule); digs are never
+budgeted and never spend it. `WorldView.refresh` hands `bake_tick` the frame's observation it already built
+(one-line change; the file stays at 400), so admitting a chunk costs no second observation. (3) THE VIEW IS
+THE PROMISE, THE MARGIN IS THE PREFETCH: a never-painted chunk whose rect meets the UN-MARGINED view rect
+paints this tick whatever the budget says, and its solid cells are spent against the budget all the same
+(so a margin chunk never joins an over-spent tick). (4) Two calls the ticket did not dictate. A CELL THE
+OBSERVATION DOES NOT COVER COUNTS AS SOLID, and every cell does when there is no observation (`bake_cells`
+passes null): the budget may only be spent on what it can see, and a pessimistic count can only defer a
+margin chunk, never open a hole -- the promise forbids holes. The per-frame observation is snapped outward
+to `Envelope.SNAP_CELLS` (32) so at 16-cell chunks every selected chunk lies inside it and the case is not
+exercised today; the alternative (unseen = air) would paint an unseen chunk for free. THE WHOLE-OR-RECT CUT
+IS A COST COMPARISON: D0522's `is_scattered` ("the rect out-areas one chunk") is, at 16-cell chunks, true
+of EVERY dig -- a chunk is 256 cells and one cell's dilation alone is (1 + 2 x 9)^2 = 361 -- and would have
+sent every blow back to whole chunks, undoing D0522. `BakeWindow.cheaper_whole(rect, influenced)` compares
+the two plans' own cell counts (`influenced` chunks x 256 against the rect's cells; ties to whole). At this
+margin (9, past half a 16-cell chunk) a single dig's rect crosses 2x2 to 3x3 chunks and `influenced_chunks`
+never answers one chunk, so a dig from a chunk's middle is 361 cells of rect against 2304 of whole chunks;
+two cells three chunks apart 1273 against 4608 (rect); twenty apart 6441 against 4608 (whole). (5) Two
+files split at their caps, each a seam: `view/visuals/bake_lane.gd` (the budget: the constant, the count,
+the choice; `bake_window.gd` went 368 -> 419 with it and is 350 without) and `view/visuals/bake_chunk.gd`
+(what one chunk draws: `frame_for` builds the pinned frame, `rect_for` consumes a partial, `paint` runs the
+painters; `terrain_bake.gd` 399 -> 349). `frame_for` is reachable headless for the first time; not pinned
+in this commit. `Plan.lane_solid` carries what the lane spent, so the suites assert the budget's own unit.
+
+**Why:** the director: "if I jump down a shaft it glitches as it quickly loads another part of the world".
+D0522 left the window lane at 4 whole 32-cell chunks a tick. Measured on THE SHAFT FALL before the change,
+same host quiet (466-559 fps, p50 1.3-1.4 ms), a temporary timer round each chunk's painters: every row of
+chunks entering the margin during the fall painted 4 chunks (4096 cells, 2404-3177 solid) for **65.0-78.2
+ms** of painter time in one tick and 2 more (1505-1940 solid) for 37.1-43.5 ms the next; the meter's
+frames at those bakes read **90.7 / 82.5 / 80.8 / 67.5 / 64.1 / 54.3 ms** (ticks 47, 60, 272, 52, 276, 64).
+The cost is per SOLID cell: 22.3-27.0 us each in those bakes, and an air 32-cell chunk still ~3.2 ms
+(12.9 ms for four with 8 solid cells among them: the painters visit every cell). THE FALL POSE: no new
+flag. `--perf --perf-drive --warp=184,120 --quit-after=600` (perf_probe.sh's flags plus the warp): the +7
+"shaft" in `data/starts/tutorial.yaml` is two metres of open cell over the drill's ore, but the capped
+chimney at +14 m (cols 184-188) is 45 m of air under an 8-row cap with a shelf at rows 125-140 in cols
+180-183; the warp stands the body on the shelf at feet (182, 124), the drive's RIGHT walks it off, and a
+headless replay of the same hand (`SeatDrive.driven`, `SeatFlags.stand_near`) shows it airborne from tick
+5 to 59 (rows 112 -> 169) and again ~255-300 (rows 185 -> 276) at `MAX_FALL` 560 px/s -- 164 rows, ten
+16-cell chunk rows, in 600 ticks.
+
+**Verified:** `tests/test_bake_budget.gd` NEW, **22 asserted**, every expected set derived by intersecting
+rectangles and every count printed: a solid chunk costs 256, an air chunk 0, a half-solid 128, an air chunk
+the observation covers only half of 128 (the unseen half), no observation 256; the first bake plans all 24
+solid chunks of the seat's window (6144 solid cells against 512) and the same planner once painted plans 2
+of 12; twelve solid chunks entering at once (a 2x2 painted block with a view 4 px inside it, the 12-chunk
+ring in the margin, none touching the view) paint **[2, 2, 2, 2, 2, 2]** nearest first spending exactly
+512 a tick, +12 painted in 6 ticks; twelve air chunks **[12]**; eight solid plus four air corners **[6, 2,
+2, 2]** (the two solid that fit and all four air, which are the farthest); the view nudged 8 px into the
+ring touches 5 never-painted solid chunks (1280 cells) and all 5 paint this tick with no margin chunk
+joining; a dig into the ring's far corner paints its 8 unpainted chunks whole while the lane still spends
+512 on 2 more. `test_bake_lanes` **37 -> 33** (the D0522 chunk-budget test moved out; the dig-lane pins
+re-derived: a middle dig's partials are exactly the 9 chunks its 19x19 rect crosses, union the rect, sum to
+5776 px^2; an edge dig 6, a corner 4, fewer than a middle's; the cut asserted both ways with the counts
+above; the fraction test on a stride-3 lattice, 9 chunks a cell measured, 447 cells under and 448 full of
+the 4026-chunk fraction of 11,844; the partial-vs-chunk visit on a 13x13 partial against a 16x16 chunk,
+18x18 raw). `test_terrain_bake` **24 -> 24** (19x19 grid; the centre-dig control is now the 9 chunks its
+reach crosses, by intersection, of the world's 361; 16 cells a side against legacy's 64x). `test_world_view`
+28, `test_gram_map` 23, `test_main_boot` 65, `test_beacon_probe` 13, unchanged. NINE MUTANTS, each applied
+and restored byte-for-byte, the pristine suites green after: the budget in chunks again (4 a tick) -- 7 of
+22 red, "got [4, 4, 4]" for solid and for air; the view promise removed -- 2 red, "2 of 5"; the first bake
+budgeted -- 1 red, "12 planned" of 24; air counted as solid -- 6 red; unseen cells counted as air -- 1 red
+(the half-covered chunk reads 0); a non-fitting chunk stops the lane -- 2 red, "[2, 2, 2, 6]"; the cut
+reversed -- 12 of 33 red in `test_bake_lanes`; a partial over an unpainted chunk -- 2 red; `CHUNK_PX` back
+to 128 -- 1 of 24 red in `test_terrain_bake`. Gates: size, layer lint, duplication (the two suites' shared
+`_lanes()` helper was a cluster; the budget suite's planner is built inside `_ring` now), formatter,
+naming, isolation, suite coverage, CI-not-shrunk (142 suites, was 141), suite count (label 141), untracked
+files: all PASS. `harness.yml` gained the suite's line and catalogue entry.
+
+**Measured, after (the same fall, the same quiet host, run back-to-back with the before above):** the
+window lane paints 2-4 chunks a tick at 361-512 solid cells for **9.5-14.5 ms** of painter time (one tick
+at 17.8 ms: 748 cells, the view promise admitting a third chunk), 53 bake ticks over the two falls against
+13 before; the per-solid-cell cost is unchanged at 20.9-29.7 us (the director's fork, not this ticket).
+Meter, first window (600 ticks, vsync off): before p50 1.40 / p99 8.36 / max **94.24** ms, 14 of 2225
+frames over 16.7 ms; after p50 1.40 / p99 20.77 / max **55.14** (tick 16, the first bake), **37** of 2053
+over 16.7. Second window: before p99 7.22 / max 73.97 (tick 301), 2 over; after p99 8.07 / max 38.65 (tick
+302), 5 over. THE HITCH IS GONE AND A STUTTER REPLACES IT: the fall's worst frames read 23.5 / 23.4 / 22.5 /
+22.0 / 18.8 / 17.6 ms (ticks 47, 19, 21, 37, 38, 39-40) where they read 54-91 before; each row of chunks
+now costs four or five ticks of ~11 ms of paint instead of two of 40-78, so more frames land just over 16.7
+and none far over. 512 cells at 22-25 us a cell is 11-13 ms of bake on this host, plus the frame's own 3-5
+ms: at the 18 us W9 measured it would sit under 16.7. Air is not free of the painters: a 16-cell air chunk
+costs ~0.6 ms (11 for 6.5 ms), so twelve air chunks admitted in one tick are ~7 ms. THE FIRST BAKE: 77
+chunks, 19,712 cells (12,373 solid), 472 ms of paint, against 24 chunks, 24,576 cells (16,126 solid), 636
+ms -- the 16-cell tiling hugs the window. `TerrainBake.setup` on the shipped world, headed: 1104 chunks
+built in **4.1 / 5.9 ms** (two boots) against 280 in 2.3 / 3.0 / 3.2 ms; the headless proxy (N LightLayers
+built and parented, three trials): 280 -> 1104: 0.26-0.29 -> 0.93-1.03 ms; G's 3008 -> 11,844: 2.6-3.0 ->
+10.4-12.4 ms, once at boot. `plan_tick`: 4.4 us quiet, 12.0 us with a dig, 14.9 us with six solid chunks
+pending. `perf_probe.sh` (still / dig / walk, this worktree, quiet host at 500-580 fps, p50 1.3 ms): still
+p99 6.90 / max 46.31 (the first bake) then 6.71 / 9.63, 3 + 0 over 16.7; dig p99 7.02 / max 51.42 then
+7.05 / 17.93, 3 + 1 over; walk p99 10.20 / max 44.47 then 6.96 / 8.09, 9 + 0 over. NOT COMPARED to the
+orchestrator's aa48c4e3 numbers (walk max 69 ms, dig 60): those and the first three fall runs here were
+taken under a contended host (Ableton Live at 42-108%, WindowServer 30-47%, 120-137 fps, p50 5.8-7.0 ms;
+gate 19: VOID as absolute numbers), which is why the fall was re-run as a before/after pair once the host
+went quiet. The contended pair, for the record: before p99 68.96-74.07 / max 168-170 ms; after p99 33.70
+/ max 58.80.
+
+**Provisional / not changed:** (a) THE LANDING FRAME IS A RESIDUAL OUTSIDE THE BAKE: the frame at the end
+of the 20 m fall reads 74.0 ms before (tick 301) and 36-39 ms after (302/304) on the quiet host, 60 / 54
+before and 89 / 74 after under contention; in all of them the painters total 2.8-6.2 ms and the tick's
+bake 5-13 ms, so it is neither -- `SeatEffects`, the audio or the sim at landing are the suspects, not
+measured here. (b) The budget is the ticket's 512 and is not re-tuned from the 22-25 us this host measured;
+384 would land a full bake tick under 16.7 ms here, and that is the director's number to move. (c) The
+per-frame observation's snap (32) covering every 16-cell chunk the window selects is arithmetic, asserted
+by nothing; the pessimistic count is what holds if it drifts. (d) `BakeChunk.frame_for` is reachable
+headless and unpinned. (e) The runs restore the worktree's own slot (`restore` 532-600 ms in the boot
+line); the dig probe run digs and may have re-saved it, which touches nothing at the chimney. (f) The
+budget suite's ring poses the observation by hand, so which chunks are solid is the fixture's word, not the
+world's; the headed fall's per-bake `lane_solid` (361-512, printed under the temporary timer, removed
+before this commit) is the real-world witness that the count runs on the live observation. (g) The seat's
+`frame_0000.png` md5 was not checked here (no seats may be opened by this worker); the shipped chunk
+binding was booted headed once (120 ticks, exit 0, a 44.7 ms first-bake frame).

@@ -26,28 +26,29 @@ extends Node2D
 ## **HOW IT WORKS, and every line of the shape is legacy's.** A world-sized `SubViewport` with a transparent
 ## background holds one `LightLayer` per chunk of the world. It never re-renders on its own
 ## (`UPDATE_DISABLED`); a dig flips it to `UPDATE_ONCE` for exactly the chunks that changed. Between
-## changes the GPU replays a single textured quad. **Two departures from legacy: WHEN the first paint
+## changes the GPU replays a single textured quad. **Three departures from legacy: WHEN the first paint
 ## happens -- `bake_window` paints the chunks in view and leaves the rest until they arrive there (D0506),
-## because painting the whole world at boot cost 6.17 s of first frame -- and HOW MUCH a dig repaints: the
+## because painting the whole world at boot cost 6.17 s of first frame; HOW MUCH a dig repaints: the
 ## dilated rect around the dug cells, not the whole of every chunk it touches (D0522), because a whole
-## chunk cost ~23 ms and froze the world on every blow. See `bake_window.gd`'s header for both.**
+## chunk cost ~23 ms and froze the world on every blow; and HOW MUCH ground scrolling in may paint in one
+## tick: a budget of solid cells (`bake_lane.gd`, D0524), because a row of chunks entering on a fall
+## painted 69-83 ms in one tick. See `bake_window.gd`'s header for all three.**
 ##
 ## **THE ERASER IS NOT OPTIONAL.** A partial re-render can only ADD coverage — alpha blending cannot take
 ## rock away — so a cell dug open to the sky would keep its old pixels forever. `erase.gdshader`
 ## (`blend_disabled`) writes straight to the target, so drawing a transparent rect with it is a true clear.
 ## Ordered below the chunk painters, it blanks each dirty chunk's rect before that chunk repaints.
 ##
-## **EACH CHUNK OBSERVES FOR ITSELF, and this is the one structural difference from legacy.** Legacy's
-## painters read the whole world off the sim directly. Here a painter may read only `frame.obs`, which is a
-## VALUE covering one window — and `Observation.material_at` answers `&""` for any cell outside the window
-## it was given, not "unknown". So handing a chunk the CAMERA's frame would paint every chunk off-screen as
-## empty and bake a mostly-blank world, silently, with every gate green. The bake therefore takes an
-## `observe(rect)` callable and builds its own `Frame` per chunk -- one observation per chunk, paid once.
+## **WHAT A CHUNK DRAWS is `view/visuals/bake_chunk.gd`'s** (D0524): each chunk observes for itself and
+## builds its own frame with the clock pinned -- that file's header says why, and it is the one structural
+## difference from legacy.
 
 ## THE CHUNK GRID, THE DIG DILATION, THE PAINTED SET AND EVERY TICK'S PLAN all live in
 ## `view/visuals/bake_window.gd`, split out so each decision is reachable from a headless suite -- `setup`
 ## below declines under `--headless`, so a decision left inside this object is covered by nothing.
 var _window: BakeWindow = BakeWindow.new()
+## What one chunk paints when the target asks it to (`bake_chunk.gd`).
+var _chunk: BakeChunk = BakeChunk.new()
 
 ## Re-exported from `BakeWindow` so a caller still reads them off the object that uses them, and so each
 ## has exactly one definition.
@@ -61,46 +62,16 @@ var _eraser: LightLayer = null
 var _erase_rects: Array[Rect2] = []
 ## The chunks the last bake left visible, so the next hides exactly those and not the whole grid (D0522).
 var _shown: Array[int] = []
-## Chunk index -> the rect it repaints THIS bake instead of its whole rect (D0522). `_paint_chunk` consumes
-## an entry as it draws; no entry means the whole rect. Replaced by every bake, so none outlives its tick.
-var _partial: Dictionary = {}
 
 ## Has the target been cleared yet? Exactly one bake per session clears it and every bake after it must
 ## not, or it would wipe the chunks already painted. That used to be `bake_full` at boot, unconditionally;
 ## since D0506 it is whichever bake runs first, which is normally the first window bake.
 var _cleared: bool = false
 
-## The painters baked into the target, in draw order. STATIC ONLY — anything that changes without the
-## terrain changing (the veil's lamp, a glint's animation, crumble, the seam at the worked cell) must stay
-## on the per-frame path or it freezes at whatever value it held when the bake ran.
-var _painters: Array[Callable] = []
-
-## `observe(rect: Rect2) -> Interface.Observation` — see the header. The bake's only route to world state,
-## and the reason a chunk off-screen bakes correctly.
-var _observe: Callable = Callable()
-
-var _look: MaterialLook = null
-## THE BAKED FRAME MUST CARRY EVERYTHING THE LIVE FRAME CARRIES. Held for the same reason `_look` is: a
-## chunk builds its own `Frame`, and a field left null here is a field the baked picture silently lacks
-## while the headless fallback path has it -- two renderers disagreeing, with no gate able to see it
-## because CI only ever runs the fallback. D0327.
-var _tone: RockTone = null
 ## The grammar map the rock tooth samples (6p, D0379): one byte per cell, filled as each chunk paints and
 ## refilled on the same dig path, so it can never disagree with the colour target about which cells are
-## which rock.
+## which rock. Owned here because its texture is uploaded once a tick, below.
 var _gram: GramMap = GramMap.new()
-
-## The zoom a baked painter sees, PINNED. Baked content is resolution-independent — drawn into world space
-## once and sampled at whatever zoom the camera later uses — so a zoom-gated detail tier must not vary per
-## bake, or the world would change appearance because a dig happened while zoomed out.
-##
-## **NO PAINTER IN THIS BUILD READS `frame.zoom` TODAY** (verified across `view/visuals/` before this
-## landed), so the value is currently unobservable and 1.0 is a placeholder rather than a decision. It is
-## named and documented anyway because legacy's label-visibility and detail-tier code is gated on zoom and
-## will arrive with a later component — at which point a baked painter reading this would freeze at one
-## tier, and the fix is to keep that painter on the per-frame path rather than to make the bake follow the
-## camera.
-const BAKE_ZOOM: float = 1.0
 
 ## False when no usable render target could be had — see `setup`. The caller then keeps its per-frame path.
 var _live: bool = false
@@ -120,10 +91,7 @@ func setup(world_cells: Vector2i, cell_px: int, observe: Callable, look: Materia
 		return false
 	_gram.setup(world_cells)
 	_window.set_margin(rebake_margin)
-	_painters = painters
-	_observe = observe
-	_look = look
-	_tone = tone
+	_chunk.setup(_window, observe, look, tone, painters, _gram)
 	if painters.is_empty() or not observe.is_valid() or look == null:
 		return false
 	if DisplayServer.get_name() == "headless":
@@ -147,6 +115,11 @@ func plan(world_cells: Vector2i, cell_px: int) -> bool:
 ## rather than infer it from pixels there is no render target to produce.
 func window() -> BakeWindow:
 	return _window
+
+
+## What a chunk draws, for a suite that wants to assert the baked frame's pinned fields (D0524).
+func chunk() -> BakeChunk:
+	return _chunk
 
 
 ## Would `bake_cells` take the full-rebake path for this many dirty chunks? Public and pure so the
@@ -199,7 +172,7 @@ func _build_eraser() -> void:
 	_viewport.add_child(_eraser)
 
 
-## One `LightLayer` per chunk, each bound to its own world rect. Legacy `:428-433`.
+## One `LightLayer` per chunk, each bound to its own index and world rect. Legacy `:428-433`.
 ##
 ## BUILT HIDDEN since D0506. Every bake sets visibility across the whole grid for itself, so this decides
 ## only what the FIRST render replays -- and a chunk left visible here would go into the target whether or
@@ -210,42 +183,11 @@ func _build_chunks() -> void:
 		for cx: int in grid.x:
 			var rect := Rect2(float(cx * CHUNK_PX), float(cy * CHUNK_PX),
 				float(CHUNK_PX), float(CHUNK_PX))
-			var chunk := LightLayer.new()
-			chunk.setup(-10, _paint_chunk.bind(_chunks.size(), rect))
-			chunk.visible = false
-			_viewport.add_child(chunk)
-			_chunks.append(chunk)
-
-
-## What a chunk draws: every baked painter, against a frame observed for the rect it repaints -- its
-## whole rect, or the partial `bake_tick` left for it (D0522).
-##
-## THE PAINTERS ARE UNCHANGED, which is the point — the bake must be pixel-identical to the per-frame path
-## or it is a second renderer with its own bugs. Each already culls against `frame.view_world_rect` (that is
-## what `TerrainPainter.visit_rect` is for), so restricting a chunk is a matter of handing it a frame whose
-## rect and whose observation are both the rect.
-func _paint_chunk(ci: CanvasItem, i: int, rect: Rect2) -> void:
-	if not _observe.is_valid():
-		return
-	var r: Rect2 = _partial.get(i, rect)
-	_partial.erase(i)
-	var f: Frame = Frame.new()
-	f.obs = _observe.call(r)
-	if f.obs == null:
-		return
-	## PINNED, not the live clock. A baked painter that read a moving clock would freeze at whatever value
-	## the last bake happened to see, and two chunks baked at different times would disagree — a seam
-	## visible exactly along a chunk boundary and only after a dig.
-	f.anim_time = 0.0
-	# Shrunk by the painters' overdraw so they visit EXACTLY the rect's cells (D0522): see `paint_rect`.
-	f.view_world_rect = _window.paint_rect(r)
-	f.zoom = BAKE_ZOOM
-	f.look = _look
-	f.tone = _tone
-	f.marks = PackedVector2Array()
-	for paint: Callable in _painters:
-		paint.call(f, ci)
-	_gram.fill_rect(f.obs, cells_of(r), _look)
+			var layer := LightLayer.new()
+			layer.setup(-10, _chunk.paint.bind(_chunks.size(), rect))
+			layer.visible = false
+			_viewport.add_child(layer)
+			_chunks.append(layer)
 
 
 ## A pixel rect as the terrain cells it covers.
@@ -271,7 +213,7 @@ func _paint_erase(layer: LightLayer) -> void:
 func bake_full() -> void:
 	if not _live:
 		return
-	_partial.clear()
+	_chunk.partial.clear()
 	_shown.clear()
 	for i: int in _chunks.size():
 		_chunks[i].visible = true
@@ -285,16 +227,18 @@ func bake_full() -> void:
 	_cleared = true
 
 
-## Legacy `_bake_terrain_chunks` `:715-735`, the per-dig lane on its own: `bake_tick` with no window.
+## Legacy `_bake_terrain_chunks` `:715-735`, the per-dig lane on its own: `bake_tick` with no window, and
+## so with nothing for the window lane to budget.
 func bake_cells(cells: Array) -> void:
-	bake_tick(Rect2(), cells)
+	bake_tick(Rect2(), cells, null)
 
 
 ## ONE BAKE PER TICK, OVER BOTH LANES AT ONCE, and that is why it is one call and not two (D0506).
 ##
 ## THE WINDOW LANE IS THE FIRST BAKE AND EVERY CHUNK THAT SCROLLS IN AFTER IT. `BakeWindow` grows
 ## `window_rect` by the observation margin and answers which of those chunks the target does not hold yet;
-## they are painted ONCE, in the tick they enter the window. `UPDATE_ONCE` on a SubViewport renders before
+## they are painted ONCE, in the tick they enter the window -- or, since D0524, in the first tick the
+## budget admits them, the view rect itself always admitted. `UPDATE_ONCE` on a SubViewport renders before
 ## its parent inside one frame -- the lane `bake_cells` has used for a dug chunk since D0326 -- so the quad
 ## samples them already painted and no frame shows a hole. Nothing rebakes a chunk that has not been dug.
 ##
@@ -302,14 +246,20 @@ func bake_cells(cells: Array) -> void:
 ## dug cells' bounding box grown by the dilation, clipped to each chunk it crosses, so a blow repaints
 ## (1 + 2 x margin) cells a side wherever it lands and a chunk corner costs nothing extra. Both lanes are
 ## planned together in `BakeWindow.plan_tick` (a second bake in one tick would hide what the first showed),
-## and that planner holds the full-rebake threshold, the scattered-dig fallback and the budget, headless.
-func bake_tick(window_rect: Rect2, dug: Array) -> void:
+## and that planner holds the full-rebake threshold, the whole-or-rect cut and, through `BakeLane`, the
+## budget, headless.
+##
+## `obs` IS THE TICK'S OWN OBSERVATION -- the one the coordinator built the frame from -- and the budget
+## counts a chunk's solid cells off it (D0524), so admitting a chunk costs no second observation. The
+## planner is given it rather than asking `observe` itself: a second observation over the window on the
+## very ticks that already paint would be the cost this budget exists to bound.
+func bake_tick(window_rect: Rect2, dug: Array, obs: Interface.Observation) -> void:
 	if not _live:
 		return
 	## Last tick's chunk paints wrote the grammar map; upload it before this tick's are queued. The tooth's
 	## uniform holds this same `ImageTexture`, updated in place, so nothing else has to be re-bound (D0511).
 	_gram.texture()
-	var p: BakeWindow.Plan = _window.plan_tick(window_rect, dug)
+	var p: BakeWindow.Plan = _window.plan_tick(window_rect, dug, obs)
 	if p.full:
 		bake_full()
 		return
@@ -330,7 +280,7 @@ func _bake_partial(p: BakeWindow.Plan) -> void:
 	for i: int in _shown:
 		_chunks[i].visible = false
 	_shown.clear()
-	_partial = p.partial
+	_chunk.partial = p.partial
 	for i: int in p.whole:
 		_show(i, _window.chunk_rect(i))
 	for i: int in p.partial:

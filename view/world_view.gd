@@ -314,14 +314,14 @@ func refresh() -> void:
 	var began: int = Time.get_ticks_usec()
 	_anim_ticks += 1
 	_frame = _build_frame()
-	# THE BAKE IS TOLD WHAT CHANGED HERE, not at the dig site: a retained target is retained, so a mined
-	# cell keeps its rock pixels until something invalidates its chunk, and driving it from the frame the
-	# coordinator already built means no caller can forget it. SINCE D0506 IT IS ALSO TOLD WHERE THE CAMERA
-	# IS, on the same call -- this is the FIRST bake, and a chunk that has just entered the window is painted
-	# in this tick, before the quad samples it. ONE call for both lanes, because each sets chunk visibility
-	# across the whole grid and a second call in the same tick would hide what the first had shown.
+	# THE BAKE IS TOLD WHAT CHANGED HERE, not at the dig site: a retained target is retained, so a mined cell
+	# keeps its rock pixels until something invalidates its chunk, and driving it from the frame the coordinator
+	# already built means no caller can forget it. SINCE D0506 IT IS ALSO TOLD WHERE THE CAMERA IS (the first
+	# bake; a chunk entering the window paints before the quad samples it), and since D0524 HANDED THIS TICK'S
+	# OBSERVATION, so the lane's solid-cell budget counts off the one already built and never takes a second.
+	# ONE call for both lanes: each sets chunk visibility across the grid, and a second would hide the first's.
 	if _bake != null:
-		_bake.bake_tick(_frame.view_world_rect, _frame.obs.mining_broke_cells)
+		_bake.bake_tick(_frame.view_world_rect, _frame.obs.mining_broke_cells, _frame.obs)
 	for layer: PaintLayer in _layers:
 		layer.queue_redraw()
 	if _hud != null:
