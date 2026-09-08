@@ -301,6 +301,9 @@ func bake_cells(cells: Array) -> void:
 func bake_tick(window_rect: Rect2, dug: Array) -> void:
 	if not _live:
 		return
+	## Last tick's chunk paints wrote the grammar map; upload it before this tick's are queued. The tooth's
+	## uniform holds this same `ImageTexture`, updated in place, so nothing else has to be re-bound (D0511).
+	_gram.texture()
 	var dirty: Dictionary = {}
 	for cell: Vector2i in dug:
 		for i: int in influenced_chunks(cell):

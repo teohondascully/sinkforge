@@ -19489,3 +19489,36 @@ edit to `batch.py` itself; `touch view/zz_probe.tmp` added `?? view/zz_probe.tmp
 removing it took it away.
 
 **Kind:** provisional.
+
+## D0511 · 2026-09-07 · The bake uploads the grammar map every tick it runs; the tooth's texture was blank
+
+**Decided:** `TerrainBake.bake_tick` calls `_gram.texture()` before queuing the tick's chunks. `GramMap.texture()`
+creates the `ImageTexture` once and afterwards `update()`s it in place when a fill has marked it dirty, so
+the tooth's `gram_tex` uniform, bound once at mount, keeps reading the current map.
+
+**Why:** `ViewStack` mounts the tooth right after `bake_static` (`view/view_stack.gd:207-208`), and the
+mount binds `bake.gram_texture()` at that moment. Nothing called `texture()` again, so the GPU copy was
+whatever the image held at mount. Before D0506 that was the whole world (the full bake ran inside
+`bake_static`), and only DIGS failed to reach the shader. After D0506 `bake_static` paints nothing, so the
+texture was created from an EMPTY image and the tooth read clastic everywhere for the whole session.
+Worker G reported this as pre-existing; the dig half was, the blank half is D0506's.
+
+**Evidence:** a scratch probe booted `Main` headed from two runtime copies (HEAD, and HEAD with this one call),
+waited 12 frames, and read `GramMap._tex.get_image()` back against `grammar_at` over the whole 256x1104
+map, reading the private texture so the probe could not perform the upload itself (its first version
+called `gram_texture()` and measured its own call: both builds matched). HEAD: 2439 non-clastic cells on
+the CPU, 0 on the GPU, 2439 mismatches. Fixed: 2439, 2439, 0. The opening frame is byte-identical either
+way (md5 6287d89b...): every surface material is clastic, which is grammar 0, the shader's unbound
+default, so the blank texture is invisible until bedded or massive rock scrolls into view.
+
+**Kind:** fix. Cost: one 3 MB `ImageTexture.update` on a tick whose previous tick painted a chunk,
+none otherwise.
+
+## D0512 · 2026-09-07 · The teaching fixture digs a second clay cell; the footing rule cost it the block
+
+**Decided:** `test_tutorial_teaching`'s wrong-stack fixture aims its clay dig at the cell beside the first
+one as well. **Why:** clay banks a sixteenth a cell (`Items._yield_rubble`). The fixture's one aim under
+the spawn broke 15 clay cells across two bites; the three cells that used to make sixteen are the boots'
+footing, which D0509 now spares. The rule is right (the pit under the spawn was the finding); the
+fixture's control was one cell from its floor. CI on 68e1bd05 went red on it because D0509 shipped after
+a gates-only local run; the suites run before the next push. **Kind:** fixture.

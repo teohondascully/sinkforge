@@ -121,7 +121,13 @@ them"; fixed D0507) and DROPPED read as success (S98, S102; the headline is NO M
 measured: ready at 3.8 s, then 6.2 s drawing the FIRST frame under every renderer -- the terrain bake paints
 the whole world at boot; a worker is making it bake the chunks in view first (D0506).
 
-**For the director:** the pit under the spawn (S65, S90, S100: a first press at the screen's centre cuts
-the floor beside the feet and the stranger never jumps out; a blow that spares the two cells under the feet
-unless aimed is the sim-side candidate); the stride (T035); D3–D6's rewards. **Next:** D0506 lands, a batch
-on D0507/D0508.
+**Landed since (D0506, D0509, D0510):** the terrain bake paints only the chunks in the camera's window
+first, the rest as they scroll in (`view/visuals/bake_window.gd`): receipt-to-first-frame 6.17 s → 1.64 s
+on main, the first frame byte-identical; six seats now boot in 8.1 s wall together (`batch_103-108.json`).
+The pit under the spawn is closed sim-side: a blow spares the four cells under a standing body's boots
+unless aimed at one (`sim/mining/footing.gd`, D0509). The batch's dirty check reads only the runtime
+tree it copies, so the harness's untracked recordings no longer block a batch (D0510).
+
+**For the director:** the stride (T035); D3–D6's rewards; the hotbar when the pack is empty (D0412's
+history); a world snapshot for new_game's 2.8 s. **Next:** strangers 103-108 on D0506–D0509 (running
+at the time of writing), their report, then the improvement workers on the findings.
