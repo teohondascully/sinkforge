@@ -20635,3 +20635,98 @@ tick 90. A deep-rock pose, where the veil takes most of the range, would very li
 was not captured. (f) `--shader-tone` is documented in `shell/seat_flags.gd`'s header but deliberately NOT
 added to `SeatFlags.parse`'s dictionary: nothing in `shell/` reads it, and a returned key nobody consumes
 is dead code.
+
+## D0529 · 2026-09-08 · The world's layers redraw only when the camera, the observation or their own state moved
+
+**Decided:** `WorldView.refresh()` no longer calls `queue_redraw()` on every world layer every tick.
+`add_painter` / `add_stateful_painter` gained `animated: bool = true`, so every existing call site keeps
+exactly today's behaviour, and a layer that opts out is queued only when `FrameGate.statics_dirty` says
+the camera's world rect, the observation's static key or the lode plane moved. THREE PAINTERS OPT OUT on
+the seat's stack and each carries its reason at its own call site: `OrePainter.paint_lode` (its header
+already said "Static, because it keeps nothing"), `SeamPainter.paint` (an integer function of the worked
+cell and the seed), `BackdropPainter.paint` (one `draw_rect` tinted by `obs.cell.y`; mounted only without
+`--sky`), plus `WallPainter` and `TerrainPainter` on the bake's DECLINED path, by the definition that put
+them in `add_baked_painter` at all. Nothing else. `view/frame_gate.gd` is new -- `world_view.gd` stood at
+exactly 400 against the cap, so `_build_frame` and the `RockTone` moved into it with the gate rather than
+the file being trimmed. `PaintLayer` gained `animated`, `queues` and `sum_draw_usec`, and
+`DrawCost.frame_report` prints `queued=N/M drawn=X.XXXms/tick`.
+
+**NOT DONE, AND IT IS MOST OF THE COST.** The bake quad stays animated: `TerrainBake.draw_quad` ignores
+its frame and would be a free win, but W14 is editing that file this session and a quad wrongly marked
+static FREEZES the whole terrain. The tooth is animated for a mechanical reason -- `ToothLayer.mount`
+calls `add_painter` itself and lives in `view/visuals/`, which this ticket may not edit.
+`AmbiencePainter.paint_under` is a pure function of `obs.machines`, but `HubPlanes._fill_metre_planes`
+rebuilds that array on EVERY observe, so its key would be dirty every tick and, sharing one gate, would
+have dragged every other static layer with it.
+
+**Why:** D0527 named this call site and estimated that a still frame redrawing only what changed would be
+"under 8.33 ms even at 3x". THAT ESTIMATE DOES NOT SURVIVE THE PAINTER-BY-PAINTER READING. Of a settled
+still tick's 2.14 ms of painter work, `sky_painter.paint` is 0.93 and `machine_painter.paint_frame` 0.48
+-- 66% in two painters whose picture genuinely changes every tick (drifting cloud, twinkling star,
+pulsing crown; pulsing glyph, bobbing chrome). Fifteen of the twenty world layers read `Frame.anim_time`.
+The rule in this entry is the honest one and its ceiling on this stack is ~0.2 ms, not ~2.
+
+THE MEASUREMENT, INTERLEAVED, because D0527's own warning applies to it. Three OFF/ON pairs alternating
+in one sitting, headed, `--resolution 1280x720 --disable-vsync -- --fresh --muted --perf
+--quit-after=900`, body at the spawn; OFF is this same tree with the two seat-stack `false` arguments
+removed, so the gate still runs and reaches nothing. A NON-interleaved before/after batch was taken
+first and is discarded: `fps_wall` read 135-411 before and 389-633 after, and a 4x frame-rate change
+cannot come from 0.1 ms of painter work. A second interleaved batch settled it -- OFF runs landed at
+`fps_wall` 119-592 and ON runs at 120-633, both arms in both regimes. Whether a run is PACED is the
+dominant term and it is not the treatment.
+
+So the reported quantity is PAINTER CPU PER RENDERED TICK (`PaintLayer.sum_draw_usec` summed over the
+world layers, over `_anim_ticks`), which is time inside the painters and does not move when the display
+paces the process. All six runs of the final batch were unpaced (`fps_wall` 389-602). Windows 1/2/3,
+OFF mean 2.177 / 2.164 / 2.142 ms a tick against ON 2.080 / 2.060 / 2.022: **-0.098 / -0.104 / -0.120 ms,
+4.5% / 4.8% / 5.6%.** OFF ranged 2.103-2.241 over its nine windows and ON 1.961-2.109, so eight of the
+nine ON windows sit below every OFF window. THE QUEUE COUNT IS THE MECHANISM AND IT IS EXACT, identical
+in all three ON runs: `queued` 5404/6000, 10804/12000, 16204/18000 against OFF's 6000/12000/18000. Twenty
+world layers, 300 ticks a window: the two static layers were queued 4 times of 600 in ticks 1-300 and
+**0 times of 600 in each of ticks 301-600 and 601-900**. THE WALK DID NOT REGRESS: the same three pairs
+under `--perf-drive` read window means OFF 2.151 / 2.096 / 2.074 against ON 2.128 / 2.097 / 2.085, deltas
+-0.023 / +0.000 / +0.012 ms, and `queued` 5946/11934/17914 -- a moving camera changes the view rect
+almost every tick, which is the gate answering correctly rather than the gate being off.
+
+THE PICTURE DOES NOT CHANGE. `--screenshot-tick=200` under the same flags, OFF against ON, byte-identical
+both times: still `f2805ddb73d47d30e7b638689b37aec7`, and under `--act=mine` (MINE held from tick 20)
+`afcef95c7762f80a45290f8c304716e5`. CONTROL, because a capture of a world nothing changed would prove
+nothing about a stale layer: the mining capture differs from the still one in **51,363 of 921,600 pixels,
+5.57%**, so the run really did dig.
+
+**Verified:** `test_world_view` **28 -> 37** asserted (nine rows: the queue pins and the stack's named
+static set). `test_main_boot` 65 -> 65, `test_terrain_bake` 24 -> 24, `test_bake_lanes` 33 -> 33,
+`test_bake_budget` 22 -> 22, `test_mark_painter` 64 -> 64, `test_machine_painter` 50 -> 50. The whole CI
+suite list: `tools/run_suites.sh` **143 passed, 0 failed, of 143** in 169 s at jobs=4. Gates: size, layer
+lint, duplication, schema, formatter, coverage, naming PASS. `check_ledger_integrity` was ALREADY RED ON
+MAIN before this commit and is not this entry's -- D0525 and D0526 are each declared twice at 5f72b802
+(lines 20256/20375 and 20283/20310), two sessions having taken the same numbers; reported, not renumbered,
+because both entries belong to other tickets. FIVE MUTANTS, each killed by the row
+that names its number: (A) `if statics_dirty:` alone -- the animated pin reads "queued 1 of 2"; (B)
+`if layer.animated or true:` -- the static pin reads "queued 2 of 2"; (C) the camera term dropped from
+`statics_dirty` -- "queued 1 of 3"; (D) the observation terms dropped -- "queued 2 of 4"; (E) the
+`, false` removed from `OrePainter.paint_lode`'s call site -- the named-set row lists four painters
+instead of five.
+
+**THE MUTANT THAT ESCAPED FIRST, AND WHY.** The camera-half pin originally moved the camera 300 px and
+mutant C SURVIVED it: `Envelope.covering` snaps the observation window outward to `SNAP_CELLS` = 32 cells
+= 128 px (D0340), so a 300 px move changes `obs.window`, the KEY catches it, and the camera term is never
+consulted. The row was measuring the observation term while claiming to measure the camera. It now moves
+8 px -- two terrain cells, inside one snap block -- and asserts the window is unchanged as its
+discriminator, because `TerrainPainter.visit_rect` derives the drawn cells from `frame.view_world_rect`
+and not from the window, so a sub-snap camera move really does change the picture.
+
+**Provisional / not changed:** (a) The gate is ONE shared memory, not one per layer: every static layer
+passes or fails together, so their memories would be identical. The cost is the coupling noted above --
+one badly-chosen key field makes every static layer dirty every tick. (b) `is_same(obs.lodes, ...)` rests
+on `HubPlanes` handing back the cached dictionary instance while its key holds; a rebuild to identical
+content redraws once for nothing, which is the safe direction. (c) The observation's own IDENTITY was
+considered and rejected: `Interface.observe` builds a fresh `Observation` every call, so that rule is
+true every tick and gates nothing -- a no-op that would have passed every picture assertion. (d) The HUD
+is untouched: `HudLayer.refresh()` queues all eleven chips every tick for 0.45-0.63 ms, and `view/hud/`
+was outside this ticket. (e) The next lever, if the still frame is worth more: the sky's static layout
+(the star field and the ridge polygons) cached per camera cell with only the drift, twinkle and pulse
+recomputed -- 0.93 of the 2.14 ms is there, and it needs `view/visuals/sky_painter.gd`. (f) A
+`sum_draw_usec` total counts engine-initiated redraws (a resize, a focus change) as well as the
+coordinator's, identically in both arms. (g) All numbers here are from this worktree at 5f72b802 + this
+change; no comparison is made to D0527's, whose runs were partly paced and carried an instrumented sky.

@@ -25,6 +25,14 @@ extends RefCounted
 ##     10  the HUD    (a `CanvasLayer`, so the camera does not move it): the depth chip, then the
 ##                     stratum arrival plate over it (D0288)
 ##
+## **AND WHICH OF THEM ARE STATIC** (D0529). Every `add_painter` here defaults to ANIMATED, which is what
+## all of them were before that decision, and the three that opt out -- the backdrop, the lode and the
+## seam -- carry a one-line reason at their own call site. The test is not "is it cheap" but "can its
+## picture change while the camera rect and the observation both hold still", so a painter reading
+## `Frame.anim_time` cannot opt out; one wrongly opted out FREEZES at the picture it last drew rather
+## than failing, exactly as a painter wrongly given to `add_baked_painter` does. `tests/test_world_view.gd`
+## names the set, because a stack that passed `false` nowhere would leave the gate reaching nothing.
+##
 ## Driven through the REAL coordinator rather than a hand-built `Frame`, which is the whole point and was
 ## D0244's own argument for `--sky`: `SkyPainter` reads nothing from `observe()`, so a shortcut frame
 ## would have drawn the same picture while proving none of the contract. Every painter added here is
@@ -103,9 +111,10 @@ static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, cam
 	# `--sky` REPLACES the backdrop rather than layering over it (D0244): the fill is opaque and would
 	# cover the starfield completely.
 	if sky:
-		view.add_painter(SkyPainter.paint).z_index = SKY_Z
+		view.add_painter(SkyPainter.paint).z_index = SKY_Z   # ANIMATED: the clouds drift, the stars twinkle, the crown pulses
 	else:
-		view.add_painter(BackdropPainter.paint).z_index = BACKDROP_Z
+		# STATIC: one `draw_rect` whose colour is `look.band_color(obs.cell.y)` and nothing else (D0529).
+		view.add_painter(BackdropPainter.paint, false).z_index = BACKDROP_Z
 	# THE TWO STATIC PAINTERS GO INTO THE BAKE, not onto a per-frame layer (D0326, `docs/PORT_ORDER.md` V1).
 	# They are the only two on this stack whose picture cannot change unless the terrain does, and they are
 	# the expensive ones: legacy measured the terrain pass at ~72% of all frame draw calls. Registered in
@@ -206,8 +215,11 @@ static func _mount_ground(view: WorldView) -> void:
 	view.add_baked_painter(TerrainPainter.paint)
 	view.bake_static(WALL_Z)
 	ToothLayer.mount(view, TOOTH_Z)
-	view.add_painter(OrePainter.paint_lode).z_index = LODE_Z
-	view.add_painter(WaterPainter.paint).z_index = WATER_Z
+	# STATIC: the metal left in every opened lode, from `obs.lodes`, `solid_at` and the view rect. Its own
+	# header already said so -- "Static, because it keeps nothing" -- and `FrameGate` takes the lode plane's
+	# identity, which `HubPlanes` rebuilds on exactly the key that would change this picture.
+	view.add_painter(OrePainter.paint_lode, false).z_index = LODE_Z
+	view.add_painter(WaterPainter.paint).z_index = WATER_Z   # ANIMATED: the surface waves on the clock
 
 
 ## The miner, as a painter on the frame like every other thing in the world; `MinerDraw` reads the pose
@@ -266,7 +278,9 @@ static func _mount_additive(view: WorldView, painter: RefCounted) -> void:
 ## and hands the same one to the guide, the dock and this painter (D0498).
 static func _mount_over_veil(view: WorldView, glint: GlintPainter) -> MachinePainter:
 	view.add_stateful_painter(glint, &"paint_frame").z_index = GLINT_Z
-	view.add_painter(SeamPainter.paint).z_index = SEAM_Z
+	# STATIC: the grain is `Seams.at(obs.mining_charging_cell, obs.world_seed)`, an integer function of the
+	# cell being worked; it appears and vanishes with the hold and never moves while one is held.
+	view.add_painter(SeamPainter.paint, false).z_index = SEAM_Z
 	view.add_painter(AmbiencePainter.paint_under).z_index = DROP_PATH_Z
 	var machines: MachinePainter = MachinePainter.new()
 	view.add_stateful_painter(machines, &"paint_frame").z_index = MACHINE_Z

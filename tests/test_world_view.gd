@@ -25,6 +25,8 @@ func _initialize() -> void:
 	await _test_the_frame_carries_the_ruled_contract()
 	await _test_a_stateful_painter_outlives_the_expression_that_created_it()
 	await _test_the_frame_asks_for_walls_exactly_when_a_per_frame_painter_reads_them()
+	await _test_a_static_layer_is_queued_only_when_the_camera_or_the_world_moved()
+	await _test_the_real_stack_opts_named_painters_out_and_leaves_the_rest_animated()
 	_finish("world_view")
 
 
@@ -75,11 +77,18 @@ class Counter extends RefCounted:
 		calls += 1
 
 
+## The grid and the camera the last `_mount()` built. Held because the redraw-gate test has to MOVE one
+## and CHANGE the other, and a test that posed its own copy of either would be asserting its own copy.
+var _grid: TileGrid = null
+var _camera: Camera2D = null
+
+
 func _build_iface() -> Interface:
 	var grid: TileGrid = TileGrid.new(GRID_W, GRID_H, 1)
 	for col: int in range(0, GRID_W):
 		for row: int in range(FLOOR_ROW, GRID_H):
 			grid.set_material(Vector2i(col, row), &"clay")
+	_grid = grid
 	var body: Body = Body.new(
 		Fx.from_int(GRID_W * Heightfield.TERRAIN_CELL_PX / 2),
 		Fx.from_int(FLOOR_ROW * Heightfield.TERRAIN_CELL_PX) - (Body.HEIGHT_PX * Fx.SCALE) / 2)
@@ -100,6 +109,7 @@ func _mount() -> WorldView:
 	var camera: Camera2D = Camera2D.new()
 	root.add_child(view)
 	view.add_child(camera)
+	_camera = camera
 	view.setup(_build_iface(), MaterialLook.new(), camera)
 	await process_frame
 	return view
@@ -233,3 +243,121 @@ func _test_the_frame_asks_for_walls_exactly_when_a_per_frame_painter_reads_them(
 	_check(not declined.materials.is_empty(),
 		"CONTROL: the MATERIALS plane is still built, so declining walls dropped one plane and not the "
 		+ "observation itself")
+
+
+## THE REDRAW GATE (D0529), and the measurement it answers. `refresh()` used to call `queue_redraw()` on
+## every world layer every tick, moved or not, so a standing-still tick re-issued about twenty painters'
+## draw commands -- D0527 measured 2.7-3.5 ms of them on a fast core and 5.0-8.2 ms in the slow frames,
+## and named this call site as the lever it was not allowed to touch.
+##
+## **COUNTED AT THE QUEUE, NOT AT THE DRAW, and the difference is what makes this assertable at all.** A
+## layer whose redraw was skipped keeps `last_draw_usec` from the frame it DID draw -- an honest answer
+## to "what does that painter cost" and a useless one to "did it run this tick". `PaintLayer.queues` is
+## stamped where the queue is issued and nowhere else.
+##
+## FOUR ROWS, EACH KILLING A DIFFERENT MUTANT: treating every layer as static kills the first, treating
+## every layer as animated kills the second, a gate blind to the camera kills the third, and one blind to
+## the observation kills the fourth -- which is the one that would ship a frozen picture over a dug hole.
+func _test_a_static_layer_is_queued_only_when_the_camera_or_the_world_moved() -> void:
+	var view: WorldView = await _mount()
+	# MADE CURRENT HERE and not in `_mount`: `view_world_rect()` reads the VIEWPORT's canvas transform, so
+	# a camera that is not the current one can be moved all day without the rect following it -- and the
+	# camera-half row below would then read 1 and blame the gate for the fixture.
+	_camera.make_current()
+	await process_frame
+	var animated: PaintLayer = view.add_painter(func(_f: Frame, _ci: CanvasItem) -> void: pass)
+	var still: PaintLayer = view.add_painter(func(_f: Frame, _ci: CanvasItem) -> void: pass, false)
+	view.refresh()
+	view.refresh()
+	_check(animated.queues == 2,
+		("an ANIMATED layer is queued on both of two refreshes over one camera rect and one unchanged "
+		+ "world (queued %d of 2) -- a gate that treated every layer as static would read 1")
+		% animated.queues)
+	_check(still.queues == 1,
+		("and the STATIC layer beside it is queued once over the same two (queued %d of 2) -- this is "
+		+ "the whole saving, and a gate that treated every layer as animated would read 2")
+		% still.queues)
+	await _camera_half(view, still)
+	# THE OBSERVATION HALF, and it is the one with teeth: a dig, a pile landing, a machine's state change
+	# and a mark moving all arrive this way, and a layer that missed one would show rock that is gone.
+	_grid.set_material(Vector2i(GRID_W / 2, FLOOR_ROW), &"")
+	view.refresh()
+	_check(still.queues == 3,
+		("and a fourth, after one terrain cell was cleared, queues it again (queued %d of 4) -- a static "
+		+ "layer holding its picture across a dig is the failure this row exists for") % still.queues)
+	_check(animated.queues == 4,
+		("CONTROL: the animated layer beside it was queued on all four refreshes (%d of 4), so the "
+		+ "counter is not simply stuck at whatever the static one reads") % animated.queues)
+	view.queue_free()
+
+
+## THE CAMERA HALF, split out at the 50-line function cap -- AND IT MOVES THE CAMERA BY LESS THAN THE
+## ENVELOPE'S SNAP, which is the whole of what makes it a test of the camera term at all.
+##
+## The first draft of this row moved the camera 300 px and passed with the rect comparison DELETED. It
+## had to: `Envelope.covering` snaps the observation window outward to `SNAP_CELLS` = 32 cells = 128 px
+## (D0340), so a 300 px move changes the window and the key catches it with the camera term never
+## consulted. A gate blind to the camera survived that mutant. Eight pixels is two terrain cells, inside
+## one snap block, so the window is byte-identical and the rect is the only input that differs -- and the
+## picture still depends on it, because `TerrainPainter.visit_rect` derives the cells a painter draws
+## from `frame.view_world_rect`, not from the window.
+func _camera_half(view: WorldView, still: PaintLayer) -> void:
+	var before: Rect2 = view.view_world_rect()
+	var window_before: Rect2i = view.current_frame().obs.window
+	_camera.position += Vector2(8.0, 0.0)
+	await process_frame
+	await process_frame
+	view.refresh()
+	_check(view.view_world_rect().position != before.position,
+		"CONTROL: moving the camera moved the coordinator's world rect (%s -> %s)"
+		% [before.position, view.view_world_rect().position])
+	_check(view.current_frame().obs.window == window_before,
+		("DISCRIMINATOR: and it moved less than the envelope's %d-cell snap, so the observation window "
+		+ "is unchanged at %s -- the camera rect is the ONLY input that differs here, and a gate reading "
+		+ "the observation alone would not notice")
+		% [Interface.Envelope.SNAP_CELLS, window_before])
+	_check(still.queues == 2,
+		"a third refresh, after that sub-snap camera move, queues the static layer again (queued %d of 3)"
+		% still.queues)
+
+
+## THE MECHANISM AND ITS CALL SITES ARE TWO THINGS, and D0330 is the file's own precedent for the gap:
+## a bake test that passed its own margin stayed green while the real call site passed zero. Every row
+## above is satisfied by a stack that marks NOTHING static -- the flag defaults to animated, so a
+## `view_stack.gd` that never passes `false` leaves the gate mounted, correct, and reaching nothing.
+##
+## Named rather than counted. A count would survive one painter being swapped for another, and which
+## painters are pure functions of the camera rect and the observation is exactly the judgment being
+## pinned. Sorted as Strings, never as StringNames: a `StringName` sort is creation order.
+func _test_the_real_stack_opts_named_painters_out_and_leaves_the_rest_animated() -> void:
+	var scene: Node2D = Node2D.new()
+	root.add_child(scene)
+	var cam: Camera2D = Camera2D.new()
+	scene.add_child(cam)
+	var view: WorldView = ViewStack.build(scene, _build_iface(), MaterialLook.new(), cam, false)
+	await process_frame
+	var static_labels: PackedStringArray = PackedStringArray()
+	var animated_labels: PackedStringArray = PackedStringArray()
+	for child: Node in view.get_children():
+		var layer: PaintLayer = child as PaintLayer
+		if layer == null:
+			continue
+		if layer.animated:
+			animated_labels.append(String(layer.label))
+		else:
+			static_labels.append(String(layer.label))
+	static_labels.sort()
+	# The bake declines with no render target, which is every headless run, so the two baked painters
+	# mount as ordinary layers here -- and they are static on that path by the definition that put them
+	# in the bake at all. `--sky` is off, so the backdrop stands in for the sky painter.
+	var want: PackedStringArray = PackedStringArray(["backdrop_painter.paint", "ore_painter.paint_lode",
+		"seam_painter.paint", "terrain_painter.paint", "wall_painter.paint"])
+	_check(static_labels == want,
+		"the real stack opts exactly these painters out of the per-tick redraw: got %s, want %s"
+		% [static_labels, want])
+	_check(animated_labels.has("machine_painter.paint_frame")
+			and animated_labels.has("water_painter.paint")
+			and animated_labels.has("crumble_painter.paint"),
+		"CONTROL: the painters that read the cosmetic clock are still animated (%d animated layers) -- "
+		% animated_labels.size() + "a stack that marked everything static would pass the row above")
+	scene.queue_free()

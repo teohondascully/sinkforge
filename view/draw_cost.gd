@@ -55,8 +55,22 @@ static func frame_report(layers: Array[PaintLayer], hud: Array[PaintLayer], refr
 	var chips: String = ""
 	if not hud.is_empty():
 		chips = " | hud " + report(hud)
-	return "%s | refresh=%.2fms (observe=%.2fms)%s%s" % [report(layers),
-		float(refresh_usec) / 1000.0, float(observe_usec) / 1000.0, rebuilds, chips]
+	# THE REDRAWS ACTUALLY ISSUED against the redraws a queue-everything coordinator would have issued
+	# (D0529). It cannot be read off the costs above: a layer whose redraw was skipped still reports what
+	# it cost the last time it DID draw, which is the honest answer to a different question.
+	var queued: int = 0
+	# AND THE PAINTER CPU THAT ACTUALLY BOUGHT, per rendered tick, accumulated over the whole run. The
+	# per-frame costs ranked above cannot answer it: a skipped layer reports the last frame it DID draw.
+	# It is also the one painter number that does not move when the display paces the process, which the
+	# frame rate does by a factor of four (D0527, D0529).
+	var drawn_usec: int = 0
+	for layer: PaintLayer in layers:
+		queued += layer.queues
+		drawn_usec += layer.sum_draw_usec
+	return "%s | refresh=%.2fms (observe=%.2fms) queued=%d/%d drawn=%.3fms/tick%s%s" % [report(layers),
+		float(refresh_usec) / 1000.0, float(observe_usec) / 1000.0,
+		queued, ticks * layers.size(), float(drawn_usec) / 1000.0 / float(maxi(ticks, 1)),
+		rebuilds, chips]
 
 
 ## The painter's own name, for the report. **THE METHOD NAME ALONE IS NOT AN IDENTIFIER**: four painters

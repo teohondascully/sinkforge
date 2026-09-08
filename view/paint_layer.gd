@@ -36,6 +36,31 @@ var last_draw_usec: int = 0
 ## callable itself, so a layer cannot be mislabelled by a caller passing the wrong string.
 var label: StringName = &"?"
 
+## CAN THIS LAYER'S PICTURE CHANGE WHILE THE CAMERA AND THE OBSERVATION HOLD STILL? (D0529.) True means
+## `Frame.anim_time` is one of the painter's inputs -- the sky's drifting cloud, the machine's pulsing
+## glyph, a crumble retiring -- and `WorldView.refresh()` queues it every tick, as it queued every layer
+## before. False means the painter is a pure function of the camera rect and the observation, and the
+## coordinator queues it only when `FrameGate.statics_dirty` says one of those moved.
+##
+## **DEFAULTS TRUE, so a call site that says nothing gets exactly today's behaviour.** The failure mode
+## of getting it wrong is not a crash: a layer wrongly marked static FREEZES at the picture it last
+## drew, silently, which is the same shape as a painter wrongly handed to `add_baked_painter` and the
+## reason that function's header spells the test out.
+var animated: bool = true
+
+## HOW MANY TIMES THE COORDINATOR HAS QUEUED THIS LAYER'S REDRAW, so the saving above is a number rather
+## than a claim. `last_draw_usec` cannot report it: a layer whose redraw was skipped keeps the cost of
+## the last frame it DID draw, which is the honest answer to "what did that painter cost" and useless as
+## an answer to "did it run". Counted where the queue is issued, in `WorldView.refresh()`.
+var queues: int = 0
+
+## EVERY MICROSECOND THIS LAYER HAS SPENT IN `_draw` SINCE IT WAS MOUNTED, and it is the one painter
+## number a redraw-skipping coordinator can be judged on. `last_draw_usec` is a snapshot of one frame and
+## `queues` counts calls rather than work; only an accumulated total says how much painter CPU a run
+## actually paid. Over a run it also survives the confound that ruined the frame-rate comparison in
+## D0529: this is time spent inside the painters, so it does not move when the display paces the process.
+var sum_draw_usec: int = 0
+
 
 ## THE BIND REFUSES A DEAD CALLABLE, LOUDLY, and D0289 is why that guard is here rather than in a
 ## comment. A `Callable` bound to a method on a `RefCounted` stores an object ID and **does not keep the
@@ -84,3 +109,4 @@ func _draw() -> void:
 	var began: int = Time.get_ticks_usec()
 	_paint.call(frame, self)
 	last_draw_usec = Time.get_ticks_usec() - began
+	sum_draw_usec += last_draw_usec

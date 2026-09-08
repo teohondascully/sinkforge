@@ -92,10 +92,11 @@ var _bake: TerrainBake = null
 var _owned: Array[RefCounted] = []
 var _frame: Frame = null
 var _hud: HudLayer = null
-## Built lazily on the first frame, because it is seeded from `Observation.world_seed` and there is no
-## observation until `refresh()` runs. Held rather than rebuilt: its eight noise fields are constructed
-## once and a per-frame rebuild would be both wasteful and, worse, a different world every frame.
-var _tone: RockTone = null
+## THE FRAME BUILDER AND THE REDRAW GATE (`view/frame_gate.gd`, D0529): it turns the interface and the
+## camera into one `Frame`, holds the `RockTone` that frame carries, and answers whether a layer
+## registered `animated: false` still has the picture it drew. Held from construction rather than built
+## on the first frame, because `bake_static` asks it for the tone before any `refresh()` has run.
+var _gate: FrameGate = FrameGate.new()
 var _post: PostFxLayer = null
 ## The dilation `bake_static` handed the bake, recorded even when the bake declined.
 ##
@@ -121,8 +122,13 @@ func setup(iface: Interface, look: MaterialLook, camera: Camera2D) -> void:
 ## Legacy had both conventions and the explicit one wins on three counts: parallax needs SEVERAL
 ## canvases and a coordinator is only one; a painter that receives its canvas is testable with no
 ## coordinator at all; and it is already the convention of the two painters actually being lifted.
-func add_painter(paint: Callable) -> PaintLayer:
+##
+## `animated` DEFAULTS TRUE so that adding the parameter changed nothing (D0529): a layer redraws every
+## tick unless its call site argues, in one line, that its painter is a pure function of the camera rect
+## and the observation. `PaintLayer.animated` carries what that costs to get wrong.
+func add_painter(paint: Callable, animated: bool = true) -> PaintLayer:
 	var layer: PaintLayer = PaintLayer.new()
+	layer.animated = animated
 	layer.bind_to(self, paint)
 	# Labelled from the callable itself, never from a caller-supplied string: a cost report that can be
 	# mislabelled at the call site would attribute one painter's milliseconds to another, and the report
@@ -165,16 +171,15 @@ func bake_static(z: int) -> bool:
 		return false
 	var probe: Interface.Observation = _iface.observe(
 		Interface.Envelope.covering(Rect2(), WINDOW_MARGIN_CELLS))
-	# Built here rather than in `_build_frame`: the bake holds this object for the life of the session, and a
-	# chunk painted with a null tone would burn the flat fill into a retained target permanently, since
-	# nothing re-bakes a chunk that has not been dug.
-	if _tone == null:
-		_tone = RockTone.new(probe.world_seed)
+	# Asked for here rather than left to the first frame: the bake holds this object for the life of the
+	# session, and a chunk painted with a null tone would burn the flat fill into a retained target
+	# permanently, since nothing re-bakes a chunk that has not been dug.
+	var tone: RockTone = _gate.tone_for(probe.world_seed)
 	_bake_margin = WINDOW_MARGIN_CELLS
 	_bake = TerrainBake.new()
 	add_child(_bake)
 	var ok: bool = _bake.setup(probe.world_cells, probe.cell_px,
-		observe_rect, _look, _tone, _baked_painters, WINDOW_MARGIN_CELLS)
+		observe_rect, _look, tone, _baked_painters, WINDOW_MARGIN_CELLS)
 	if not ok:
 		# `free()`, not `remove_child` alone: removing a node from the tree does NOT free it, and the
 		# declined bake would sit in memory holding its CanvasItem RID for the life of the process. On the
@@ -182,8 +187,10 @@ func bake_static(z: int) -> bool:
 		remove_child(_bake)
 		_bake.free()
 		_bake = null
+		# STATIC ON THIS PATH TOO, by the definition that put them in `_baked_painters` at all: their
+		# picture cannot change unless the terrain does (D0529), and here they are the expensive layers.
 		for paint: Callable in _baked_painters:
-			add_painter(paint).z_index = z
+			add_painter(paint, false).z_index = z
 		return false
 	# NEAREST ON THE QUAD, NOT ONLY INSIDE THE VIEWPORT (D0331). The SubViewport's own
 	# `canvas_item_default_texture_filter` governs how the chunk painters draw INTO the target; it says
@@ -258,9 +265,9 @@ func terrain_bake() -> TerrainBake:
 ##
 ## Taking the object means this can hold it. `_owned` is the only reason the array exists: nothing reads
 ## it, and that is the point — it is a lifetime, not a registry.
-func add_stateful_painter(painter: RefCounted, method: StringName) -> PaintLayer:
+func add_stateful_painter(painter: RefCounted, method: StringName, animated: bool = true) -> PaintLayer:
 	_owned.append(painter)
-	return add_painter(Callable(painter, method))
+	return add_painter(Callable(painter, method), animated)
 
 
 ## The screen-space half. A `HudLayer` is a `CanvasLayer`, so its children are not moved by the camera
@@ -314,6 +321,7 @@ func refresh() -> void:
 	var began: int = Time.get_ticks_usec()
 	_anim_ticks += 1
 	_frame = _build_frame()
+	last_observe_usec = _gate.last_observe_usec
 	# THE BAKE IS TOLD WHAT CHANGED HERE, not at the dig site: a retained target is retained, so a mined cell
 	# keeps its rock pixels until something invalidates its chunk, and driving it from the frame the coordinator
 	# already built means no caller can forget it. SINCE D0506 IT IS ALSO TOLD WHERE THE CAMERA IS (the first
@@ -322,8 +330,15 @@ func refresh() -> void:
 	# ONE call for both lanes: each sets chunk visibility across the grid, and a second would hide the first's.
 	if _bake != null:
 		_bake.bake_tick(_frame.view_world_rect, _frame.obs.mining_broke_cells, _frame.obs)
+	# A STILL FRAME REDRAWS ONLY WHAT MOVED (D0529). Every layer used to be queued here every tick, moved
+	# or not, so a standing-still tick re-issued about twenty painters' draw commands. An ANIMATED layer
+	# still is; a painter that is a pure function of the camera rect and the observation is queued only
+	# when `FrameGate` says one of those moved, and `layer.queues` counts what was actually issued.
+	var statics_dirty: bool = _gate.statics_dirty(_frame)
 	for layer: PaintLayer in _layers:
-		layer.queue_redraw()
+		if layer.animated or statics_dirty:
+			layer.queues += 1
+			layer.queue_redraw()
 	if _hud != null:
 		_hud.refresh()
 	# The lens rides the same deterministic clock as every animated painter (D0277). Fed here rather than
@@ -358,35 +373,19 @@ func reset_anim_clock() -> void:
 	_anim_ticks = 0
 
 
+## THE WALL PLANE IS ASKED FOR ONLY WHEN SOMETHING ON THE PER-FRAME PATH STILL READS IT (D0338). Its one
+## reader is `WallPainter`, and D0326 normally puts that painter INTO THE BAKE -- where it draws from the
+## bake's own `observe_rect()`, which still requests the plane. So on the baked path the per-frame
+## observation was building ~18,900 dictionary lookups a frame for nobody.
+##
+## **BUT THE BAKE CAN DECLINE**, and on that path (`bake_static` returning false -- headless, which is
+## every CI run) `WallPainter` is mounted as an ordinary per-frame layer and reads THIS observation.
+## Declining unconditionally would make it `push_error` every frame and lose the background plane in
+## exactly the configuration the suites run under. `_bake` is nulled on decline, so it is the honest
+## discriminator: ask for walls precisely when the per-frame stack still has a reader for them.
 func _build_frame() -> Frame:
-	var f: Frame = Frame.new()
-	var rect: Rect2 = view_world_rect()
-	# TIMED SEPARATELY because it is the suspect for the ~13 ms that D0337 measured OUTSIDE the painters
-	# and deliberately did not attribute. `observe` builds a dictionary over the whole window, so it is the
-	# one per-tick cost that still scales with visible area after the painters stopped doing so.
-	var obs_began: int = Time.get_ticks_usec()
-	# THE WALL PLANE IS ASKED FOR ONLY WHEN SOMETHING ON THE PER-FRAME PATH STILL READS IT (D0338).
-	# Its one reader is `WallPainter`, and D0326 normally puts that painter INTO THE BAKE -- where it
-	# draws from the bake's own `observe_rect()`, which still requests the plane. So on the baked path
-	# the per-frame observation was building ~18,900 dictionary lookups a frame for nobody.
-	#
-	# **BUT THE BAKE CAN DECLINE**, and on that path (`bake_static` returning false -- headless, which is
-	# every CI run) `WallPainter` is mounted as an ordinary per-frame layer and reads THIS observation.
-	# Declining unconditionally would make it `push_error` every frame and lose the background plane in
-	# exactly the configuration the suites run under. `_bake` is nulled on decline, so it is the honest
-	# discriminator: ask for walls precisely when the per-frame stack still has a reader for them.
-	var needs_walls: bool = _bake == null
-	f.obs = _iface.observe(Interface.Envelope.covering(rect, WINDOW_MARGIN_CELLS, needs_walls, true))
-	last_observe_usec = Time.get_ticks_usec() - obs_began
-	f.anim_time = anim_time()
-	f.view_world_rect = rect
-	f.zoom = _camera.zoom.x if _camera != null else 1.0
-	f.look = _look
-	if _tone == null:
-		_tone = RockTone.new(f.obs.world_seed)
-	f.tone = _tone
-	f.marks = MarkPainter.sky_marks(f.obs)  ## where a build ghost stands, so the stars step aside (6m, D0376)
-	return f
+	return _gate.build(_iface, _look, _camera, view_world_rect(), WINDOW_MARGIN_CELLS,
+		_bake == null, anim_time())
 
 
 ## The camera's world-space rectangle in pixels. Falls back to the viewport's own rect when there is no
