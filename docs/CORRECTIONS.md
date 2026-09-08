@@ -144,6 +144,11 @@ keyword scan ("7 files corrected"), but it is drift cleanup — annotating alrea
 "parked, see D0153-D0155" — not a correction of a claim that was ever WRONG. Noted here so the freshness
 gate (`tools/check_corrections_freshness.py`) doesn't keep re-flagging it as unreviewed drift.
 
+**D0496, read and deliberately excluded, not silently dropped:** its header names the WRONG STACK lesson
+("names every floor drop and every wrong stack"), which trips the keyword scan on "wrong"; the entry adds
+the drop's refusals to the refusal slot and corrects nothing. Noted so the freshness gate stops re-flagging
+it, by the same reasoning as D0181 and D0185 rather than by narrowing the pattern.
+
 ## D0195 supersedes D0110 — a deferral answered by dissolving the question, not by picking a side
 
 **What D0110 claimed** (2026-08-28): digging is horizontal-only, and the reason given was that a vertical
