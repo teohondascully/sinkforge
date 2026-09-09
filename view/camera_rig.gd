@@ -178,6 +178,10 @@ func warp_to(world_pos: Vector2) -> void:
 	_pos = world_pos
 	_lead = Vector2.ZERO
 	_started = true
+	# An explicit camera cut invalidates interpolation even below TELEPORT_PX. Do not
+	# change body history: moving the camera does not imply that the miner was placed.
+	_pre_prev = world_pos
+	_pre_cur = world_pos
 
 
 ## One frame of follow. Returns the position to ASSIGN to the camera -- already pixel-snapped -- while

@@ -25,6 +25,7 @@ func _initialize() -> void:
 	_test_the_default_zoom_never_frames_void()
 	_test_the_camera_never_shows_past_the_world()
 	_test_a_presented_frame_sits_between_two_ticks_and_stays_on_the_pixel_grid()
+	_test_explicit_camera_warp_discards_presentation_history()
 	_finish("camera_rig")
 
 
@@ -305,6 +306,20 @@ func _test_the_camera_never_shows_past_the_world() -> void:
 ## existed; every presented position is still on the pixel grid, because the lerp happens BEFORE the snap
 ## and not after; and a body that was PLACED rather than moved is not smeared across everything between
 ## the two places.
+func _test_explicit_camera_warp_discards_presentation_history() -> void:
+	var rig := CameraRig.new()
+	rig.step(Vector2(500.0, 300.0), Vector2.ZERO, ZOOM, SCREEN_W, DT)
+	# A short explicit cut is still a cut, even below the inferred-teleport threshold.
+	var target := Vector2(510.0, 300.0)
+	rig.warp_to(target)
+	for f: float in [0.0, 0.5, 1.0]:
+		_check(rig.presented_camera(f) == CameraRig.snap_to_pixel(target, ZOOM),
+			"explicit camera reset discards old presentation at fraction %s" % f)
+	var after: Vector2 = rig.step(target, Vector2.ZERO, ZOOM, SCREEN_W, DT)
+	_check(rig.presented_camera(0.5) == after,
+		"the first tick after a stationary reset cannot blend back toward the old camera")
+
+
 func _test_a_presented_frame_sits_between_two_ticks_and_stays_on_the_pixel_grid() -> void:
 	var rig: CameraRig = CameraRig.new()
 	var at: Vector2 = Vector2(500.0, 300.0)

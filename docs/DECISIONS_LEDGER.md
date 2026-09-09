@@ -21024,3 +21024,15 @@ Remaining work is explicitly open in PERF_PLAN, not declared completed by these 
 **Integration verification:** complete local battery passed, including all 145 suites (175 seconds
 for the suite phase at jobs=4) and its local quality gates. Gate-status completed with no unnumbered
 FAIL/SKIPPED steps; CI on this uncommitted treatment is not claimed. Python fixture regressions pass.
+
+## D0539 · 2026-09-08 · Explicit camera cuts discard stale presentation history
+
+**Decided:** `CameraRig.warp_to` resets both presentation-camera endpoints along with its eased
+position. An explicit reset is a cut even below the inferred TELEPORT_PX threshold. Body history is
+unchanged: moving a camera is not evidence of placing the miner. No sim/default-flag change or FPS
+claim. Director requested one small follow-up, not another programme-sized pass.
+
+**Evidence:** four assertions failed before the fix: presentation at fractions 0, 0.5 and 1 after a
+short explicit cut, and the first stationary tick following it. Camera, main-boot and world-view
+suites pass afterward, including existing ordinary-motion controls. Formatter, size and function-
+length checks pass. The prior full battery belongs to D0538; not rerun for this slice.

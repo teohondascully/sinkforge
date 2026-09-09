@@ -1,5 +1,12 @@
 # Brief
 
+## Small follow-up — camera reset correctness (D0539)
+
+An explicit camera cut left old interpolation endpoints alive, including on the following tick.
+Resetting them fixes it without touching body history or simulation. Four new assertions caught
+the defect; camera, main-boot and world-view suites pass. Interpolation stays opt-in. No new FPS
+or complete-motion-validation claim; broader performance work remains open.
+
 ## What was learned — performance audit correction (D0538)
 
 The fixture could announce a refusal and still print the forbidden comparison. Its maximum was a

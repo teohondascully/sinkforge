@@ -4,6 +4,11 @@
 
 ## Performance programme — the five passes, September 8
 
+**D0539 small follow-up:** explicit camera resets clear camera interpolation history, including
+cuts below the inferred-teleport threshold. Four new assertions failed before the fix; camera,
+main-boot and world-view suites pass afterward. Miner history/simulation are unchanged;
+interpolation remains opt-in. Focused verification, not a full-battery or motion-quality claim.
+
 **D0538 audit corrections take precedence over the historical summaries below:** the fixture now
 rejects failed/incomplete processes and empty repetitions, suppresses withheld frame comparisons,
 retains raw parsed windows, reports actual maximum separately from median window maxima, and uses
