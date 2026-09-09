@@ -20751,3 +20751,30 @@ plan and working state so they no longer call the now-existing GPU prototype uni
 
 **Reverse cost:** reorder one workflow argument list. The regression remains mandatory, and the runner
 still accounts for every requested result. No persistent timing cache or new scheduling service.
+
+## D0533 · 2026-09-08 · Share rock-neighborhood work per dirty region, preserving the CPU picture
+
+**Decided:** `RockNeighborhood` copies the observation's bounded bytes through the existing pure
+`BakeData.solid_bytes` helper, computes nearest vertical air in two column sweeps and samples AO from
+adjacent bytes. A fully solid halo skips the sweeps. The terrain painter builds it per paint region;
+no state survives a paint, so digging cannot leave a stale cache. `RockTone.shade` keeps its original
+Callable path as the reference and accepts integer-coded neighborhood terms on the fast path. Integer
+coding avoids rounding double-precision form arithmetic through a float32 vector. No shader is enabled.
+
+**Evidence:** 16,392 exact-colour comparisons cover solid, air, changing perforations, interior fast
+paths, negative origins and observation borders. A mutant substituting above-distance for below fails
+that comparison. Nine focused suites pass. Headed baseline a31fa3cf and treatment, 1280x720, fixed-fps
+60, fresh/muted, act=mine, screenshot-tick=120: both PNG SHA256
+`65899f0e893948722cb17ec8c637b9d137d01b1a432c44a5c039be1dbf1d1f30`.
+This is a picture comparison, not a fixed-fps performance measurement.
+
+The CPU probe includes building the region on every timed repetition. Median usec, reference → shared:
+16x16 beside a cave: clastic 1564 → 524, bedded 2022 → 964, massive 1552 → 526. A solid 16x16 region:
+1702 → 369, 2323 → 970, 1707 → 371 respectively. Five repetitions per case on the same M4 Pro;
+all nine region/grammar output hashes match. This measures rock shading plus preparation, not the
+entire terrain painter or FPS. `/tmp/sinkforge-neighborhood-profile.log` retains raw samples.
+
+**Alternative/reversal:** retain independent neighbor probes per cell, or enable the appearance-changing
+GPU prototype. Sharing the exact existing terms wins without that art change. Revert the painter's
+optional encoded argument to select the reference path; no sim/save migration. Director-approved pass 1
+of the sequential performance work; subsequent passes remain independent.

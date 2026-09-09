@@ -2,6 +2,17 @@
 
 ## September 8 update: 360 fps is a frame-time target, not a universal guarantee
 
+### Sequential execution status
+
+1. **Complete, D0533:** shared per-region rock neighborhoods. Including preparation, a 16x16 region
+   beside a cave measures 1.564 → 0.524 ms clastic and 2.022 → 0.964 ms bedded. 16,392 colour
+   comparisons and a headed mining screenshot match exactly. This is not a whole-frame FPS claim.
+2. **Next:** fix the existing shader prototype's seams/appearance and evaluate its total cost before
+   enabling it. Keep the CPU path as the reference.
+3. **Queued:** movement-ahead terrain prefetch, preserving immediate digging and no visible holes.
+4. **Queued:** presentation-only player/camera interpolation; deterministic sim remains unchanged.
+5. **Queued:** measure and reduce remaining sky, lighting and HUD work.
+
 The director now requests 360 fps: **2.78 ms per rendered frame**, on a declared host, resolution and
 workload. An average above 360 is insufficient while excavation or streaming stalls. Do not replace
 the older measured 120 Hz criteria silently, or assert that every device can meet the new target.

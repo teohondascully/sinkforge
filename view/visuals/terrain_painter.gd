@@ -66,6 +66,7 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 		return
 	var cell_px: int = frame.obs.cell_px
 	var r: Rect2i = visit_rect(frame.obs, frame.view_world_rect, cell_px)
+	var neighbors: RockNeighborhood = RockNeighborhood.new(frame.obs, r) if frame.tone != null and r.has_area() else null
 	# THE NEIGHBOUR PROBE for the carved-edge terms (D0329): AO, the rim lip and the sky-form gradient all
 	# need to know whether the cell next door is rock. Bound once here rather than per cell, because a
 	# Callable built inside the loop is one allocation per cell per frame.
@@ -86,7 +87,7 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 				if row == srow - 1:
 					_paint_tuft(frame, ci, col, row, cell_px)
 				continue
-			ci.draw_rect(Rect2(col * cell_px, row * cell_px, cell_px, cell_px), cell_fill(frame, material, col, row, srow, solid), true)
+			ci.draw_rect(Rect2(col * cell_px, row * cell_px, cell_px, cell_px), cell_fill(frame, material, col, row, srow, solid, neighbors.at(col, row) if neighbors != null else -1), true)
 
 
 ## The colour one solid cell is filled with: the material's own, the molded shading, the surface terms, the
@@ -96,11 +97,11 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 ## the matrix (`world_renderer.gd:1204`, and D0299 carries why). THE CAP (6o, D0378): the walked surface
 ## cell of a material with a cap colour IS the cap, one cell being under a quarter of a metre; one column
 ## in five roots the cell below it half toward the cap's dark.
-static func cell_fill(frame: Frame, material: StringName, col: int, row: int, srow: int, solid: Callable) -> Color:
+static func cell_fill(frame: Frame, material: StringName, col: int, row: int, srow: int, solid: Callable, edges: int = -1) -> Color:
 	var fill: Color = frame.look.cell_color(material, col, row)
 	if frame.tone == null:
 		return fill
-	fill = frame.tone.shade(fill, col, row, frame.look.grammar_of(material), solid)
+	fill = frame.tone.shade(fill, col, row, frame.look.grammar_of(material), solid, edges)
 	fill = frame.tone.surface.shade(fill, col, row, srow, solid)
 	if srow == SurfaceTone.NONE:
 		return fill

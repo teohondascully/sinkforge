@@ -204,7 +204,7 @@ static func field(world_seed: int, salt: int, type: FastNoiseLite.NoiseType, fre
 ## with the material's own value and cannot bleach dark rock, while the drift and patch are ADDITIVE so a
 ## broad face still separates from its neighbour where the multiplicative term has almost nothing left to
 ## scale. Getting that backwards makes deep rock either uniformly black or uniformly grey.
-func shade(base: Color, col: int, row: int, gram: int, solid_at: Callable = Callable()) -> Color:
+func shade(base: Color, col: int, row: int, gram: int, solid_at: Callable = Callable(), edges: int = -1) -> Color:
 	var g: int = clampi(gram, 0, GRAM_MASSIVE)
 	var x: float = float(col)
 	var y: float = float(row)
@@ -230,15 +230,15 @@ func shade(base: Color, col: int, row: int, gram: int, solid_at: Callable = Call
 	var form: float = 0.0
 	var rim: float = 0.0
 	var rim_warm: float = 0.0
-	if solid_at.is_valid():
-		ao = _air_weight(solid_at, col, row)
-		form = _sky_form(solid_at, col, row)
+	if solid_at.is_valid() or edges >= 0:
+		ao = _air_weight(solid_at, col, row) if edges < 0 else float(edges & 15) * 0.5
+		form = _sky_form(solid_at, col, row) if edges < 0 else _encoded_form(edges)
 		if ao > AO_TEAL_GATE:
 			col_out = col_out.lerp(SHADOW_TEAL, clampf(ao / 6.0, 0.0, 1.0) * AO_TEAL_AMOUNT)
 		# The rim lights the topmost solid cell of an UP-facing face -- open air above, solid below. The
 		# second half of that test is what stops a one-cell-thick shelf being lit from both sides.
-		var top: int = _top_air_distance(solid_at, col, row)
-		if top >= 0 and top < RIM_DEPTH and bool(solid_at.call(col, row + 1)):
+		var top: int = _top_air_distance(solid_at, col, row) if edges < 0 else ((edges >> 4) & 7) - 1
+		if top >= 0 and top < RIM_DEPTH and (bool(solid_at.call(col, row + 1)) if edges < 0 else ((edges >> 7) & 7) != 1):
 			var lip: float = 1.0 - float(top) / float(RIM_DEPTH)
 			rim = RIM_LIGHT * lip
 			rim_warm = RIM_WARM * lip
@@ -323,6 +323,18 @@ func _sky_form(solid_at: Callable, col: int, row: int) -> float:
 		if not bool(solid_at.call(col, row + d + 1)):
 			f -= FORM_SINK * (1.0 - float(d) / float(FORM_REACH))
 			break
+	return f
+
+
+## Preserve the reference's double-precision operation order; storing this as Vector2 would round it.
+func _encoded_form(edges: int) -> float:
+	var up: int = (edges >> 4) & 7
+	var down: int = (edges >> 7) & 7
+	var f: float = 0.0
+	if up <= FORM_REACH:
+		f += FORM_LIFT * (1.0 - float(up - 1) / float(FORM_REACH))
+	if down <= FORM_REACH:
+		f -= FORM_SINK * (1.0 - float(down - 1) / float(FORM_REACH))
 	return f
 
 

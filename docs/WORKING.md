@@ -63,6 +63,9 @@ D0528 subsequently added the GPU prototype, off by default; appearance parity an
 interpolation remain undone. Twelve focused integration suites pass on 41f00226 (D0532), including
 the shader-data path, world view and main boot; the current full 144-suite battery was not rerun here.
 Reproduction and next bottlenecks: [performance plan](PERF_PLAN.md).
+Sequential continuation: D0533 completes shared per-region CPU shading with exact picture parity;
+the existing shader prototype's seam/appearance correction is next, then prefetch, interpolation and
+remaining dynamic painters. No 360 fps acceptance claim yet.
 The gameplay section above was reconciled by the engineer at their 2026-09-07 late checkpoint
 (after strangers 115-120); the batch queue is theirs, the tooling queue is this section's.
 

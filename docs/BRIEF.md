@@ -4,6 +4,11 @@
 
 ## What was learned — tooling and terrain closeout, September 8 (D0525/D0526/D0532)
 
+**Sequential pass 1 completed (D0533):** sharing neighboring-cell work per paint region halves or better
+the sampled 16x16 rock-shading cost, including preparation. 16,392 reference colour comparisons pass;
+the headed mining PNG is byte-identical to a31fa3cf. Nine focused suites pass; the whole battery will
+run at the integration checkpoint. Pass 2 addresses the existing, still-disabled shader prototype.
+
 The existing CPU shading contained avoidable work: name decoding for solidity, zero-weight bedding,
 and per-cell AO arrays. Removing those reduces the sampled shading cost 40-56%, with identical colour
 hashes; it does not establish sustained 360 fps. The headed runs still have long-tail stalls, and
