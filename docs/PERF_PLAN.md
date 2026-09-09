@@ -7,8 +7,10 @@
 1. **Complete, D0533:** shared per-region rock neighborhoods. Including preparation, a 16x16 region
    beside a cave measures 1.564 → 0.524 ms clastic and 2.022 → 0.964 ms bedded. 16,392 colour
    comparisons and a headed mining screenshot match exactly. This is not a whole-frame FPS claim.
-2. **Next:** fix the existing shader prototype's seams/appearance and evaluate its total cost before
-   enabling it. Keep the CPU path as the reference.
+2. **Partial, D0534; paused at director's session-limit request:** the shader now retains CPU surface
+   tufts. Four focused suites and a headed mining capture pass. Noise still uses different algorithms;
+   seam diagnosis, appearance comparison and total preparation/upload/GPU cost remain unresolved.
+   Keep the prototype OFF and the CPU path as the reference. Resume here, not by rebuilding pass 1.
 3. **Queued:** movement-ahead terrain prefetch, preserving immediate digging and no visible holes.
 4. **Queued:** presentation-only player/camera interpolation; deterministic sim remains unchanged.
 5. **Queued:** measure and reduce remaining sky, lighting and HUD work.

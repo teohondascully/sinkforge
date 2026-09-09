@@ -2,6 +2,15 @@
 
 **Last updated: 2026-09-08 (tooling; gameplay section reconciled September 7).**
 
+## Performance handoff — September 8 closeout
+
+Director requested immediate closeout at the session limit. Pass 1 is committed at `6b4b5e6c`
+(D0533): exact-picture neighborhood sharing. Pass 2 is partial (D0534): the OFF-by-default shader
+prototype retains surface tufts, verified with four focused suites and a headed mining capture.
+No shader enablement, prefetch change or interpolation has landed. Continue the numbered queue in
+[PERF_PLAN](PERF_PLAN.md). Before integration, run the complete 144-suite battery; focused results
+here are not whole-head certification. Do not repeat the expensive old CPU baseline work.
+
 ## Current stage
 
 The A′ legacy port has implemented the playable systems through its presentation and generation work.

@@ -115,8 +115,20 @@ static func cell_fill(frame: Frame, material: StringName, col: int, row: int, sr
 	return fill
 
 
-## A blade overhanging the walked line into the air cell above it, one column in three, in the cap's own
-## colour: legacy's "what kills the razor edge". Two legacy pixels wide and four tall, at half.
+## Surface-only companion to the experimental GPU solid fill. Visits columns, not every solid cell;
+## keeps the same clipping and blade renderer as the CPU path, including partial digging repaints.
+static func paint_tufts(frame: Frame, ci: CanvasItem) -> void:
+	if frame == null or frame.obs == null or frame.look == null or frame.tone == null or frame.obs.cell_px <= 0:
+		return
+	var cell_px: int = frame.obs.cell_px
+	var r: Rect2i = visit_rect(frame.obs, frame.view_world_rect, cell_px)
+	for col: int in range(r.position.x, r.end.x):
+		var row: int = SurfaceTone.column_surface_row(frame.obs, col) - 1
+		if r.has_point(Vector2i(col, row)) and not frame.obs.solid_at(Vector2i(col, row)):
+			_paint_tuft(frame, ci, col, row, cell_px)
+
+
+## A blade overhanging the walked line into air, one column in three, in the cap's own colour.
 static func _paint_tuft(frame: Frame, ci: CanvasItem, col: int, row: int, cell_px: int) -> void:
 	if not SurfaceTone.tuft_here(col):
 		return

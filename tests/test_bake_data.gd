@@ -320,9 +320,10 @@ func _test_with_the_flag_off_bake_chunk_keeps_the_cpu_painter_and_builds_nothing
 	# `shader_tone()` from a suite, so it is asserted here where a mutation can move it.
 	var on: Array = BakeChunk.tone_painters(baked, true)
 	var off: Array = BakeChunk.tone_painters(baked, false)
-	_check((on[0] as Array).size() == 1 and not (on[0] as Array).has(TerrainPainter.paint)
+	_check((on[0] as Array).size() == 2 and not (on[0] as Array).has(TerrainPainter.paint)
+			and (on[0] as Array).has(TerrainPainter.paint_tufts)
 			and (on[0] as Array).has(WallPainter.paint) and not bool(on[1]),
-		"the flag ON pulls out TerrainPainter.paint by identity and leaves WallPainter.paint: %s left"
+		"the flag ON replaces solid shading but retains surface tufts and WallPainter.paint: %s left"
 			% [(on[0] as Array).size()])
 	_check((off[0] as Array).size() == 2 and bool(off[1]),
 		"the flag OFF changes nothing: %d painters, cpu_tone %s" % [(off[0] as Array).size(), off[1]])

@@ -48,9 +48,9 @@ var gram: GramMap = null
 var partial: Dictionary = {}
 
 ## THE SHADER TONE, OFF (D0528, T040's evidence). False is the shipped picture: `TerrainPainter.paint`
-## fills every solid cell with `RockTone`/`SurfaceTone` on the CPU, 18-25 us a solid cell. True pulls that
+## fills every solid cell with `RockTone`/`SurfaceTone` on the CPU. True pulls that
 ## one painter out of the baked list and replaces it with `BakeData`'s texture and `rock_tone.gdshader`.
-## The look is NOT the same -- eleven `FastNoiseLite` fields are re-derived in GLSL and the tufts are lost
+## The look is NOT the same -- eleven `FastNoiseLite` fields are re-derived in GLSL. Tufts stay on the CPU
 ## -- so this ships off and the ledger carries the capture diff the director rules on.
 const SHADER_TONE: bool = false
 const SHADER_TONE_FLAG: String = "--shader-tone"
@@ -120,7 +120,7 @@ static func tone_painters(baked: Array[Callable], on: bool) -> Array:
 	if at < 0:
 		return [baked, true]
 	var kept: Array[Callable] = baked.duplicate()
-	kept.remove_at(at)
+	kept[at] = TerrainPainter.paint_tufts
 	return [kept, false]
 
 

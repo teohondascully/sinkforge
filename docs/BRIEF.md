@@ -1,6 +1,12 @@
 # Brief
 
-**Last updated: 2026-09-08.** Tooling/CPU-shading verification reconciled through 41f00226; prior entries retained.
+**Last updated: 2026-09-08.** Director-requested session-limit closeout; prior entries retained.
+
+**Final checkpoint:** pass 1 is committed at `6b4b5e6c` (D0533). Pass 2 is partial: D0534 restores
+surface tufts to the disabled shader prototype; four focused suites pass and a headed mining capture
+shows the blades restored. Shader noise/parity and seam investigation remain open. Passes 3-5 are
+not started; resume the queue in [PERF_PLAN](PERF_PLAN.md). No sustained FPS target is certified.
+The complete current-head 144-suite battery is still required before integration; no push requested.
 
 ## What was learned — tooling and terrain closeout, September 8 (D0525/D0526/D0532)
 

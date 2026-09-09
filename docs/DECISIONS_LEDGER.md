@@ -20778,3 +20778,22 @@ entire terrain painter or FPS. `/tmp/sinkforge-neighborhood-profile.log` retains
 GPU prototype. Sharing the exact existing terms wins without that art change. Revert the painter's
 optional encoded argument to select the reference path; no sim/save migration. Director-approved pass 1
 of the sequential performance work; subsequent passes remain independent.
+
+## D0534 · 2026-09-08 · Retain surface tufts in the disabled shader prototype; pause pass 2
+
+**Decided:** replace only the CPU solid shading with the experimental shader. Keep a column-only
+`TerrainPainter.paint_tufts` in the original painter position, using the existing blade renderer and
+paint-region clipping. The shader is still OFF; its alternative noise algorithms remain an appearance
+difference, and its reported seam has not been diagnosed. No claim of GPU parity or an FPS gain.
+
+**Evidence:** the painter-selection regression now requires both wall and tuft painters on the shader
+path. Four focused suites pass: bake_data, terrain_painter, surface_tone, terrain_bake. A fresh/muted
+1280x720 mining capture at requested tick 120 (actual 121), `--shader-tone --fixed-fps 60`, visibly
+restores the surface blades. Before and after: `/tmp/sinkforge-shader-before.png` and
+`/tmp/sinkforge-shader-tufts-after.png`. No SCRIPT ERROR or native ERROR in the headed capture log.
+The test asserts routing; the headed inspection witnesses drawing. Neither certifies every GPU pixel.
+
+**Stop/handoff:** director requested immediate finish at the session limit. Pass 1 is complete at
+6b4b5e6c; pass 2 remains partial, passes 3-5 are queued in PERF_PLAN. Full current-head battery is
+outstanding. Reversal replaces the tuft companion with the previous removal of the terrain painter;
+the shipped CPU path and all simulation/save behavior are unchanged.
