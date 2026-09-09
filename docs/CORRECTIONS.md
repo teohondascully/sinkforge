@@ -586,3 +586,47 @@ area that the instrument had maximised independently (D0541 finding 1, D0542's f
 streaming verdict read "no newly-visible callbacks -> revisit only" when zero has two causes -- no new
 terrain crossed, or a prefetch that never lost. The second is the answer, and the draft would have
 reported it as an absence.
+
+## `git add -A` committed a peer session's work, and the verification claim on it was false (D0546)
+
+`d344a35d` is mine and its commit message ends "Verification: full local battery, 173 gates PASS 0 FAIL,
+145 suites passed 0 failed." **That claim does not cover five of the twelve files in the commit.**
+
+I staged with `git add -A` instead of naming paths. Astra was working in this same checkout at the same
+time, and the sweep took their in-progress work with mine: `tools/metal_trace.py` (new, 73 lines),
+`tools/perf_identity.py` (new, 80), `tools/test_metal_trace.py` (new, 39), and changes to
+`tools/perf_fixture.py` (+57) and `tools/test_perf_fixture.py` (+96) -- 334 insertions, none of them
+described by the message they were committed under, and all of them in the files the standing rule
+names as Astra's.
+
+**The timestamps make it worse than mis-attribution.** The battery ran 16:13:50-16:23:52. Those files
+were written 16:20:51-16:24:03, so Astra was editing the tree while the sweep was reading it -- the
+`[[sweep-reads-the-live-tree]]` failure, from the other side this time: I have been careful not to edit
+during my own battery and did not think about a second session doing it. `tools/metal_trace.py` landed
+at 16:24:03, **eleven seconds after the battery finished**, so it was never covered at all. The gate
+that would have caught the new files, `check_untracked_files`, ran near the start of the battery when
+they did not yet exist.
+
+**What is and is not true.** Astra's own tests pass on the pushed tree (`tools/test_perf_fixture.py`
+"all rules fire and all controls pass"; `tools/test_metal_trace.py` 2 tests OK), so nothing is known to
+be broken. But "verified by a full battery" was not true of those files when I wrote it, and a
+verification claim is exactly the kind that must not be inherited by whatever happens to be staged
+beside it.
+
+**Not reverted, deliberately.** The files are Astra's work and reverting would delete them from the
+working tree they are still using; `[[never-delete-user-artifacts]]` and
+`[[untracking-is-deferred-deletion]]` both apply. The record is corrected here instead, and the tree is
+re-verified after the fact rather than the claim being left standing.
+
+**The rule this earns:** stage by explicit path, never `-A`, in a repository a second session is
+working in -- `[[git-add-with-a-missing-path-stages-nothing]]` warned about the opposite failure and I
+took the opposite lesson too far. And a shared checkout means the battery's "do not edit during a
+sweep" rule is not something one session can honour alone.
+
+**And the guard I wrote to catch it next time was itself a no-op.** I re-ran the battery with a
+before/after comparison of `git rev-parse HEAD^{tree}`, which cannot change unless someone commits --
+`[[guards-that-cannot-be-false]]`, written while correcting an instance of the same class, in the same
+hour. It reported "GUARD OK" over a run during which Astra wrote D0547, a new audit document, and
+further changes to two `tools/` files. The quantity that discriminates is the WORKING tree, not HEAD's:
+`git status --porcelain` plus a content hash of the tracked files. The re-verification passed (173
+gates, 145 suites) but it is not a verification of any single tree state, and it is recorded that way.
