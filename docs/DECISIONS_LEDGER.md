@@ -21348,3 +21348,18 @@ dilated/painted has no clock in it at all. Not checked at wide zoom or on the fa
 convergence is 3-11%, so dilation is the dominant term and not the only one. No scheduling changed, no
 picture changed, no frame-time or FPS claim -- frame metrics remain WITHHELD at focus 0.00 (see the
 handoff's note for Astra on why `--front` cannot currently hold the front).
+
+## D0547 · 2026-09-09 · Runner identity, foreground intent and an actual GPU trace
+
+**Decided:** remove the contradictory no-focus argv in foreground mode and request foreground by
+the child PID, without weakening the measured focus guard. Parse setup plus solid/dilated reason
+counts. Fingerprint runtime inputs/preferences around each seat and enforce configuration provenance
+in comparisons; legacy evidence is refused rather than guessed. Add a PID-filtered Metal trace
+reader that unions overlapping intervals instead of calling their sum frame time.
+
+**Alternative:** continue reading raw logs and trust labels; rejected because lost fields, changing
+inputs and mismatched configurations already invalidated measurements. Reverse cost is tooling-only;
+no simulation, scheduling or art changes. Detailed status and local artifacts are in
+`docs/audits/2026-09-09-runner-gpu-closeout.md`. Two Python test programs pass, and a real trace
+contains 19,958 active game GPU intervals. Focus remains susceptible to desktop contention, and
+exact shader parity remains open. No FPS gain or full-battery certification is claimed.

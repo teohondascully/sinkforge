@@ -108,7 +108,10 @@ RAISE_SCRIPT = 'tell application "System Events" to set frontmost of process "%s
 
 
 def _osa(script):
-    r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    try:
+        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
@@ -121,6 +124,14 @@ def _keep_custody(pid, restore_to, done):
     while not done.wait(CUSTODY_EVERY_S):
         if _osa(FRONT_PID) == str(pid) and restore_to:
             _osa(RAISE_SCRIPT % restore_to)
+
+
+def _keep_front(pid, done):
+    """Explicit --front owns the screen for this run, scoped to our child rather than every Godot."""
+    while not done.wait(0.25):
+        if _osa(FRONT_PID) != str(pid):
+            _osa('tell application "System Events" to set frontmost of '
+                 '(first process whose unix id is %d) to true' % pid)
 
 
 def run_once(workload, ticks, zoom, godot, hide=False, front=False, extra=()):
@@ -140,6 +151,8 @@ def run_once(workload, ticks, zoom, godot, hide=False, front=False, extra=()):
     elif not front:
         custodian = threading.Thread(target=_keep_custody, args=(proc.pid, was_front, done), daemon=True)
         custodian.start()
+    else:
+        threading.Thread(target=_keep_front, args=(proc.pid, done), daemon=True).start()
     try:
         out, _ = proc.communicate(timeout=max(60, ticks / 60 * 10))
     except subprocess.TimeoutExpired:

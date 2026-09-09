@@ -231,6 +231,24 @@ def test_focus_argv() -> None:
         FAILURES.append("custodian seat lost its no-focus protection")
 
 
+def test_front_requests_only_its_pid() -> None:
+    # The OS call is the external boundary: the actual launcher policy must emit our PID, not a name.
+    if not hasattr(pf, "_keep_front"):
+        FAILURES.append("front mode never requests foreground activation")
+        return
+    class Done:
+        def __init__(self):
+            self.calls = 0
+        def wait(self, _):
+            self.calls += 1
+            return self.calls > 1
+    scripts = []
+    with patch.object(pf, "_osa", side_effect=lambda script: scripts.append(script) or "other"):
+        pf._keep_front(12345, Done())
+    if not any("unix id is 12345" in script and "frontmost" in script for script in scripts):
+        FAILURES.append("foreground activation omitted its exact child PID")
+
+
 def test_setup_summary() -> None:
     a = dict(win(), setup={"ms": 12, "callbacks": 2, "observed_cells": 100, "painted_cells": 20})
     b = dict(win(), setup={"ms": 6, "callbacks": 1, "observed_cells": 80, "painted_cells": 10})
@@ -298,7 +316,7 @@ def main() -> int:
     for fn in (test_work_rule, test_movement_rule, test_control_rule, test_one_window_rule,
                test_window_regime_rule, test_pacing_rule, test_parser, test_reporting_contracts,
                test_process_completion, test_paired_burst_summary, test_focus_argv, test_setup_summary,
-               test_saved_identity):
+               test_saved_identity, test_front_requests_only_its_pid):
         fn()
     if FAILURES:
         print("test_perf_fixture: %d FAILED" % len(FAILURES))

@@ -1,5 +1,14 @@
 # Brief
 
+## What was learned — reliable evidence has several boundaries (D0547)
+
+`--front` contradicted itself by sending `--unfocused`; fixed, with PID-scoped activation added.
+The desktop can still steal focus, and that must withhold frame claims. Setup/density measurements
+now survive JSON, while source/settings/engine identity prevents mismatched comparisons. A real
+Metal trace produced GPU intervals, not a zero timer. Shader parity is still unimplemented; the old
+blanket brightness diagnosis is withdrawn, not a compensation to apply. Claude's `d344a35d` already
+included the first tooling changes. [Checkpoint and remaining limits](audits/2026-09-09-runner-gpu-closeout.md).
+
 ## Paired evidence now identifies optional work (D0542, September 9)
 
 The slowest preparation receipt now carries its own cells, callback count, execution/planning

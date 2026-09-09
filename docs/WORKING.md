@@ -4,6 +4,13 @@
 
 ## Performance programme — the five passes, September 8
 
+**D0547 runner/GPU checkpoint:** foreground argv now permits focus and a PID-scoped keeper requests
+it; measured focus still gates claims (latest 0.92/0.95, withheld). Setup and density counts survive
+JSON; runtime/settings/engine provenance constrains comparisons. Metal System Trace produced real
+PID-filtered GPU intervals; Godot's zero GPU timer remains unmeasured. Exact shader parity is OPEN.
+Claude's `d344a35d` included the initial five tooling files; do not reapply those changes.
+[Status, reproduction and verification](audits/2026-09-09-runner-gpu-closeout.md).
+
 **D0542 implemented:** paired slowest-preparation receipts and per-chunk scheduling reasons now
 reach the saved performance report. One 900-tick dig trace attributes its 9.793 ms warm peak to
 four optional-margin callbacks (1,024 rectangle cells). Focus was lost: frame metrics withheld.
