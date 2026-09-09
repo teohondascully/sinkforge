@@ -1,6 +1,6 @@
 # Working state
 
-**Last updated: 2026-09-09 (performance programme and its audit; gameplay section reconciled September 7).**
+**Last updated: 2026-09-09 (performance programme and its audit; gameplay measured by strangers 127-132, D0544).**
 
 ## Performance programme — the five passes, September 8
 
@@ -129,8 +129,21 @@ seat, from 38-168), new_game's phases and the batch's fresh-game snapshot (D0518
 0.7 s, six in 5.4 s wall), the mission's tick calibration (D0520: it did not change the actor's walks),
 the ring's IN REACH state (D0521), the spider cracks removed at the director's ask (D0523), THE EDGE
 lesson at the world boundary (D0529) and the acknowledged rung's card naming the next rung with the
-receipt using the ring's word (D0530) -- the last two answer the walls 121-126 left and are UNMEASURED:
-the next batch is their test.
+receipt using the ring's word (D0530) -- both now MEASURED by strangers 127-132 (D0544, below).
+
+**Strangers 127-132, 2026-09-09 (D0544), on `60da8d1d`, all six VALID, 0 Invariants.** Four ore 6 of 6,
+coal 5 of 6, two ingots 3 of 6, delivered 1 of 6, the drill placed 0 of 6.
+[The report](playtests/2026-09-09_strangers127-132_hotbar.md). **D0529 fires exactly on its trigger** --
+three seats entered the 4-cell edge band, all three saw the lesson, no seat outside a band saw one; two of
+the three then left the band, where two of three ended at the edge in 121-126. **D0530 was seen once**, by
+the only seat that finished a rung past deliver, and that seat did not quit on the card; one observation,
+not a measurement. **The batch's finding is neither lesson: the hotbar renumbers itself under the player.**
+`slots` is the bar's own order, draining a stack removes it and shifts every later stack down a number, and
+re-acquiring it appends at the end -- so the smelt rung, which asks the player to drain stacks into a
+machine, is what invalidates the numbers the card tells them to press. Four of six fed or selected the
+wrong stack; the only seat that delivered is the only one whose bar never reordered. No regression is
+claimed from 3/6 to 1/6 delivered: six seats cannot separate those. Live and separate: two seats stood
+beside a ringed RIG at TOO FAR.
 
 The director's freeze, measured and mitigated: the investigated blow stalls were terrain bake work, not the sim (0.3 ms a tick
 headless). A blow repaints its own dilated rectangle, chunks are 16 cells, and the streaming lane budgets

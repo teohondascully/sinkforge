@@ -21207,3 +21207,43 @@ and zero has two causes. A run that crossed no new terrain has no margin work ei
 prefetch simply never lost has plenty. The note now separates OVERTAKEN, COVERED and REVISIT ONLY, and
 the first draft would have reported the answer as an absence of one.
 
+
+## D0544 · 2026-09-09 · Strangers 127-132 measure D0529 and D0530, and find the hotbar renumbering itself
+
+**Context:** D0529 (THE EDGE lesson at the world boundary) and D0530 (the acknowledged rung's card naming
+the next rung) shipped UNMEASURED; `docs/WORKING.md` said in as many words that the next batch is their
+test. Six blind haiku strangers on the shipped seed at `60da8d1d`, all VALID, 0 `Invariants`, 0 `ERROR`.
+[The report](playtests/2026-09-09_strangers127-132_hotbar.md).
+
+**Decided, on classifying:** every lesson number in the report is a TRANSITION count, not a burst count.
+`state.lesson` is STICKY -- it holds the last hint shown until another replaces it -- so counting bursts
+with a lesson measures how long a hint lingered, not how often it fired. The first cut of the analysis
+did the latter and reported `world_edge_left` ten times for a seat that entered the left band once.
+
+**Decided, on timing an edge entry:** the lesson field cannot do it. Hints have priority and linger, so a
+seat standing at cell 2 can show `dropped_short`. The band membership is read off `state.cell` against
+`hints.gd`'s own `EDGE_CELLS = 4` instead. On that instrument the correspondence is exact: three seats
+entered a band, all three saw the matching lesson, no seat outside a band saw one.
+
+**Decided, on the mission:** the template's HTML comments are stripped before a seat receives it. They
+carry ledger ids and the list of goals used so far, and the standing rule is that design context stays out
+of blind stranger prompts. The two substitutions the template prescribes are the only other change; the
+body is byte-identical, which the report records by sha256.
+
+**The finding, which is not about either lesson.** `state.slots` is the bar's own order, "slot N is key N".
+It is not stable across a run: draining a stack removes it (`sim/items/pack.gd:47`, "so the hotbar never
+shows an empty slot"), which shifts every stack after it down a number, and re-acquiring that item appends
+it at the END (insertion order is state, `pack.gd:16-18`). So the rung that asks a player to drain stacks
+into a machine is the rung that renumbers their keys, while the card says "press each stack's NUMBER and
+Q". Four of six seats fed or selected the wrong stack; the only seat that delivered is the only one whose
+bar never reordered, and it carried no clay at all.
+
+**Verified against receipts, not reports.** S129 reported "forge consumed 7 ore, produced 1 Clay". Its pack
+says the first cut gave `clay:1` and `ore:7` together, burst 21 fed the ore, burst 22 fed the clay, and the
+later clay came from mining. Nothing produced clay. The agent's own account was wrong in a way that would
+have sent a reader to the forge's recipe; the receipts sent them to the hotbar.
+
+**Not claimed:** any regression in delivery (1 of 6 against 121-126's 3 of 6 -- six seats cannot separate
+those); any measurement of D0530 (exactly one seat reached its card, and did not quit on it); that the
+hotbar is the sole cause of the delivery failures -- the RIG's reach feedback is a separate live suspect,
+with two seats standing beside a ringed RIG at TOO FAR.
