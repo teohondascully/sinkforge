@@ -29,6 +29,10 @@ The rules exist because each of them caught something real while the fixture was
 from __future__ import annotations
 
 import sys
+import contextlib
+import io
+import json
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -140,9 +144,53 @@ def test_parser() -> None:
         FAILURES.append("parser: kept a window that carried no PERF line")
 
 
+def test_reporting_contracts() -> None:
+    """A withheld side must suppress frame comparisons; an outlier and a missing run must survive aggregation."""
+    w = dict(win(), max=2, frames=100, over16=0)
+    s = pf.summarise("dig", [[w, w, dict(w, max=100), w]])
+    if s["warm_max"] != 100:
+        FAILURES.append("summary hides a 100ms frame behind median window max")
+    check("missing repetition", pf.summarise("dig", [[w, w, w], []])["verdict"], "VOID")
+    for left, right in (("VALID", "VALID"), ("VALID", "WITHHELD"), ("WITHHELD", "VALID"),
+                        ("WITHHELD", "WITHHELD")):
+        a = dict(s, frames=left)
+        b = dict(s, frames=right)
+        output = io.StringIO()
+        with patch.object(pf.pathlib.Path, "read_text", side_effect=[json.dumps([a]), json.dumps([b])]):
+            with contextlib.redirect_stdout(output):
+                pf.compare("before", "after")
+        shown = any(line.strip().startswith("fps_wall ") for line in output.getvalue().splitlines())
+        if shown != (left == right == "VALID"):
+            FAILURES.append("comparison leaked/suppressed frame metrics for %s/%s" % (left, right))
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        pf.render(dict(s, frames="WITHHELD"))
+    if "warm draw " in output.getvalue() or "max frame" in output.getvalue():
+        FAILURES.append("render leaks presentation timing from a withheld regime")
+
+
+def test_process_completion() -> None:
+    """Late crashes, missing reports and engine errors cannot certify a partial run."""
+    windows = [dict(win(), tick=t, workload="dig", drawn_per_tick=1, prep_ms=1, upload_ms=1)
+               for t in (300, 600, 900)]
+    for code, output, rows, refused in ((0, "", windows, False), (1, "", windows, True),
+                                      (0, "SCRIPT ERROR: failed", windows, True),
+                                      (0, "ERROR: failed", windows, True),
+                                      (0, "", windows[:-1], True),
+                                      (0, "", windows + [windows[-1]], True)):
+        try:
+            pf.validate_run(rows, output, code, "dig", 900)
+            failed = False
+        except RuntimeError:
+            failed = True
+        if failed != refused:
+            FAILURES.append("process completion misclassified code=%d reports=%d" % (code, len(rows)))
+
+
 def main() -> int:
     for fn in (test_work_rule, test_movement_rule, test_control_rule, test_one_window_rule,
-               test_window_regime_rule, test_pacing_rule, test_parser):
+               test_window_regime_rule, test_pacing_rule, test_parser, test_reporting_contracts,
+               test_process_completion):
         fn()
     if FAILURES:
         print("test_perf_fixture: %d FAILED" % len(FAILURES))

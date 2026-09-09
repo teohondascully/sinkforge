@@ -36,6 +36,7 @@ func _test_bake_cost_counts_both_phases_and_resets() -> void:
 	BakeCost.note(BakeCost.UPLOAD, began, 4096)
 	_check(BakeCost.prep_chunks == 2, "two prepared chunks counted, not one and not three")
 	_check(BakeCost.prep_cells == 320, "the cells are summed across chunks: 256 + 64 == %d" % BakeCost.prep_cells)
+	_check(BakeCost.prep_tick_max_cells == 320, "a burst sums both chunks in the same physics tick")
 	_check(BakeCost.uploads == 1 and BakeCost.upload_cells == 4096, "the upload is counted apart from the preparation")
 	# THE TWO PHASES MUST NOT SHARE A CLOCK. An upload charged to preparation is exactly the confusion
 	# `docs/PERF_PLAN.md`'s rule 5 warns about ("measure `set_data`/`update` separately; the per-cell
@@ -45,6 +46,7 @@ func _test_bake_cost_counts_both_phases_and_resets() -> void:
 	_check(line.contains("us/cell"), "and charges per cell, not per chunk: %s" % line)
 	BakeCost.reset()
 	_check(BakeCost.prep_cells == 0 and BakeCost.upload_cells == 0, "reset clears both phases")
+	_check(BakeCost.prep_tick_max_cells == 0, "reset clears the burst high-water mark")
 
 
 ## The control loop must do the SAME work every time it is asked, or it measures itself rather than the

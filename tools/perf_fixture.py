@@ -121,17 +121,41 @@ def run_once(workload, ticks, zoom, godot, hide=False, front=False, extra=()):
     """One seat run, returning its windows in order. Window 1 is the cold one, by construction."""
     was_front = _osa(FRONT_NAME)
     proc = subprocess.Popen([godot] + flags_for(workload, ticks, zoom, extra),
-                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, cwd=str(ROOT))
     done = threading.Event()
+    timer = None
     if hide:
-        threading.Timer(HIDE_AFTER_S, _hide, args=(proc.pid,)).start()
+        timer = threading.Timer(HIDE_AFTER_S, _hide, args=(proc.pid,))
+        timer.start()
     elif not front:
         custodian = threading.Thread(target=_keep_custody, args=(proc.pid, was_front, done), daemon=True)
         custodian.start()
-    out, _ = proc.communicate()
-    done.set()
-    return parse_windows(out)
+    try:
+        out, _ = proc.communicate(timeout=max(60, ticks / 60 * 10))
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        raise RuntimeError("VOID: seat exceeded its wall-time limit") from None
+    finally:
+        done.set()
+        if timer is not None:
+            timer.cancel()
+    windows = parse_windows(out)
+    validate_run(windows, out, proc.returncode, workload, ticks)
+    return windows
+
+
+def validate_run(windows, output, returncode, workload, ticks):
+    """Require a complete, successful process, not merely enough surviving samples to average."""
+    if returncode != 0 or re.search(r"(?:SCRIPT ERROR:|^ERROR:)", output, re.MULTILINE):
+        raise RuntimeError("VOID: seat failed (exit %d)\n%s" % (returncode, output[-4000:]))
+    expected = list(range(WINDOW_TICKS, ticks + 1, WINDOW_TICKS))
+    if [w["tick"] for w in windows] != expected:
+        raise RuntimeError("VOID: missing, duplicate or out-of-order window reports")
+    required = {"drawn_per_tick", "prep_ms", "upload_ms", "cal_p50"}
+    if any(w["workload"] != workload or not required.issubset(w) for w in windows):
+        raise RuntimeError("VOID: mismatched workload or incomplete phase report")
 
 
 def parse_windows(out):
@@ -161,6 +185,9 @@ def parse_windows(out):
             cur.update(zip(("prep_ms", "prep_chunks", "prep_cells", "prep_us_cell",
                             "upload_ms", "uploads", "upload_cells", "upload_us_cell"),
                            (float(g) for g in m.groups())))
+            peak = re.search(r"peak_tick cells=(\d+) prep=([\d.]+)ms", line)
+            if peak:
+                cur["peak_cells"], cur["peak_prep_ms"] = map(float, peak.groups())
     return [w for w in windows if "fps_wall" in w]
 
 
@@ -275,12 +302,23 @@ def summarise(workload, runs, hidden=False):
     s = {"workload": workload, "reps": len(runs), "warm_windows": len(warm),
          "verdict": verdict(workload, warm),
          "frames": HIDDEN_FRAMES if hidden else frame_note(warm)}
+    if not runs or any(len(r) < 3 for r in runs):
+        s["verdict"] = "VOID: every repetition must contain a cold and at least two warm windows"
     for key in ("fps_wall", "p50", "p99", "max", "over16", "quiet_p50", "cal_p50", "cal_spread",
                 "focus", "draw_p50", "draw_p99", "drawn_per_tick", "prep_ms", "prep_us_cell", "prep_cells", "upload_ms",
                 "upload_us_cell", "uploads"):
         s["warm_" + key] = med(warm, key)
     for key in ("fps_wall", "p50", "max", "prep_ms", "upload_ms"):
         s["cold_" + key] = med(cold, key)
+    s["warm_window_max_median"] = s["warm_max"]
+    s["warm_max"] = max((w["max"] for w in warm if "max" in w), default=float("nan"))
+    s["cold_max"] = max((w["max"] for w in cold if "max" in w), default=float("nan"))
+    s["warm_frames"] = sum(w.get("frames", 0) for w in warm)
+    s["warm_over16_total"] = sum(w.get("over16", 0) for w in warm)
+    s["runs"] = runs  # retain windows; do not discard the evidence behind the summary
+    s["schema_version"] = 2
+    s["warm_peak_prep_ms"] = max((w.get("peak_prep_ms", 0) for w in warm), default=0)
+    s["warm_peak_cells"] = max((w.get("peak_cells", 0) for w in warm), default=0)
     return s
 
 
@@ -292,17 +330,21 @@ def render(s):
     if s["verdict"].startswith("VOID"):
         return
     print("  warm physics  quiet tick p50 %.2f ms" % s["warm_quiet_p50"])
+    print("  warm peak     preparation %.3f ms in one physics tick; peak painted rectangle cells %.0f"
+          % (s["warm_peak_prep_ms"], s["warm_peak_cells"]))
     print("  warm painters drawn %.3f ms/tick" % s["warm_drawn_per_tick"])
-    print("  warm draw     phase p50 %.2f ms  p99 %.2f ms   (window focused in %.0f%% of frames)"
-          % (s["warm_draw_p50"], s["warm_draw_p99"], s["warm_focus"] * 100.0))
+    if s["frames"] == "VALID":
+        print("  warm draw     phase p50 %.2f ms  p99 %.2f ms   (window focused in %.0f%% of frames)"
+              % (s["warm_draw_p50"], s["warm_draw_p99"], s["warm_focus"] * 100.0))
     print("  warm bake     prep %.3f ms/tick over %.0f cells (%.2f us/cell) | upload %.3f ms/tick, %.0f of them (%.3f us/cell)"
           % (s["warm_prep_ms"], s["warm_prep_cells"], s["warm_prep_us_cell"],
              s["warm_upload_ms"], s["warm_uploads"], s["warm_upload_us_cell"]))
-    print("  cold window   prep %.3f ms/tick  upload %.3f ms/tick  max frame %.2f ms"
-          % (s["cold_prep_ms"], s["cold_upload_ms"], s["cold_max"]))
+    print("  cold window   prep %.3f ms/tick  upload %.3f ms/tick"
+          % (s["cold_prep_ms"], s["cold_upload_ms"]))
     if s["frames"].startswith("VALID"):
-        print("  warm frame    fps_wall %.1f  p50 %.2f ms  p99 %.2f ms  max %.2f ms  over16.7 %.0f/600"
-              % (s["warm_fps_wall"], s["warm_p50"], s["warm_p99"], s["warm_max"], s["warm_over16"]))
+        print("  warm frame    median-window fps_wall %.1f  p50 %.2f ms  p99 %.2f ms  observed max %.2f ms  over16.7 %.0f/%.0f"
+              % (s["warm_fps_wall"], s["warm_p50"], s["warm_p99"], s["warm_max"],
+                 s["warm_over16_total"], s["warm_frames"]))
         print("  cold frame    fps_wall %.1f  p50 %.2f ms" % (s["cold_fps_wall"], s["cold_p50"]))
 
 
@@ -315,8 +357,9 @@ def compare(before, after):
         if b[name]["verdict"] != "VALID" or a[name]["verdict"] != "VALID":
             print("  REFUSED: before %s / after %s" % (b[name]["verdict"], a[name]["verdict"]))
             continue
-        if "VALID" not in (b[name]["frames"], a[name]["frames"]):
-            print("  frame statistics withheld on both sides; phase clocks below only")
+        frames_valid = b[name]["frames"] == a[name]["frames"] == "VALID"
+        if not frames_valid:
+            print("  frame statistics withheld: at least one side is invalid; phase clocks below only")
         ratio = a[name]["warm_cal_p50"] / max(b[name]["warm_cal_p50"], 1e-9)
         if not 1 / CAL_DRIFT_MAX <= ratio <= CAL_DRIFT_MAX:
             print("  REFUSED: the host ran %.2fx differently between the two runs (control %.0f -> %.0f us)"
@@ -327,6 +370,11 @@ def compare(before, after):
                           ("warm_max", "ms"), ("warm_drawn_per_tick", "ms/tick"),
                           ("warm_draw_p50", "ms"), ("warm_prep_ms", "ms/tick"),
                           ("warm_prep_us_cell", "us/cell"), ("warm_upload_ms", "ms/tick")):
+            if not frames_valid and key in ("warm_fps_wall", "warm_p50", "warm_p99", "warm_max", "warm_draw_p50"):
+                continue
+            if key == "warm_max" and any(s[name].get("schema_version") != 2 for s in (a, b)):
+                print("  max withheld: legacy reports stored a median of maxima, not an observed maximum")
+                continue
             was, now = b[name][key], a[name][key]
             # A RATIO BETWEEN TWO NUMBERS AT THE PRINT PRECISION IS NOT A RESULT: 0.001 -> 0.002 ms/tick
             # reads as +100% and is one digit of rounding. Below the floor the line says so and stops.
@@ -365,6 +413,8 @@ def main():
     if args.compare:
         compare(*args.compare)
         return 0
+    if args.reps < 1 or args.ticks < 900 or args.ticks % WINDOW_TICKS:
+        ap.error("require positive repetitions and at least 900 ticks in complete 300-tick windows")
     names = list(WORKLOADS) if args.all else [args.workload or "still"]
     out = []
     for name in names:
@@ -377,8 +427,12 @@ def main():
     if args.out:
         pathlib.Path(args.out).write_text(json.dumps(out, indent=1))
         print("\nsaved %s" % args.out)
-    return 0
+    return 1 if any(s["verdict"] != "VALID" for s in out) else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)

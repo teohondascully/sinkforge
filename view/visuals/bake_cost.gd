@@ -34,6 +34,12 @@ static var prep_cells: int = 0
 static var upload_usec: int = 0
 static var uploads: int = 0
 static var upload_cells: int = 0
+## Peak aggregate preparation in one physics tick, not a window average or single chunk.
+static var prep_tick_max_cells: int = 0
+static var prep_tick_max_usec: int = 0
+static var _tick: int = -1
+static var _tick_cells: int = 0
+static var _tick_usec: int = 0
 
 
 ## One event of `phase`, timed from `began` to now, over `n` terrain cells (preparation) or texels
@@ -41,6 +47,15 @@ static var upload_cells: int = 0
 static func note(phase: int, began: int, n: int) -> void:
 	var spent: int = Time.get_ticks_usec() - began
 	if phase == PREP:
+		var tick: int = Engine.get_physics_frames()
+		if tick != _tick:
+			_tick = tick
+			_tick_cells = 0
+			_tick_usec = 0
+		_tick_cells += n
+		_tick_usec += spent
+		prep_tick_max_cells = maxi(prep_tick_max_cells, _tick_cells)
+		prep_tick_max_usec = maxi(prep_tick_max_usec, _tick_usec)
 		prep_usec += spent
 		prep_chunks += 1
 		prep_cells += n
@@ -51,6 +66,11 @@ static func note(phase: int, began: int, n: int) -> void:
 
 
 static func reset() -> void:
+	_tick = -1
+	_tick_cells = 0
+	_tick_usec = 0
+	prep_tick_max_cells = 0
+	prep_tick_max_usec = 0
 	prep_usec = 0
 	prep_chunks = 0
 	prep_cells = 0
@@ -64,8 +84,9 @@ static func reset() -> void:
 ## rule 6: "extent is not cost. Gate on per-cell us, not on cell count."
 static func report(ticks: int) -> String:
 	var t: float = float(maxi(ticks, 1))
-	return "bake prep=%.3fms/tick chunks=%d cells=%d %.2fus/cell | upload=%.3fms/tick n=%d cells=%d %.3fus/cell" % [
+	return "bake prep=%.3fms/tick chunks=%d cells=%d %.2fus/cell | upload=%.3fms/tick n=%d cells=%d %.3fus/cell | peak_tick cells=%d prep=%.3fms" % [
 		float(prep_usec) / 1000.0 / t, prep_chunks, prep_cells,
 		float(prep_usec) / float(maxi(prep_cells, 1)),
 		float(upload_usec) / 1000.0 / t, uploads, upload_cells,
-		float(upload_usec) / float(maxi(upload_cells, 1))]
+		float(upload_usec) / float(maxi(upload_cells, 1)), prep_tick_max_cells,
+		float(prep_tick_max_usec) / 1000.0]

@@ -11,22 +11,22 @@
    tufts. Four focused suites and a headed mining capture pass. Noise still uses different algorithms;
    seam diagnosis, appearance comparison and total preparation/upload/GPU cost remain unresolved.
    Keep the prototype OFF and the CPU path as the reference. Resume here, not by rebuilding pass 1.
-3. **Inspected, NOT built (D0535's fixture, 2026-09-08):** movement-ahead terrain prefetch. The window
-   lane's budget is 512 solid cells a tick and the two workloads that stress streaming demand 45.8
-   (`dig`) and 31.4 (`fall`) -- 6-9% of its own budget -- and no visible hole appears at the first
-   presented frame after a cold warp to 131 m. Prefetch cannot help a lane that is idle. Untested: the
-   widest zoom rung.
+3. **Open; prior null conclusion withdrawn (D0538):** painted rectangle area per tick is not solid
+   streaming-lane utilisation, and averages hide bursts. A zoom-0.66 fall measures 6.865 ms of
+   preparation in one tick against 0.306 ms/tick average. Separate dig and newly visible work next;
+   retain immediate digging and no visible holes. The run's frame numbers were withheld for focus.
 4. **Implemented, OFF, awaiting the director's eye (D0537):** presentation-only camera and miner
    interpolation behind `--interpolate`, lerped BEFORE the pixel snap so the grid survives. No measurable
    cost; the picture at rest is byte-identical with the flag on and off. The sim is untouched.
 5. **Done in part (D0536):** the minimap rebuilt all ~17,000 logic cells on every terrain version change
    -- 36.5-38.1 ms in one HUD chip, on nineteen of twenty slow frames of a mining run. It now repaints
-   changed cells; the worst frame of that run fell 54.5 -> 21.5 ms, reproduced. Remaining and measured,
+   changed cells; the median of window maxima fell 54.5 -> 21.5 ms (not the actual worst frame;
+   D0538 corrects the fixture). Remaining and measured,
    not acted on: `machine_painter` 1.44 ms, `veil_layer` 1.22, `sky_painter` 0.91, `target_guide` 1.20 on
    a slow frame, `refresh` 1.08 (`observe` 0.98), and `queued=5988/6240` -- 96% of layers redraw every
    tick during a dig, so D0531's gate buys almost nothing while terrain is changing.
 
-**Item 1 below is DONE (D0535)** and everything above depends on it: `tools/perf_fixture.py`, four named
+**Fixture corrected in D0538; further coverage remains.** `tools/perf_fixture.py`, four named
 workloads, terrain preparation and upload split from the draw, a fixed-work host-speed control and a
 window-focus control in every window, six refusal rules. The full account, written for audit, is
 [the programme report](audits/2026-09-08-performance-programme.md).

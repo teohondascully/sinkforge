@@ -4,6 +4,17 @@
 
 ## Performance programme — the five passes, September 8
 
+**D0538 audit corrections take precedence over the historical summaries below:** the fixture now
+rejects failed/incomplete processes and empty repetitions, suppresses withheld frame comparisons,
+retains raw parsed windows, reports actual maximum separately from median window maxima, and uses
+the real frame denominator. Peak preparation per physics tick is now instrumented. The earlier
+54.5 → 21.5 ms was a median-of-maxima claim, not actual worst-frame evidence. The prefetch utilisation
+argument compared different populations and is withdrawn. Wide zoom showed a 6.865 ms preparation
+burst against 0.306 ms/tick average; presentation numbers were withheld. Fresh cave captures do not
+reproduce the claimed blanket 2.4–3x brightness excess. Full corrections and artifacts are in the
+[audit report](audits/2026-09-08-performance-programme.md). Shader parity, lane-specific burst
+attribution, interpolation motion review and water/large-factory coverage remain open.
+
 Astra's pass 1 is committed at `6b4b5e6c` (D0533, exact-picture neighborhood sharing) and pass 2 is
 partial at `b836bac3` (D0534, the OFF-by-default shader prototype retains surface tufts). The engineer
 verified both, ran the complete battery Astra's handoff left outstanding (172 checks, 144 suites, 0

@@ -1,5 +1,21 @@
 # Brief
 
+## What was learned — performance audit correction (D0538)
+
+The fixture could announce a refusal and still print the forbidden comparison. Its maximum was a
+median of maxima, and a missing repetition could pass. Those defects now have failing-then-passing
+regressions and fixes. Real dig validation reports 10/5195 warm frames over 16.7 ms, actual max
+22.70 ms; no speedup claimed. Peak-per-tick preparation exposes a widest-zoom fall burst of 6.865 ms
+behind a 0.306 ms average. Its focus was invalid, so frame statistics are withheld.
+
+Fresh matched cave captures do not reproduce the old blanket brightness claim; do not compensate
+ambient shading for it. Shader parity, lane-specific burst attribution and interpolation motion
+evaluation remain open. See the corrected [programme audit](audits/2026-09-08-performance-programme.md)
+and [performance queue](PERF_PLAN.md). Full local battery passed: 145 suites, zero failures, and
+local quality gates. The suite phase took 175 seconds at jobs=4. Python fixture regressions also
+pass. Gate-status has no unnumbered FAIL/SKIPPED steps; no new-head CI claim or push.
+Historical completion statements below do not certify unresolved renderer work.
+
 **Last updated: 2026-09-08.** Director-requested session-limit closeout; prior entries retained.
 
 **Final checkpoint:** pass 1 is committed at `6b4b5e6c` (D0533). Pass 2 is partial: D0534 restores

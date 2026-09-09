@@ -20998,3 +20998,29 @@ flag on and off the seat's frame at `--warp=130,90 --screenshot-tick=120` is byt
 verdict is not mine. The director watches it move and says whether it is better:
 `godot --path . -- --interpolate`. Until then the default path is the one that shipped.
 
+## D0538 · 2026-09-08 · Make performance refusals effective and preserve burst evidence
+
+**Decided:** fix the audited fixture before spending further runs on optimisations. Suppress frame
+comparisons unless both regimes qualify; preserve actual maxima separately from median maxima;
+count the real frame population; require every repetition and expected window, successful process
+exit and complete phase records; retain merged errors, bound process wall time and cancel hiding
+timers at exit. Saved reports retain parsed windows and carry schema version 2; legacy maxima are
+not compared as actual maxima. BakeCost now sums preparation per physics tick and reports its peak.
+
+**Evidence:** reporting regressions failed on all five original defects then passed; process tests
+cover nonzero exit, SCRIPT ERROR, native ERROR, missing/duplicate reports and a passing control.
+The existing Godot fixture suite passes 47 assertions, including same-tick chunk accumulation and
+reset. A real 900-tick dig completed all three windows: warm actual max 22.70 ms, 10/5195 frames
+over 16.7 ms. This validates the fixture, not a speedup. A separate widest-zoom fall had 6.865 ms
+peak preparation and 0.306 ms/tick average; focus invalidated its frame metrics.
+
+**Corrected interpretations:** prior reported worst frames were median window maxima. Repaint area
+(including air and dig work) is not streaming solid-cell utilisation. Fresh matched cave captures
+have region mean display-luminance ratio 1.00667, not blanket 2.4–3x brightness; the old table was
+red-channel ratios and cannot isolate ambient shading. Detailed scope/artifacts in the programme audit.
+Shader remains disabled; no simulation changes, art compensation or speculative prefetch scheduler.
+Remaining work is explicitly open in PERF_PLAN, not declared completed by these tests.
+
+**Integration verification:** complete local battery passed, including all 145 suites (175 seconds
+for the suite phase at jobs=4) and its local quality gates. Gate-status completed with no unnumbered
+FAIL/SKIPPED steps; CI on this uncommitted treatment is not claimed. Python fixture regressions pass.

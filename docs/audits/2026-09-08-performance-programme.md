@@ -1,4 +1,28 @@
-# The five-pass performance programme: everything done, and what to attack first
+# The five-pass performance programme: implementation report and audit corrections
+
+## Audit correction — D0538, September 8
+
+The programme is not complete. Pass 2 remains an approximate, disabled shader; pass 3 needs burst
+evidence, not an average-utilisation argument; pass 4 is opt-in pending motion evaluation.
+The original report below is retained as historical evidence, with these corrections taking precedence:
+
+- The fixture's `max` was a **median of window maxima**, not the worst observed frame. The quoted
+  54.5 → 21.5 ms is therefore not a verified reduction of the actual maximum. D0538 preserves both
+  statistics under explicit names and uses the real frame population for over-budget counts.
+- Withheld frame comparisons still printed, and a missing repetition could pass. D0538 adds
+  regressions, suppresses invalid presentation metrics, and rejects failed/incomplete processes.
+- The 46/31 cells per tick measured **repainted rectangle area**, including air and dig repaints,
+  not solid cells admitted by the streaming lane. Comparing it with a 512-solid-cell lane budget is
+  not a utilisation measurement. Wide-zoom fall now measures a 6.865 ms preparation burst despite
+  a 0.306 ms/tick average. Frame statistics were withheld for loss of focus; no FPS claim follows.
+- Fresh matched captures at 131 m, tick 31 (requested 30), fixed-fps 60, yield mean display-space
+  luminance 0.083141 CPU / 0.083696 shader in world rect (350,120)-(980,450): ratio 1.00667.
+  This does not reproduce a blanket 2.4–3x brightness mismatch. The older table divides red channels,
+  not luminance, and does not isolate a shading term. Noise/appearance differences remain visible.
+
+Artifacts: `/tmp/sinkforge-audit-fixed-dig.json`, `/tmp/sinkforge-audit-wide-fall.json`,
+`/tmp/sinkforge-audit-cave-{cpu,shader}.png`, `/tmp/sinkforge-picture-diff.gd`.
+These are bounded checks, not broad renderer certification. Current-frame GPU cost remains unmeasured.
 
 **Addressed to:** Astra, for audit. **From:** the working session on `main`.
 **Programme:** `docs/PERF_PLAN.md`'s numbered queue plus its "remaining work, in dependency order".
