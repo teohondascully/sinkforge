@@ -21300,3 +21300,51 @@ runs; `docs/PERF_PLAN.md` rule 6 gates on per-cell us and this is the caveat tha
 **Not done:** `tools/perf_fixture.py` does not parse the new `setup=` field, so it does not reach the
 saved JSON. That file is Astra's and the change is theirs to make or approve; the numbers above were
 read off the seat's own report line.
+
+## D0546 · 2026-09-09 · The dirty repaint's real denominator is the DILATED span, and the case closes
+
+**Context:** D0545 measured region setup out of the bottleneck (12.7-14.0% of preparation) and left one
+suspect standing for the remaining 83% of the dig-vs-margin per-cell gap: solid-cell density, since
+`RockTone.shade` costs per solid cell and skips air. This entry measures that, refutes it too, and finds
+what the cost is actually proportional to.
+
+**Instrument:** `BakeCost.note_density(reason, solid, dilated)` charges each callback's solid count and
+its dilated span to the reason that selected it. Counted and charged AFTER the PREP clock closes and only
+while `capture_bursts` is set, because the solid count is an O(cells) walk and an instrument that runs
+inside the window it measures reports its own cost as the subject's. `BakeLane.solid_in(obs, cells)` was
+split out of `solid_cells_in` so the rect and per-chunk counts share one rule rather than two copies.
+
+**Density is NOT the answer.** Dig is 75.2% solid against margin's 69.4% -- a 1.08x difference against a
+1.64-1.82x cost gap. Converting to the painters' own unit barely narrows it: **20.1 and 19.0 us a solid
+cell for dig against 12.0 and 12.5 for margin**, still 1.53-1.59x apart. Density explains about 8%.
+
+**The dilated span is.** `TerrainPainter.paint` builds one `RockNeighborhood` per callback over
+`cells.grow(RockTone.FORM_REACH)` (`terrain_painter.gd:69`, FORM_REACH 6) and that constructor makes
+three passes over the span -- `BakeData.solid_bytes` plus two `_scan`s. Charged against it, the two
+reasons converge: **3.01 and 2.94 us a dilated cell for dig against 2.71 and 2.86 for margin**, within
+11% and 3%, where per painted cell they differ 1.82x and 1.64x. The dilation ratio is the whole story:
+dig paints 94 cells a callback and dilates to 5.02x that; margin paints 256 and dilates to 3.06x.
+
+**So a dirty repaint is not dear because a dug cell is dear.** It is dear because a dig plans MANY SMALL
+RECTS, and every per-callback cost is paid over a grown region: `RockNeighborhood` over the rect grown by
+6, and `WorldView.observe_rect` over the rect grown by 9 (D0545). Both are amortised over the painted
+rect, so the smaller the rect the worse the rate. This is the same defect class as D0538's withdrawn
+prefetch number and D0524's wrong-unit budget: a rate whose denominator is not what the cost is
+proportional to. `docs/PERF_PLAN.md` rule 6 gates on per-cell us and needs this caveat.
+
+**The treatment this points at, NOT implemented and NOT claimed:** coalesce a tick's dig rects so the
+dilation is paid once instead of per partial. D0543's worst event was 4 dig callbacks over 462 cells,
+which is four dilated spans. This is an "affected area" change, which is exactly what the handoff's item
+4 case 3 asks for and explicitly not a scheduling change. It is NOT free: the union of several partials
+covers cells that did not need repainting, and that trade is unmeasured. Do not ship it on this entry.
+
+**Mutation-tested, three mutants, all killed:** removing the `note_density` call fails 2 assertions;
+recording the painted rect instead of the dilated span fails 1; running the walk with profiling off fails
+1. The suite drives a real `BakeChunk.paint`, so a wiring failure cannot pass as a quiet zero.
+
+**Limits.** Two warm windows of one workload (dig, zoom 2), from a seat run with the fixture's own argv
+and therefore no host-speed control; every headline figure is a RATIO within a single run, and
+dilated/painted has no clock in it at all. Not checked at wide zoom or on the fall workload. The
+convergence is 3-11%, so dilation is the dominant term and not the only one. No scheduling changed, no
+picture changed, no frame-time or FPS claim -- frame metrics remain WITHHELD at focus 0.00 (see the
+handoff's note for Astra on why `--front` cannot currently hold the front).

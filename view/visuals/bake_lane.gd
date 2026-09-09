@@ -49,7 +49,14 @@ const OPTIONAL_MIN_PER_TICK: int = 1
 ## pessimism is never exercised; were the snap or the chunk to change, the lane would paint fewer chunks a
 ## tick, never a hole -- the view promise in `choose` is what forbids holes.
 static func solid_cells_in(w: BakeWindow, i: int, obs: Interface.Observation) -> int:
-	var cells: Rect2i = w.cells_of(w.chunk_rect(i))
+	return solid_in(obs, w.cells_of(w.chunk_rect(i)))
+
+
+## The same count over ANY cell rect, which is what a partial repaint needs (D0546): the dig lane paints
+## rects that are not a whole chunk, so a per-chunk counter cannot say what one of them held. Split out of
+## the function above rather than written twice -- the pessimism about unseen cells is a rule, and a rule
+## copied is a rule that drifts.
+static func solid_in(obs: Interface.Observation, cells: Rect2i) -> int:
 	if obs == null:
 		return cells.get_area()
 	var seen: Rect2i = cells.intersection(obs.window)

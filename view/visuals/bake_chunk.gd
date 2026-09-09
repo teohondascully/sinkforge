@@ -166,6 +166,13 @@ func paint(ci: CanvasItem, i: int, rect: Rect2) -> void:
 	var source: Array = attribution.get(i, [-1, "unknown"])
 	attribution.erase(i)
 	BakeCost.note(BakeCost.PREP, began, _paint(ci, i, rect), source[0], source[1])
+	# DENSITY, COUNTED AFTER THE CLOCK CLOSED (D0546). `_paint` leaves the rect and observation it actually
+	# used; the O(cells) walk that counts solid cells in them runs here, outside the PREP window and only
+	# while profiling, so the instrument never charges its own cost to the phase it is measuring.
+	if BakeCost.capture_bursts and _last_obs != null:
+		BakeCost.note_density(source[1], BakeLane.solid_in(_last_obs, _last_cells),
+			_last_cells.grow(RockTone.FORM_REACH).get_area())
+		_last_obs = null
 
 
 ## The paint itself, returning the terrain cells it prepared so the clock above can charge per cell
@@ -173,6 +180,12 @@ func paint(ci: CanvasItem, i: int, rect: Rect2) -> void:
 ## over a mixed window names neither. Split out only so `paint` can be the timed wrapper: a `began` read
 ## at the top of a body with four early returns would need the stamp repeated at each of them, and the
 ## one that got missed would be the cheap path, which is the shape that reads as a speedup.
+## What the last `_paint` actually used, so `paint` can count density outside the timed window. Held for
+## exactly one callback and cleared as it is consumed; null whenever profiling is off.
+static var _last_obs: Interface.Observation = null
+static var _last_cells: Rect2i = Rect2i()
+
+
 func _paint(ci: CanvasItem, i: int, rect: Rect2) -> int:
 	var r: Rect2 = rect_for(i, rect)
 	# REGION SETUP, TIMED APART FROM PAINTING (D0545). `frame_for` is one `WorldView.observe_rect`, which
@@ -186,6 +199,8 @@ func _paint(ci: CanvasItem, i: int, rect: Rect2) -> int:
 		return 0
 	var cells: Rect2i = window.cells_of(r)
 	var prepared: int = cells.size.x * cells.size.y
+	_last_obs = f.obs if BakeCost.capture_bursts else null   # two assignments, not a walk: see `paint`
+	_last_cells = cells
 	for p: Callable in painters:
 		p.call(f, ci)
 	if cpu_tone:

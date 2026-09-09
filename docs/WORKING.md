@@ -92,9 +92,16 @@ preparation and margin 15%, and the handoff's third case -- dirty-repaint region
 the painters: region setup is **14.0% and 12.7% of preparation** across two warm dig windows, at an
 observed-over-painted area ratio of **7.33x and 7.14x**. The inflation is real -- every bake rect is
 grown by `WINDOW_MARGIN_CELLS` (9) on four sides while the clock is charged over the painted rect -- but
-it explains only about **17%** of the 5.5 us/cell gap between dig (14.4) and margin (8.9). The remaining
-83% points at solid-cell density, which is the next measurement and is not claimed yet. Mutation-tested
-with two mutants, both killed. No scheduling, picture, or FPS claim. Left open: at wide zoom a terminal-velocity fall's slowest event is three margin callbacks
+it explains only about **17%** of the 5.5 us/cell gap between dig (14.4) and margin (8.9). **D0546 finished it: solid-cell
+density is not the answer either (dig 75.2% solid against margin 69.4%, a 1.08x difference), and the
+real denominator is the DILATED span.** `TerrainPainter` builds one `RockNeighborhood` per callback over
+`cells.grow(FORM_REACH)` and scans it three times; charged per dilated cell the two reasons converge to
+**3.01/2.94 us (dig) against 2.71/2.86 (margin), within 3-11%**, where per painted cell they differ
+1.64-1.82x. So a dirty repaint is dear because a dig plans MANY SMALL RECTS and every per-callback cost
+is paid over a grown region, not because a dug cell is dear. The treatment that points at -- coalescing
+a tick's dig rects so the dilation is paid once -- is an affected-area change, is NOT implemented, and
+its cost (the union repaints cells that did not need it) is unmeasured. Five mutants killed across the
+two entries. No scheduling, picture, or FPS claim. Left open: at wide zoom a terminal-velocity fall's slowest event is three margin callbacks
 at 28.089 ms, which is what avoiding a hole costs there; its before arm came back VOID and that A/B is
 inconclusive and was stopped rather than stacked.
 

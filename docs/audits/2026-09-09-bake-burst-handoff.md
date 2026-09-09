@@ -197,6 +197,51 @@ over an observation window wider than the chunk it paints.
 the saved JSON — the numbers above were read off the seat's own report line. That file is yours; I did
 not edit it. Adding one regex would put region setup into every future run's record.
 
+### D0546 checkpoint — September 9 (Claude): what the dirty repaint is actually proportional to
+
+D0545 put region setup at 12.7-14.0% of preparation and left solid-cell density as the suspect for the
+rest. **Density is not it either**, and the third candidate is measured and matches.
+
+| charged per | dig | margin | apart by |
+|---|---|---|---|
+| painted cell | 15.1 / 14.3 us | 8.3 / 8.7 us | **1.82x / 1.64x** |
+| solid cell | 20.1 / 19.0 us | 12.0 / 12.5 us | 1.53x / 1.59x |
+| **dilated cell** | **3.01 / 2.94 us** | **2.71 / 2.86 us** | **1.11x / 1.03x** |
+
+Dig is 75.2% solid against margin's 69.4% -- a 1.08x difference that cannot carry a 1.7x gap. But
+`TerrainPainter.paint:69` builds one `RockNeighborhood` per callback over `cells.grow(FORM_REACH)` (6),
+and that constructor makes three passes over the span. Charged against THAT, the reasons converge to
+within 3-11%. Dig paints 94 cells a callback and dilates to 5.02x; margin paints 256 and dilates to 3.06x.
+
+**A dirty repaint is not dear because a dug cell is dear. It is dear because a dig plans many small
+rects, and every per-callback cost is paid over a grown region** -- the neighbourhood's +6 and the
+observation's +9 -- while the rate is charged over the painted rect. Your item 4 case 3 said "inspect
+repeated region setup and affected area": region setup is the smaller half, affected area is the larger.
+
+**The treatment this points at, and I have NOT taken it:** coalesce a tick's dig rects so the dilation is
+paid once rather than per partial. It is an affected-area change, not scheduling. It is not free -- the
+union of several partials repaints cells that did not need it -- and that trade is unmeasured. Flagging
+it rather than shipping it, per your item 5's rule about stopping at a bounded result.
+
+Three mutants killed (call removed; painted rect recorded instead of the dilated span; walk left on with
+profiling off). Limits: two warm windows, one workload, no host-speed control -- every figure is a ratio
+within one run, and dilated/painted has no clock in it.
+
+### For Astra: `--front` cannot hold the front, and it blocks every frame number
+
+`flags_for()` at `tools/perf_fixture.py:79` appends `--unfocused` to the seat's argv unconditionally, and
+`--front` only skips the custodian thread (line 132) — it never removes that flag. `--unfocused` sets
+`Window.FLAG_NO_FOCUS` (`shell/seat_drive.gd:43`), so the run whose whole purpose is holding the front is
+launched refusing focus. That is consistent with frame metrics being WITHHELD at focus 0.00 in every run
+of D0542, D0543, D0545 and D0546, and with `--front`'s own docstring promise ("the only regime a frame
+rate can be claimed from") never having been delivered. `seat_drive.gd:34` notes macOS activates the
+process anyway after three or four seconds; a 900-tick run at ~500 fps finishes before that, so short
+runs never escape it.
+
+**This is a source-level diagnosis, not a confirmed fix** — I did not run the experiment, and I did not
+edit the file, because it is yours. If it holds, it unblocks every FPS and frame-time claim in the
+programme, which is currently the largest thing the fixture cannot do.
+
 ## Tests that earn their cost
 
 - Two ticks with opposite time/area maxima: the slowest receipt retains its own cells and tick.

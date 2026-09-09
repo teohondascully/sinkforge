@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_region_setup_is_a_slice_of_preparation_not_a_fourth_phase()
 	_test_the_setup_line_names_the_multiplier_a_per_cell_rate_carries()
 	_test_a_real_paint_charges_setup_and_cells_over_different_areas()
+	_test_a_real_paint_records_the_dilated_span_the_painters_actually_scan()
 	_finish("perf_fixture")
 
 
@@ -235,5 +236,56 @@ func _test_a_real_paint_charges_setup_and_cells_over_different_areas() -> void:
 	_check(BakeCost.prep_setup_cells > BakeCost.prep_cells,
 		"observed exceeds painted, which is the finding: %d > %d"
 			% [BakeCost.prep_setup_cells, BakeCost.prep_cells])
+	ci.free()
+	BakeCost.reset()
+
+
+## THE DENOMINATOR THE PAINTERS ACTUALLY COST BY (D0546). `TerrainPainter.paint` builds one
+## `RockNeighborhood` per callback over `cells.grow(RockTone.FORM_REACH)` and scans it three times, so a
+## callback's cost tracks that DILATED span, not the rect it charges. Measured over a dig: 3.01 and 2.94
+## us a dilated cell against margin's 2.71 and 2.86 -- converging within 3-11% where the per-painted-cell
+## figures differ 1.64-1.82x. This pins that the recorded span is the dilated one and comes from the
+## production path; charge it the painted rect instead and the ratio the finding rests on vanishes.
+##
+## `capture_bursts` gates the density walk, so it is set here deliberately: with it off the production
+## path must record NOTHING, which is the other half of the pin.
+func _test_a_real_paint_records_the_dilated_span_the_painters_actually_scan() -> void:
+	var cell_px: int = 4
+	var per_chunk: int = BakeWindow.CHUNK_PX / cell_px
+	var w := BakeWindow.new()
+	w.plan(Vector2i(3000, 1000), cell_px)
+	w.set_margin(WorldView.WINDOW_MARGIN_CELLS)
+	var i: int = 4 * w.grid().x + 60
+	var wide := Rect2i(58 * per_chunk, 2 * per_chunk, 4 * per_chunk, 4 * per_chunk)
+	var obs := Interface.Observation.new()
+	obs.window = wide
+	obs.legend = PackedStringArray(["", "clay"])
+	obs.materials = PackedByteArray()
+	obs.materials.resize(wide.size.x * wide.size.y)
+	obs.materials.fill(1)                       # every observed cell solid, so `solid` is checkable
+	var chunk := BakeChunk.new()
+	var empty: Array[Callable] = []
+	chunk.setup(w, func(_r: Rect2) -> Interface.Observation: return obs,
+		MaterialLook.new(), RockTone.new(0), empty, null)
+	var ci := Node2D.new()
+	var painted: Rect2i = w.cells_of(w.chunk_rect(i))
+	var expected: int = painted.grow(RockTone.FORM_REACH).get_area()
+	BakeCost.reset()
+	BakeCost.capture_bursts = true
+	chunk.paint(ci, i, w.chunk_rect(i))
+	var part: Dictionary = BakeCost.prep_by_reason.get("unknown", {})
+	_check(int(part.get("dilated", 0)) == expected,
+		"the DILATED span is recorded: %d, expected grow(%d) of %d painted = %d"
+			% [int(part.get("dilated", 0)), RockTone.FORM_REACH, painted.get_area(), expected])
+	_check(expected > painted.get_area(),
+		"the dilated span exceeds the painted rect, which is the finding: %d > %d"
+			% [expected, painted.get_area()])
+	_check(int(part.get("solid", 0)) == painted.get_area(),
+		"every cell was solid, so solid == painted here: %d" % int(part.get("solid", 0)))
+	BakeCost.reset()
+	BakeCost.capture_bursts = false
+	chunk.paint(ci, i, w.chunk_rect(i))
+	_check(not BakeCost.prep_by_reason.get("unknown", {}).has("dilated"),
+		"with profiling off the density walk does not run at all")
 	ci.free()
 	BakeCost.reset()

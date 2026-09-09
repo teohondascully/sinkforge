@@ -32,6 +32,8 @@ import sys
 import contextlib
 import io
 import json
+import tempfile
+import subprocess
 from unittest.mock import patch
 from pathlib import Path
 
@@ -49,6 +51,12 @@ def check(name: str, got: str, want_prefix: str) -> None:
 def win(cal: float = 60.0, fps: float = 400.0, chunks: int = 5, body: tuple = (10, 20),
         focus: float = 1.0) -> dict:
     return {"cal_p50": cal, "fps_wall": fps, "prep_chunks": chunks, "body": body, "focus": focus}
+
+
+def run_identity() -> dict:
+    return {"identity_version": 1, "zoom": "2", "ticks": 900, "regime": "front", "seat": [],
+            "engine_sha256": "engine", "platform": "host", "host": "one", "settings_sha256": "default",
+            "graphics_env_sha256": "env", "renderer": "Metal", "source_sha256": "before"}
 
 
 def test_work_rule() -> None:
@@ -124,7 +132,8 @@ def test_parser() -> None:
         "painters total=3.44ms (budget 8.33ms at 120Hz) -- sky_painter.paint=1.51ms | refresh=0.26ms "
         "(observe=0.18ms) queued=10824/12000 drawn=2.430ms/tick plane_rebuilds=105 hub_rebuilds=418 /600 ticks",
         "bake prep=0.554ms/tick chunks=120 cells=13892 12.30us/cell | upload=0.002ms/tick n=30 "
-        "cells=8478720 0.000us/cell",
+        "cells=8478720 0.000us/cell | setup=23.400ms/12cb 14.0%ofprep obs_cells=1000 painted_cells=200 obs/painted=5.00x"
+        " | by_reason dig=1.200ms/2cb/100cells/75solid/400dilated 12.0us_cell 16.0us_solid 3.00us_dilated",
         'BURST {"usec":9000,"cells":200,"callbacks":2,"reasons":{"dig":{"usec":9000}}}',
     ]
     w = pf.parse_windows("\n".join(lines))
@@ -132,6 +141,11 @@ def test_parser() -> None:
         FAILURES.append("parser: wanted 1 window, got %d" % len(w))
         return
     got = w[0]
+    if got.get("reasons", {}).get("dig", {}).get("dilated") != 400:
+        FAILURES.append("parser: reason lost its measured dilated-area denominator")
+    if got.get("setup") != {"ms": 23.4, "callbacks": 12, "percent_of_prep": 14.0,
+                            "observed_cells": 1000, "painted_cells": 200, "area_ratio": 5.0}:
+        FAILURES.append("parser: region setup measurements lost")
     if got.get("burst", {}).get("reasons", {}).get("dig", {}).get("usec") != 9000:
         FAILURES.append("parser: paired burst lost its nested attribution")
     for key, want in (("workload", "dig"), ("body", (130, 147)), ("fps_wall", 114.6), ("p50", 6.10),
@@ -151,6 +165,7 @@ def test_reporting_contracts() -> None:
     """A withheld side must suppress frame comparisons; an outlier and a missing run must survive aggregation."""
     w = dict(win(), max=2, frames=100, over16=0)
     s = pf.summarise("dig", [[w, w, dict(w, max=100), w]])
+    s["run"] = run_identity()
     if s["warm_max"] != 100:
         FAILURES.append("summary hides a 100ms frame behind median window max")
     check("missing repetition", pf.summarise("dig", [[w, w, w], []])["verdict"], "VOID")
@@ -203,10 +218,87 @@ def test_paired_burst_summary() -> None:
         FAILURES.append("legacy missing burst data is not explicit")
 
 
+def test_focus_argv() -> None:
+    # The actual child argv must permit focus, not only omit the custodian thread.
+    try:
+        front = pf.flags_for("dig", 900, "2", front=True)
+    except TypeError:
+        FAILURES.append("front regime cannot reach the seat argv")
+        return
+    if "--unfocused" in front or "--perf-drive=dig" not in front:
+        FAILURES.append("foreground seat refuses focus or reads physical input")
+    if "--unfocused" not in pf.flags_for("dig", 900, "2"):
+        FAILURES.append("custodian seat lost its no-focus protection")
+
+
+def test_setup_summary() -> None:
+    a = dict(win(), setup={"ms": 12, "callbacks": 2, "observed_cells": 100, "painted_cells": 20})
+    b = dict(win(), setup={"ms": 6, "callbacks": 1, "observed_cells": 80, "painted_cells": 10})
+    s = pf.summarise("dig", [[win(), a, b]])
+    if s.get("warm_setup") != {"ms": 18, "callbacks": 3, "observed_cells": 180, "painted_cells": 30}:
+        FAILURES.append("setup summary must sum paired warm measurements, excluding cold")
+    if pf.summarise("dig", [[win(), win(), win()]]).get("warm_setup") is not None:
+        FAILURES.append("legacy unmeasured setup fabricated as zero")
+
+
+def test_saved_identity() -> None:
+    try:
+        import perf_identity as identity
+    except ImportError:
+        FAILURES.append("saved runs have no content identity / compatibility guard")
+        return
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        subprocess.run(["git", "init", "-q", directory], check=True)
+        (root / "shell").mkdir()
+        source = root / "shell/main.gd"
+        source.write_text("first")
+        first = identity.source_state(root)
+        source.write_text("second")
+        second = identity.source_state(root)
+        if first["source_sha256"] == second["source_sha256"]:
+            FAILURES.append("untracked runtime edits missing from content identity")
+        (root / "notes.md").write_text("a documentation update")
+        if identity.source_state(root)["source_sha256"] != second["source_sha256"]:
+            FAILURES.append("documentation-only edit invalidates the runtime identity")
+    a = run_identity()
+    b = dict(a, source_sha256="after")
+    if identity.incompatible(a, b):
+        FAILURES.append("intended source-code treatment rejected")
+    for key in ("zoom", "ticks", "regime", "engine_sha256", "settings_sha256", "host", "renderer"):
+        if not identity.incompatible(a, dict(b, **{key: "different"})):
+            FAILURES.append("comparison accepts mismatched " + key)
+    if not identity.incompatible({}, {}):
+        FAILURES.append("legacy missing identities accepted")
+    if not identity.incompatible(a, dict(b, seat=["--shader-tone"])):
+        FAILURES.append("unannounced seat-flag treatment accepted")
+    if identity.incompatible(a, dict(b, seat=["--shader-tone"]), allow_seat_change=True):
+        FAILURES.append("explicit seat-flag treatment refused")
+    for source, settings, refused in (("before", "default", False), ("after", "default", True),
+                                      ("before", "edited", True)):
+        try:
+            identity.verify_unchanged(a, {"source_sha256": source}, settings)
+            failed = False
+        except RuntimeError:
+            failed = True
+        if failed != refused:
+            FAILURES.append("mid-run mutation guard misclassified sources/settings")
+    # Exercise the reporting consumer, not just the predicate: a mismatch must print no ranking.
+    output = io.StringIO()
+    row = {"workload": "dig", "run": a, "verdict": "VALID", "frames": "VALID"}
+    other = dict(row, run=dict(a, zoom="0.66"))
+    with patch.object(pf.pathlib.Path, "read_text", side_effect=[json.dumps([row]), json.dumps([other])]):
+        with contextlib.redirect_stdout(output):
+            pf.compare("before", "after")
+    if "REFUSED" not in output.getvalue() or "control held" in output.getvalue():
+        FAILURES.append("comparison did not refuse mismatched zoom before ranking")
+
+
 def main() -> int:
     for fn in (test_work_rule, test_movement_rule, test_control_rule, test_one_window_rule,
                test_window_regime_rule, test_pacing_rule, test_parser, test_reporting_contracts,
-               test_process_completion, test_paired_burst_summary):
+               test_process_completion, test_paired_burst_summary, test_focus_argv, test_setup_summary,
+               test_saved_identity):
         fn()
     if FAILURES:
         print("test_perf_fixture: %d FAILED" % len(FAILURES))

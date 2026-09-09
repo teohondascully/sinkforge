@@ -38,6 +38,9 @@ import statistics
 import subprocess
 import sys
 import threading
+import time
+
+import perf_identity
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GODOT = "/opt/homebrew/bin/godot"
@@ -64,19 +67,21 @@ PERF_RE = re.compile(
     r"quiet p50=([\d.]+)ms p99=([\d.]+)ms n=\d+ \| "
     r"cal p50=(\d+)us p99=(\d+)us max=(\d+)us spread=([\d.]+) n=(\d+)")
 PAINT_RE = re.compile(r"^painters total=([\d.]+)ms.*?drawn=([\d.]+)ms/tick")
-REASON_RE = re.compile(r"(\w+)=([\d.]+)ms/(\d+)cb/(\d+)cells")
+REASON_RE = re.compile(r"(\w+)=([\d.]+)ms/(\d+)cb/(\d+)cells(?:/(\d+)solid/(\d+)dilated)?")
 BAKE_RE = re.compile(
     r"^bake prep=([\d.]+)ms/tick chunks=(\d+) cells=(\d+) ([\d.]+)us/cell \| "
     r"upload=([\d.]+)ms/tick n=(\d+) cells=(\d+) ([\d.]+)us/cell")
+SETUP_RE = re.compile(r" \| setup=([\d.]+)ms/(\d+)cb ([\d.]+)%ofprep obs_cells=(\d+) "
+                      r"painted_cells=(\d+) obs/painted=([\d.]+)x")
 
 
-def flags_for(workload, ticks, zoom, extra=()):
+def flags_for(workload, ticks, zoom, extra=(), front=False):
     """The seat's argv for one workload. Always `--perf-drive=`, never bare `--perf`: only a driven seat
     is deaf to the real keyboard, and a measurement a passer-by can change is not a measurement."""
     seat = ["--fresh", "--muted", "--zoom=%s" % zoom, "--quit-after=%d" % ticks,
             "--perf-drive=%s" % workload]
     return ["--resolution", "1280x720", "--disable-vsync", "--max-fps", "0",
-            "--path", str(ROOT), "--", "--unfocused"] + seat + list(extra)
+            "--path", str(ROOT), "--"] + ([] if front else ["--unfocused"]) + seat + list(extra)
 
 
 # THE SEAT RENDERS FOR REAL, ALWAYS. Hiding the process was tried and rejected by the director: macOS
@@ -121,7 +126,10 @@ def _keep_custody(pid, restore_to, done):
 def run_once(workload, ticks, zoom, godot, hide=False, front=False, extra=()):
     """One seat run, returning its windows in order. Window 1 is the cold one, by construction."""
     was_front = _osa(FRONT_NAME)
-    proc = subprocess.Popen([godot] + flags_for(workload, ticks, zoom, extra),
+    identity = perf_identity.capture(ROOT, godot)
+    argv = [godot] + flags_for(workload, ticks, zoom, extra, front)
+    began = time.time()
+    proc = subprocess.Popen(argv,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, cwd=str(ROOT))
     done = threading.Event()
@@ -144,6 +152,11 @@ def run_once(workload, ticks, zoom, godot, hide=False, front=False, extra=()):
             timer.cancel()
     windows = parse_windows(out)
     validate_run(windows, out, proc.returncode, workload, ticks)
+    after = perf_identity.source_state(ROOT)
+    perf_identity.verify_unchanged(identity, after, perf_identity.digest_file(perf_identity.settings_path()))
+    identity["renderer"] = next((line for line in out.splitlines() if "Using Device" in line), "unreported")
+    windows[0]["receipt"] = {"identity": identity, "head_after": after["head"], "argv": argv,
+                              "started_at": began, "finished_at": time.time(), "output": out}
     return windows
 
 
@@ -174,11 +187,17 @@ def parse_windows(out):
         if line.startswith("BURST "):
             cur["burst"] = json.loads(line[6:])
             continue
+        setup = SETUP_RE.search(line)
+        if setup:
+            cur["setup"] = dict(zip(("ms", "callbacks", "percent_of_prep", "observed_cells",
+                                      "painted_cells", "area_ratio"), map(float, setup.groups())))
         if " | by_reason " in line:
             # The window's preparation split by WHY each chunk was selected. Parsed off the same bake
             # line the totals come from, so a window can never carry a reason mix from another window.
             cur["reasons"] = {m.group(1): {"ms": float(m.group(2)), "callbacks": int(m.group(3)),
-                                           "cells": int(m.group(4))}
+                                           "cells": int(m.group(4)),
+                                           **({"solid": int(m.group(5)), "dilated": int(m.group(6))}
+                                              if m.group(5) is not None else {})}
                               for m in REASON_RE.finditer(line.split(" | by_reason ", 1)[1])}
         m = PERF_RE.match(line)
         if m:
@@ -345,6 +364,11 @@ def summarise(workload, runs, hidden=False):
          "frames": HIDDEN_FRAMES if hidden else frame_note(warm)}
     if not runs or any(len(r) < 3 for r in runs):
         s["verdict"] = "VOID: every repetition must contain a cold and at least two warm windows"
+    identities = [w["receipt"]["identity"] for w in cold if "receipt" in w]
+    if identities:
+        s["run"].update(identities[0])
+        if len(identities) != len(runs) or any(i != identities[0] for i in identities[1:]):
+            s["verdict"] = "VOID: repetitions have different source or environment identities"
     for key in ("fps_wall", "p50", "p99", "max", "over16", "quiet_p50", "cal_p50", "cal_spread",
                 "focus", "draw_p50", "draw_p99", "drawn_per_tick", "prep_ms", "prep_us_cell", "prep_cells", "upload_ms",
                 "upload_us_cell", "uploads"):
@@ -369,10 +393,14 @@ def summarise(workload, runs, hidden=False):
     for w in warm:
         for name, d in w.get("reasons", {}).items():
             t = totals.setdefault(name, {"ms": 0.0, "callbacks": 0, "cells": 0})
-            for k in t:
-                t[k] += d[k]
+            for k in d:
+                t[k] = t.get(k, 0) + d[k]
     s["warm_reasons"] = totals
     s["warm_reason_ms"] = sum(t["ms"] for t in totals.values())
+    setups = [w["setup"] for w in warm if "setup" in w]
+    s["warm_setup"] = ({k: sum(d[k] for d in setups)
+                        for k in ("ms", "callbacks", "observed_cells", "painted_cells")}
+                       if setups else None)
     return s
 
 
@@ -385,6 +413,8 @@ def render(s):
         return
     print("  warm physics  quiet tick p50 %.2f ms" % s["warm_quiet_p50"])
     print("  slowest burst " + json.dumps(s["slowest_burst"], sort_keys=True))
+    if s.get("warm_setup") is not None:
+        print("  warm setup    " + json.dumps(s["warm_setup"], sort_keys=True) + " (included in prep, not additional)")
     if s.get("warm_reasons"):
         order = sorted(s["warm_reasons"].items(), key=lambda kv: -kv[1]["ms"])
         print("  warm by reason " + "  ".join(
@@ -410,12 +440,18 @@ def render(s):
         print("  cold frame    fps_wall %.1f  p50 %.2f ms" % (s["cold_fps_wall"], s["cold_p50"]))
 
 
-def compare(before, after):
+def compare(before, after, allow_seat_change=False):
     """Two saved runs, workload by workload. Refuses any pair whose verdicts are not both plain VALID."""
     b = {s["workload"]: s for s in json.loads(pathlib.Path(before).read_text())}
     a = {s["workload"]: s for s in json.loads(pathlib.Path(after).read_text())}
     for name in [w for w in WORKLOADS if w in b and w in a]:
         print("\n=== %s ===" % name)
+        mismatch = perf_identity.incompatible(b[name].get("run", {}), a[name].get("run", {}), allow_seat_change)
+        if mismatch:
+            print("  REFUSED: " + mismatch)
+            continue
+        if allow_seat_change:
+            print("  declared seat treatment: %s -> %s" % (b[name]["run"]["seat"], a[name]["run"]["seat"]))
         if b[name]["verdict"] != "VALID" or a[name]["verdict"] != "VALID":
             print("  REFUSED: before %s / after %s" % (b[name]["verdict"], a[name]["verdict"]))
             continue
@@ -471,12 +507,15 @@ def main():
                          "CPU phases are isolated from presentation and every frame number is withheld. "
                          "Not the default: presentation is part of what is being measured.")
     ap.add_argument("--compare", nargs=2, metavar=("BEFORE", "AFTER"))
+    ap.add_argument("--allow-seat-change", action="store_true", help="explicitly compare different seat flags as a treatment")
     args = ap.parse_args()
     if args.compare:
-        compare(*args.compare)
+        compare(*args.compare, allow_seat_change=args.allow_seat_change)
         return 0
     if args.reps < 1 or args.ticks < 900 or args.ticks % WINDOW_TICKS:
         ap.error("require positive repetitions and at least 900 ticks in complete 300-tick windows")
+    if args.front and (args.hidden or "--unfocused" in args.seat):
+        ap.error("--front conflicts with --hidden and --seat=--unfocused")
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
                           cwd=str(ROOT)).stdout.strip()
     dirty = bool(subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],

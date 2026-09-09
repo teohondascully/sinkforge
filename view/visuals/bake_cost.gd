@@ -117,6 +117,26 @@ static func record_preparation(physics: int, render: int, planned: int, usec: in
 		slowest = _event.duplicate(true)
 
 
+## THE SOLID CELLS ONE CALLBACK PAINTED, charged to its reason (D0546). Counted and charged AFTER the PREP
+## clock has closed, and only while profiling, because the count is an O(cells) walk of the observation and
+## an instrument that runs inside the window it measures reports its own cost as the subject's.
+##
+## It exists to settle what D0545 left open. Preparation's us/cell is charged over PAINTED cells, and dig
+## partials cost 14.4 against margin's 8.9 -- a 5.5 us gap of which region setup explains about 17%. The
+## painters' real unit is the SOLID cell (`TerrainPainter.cell_fill` -> `RockTone.shade` probes neighbours
+## per solid cell and skips air), so if density is the rest of that gap, the per-solid-cell costs converge.
+## If they do not, the gap is something else and this says so instead of confirming a guess.
+## `dilated` is `cells.grow(RockTone.FORM_REACH)`'s area -- the span `RockNeighborhood` actually builds
+## and scans three times, once per callback (`terrain_painter.gd:69`). It is arithmetic on a rect, not a
+## walk, and it is the denominator the painters' real cost is proportional to.
+static func note_density(reason: String, solid: int, dilated: int) -> void:
+	var part: Dictionary = prep_by_reason.get(reason,
+		{"usec": 0, "cells": 0, "callbacks": 0, "solid": 0, "dilated": 0})
+	part["solid"] = int(part.get("solid", 0)) + solid
+	part["dilated"] = int(part.get("dilated", 0)) + dilated
+	prep_by_reason[reason] = part
+
+
 ## One region setup, timed from `began` to now, over the `observed` cells the envelope actually covered.
 ## Charged INSIDE a PREP callback, so it is a slice of `prep_usec` and never an addition to it.
 static func note_setup(began: int, observed: int) -> void:
@@ -182,5 +202,11 @@ static func reason_line() -> String:
 	var parts: PackedStringArray = PackedStringArray()
 	for r: String in names:
 		var d: Dictionary = prep_by_reason[r]
-		parts.append("%s=%.3fms/%dcb/%dcells" % [r, float(d["usec"]) / 1000.0, d["callbacks"], d["cells"]])
+		var solid: int = int(d.get("solid", 0))
+		var dil: int = int(d.get("dilated", 0))
+		parts.append("%s=%.3fms/%dcb/%dcells/%dsolid/%ddilated %.1fus_cell %sus_solid %sus_dilated" % [
+			r, float(d["usec"]) / 1000.0, d["callbacks"], d["cells"], solid, dil,
+			float(d["usec"]) / float(maxi(int(d["cells"]), 1)),
+			"%.1f" % (float(d["usec"]) / float(solid)) if solid > 0 else "n/a",
+			"%.2f" % (float(d["usec"]) / float(dil)) if dil > 0 else "n/a"])
 	return " | by_reason " + " ".join(parts)
