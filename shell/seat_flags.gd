@@ -9,6 +9,9 @@ extends RefCounted
 ##
 ##   --quit-after=N          run N ticks and exit 0, printing the boot line (the smoke's flag)
 ##   --perf / --perf-drive   the wall-clock frame meter, still or on a scripted walk (`FrameMeter`)
+##   --perf-drive=walk|dig|fall  the meter on one NAMED workload (`SeatDrive.WORKLOADS`): the walk, a
+##                           sustained excavation straight down, or a dig phase followed by a free fall
+##                           back down the shaft it just cut. Bare `--perf-drive` is `walk`.
 ##   --warp=col,row          stand the body on the nearest floor to a terrain cell before the first tick
 ##   --zoom=Z                the camera zoom, overriding the saved setting
 ##   --screenshot-tick=N     at tick N save the viewport to --screenshot-out, then quit unless
@@ -37,15 +40,25 @@ const NO_WARP: Vector2i = Vector2i(-1, -1)
 static func parse(args: PackedStringArray) -> Dictionary:
 	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
 		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false, "start": "",
-		"mute": PackedStringArray(), "lamp_occlusion": -1.0, "muted": false, "seed": 0}
+		"mute": PackedStringArray(), "lamp_occlusion": -1.0, "muted": false, "seed": 0,
+		"workload": SeatDrive.WALK, "unfocused": false}
 	for a: String in args:
 		if a.begins_with("--quit-after="):
 			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
 		elif a == "--perf":
 			f["perf"] = true
-		elif a == "--perf-drive":
+		elif a == "--perf-drive" or a.begins_with("--perf-drive="):
 			f["perf"] = true
 			f["drive"] = true
+			# An unknown name is REFUSED rather than silently walked: a typo that fell back to the walk
+			# would report a walk's numbers under a dig's heading, which is the one failure a perf
+			# fixture cannot survive. `workload` stays at its default and the seat prints the refusal.
+			if a.begins_with("--perf-drive="):
+				var name: String = a.substr("--perf-drive=".length())
+				if SeatDrive.WORKLOADS.has(name):
+					f["workload"] = name
+				else:
+					push_error("--perf-drive=%s: not one of %s" % [name, SeatDrive.WORKLOADS])
 		elif a.begins_with("--warp="):
 			var parts: PackedStringArray = a.substr("--warp=".length()).split(",")
 			if parts.size() == 2:
@@ -68,6 +81,8 @@ static func parse(args: PackedStringArray) -> Dictionary:
 			f["seed"] = maxi(int(a.substr("--seed=".length())), 0)   # 0 keeps the shipped seed (D0460, the holdout)
 		elif a.begins_with("--lamp-occlusion="):
 			f["lamp_occlusion"] = maxf(float(a.substr("--lamp-occlusion=".length())), 0.0)
+		elif a == "--unfocused":
+			f["unfocused"] = true
 		elif a == "--muted":
 			f["muted"] = true
 	return f

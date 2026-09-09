@@ -20797,3 +20797,90 @@ The test asserts routing; the headed inspection witnesses drawing. Neither certi
 6b4b5e6c; pass 2 remains partial, passes 3-5 are queued in PERF_PLAN. Full current-head battery is
 outstanding. Reversal replaces the tuft companion with the previous removal of the terrain painter;
 the shipped CPU path and all simulation/save behavior are unchanged.
+
+## D0535 · 2026-09-08 · The performance fixture: named workloads, a host-speed control inside every window, the bake's two phases split from the draw, and a scripted seat made deaf to the machine's real keyboard
+
+**Decided:** `docs/PERF_PLAN.md`'s first remaining-work item, built before any of the four optimisation
+passes queued behind it. New: `view/visuals/bake_cost.gd` (preparation and upload counted apart, per cell
+as well as per window), `tools/perf_fixture.py` (the runner and its refusals), `tools/test_perf_fixture.py`
+and `tests/test_perf_fixture.gd` (45 assertions). Changed: `shell/frame_meter.gd` carries a fixed-work
+calibration loop and reports the draw phase over every frame rather than the worst eight;
+`shell/seat_drive.gd` gains four named workloads (`still`, `walk`, `dig`, `fall`), the sweeping aim they
+need and the `--unfocused` window flag; `shell/seat_flags.gd` parses `--perf-drive=NAME` and refuses an
+unknown name rather than falling back to the walk; `shell/main.gd` routes a scripted seat's verbs and HUD
+keys through the script; `view/visuals/bake_chunk.gd` and `view/visuals/gram_map.gd` stamp the two phases.
+
+**A SCRIPTED SEAT IS NOW DEAF TO THE REAL KEYBOARD AND MOUSE, and that is the load-bearing change.**
+`PlayInput.verbs` read `Controls.pressed` and `Input.is_physical_key_pressed` -- the actual hardware --
+on every seat, driven or not, and `_hud_keys` did the same whenever `--act=` was empty. A headed seat
+window takes focus on this machine (sampled once a second against `System Events`: `godot` frontmost at
+t+1s and t+5s of a run, with the director working in another application), so a keystroke typed by the
+machine's owner reached the seat, `Command.select` changed the held item, and the held item changes what
+MINE snaps to (D0490). Three `dig` runs stopped at the surface with `bake prep=0.000ms/tick chunks=0` for
+four consecutive windows; two more runs of the identical script descended normally. The mechanism is
+certain from the source; that it caused those three specific runs is inference from the reproduction
+pattern, not proof. Every `--act=` capture the project has ever taken shared the exposure.
+
+**Why the fixture refuses rather than reports.** Six rules, each mutation-tested against a control that
+must still pass (`tools/test_perf_fixture.py`, and the live mutation below). The stamp itself is ONE function taking the
+phase, not a `note_prep`/`note_upload` pair: the duplication gate refused the pair, correctly -- they
+differed only in which three counters they touched, and a pair like that drifts the moment one of them
+learns something.
+
+1. Fewer than two warm windows -> VOID: one window has no spread and cannot carry a control.
+2. A `dig` or `fall` window that baked no chunks -> VOID. Caught four real failures while the fixture was
+   being built. The scope is itself the mutation: `still` and `walk` bake nothing by design here.
+3. A `walk` that ended in one place, or a `still` that moved -> VOID. The walk is the workload the bake
+   cannot check, so it is checked by the only thing it claims.
+4. The host-speed control drifting past 1.20x -> SUSPECT with the drift stated; past 1.50x -> VOID.
+5. Any warm window paced at ~120 Hz -> the FRAME statistics are withheld and the phase clocks are not.
+   A timer inside the frame does not care what the display did with the finished picture, and refusing
+   the phase numbers would throw away measurements of exactly what the four passes move.
+6. A window carrying no PERF line is dropped, not carried with holes in it.
+
+Live mutation: with `BakeCost.note`'s PREP stamp removed from `BakeChunk.paint`, two `dig` runs reported
+`VOID: 4 of 4 warm windows baked NO chunks` instead of a smaller number. The instrument registers its
+subject, and says so when it stops. `view/visuals/bake_chunk.gd` restored to md5
+85fc9ffa40ed24c966fae68e1c20b634 afterwards.
+
+**Why the calibration loop is 2400 iterations sampled one frame in four.** At 600 it cost 14-26 us, where
+one tick of the 1 us clock is 4-7%, and it read 1.21x of drift between two windows that were almost
+certainly identical: a control whose own noise reaches the threshold it guards is not a control. At 2400
+it costs ~60 us, quantisation is under 2%, and one frame in four keeps its share of a 400 fps frame near
+half a percent. Its result is kept in `cal_sink` so the suite can assert two meters do the same work.
+
+**Baseline, `b836bac3`, Apple M4 Pro / 24 GiB / Godot 4.6.2, 1280x720, `--disable-vsync --max-fps 0`,
+zoom 2, 1500 ticks a run, 3 repetitions, five 300-tick windows each, window 1 discarded as cold.**
+Medians over the warm windows, visible and presenting:
+
+| workload | phases | frames | painters ms/tick | draw p50 | bake prep ms/tick | us/cell | upload ms/tick |
+|---|---|---|---:|---:|---:|---:|---:|
+| still | VOID (control 1.53x) | paced 10/12 | -- | -- | -- | -- | -- |
+| walk | SUSPECT (1.31x) | paced 12/12 | 2.489 | 5.41 | 0.000 | -- | 0.000 |
+| dig | VALID | VALID | 2.430 | 4.40 | 0.554 | 12.30 | 0.002 |
+| fall | SUSPECT (1.23x) | paced 1/12 | 2.519 | 1.33 | 0.391 | 12.46 | 0.001 |
+
+`dig` warm frames: `fps_wall` 114.6, p50 6.10 ms, p99 40.17, max 62.71, 25 of 600 over 16.7 ms. `fall`
+warm frames when it ran unpaced: `fps_wall` 509.9, p50 1.38 ms. Quiet physics tick 0.64-0.70 ms
+everywhere. **THE FINDING THE SPLIT WAS BUILT FOR:** `dig` and `fall` carry the same painter CPU per tick
+(2.43 vs 2.52 ms) and the same physics, and run at 115 and 510 frames a second. The difference is the
+draw phase, 4.40 ms against 1.33, and nothing that was being ranked before could see it.
+
+**Three things measured and NOT acted on here.**
+* Hiding the seat's window (`--hidden`) drops the draw phase from 4.40 ms to 0.50 with identical bake
+  work -- macOS stops presenting an invisible window. The director's call, asked and answered: that is
+  presentation leaving the measurement, not work getting cheaper, and presentation is the telemetry. The
+  flag survives only as a deliberate isolation and withholds every frame number when used.
+* `--unfocused` sets `Window.FLAG_NO_FOCUS` from the first frame of `_ready` and is only a partial
+  answer: the engine creates the window before any script runs, and the creation-time project setting
+  `display/window/size/no_focus` (tested via `override.cfg`, confirmed read as `true`) did not stop macOS
+  activating the process either. `--display-driver headless` is not an alternative: it forces the dummy
+  rendering driver and the bake's SubViewport then renders nothing at all, `bake prep=0.000ms/tick`. What
+  works is the runner handing the front back to whatever application held it, by unix id and never by
+  process name -- the director may have their own game open.
+* The `walk` workload does not stream and cannot be made to. This world is 256 cells wide and the camera
+  shows 160 of them at play zoom, so a one-way walk crossed it inside one window (body cell 130 -> 254 by
+  tick 400) and then stood against the east edge. The axis that streams is the 1024-cell vertical one.
+  So `walk` is a moving-camera painter workload and is documented as one; `dig` and `fall` carry
+  streaming. The `dig` workload descends exactly 15 terrain cells per window, run after run.
+

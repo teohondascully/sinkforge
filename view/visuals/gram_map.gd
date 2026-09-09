@@ -60,9 +60,13 @@ func texture() -> ImageTexture:
 	if _img == null:
 		return null
 	if _tex == null:
+		var first: int = Time.get_ticks_usec()
 		_tex = ImageTexture.create_from_image(_img)
 		_dirty = false
+		BakeCost.note(BakeCost.UPLOAD, first, _size.x * _size.y)
 	elif _dirty:
+		var began: int = Time.get_ticks_usec()
 		_tex.update(_img)
 		_dirty = false
+		BakeCost.note(BakeCost.UPLOAD, began, _size.x * _size.y)
 	return _tex

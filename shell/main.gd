@@ -55,6 +55,7 @@ var effects: SeatEffects = SeatEffects.new()   ## the per-tick particles, the sh
 func _ready() -> void:
 	flags = SeatFlags.parse(OS.get_cmdline_user_args())
 	quit_after = flags["quit_after"]
+	SeatDrive.apply_window(flags, get_window())
 	if flags["perf"]:
 		meter = FrameMeter.new()
 		meter.measure_render(get_viewport().get_viewport_rid())
@@ -221,10 +222,12 @@ func _physics_process(delta: float) -> void:
 	var map_open: bool = stack.minimap != null and stack.minimap.large   # the large map is a modal too (D0410)
 	var frame_in: InputFrame = _read_hands(page_open or map_open)
 	door.apply(Command.move(frame_in))
+	var scripted: bool = drive or String(flags["act"]) != ""   # then the verbs and the HUD keys come from the script, never from a real keyboard (D0535)
 	if not (page_open or map_open):
-		for c: Command in hands.verbs(Controls.pressed, _digit_down, PlayInput.aim_logic_of(frame_in), Settings.auto_pickup):
+		for c: Command in hands.verbs(_driven if scripted else Controls.pressed,
+				SeatDrive.no_digit if scripted else _digit_down, PlayInput.aim_logic_of(frame_in), Settings.auto_pickup):
 			door.apply(c)
-	_hud_keys(page_open) if String(flags["act"]) == "" else _hud_keys_driven()
+	_hud_keys_driven() if scripted else _hud_keys(page_open)
 	last_input = frame_in
 	view.refresh()
 	_effects(delta)
@@ -269,11 +272,8 @@ func _read_hands(page_open: bool) -> InputFrame:
 	var grid: TileGrid = (door.services()["world"] as World).grid
 	var grid_ok: Callable = func(c: Vector2i) -> bool: return grid.in_bounds(c)
 	if drive or String(flags["act"]) != "":
-		if String(flags["act"]) in ["mine", "far"]:   # aim half a metre ahead and just under the feet: the ground he stands on; "far": six metres ahead, past the reach (D0488)
-			var body: Body = door.services()["body"]
-			var ahead: float = 8.0 if String(flags["act"]) == "mine" else 96.0
-			Controls.pose_pointer(Vector2(float(body.pos_x) / float(Fx.SCALE) + ahead * float(body.facing),
-				float(body.pos_y) / float(Fx.SCALE) + float(Body.HEIGHT_PX) / 2.0 + 4.0))
+		if SeatDrive.poses_pointer(flags):   # the scripted hand's own pointer (`SeatDrive.feet_aim`)
+			Controls.pose_pointer(SeatDrive.feet_aim(flags, door.services()["body"], tick))
 		return hands.read(_driven, Controls.pointer_world(self), cell_px, grid_ok)
 	return hands.read(Controls.pressed, Controls.pointer_world(self), cell_px, grid_ok)
 

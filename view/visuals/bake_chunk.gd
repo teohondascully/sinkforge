@@ -160,25 +160,38 @@ func frame_for(r: Rect2) -> Frame:
 ## What a chunk draws: every baked painter, against a frame observed for the rect it repaints -- its
 ## whole rect, or the partial the plan left for it (D0522). Bound per chunk by `TerrainBake._build_chunks`.
 func paint(ci: CanvasItem, i: int, rect: Rect2) -> void:
+	var began: int = Time.get_ticks_usec()
+	BakeCost.note(BakeCost.PREP, began, _paint(ci, i, rect))
+
+
+## The paint itself, returning the terrain cells it prepared so the clock above can charge per cell
+## rather than per chunk -- a partial chunk (D0522) is a fraction of a whole one and a per-chunk average
+## over a mixed window names neither. Split out only so `paint` can be the timed wrapper: a `began` read
+## at the top of a body with four early returns would need the stamp repeated at each of them, and the
+## one that got missed would be the cheap path, which is the shape that reads as a speedup.
+func _paint(ci: CanvasItem, i: int, rect: Rect2) -> int:
 	var r: Rect2 = rect_for(i, rect)
 	var f: Frame = frame_for(r)
 	if f == null:
-		return
+		return 0
+	var cells: Rect2i = window.cells_of(r)
+	var prepared: int = cells.size.x * cells.size.y
 	for p: Callable in painters:
 		p.call(f, ci)
 	if cpu_tone:
 		cpu_paints += 1
 	if gram != null:
-		gram.fill_rect(f.obs, window.cells_of(r), look)
+		gram.fill_rect(f.obs, cells, look)
 	if data == null:
-		return
+		return prepared
 	# BUILT HERE, WHERE THE OBSERVATION IS ALREADY IN HAND, so the shader path pays for exactly one
 	# observation a chunk, as the CPU path does. The child layer's own `_draw` only uploads and draws.
-	var img: Image = data.build(f.obs, window.cells_of(r), look)
+	var img: Image = data.build(f.obs, cells, look)
 	if img == null:
-		return
+		return prepared
 	_pending[i] = [img, data.span.position, r, f.obs.world_seed, f.obs.cell_px]
 	data_builds += 1
+	return prepared
 
 
 ## THE CHILD LAYER THAT DRAWS ONE CHUNK'S QUAD, added under the chunk's own layer so the parent's
@@ -214,12 +227,14 @@ func paint_tone(ci: CanvasItem, i: int, _rect: Rect2) -> void:
 	if e.is_empty() or ci.material == null:
 		return
 	var img: Image = e[0]
+	var began: int = Time.get_ticks_usec()
 	var tex: ImageTexture = _tone_textures.get(i)
 	if tex == null or tex.get_size() != Vector2(img.get_size()):
 		tex = ImageTexture.create_from_image(img)
 		_tone_textures[i] = tex
 	else:
 		tex.update(img)
+	BakeCost.note(BakeCost.UPLOAD, began, img.get_width() * img.get_height())
 	var mat: ShaderMaterial = ci.material
 	mat.set_shader_parameter("data_tex", tex)
 	mat.set_shader_parameter("span_origin", e[1])
