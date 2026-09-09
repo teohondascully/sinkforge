@@ -21101,3 +21101,18 @@ bake-budget/lane/fixture suites pass after an approved rerun outside the sandbox
 engine crashed in user-log rotation before tests). No runtime changes or new timing claim. This
 does not withdraw D0540's reported minimap comparison; it narrows its explanation of the remaining
 burst. The original saved-run-provenance idea is deferred to keep this pass on the immediate blocker.
+
+## D0542 · 2026-09-09 · Preserve paired preparation events through draw and reporting
+
+**Decided:** implement D0541's attribution prerequisite without changing paint selection. Keep
+the slowest preparation event's own cells, callbacks, physics/render IDs and planned ticks;
+carry initial/dig/visible/margin/full reasons per chunk to its draw callback. Detailed capture
+is profiling-only. Preserve the event through BURST parsing and summary JSON, including its
+source repetition/window. Independent legacy maxima remain independent.
+
+**Evidence:** opposite time/area maxima and reason tests failed before implementation; six
+focused engine suites and Python fixture tests pass afterward. One live 900-tick dig trace
+recorded 9,793 us, 1,024 rectangle cells, four callbacks, all margin, in one warm event. Window
+focus was lost; frame metrics are withheld. No FPS improvement, picture change, full-battery,
+or general cold-streaming conclusion is claimed. See the September 9 bake-burst handoff for
+the trace identity and remaining bounded optimisation queue.

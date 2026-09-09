@@ -76,6 +76,28 @@ whether a moving camera continuously outruns the prefetch margin.
 
 ## Implementation queue, in order
 
+### D0542 implementation checkpoint — September 9
+
+Items 1 and 2 below are implemented. `BakeCost.slowest` retains a deep-copied event with actual
+physics/render IDs, planned ticks, summed preparation microseconds, rectangle cells, callbacks,
+and per-reason totals. Per-chunk attribution survives to the draw callback. Detailed capture is
+enabled by profiling; legacy independent maxima remain separate. `BURST` lines survive parsing
+and JSON summarisation with their source repetition and window tick.
+
+One 900-tick dig discovery trace (`/tmp/sinkforge-paired-burst-dig.json`, local ephemeral artifact)
+found the slowest warm preparation event at physics 722/render 1499, planned tick 722:
+9,793 microseconds, 1,024 rectangle cells, four callbacks, all `margin`. This is one paired
+observation, not a join of maxima. Both warm windows lost foreground status, so frame metrics
+are WITHHELD. It establishes optional-margin attribution for this event, not an FPS gain or a
+universal cause. Scheduler behaviour and the rendered picture were not changed by this pass.
+
+Verification: six engine suites (perf_fixture, bake_budget, bake_lanes, terrain_bake, main_boot,
+world_view) passed; Python fixture tests passed including nested BURST parsing and opposite
+time/area maxima. New producer and reason tests failed before implementation. No full battery
+or cold-descent trace was run. Continue with item 3's cold-descent coverage, then a bounded
+optional-margin scheduling treatment and matched picture/cost checks; do not enable the GPU
+prototype or claim sustained 360 FPS from this instrumentation work.
+
 1. **One paired burst receipt, not another benchmark framework.** Retain the slowest preparation
    event with its physics-frame ID, render-frame ID, elapsed preparation time, rectangle-cell count
    and actual callback count. Preserve separate maximum-area statistics under explicit names.

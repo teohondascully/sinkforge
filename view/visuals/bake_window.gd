@@ -76,6 +76,8 @@ class Plan extends RefCounted:
 	var whole: Array[int] = []
 	var partial: Dictionary = {}
 	var lane_solid: int = 0
+	var reasons: Dictionary = {}
+	var planned_tick: int = Engine.get_physics_frames()
 
 ## HOW FAR A DIG'S INFLUENCE SPREADS, and how far past the camera the first bake reaches, in cells. Not a
 ## tuning knob: a PATCHED REGION MUST BE BYTE-IDENTICAL TO A FULL BAKE, and without this it is not. The
@@ -336,8 +338,13 @@ func plan_tick(window_rect: Rect2, dug: Array, obs: Interface.Observation = null
 	else:
 		for i: int in influenced:
 			whole[i] = true
+	for i: int in whole:
+		p.reasons[i] = "dig"
+	for i: int in p.partial:
+		p.reasons[i] = "dig"
 	for i: int in BakeLane.choose(self, window_rect, whole, obs, p):
 		whole[i] = true
+		p.reasons[i] = "initial" if _painted.is_empty() else ("visible" if chunk_rect(i).intersects(window_rect) else "margin")
 	p.whole.assign(whole.keys())
 	p.whole.sort()
 	return p

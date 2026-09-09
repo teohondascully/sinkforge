@@ -170,6 +170,9 @@ def parse_windows(out):
             continue
         if cur is None:
             continue
+        if line.startswith("BURST "):
+            cur["burst"] = json.loads(line[6:])
+            continue
         m = PERF_RE.match(line)
         if m:
             cur.update(zip(("frames", "fps_wall", "p50", "p99", "max", "over8", "over16",
@@ -319,6 +322,9 @@ def summarise(workload, runs, hidden=False):
     s["schema_version"] = 2
     s["warm_peak_prep_ms"] = max((w.get("peak_prep_ms", 0) for w in warm), default=0)
     s["warm_peak_cells"] = max((w.get("peak_cells", 0) for w in warm), default=0)
+    events = [dict(w["burst"], repetition=i + 1, window_tick=w["tick"])
+              for i, run in enumerate(runs) for w in run[1:] if w.get("burst")]
+    s["slowest_burst"] = max(events, key=lambda event: event["usec"], default={})
     return s
 
 
@@ -330,6 +336,7 @@ def render(s):
     if s["verdict"].startswith("VOID"):
         return
     print("  warm physics  quiet tick p50 %.2f ms" % s["warm_quiet_p50"])
+    print("  slowest burst " + json.dumps(s["slowest_burst"], sort_keys=True))
     print("  warm peak     preparation %.3f ms in one physics tick; peak painted rectangle cells %.0f"
           % (s["warm_peak_prep_ms"], s["warm_peak_cells"]))
     print("  warm painters drawn %.3f ms/tick" % s["warm_drawn_per_tick"])

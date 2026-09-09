@@ -217,8 +217,11 @@ func bake_full() -> void:
 	if not _live:
 		return
 	_chunk.partial.clear()
+	_chunk.attribution.clear()
 	_shown.clear()
 	for i: int in _chunks.size():
+		if BakeCost.capture_bursts:
+			_chunk.attribution[i] = [Engine.get_physics_frames(), "full"]
 		_chunks[i].visible = true
 		_chunks[i].queue_redraw()
 		_chunk.queue_tone(i)
@@ -285,6 +288,10 @@ func _bake_partial(p: BakeWindow.Plan) -> void:
 		_chunks[i].visible = false
 	_shown.clear()
 	_chunk.partial = p.partial
+	_chunk.attribution.clear()
+	if BakeCost.capture_bursts:
+		for i: int in p.reasons:
+			_chunk.attribution[i] = [p.planned_tick, p.reasons[i]]
 	for i: int in p.whole:
 		_show(i, _window.chunk_rect(i))
 	for i: int in p.partial:

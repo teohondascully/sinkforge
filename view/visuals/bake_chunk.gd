@@ -46,6 +46,8 @@ var gram: GramMap = null
 ## Chunk index -> the rect it repaints THIS bake instead of its whole rect (D0522). `paint` consumes an
 ## entry as it draws; no entry means the whole rect. Replaced by every bake, so none outlives its tick.
 var partial: Dictionary = {}
+## Per-chunk planning metadata, consumed by its actual draw callback (profiling only).
+var attribution: Dictionary = {}
 
 ## THE SHADER TONE, OFF (D0528, T040's evidence). False is the shipped picture: `TerrainPainter.paint`
 ## fills every solid cell with `RockTone`/`SurfaceTone` on the CPU. True pulls that
@@ -161,7 +163,9 @@ func frame_for(r: Rect2) -> Frame:
 ## whole rect, or the partial the plan left for it (D0522). Bound per chunk by `TerrainBake._build_chunks`.
 func paint(ci: CanvasItem, i: int, rect: Rect2) -> void:
 	var began: int = Time.get_ticks_usec()
-	BakeCost.note(BakeCost.PREP, began, _paint(ci, i, rect))
+	var source: Array = attribution.get(i, [-1, "unknown"])
+	attribution.erase(i)
+	BakeCost.note(BakeCost.PREP, began, _paint(ci, i, rect), source[0], source[1])
 
 
 ## The paint itself, returning the terrain cells it prepared so the clock above can charge per cell

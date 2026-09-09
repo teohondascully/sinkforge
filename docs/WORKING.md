@@ -4,6 +4,12 @@
 
 ## Performance programme — the five passes, September 8
 
+**D0542 implemented:** paired slowest-preparation receipts and per-chunk scheduling reasons now
+reach the saved performance report. One 900-tick dig trace attributes its 9.793 ms warm peak to
+four optional-margin callbacks (1,024 rectangle cells). Focus was lost: frame metrics withheld.
+Six focused engine suites plus Python fixture tests pass. No scheduling/art change or full-battery
+claim. Next: cold-descent coverage and a bounded optional-margin treatment; see the handoff below.
+
 **September 9 review, D0541:** D0540's streaming attribution is not established. Peak preparation
 time and peak cells are independent extrema, not one event, and rectangle area does not identify
 a lane. Before scheduler changes, retain a paired slowest-event receipt and scheduling reason through

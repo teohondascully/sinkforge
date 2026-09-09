@@ -198,6 +198,8 @@ func _test_twelve_solid_chunks_entering_at_once_paint_two_a_tick_and_all_within_
 	_check_nearest(w, RING_VIEW, twelve, first.whole)
 	_check(first.whole.size() == 2 and first.lane_solid == BUDGET, "this tick paints 2 of the 12 (got %d), "
 		% first.whole.size() + "spending exactly the %d-cell budget (%d)" % [BUDGET, first.lane_solid])
+	_check(first.reasons.values().all(func(reason: String) -> bool: return reason == "margin"),
+		"offscreen selections retain margin provenance")
 	w.note_plan(first)
 	var counts: Array[int] = [first.whole.size()]
 	counts.append_array(_drain(w, obs, "12 solid"))
@@ -267,6 +269,8 @@ func _test_a_chunk_the_view_touches_paints_this_tick_even_when_the_budget_is_spe
 			% [promised, on_screen.size(), p.lane_solid] + "of %d" % BUDGET)
 	_check(p.whole.size() == on_screen.size(), "and with the budget over-spent no margin chunk joins them "
 		+ "(%d planned)" % p.whole.size())
+	_check(p.reasons.values().all(func(reason: String) -> bool: return reason == "visible"),
+		"mandatory visible work is distinguished from optional margin work")
 
 
 ## DIGS ARE NEVER BUDGETED, AND DO NOT SPEND THE BUDGET: a dig into one of the ring's solid chunks paints it
@@ -287,5 +291,6 @@ func _test_a_dig_into_an_entering_chunk_paints_it_whole_and_spends_nothing() -> 
 			dug_whole += 1
 	_check(dug_whole == crossed.size() and p.whole.has(dug_chunk), "the dig's %d unpainted chunks all paint "
 		% crossed.size() + "whole (%d), the dug chunk %d among them" % [dug_whole, dug_chunk])
+	_check(p.reasons[dug_chunk] == "dig", "dig provenance wins over a simultaneous window request")
 	_check(p.lane_solid == BUDGET and p.whole.size() == crossed.size() + 2, "and the lane still spent its "
 		+ "%d on 2 more (%d spent, %d whole in all)" % [BUDGET, p.lane_solid, p.whole.size()])

@@ -1,5 +1,14 @@
 # Brief
 
+## Paired evidence now identifies optional work (D0542, September 9)
+
+The slowest preparation receipt now carries its own cells, callback count, execution/planning
+IDs and scheduling reasons into JSON. One dig trace measured 9.793 ms in four optional-margin
+callbacks. Lost window focus invalidates FPS conclusions, not this preparation attribution.
+Six focused engine suites and Python fixture tests pass. No scheduler or art change yet.
+Next: cold-descent coverage, then spread optional work without delaying cuts or visible terrain.
+[Implementation and Claude handoff](audits/2026-09-09-bake-burst-handoff.md).
+
 ## What was learned — burst attribution before scheduling (D0541, September 9)
 
 The peak-cell count and peak preparation time can come from different ticks. D0540's "9 ms over

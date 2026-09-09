@@ -18,6 +18,7 @@ const BODY_PX: int = Body.WIDTH_PX
 
 func _initialize() -> void:
 	_test_bake_cost_counts_both_phases_and_resets()
+	_test_slowest_receipt_keeps_its_own_cells_and_reasons()
 	_test_the_control_loop_is_fixed_work_and_is_reported()
 	_test_each_workload_presses_what_it_is_named_for()
 	_test_the_dig_sweep_is_wider_than_the_miner()
@@ -27,6 +28,22 @@ func _initialize() -> void:
 
 ## Preparation and upload are counted apart, per cell as well as per window, and `reset` closes a window
 ## without leaving the last one's work in the next one's numbers.
+func _test_slowest_receipt_keeps_its_own_cells_and_reasons() -> void:
+	BakeCost.reset()
+	BakeCost.record_preparation(10, 20, 9, 6000, 100, "dig")
+	BakeCost.record_preparation(10, 20, 9, 3000, 100, "margin")
+	BakeCost.record_preparation(11, 21, 11, 1000, 1024, "visible")
+	var event: Dictionary = BakeCost.slowest
+	_check(event["usec"] == 9000 and event["cells"] == 200 and event["callbacks"] == 2,
+		"slowest receipt pairs 9ms with its own 200 cells, not the later 1024-cell tick")
+	_check(event["physics"] == 10 and event["render"] == 20 and event["planned"] == [9],
+		"delayed drawing preserves both planning and execution identity")
+	_check(event["reasons"]["dig"]["usec"] == 6000 and event["reasons"]["margin"]["cells"] == 100,
+		"same-event reason totals remain separate and add to the event")
+	BakeCost.reset()
+	_check(BakeCost.slowest.is_empty(), "reset does not carry a previous window's slow receipt")
+
+
 func _test_bake_cost_counts_both_phases_and_resets() -> void:
 	BakeCost.reset()
 	_check(BakeCost.prep_usec == 0 and BakeCost.upload_usec == 0, "a reset BakeCost holds no work")

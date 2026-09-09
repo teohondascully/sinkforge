@@ -40,13 +40,18 @@ static var prep_tick_max_usec: int = 0
 static var _tick: int = -1
 static var _tick_cells: int = 0
 static var _tick_usec: int = 0
+static var capture_bursts: bool = false
+static var slowest: Dictionary = {}
+static var _event: Dictionary = {}
 
 
 ## One event of `phase`, timed from `began` to now, over `n` terrain cells (preparation) or texels
 ## (upload). The clock is read here rather than at the call site so a stamp cannot be half-applied.
-static func note(phase: int, began: int, n: int) -> void:
+static func note(phase: int, began: int, n: int, planned: int = -1, reason: String = "unknown") -> void:
 	var spent: int = Time.get_ticks_usec() - began
 	if phase == PREP:
+		if capture_bursts:
+			record_preparation(Engine.get_physics_frames(), Engine.get_frames_drawn(), planned, spent, n, reason)
 		var tick: int = Engine.get_physics_frames()
 		if tick != _tick:
 			_tick = tick
@@ -65,7 +70,29 @@ static func note(phase: int, began: int, n: int) -> void:
 		upload_cells += n
 
 
+## One measured callback. Group by execution identity; retain the complete slowest event, not
+## unrelated extrema. Called only in profiling mode; explicit measurements also permit deterministic tests.
+static func record_preparation(physics: int, render: int, planned: int, usec: int, cells: int, reason: String) -> void:
+	if _event.is_empty() or _event["physics"] != physics or _event["render"] != render:
+		_event = {"physics": physics, "render": render, "planned": [], "usec": 0,
+			"cells": 0, "callbacks": 0, "reasons": {}}
+	if not _event["planned"].has(planned):
+		_event["planned"].append(planned)
+	_event["usec"] += usec
+	_event["cells"] += cells
+	_event["callbacks"] += 1
+	var part: Dictionary = _event["reasons"].get(reason, {"usec": 0, "cells": 0, "callbacks": 0})
+	part["usec"] += usec
+	part["cells"] += cells
+	part["callbacks"] += 1
+	_event["reasons"][reason] = part
+	if _event["usec"] > int(slowest.get("usec", -1)):
+		slowest = _event.duplicate(true)
+
+
 static func reset() -> void:
+	slowest = {}
+	_event = {}
 	_tick = -1
 	_tick_cells = 0
 	_tick_usec = 0

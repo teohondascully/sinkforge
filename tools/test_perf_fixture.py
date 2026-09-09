@@ -125,12 +125,15 @@ def test_parser() -> None:
         "(observe=0.18ms) queued=10824/12000 drawn=2.430ms/tick plane_rebuilds=105 hub_rebuilds=418 /600 ticks",
         "bake prep=0.554ms/tick chunks=120 cells=13892 12.30us/cell | upload=0.002ms/tick n=30 "
         "cells=8478720 0.000us/cell",
+        'BURST {"usec":9000,"cells":200,"callbacks":2,"reasons":{"dig":{"usec":9000}}}',
     ]
     w = pf.parse_windows("\n".join(lines))
     if len(w) != 1:
         FAILURES.append("parser: wanted 1 window, got %d" % len(w))
         return
     got = w[0]
+    if got.get("burst", {}).get("reasons", {}).get("dig", {}).get("usec") != 9000:
+        FAILURES.append("parser: paired burst lost its nested attribution")
     for key, want in (("workload", "dig"), ("body", (130, 147)), ("fps_wall", 114.6), ("p50", 6.10),
                       ("draw_p50", 4.40), ("focus", 0.98), ("quiet_p50", 0.67), ("cal_p50", 58.0), ("over16", 25.0),
                       ("drawn_per_tick", 2.430), ("prep_ms", 0.554), ("prep_chunks", 120.0),
@@ -187,10 +190,23 @@ def test_process_completion() -> None:
             FAILURES.append("process completion misclassified code=%d reports=%d" % (code, len(rows)))
 
 
+def test_paired_burst_summary() -> None:
+    a = dict(win(), tick=600, burst={"usec": 9000, "cells": 200, "callbacks": 2,
+                                   "physics": 15, "render": 20, "planned": [14], "reasons": {}})
+    b = dict(win(), tick=900, burst={"usec": 1000, "cells": 1024, "callbacks": 4,
+                                   "physics": 25, "render": 30, "planned": [25], "reasons": {}})
+    result = pf.summarise("dig", [[win(), a, b]])
+    event = result.get("slowest_burst", {})
+    if event.get("cells") != 200 or event.get("usec") != 9000 or event.get("window_tick") != 600:
+        FAILURES.append("slowest burst lost its paired count, duration or source window")
+    if pf.summarise("dig", [[win(), win(), win()]]).get("slowest_burst") != {}:
+        FAILURES.append("legacy missing burst data is not explicit")
+
+
 def main() -> int:
     for fn in (test_work_rule, test_movement_rule, test_control_rule, test_one_window_rule,
                test_window_regime_rule, test_pacing_rule, test_parser, test_reporting_contracts,
-               test_process_completion):
+               test_process_completion, test_paired_burst_summary):
         fn()
     if FAILURES:
         print("test_perf_fixture: %d FAILED" % len(FAILURES))

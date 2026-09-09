@@ -39,6 +39,7 @@ static var _fall_armed: bool = false
 ## does by PID after launch. `--display-driver headless` is not an alternative: it forces the dummy
 ## rendering driver, and then the terrain bake's SubViewport renders nothing at all.
 static func apply_window(flags: Dictionary, win: Window) -> void:
+	BakeCost.capture_bursts = bool(flags.get("perf", false))
 	if bool(flags.get("unfocused", false)) and win != null:
 		win.set_flag(Window.FLAG_NO_FOCUS, true)
 
@@ -185,6 +186,7 @@ static func meter_tick(main: Main, began: int) -> void:
 		print(main.meter.report())
 		print(main.view.draw_cost_report())
 		print(BakeCost.report(300))
+		print("BURST " + JSON.stringify(BakeCost.slowest))
 		for line: String in main.meter.slow:
 			print(line)
 		main.meter.reset()
