@@ -23,6 +23,9 @@ func _initialize() -> void:
 	_test_each_workload_presses_what_it_is_named_for()
 	_test_the_dig_sweep_is_wider_than_the_miner()
 	_test_the_seat_parses_its_workload_and_refuses_a_typo()
+	_test_region_setup_is_a_slice_of_preparation_not_a_fourth_phase()
+	_test_the_setup_line_names_the_multiplier_a_per_cell_rate_carries()
+	_test_a_real_paint_charges_setup_and_cells_over_different_areas()
 	_finish("perf_fixture")
 
 
@@ -158,3 +161,79 @@ func _test_the_seat_parses_its_workload_and_refuses_a_typo() -> void:
 		"an unknown workload is refused, not silently walked")
 	for i: int in 10:
 		_check(not SeatDrive.no_digit(i), "a scripted seat holds no digit key: %d" % i)
+
+
+## REGION SETUP IS A SLICE OF PREPARATION, NOT A FOURTH PHASE (D0545). The PREP clock in `BakeChunk.paint`
+## wraps the whole callback, observation included, so `prep_setup_usec` is CONTAINED in `prep_usec` and the
+## two must never be summed. This is the containment `docs/QUALITY.md`'s two-instruments rule asks for: the
+## counters do not add to a cover, one is inside the other, and a suite says which.
+func _test_region_setup_is_a_slice_of_preparation_not_a_fourth_phase() -> void:
+	BakeCost.reset()
+	_check(BakeCost.prep_setup_usec == 0 and BakeCost.prep_setups == 0,
+		"a reset BakeCost holds no region setup")
+	var began: int = Time.get_ticks_usec()
+	BakeCost.note_setup(began, 812)
+	BakeCost.note(BakeCost.PREP, began, 110, 7, "dig")
+	_check(BakeCost.prep_setups == 1 and BakeCost.prep_setup_cells == 812,
+		"one setup counted, over the cells the envelope observed: 812")
+	_check(BakeCost.prep_cells == 110,
+		"preparation still counts the PAINTED cells: 110, not the 812 observed")
+	_check(BakeCost.prep_setup_usec <= BakeCost.prep_usec,
+		"setup is contained in preparation: %d <= %d" % [BakeCost.prep_setup_usec, BakeCost.prep_usec])
+	BakeCost.reset()
+	_check(BakeCost.prep_setup_cells == 0, "reset closes the window's setup counters too")
+
+
+## The line exists to print the ratio the per-cell rate is silently carrying, so the ratio is what is
+## pinned. 812 observed against 110 painted is a dig partial grown by the 9-cell margin on four sides;
+## the number a reader must see is 7.38x, not either area alone.
+func _test_the_setup_line_names_the_multiplier_a_per_cell_rate_carries() -> void:
+	BakeCost.reset()
+	_check(BakeCost.setup_line() == "", "no setups means no line, never a 0.00x")
+	var began: int = Time.get_ticks_usec()
+	BakeCost.note_setup(began, 812)
+	BakeCost.note(BakeCost.PREP, began, 110, 7, "dig")
+	var line: String = BakeCost.setup_line()
+	_check(line.contains("obs_cells=812") and line.contains("painted_cells=110"),
+		"both denominators are printed, because the point is that they differ: %s" % line)
+	_check(line.contains("obs/painted=7.38x"),
+		"the multiplier is stated, not left to the reader: %s" % line)
+	BakeCost.reset()
+
+
+## THE INSTRUMENT IS WIRED, not merely present (D0545). The two pins above call `note_setup` themselves,
+## so they stay green if `BakeChunk._paint` never calls it -- the house failure exactly, arriving as a
+## quiet zero rather than an error. This drives a REAL `BakeChunk.paint` over a posed observation whose
+## window is deliberately WIDER than the chunk being painted, and asserts the two counters took their
+## areas from different places. If either read the other's, the ratio the line exists to print is 1.00x.
+func _test_a_real_paint_charges_setup_and_cells_over_different_areas() -> void:
+	var cell_px: int = 4
+	var per_chunk: int = BakeWindow.CHUNK_PX / cell_px
+	var w := BakeWindow.new()
+	w.plan(Vector2i(3000, 1000), cell_px)
+	w.set_margin(WorldView.WINDOW_MARGIN_CELLS)
+	var i: int = 4 * w.grid().x + 60
+	var wide := Rect2i(58 * per_chunk, 2 * per_chunk, 4 * per_chunk, 4 * per_chunk)
+	var obs := Interface.Observation.new()
+	obs.window = wide
+	obs.legend = PackedStringArray(["", "clay"])
+	obs.materials = PackedByteArray()
+	obs.materials.resize(wide.size.x * wide.size.y)
+	var chunk := BakeChunk.new()
+	var empty: Array[Callable] = []
+	chunk.setup(w, func(_r: Rect2) -> Interface.Observation: return obs,
+		MaterialLook.new(), RockTone.new(0), empty, null)
+	var ci := Node2D.new()
+	BakeCost.reset()
+	chunk.paint(ci, i, w.chunk_rect(i))
+	_check(BakeCost.prep_setups == 1,
+		"the production path called note_setup once, not %d" % BakeCost.prep_setups)
+	_check(BakeCost.prep_setup_cells == wide.get_area(),
+		"setup charged the OBSERVED window %d, not %d" % [wide.get_area(), BakeCost.prep_setup_cells])
+	_check(BakeCost.prep_cells == per_chunk * per_chunk,
+		"preparation charged the PAINTED chunk %d, not %d" % [per_chunk * per_chunk, BakeCost.prep_cells])
+	_check(BakeCost.prep_setup_cells > BakeCost.prep_cells,
+		"observed exceeds painted, which is the finding: %d > %d"
+			% [BakeCost.prep_setup_cells, BakeCost.prep_cells])
+	ci.free()
+	BakeCost.reset()

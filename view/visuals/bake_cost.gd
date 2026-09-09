@@ -49,6 +49,22 @@ static var _event: Dictionary = {}
 ## work in five seconds, or one of forty. D0541 is explicit that two independently-aggregated extrema
 ## must not be read as one event, and a per-reason total is the statistic that has no such join in it.
 static var prep_by_reason: Dictionary = {}
+## REGION SETUP, THE PART OF PREPARATION SPENT OBSERVING RATHER THAN PAINTING (D0545 instrument).
+##
+## A SUBSET OF `prep_usec`, NOT A FOURTH PHASE -- the PREP clock wraps the whole callback, observation
+## included, so these two must never be added together. Named `prep_setup_*` so the containment is in the
+## name: whatever a reader does with it, `prep_setup_usec <= prep_usec` is an invariant a suite pins.
+##
+## It exists because preparation's us/cell cannot answer item 4's third case. `BakeChunk._paint` charges
+## the clock over the PAINTED rect, while `WorldView.observe_rect` observes that rect grown by
+## `WINDOW_MARGIN_CELLS` (9) on all four sides and builds both planes. The observed area is therefore
+## 1.33x the painted one for the per-frame view, 4.5x for a whole 16-cell chunk and 7-30x for the small
+## partial rects a dig plans -- so a per-cell rate charged over painted cells rises as the rect shrinks
+## whether or not a dug cell is dearer to shade. `prep_setup_cells` records the observed area so that
+## ratio is MEASURED here rather than reasoned about from the source.
+static var prep_setup_usec: int = 0
+static var prep_setup_cells: int = 0
+static var prep_setups: int = 0
 
 
 ## One event of `phase`, timed from `began` to now, over `n` terrain cells (preparation) or texels
@@ -101,10 +117,21 @@ static func record_preparation(physics: int, render: int, planned: int, usec: in
 		slowest = _event.duplicate(true)
 
 
+## One region setup, timed from `began` to now, over the `observed` cells the envelope actually covered.
+## Charged INSIDE a PREP callback, so it is a slice of `prep_usec` and never an addition to it.
+static func note_setup(began: int, observed: int) -> void:
+	prep_setup_usec += Time.get_ticks_usec() - began
+	prep_setup_cells += observed
+	prep_setups += 1
+
+
 static func reset() -> void:
 	slowest = {}
 	_event = {}
 	prep_by_reason = {}
+	prep_setup_usec = 0
+	prep_setup_cells = 0
+	prep_setups = 0
 	_tick = -1
 	_tick_cells = 0
 	_tick_usec = 0
@@ -128,7 +155,20 @@ static func report(ticks: int) -> String:
 		float(prep_usec) / float(maxi(prep_cells, 1)),
 		float(upload_usec) / 1000.0 / t, uploads, upload_cells,
 		float(upload_usec) / float(maxi(upload_cells, 1)), prep_tick_max_cells,
-		float(prep_tick_max_usec) / 1000.0] + reason_line()
+		float(prep_tick_max_usec) / 1000.0] + setup_line() + reason_line()
+
+
+## The share of preparation that was region setup, and the area that setup actually observed against the
+## area the callbacks painted. Both denominators are printed because the whole point of the line is that
+## they differ: `obs/painted` is the multiplier a per-cell rate is silently carrying.
+static func setup_line() -> String:
+	if prep_setups == 0:
+		return ""
+	return " | setup=%.3fms/%dcb %.1f%%ofprep obs_cells=%d painted_cells=%d obs/painted=%.2fx" % [
+		float(prep_setup_usec) / 1000.0, prep_setups,
+		100.0 * float(prep_setup_usec) / float(maxi(prep_usec, 1)),
+		prep_setup_cells, prep_cells,
+		float(prep_setup_cells) / float(maxi(prep_cells, 1))]
 
 
 ## The window's preparation split by why each chunk was selected, slowest reason first. Empty when

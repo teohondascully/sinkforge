@@ -21247,3 +21247,56 @@ have sent a reader to the forge's recipe; the receipts sent them to the hotbar.
 those); any measurement of D0530 (exactly one seat reached its card, and did not quit on it); that the
 hotbar is the sole cause of the delivery failures -- the RIG's reach feedback is a separate live suspect,
 with two seats standing beside a ringed RIG at TOO FAR.
+
+## D0545 · 2026-09-09 · Region setup is measured, and it is NOT the dirty-repaint bottleneck
+
+**Context:** D0543 redirected the bake work at item 4's third case in
+[the handoff](audits/2026-09-09-bake-burst-handoff.md) -- "dirty repaints dominate: inspect repeated
+region setup and affected area before altering scheduling" -- on the strength of dig repaints costing
+20.5 us a cell against a 12-14 us mean. Source analysis found a mechanism that PREDICTS exactly that
+without any dug cell being dearer to shade: `WorldView.observe_rect` grows every rect by
+`WINDOW_MARGIN_CELLS` (9) on all four sides and builds both planes, while `BakeChunk._paint` charges
+the clock over the PAINTED rect. The observed/painted ratio is then 1.33x for the per-frame view, 4.5x
+for a whole chunk and 7-30x for a dig's small partials, so a per-cell rate rises as the rect shrinks.
+
+**Decided:** build the instrument before the treatment. `BakeCost.prep_setup_usec/cells/setups` times
+`frame_for` apart from the painters, named `prep_setup_*` because it is a SLICE of `prep_usec` and not a
+fourth phase -- the PREP clock wraps the whole callback, so the two must never be summed.
+
+**Measured, and it refutes the hypothesis.** 900-tick dig, zoom 2, `--perf-drive=dig`, two warm windows:
+region setup is **14.0% and 12.7% of preparation**, at an observed/painted ratio of **7.33x and 7.14x**
+(cold window 9.1% at 5.37x, its 96 whole initial chunks being the better-shaped ones). The area
+inflation is real and is what the arithmetic predicted; **the time it costs is not the bottleneck.**
+
+**What the per-cell gap actually is.** In the same window, dig 14.4 us/cell over 94 cells a callback,
+margin 8.9 us/cell over 256 cells a callback -- a 5.5 us gap. Apportioning setup by observed area gives
+dig 2.05 and margin 1.13 us/painted-cell, so **region setup explains about 17% of that gap** and the
+remaining 83% is elsewhere. The live suspect is now solid-cell density, not region setup:
+`TerrainPainter.cell_fill` -> `RockTone.shade` costs per SOLID cell and skips air, and a dig site is
+solid rock where a margin chunk in this workload is substantially air. That is the next thing to
+measure, and it is NOT what was measured here.
+
+**Mutation-tested.** Deleting the `note_setup` call from `_paint` fails 3 assertions; charging setup the
+painted area instead of the observed one fails 2. Both mutants were run and killed. The unit pins alone
+would have stayed green under the first mutant -- they call `note_setup` themselves -- so the suite also
+drives a real `BakeChunk.paint` over a posed observation whose window is wider than the chunk painted.
+
+**Limits, stated rather than papered over.** The two headline figures come from a seat run directly with
+the fixture's own argv and therefore carry NO host-speed control; both are RATIOS within a single run,
+so host drift cancels in the numerator and denominator, and obs/painted is pure counting with no clock
+in it at all. A `perf_fixture.py` run of the same workload agrees on the quantities they share (prep
+13.05 us/cell against 13.10; dig 85% / margin 15% against 84/16; phases VALID, control 1.35, frames
+WITHHELD at focus 0.00). The apportionment of setup between reasons assumes setup time is proportional
+to observed area; `note_setup` does not carry a reason, so that split is reasoned, not measured. No
+scheduling changed, no picture changed, and no frame-time or FPS claim is made.
+
+**D0543's 20.5 us/cell was not reproduced here, and that is flagged rather than superseded.** This run
+put dig at 14.4 us/cell and margin at 8.9 against an overall 13.1. D0543's figure came from a different
+run on a differently-loaded host and is not withdrawn by one run that disagrees -- but the RATIO between
+dig and margin is what item 4's third case rests on, and it is 1.6x here where D0543 implied more. The
+per-cell figure is the unstable one and should be read as a ratio within a run, never carried between
+runs; `docs/PERF_PLAN.md` rule 6 gates on per-cell us and this is the caveat that rule needs.
+
+**Not done:** `tools/perf_fixture.py` does not parse the new `setup=` field, so it does not reach the
+saved JSON. That file is Astra's and the change is theirs to make or approve; the numbers above were
+read off the seat's own report line.

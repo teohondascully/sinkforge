@@ -86,9 +86,15 @@ settled tick. No timing improvement is claimed.
 **Streaming coverage is verified and the prefetch is not starved:** 96 chunks streamed as margin at
 default zoom and 128 at wide zoom, with **zero arriving on screen unpainted**, before and after.
 
-**What it redirects:** digging is 85% of preparation and margin 15%. The next target is dirty-repaint
-region setup -- explicitly not a scheduling change -- and dig repaints cost 20.5 us a cell against a
-12-14 us mean. Left open: at wide zoom a terminal-velocity fall's slowest event is three margin callbacks
+**What it redirects, and what that redirect turned out to be worth (D0545).** Digging is 85% of
+preparation and margin 15%, and the handoff's third case -- dirty-repaint region setup -- is now
+**measured and closed as the leading suspect**. `BakeCost.prep_setup_*` times the observation apart from
+the painters: region setup is **14.0% and 12.7% of preparation** across two warm dig windows, at an
+observed-over-painted area ratio of **7.33x and 7.14x**. The inflation is real -- every bake rect is
+grown by `WINDOW_MARGIN_CELLS` (9) on four sides while the clock is charged over the painted rect -- but
+it explains only about **17%** of the 5.5 us/cell gap between dig (14.4) and margin (8.9). The remaining
+83% points at solid-cell density, which is the next measurement and is not claimed yet. Mutation-tested
+with two mutants, both killed. No scheduling, picture, or FPS claim. Left open: at wide zoom a terminal-velocity fall's slowest event is three margin callbacks
 at 28.089 ms, which is what avoiding a hole costs there; its before arm came back VOID and that A/B is
 inconclusive and was stopped rather than stacked.
 

@@ -159,6 +159,44 @@ raising itself to three to keep ahead, which is what not having a hole costs the
 (control 1.25x); its matching before arm came back VOID (control 2.02x) and I stopped rather than stack,
 per item 5. Frame metrics were withheld in every run tonight (focus 0.00). GPU cost stays unmeasured.
 
+### D0545 checkpoint — September 9 (Claude): item 4's third case, measured and closed
+
+Your item 4 said "dirty repaints dominate: **inspect repeated region setup and affected area** before
+altering scheduling." Both halves are now measured, and the answer is a null on the leading suspect.
+
+**The mechanism is real.** `WorldView.observe_rect:232` grows every bake rect by `WINDOW_MARGIN_CELLS`
+(9) on all four sides and takes both planes (the per-frame path declines walls; the bake does not), while
+`BakeChunk._paint` charges its clock over the PAINTED rect. Observed/painted is 1.33x for the per-frame
+view, 4.5x for a whole chunk, 7-30x for a dig's partials. `interface/envelope.gd:78` already says the
+neighbouring half: "It HURTS a caller that asks for many small rects."
+
+**The measurement says it is not the bottleneck.** New `BakeCost.prep_setup_*` times `frame_for` apart
+from the painters (a SLICE of `prep_usec`, never a fourth phase). 900-tick dig, zoom 2, two warm windows:
+setup is **14.0% / 12.7% of preparation** at **7.33x / 7.14x** observed-over-painted. The area inflation
+is exactly as predicted; the time is not where the cost lives.
+
+**Where the gap actually is.** Same window: dig **14.4 us/cell** over 94 cells a callback, margin **8.9
+us/cell** over 256 -- a 5.5 us gap. Apportioning setup by observed area, region setup explains **~17%**
+of it. The remaining 83% points at **solid-cell density**, since `RockTone.shade` costs per solid cell
+and skips air, and a dig site is rock where this workload's margin chunks are substantially air. That is
+the next measurement and is explicitly NOT claimed here.
+
+**A hazard I checked before touching anything, and it is a null.** `Interface.observe` drains
+`_events`, `_drop_went` and `_build_went` -- the flow events, the FED receipt's landing and the BUILD
+refusal -- and the bake calls it several times a tick and discards all of it. It cannot lose a player's
+receipt: in `shell/main.gd._physics_process` every `door.apply` runs before `view.refresh()`, which
+observes at once, and `_effects` afterwards only reads the frame; the bake's own observes happen later
+in the chunk layers' `_draw`, on an already-empty channel. This also means sharing one observation
+across a tick's chunks cannot change event delivery, if that treatment is ever wanted.
+
+**Mutation-tested:** deleting the `note_setup` call fails 3 assertions, charging it the painted area
+fails 2. The unit pins alone would survive the first, so the suite also drives a real `BakeChunk.paint`
+over an observation window wider than the chunk it paints.
+
+**Yours to rule on:** `tools/perf_fixture.py` does not parse the new `setup=` field, so it never reaches
+the saved JSON — the numbers above were read off the seat's own report line. That file is yours; I did
+not edit it. Adding one regex would put region setup into every future run's record.
+
 ## Tests that earn their cost
 
 - Two ticks with opposite time/area maxima: the slowest receipt retains its own cells and tick.

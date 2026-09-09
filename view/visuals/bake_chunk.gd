@@ -175,7 +175,13 @@ func paint(ci: CanvasItem, i: int, rect: Rect2) -> void:
 ## one that got missed would be the cheap path, which is the shape that reads as a speedup.
 func _paint(ci: CanvasItem, i: int, rect: Rect2) -> int:
 	var r: Rect2 = rect_for(i, rect)
+	# REGION SETUP, TIMED APART FROM PAINTING (D0545). `frame_for` is one `WorldView.observe_rect`, which
+	# grows `r` by `WINDOW_MARGIN_CELLS` on every side and builds both planes; the painters below then
+	# visit only `r`. Charging both to one per-cell rate is what makes a small dig partial look dear.
+	# The stamp is a slice of the PREP clock `paint()` already started, never a separate phase.
+	var setup_began: int = Time.get_ticks_usec()
 	var f: Frame = frame_for(r)
+	BakeCost.note_setup(setup_began, f.obs.window.get_area() if f != null else 0)
 	if f == null:
 		return 0
 	var cells: Rect2i = window.cells_of(r)
