@@ -538,3 +538,28 @@ painter CPU by 0.7%. `tools/perf_fixture.py` now carries a measured noise floor 
 "not evidence" on any line that does not clear it, so the next reader does not depend on running a third
 experiment by luck. `[[scrutiny-asymmetry]]`: the number that is changing is the one to distrust, and a
 correction feels verified in exactly the way the original claim did.
+
+## D0536's worst frame, corrected by D0538 and re-measured by D0540 (2026-09-08/09)
+
+D0536 claimed the minimap fix took the worst frame of a mining run from 54.5 ms to 21.5. **D0538 (Astra's
+audit) found the label was wrong**: the fixture's `max` was a MEDIAN OF PER-WINDOW MAXIMA, so neither
+number was a worst frame, and the same defect had put an invented `/600` denominator under the
+over-budget counts when a window actually holds 2,000-2,600 frames. The claim was withdrawn as unverified.
+
+**D0540 re-measured it on the corrected fixture** -- the pre-D0536 minimap restored in the working tree,
+both sides `--front` with the control at 1.02x -- and the claim survives with an honest number: the
+observed maximum falls **61.08 -> 35.87 ms (-41%)**, and frames over 16.7 ms fall from 205 of 13,359 to
+165 of 14,548. The direction was never in doubt from the meter's SLOW lines, which are actual per-frame
+observations rather than medians; the fixture's own headline figure was the thing that was wrong.
+
+**Two lessons, and the second is the one that generalises.** A summary statistic inherits the label its
+author gives it, and "max" was mine; the fixture now carries `warm_window_max_median` and `warm_max`
+under separate names because one of them had been answering to the other's question. And the correction
+was found by an auditor reading the code, not by any run -- every number the defect produced looked
+plausible, moved in the expected direction, and passed its own noise floor. `[[count-without-membership]]`,
+`[[name-the-frame]]`.
+
+Two of the same report's other conclusions were corrected in the same audit and are NOT restated: the
+pass-3 utilisation figure compared repainted rectangle area against a solid-cell lane budget (different
+populations), and the pass-2 "2.4-3.0x brighter" divided red channels of stale unmatched captures. Both
+are withdrawn outright. `[[mechanism-vs-population]]`, `[[two-luma-conventions]]`.

@@ -9,6 +9,12 @@ The original report below is retained as historical evidence, with these correct
 - The fixture's `max` was a **median of window maxima**, not the worst observed frame. The quoted
   54.5 → 21.5 ms is therefore not a verified reduction of the actual maximum. D0538 preserves both
   statistics under explicit names and uses the real frame population for over-budget counts.
+  **Re-measured on the corrected fixture (D0540)** with the pre-D0536 minimap restored in the working
+  tree, both sides `--front`, control 1.02x: observed maximum **61.08 → 35.87 ms (−41%)**, frames over
+  16.7 ms **205/13,359 → 165/14,548**. The claim survives with an honest number, and the same run names
+  the tail that remains: **preparation peaks at 9.0 ms in ONE physics tick over 1024 cells at ordinary
+  play zoom**, against a 0.56 ms/tick average — 3.2× the frame budget, and unchanged by the HUD fix. The
+  6.865 ms wide-zoom burst is therefore not a wide-zoom property.
 - Withheld frame comparisons still printed, and a missing repetition could pass. D0538 adds
   regressions, suppresses invalid presentation metrics, and rejects failed/incomplete processes.
 - The 46/31 cells per tick measured **repainted rectangle area**, including air and dig repaints,
@@ -19,6 +25,12 @@ The original report below is retained as historical evidence, with these correct
   luminance 0.083141 CPU / 0.083696 shader in world rect (350,120)-(980,450): ratio 1.00667.
   This does not reproduce a blanket 2.4–3x brightness mismatch. The older table divides red channels,
   not luminance, and does not isolate a shading term. Noise/appearance differences remain visible.
+  **Independently recomputed (D0540): 1.00667 reproduces exactly** and the 2.4–3x claim is withdrawn
+  without qualification. Adding, from the same pixels: the ratio is a SIGNED mean and cancels — mean
+  `|Δluma|` over that rect is 3.34 of 255, p99 +25, extremes −49 and +84, worst column 2.7× the median
+  column at x=604–611. The pictures differ substantially where the signed mean reads 1.007. Neither
+  statistic settles the reported seam: this capture is a cave at 131 m and the seam was reported at a
+  surface cut, so that scene has still never been posed.
 
 Artifacts: `/tmp/sinkforge-audit-fixed-dig.json`, `/tmp/sinkforge-audit-wide-fall.json`,
 `/tmp/sinkforge-audit-cave-{cpu,shader}.png`, `/tmp/sinkforge-picture-diff.gd`.

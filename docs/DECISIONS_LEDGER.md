@@ -21036,3 +21036,54 @@ claim. Director requested one small follow-up, not another programme-sized pass.
 short explicit cut, and the first stationary tick following it. Camera, main-boot and world-view
 suites pass afterward, including existing ordinary-motion controls. Formatter, size and function-
 length checks pass. The prior full battery belongs to D0538; not rerun for this slice.
+
+## D0540 · 2026-09-09 · D0536's worst-frame claim re-measured on the corrected fixture: real, and smaller than stated. The tail that remains is a 9 ms terrain-preparation burst in one physics tick
+
+**Decided:** no code change. D0538 was right that D0536's `54.5 -> 21.5 ms` was a median of window
+maxima under a label that said worst frame, so the claim was withdrawn as unverified. It is now measured
+properly and RESTATED rather than dropped, and the same run names the next bottleneck.
+
+**Method.** `view/hud/minimap.gd` reverted to `b7773ea4^` in the working tree, measured, restored by
+`git checkout` (0 modified files after; the runs straddled local midnight, hence this entry's date against
+D0538's). Both sides `--front`, `dig`, 2 repetitions of 1500 ticks, eight
+warm windows each, on D0538's corrected fixture -- actual observed maximum, real frame denominators,
+process-exit and window-completeness checks. Control 61 -> 62 us (1.02x); both sides focused for 100% of
+frames.
+
+| | before D0536 | after | verdict |
+|---|---:|---:|---|
+| **observed max frame** | **61.08 ms** | **35.87 ms** | **-41%, clears its 15% floor** |
+| frames over 16.7 ms | 205 of 13,359 (1.535%) | 165 of 14,548 (1.134%) | -26% relative |
+| `fps_wall` | 338.0 | 365.8 | inside its floor, not evidence |
+| frame p50 | 1.615 ms | 1.525 ms | inside its floor |
+| frame p99 | 19.83 ms | 17.30 ms | inside its floor |
+| painters drawn | 2.374 ms/tick | 2.433 ms/tick | inside its floor |
+| bake preparation | 12.325 us/cell | 12.320 us/cell | unchanged |
+
+So the fix is real and the honest number is 61 -> 36 ms, not 54 -> 21. The direction was never in doubt
+from a second instrument -- the meter's SLOW lines are actual per-frame observations, and they carried
+`minimap.paint=36.5-38.1ms` inside 49.7-56.4 ms frames before and 1.5-1.8 ms inside 16.8-23.1 ms frames
+after -- but the fixture's own headline figure was mislabelled and the correction stands.
+
+**THE TAIL THAT REMAINS IS NOT THE HUD.** Both sides report `peak preparation 9.007 / 9.344 ms in one
+physics tick over 1024 painted rectangle cells`, against a 0.56 ms/tick average -- **3.2x the whole
+2.78 ms frame budget, in one tick, at ordinary play zoom.** D0538 found 6.865 ms at the widest zoom and
+that reads as a wide-zoom property; it is not. 1024 cells is four 16-cell chunks, so the burst is the
+window lane admitting its per-tick allowance in one go while a dig's unbudgeted repaints run beside it.
+This is what `docs/PERF_PLAN.md` item 2 asks for and what my average-utilisation argument was structurally
+unable to see: D0538's peak telemetry is the instrument that registers it, and an average never could.
+
+**Not fixed here, and named as the next thing to fix.** The lever is `BakeLane`'s budget grain, not its
+size -- D0524 already measured that 384 and 512 solid cells behave the same because the floor is per-cell
+CPU. Splitting one tick's admission across several ticks, or bounding the union of the dig and window
+lanes rather than each alone, is the shape; both are scheduling changes that need their own before/after
+on this fixture and neither is a change to make inside a report.
+
+**Also corrected, from Astra's own artifacts.** Their `1.00667` region luminance ratio reproduces exactly
+(recomputed independently: cpu 0.083141, shader 0.083696 over the same rect), and my "2.4-3.0x brighter"
+is withdrawn without qualification -- it divided red channels of stale, unmatched captures. But the ratio
+is a SIGNED mean and cancels: over the same region mean `|dluma|` is 3.34 of 255, p99 +25, extremes -49
+and +84, and the worst column carries 2.7x the median column's difference at x=604-611. The two pictures
+differ substantially where a signed mean reads 1.007. Neither statistic settles the reported seam, because
+this capture is a cave at 131 m and the seam was reported at a surface cut; the scene was never posed.
+

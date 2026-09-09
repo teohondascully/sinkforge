@@ -1,6 +1,6 @@
 # Working state
 
-**Last updated: 2026-09-08 (performance programme; gameplay section reconciled September 7).**
+**Last updated: 2026-09-09 (performance programme and its audit; gameplay section reconciled September 7).**
 
 ## Performance programme — the five passes, September 8
 
@@ -47,13 +47,30 @@ Presentation interpolation behind `--interpolate`, OFF (D0537): the camera and t
 between sim ticks, lerped before the pixel snap so the grid survives, at no measurable cost. It is a
 motion change and awaits the director's eye.
 
+**Audited by Astra, D0538-D0539, and corrected.** Five real defects in the fixture: stderr discarded so a
+failed seat looked healthy, no check that the process exited 0 or that every window arrived, `max`
+reported as a median of per-window maxima under a worst-frame label, and an invented `/600` denominator
+under the over-budget counts. Astra also fixed a real bug in D0537: `CameraRig.warp_to` never passed
+through the teleport guard, so a short camera cut blended from a stale position (verified here -- their
+four assertions all fire when the fix is reverted). Their peak-per-tick preparation telemetry is the
+instrument the programme was missing.
+
+**D0540, the claim re-measured and the next bottleneck named.** On the corrected fixture, with the
+pre-D0536 minimap restored in the working tree and the control at 1.02x, the observed maximum falls
+**61.08 -> 35.87 ms** and frames over 16.7 ms fall from 205 of 13,359 to 165 of 14,548. The earlier
+"54.5 -> 21.5" was the mislabelled statistic and is withdrawn. The same run names what is left:
+**preparation peaks at 9.0 ms in ONE physics tick over 1024 cells at ordinary play zoom**, against a
+0.56 ms/tick average -- 3.2x the frame budget, untouched by the HUD fix, and the next thing to fix.
+
 **Not done, with reasons in the report:** the shader prototype stays OFF and unfixed -- its divergence is
 not the reported seam but a whole-surface brightness difference that grows with distance into the rock
 (2.44x at a cut's edge, 3.00x five cells in), so the carved-edge lighting gradient is the suspect and
-enabling it is a director art call (T040). Movement-ahead prefetch was inspected and NOT built: the
-streaming lane's budget is 512 solid cells a tick and the two workloads that stress it demand 46 and 31,
-so it runs at 6-9% of its own budget, and no visible hole appears at the first presented frame after a
-cold warp to 131 m.
+enabling it is a director art call (T040). Movement-ahead prefetch was inspected and NOT built, but that
+inspection's central number is WITHDRAWN (D0538): 46 and 31 cells a tick is repainted rectangle area
+including air and unbudgeted dig repaints, not solid cells admitted by the window lane, so it cannot be
+read against a 512-solid-cell budget. What survives is that no visible hole appears at the first
+presented frame after a cold warp to 131 m -- and D0540's 9.0 ms single-tick burst says the lane's
+scheduling is the open problem after all.
 
 ## Current stage
 
