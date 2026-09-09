@@ -563,3 +563,26 @@ Two of the same report's other conclusions were corrected in the same audit and 
 pass-3 utilisation figure compared repainted rectangle area against a solid-cell lane budget (different
 populations), and the pass-2 "2.4-3.0x brighter" divided red channels of stale unmatched captures. Both
 are withdrawn outright. `[[mechanism-vs-population]]`, `[[two-luma-conventions]]`.
+
+## "An air chunk always fits", reversed by D0543 (2026-09-09)
+
+`view/visuals/bake_lane.gd` promised, in its own docstring, that the window lane's budget is in solid
+cells because "the painters' cost is per SOLID cell ... an air chunk costs it nothing and always fits",
+and `tests/test_bake_budget.gd` pinned it as **"12 air chunks paint in one tick"**. Both were written
+in D0524 and both were half right in the way that is hardest to catch: air costs the SOLID-CELL BUDGET
+nothing, which is true, and the docstring then read that as costing nothing to paint, which is not the
+same claim. `BakeChunk._paint` observes the whole rectangle, runs every retained painter over it --
+the background wall included -- and fills the grammar map for air as well as rock; only
+`TerrainPainter.cell_fill` skips air. Twelve air chunks in one tick were twelve real preparation
+callbacks over 3,072 rectangle cells, admitted because the budget could not see them.
+
+Astra's D0541 found it by reading the source, not by running anything, and the pin is what makes it
+worth recording here: **the suite was green the whole time, and it was green because it asserted the
+defect.** A rule and its test can share an assumption, and then the test is not a check on the rule --
+it is a copy of it. `[[reversed-rule-has-a-pinning-suite]]`, `[[two-instruments-are-not-a-cover]]`.
+
+Corrected in the same entry, and mine: D0540's "9 ms over 1024 cells" joined a peak duration and a peak
+area that the instrument had maximised independently (D0541 finding 1, D0542's fix), and D0543's first
+streaming verdict read "no newly-visible callbacks -> revisit only" when zero has two causes -- no new
+terrain crossed, or a prefetch that never lost. The second is the answer, and the draft would have
+reported it as an absence.

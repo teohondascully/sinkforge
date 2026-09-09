@@ -64,6 +64,7 @@ PERF_RE = re.compile(
     r"quiet p50=([\d.]+)ms p99=([\d.]+)ms n=\d+ \| "
     r"cal p50=(\d+)us p99=(\d+)us max=(\d+)us spread=([\d.]+) n=(\d+)")
 PAINT_RE = re.compile(r"^painters total=([\d.]+)ms.*?drawn=([\d.]+)ms/tick")
+REASON_RE = re.compile(r"(\w+)=([\d.]+)ms/(\d+)cb/(\d+)cells")
 BAKE_RE = re.compile(
     r"^bake prep=([\d.]+)ms/tick chunks=(\d+) cells=(\d+) ([\d.]+)us/cell \| "
     r"upload=([\d.]+)ms/tick n=(\d+) cells=(\d+) ([\d.]+)us/cell")
@@ -173,6 +174,12 @@ def parse_windows(out):
         if line.startswith("BURST "):
             cur["burst"] = json.loads(line[6:])
             continue
+        if " | by_reason " in line:
+            # The window's preparation split by WHY each chunk was selected. Parsed off the same bake
+            # line the totals come from, so a window can never carry a reason mix from another window.
+            cur["reasons"] = {m.group(1): {"ms": float(m.group(2)), "callbacks": int(m.group(3)),
+                                           "cells": int(m.group(4))}
+                              for m in REASON_RE.finditer(line.split(" | by_reason ", 1)[1])}
         m = PERF_RE.match(line)
         if m:
             cur.update(zip(("frames", "fps_wall", "p50", "p99", "max", "over8", "over16",
@@ -230,7 +237,7 @@ def verdict(workload, warm):
     # is checked by its opposite. Both catch the same class of failure the bake check caught twice.
     places = {w["body"] for w in warm if "body" in w}
     if workload == "walk" and len(places) < 2:
-        return "VOID: the walk ended at one place, %s, in every warm window; the camera was not moving" % places
+        return "VOID: %s ended at one place, %s, in every warm window; the camera was not moving" % (workload, places)
     if workload == "still" and len(places) > 1:
         return "VOID: the still workload moved: %s. Something pressed a key that was not the script" % sorted(places)
     cals = [w["cal_p50"] for w in warm]
@@ -273,6 +280,29 @@ NOISE_FLOOR = {"warm_fps_wall": 0.30, "warm_p50": 0.30, "warm_p99": 0.25, "warm_
                "warm_prep_us_cell": 0.10, "warm_upload_ms": 0.50}
 
 
+# The handoff's acceptance criterion for item 3, mechanised -- and it takes THREE outcomes, not two.
+# `visible` is the reason `BakeWindow.plan_tick` gives a lane chunk that is already on screen when it is
+# painted: prefetch that arrived late. `margin` is the same lane painting ahead of the camera, in time.
+#
+# The first draft of this read "no visible callbacks -> REVISIT ONLY" and that was wrong in the way this
+# repository keeps being wrong: zero has two causes and the note named one. A run that crossed no new
+# terrain has no margin work EITHER; a run whose prefetch simply never lost has plenty. The first cannot
+# certify streaming; the second certifies it and passes. Reporting the second as "revisit only" would
+# have thrown away the answer while printing a sentence about it.
+def descent_note(s):
+    reasons = s.get("warm_reasons", {})
+    late = reasons.get("visible", {}).get("callbacks", 0)
+    ahead = reasons.get("margin", {}).get("callbacks", 0)
+    if late:
+        return ("OVERTAKEN: %d chunks were painted while already on screen (%.1f ms). The camera outran "
+                "the prefetch and those are holes filled late." % (late, reasons["visible"]["ms"]))
+    if ahead:
+        return ("COVERED: %d chunks streamed in as margin (%.1f ms) and NONE arrived on screen unpainted. "
+                "New terrain was crossed and the prefetch was never overtaken." % (ahead, reasons["margin"]["ms"]))
+    return ("REVISIT ONLY: no chunk was painted by the window lane at all, ahead or late. The camera "
+            "crossed only terrain the bake already held, so this run cannot certify streaming coverage.")
+
+
 def frame_note(warm):
     """Whether the FRAME statistics may be read: `fps_wall`, the percentiles and the over-budget counts.
 
@@ -299,10 +329,18 @@ def med(warm, key):
     return statistics.median(vals) if vals else float("nan")
 
 
+# WHAT THE RUN WAS, recorded beside what it measured. A saved summary carried no zoom, no tick count and
+# no seat flags, so two files could be compared without either reader knowing they were taken at
+# different zooms -- which is exactly the pair this handoff turns on (D0541's wide-zoom fall against a
+# default-zoom dig). Filled once by `main`.
+PROVENANCE = {}
+
+
 def summarise(workload, runs, hidden=False):
     cold = [r[0] for r in runs if r]
     warm = [w for r in runs for w in r[1:]]
     s = {"workload": workload, "reps": len(runs), "warm_windows": len(warm),
+         "run": dict(PROVENANCE),
          "verdict": verdict(workload, warm),
          "frames": HIDDEN_FRAMES if hidden else frame_note(warm)}
     if not runs or any(len(r) < 3 for r in runs):
@@ -325,6 +363,16 @@ def summarise(workload, runs, hidden=False):
     events = [dict(w["burst"], repetition=i + 1, window_tick=w["tick"])
               for i, run in enumerate(runs) for w in run[1:] if w.get("burst")]
     s["slowest_burst"] = max(events, key=lambda event: event["usec"], default={})
+    # SUMMED, NOT MAXIMISED. These are the totals a deferral treatment moves, and summing them over the
+    # warm windows joins nothing that was measured apart: every term came from one window's own line.
+    totals = {}
+    for w in warm:
+        for name, d in w.get("reasons", {}).items():
+            t = totals.setdefault(name, {"ms": 0.0, "callbacks": 0, "cells": 0})
+            for k in t:
+                t[k] += d[k]
+    s["warm_reasons"] = totals
+    s["warm_reason_ms"] = sum(t["ms"] for t in totals.values())
     return s
 
 
@@ -337,6 +385,13 @@ def render(s):
         return
     print("  warm physics  quiet tick p50 %.2f ms" % s["warm_quiet_p50"])
     print("  slowest burst " + json.dumps(s["slowest_burst"], sort_keys=True))
+    if s.get("warm_reasons"):
+        order = sorted(s["warm_reasons"].items(), key=lambda kv: -kv[1]["ms"])
+        print("  warm by reason " + "  ".join(
+            "%s %.1fms/%dcb (%.0f%%)" % (n, d["ms"], d["callbacks"],
+                                         100.0 * d["ms"] / max(s["warm_reason_ms"], 1e-9))
+            for n, d in order))
+        print("  streaming     %s" % descent_note(s))
     print("  warm peak     preparation %.3f ms in one physics tick; peak painted rectangle cells %.0f"
           % (s["warm_peak_prep_ms"], s["warm_peak_cells"]))
     print("  warm painters drawn %.3f ms/tick" % s["warm_drawn_per_tick"])
@@ -422,6 +477,14 @@ def main():
         return 0
     if args.reps < 1 or args.ticks < 900 or args.ticks % WINDOW_TICKS:
         ap.error("require positive repetitions and at least 900 ticks in complete 300-tick windows")
+    head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                          cwd=str(ROOT)).stdout.strip()
+    dirty = bool(subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+                                capture_output=True, text=True, cwd=str(ROOT)).stdout.strip())
+    PROVENANCE.update({"head": head, "dirty_tree": dirty, "zoom": args.zoom, "ticks": args.ticks,
+                       "reps": args.reps, "seat": list(args.seat), "regime": (
+                           "hidden" if args.hidden else "front" if args.front else "custodian"),
+                       "label": args.label})
     names = list(WORKLOADS) if args.all else [args.workload or "still"]
     out = []
     for name in names:

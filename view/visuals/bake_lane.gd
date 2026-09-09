@@ -22,6 +22,23 @@ extends RefCounted
 ## hole (D0522). Digs are never budgeted and never spend it: a dug cell must never show stale for a frame.
 const WINDOW_LANE_SOLID_CELLS: int = 512
 
+## THE OPTIONAL MARGIN'S OWN PER-TICK CAP, IN CHUNKS (D0543), because the budget above is in the wrong
+## unit for the cost it is trying to bound and the paragraph above says so in its own words: "an air chunk
+## holds no solid cells and always fits". That was measured false. `BakeChunk._paint` observes the whole
+## rectangle, runs EVERY retained painter over it -- the background wall included -- and fills the grammar
+## map for air as well as rock; only `TerrainPainter.cell_fill` skips air. So an air-heavy margin chunk
+## spends almost nothing of the solid-cell budget and still costs milliseconds. D0541 finding 4 named it
+## from the source and D0542's paired receipt is the observation: **four margin callbacks, 1024 rectangle
+## cells, 9.793 ms in ONE physics tick**, against a 2.78 ms frame.
+##
+## The cap is not a tuning knob and not a number I chose. A 16-cell chunk is 256 rectangle cells and
+## preparation measures 9.6-12.3 us a cell, so ONE chunk is already 2.5-3.1 ms -- the whole frame budget.
+## There is no cap that makes the margin free; the only question is how few chunks a tick it can be
+## spread over WITHOUT the camera overtaking the prefetch, and that is arithmetic over the camera's own
+## measured travel: see `optional_cap`. MANDATORY WORK IS NOT CAPPED AND NEVER WAITS -- a chunk on screen
+## is a hole in the world and a dug cell must never show stale for a frame.
+const OPTIONAL_MIN_PER_TICK: int = 1
+
 
 ## THE SOLID CELLS OF CHUNK `i` AS THE OBSERVATION SEES THEM: a byte count over the chunk's rows of
 ## `obs.materials`, where 0 is air by the grid's own legend (`TileGrid.legend[0]`), so no string is
@@ -50,11 +67,13 @@ static func solid_cells_in(w: BakeWindow, i: int, obs: Interface.Observation) ->
 ##
 ## THE VIEW IS THE PROMISE. A chunk whose rect meets the UN-MARGINED view `rect` is on screen now, and an
 ## unpainted chunk on screen is a hole in the world; it paints this tick whatever the budget says, and what
-## it costs is spent against the budget all the same. THE MARGIN IS THE PREFETCH. Of the rest, each chunk
-## whose solid cells still fit under `WINDOW_LANE_SOLID_CELLS` paints, nearest first; an air chunk holds
-## no solid cells and always fits. A chunk that does not fit is skipped, not a stop: a nearer solid chunk
-## must not hold up a farther air one. `p.lane_solid` receives what was spent, so a suite can assert the
-## number the budget is in and not only a chunk count.
+## it costs is spent against the budget all the same. THE MARGIN IS THE PREFETCH, and it is bounded twice:
+## by `WINDOW_LANE_SOLID_CELLS` as before, and by `optional_cap` in whole chunks (D0543). A chunk that
+## exceeds the solid budget is SKIPPED, not a stop -- a nearer solid chunk must not hold up a farther air
+## one -- but running out of the chunk cap IS a stop, because that cap is on the tick's optional cost and
+## every remaining chunk costs about the same. This is where "an air chunk always fits" used to be, and
+## that sentence was the defect: air is free to the budget and is not free to paint. `p.lane_solid`
+## receives what was spent, so a suite can assert the number the budget is in and not only a chunk count.
 static func choose(w: BakeWindow, rect: Rect2, exclude: Dictionary, obs: Interface.Observation,
 		p: BakeWindow.Plan) -> Array[int]:
 	var pending: Array[int] = []
@@ -65,22 +84,61 @@ static func choose(w: BakeWindow, rect: Rect2, exclude: Dictionary, obs: Interfa
 		for i: int in pending:   # the first bake: everything, and what it costs said in the budget's unit
 			p.lane_solid += solid_cells_in(w, i, obs)
 		return pending
-	var centre: Vector2 = rect.get_center()
+	# NEAREST TO WHERE THE CAMERA IS GOING, not to where it is. `travel` is the window's own movement
+	# since the last plan, so it needs no constant from `sim/` and no guess about how a body is moving --
+	# a grapple and a fall order the same way. A still camera has zero travel and this is the old
+	# distance-to-centre order exactly.
+	var focus: Vector2 = focus_of(rect, w.travel())
 	pending.sort_custom(func(a: int, b: int) -> bool:
-		var da: float = w.chunk_rect(a).get_center().distance_squared_to(centre)
-		var db: float = w.chunk_rect(b).get_center().distance_squared_to(centre)
+		var da: float = w.chunk_rect(a).get_center().distance_squared_to(focus)
+		var db: float = w.chunk_rect(b).get_center().distance_squared_to(focus)
 		return da < db if da != db else a < b)
 	var chosen: Array[int] = []
 	var prefetch: Array[int] = []
 	for i: int in pending:
 		if w.chunk_rect(i).intersects(rect):
-			chosen.append(i)
+			chosen.append(i)   # ON SCREEN: mandatory, uncapped, and still charged to the budget
 			p.lane_solid += solid_cells_in(w, i, obs)
 		else:
 			prefetch.append(i)
+	var room: int = optional_cap(w.travel(), rect)
 	for i: int in prefetch:
-		var solid: int = solid_cells_in(w, i, obs)
+		if room <= 0:
+			break   # A STOP, not a skip: the cap is on the tick's optional COST, and the next chunk down
+		var solid: int = solid_cells_in(w, i, obs)   # the list costs the same as this one.
 		if p.lane_solid + solid <= WINDOW_LANE_SOLID_CELLS:
 			chosen.append(i)
 			p.lane_solid += solid
+			room -= 1
 	return chosen
+
+
+## How many OPTIONAL margin chunks this tick may paint: enough that the camera cannot overtake the
+## prefetch, and not one more.
+##
+## A row of chunks entering the margin is `ceil(width / CHUNK_PX) + 1` chunks wide, and the camera crosses
+## one chunk of ground every `CHUNK_PX / speed` ticks, so staying ahead needs `chunks * speed / CHUNK_PX`
+## chunks a tick. Every term is read off the window itself. A still camera exposes nothing and falls to
+## `OPTIONAL_MIN_PER_TICK`, so the margin still fills, just without a burst nobody is waiting for.
+##
+## THIS CANNOT PROMISE A 2.78 ms FRAME and does not pretend to: one chunk is already 2.5-3.1 ms. What it
+## promises is that the tick's optional work is the least the camera's own speed allows, where before it
+## was however many chunks happened to fit under a budget that charges air nothing.
+## THE POINT THE MARGIN IS ORDERED AROUND: one chunk ahead of the camera along its own travel, or the
+## camera's centre when it is still. Pure, and separate from `choose`, so the ordering is a claim a suite
+## can check rather than one a reader has to take on trust. One chunk of lead and not more: the margin is
+## one chunk deep, so a focus further out would rank chunks the window does not reach.
+static func focus_of(rect: Rect2, travel: Vector2) -> Vector2:
+	if travel.length() <= 0.0:
+		return rect.get_center()
+	return rect.get_center() + travel.normalized() * float(BakeWindow.CHUNK_PX)
+
+
+## Pure in its two inputs so a suite can pin the derivation directly, at any speed, without posing a
+## camera that moves the window it is measuring.
+static func optional_cap(travel: Vector2, rect: Rect2) -> int:
+	var speed: float = travel.length()
+	if speed <= 0.0:
+		return OPTIONAL_MIN_PER_TICK
+	var wide: int = ceili(rect.size.x / float(BakeWindow.CHUNK_PX)) + 1
+	return maxi(OPTIONAL_MIN_PER_TICK, ceili(float(wide) * speed / float(BakeWindow.CHUNK_PX)))

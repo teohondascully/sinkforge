@@ -36,8 +36,10 @@ func _initialize() -> void:
 	_test_a_chunks_cost_is_its_solid_cells_as_the_observation_sees_them()
 	_test_the_first_bake_of_a_session_is_not_budgeted()
 	_test_twelve_solid_chunks_entering_at_once_paint_two_a_tick_and_all_within_six()
-	_test_twelve_air_chunks_entering_at_once_all_paint_this_tick()
+	_test_twelve_air_chunks_are_not_free_and_drain_at_the_optional_cap()
 	_test_a_solid_chunk_that_does_not_fit_is_skipped_not_a_stop()
+	_test_the_optional_cap_is_derived_from_the_cameras_own_travel()
+	_test_mandatory_work_over_the_allowance_is_shown_now_and_optional_waits()
 	_test_a_chunk_the_view_touches_paints_this_tick_even_when_the_budget_is_spent()
 	_test_a_dig_into_an_entering_chunk_paints_it_whole_and_spends_nothing()
 	_finish("bake_budget")
@@ -168,7 +170,7 @@ func _test_the_first_bake_of_a_session_is_not_budgeted() -> void:
 func _drain(w: BakeWindow, obs: Interface.Observation, label: String) -> Array[int]:
 	var counts: Array[int] = []
 	var spent: Array[int] = []
-	while w.unpainted_in(RING_VIEW).size() > 0 and counts.size() < 10:
+	while w.unpainted_in(RING_VIEW).size() > 0 and counts.size() < 16:
 		var p: BakeWindow.Plan = w.plan_tick(RING_VIEW, [], obs)
 		counts.append(p.whole.size())
 		spent.append(p.lane_solid)
@@ -196,24 +198,38 @@ func _test_twelve_solid_chunks_entering_at_once_paint_two_a_tick_and_all_within_
 	var before: int = w.painted_count()
 	var first: BakeWindow.Plan = w.plan_tick(RING_VIEW, [], obs)
 	_check_nearest(w, RING_VIEW, twelve, first.whole)
-	_check(first.whole.size() == 2 and first.lane_solid == BUDGET, "this tick paints 2 of the 12 (got %d), "
-		% first.whole.size() + "spending exactly the %d-cell budget (%d)" % [BUDGET, first.lane_solid])
+	# ONE A TICK, NOT TWO (D0543). The camera is still here, so `optional_cap` is its floor of one, and
+	# the tick's optional cost is one chunk: 256 rectangle cells at the 9.6-12.3 us a cell preparation
+	# measures, about 2.5-3.1 ms. Two was 512 solid cells, which D0524 sized against a 8.33 ms frame and
+	# which measured 9.793 ms in one tick under a 2.78 ms one (D0542's paired receipt). The budget was
+	# never wrong about its unit for SOLID chunks; it was sized for a frame twice as long.
+	_check(first.whole.size() == 1 and first.lane_solid == CHUNK_CELLS, "this tick paints 1 of the 12 "
+		+ "(got %d), spending one chunk of the %d-cell budget (%d)" % [first.whole.size(), BUDGET, first.lane_solid])
 	_check(first.reasons.values().all(func(reason: String) -> bool: return reason == "margin"),
 		"offscreen selections retain margin provenance")
 	w.note_plan(first)
 	var counts: Array[int] = [first.whole.size()]
 	counts.append_array(_drain(w, obs, "12 solid"))
-	_check(counts == [2, 2, 2, 2, 2, 2], "12 solid chunks paint 2 a tick over 6 ticks, got %s" % str(counts))
+	_check(counts == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "12 solid chunks paint 1 a tick over 12 ticks, got %s" % str(counts))
 	_check(w.painted_count() == before + 12, "painted_count reaches +12 in %d ticks (%d -> %d), none dropped"
 		% [counts.size(), before, w.painted_count()])
 
 
-## TWELVE AIR CHUNKS ENTERING IN ONE TICK all paint this tick: air costs the budget nothing. Under a budget
-## in chunks the same twelve took three ticks (4, 4, 4).
-func _test_twelve_air_chunks_entering_at_once_all_paint_this_tick() -> void:
+## TWELVE AIR CHUNKS ARE NOT FREE, and this assertion is the reversal of the one it replaces (D0543).
+##
+## It read "12 air chunks paint in one tick, air costs the budget nothing" and that was the defect, stated
+## as a pin. Air costs the SOLID-CELL BUDGET nothing, which is true and is not the same claim:
+## `BakeChunk._paint` observes the whole rectangle, runs every retained painter over it -- the background
+## wall included -- and fills the grammar map for air as well as rock. Only `TerrainPainter.cell_fill`
+## skips air. So twelve air chunks in one tick were twelve real preparation callbacks over 3,072
+## rectangle cells, and the lane admitted them believing they were free. D0541 finding 4 named it from
+## the source. They now drain at the optional cap like anything else.
+func _test_twelve_air_chunks_are_not_free_and_drain_at_the_optional_cap() -> void:
 	var ring: Array = _ring(false)
 	var counts: Array[int] = _drain(ring[0], ring[3], "12 air")
-	_check(counts == [12], "12 air chunks paint in one tick, got %s" % str(counts))
+	_check(counts == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+		"12 air chunks drain one a tick, not all in one (got %s)" % str(counts))
+	_check(ring[0].unpainted_in(RING_VIEW).is_empty(), "and all twelve are painted in the end, none dropped")
 
 
 ## A SOLID CHUNK THAT DOES NOT FIT IS SKIPPED, NOT A STOP: with the ring's four corners air and its eight
@@ -233,13 +249,15 @@ func _test_a_solid_chunk_that_does_not_fit_is_skipped_not_a_stop() -> void:
 	for i: int in corners:
 		if first.whole.has(i):
 			air_in += 1
-	_check(air_in == 4 and first.whole.size() == 6 and first.lane_solid == BUDGET, "the first tick paints all "
-		+ "4 air corners (%d) beside the 2 solid chunks that fit: %d chunks, %d solid cells" % [air_in,
-			first.whole.size(), first.lane_solid])
+	# The cap now bounds the tick before the solid budget can, so the first tick paints ONE chunk and the
+	# skip-versus-stop distinction moves to the test below, where mandatory work spends the budget first
+	# and the optional chunks have to wait for a reason the cap cannot explain.
+	_check(air_in <= 1 and first.whole.size() == 1, "the first tick paints one chunk of the twelve "
+		+ "(%d air corners, %d chunks, %d solid cells)" % [air_in, first.whole.size(), first.lane_solid])
 	w.note_plan(first)
 	var counts: Array[int] = [first.whole.size()]
 	counts.append_array(_drain(w, ring[3], "8 solid + 4 air"))
-	_check(counts == [6, 2, 2, 2], "6 this tick then 2 a tick, got %s" % str(counts))
+	_check(counts.size() == 12 and counts.count(1) == 12, "twelve ticks of one, got %s" % str(counts))
 
 
 ## THE VIEW IS THE PROMISE. The same ring, the view nudged 8 px right and 8 px down so it pokes into the
@@ -292,5 +310,79 @@ func _test_a_dig_into_an_entering_chunk_paints_it_whole_and_spends_nothing() -> 
 	_check(dug_whole == crossed.size() and p.whole.has(dug_chunk), "the dig's %d unpainted chunks all paint "
 		% crossed.size() + "whole (%d), the dug chunk %d among them" % [dug_whole, dug_chunk])
 	_check(p.reasons[dug_chunk] == "dig", "dig provenance wins over a simultaneous window request")
-	_check(p.lane_solid == BUDGET and p.whole.size() == crossed.size() + 2, "and the lane still spent its "
-		+ "%d on 2 more (%d spent, %d whole in all)" % [BUDGET, p.lane_solid, p.whole.size()])
+	# THE DIG SPENDS NOTHING and the lane still does its own work beside it -- one chunk now rather than
+	# two, because a still camera's optional cap is one (D0543); the dig's own chunks are not in that
+	# count and never were.
+	_check(p.lane_solid == CHUNK_CELLS and p.whole.size() == crossed.size() + 1, "and the lane still spent "
+		+ "its own one chunk beside the dig (%d spent, %d whole in all)" % [p.lane_solid, p.whole.size()])
+
+
+## THE CAP IS DERIVED, NOT CHOSEN (D0543), so it is pinned as arithmetic rather than as a number. A row of
+## chunks entering the margin is `ceil(width / CHUNK) + 1` wide and the camera crosses one chunk of ground
+## every `CHUNK / speed` ticks, so staying ahead of it needs `wide * speed / CHUNK` chunks a tick. Pure in
+## its two inputs precisely so this can pose any speed without moving the window it would be measuring.
+func _test_the_optional_cap_is_derived_from_the_cameras_own_travel() -> void:
+	var view := Rect2(0.0, 0.0, 120.0, 120.0)
+	var wide: int = ceili(view.size.x / float(CHUNK)) + 1
+	_check(BakeLane.optional_cap(Vector2.ZERO, view) == BakeLane.OPTIONAL_MIN_PER_TICK,
+		"a still camera exposes nothing and falls to the floor of %d" % BakeLane.OPTIONAL_MIN_PER_TICK)
+	# A CAMERA AT A CHUNK A TICK must be allowed the whole row it exposes each tick, or the margin is
+	# overtaken and what should have been prefetch arrives as a hole the view has to fill immediately.
+	_check(BakeLane.optional_cap(Vector2(0.0, float(CHUNK)), view) == wide,
+		"a camera crossing a chunk a tick may paint the whole %d-chunk row it exposes (%d)"
+			% [wide, BakeLane.optional_cap(Vector2(0.0, float(CHUNK)), view)])
+	# AND IT RISES WITH SPEED AND WITH WIDTH, both, because both are terms in the exposure.
+	var faster: int = BakeLane.optional_cap(Vector2(0.0, float(CHUNK) * 2.0), view)
+	var wider: int = BakeLane.optional_cap(Vector2(0.0, float(CHUNK)), Rect2(0.0, 0.0, 640.0, 120.0))
+	_check(faster == wide * 2, "twice the speed, twice the allowance (%d vs %d)" % [faster, wide * 2])
+	_check(wider > wide, "a wider camera exposes a longer row and is allowed more (%d > %d)" % [wider, wide])
+	# DIRECTION DOES NOT CHANGE THE ALLOWANCE, only the order: the same speed sideways exposes the same
+	# amount of ground, and a cap that read the sign would starve one direction.
+	_check(BakeLane.optional_cap(Vector2(float(CHUNK), 0.0), view) == wide, "sideways is the same allowance")
+	_check(BakeLane.optional_cap(Vector2(0.0, -float(CHUNK)), view) == wide, "and so is upward")
+	# THE ORDER, WHICH DIRECTION DOES CHANGE. With a cap the margin cannot paint everything this tick, so
+	# which chunk goes first stops being cosmetic: a camera falling should reach the ground below it
+	# before the ceiling it is leaving. The focus is one chunk ahead along the camera's own travel.
+	var centre: Vector2 = view.get_center()
+	_check(BakeLane.focus_of(view, Vector2.ZERO) == centre, "a still camera is ordered around its centre")
+	var falling: Vector2 = BakeLane.focus_of(view, Vector2(0.0, 9.33))
+	var rising: Vector2 = BakeLane.focus_of(view, Vector2(0.0, -9.33))
+	_check(falling.y > centre.y and rising.y < centre.y,
+		"a falling camera looks down and a rising one looks up (%.1f, %.1f, centre %.1f)"
+			% [falling.y, rising.y, centre.y])
+	_check(is_equal_approx(falling.distance_to(centre), float(CHUNK)),
+		"by exactly one chunk of lead, whatever the speed (%.1f)" % falling.distance_to(centre))
+	_check(BakeLane.focus_of(view, Vector2(0.0, 200.0)).is_equal_approx(falling),
+		"a faster camera does not look further ahead; it is allowed MORE chunks, which is the other rule")
+
+
+## MANDATORY WORK IS SHOWN NOW EVEN WHEN IT EXCEEDS THE ALLOWANCE, and the optional work behind it waits
+## and later drains. This is the rule the whole treatment is built not to break: a chunk the view touches
+## is a hole in the world, and a budget that made a player wait for it would be trading the thing the
+## budget exists to protect. The old skip-versus-stop pin lives here now, because with the optional cap
+## bounding the tick first it is only mandatory spend that can make an optional chunk wait.
+func _test_mandatory_work_over_the_allowance_is_shown_now_and_optional_waits() -> void:
+	var ring: Array = _ring(true)
+	var w: BakeWindow = ring[0]
+	var twelve: Array[int] = ring[2]
+	# A view over the WHOLE ring block: all twelve are on screen, so all twelve are mandatory.
+	var wide_view := Rect2(float(RING_COL * CHUNK) + 2.0, float(RING_ROW * CHUNK) + 2.0,
+		float(4 * CHUNK) - 4.0, float(4 * CHUNK) - 4.0)
+	var p: BakeWindow.Plan = w.plan_tick(wide_view, [], ring[3])
+	var on_screen: int = 0
+	for i: int in twelve:
+		if p.whole.has(i):
+			on_screen += 1
+	_check(on_screen == 12, "all twelve on-screen chunks paint this tick (%d)" % on_screen)
+	_check(p.lane_solid > BUDGET, "even though they spend %d cells against a %d-cell budget"
+		% [p.lane_solid, BUDGET])
+	_check(p.reasons.values().all(func(r: String) -> bool: return r == "visible"),
+		"and every one of them is charged as mandatory visible work, not margin")
+	# THE OPTIONAL WORK BEHIND THEM WAITED. The grown window reaches a ring of chunks the view does not
+	# touch; none may paint on a tick whose mandatory spend already passed the budget.
+	var optional_now: int = p.whole.size() - on_screen
+	_check(optional_now == 0, "no optional chunk paints on a tick mandatory work has already filled (%d)" % optional_now)
+	w.note_plan(p)
+	# AND IT DRAINS AFTERWARDS rather than being dropped: the next tick has no mandatory work left.
+	var next: BakeWindow.Plan = w.plan_tick(wide_view, [], ring[3])
+	_check(next.whole.size() >= 1, "the tick after, the deferred optional work resumes (%d)" % next.whole.size())

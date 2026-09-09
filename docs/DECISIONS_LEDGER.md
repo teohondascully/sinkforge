@@ -21116,3 +21116,94 @@ recorded 9,793 us, 1,024 rectangle cells, four callbacks, all margin, in one war
 focus was lost; frame metrics are withheld. No FPS improvement, picture change, full-battery,
 or general cold-streaming conclusion is claimed. See the September 9 bake-burst handoff for
 the trace identity and remaining bounded optimisation queue.
+
+## D0543 · 2026-09-09 · The optional margin is capped per tick and ordered toward the camera's travel; mandatory work is untouched. The worst burst stops being optional, and the bulk of preparation turns out to be digging
+
+**Decided:** `BakeLane` bounds the OPTIONAL margin twice -- by the existing solid-cell budget and by
+`optional_cap`, a per-tick count of whole chunks -- and orders the margin around `focus_of`, a point one
+chunk ahead along the window's own travel. `BakeWindow` records that travel. **Mandatory work is not
+capped and does not wait**: a chunk the view touches paints this tick, and a dig is never budgeted, both
+mutation-tested. `BakeCost` gains per-window per-reason totals; `tools/perf_fixture.py` parses them,
+records run provenance (head, dirty tree, zoom, ticks, regime, seat flags) and reports a streaming
+verdict. Following `docs/audits/2026-09-09-bake-burst-handoff.md` items 3 and 4 at the director's ask.
+
+**Neither number is chosen.** The cap is `ceil(wide * speed / CHUNK_PX)`, floored at one: a row entering
+the margin is `ceil(width / CHUNK_PX) + 1` chunks wide and the camera crosses a chunk of ground every
+`CHUNK_PX / speed` ticks, so staying ahead of it needs that many chunks a tick and no more. Every term is
+read off the window itself, so no constant crosses a layer to say how fast a body can move and a grapple
+orders the same as a fall. The lead is one chunk because the margin is one chunk deep. Both are pure
+statics precisely so the suite pins the derivation rather than a number (`tests/test_bake_budget.gd`).
+
+**Why the old bound was not enough, in its own words.** `bake_lane.gd` promised "an air chunk holds no
+solid cells and always fits", and `tests/test_bake_budget.gd` pinned it as "12 air chunks paint in one
+tick". Air costs the SOLID-CELL budget nothing, which is true, and is not the same claim as costing
+nothing: `BakeChunk._paint` observes the whole rectangle, runs every retained painter over it including
+the background wall, and fills the grammar map for air as well as rock. Only `TerrainPainter.cell_fill`
+skips air. Twelve air chunks in one tick were twelve real callbacks over 3,072 rectangle cells. D0541
+finding 4 named it from the source. That pin is reversed here, deliberately, with the reason in the test.
+
+**And the solid case was simply sized for a longer frame.** 512 solid cells is two solid chunks, which
+D0524 costed at ~9 ms against an 8.33 ms budget and accepted. Under 2.78 ms it is the burst: D0542's
+paired receipt read four margin callbacks, 1,024 rectangle cells, 9.793 ms in ONE physics tick. One
+16-cell chunk is 256 rectangle cells at 9.6-14.1 us a cell, so **a single chunk is already 2.2-3.1 ms**.
+No cap makes the margin free. The grain is the floor and this entry does not move it.
+
+**Measured, default zoom, `dig`, 2 repetitions of 1500 ticks, eight warm windows each arm.**
+
+| | before | after |
+|---|---|---|
+| dig callbacks / cells | 876 / 84,804 | 876 / 84,804 |
+| margin callbacks / cells | 96 / 24,576 | 96 / 24,576 |
+| slowest event | 4 callbacks, 1,024 cells, 9.821 ms, **all margin** | 4 callbacks, 462 cells, 9.486 ms, **all dig** |
+| streaming | COVERED, 0 late | COVERED, 0 late |
+
+**THE WORK IS BIT-IDENTICAL ACROSS THE ARMS** -- the same callbacks over the same cells, to the integer --
+so the cap DEFERS and drops nothing, and that comparison needs no host control to be read. What changed
+is the distribution: the worst preparation event stopped being optional margin and became mandatory dig
+work, which is the outcome the treatment was chosen for. **No timing improvement is claimed**: peak
+preparation 9.821 -> 9.486 ms is inside the noise, the before arm's control drifted 1.25x so the
+comparator REFUSED the numeric comparison, and frame metrics were withheld in every run below (focus
+0.00; `--front` did not hold the front on this machine tonight).
+
+**The picture is byte-identical** at a settled tick, md5 `1e08015770075ff9da0505bed9b4d51d` both arms
+(`--perf-drive=still --seed=7 --warp=130,90 --screenshot-tick=900`, same tick, same body cell). An
+earlier check compared frames that differed by 55% and it was measuring the capture, not the render:
+the first pair fired the shutter at different moments, and the second pair was a seat reading the real
+keyboard, which moved the body two cells at the same tick. Both are this programme's own documented
+traps and both were mine.
+
+**THE FINDING THAT REDIRECTS THE NEXT PASS: digging is 85% of preparation, margin is 15%** (1,282 ms
+over 876 callbacks against 226 ms over 96, default zoom; 80/20 at wide zoom). The slowest single EVENT
+was margin and the population is overwhelmingly dig, which is exactly the join D0541 warned about one
+level up. So `docs/audits/2026-09-09-bake-burst-handoff.md` item 4's third case is the live one --
+"dirty repaints dominate: inspect repeated region setup and affected area before altering scheduling" --
+and it is explicitly NOT a scheduling change. Dig repaints also cost more per cell than the average
+(9,486 us over 462 cells is 20.5 us a cell against a 12-14 us mean), which is where I would look first.
+
+**Cold-descent coverage, the director's first ask, ANSWERED WITHOUT A NEW FIXTURE.** The per-reason
+telemetry distinguishes prefetch that arrived in time (`margin`) from prefetch that arrived late
+(`visible`, a chunk painted while already on screen). Default zoom: 96 chunks streamed as margin, **zero
+late**. Wide zoom (1.25, the widest this 256-cell world supports at 1280 px): 128 chunks, **zero late**.
+Before and after the treatment alike. The prefetch is not starved and never was.
+
+**What is NOT covered, said plainly.** The `dig` camera descends about 0.05 cells a tick; terminal
+velocity is 2.33. At wide zoom the `fall` workload does move at terminal velocity, and with the cap in
+force its slowest event was **three margin callbacks, 768 cells, 28.089 ms in one tick** -- the cap
+correctly RAISING itself to three to keep ahead, and that is what not having a hole costs there. That
+run was SUSPECT (control 1.25x) so it is a description. The matching before arm came back VOID (control
+2.02x) and I stopped rather than stack runs whose noise hides the effect, per the handoff's own rule. So
+the wide-zoom terminal-velocity A/B is INCONCLUSIVE and no claim is made about it in either direction.
+
+**A `descend` workload was written and removed.** It carried the body down through solid rock at terminal
+velocity to transport a camera across virgin terrain; the collision resolver ejected it every tick,
+cancelling the descent exactly and walking it out of the world (`Invariants: body's own box ... left the
+world`, column 254 of 256, depth unchanged after 600 ticks), and D0538's own rule voids a run whose seat
+prints `ERROR:`. A genuine pre-excavated unbaked descent needs a world dug by one run and loaded by
+another, which is a fixture nobody has yet built; shipping the scaffolding would have been a claim that
+it works. The question it was for was answered by the telemetry instead.
+
+**Also corrected here:** my first streaming verdict read "no newly-visible callbacks -> REVISIT ONLY",
+and zero has two causes. A run that crossed no new terrain has no margin work either; a run whose
+prefetch simply never lost has plenty. The note now separates OVERTAKEN, COVERED and REVISIT ONLY, and
+the first draft would have reported the answer as an absence of one.
+

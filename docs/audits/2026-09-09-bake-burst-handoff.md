@@ -119,6 +119,46 @@ prototype or claim sustained 360 FPS from this instrumentation work.
    or changes to the deterministic sim. Stop after a bounded inconclusive trial rather than stacking
    runs whose noise hides the effect. Leave GPU cost labelled unmeasured until a real GPU instrument.
 
+### D0543 implementation checkpoint — September 9 (Claude)
+
+Items 3 and 4 are done; item 5's picture check is done and its timing half is inconclusive and stopped.
+
+**Item 3, cold-descent coverage — ANSWERED WITHOUT THE FIXTURE.** `BakeCost` now carries per-window
+per-reason totals, so the fixture separates prefetch that arrived in time (`margin`) from prefetch that
+arrived late (`visible`). Default zoom: 96 chunks streamed as margin, **zero late**. Wide zoom (1.25,
+the widest this 256-cell world supports at 1280 px): 128 chunks, **zero late**. Before and after the
+treatment alike. The prefetch is not starved. Your acceptance criterion needed a third outcome, not two:
+a run that crossed no new terrain has no margin work either, so "no visible callbacks" alone cannot tell
+a revisit from a prefetch that never lost — the verdict now separates OVERTAKEN / COVERED / REVISIT ONLY.
+
+A `descend` workload was written and removed: carrying the body through rock at terminal velocity is
+cancelled exactly by the collision resolver and walks the body out of the world, and D0538 rightly voids
+a run whose seat prints `ERROR:`. A real pre-excavated unbaked descent needs a world dug by one run and
+loaded by another; that fixture does not exist and shipping the scaffolding would have claimed it did.
+
+**Item 4, one treatment — optional margin, capped per tick and ordered toward travel (D0543).** The cap
+is `ceil(wide * speed / CHUNK_PX)` floored at one, every term read off the window; the lead is one chunk
+because the margin is one chunk deep. Mandatory work is uncapped and mutation-tested to stay that way.
+Default-zoom dig, both arms: **the work is bit-identical** — 876 dig callbacks over 84,804 cells and 96
+margin callbacks over 24,576 — so the cap defers and drops nothing, and the slowest event moves from
+**4 callbacks / 1,024 cells / 9.821 ms, all margin** to **4 callbacks / 462 cells / 9.486 ms, all dig**.
+No timing improvement is claimed: the before arm's control drifted 1.25x and the comparator refused.
+
+**Item 5, picture: byte-identical** at a settled tick, md5 `1e08015770075ff9da0505bed9b4d51d`. Two
+earlier attempts differed by 55% and were measuring the capture, not the render — an unposed shutter
+tick, then a seat reading the real keyboard.
+
+**What this redirects.** Digging is **85%** of preparation and margin **15%** (1,282 ms / 876 callbacks
+against 226 ms / 96; 80/20 at wide zoom). The slowest single EVENT was margin and the population is
+overwhelmingly dig — your finding 1's join, one level up. So item 4's third case is the live one, and it
+is explicitly not a scheduling change. Dig repaints also cost 20.5 us a cell against a 12-14 us mean.
+
+**Left open and NOT claimed.** At wide zoom the `fall` workload does reach terminal velocity, and with
+the cap its slowest event was three margin callbacks, 768 cells, **28.089 ms in one tick** — the cap
+raising itself to three to keep ahead, which is what not having a hole costs there. That run was SUSPECT
+(control 1.25x); its matching before arm came back VOID (control 2.02x) and I stopped rather than stack,
+per item 5. Frame metrics were withheld in every run tonight (focus 0.00). GPU cost stays unmeasured.
+
 ## Tests that earn their cost
 
 - Two ticks with opposite time/area maxima: the slowest receipt retains its own cells and tick.

@@ -74,6 +74,24 @@ pre-D0536 minimap restored in the working tree and the control at 1.02x, the obs
 **preparation peaks at 9.0 ms in ONE physics tick over 1024 cells at ordinary play zoom**, against a
 0.56 ms/tick average -- 3.2x the frame budget, untouched by the HUD fix, and the next thing to fix.
 
+**The bake burst, D0541-D0543.** Astra's audit found D0540's "9 ms over 1024 cells" joined a peak
+duration and a peak area the instrument had maximised independently, and built a paired receipt and
+per-chunk scheduling attribution (D0542). On that: the optional margin is now capped per tick and ordered
+one chunk ahead of the camera's own travel (D0543), with mandatory work uncapped and mutation-tested to
+stay so. Default-zoom dig, both arms: the work is bit-identical -- 876 dig callbacks over 84,804 cells,
+96 margin over 24,576 -- so the cap defers and drops nothing, and the slowest event moves from four
+margin callbacks at 9.821 ms to four dig callbacks at 9.486 ms. The picture is byte-identical at a
+settled tick. No timing improvement is claimed.
+
+**Streaming coverage is verified and the prefetch is not starved:** 96 chunks streamed as margin at
+default zoom and 128 at wide zoom, with **zero arriving on screen unpainted**, before and after.
+
+**What it redirects:** digging is 85% of preparation and margin 15%. The next target is dirty-repaint
+region setup -- explicitly not a scheduling change -- and dig repaints cost 20.5 us a cell against a
+12-14 us mean. Left open: at wide zoom a terminal-velocity fall's slowest event is three margin callbacks
+at 28.089 ms, which is what avoiding a hole costs there; its before arm came back VOID and that A/B is
+inconclusive and was stopped rather than stacked.
+
 **Not done, with reasons in the report:** the shader prototype stays OFF and unfixed -- its divergence is
 not the reported seam but a whole-surface brightness difference that grows with distance into the rock
 (2.44x at a cut's edge, 3.00x five cells in), so the carved-edge lighting gradient is the suspect and

@@ -79,6 +79,16 @@ class Plan extends RefCounted:
 	var reasons: Dictionary = {}
 	var planned_tick: int = Engine.get_physics_frames()
 
+## The window rect the last plan saw, and the movement between it and this one, in world px a tick.
+var _last_rect: Rect2 = Rect2()
+var _travel: Vector2 = Vector2.ZERO
+
+
+## The window's movement since the previous plan. Zero on the first plan and whenever the camera is still.
+func travel() -> Vector2:
+	return _travel
+
+
 ## HOW FAR A DIG'S INFLUENCE SPREADS, and how far past the camera the first bake reaches, in cells. Not a
 ## tuning knob: a PATCHED REGION MUST BE BYTE-IDENTICAL TO A FULL BAKE, and without this it is not. The
 ## baked painters all read NEIGHBOURS -- `WallPainter.ao_alpha` probes `AO_RAMP_CELLS` (2) out,
@@ -319,6 +329,11 @@ func partials_of(rect: Rect2) -> Dictionary:
 ## by construction: partials go only to painted chunks, the window lane only to unpainted ones.
 func plan_tick(window_rect: Rect2, dug: Array, obs: Interface.Observation = null) -> Plan:
 	var p := Plan.new()
+	# THE WINDOW'S OWN MOVEMENT SINCE THE LAST PLAN, recorded here because this is the only place that
+	# sees two consecutive rects. `BakeLane` orders and bounds the optional margin by it (D0543), and
+	# reading it off the window means no constant crosses a layer to say how fast a body can move.
+	_travel = window_rect.get_center() - _last_rect.get_center() if _last_rect.has_area() else Vector2.ZERO
+	_last_rect = window_rect
 	var influenced: Dictionary = {}
 	for cell: Vector2i in dug:
 		for i: int in influenced_chunks(cell):

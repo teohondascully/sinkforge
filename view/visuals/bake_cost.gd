@@ -43,6 +43,12 @@ static var _tick_usec: int = 0
 static var capture_bursts: bool = false
 static var slowest: Dictionary = {}
 static var _event: Dictionary = {}
+## PREPARATION CHARGED PER SCHEDULING REASON OVER THE WHOLE WINDOW. `slowest` says what one burst was
+## made of; this says what the window was made of, and they answer different questions. A treatment that
+## defers optional work has to be judged on the second: one 9 ms margin burst could be the only margin
+## work in five seconds, or one of forty. D0541 is explicit that two independently-aggregated extrema
+## must not be read as one event, and a per-reason total is the statistic that has no such join in it.
+static var prep_by_reason: Dictionary = {}
 
 
 ## One event of `phase`, timed from `began` to now, over `n` terrain cells (preparation) or texels
@@ -57,6 +63,11 @@ static func note(phase: int, began: int, n: int, planned: int = -1, reason: Stri
 			_tick = tick
 			_tick_cells = 0
 			_tick_usec = 0
+		var part: Dictionary = prep_by_reason.get(reason, {"usec": 0, "cells": 0, "callbacks": 0})
+		part["usec"] += spent
+		part["cells"] += n
+		part["callbacks"] += 1
+		prep_by_reason[reason] = part
 		_tick_cells += n
 		_tick_usec += spent
 		prep_tick_max_cells = maxi(prep_tick_max_cells, _tick_cells)
@@ -93,6 +104,7 @@ static func record_preparation(physics: int, render: int, planned: int, usec: in
 static func reset() -> void:
 	slowest = {}
 	_event = {}
+	prep_by_reason = {}
 	_tick = -1
 	_tick_cells = 0
 	_tick_usec = 0
@@ -116,4 +128,19 @@ static func report(ticks: int) -> String:
 		float(prep_usec) / float(maxi(prep_cells, 1)),
 		float(upload_usec) / 1000.0 / t, uploads, upload_cells,
 		float(upload_usec) / float(maxi(upload_cells, 1)), prep_tick_max_cells,
-		float(prep_tick_max_usec) / 1000.0]
+		float(prep_tick_max_usec) / 1000.0] + reason_line()
+
+
+## The window's preparation split by why each chunk was selected, slowest reason first. Empty when
+## nothing was prepared; `unknown` when the run is not capturing attribution.
+static func reason_line() -> String:
+	if prep_by_reason.is_empty():
+		return ""
+	var names: Array = prep_by_reason.keys()
+	names.sort_custom(func(a: String, b: String) -> bool:
+		return int(prep_by_reason[a]["usec"]) > int(prep_by_reason[b]["usec"]))
+	var parts: PackedStringArray = PackedStringArray()
+	for r: String in names:
+		var d: Dictionary = prep_by_reason[r]
+		parts.append("%s=%.3fms/%dcb/%dcells" % [r, float(d["usec"]) / 1000.0, d["callbacks"], d["cells"]])
+	return " | by_reason " + " ".join(parts)
