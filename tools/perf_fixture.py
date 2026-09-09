@@ -60,7 +60,7 @@ PACED_BAND = (117.0, 123.0)
 WINDOW_RE = re.compile(r"^WINDOW tick=(\d+) workload=(\w+) body=\((-?\d+),(-?\d+)\)")
 PERF_RE = re.compile(
     r"^PERF frames=(\d+) fps_wall=([\d.]+) frame p50=([\d.]+)ms p99=([\d.]+)ms max=([\d.]+)ms "
-    r"over8\.3ms=(\d+) over16\.7ms=(\d+) \| draw p50=([\d.]+)ms p99=([\d.]+)ms.*?"
+    r"over8\.3ms=(\d+) over16\.7ms=(\d+) focus=([\d.]+) \| draw p50=([\d.]+)ms p99=([\d.]+)ms.*?"
     r"quiet p50=([\d.]+)ms p99=([\d.]+)ms n=\d+ \| "
     r"cal p50=(\d+)us p99=(\d+)us max=(\d+)us spread=([\d.]+) n=(\d+)")
 PAINT_RE = re.compile(r"^painters total=([\d.]+)ms.*?drawn=([\d.]+)ms/tick")
@@ -117,7 +117,7 @@ def _keep_custody(pid, restore_to, done):
             _osa(RAISE_SCRIPT % restore_to)
 
 
-def run_once(workload, ticks, zoom, godot, hide=False):
+def run_once(workload, ticks, zoom, godot, hide=False, front=False):
     """One seat run, returning its windows in order. Window 1 is the cold one, by construction."""
     was_front = _osa(FRONT_NAME)
     proc = subprocess.Popen([godot] + flags_for(workload, ticks, zoom),
@@ -126,7 +126,7 @@ def run_once(workload, ticks, zoom, godot, hide=False):
     done = threading.Event()
     if hide:
         threading.Timer(HIDE_AFTER_S, _hide, args=(proc.pid,)).start()
-    else:
+    elif not front:
         custodian = threading.Thread(target=_keep_custody, args=(proc.pid, was_front, done), daemon=True)
         custodian.start()
     out, _ = proc.communicate()
@@ -149,7 +149,7 @@ def parse_windows(out):
         m = PERF_RE.match(line)
         if m:
             cur.update(zip(("frames", "fps_wall", "p50", "p99", "max", "over8", "over16",
-                            "draw_p50", "draw_p99", "quiet_p50", "quiet_p99", "cal_p50", "cal_p99",
+                            "focus", "draw_p50", "draw_p99", "quiet_p50", "quiet_p99", "cal_p50", "cal_p99",
                             "cal_max", "cal_spread", "cal_n"), (float(g) for g in m.groups())))
             continue
         m = PAINT_RE.match(line)
@@ -164,10 +164,10 @@ def parse_windows(out):
     return [w for w in windows if "fps_wall" in w]
 
 
-def gather(workload, reps, ticks, zoom, godot, hide=False):
+def gather(workload, reps, ticks, zoom, godot, hide=False, front=False):
     runs = []
     for i in range(reps):
-        w = run_once(workload, ticks, zoom, godot, hide)
+        w = run_once(workload, ticks, zoom, godot, hide, front)
         print("  rep %d/%d: %d windows" % (i + 1, reps, len(w)), file=sys.stderr)
         if not w:
             print("  rep %d produced NO windows -- the seat did not reach tick %d" % (i + 1, ticks),
@@ -222,6 +222,27 @@ HIDDEN_FRAMES = ("WITHHELD: the window was hidden, so macOS stopped presenting i
                  "longer carries presentation. Re-run with --visible for a frame-rate number.")
 
 
+# A frame number belongs to a window regime, not to the game alone. Below this share of focused frames
+# the compositor was not presenting the window the way a player's would be presented, and the frame and
+# draw numbers describe macOS's economy rather than ours -- measured across three runs of one workload
+# with the CPU control steady: draw p50 4.40 ms focused, 0.55 ms while the fixture kept handing the front
+# back to the director, 1.31 ms occluded behind a terminal.
+FOCUS_MIN = 0.95
+
+# THE RUN-TO-RUN NOISE FLOOR OF EACH METRIC, as a ratio, measured rather than assumed. Three `--front`
+# runs of the `dig` workload on 2026-09-08 -- one before the minimap fix, two after, the two after
+# differing by a change worth 0.7% of painter CPU -- reported `fps_wall` 381.4, 533.1 and 409.8 with the
+# host-speed control at 61, 60 and 61 us and painter CPU at 2.372, 2.418 and 2.401 ms/tick. So the frame
+# rate moved 30% between builds that were, by every stable measure, the same. Below these floors a
+# difference is not evidence, and `compare()` says so on the line rather than leaving the reader to
+# multiply it out. `[[scrutiny-asymmetry]]`: the number that is changing is the one to distrust.
+# Below these absolute sizes a metric is at its own print precision and a ratio over it means nothing.
+TINY = {"warm_upload_ms": 0.010, "warm_prep_ms": 0.010, "warm_drawn_per_tick": 0.010}
+NOISE_FLOOR = {"warm_fps_wall": 0.30, "warm_p50": 0.30, "warm_p99": 0.25, "warm_draw_p50": 0.30,
+               "warm_max": 0.15, "warm_drawn_per_tick": 0.05, "warm_prep_ms": 0.10,
+               "warm_prep_us_cell": 0.10, "warm_upload_ms": 0.50}
+
+
 def frame_note(warm):
     """Whether the FRAME statistics may be read: `fps_wall`, the percentiles and the over-budget counts.
 
@@ -230,6 +251,12 @@ def frame_note(warm):
     wrote this down and D0527 walked into it anyway. There is nothing to salvage: the numbers describe
     the compositor. The phase clocks above survive it; these do not.
     """
+    unfocused = [w for w in warm if w.get("focus", 0.0) < FOCUS_MIN]
+    if unfocused:
+        return ("WITHHELD: %d of %d warm windows drew into a window that was not frontmost (focus %s). "
+                "macOS stops presenting what nobody is looking at, so these frame and draw times are the "
+                "compositor's, not the game's. Re-run with --front." % (len(unfocused), len(warm),
+                ", ".join("%.2f" % w.get("focus", 0.0) for w in unfocused[:4])))
     paced = [w for w in warm if PACED_BAND[0] <= w["fps_wall"] <= PACED_BAND[1]]
     if not paced:
         return "VALID"
@@ -249,7 +276,7 @@ def summarise(workload, runs, hidden=False):
          "verdict": verdict(workload, warm),
          "frames": HIDDEN_FRAMES if hidden else frame_note(warm)}
     for key in ("fps_wall", "p50", "p99", "max", "over16", "quiet_p50", "cal_p50", "cal_spread",
-                "draw_p50", "draw_p99", "drawn_per_tick", "prep_ms", "prep_us_cell", "prep_cells", "upload_ms",
+                "focus", "draw_p50", "draw_p99", "drawn_per_tick", "prep_ms", "prep_us_cell", "prep_cells", "upload_ms",
                 "upload_us_cell", "uploads"):
         s["warm_" + key] = med(warm, key)
     for key in ("fps_wall", "p50", "max", "prep_ms", "upload_ms"):
@@ -266,7 +293,8 @@ def render(s):
         return
     print("  warm physics  quiet tick p50 %.2f ms" % s["warm_quiet_p50"])
     print("  warm painters drawn %.3f ms/tick" % s["warm_drawn_per_tick"])
-    print("  warm draw     phase p50 %.2f ms  p99 %.2f ms" % (s["warm_draw_p50"], s["warm_draw_p99"]))
+    print("  warm draw     phase p50 %.2f ms  p99 %.2f ms   (window focused in %.0f%% of frames)"
+          % (s["warm_draw_p50"], s["warm_draw_p99"], s["warm_focus"] * 100.0))
     print("  warm bake     prep %.3f ms/tick over %.0f cells (%.2f us/cell) | upload %.3f ms/tick, %.0f of them (%.3f us/cell)"
           % (s["warm_prep_ms"], s["warm_prep_cells"], s["warm_prep_us_cell"],
              s["warm_upload_ms"], s["warm_uploads"], s["warm_upload_us_cell"]))
@@ -295,11 +323,22 @@ def compare(before, after):
                   % (ratio, b[name]["warm_cal_p50"], a[name]["warm_cal_p50"]))
             continue
         print("  control held: %.0f -> %.0f us (%.2fx)" % (b[name]["warm_cal_p50"], a[name]["warm_cal_p50"], ratio))
-        for key, unit in (("warm_p50", "ms"), ("warm_p99", "ms"), ("warm_max", "ms"),
-                          ("warm_drawn_per_tick", "ms/tick"), ("warm_draw_p50", "ms"),
-                          ("warm_prep_ms", "ms/tick"),
+        for key, unit in (("warm_fps_wall", "fps"), ("warm_p50", "ms"), ("warm_p99", "ms"),
+                          ("warm_max", "ms"), ("warm_drawn_per_tick", "ms/tick"),
+                          ("warm_draw_p50", "ms"), ("warm_prep_ms", "ms/tick"),
                           ("warm_prep_us_cell", "us/cell"), ("warm_upload_ms", "ms/tick")):
-            print("  %-22s %8.3f -> %8.3f %s" % (key[5:], b[name][key], a[name][key], unit))
+            was, now = b[name][key], a[name][key]
+            # A RATIO BETWEEN TWO NUMBERS AT THE PRINT PRECISION IS NOT A RESULT: 0.001 -> 0.002 ms/tick
+            # reads as +100% and is one digit of rounding. Below the floor the line says so and stops.
+            if max(abs(was), abs(now)) < TINY.get(key, 0.0):
+                print("  %-22s %8.3f -> %8.3f %-8s  (both below %.3f: rounding, not a result)"
+                      % (key[5:], was, now, unit, TINY[key]))
+                continue
+            moved = abs(now - was) / max(abs(was), 1e-9)
+            floor = NOISE_FLOOR.get(key, 0.10)
+            mark = "  moved %+.0f%%" % (100.0 * (now - was) / max(abs(was), 1e-9)) if moved > floor \
+                else "  (within this metric's %.0f%% noise floor: not evidence)" % (100.0 * floor)
+            print("  %-22s %8.3f -> %8.3f %-8s%s" % (key[5:], was, now, unit, mark))
 
 
 def main():
@@ -312,6 +351,9 @@ def main():
     ap.add_argument("--godot", default=GODOT)
     ap.add_argument("--out")
     ap.add_argument("--label", default="")
+    ap.add_argument("--front", action="store_true",
+                    help="do not hand focus back: the seat keeps the front for the whole run, which is "
+                         "the only regime a frame rate can be claimed from, and takes the screen to do it")
     ap.add_argument("--hidden", action="store_true",
                     help="hide the seat window after two seconds. macOS then stops presenting it, so the "
                          "CPU phases are isolated from presentation and every frame number is withheld. "
@@ -326,7 +368,7 @@ def main():
     for name in names:
         print("running %s x%d (%d ticks each)" % (name, args.reps, args.ticks), file=sys.stderr)
         out.append(summarise(name, gather(name, args.reps, args.ticks, args.zoom, args.godot,
-                                           args.hidden), args.hidden))
+                                           args.hidden, args.front), args.hidden))
     print("\nfixture: %s, %d ticks a run, zoom %s, label %r" % (", ".join(names), args.ticks, args.zoom, args.label))
     for s in out:
         render(s)

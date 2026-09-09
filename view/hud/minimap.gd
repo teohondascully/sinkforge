@@ -56,6 +56,13 @@ var _tex_version: int = -1
 var _tex_seen_version: int = -1
 var _img: Image = null   ## the image behind `_tex`, kept so a step of seeing updates it in place
 var _tex_cells: Vector2i = Vector2i.ZERO
+## THE CLASS AND MEMORY BYTES THE IMAGE WAS PAINTED FROM, so a terrain change can repaint the cells that
+## actually changed instead of all seventeen thousand. Both are `PackedByteArray` and both are
+## copy-on-write, so holding them costs nothing until the world writes to one.
+var _drawn_map: PackedByteArray = PackedByteArray()
+var _drawn_seen: PackedByteArray = PackedByteArray()
+## Cells repainted by the last patch, for a test to read the work rather than infer it from a timing.
+var patched: int = 0
 
 
 ## The largest rect with `aspect`'s proportions that fits inside `box`.
@@ -131,19 +138,67 @@ func ensure_texture(o: Interface.Observation, look: MaterialLook) -> ImageTextur
 			if o.map[i] == Interface.Observation.MAP_ORE:
 				_img.set_pixel(i % o.map_cells.x, i / o.map_cells.x, class_color(o.map[i], i / o.map_cells.x, look, true))
 		_tex.update(_img)
-		_tex_seen_version = o.map_seen_version
+		_stamp(o)
 		return _tex
+	# THE TERRAIN MOVED. Repaint the cells that differ, not the world: a full rebuild walks every logic
+	# cell calling `class_color` and `set_pixel`, and measured 36.5-38.1 ms in a 1280x720 seat -- thirteen
+	# times the whole 2.78 ms frame budget, in one HUD chip, on nineteen of the twenty slow frames of a
+	# 1500-tick mining run (2026-09-08). It fired every twenty to sixty ticks while digging, because a
+	# dig is exactly what moves `map_version`, so the chip was at its most expensive precisely while the
+	# player was doing the thing the director said felt like a freeze. The bytes the image was painted
+	# from are kept above, so the diff is a byte compare over the map, and a dig changes a handful of
+	# cells. Same pixels by construction: the changed cells go through the same `class_color`.
+	if _can_patch(o):
+		return _patch(o, look, has_seen)
 	_img = Image.create(o.map_cells.x, o.map_cells.y, false, Image.FORMAT_RGBA8)
 	for y: int in o.map_cells.y:
 		for x: int in o.map_cells.x:
 			var i: int = y * o.map_cells.x + x
 			_img.set_pixel(x, y, class_color(o.map[i], y, look, has_seen and o.map_seen[i] != 0))
 	_tex = ImageTexture.create_from_image(_img)
+	_stamp(o)
+	rebuilds += 1
+	return _tex
+
+
+## Is there an image on screen that the same world painted, at the same size? Then the difference between
+## it and this observation is a set of cells, and that set is what has to be repainted.
+func _can_patch(o: Interface.Observation) -> bool:
+	return (_tex != null and _img != null and _tex_cells == o.map_cells
+		and _drawn_map.size() == o.map.size() and _drawn_seen.size() == o.map_seen.size()
+		# A world with no memory plane carries an EMPTY `map_seen`, not a zeroed one, and indexing it per
+		# cell is a crash rather than a wrong colour. The full rebuild reads it through `has_seen` for
+		# exactly this reason; the patch has to honour the same guard.
+		and (o.map_seen.is_empty() or o.map_seen.size() == o.map.size()))
+
+
+## Repaint exactly the cells whose class byte or memory byte differs from what the image holds.
+func _patch(o: Interface.Observation, look: MaterialLook, has_seen: bool) -> ImageTexture:
+	patched = 0
+	var w: int = o.map_cells.x
+	for i: int in o.map.size():
+		var now_seen: int = o.map_seen[i] if has_seen else 0
+		if o.map[i] == _drawn_map[i] and now_seen == (_drawn_seen[i] if has_seen else 0):
+			continue
+		_img.set_pixel(i % w, i / w, class_color(o.map[i], i / w, look, now_seen != 0))
+		patched += 1
+	if patched > 0:
+		_tex.update(_img)
+	_stamp(o)
+	return _tex
+
+
+## What the image now holds, recorded so the next call can diff against it.
+func _stamp(o: Interface.Observation) -> void:
 	_tex_version = o.map_version
 	_tex_seen_version = o.map_seen_version
 	_tex_cells = o.map_cells
-	rebuilds += 1
-	return _tex
+	# DUPLICATED, NOT ALIASED. `o.map` is the world's own coarse plane handed straight out, so holding the
+	# reference holds a window onto whatever the world does next: the diff then compares the array with
+	# itself and finds nothing changed, for ever. The suite caught it -- one changed byte repainted zero
+	# cells -- and it would have shipped as a minimap that stops updating the moment you mine.
+	_drawn_map = o.map.duplicate()
+	_drawn_seen = o.map_seen.duplicate()
 
 
 ## Everything the map decides, in canvas px; `{}` when hidden or the world has no map.

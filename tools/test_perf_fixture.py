@@ -42,8 +42,9 @@ def check(name: str, got: str, want_prefix: str) -> None:
         FAILURES.append("%s: wanted %s, got %r" % (name, want_prefix, got))
 
 
-def win(cal: float = 60.0, fps: float = 400.0, chunks: int = 5, body: tuple = (10, 20)) -> dict:
-    return {"cal_p50": cal, "fps_wall": fps, "prep_chunks": chunks, "body": body}
+def win(cal: float = 60.0, fps: float = 400.0, chunks: int = 5, body: tuple = (10, 20),
+        focus: float = 1.0) -> dict:
+    return {"cal_p50": cal, "fps_wall": fps, "prep_chunks": chunks, "body": body, "focus": focus}
 
 
 def test_work_rule() -> None:
@@ -80,6 +81,22 @@ def test_one_window_rule() -> None:
     check("one window", pf.verdict("dig", [win()]), "VOID")
 
 
+def test_window_regime_rule() -> None:
+    """A frame number belongs to a window regime; an unfocused window's frames are the compositor's.
+
+    This rule exists because the first control could not see the fault it guards. Three runs of one
+    workload, with the CPU control steady in all three, reported the draw phase at 4.40, 1.31 and
+    0.55 ms: focused, occluded, and being handed the front back by the fixture's own focus custodian.
+    Nothing about the game differed.
+    """
+    check("unfocused", pf.frame_note([win(focus=0.3), win(focus=1.0)]), "WITHHELD")
+    check("all unfocused", pf.frame_note([win(focus=0.0), win(focus=0.0)]), "WITHHELD")
+    check("focused", pf.frame_note([win(focus=1.0), win(focus=0.99)]), "VALID")
+    # AND IT MUST NOT REACH THE PHASE CLOCKS. A CPU timer inside the frame measures the same work whether
+    # or not macOS chose to put the finished picture on a screen.
+    check("unfocused phases survive", pf.verdict("dig", [win(focus=0.0), win(focus=0.0)]), "VALID")
+
+
 def test_pacing_rule() -> None:
     """Pacing disqualifies the frame statistics and nothing else."""
     paced = [win(fps=120.0), win(fps=119.0)]
@@ -97,7 +114,8 @@ def test_parser() -> None:
     lines = [
         "WINDOW tick=600 workload=dig body=(130,147)",
         "PERF frames=600 fps_wall=114.6 frame p50=6.10ms p99=40.17ms max=62.71ms over8.3ms=300 "
-        "over16.7ms=25 | draw p50=4.40ms p99=9.91ms | physics hub p50=0.74ms p99=1.13ms n=100 | "
+        "over16.7ms=25 focus=0.98 | draw p50=4.40ms p99=9.91ms baking p50=6.10ms n=40 "
+        "quiet p50=1.20ms n=560 | physics hub p50=0.74ms p99=1.13ms n=100 | "
         "quiet p50=0.67ms p99=1.05ms n=200 | cal p50=58us p99=79us max=91us spread=1.36 n=150",
         "painters total=3.44ms (budget 8.33ms at 120Hz) -- sky_painter.paint=1.51ms | refresh=0.26ms "
         "(observe=0.18ms) queued=10824/12000 drawn=2.430ms/tick plane_rebuilds=105 hub_rebuilds=418 /600 ticks",
@@ -110,7 +128,7 @@ def test_parser() -> None:
         return
     got = w[0]
     for key, want in (("workload", "dig"), ("body", (130, 147)), ("fps_wall", 114.6), ("p50", 6.10),
-                      ("draw_p50", 4.40), ("quiet_p50", 0.67), ("cal_p50", 58.0), ("over16", 25.0),
+                      ("draw_p50", 4.40), ("focus", 0.98), ("quiet_p50", 0.67), ("cal_p50", 58.0), ("over16", 25.0),
                       ("drawn_per_tick", 2.430), ("prep_ms", 0.554), ("prep_chunks", 120.0),
                       ("prep_us_cell", 12.30), ("upload_ms", 0.002), ("uploads", 30.0)):
         if got.get(key) != want:
@@ -124,7 +142,7 @@ def test_parser() -> None:
 
 def main() -> int:
     for fn in (test_work_rule, test_movement_rule, test_control_rule, test_one_window_rule,
-               test_pacing_rule, test_parser):
+               test_window_regime_rule, test_pacing_rule, test_parser):
         fn()
     if FAILURES:
         print("test_perf_fixture: %d FAILED" % len(FAILURES))

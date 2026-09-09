@@ -20884,3 +20884,72 @@ draw phase, 4.40 ms against 1.33, and nothing that was being ranked before could
   So `walk` is a moving-camera painter workload and is documented as one; `dig` and `fall` carry
   streaming. The `dig` workload descends exactly 15 terrain cells per window, run after run.
 
+
+## D0536 · 2026-09-08 · The minimap repainted the whole world on every terrain change: 36.5-38.1 ms in one HUD chip, on nineteen of twenty slow frames of a mining run. It now repaints the cells that changed
+
+**Decided:** `Minimap.ensure_texture` keeps the class and memory bytes its image was painted from
+(`_drawn_map`, `_drawn_seen`, both duplicated) and, when the terrain version moves, repaints only the
+cells whose bytes differ. The full rebuild survives for a first build, a resize, or any state the patch
+cannot reach. `patched` counts the repainted cells so a test can read the work instead of inferring it
+from a duration.
+
+**Why: it was the tail.** The performance fixture (D0535) at `e97e8270`, `dig` workload, window frontmost
+for 100% of frames, 1500 ticks: of the twenty slow frames the meter kept, nineteen carried
+`minimap.paint=36.5-38.1ms` inside a 49.7-56.4 ms frame. Thirteen times the whole 2.78 ms budget, in one
+HUD chip. It fired every twenty to sixty ticks -- because a dig is exactly what moves `map_version`, so
+the chip was at its most expensive precisely while the player was doing the thing the director described
+as "the world freezes every single time i mine a block". The rebuild walks every logic cell of the world
+(64 x 256 here, about 17,000) calling `class_color` and `set_pixel`; a dig changes a handful.
+
+**Measured, `--front`, 2 repetitions of 1500 ticks, eight warm windows each side, control held at 0.98x
+(61 -> 60 us), both sides focused for 100% of frames:**
+
+| | before | after | second run after | claimable |
+|---|---:|---:|---:|---|
+| **worst frame** | **54.50 ms** | **21.46 ms** | **20.89 ms** | YES, -61% |
+| `fps_wall` | 381.4 | 533.1 | 409.8 | NO |
+| frame p50 | 1.84 ms | 1.38 ms | 1.79 ms | NO |
+| frame p99 | 13.41 ms | 12.26 ms | 13.22 ms | NO |
+| frames over 16.7 ms | 9 of 600 | 6 of 600 | 8 of 600 | NO |
+| painters drawn | 2.372 ms/tick | 2.418 ms/tick | 2.401 ms/tick | no change |
+| bake preparation | 11.81 us/cell | 11.59 us/cell | 11.82 us/cell | no change |
+
+**ONLY THE WORST FRAME IS CLAIMED, and the third column is why.** The first draft of this entry claimed
+`fps_wall` 381 -> 533 and p50 1.84 -> 1.38 as the result of this change. A third `--front` run, of a build
+differing from the second by an edit worth 0.7% of painter CPU, read 409.8 and 1.79 -- back inside the
+"before" range -- with the host-speed control at 61, 60 and 61 us across all three. So `fps_wall` and the
+frame percentiles move about 30% run to run in this environment for reasons neither control captures,
+and a 40% reading is not evidence. The claim was withdrawn before this was pushed.
+`tools/perf_fixture.py` now carries a measured noise floor per metric and prints "not evidence" on any
+line that does not clear it, so the next reader cannot make the mistake this entry nearly shipped.
+`[[scrutiny-asymmetry]]`.
+
+What survives is structural and reproduced twice: the worst frame of a 1500-tick mining run fell from
+54.5 ms to 21.5 and 20.9, and `minimap.paint=36.5-38.1ms` no longer appears on any slow frame. The
+painter total per tick does not move at all, and that is the point: the cost was never in the average,
+it was one enormous spike every few dozen ticks, and `drawn=ms/tick` had been dividing it away.
+
+**A second change measured and REVERTED.** Throttling the patch to one repaint every six ticks (a chart
+following the world at 10 Hz) was implemented, pinned by two assertions -- that a change inside the
+window is held rather than dropped, and that it is painted on the next eligible tick -- and then backed
+out: painter CPU per tick moved 2.418 -> 2.401 ms, inside the 5% noise floor. The `minimap.paint=1.61ms`
+seen on slow frames after the fix is not a diff running every tick; `map_version` moves only when a LOGIC
+cell's class changes, which needs a write at the cell's centre, so the diff runs rarely and its cost is
+already amortised away. It was the ordinary cost of the chip in a frame where the host was slow and
+every painter was slow with it -- D0527's lesson arriving one more time. No lag was added to the chart
+for a saving that was not there.
+
+**The aliasing bug the pin caught before it shipped.** `_drawn_map = o.map` shares the world's own coarse
+plane rather than copying it -- `Observation.map` is handed straight out -- so the diff compared the array
+with itself and found nothing changed, for ever. The first run of the new assertion read "one changed
+byte repainted zero cells". Without `.duplicate()` this would have shipped as a minimap that silently
+stops updating the moment you mine, which is the failure mode a chart of where the ore is can least
+afford. `tests/test_minimap.gd` now pins the patched image byte-for-byte against a full rebuild of the
+same observation, twice, and asserts the repainted count rather than a duration -- a duration on this
+machine measures this machine.
+
+**Reversed rule, with its old pin rewritten deliberately:** `_test_the_texture_rebuilds_only_on_a_new_version`
+asserted "a new version rebuilds" and returned a NEW texture. A new version now keeps the texture and
+repaints what changed. The assertion was rewritten rather than deleted, and made stronger: it now names
+the number of cells repainted.
+

@@ -71,7 +71,16 @@ func _test_the_texture_rebuilds_only_on_a_new_version() -> void:
 	o.map[2] = TileGrid.COARSE_ROCK
 	_check(m.ensure_texture(o, look) == t1 and m.rebuilds == 1, "a changed byte under the SAME version is not seen: the version is the key, not the bytes")
 	o.map_version = 2
-	_check(m.ensure_texture(o, look) != t1 and m.rebuilds == 2, "a new version rebuilds")
+	# A NEW VERSION REPAINTS WHAT CHANGED, and keeps the texture it already has (D0536). It used to walk
+	# every logic cell: 36.5-38.1 ms in a 1280x720 seat, on nineteen of the twenty slow frames of a
+	# 1500-tick mining run, because a dig is what moves this version. One byte moved here, so one cell
+	# is repainted -- and the number is asserted rather than a duration, because a duration on this
+	# machine measures the machine.
+	_check(m.ensure_texture(o, look) == t1 and m.rebuilds == 1 and m.patched == 1,
+		"a new version repaints the one cell that changed and keeps the texture (%d rebuilt, %d patched)"
+			% [m.rebuilds, m.patched])
+	_test_a_patched_image_equals_a_rebuilt_one(o, look, m)
+
 	var img: Image = m.ensure_texture(o, look).get_image()
 	# An 8-bit texture reads back quantised (0.95 is 242/255), so the comparison is within a step, not exact.
 	_check(_close(img.get_pixel(1, 0), img.get_pixel(0, 0)) and _close(img.get_pixel(5, 5), Minimap.VOID_COLOR), "ore paints as its rock (the map does not give the survey away, D0392), void the void (%s, %s)" % [str(img.get_pixel(1, 0)), str(img.get_pixel(5, 5))])
@@ -158,3 +167,22 @@ func _test_a_real_observation_carries_the_plane() -> void:
 		await process_frame
 	_check(int(ran[0]) > 0 and chip.rebuilds >= 1, "paint() ran through the host and built the image once (%d runs, %d rebuilds)" % [int(ran[0]), chip.rebuilds])
 	view.queue_free()
+
+## THE PIN THAT MAKES THE PATCH SAFE: whatever route the image took, its bytes are the bytes a full
+## rebuild would have produced. A partial repaint that drifts from the reference is a stale minimap, and
+## a stale minimap is a map that lies about where the ore is -- silently, and only after mining.
+func _test_a_patched_image_equals_a_rebuilt_one(o: Interface.Observation, look: MaterialLook, patched_map: Minimap) -> void:
+	var fresh: Minimap = Minimap.new()
+	var reference: ImageTexture = fresh.ensure_texture(o, look)
+	_check(fresh.rebuilds == 1 and fresh.patched == 0, "the reference took the full-rebuild route")
+	_check(reference.get_image().get_data() == patched_map._img.get_data(),
+		"the patched image is byte-identical to a full rebuild of the same observation")
+	# AND AFTER A SECOND CHANGE, so the pin is not satisfied by a patch that happened to touch nothing.
+	o.map[7] = TileGrid.COARSE_ORE
+	o.map[9] = TileGrid.COARSE_WALL
+	o.map_version = 3
+	patched_map.ensure_texture(o, look)
+	_check(patched_map.patched == 2, "two changed bytes repaint two cells, not the world (%d)" % patched_map.patched)
+	var after: Minimap = Minimap.new()
+	_check(after.ensure_texture(o, look).get_image().get_data() == patched_map._img.get_data(),
+		"and the image still matches a full rebuild after a second patch")

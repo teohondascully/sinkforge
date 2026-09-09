@@ -55,6 +55,8 @@ func note_process() -> void:
 		last_frame_usec = now - _last_process_usec
 		_frames.append(last_frame_usec)
 	_last_process_usec = now
+	if DisplayServer.window_is_focused():
+		_focused += 1
 	_note_calibration()
 
 
@@ -122,6 +124,15 @@ func note_pre_draw() -> void:
 func note_post_draw() -> void:
 	last_draw_usec = Time.get_ticks_usec() - _pre_draw_usec
 	_draws.append(last_draw_usec)
+	# SPLIT BY WHETHER TERRAIN WAS PAINTED SINCE THE LAST FRAME CLOSED. Tagged against the previous
+	# post-draw, NOT against this frame's own pre-draw: `BakeChunk.paint` runs in the engine's queued-
+	# redraw flush, which happens BEFORE `frame_pre_draw` fires, so a pre-to-post comparison read zero
+	# baking frames in every window of a dig run -- a split that could not register its own subject.
+	if BakeCost.prep_chunks > _pre_draw_chunks:
+		_pre_draw_chunks = BakeCost.prep_chunks
+		_draws_baking.append(last_draw_usec)
+	else:
+		_draws_quiet.append(last_draw_usec)
 
 
 ## Every frame's draw phase, not just the worst eight. The window report needs the median: a dig window
@@ -129,6 +140,22 @@ func note_post_draw() -> void:
 ## ran at 114 and 510 frames a second. The difference had to be in a phase nothing was ranking, and the
 ## draw phase was the only one left unmeasured across the whole population rather than at its tail.
 var _draws: PackedInt64Array = PackedInt64Array()
+## The same population split in two: frames that painted terrain chunks, and frames that did not. The
+## baseline made the question unavoidable -- `dig` and `fall` carry the same painter CPU per tick and the
+## same physics tick, and run at 115 and 510 frames a second, with the draw phase at 4.40 ms against 1.33.
+## A median over both populations at once cannot say whether the bake's own render is what costs that.
+var _draws_baking: PackedInt64Array = PackedInt64Array()
+var _draws_quiet: PackedInt64Array = PackedInt64Array()
+var _pre_draw_chunks: int = 0
+## HOW MANY OF THE WINDOW'S FRAMES WERE DRAWN INTO A FOCUSED WINDOW. The second control, and it exists
+## because the first one could not see this: three runs of the identical `dig` workload, with the CPU
+## control steady, reported the draw phase at 4.40, 1.31 and 0.55 ms and the frame rate at 115, 507 and
+## 134 a second. The variable was the compositor -- whether this window was frontmost, occluded behind
+## the director's own work, or being handed the front back by the fixture's focus custodian. macOS stops
+## presenting what nobody can see, and the draw phase is where that shows up. So a frame number is only
+## comparable with another frame number taken in the SAME window regime, and this is the field that says
+## which regime a run was in. `[[the-human-is-inside-the-measurement]]`.
+var _focused: int = 0
 
 
 ## The draw phase and what the renderer was handed: the pre-draw to post-draw wall time, the viewport's
@@ -157,6 +184,9 @@ func reset() -> void:
 	_quiet.clear()
 	_cal.clear()
 	_draws.clear()
+	_draws_baking.clear()
+	_draws_quiet.clear()
+	_focused = 0
 	slow.clear()
 
 
@@ -177,9 +207,12 @@ func report() -> String:
 	for d: int in f:
 		span_usec += d
 	var fps: float = float(f.size()) * 1e6 / float(maxi(span_usec, 1))
-	return "PERF frames=%d fps_wall=%.1f frame p50=%.2fms p99=%.2fms max=%.2fms over8.3ms=%d over16.7ms=%d | draw p50=%.2fms p99=%.2fms | physics hub p50=%.2fms p99=%.2fms n=%d | quiet p50=%.2fms p99=%.2fms n=%d | %s" % [
+	return "PERF frames=%d fps_wall=%.1f frame p50=%.2fms p99=%.2fms max=%.2fms over8.3ms=%d over16.7ms=%d focus=%.2f | draw p50=%.2fms p99=%.2fms baking p50=%.2fms n=%d quiet p50=%.2fms n=%d | physics hub p50=%.2fms p99=%.2fms n=%d | quiet p50=%.2fms p99=%.2fms n=%d | %s" % [
 		f.size(), fps, _ms(_quantile(f, 0.5)), _ms(_quantile(f, 0.99)), _ms(f[f.size() - 1]), over120, over60,
+		float(_focused) / float(maxi(f.size(), 1)),
 		_ms(_quantile_of(_draws, 0.5)), _ms(_quantile_of(_draws, 0.99)),
+		_ms(_quantile_of(_draws_baking, 0.5)), _draws_baking.size(),
+		_ms(_quantile_of(_draws_quiet, 0.5)), _draws_quiet.size(),
 		_ms(_quantile_of(_hub, 0.5)), _ms(_quantile_of(_hub, 0.99)), _hub.size(),
 		_ms(_quantile_of(_quiet, 0.5)), _ms(_quantile_of(_quiet, 0.99)), _quiet.size(), calibration()]
 
