@@ -518,3 +518,23 @@ D0464 set the aim snap's tolerance to one metre for every cursor out of reach, o
 been snapping to the vein 2.3 m from the cursor, and D0464 refused it "air". D0474 keeps the metre for a
 pointed ROCK out of reach and restores legacy's reach for a pointer on open air. The D0464 entry stands
 as written; its far pin still holds (the cursor in that pin is on rock).
+
+## D0536's own frame-rate claim, withdrawn inside D0536 before it was pushed (2026-09-08)
+
+Not a correction of an earlier entry -- a correction of the entry's own first draft, recorded here
+because the page's subject is being confidently wrong and this is the shape it took.
+
+D0536's draft claimed the minimap fix moved `fps_wall` 381.4 -> 533.1 and frame p50 1.84 -> 1.38 ms, from
+a before/after pair whose host-speed control held at 0.98x. A third `--front` run, of a build differing
+from the second by an edit worth 0.7% of painter CPU, read 409.8 and 1.79 -- back inside the "before"
+range, with the control at 61, 60 and 61 us across all three. The frame rate and the percentiles move
+about 30% run to run on this host for reasons neither of the fixture's controls captures. Only the worst
+frame (54.5 -> 21.5 ms, reproduced at 20.9) survived and is claimed.
+
+**What the near-miss cost, and what stopped it:** nothing was published; the third run existed only
+because a *separate* experiment (a repaint throttle, since reverted) needed a measurement. Had that
+experiment not been run, a 40% frame-rate improvement would have been attributed to a change that moved
+painter CPU by 0.7%. `tools/perf_fixture.py` now carries a measured noise floor per metric and prints
+"not evidence" on any line that does not clear it, so the next reader does not depend on running a third
+experiment by luck. `[[scrutiny-asymmetry]]`: the number that is changing is the one to distrust, and a
+correction feels verified in exactly the way the original claim did.

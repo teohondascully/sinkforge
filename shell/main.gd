@@ -208,10 +208,10 @@ func _on_post_draw() -> void:
 
 
 func _process(_delta: float) -> void:
+	if flags["interpolate"]:
+		ViewStack.present(camera, rig)   # a frame between two sim ticks (D0537); off unless asked for
 	if meter != null:
-		meter.note_process()
-		if meter.last_was_slow() and booted:
-			meter.note_slow("tick=%d %s" % [tick, view.draw_cost_report()])
+		SeatDrive.meter_frame(self)
 
 
 func _physics_process(delta: float) -> void:

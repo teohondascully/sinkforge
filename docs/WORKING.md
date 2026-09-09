@@ -1,15 +1,43 @@
 # Working state
 
-**Last updated: 2026-09-08 (tooling; gameplay section reconciled September 7).**
+**Last updated: 2026-09-08 (performance programme; gameplay section reconciled September 7).**
 
-## Performance handoff — September 8 closeout
+## Performance programme — the five passes, September 8
 
-Director requested immediate closeout at the session limit. Pass 1 is committed at `6b4b5e6c`
-(D0533): exact-picture neighborhood sharing. Pass 2 is partial (D0534): the OFF-by-default shader
-prototype retains surface tufts, verified with four focused suites and a headed mining capture.
-No shader enablement, prefetch change or interpolation has landed. Continue the numbered queue in
-[PERF_PLAN](PERF_PLAN.md). Before integration, run the complete 144-suite battery; focused results
-here are not whole-head certification. Do not repeat the expensive old CPU baseline work.
+Astra's pass 1 is committed at `6b4b5e6c` (D0533, exact-picture neighborhood sharing) and pass 2 is
+partial at `b836bac3` (D0534, the OFF-by-default shader prototype retains surface tufts). The engineer
+verified both, ran the complete battery Astra's handoff left outstanding (172 checks, 144 suites, 0
+failures) and carried the remaining queue. Full account for audit:
+[the report](audits/2026-09-08-performance-programme.md).
+
+**The measurement came first (D0535).** `tools/perf_fixture.py` plus `view/visuals/bake_cost.gd` and a
+calibration loop in `shell/frame_meter.gd`: four named workloads, terrain preparation and upload split
+from the draw, a fixed-work host-speed control inside every window, and six refusal rules that VOID a run
+rather than report it. It refused four of its own first runs, correctly. A scripted seat is now deaf to
+the machine's real keyboard and mouse -- `PlayInput.verbs` read the hardware on every seat, driven or
+not, so a keystroke typed by whoever owns the laptop could change what MINE snaps to.
+
+**Where the frame stands, `--front`, 1280x720, zoom 2, M4 Pro.** The dig workload runs at 400-530 frames
+a second with a frame p50 of 1.4-1.8 ms, so the director's 360 fps (2.78 ms) is already met on the
+average and the median. What fails is the tail, and `fps_wall` itself is unreliable: three runs whose
+painter CPU agreed within 2% and whose control agreed within 2% read 381, 533 and 410. The stable
+quantities are painter CPU per tick (2.4 ms), bake preparation (12 us a cell, 0.53 ms/tick), the physics
+tick (0.65 ms) and the worst frame.
+
+**Landed since:** the minimap repaints changed cells rather than the world (D0536) -- it was rebuilding
+all ~17,000 logic cells on every terrain version change, 36.5-38.1 ms in one HUD chip on nineteen of
+twenty slow frames of a mining run; the worst frame of that run fell 54.5 -> 21.5 ms, reproduced.
+Presentation interpolation behind `--interpolate`, OFF (D0537): the camera and the miner presented
+between sim ticks, lerped before the pixel snap so the grid survives, at no measurable cost. It is a
+motion change and awaits the director's eye.
+
+**Not done, with reasons in the report:** the shader prototype stays OFF and unfixed -- its divergence is
+not the reported seam but a whole-surface brightness difference that grows with distance into the rock
+(2.44x at a cut's edge, 3.00x five cells in), so the carved-edge lighting gradient is the suspect and
+enabling it is a director art call (T040). Movement-ahead prefetch was inspected and NOT built: the
+streaming lane's budget is 512 solid cells a tick and the two workloads that stress it demand 46 and 31,
+so it runs at 6-9% of its own budget, and no visible hole appears at the first presented frame after a
+cold warp to 131 m.
 
 ## Current stage
 

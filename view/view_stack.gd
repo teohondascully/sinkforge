@@ -227,6 +227,29 @@ static func _mount_ground(view: WorldView) -> void:
 static func _mount_body(view: WorldView) -> void:
 	var body: PaintLayer = view.add_painter(MinerDraw.paint)
 	body.z_index = BODY_Z
+	_body_layer = body
+
+
+## The miner's own canvas, held so a rendered frame can shift it between sim ticks (D0537). Static
+## because there is one world view in a process and the shell that presents it is two layers away; the
+## alternative was a handle threaded through `WorldView`, which is at its 400-line cap.
+static var _body_layer: PaintLayer = null
+
+
+## PRESENT THE FRAME BETWEEN TWO SIM TICKS: the camera where it is now, and the miner's layer shifted by
+## the same fraction so he does not slide against the ground while the world scrolls under him.
+##
+## Nothing here is re-drawn -- both are `Node2D` transforms, so a frame costs two vector writes and no
+## painter. That is the whole reason only these two move: the veil is a lamp texture rebuilt per draw
+## (1.05-1.22 ms), and running it every frame at 500 frames a second would cost half a core. Its lamp
+## therefore lags by one tick, which at 9 m/s is 0.15 m against a lightmap whose own resolution is 1 m.
+static func present(camera: Camera2D, rig: CameraRig) -> void:
+	if camera == null or rig == null:
+		return
+	var f: float = Engine.get_physics_interpolation_fraction()
+	camera.position = rig.presented_camera(f)
+	if _body_layer != null and is_instance_valid(_body_layer):
+		_body_layer.position = rig.presented_body_offset(f)
 
 
 static func _mount_veil(view: WorldView, ore: OrePainter = null, falling: FallingItems = null) -> void:

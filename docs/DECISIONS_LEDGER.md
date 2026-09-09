@@ -20910,7 +20910,7 @@ as "the world freezes every single time i mine a block". The rebuild walks every
 | `fps_wall` | 381.4 | 533.1 | 409.8 | NO |
 | frame p50 | 1.84 ms | 1.38 ms | 1.79 ms | NO |
 | frame p99 | 13.41 ms | 12.26 ms | 13.22 ms | NO |
-| frames over 16.7 ms | 9 of 600 | 6 of 600 | 8 of 600 | NO |
+| frames over 16.7 ms | 9 of 600 | 6.5 of 600 | 7.5 of 600 | NO |
 | painters drawn | 2.372 ms/tick | 2.418 ms/tick | 2.401 ms/tick | no change |
 | bake preparation | 11.81 us/cell | 11.59 us/cell | 11.82 us/cell | no change |
 
@@ -20952,4 +20952,49 @@ machine measures this machine.
 asserted "a new version rebuilds" and returned a NEW texture. A new version now keeps the texture and
 repaints what changed. The assertion was rewritten rather than deleted, and made stronger: it now names
 the number of cells repainted.
+
+
+## D0537 · 2026-09-08 · Presentation interpolation, behind `--interpolate` and OFF: the camera and the miner presented between sim ticks, lerped BEFORE the pixel snap so the grid survives
+
+**Decided:** `CameraRig` keeps the last two ticks' un-snapped camera and body positions and answers
+`presented_camera(f)` / `presented_body_offset(f)`; `ViewStack.present` writes both transforms once a
+rendered frame; `shell/main.gd`'s `_process` calls it when `--interpolate` is given. Default OFF.
+
+**Why it is worth having.** The sim is 60 Hz and the seat renders 400-530 frames a second on this host
+(D0535), so seven or eight frames in nine repeat a picture already on screen, and the camera moves in one
+4.8-screen-pixel step a tick at the body's 9 m/s and play zoom. The director's own display paces at
+120 Hz, so it can show two distinct positions per tick and is being handed one.
+
+**THE DESIGN DECISION IS THE ORDER OF TWO OPERATIONS.** `CameraRig.snap_to_pixel` exists because this is
+pixel art: a camera on a fractional pixel smears every edge in the world. Lerping two already-snapped
+positions puts the camera back on fractions and quietly undoes that rule -- the mutant that does it
+reports the camera at 621.775, 622.05, 622.325 and the suite goes red on nine of eleven sampled
+fractions. Lerping the two UN-SNAPPED positions and snapping the result keeps every frame on the grid and
+turns one 4.8-pixel jump a tick into up to five one-pixel steps: the grid is preserved and the temporal
+resolution is multiplied.
+
+**Why only the camera and the miner move.** Both are `Node2D` transforms, so a frame costs two vector
+writes and re-runs no painter. Everything else that follows the body stays on the tick. The veil is the
+reason: `veil_layer.paint_frame` rebuilds a lamp texture per draw and measured 1.05-1.22 ms, so running
+it every frame at 500 frames a second would cost half a core -- and its lamp lagging one tick is 0.15 m
+against a lightmap whose own resolution is a metre. The miner's own layer is shifted with the camera
+because otherwise he slides against the ground while the world scrolls under him, which is worse than
+the judder it replaces.
+
+**A placement is taken whole.** `--warp`, a load and the fixture's `fall` workload put the body somewhere
+it did not walk to; past `TELEPORT_PX` (48 world px, twenty ticks of a full run) the step is not
+interpolated at all. Mutation-tested both ways: removing the guard smears a teleport by 96 px and the
+suite fails; a body that walked a quarter of that bound is still interpolated, so the guard is not
+vacuous.
+
+**Measured cost: none that the fixture can see.** `--front`, `dig`, 2 repetitions of 1500 ticks each
+side, control 58 -> 61 us. `fps_wall` 455.5 -> 427.3, p50 1.585 -> 1.725 ms, p99 13.02 -> 13.28, worst
+frame 20.39 -> 20.80, painters 2.401 -> 2.406 ms/tick, bake preparation 11.95 -> 12.06 us/cell. EVERY ONE
+IS INSIDE ITS OWN NOISE FLOOR and none is claimed as a difference in either direction.
+
+**Why it ships OFF.** It is a change to how motion looks, and a still capture cannot judge it: with the
+flag on and off the seat's frame at `--warp=130,90 --screenshot-tick=120` is byte-identical, md5
+1fc4657fee294bf63417c00c1c80b8d7, which is the pin working exactly as intended and also the reason the
+verdict is not mine. The director watches it move and says whether it is better:
+`godot --path . -- --interpolate`. Until then the default path is the one that shipped.
 

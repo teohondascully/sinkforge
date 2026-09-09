@@ -69,13 +69,13 @@ BAKE_RE = re.compile(
     r"upload=([\d.]+)ms/tick n=(\d+) cells=(\d+) ([\d.]+)us/cell")
 
 
-def flags_for(workload, ticks, zoom):
+def flags_for(workload, ticks, zoom, extra=()):
     """The seat's argv for one workload. Always `--perf-drive=`, never bare `--perf`: only a driven seat
     is deaf to the real keyboard, and a measurement a passer-by can change is not a measurement."""
     seat = ["--fresh", "--muted", "--zoom=%s" % zoom, "--quit-after=%d" % ticks,
             "--perf-drive=%s" % workload]
     return ["--resolution", "1280x720", "--disable-vsync", "--max-fps", "0",
-            "--path", str(ROOT), "--", "--unfocused"] + seat
+            "--path", str(ROOT), "--", "--unfocused"] + seat + list(extra)
 
 
 # THE SEAT RENDERS FOR REAL, ALWAYS. Hiding the process was tried and rejected by the director: macOS
@@ -117,10 +117,10 @@ def _keep_custody(pid, restore_to, done):
             _osa(RAISE_SCRIPT % restore_to)
 
 
-def run_once(workload, ticks, zoom, godot, hide=False, front=False):
+def run_once(workload, ticks, zoom, godot, hide=False, front=False, extra=()):
     """One seat run, returning its windows in order. Window 1 is the cold one, by construction."""
     was_front = _osa(FRONT_NAME)
-    proc = subprocess.Popen([godot] + flags_for(workload, ticks, zoom),
+    proc = subprocess.Popen([godot] + flags_for(workload, ticks, zoom, extra),
                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                             text=True, cwd=str(ROOT))
     done = threading.Event()
@@ -164,10 +164,10 @@ def parse_windows(out):
     return [w for w in windows if "fps_wall" in w]
 
 
-def gather(workload, reps, ticks, zoom, godot, hide=False, front=False):
+def gather(workload, reps, ticks, zoom, godot, hide=False, front=False, extra=()):
     runs = []
     for i in range(reps):
-        w = run_once(workload, ticks, zoom, godot, hide, front)
+        w = run_once(workload, ticks, zoom, godot, hide, front, extra)
         print("  rep %d/%d: %d windows" % (i + 1, reps, len(w)), file=sys.stderr)
         if not w:
             print("  rep %d produced NO windows -- the seat did not reach tick %d" % (i + 1, ticks),
@@ -351,6 +351,8 @@ def main():
     ap.add_argument("--godot", default=GODOT)
     ap.add_argument("--out")
     ap.add_argument("--label", default="")
+    ap.add_argument("--seat", action="append", default=[],
+                    help="an extra flag passed through to the seat, e.g. --seat=--interpolate. Repeatable.")
     ap.add_argument("--front", action="store_true",
                     help="do not hand focus back: the seat keeps the front for the whole run, which is "
                          "the only regime a frame rate can be claimed from, and takes the screen to do it")
@@ -368,7 +370,7 @@ def main():
     for name in names:
         print("running %s x%d (%d ticks each)" % (name, args.reps, args.ticks), file=sys.stderr)
         out.append(summarise(name, gather(name, args.reps, args.ticks, args.zoom, args.godot,
-                                           args.hidden, args.front), args.hidden))
+                                           args.hidden, args.front, tuple(args.seat)), args.hidden))
     print("\nfixture: %s, %d ticks a run, zoom %s, label %r" % (", ".join(names), args.ticks, args.zoom, args.label))
     for s in out:
         render(s)

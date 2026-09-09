@@ -141,6 +141,29 @@ var _limits: Rect2 = Rect2()
 var _pos: Vector2 = Vector2.ZERO      ## the eased position, kept at FULL precision -- see the header
 var _lead: Vector2 = Vector2.ZERO
 var _started: bool = false
+
+## PRESENTATION INTERPOLATION (D0537), the last two ticks' un-snapped camera and body positions, kept so
+## a rendered frame can sit BETWEEN two sim ticks instead of repeating the last one.
+##
+## The sim runs at 60 Hz and the seat renders at 400-530 frames a second on this host, so seven or eight
+## frames in nine show a picture that is already on screen. The camera moves 4.8 screen pixels a tick at
+## the body's 9 m/s and play zoom, all in one step.
+##
+## INTERPOLATING BEFORE THE SNAP, NOT AFTER, and that is the whole design. `snap_to_pixel` exists because
+## this is pixel art and a camera on a fractional pixel smears every edge in the world; lerping two
+## already-snapped positions would put the camera on fractions and undo it. Lerping the two UN-SNAPPED
+## positions and snapping the result keeps every frame on the pixel grid and turns one 4.8-pixel jump a
+## tick into up to five one-pixel steps. The grid is preserved and the temporal resolution is multiplied.
+var _pre_prev: Vector2 = Vector2.ZERO
+var _pre_cur: Vector2 = Vector2.ZERO
+var _body_prev: Vector2 = Vector2.ZERO
+var _body_cur: Vector2 = Vector2.ZERO
+var _last_zoom: float = 0.0
+## Past this much movement in one tick the body did not travel, it was PLACED -- a warp, a load, the fall
+## workload's return to the shaft top. Interpolating across a teleport draws the miner smeared over
+## everything between the two places, so the step is taken whole. 9 m/s is 2.4 world px a tick, and the
+## camera's own `cut_distance` snap is the same idea one layer up.
+const TELEPORT_PX: float = 48.0
 var _shake: float = 0.0             ## world px of shake still ringing (D0410)
 
 
@@ -180,7 +203,13 @@ func step(body_pos: Vector2, body_vel: Vector2, zoom: float, screen_width: float
 		_pos = target
 	else:
 		_pos = _pos.lerp(target, 1.0 - exp(-FOLLOW_SPEED * delta))
-	return snap_to_pixel(clamp_to_limits(_pos, zoom, screen_width), zoom) + shake_offset()
+	var placed: Vector2 = clamp_to_limits(_pos, zoom, screen_width)
+	_pre_prev = _pre_cur
+	_pre_cur = placed
+	_body_prev = _body_cur
+	_body_cur = body_pos
+	_last_zoom = zoom
+	return snap_to_pixel(placed, zoom) + shake_offset()
 
 
 ## THE SHAKE (D0410, legacy's `_shake` come back with its trigger): a knock of up to `px` world px that
@@ -255,6 +284,31 @@ static func snap_to_pixel(world_pos: Vector2, zoom: float) -> Vector2:
 ## is converging rather than where it is being drawn.
 func position_unsnapped() -> Vector2:
 	return _pos
+
+
+## Where the camera is drawn on a frame `f` of the way from the last sim tick to the next one. `f == 1`
+## is exactly what `step` returned, so a build that never calls this and one that calls it at the tick
+## boundary draw the same picture.
+func presented_camera(f: float) -> Vector2:
+	return snap_to_pixel(_between(_pre_prev, _pre_cur, f), _last_zoom) + shake_offset()
+
+
+## How far the body's own layer is shifted on that frame: where the body is presented, minus where the
+## painters drew it. The painters read the TICK's observation and are not re-run between ticks, so the
+## miner would otherwise sit at the last tick's place while the camera moved on -- the body sliding
+## against the ground, which is worse than the judder it replaces.
+func presented_body_offset(f: float) -> Vector2:
+	if _last_zoom <= 0.0:
+		return Vector2.ZERO
+	return snap_to_pixel(_between(_body_prev, _body_cur, f), _last_zoom) - snap_to_pixel(_body_cur, _last_zoom)
+
+
+## The point `f` of the way from `a` to `b`, or `b` whole when the two are further apart than a body can
+## travel in one tick -- see `TELEPORT_PX`.
+static func _between(a: Vector2, b: Vector2, f: float) -> Vector2:
+	if a.distance_to(b) > TELEPORT_PX:
+		return b
+	return a.lerp(b, clampf(f, 0.0, 1.0))
 
 
 func lead_offset() -> Vector2:

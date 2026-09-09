@@ -24,6 +24,7 @@ func _initialize() -> void:
 	_test_the_framing_shows_legacys_own_field_of_view()
 	_test_the_default_zoom_never_frames_void()
 	_test_the_camera_never_shows_past_the_world()
+	_test_a_presented_frame_sits_between_two_ticks_and_stays_on_the_pixel_grid()
 	_finish("camera_rig")
 
 
@@ -296,3 +297,50 @@ func _test_the_camera_never_shows_past_the_world() -> void:
 	var centred: Vector2 = n.step(Vector2(5000.0, 2000.0), Vector2.ZERO, ZOOM, SCREEN_W, DT)
 	_check(absf(centred.x - 50.0) < 1.0,
 		"a world narrower than the view is CENTRED at %.1f, not pinned to an edge" % centred.x)
+
+
+## PRESENTATION INTERPOLATION (D0537). The sim runs at 60 Hz and the seat renders four to nine times
+## faster, so a rendered frame may sit between two ticks. Three properties make that safe, and each is
+## the mutation of the others: at the tick boundary the picture is exactly what it was before the feature
+## existed; every presented position is still on the pixel grid, because the lerp happens BEFORE the snap
+## and not after; and a body that was PLACED rather than moved is not smeared across everything between
+## the two places.
+func _test_a_presented_frame_sits_between_two_ticks_and_stays_on_the_pixel_grid() -> void:
+	var rig: CameraRig = CameraRig.new()
+	var at: Vector2 = Vector2(500.0, 300.0)
+	var last: Vector2 = Vector2.ZERO
+	for i: int in 40:
+		at += Vector2(2.4, 0.0)   # 9 m/s at 16 logic px a metre: one tick of a full run
+		last = rig.step(at, Vector2(144.0, 0.0), ZOOM, SCREEN_W, DT)
+	# AT THE BOUNDARY, NOTHING CHANGED. A build that never presents and one that presents at f == 1 draw
+	# the same frame, which is why the flag can be off by default without the two paths diverging.
+	_check(rig.presented_camera(1.0).is_equal_approx(last),
+		"f == 1 is exactly what step() returned (%s vs %s)" % [str(rig.presented_camera(1.0)), str(last)])
+	_check(rig.presented_body_offset(1.0) == Vector2.ZERO,
+		"and the miner's layer is not shifted at all (%s)" % str(rig.presented_body_offset(1.0)))
+	# BETWEEN, IT MOVES -- and lands on the grid every time. A camera on a fractional pixel smears every
+	# edge in a pixel-art world, which is what `snap_to_pixel` exists to prevent; lerping two already
+	# snapped positions would put it on fractions and quietly undo that rule.
+	var seen: Dictionary = {}
+	for i: int in 11:
+		var f: float = float(i) / 10.0
+		var at_f: Vector2 = rig.presented_camera(f)
+		var on_grid: Vector2 = CameraRig.snap_to_pixel(at_f - rig.shake_offset(), ZOOM)
+		_check(on_grid.is_equal_approx(at_f - rig.shake_offset()),
+			"the presented camera is on the pixel grid at f=%.1f (%s)" % [f, str(at_f)])
+		seen[str(at_f)] = true
+	_check(seen.size() > 1, "and it does not sit on one place for the whole tick (%d distinct)" % seen.size())
+	# A PLACEMENT IS TAKEN WHOLE. `--warp`, a load and the fixture's fall workload all put the body
+	# somewhere it did not walk to; interpolating across that draws the miner over everything between.
+	var placed: CameraRig = CameraRig.new()
+	placed.step(Vector2(500.0, 300.0), Vector2.ZERO, ZOOM, SCREEN_W, DT)
+	placed.step(Vector2(500.0 + CameraRig.TELEPORT_PX * 4.0, 300.0), Vector2.ZERO, ZOOM, SCREEN_W, DT)
+	_check(placed.presented_body_offset(0.5) == Vector2.ZERO,
+		"a teleported body is not interpolated at all (%s)" % str(placed.presented_body_offset(0.5)))
+	# AND THE MUTATION THAT SAYS THE GUARD IS NOT VACUOUS: an ordinary tick, four times shorter than the
+	# teleport bound, IS interpolated.
+	var walked: CameraRig = CameraRig.new()
+	walked.step(Vector2(500.0, 300.0), Vector2.ZERO, ZOOM, SCREEN_W, DT)
+	walked.step(Vector2(500.0 + CameraRig.TELEPORT_PX / 4.0, 300.0), Vector2.ZERO, ZOOM, SCREEN_W, DT)
+	_check(walked.presented_body_offset(0.5) != Vector2.ZERO,
+		"a body that walked is (%s)" % str(walked.presented_body_offset(0.5)))

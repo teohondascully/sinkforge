@@ -99,6 +99,23 @@ func _test_the_map_paints_ore_only_where_seen() -> void:
 	var got: Color = map._img.get_pixel(5, 6)
 	var close: bool = absf(got.r - want.r) < 1.5 / 255.0 and absf(got.g - want.g) < 1.5 / 255.0 and absf(got.b - want.b) < 1.5 / 255.0
 	_check(tex2 == tex and map.rebuilds == first and close, "one step of seeing paints the turned ore cell into the same texture without a rebuild (%s vs %s, 8-bit)" % [str(got), str(want)])
-	o.map_seen_version += 3
+	_skipped_version_control(map, o, look, plane, first)
+
+
+## CONTROL FOR THE ONE-STEP PATH ABOVE: a SKIPPED version must not take it, and must still land on the
+## exact picture. It used to fall through to a full rebuild and that is what this asserted. Since D0536
+## it falls through to the byte diff instead, which is cheaper and reaches the same image -- so the
+## assertion was rewritten to pin the property that mattered rather than the route that used to carry it.
+## The fast path is still narrow (`patched` stays 0 while it applies and moves when it does not), and
+## whatever route is taken the chart equals a rebuild of the same observation.
+func _skipped_version_control(map: Minimap, o: Interface.Observation, look: MaterialLook,
+		plane: SeenPlane, first: int) -> void:
+	plane.mark(Vector2i(9, 9), 1)
+	o.map_seen = plane.seen
+	o.map_seen_version = plane.version + 3
 	map.ensure_texture(o, look)
-	_check(map.rebuilds == first + 1, "control: a skipped version rebuilds")
+	_check(map.rebuilds == first, "control: a skipped version does not rebuild the world (%d)" % map.rebuilds)
+	_check(map.patched > 0, "control: it takes the diff, which the one-step path never does (%d patched)" % map.patched)
+	var fresh: Minimap = Minimap.new()
+	_check(fresh.ensure_texture(o, look).get_image().get_data() == map._img.get_data(),
+		"and the picture is byte-identical to a full rebuild of the same observation")

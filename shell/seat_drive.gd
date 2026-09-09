@@ -154,6 +154,15 @@ static func workload_tick(main: Main) -> void:
 		body.place(_fall_from.x, _fall_from.y)
 
 
+## The meter's per-RENDERED-frame sample and the context it keeps for a slow one. Lives here rather than
+## in `shell/main.gd` because that file is at its 400-line cap and this one is the instrument's half of
+## the seat; `meter_tick` below is its per-sim-tick sibling.
+static func meter_frame(main: Main) -> void:
+	main.meter.note_process()
+	if main.meter.last_was_slow() and main.booted:
+		main.meter.note_slow("tick=%d %s" % [main.tick, main.view.draw_cost_report()])
+
+
 ## The meter's physics sample, split by whether this tick ran the hub; a report every 300 ticks.
 ##
 ## The window's four lines are the phase split `docs/PERF_PLAN.md` asks for and each is measured by a
