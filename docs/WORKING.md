@@ -4,6 +4,12 @@
 
 ## Performance programme — the five passes, September 8
 
+**September 9 review, D0541:** D0540's streaming attribution is not established. Peak preparation
+time and peak cells are independent extrema, not one event, and rectangle area does not identify
+a lane. Before scheduler changes, retain a paired slowest-event receipt and scheduling reason through
+the draw callback. [Claude handoff and bounded implementation queue](audits/2026-09-09-bake-burst-handoff.md).
+Three focused bake/fixture suites pass; no runtime changes or new FPS claim in this analysis pass.
+
 **D0539 small follow-up:** explicit camera resets clear camera interpolation history, including
 cuts below the inferred-teleport threshold. Four new assertions failed before the fix; camera,
 main-boot and world-view suites pass afterward. Miner history/simulation are unchanged;

@@ -21087,3 +21087,17 @@ and +84, and the worst column carries 2.7x the median column's difference at x=6
 differ substantially where a signed mean reads 1.007. Neither statistic settles the reported seam, because
 this capture is a cave at 131 m and the seam was reported at a surface cut; the scene was never posed.
 
+## D0541 · 2026-09-09 · Pair burst evidence before attributing it to the streaming scheduler
+
+**Decided:** bounded code-analysis pass, not a scheduler rewrite. D0538's peak cells and peak time
+are independent maxima at both producer and summariser; D0540 cannot join them into one event.
+The real summariser given (200 cells, 9 ms) and (1024 cells, 1 ms) reports maxima (1024, 9).
+Rectangle area includes air and dirty repaints and cannot identify four streamed chunks. Keep
+mandatory digging/visible coverage unchanged; first carry a paired event and selection reason to
+the draw callback. Detailed implementation queue: `docs/audits/2026-09-09-bake-burst-handoff.md`.
+
+**Evidence:** reviewed BakeCost, BakeChunk, BakeLane, BakeWindow and the fall driver; three focused
+bake-budget/lane/fixture suites pass after an approved rerun outside the sandbox (the sandboxed
+engine crashed in user-log rotation before tests). No runtime changes or new timing claim. This
+does not withdraw D0540's reported minimap comparison; it narrows its explanation of the remaining
+burst. The original saved-run-provenance idea is deferred to keep this pass on the immediate blocker.

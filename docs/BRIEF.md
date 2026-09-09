@@ -1,5 +1,13 @@
 # Brief
 
+## What was learned — burst attribution before scheduling (D0541, September 9)
+
+The peak-cell count and peak preparation time can come from different ticks. D0540's "9 ms over
+1024 cells" is not one joined observation, and 1024 rectangle cells does not identify streaming.
+No scheduler change landed. [Claude's next-step handoff](audits/2026-09-09-bake-burst-handoff.md)
+specifies a paired receipt, lane attribution, one cold-descent fixture and the treatment decision.
+Three focused bake/fixture suites pass. This is code analysis, not a new FPS or visual-parity claim.
+
 ## Small follow-up — camera reset correctness (D0539)
 
 An explicit camera cut left old interpolation endpoints alive, including on the following tick.

@@ -1,0 +1,117 @@
+# Bake-burst attribution: handoff to Claude
+
+Reviewed head: `b9f1f7c1`. Scope: source analysis of D0540 and the scheduling change it recommends.
+No renderer or fixture behavior changed in this pass. This is not a new performance benchmark.
+
+## Bottom line
+
+Keep the minimap optimisation. D0540 reports a corrected before/after with actual maxima; this review
+does not rerun that experiment. Preparation bursts are a legitimate next target. However, the current
+evidence does **not** identify the streaming allowance as their cause. Do not split or cap mandatory
+digging work based on the number 1024 alone.
+
+## Findings
+
+### 1. Peak time and peak cells are not one event
+
+`view/visuals/bake_cost.gd:57` independently updates `prep_tick_max_cells` and `prep_tick_max_usec`.
+`tools/perf_fixture.py:320` independently maximises them again across warm windows. Neither preserves
+the identity of the tick that produced a maximum. D0540's wording "9 ms ... over 1024 cells" therefore
+joins measurements the instrument did not join.
+
+Reproduction using the real summariser, no game or timer involved:
+
+```text
+warm sample A: peak_cells=200,  peak_prep_ms=9
+warm sample B: peak_cells=1024, peak_prep_ms=1
+summary:       warm_peak_cells=1024, warm_peak_prep_ms=9
+```
+
+This is a limitation in D0538's telemetry, which I authored. Both extrema are individually useful;
+they must not be interpreted as the attributes of one event. Fix the producer as well as the Python
+aggregation: pairing already-independent window maxima in Python cannot recover the missing event.
+
+### 2. Rectangle area does not identify a lane or a chunk count
+
+`BakeChunk._paint` at `view/visuals/bake_chunk.gd:177` returns the area of the paint rectangle. That
+rectangle can be partial or whole and includes air. Every preparation callback uses the same counter.
+`BakeWindow.plan_tick` combines mandatory dig work and window work into `Plan.whole` and `Plan.partial`;
+the cost stamp no longer knows why a chunk was selected.
+
+1024 cells equals four full-chunk *areas*. It does not prove four full-chunk callbacks, a streaming
+selection, or 1024 solid cells. Several partial rectangles can sum to the same number.
+
+### 3. The streaming budget is not a whole-frame cap
+
+The current policy has four distinct cases:
+
+| Case | Current behavior | Safe action if it dominates |
+|---|---|---|
+| Initial bake | Paint everything required | Treat as startup; measure separately |
+| Dig-influenced terrain | Mandatory, outside window allowance | Reduce work per dirty region; don't defer visible excavation |
+| Previously unpainted terrain already visible | Mandatory even beyond allowance | Prefetch earlier or reduce paint cost; don't introduce holes |
+| Not-yet-visible margin | Budgeted at 512 solid cells | Defer or prioritise this optional work |
+
+`tests/test_bake_budget.gd` already demonstrates this distinction: twelve solid margin chunks drain
+two per tick; moving the view exposes five chunks and admits 1280 solid cells immediately; a dig can
+add whole chunks without spending the margin's allowance. All these cases passed in this review.
+
+A shared remaining-work budget may help **optional margin work** coexist with digging. It cannot
+promise a 2.78 ms frame when mandatory work alone exceeds that time. Do not reinterpret "shared budget"
+as permission to delay the cut a player just made.
+
+### 4. Zero solid cells is not necessarily zero preparation cost
+
+`BakeLane` permits every zero-solid-cell margin chunk. But `BakeChunk._paint` still observes its region,
+invokes the retained painters (including the background-wall painter), and fills the grammar map.
+An air foreground over a wall is not an empty rendering workload. The budget is a useful proxy for
+rock shading, not a proof that these callbacks are free. Measure this before adding a second budget.
+
+### 5. The fall fixture revisits terrain it already painted
+
+`shell/seat_drive.gd:138` explicitly describes falling down the shaft the same run first excavated.
+This is useful movement/revisit coverage, but not a dedicated cold-streaming descent. Some work may
+enter at the bottom; the fixture does not certify how much. A cold warp tests immediate coverage, not
+whether a moving camera continuously outruns the prefetch margin.
+
+## Implementation queue, in order
+
+1. **One paired burst receipt, not another benchmark framework.** Retain the slowest preparation
+   event with its physics-frame ID, render-frame ID, elapsed preparation time, rectangle-cell count
+   and actual callback count. Preserve separate maximum-area statistics under explicit names.
+   Carry that same record through JSON; do not reconstruct it from extrema.
+2. **Preserve scheduling reasons to the draw callback.** Classify whole selections as initial,
+   dig-influenced, newly-visible, or optional margin; classify partials as dig-influenced. For overlap,
+   mandatory wins, and charge work once. Pass classification with the planned batch, not mutable
+   "current reason" global state: `_draw` occurs after planning. Record planned tick and actual draw
+   tick so delayed rendering cannot silently change attribution. Include full-rebake fallback.
+3. **Run one bounded discovery trace.** Default-zoom dig plus a pre-excavated, unbaked descent at
+   widest zoom. The latter is a labelled performance fixture, not a golden gameplay episode. Require
+   actual newly-visible callbacks during the timed descent; otherwise it is a revisit control only.
+4. **Pick exactly one treatment from the receipt.** Optional margin dominates: subtract mandatory
+   predicted cost from discretionary allowance and prefer chunks in the travel direction. Mandatory
+   new-visible work dominates: extend prefetch lead without widening the observation blindly. Dirty
+   repaints dominate: inspect repeated region setup and affected area before altering scheduling.
+5. **Verify effect and picture together.** Same head/settings/seed/workload; interleaved A/B order;
+   compare actual tails and the attributed phase. No stale cuts, missing terrain, starved prefetch,
+   or changes to the deterministic sim. Stop after a bounded inconclusive trial rather than stacking
+   runs whose noise hides the effect. Leave GPU cost labelled unmeasured until a real GPU instrument.
+
+## Tests that earn their cost
+
+- Two ticks with opposite time/area maxima: the slowest receipt retains its own cells and tick.
+- Two preparation callbacks in one draw: their sum and count share one event identity.
+- Dirty chunk also requested by streaming: charged once, mandatory reason preserved.
+- Mandatory work exceeds allowance: still shown now; optional work can wait and later drains.
+- Air foreground with background wall: counted as a preparation callback, not declared free.
+- Cold-descent fixture: both moving-body and newly-visible-paint witnesses; a warm replay is a control.
+
+## Verification and limits
+
+Three focused suites passed: bake_budget, bake_lanes, perf_fixture. The initial sandboxed launch failed
+in Godot's user-log rotation before tests; the approved unrestricted rerun passed all three in two
+seconds. CodeRabbit 0.7.3 is signed out, so this was direct source review, not a CodeRabbit result.
+No full suite rerun, new FPS measurement, or claim that the shader seam is resolved.
+
+The originally considered saved-run provenance improvement remains useful but is deferred. Do not
+start that separate workstream ahead of the paired receipt needed to select the next game optimisation.
