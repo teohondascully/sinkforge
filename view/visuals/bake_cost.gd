@@ -151,12 +151,60 @@ static func note_density(reason: String, solid: int, dilated: int) -> void:
 static var dig_paid_dilated: int = 0
 static var dig_shared_dilated: int = 0
 static var dig_split_ticks: int = 0
+## THE WORST SINGLE TICK'S TRADE, beside the window's total, because the totals above are SUMS and a sum
+## cannot see a burst -- the lesson this file already carries for `prep_tick_max_usec` and did not apply
+## here. The frame a player loses is dropped by ONE tick, so what a shared neighbourhood is worth is what
+## it takes off the WORST tick, not what it takes off the average of three hundred. Kept by largest
+## `paid`: that is the tick nearest to dropping a frame, and the tick whose saving decides whether the
+## treatment is worth writing. `[[an-average-cannot-see-a-burst]]`.
+static var dig_peak_paid: int = 0
+static var dig_peak_shared: int = 0
+## THE SAME TRADE AT THE OBSERVATION'S OWN DILATION (D0556). The four counters above grow by
+## `RockTone.FORM_REACH` (6), which is the span `RockNeighborhood` builds -- but the question the split
+## was built to answer is whether ONE UNION OBSERVATION pays for itself, and an observation grows by
+## `WorldView.WINDOW_MARGIN_CELLS` (9). Measuring a 6-dilation to decide a 9-dilation's trade is the
+## same unit error as pricing the neighbourhood by `setup`'s clock, so both spans are counted and each
+## is reported against the clock that charges for it: `form` for these, `setup` for those.
+static var dig_paid_obs: int = 0
+static var dig_shared_obs: int = 0
+static var dig_peak_paid_obs: int = 0
+static var dig_peak_shared_obs: int = 0
 
 
-static func note_dig_span(paid: int, shared: int) -> void:
+static func note_dig_span(paid: int, shared: int, paid_obs: int = 0, shared_obs: int = 0) -> void:
 	dig_paid_dilated += paid
 	dig_shared_dilated += shared
+	dig_paid_obs += paid_obs
+	dig_shared_obs += shared_obs
 	dig_split_ticks += 1
+	if paid > dig_peak_paid:   # the four are kept together: a peak paid beside another tick's shared is
+		dig_peak_paid = paid   # a trade nobody was ever offered, and it reads as a better one
+		dig_peak_shared = shared
+		dig_peak_paid_obs = paid_obs
+		dig_peak_shared_obs = shared_obs
+
+
+## THE SHADING NEIGHBOURHOOD'S OWN CLOCK (D0556), and the reason it exists: `dig_split` above measures a
+## span dilated by `RockTone.FORM_REACH` (6), while `setup` measures one dilated by `WINDOW_MARGIN_CELLS`
+## (9). They are DIFFERENT DILATIONS of different work -- the observation against the neighbourhood -- and
+## sizing the union-observation trade by `setup`'s share of preparation charges the saving to a clock that
+## does not measure it. `RockNeighborhood._init` spans exactly `cells.grow(FORM_REACH)`, so this clock and
+## `dig_split`'s `paid_dilated` count the same cells and the trade can be priced in the unit it is offered
+## in. Charged inside a PREP callback like `setup`, so it is a slice of `prep_usec`, never an addition.
+static var prep_form_usec: int = 0
+static var prep_form_cells: int = 0
+static var prep_forms: int = 0
+
+
+## One neighbourhood build, over the `dilated` cells it actually spanned. A build that was skipped (no
+## tone, or an empty rect) charges nothing and counts nothing -- a zero-cell build averaged in would
+## drag the per-cell rate toward a cost nobody paid.
+static func note_form(began: int, dilated: int) -> void:
+	if dilated <= 0:
+		return
+	prep_form_usec += Time.get_ticks_usec() - began
+	prep_form_cells += dilated
+	prep_forms += 1
 
 
 ## One region setup, timed from `began` to now, over the `observed` cells the envelope actually covered.
@@ -177,6 +225,15 @@ static func reset() -> void:
 	dig_paid_dilated = 0
 	dig_shared_dilated = 0
 	dig_split_ticks = 0
+	dig_peak_paid = 0
+	dig_peak_shared = 0
+	dig_paid_obs = 0
+	dig_shared_obs = 0
+	dig_peak_paid_obs = 0
+	dig_peak_shared_obs = 0
+	prep_form_usec = 0
+	prep_form_cells = 0
+	prep_forms = 0
 	_tick = -1
 	_tick_cells = 0
 	_tick_usec = 0
@@ -213,16 +270,41 @@ static func setup_line() -> String:
 		float(prep_setup_usec) / 1000.0, prep_setups,
 		100.0 * float(prep_setup_usec) / float(maxi(prep_usec, 1)),
 		prep_setup_cells, prep_cells,
-		float(prep_setup_cells) / float(maxi(prep_cells, 1))]
+		float(prep_setup_cells) / float(maxi(prep_cells, 1))] + form_line()
+
+
+## The neighbourhood build beside the setup it is not, in the same units, so the union-observation trade
+## can be priced against the clock that would actually pay for it.
+static func form_line() -> String:
+	if prep_forms == 0:
+		return ""
+	return " | form=%.3fms/%dbuilds %.1f%%ofprep dilated_cells=%d %.2fus/dilated" % [
+		float(prep_form_usec) / 1000.0, prep_forms,
+		100.0 * float(prep_form_usec) / float(maxi(prep_usec, 1)),
+		prep_form_cells, float(prep_form_usec) / float(maxi(prep_form_cells, 1))]
 
 
 ## What the chunk split costs the dig, as a ceiling on sharing: paid against shared dilated span.
 static func split_line() -> String:
 	if dig_split_ticks == 0:
 		return ""
-	return " | dig_split ticks=%d paid_dilated=%d shared_dilated=%d overlap=%.1f%%" % [
+	return " | dig_split ticks=%d paid_dilated=%d shared_dilated=%d overlap=%.1f%% peak_tick paid=%d shared=%d overlap=%.1f%%" % [
 		dig_split_ticks, dig_paid_dilated, dig_shared_dilated,
-		100.0 * float(dig_paid_dilated - dig_shared_dilated) / float(maxi(dig_paid_dilated, 1))]
+		100.0 * float(dig_paid_dilated - dig_shared_dilated) / float(maxi(dig_paid_dilated, 1)),
+		dig_peak_paid, dig_peak_shared,
+		100.0 * float(dig_peak_paid - dig_peak_shared) / float(maxi(dig_peak_paid, 1))] + obs_span_line()
+
+
+## The union trade at the OBSERVATION's dilation, which is the one `setup` charges for. Silent when the
+## caller did not supply it, rather than printing a 100% overlap nobody measured.
+static func obs_span_line() -> String:
+	if dig_paid_obs <= 0:
+		return ""
+	return " obs_span paid=%d shared=%d overlap=%.1f%% peak_obs paid=%d shared=%d overlap=%.1f%%" % [
+		dig_paid_obs, dig_shared_obs,
+		100.0 * float(dig_paid_obs - dig_shared_obs) / float(maxi(dig_paid_obs, 1)),
+		dig_peak_paid_obs, dig_peak_shared_obs,
+		100.0 * float(dig_peak_paid_obs - dig_peak_shared_obs) / float(maxi(dig_peak_paid_obs, 1))]
 
 
 ## The window's preparation split by why each chunk was selected, slowest reason first. Empty when

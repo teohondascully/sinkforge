@@ -21759,3 +21759,66 @@ listed is silently dead -- caught by reading the asserted COUNT (72, unchanged) 
 windows, 2 repetitions in the regime comparison against D0551's 3. `--max-fps` sleeps where vsync blocks,
 so the cap ladder and the vsync arm are not the same mechanism -- they agree, which is why both are here.
 Nothing is claimed about a 60 Hz screen, and the bake's own treatment is measured but not yet attempted.
+
+## D0556 · 2026-09-09 · Q3 answered: the union observation is favourable and too small to stop the hitch, so Q4 is NOT built
+
+**Decided:** DO NOT implement the shared neighbourhood (the queue's Q4). Measured, it is worth **10.1% of
+preparation and 1.04 ms off the worst tick** -- real, bounded, and not enough to keep that tick's frame.
+Three instruments were added to say so rather than guess it, and the perf programme stops here.
+
+**The unit error first, because it nearly produced the wrong answer.** `dig_split` (D0546) weighs the
+trade in cells dilated by `RockTone.FORM_REACH` (6) -- the span `RockNeighborhood` builds. `setup`
+(D0545) measures a span dilated by `WorldView.WINDOW_MARGIN_CELLS` (9) -- the observation. They are
+different dilations of different work, and my first sizing multiplied the split's overlap by setup's
+share of preparation, charging a saving to a clock that cannot measure it. That answer was 3%; the
+measured one is 10.1%. `[[budget-in-the-wrong-unit-is-green-forever]]`, one clock over.
+
+**The instruments.** (1) `form=` clocks `RockNeighborhood.new` where it is actually built
+(`terrain_painter.gd`), so the neighbourhood is priced in the unit its trade is offered in.
+(2) `peak_tick`/`peak_obs` keep the WORST tick's trade beside the window's total, because the totals are
+sums and a sum cannot see a burst -- the lesson this file already carried for `prep_tick_max_usec` and
+had not applied here. The pair is stored together: a peak paid beside another tick's shared is a trade
+nobody was offered, and it reads as a better one. (3) `obs_span` measures the same trade at the
+observation's own dilation, which is the one Q3 actually asked about.
+
+**Measured** (dig, 900 ticks, zoom 2, warm window, deterministic across repetitions):
+
+| | paid | shared | overlap | rate |
+|---|---|---|---|---|
+| neighbourhood span, window | 50,828 | 25,016 | 50.8% | 0.18-0.19 us/cell |
+| neighbourhood span, peak tick | 2,668 | 1,156 | 56.7% | |
+| observation span, window | 82,844 | 34,946 | 57.8% | 0.272 us/cell |
+| observation span, peak tick | 4,408 | 1,600 | **63.7%** | |
+
+`setup` is 13.3-15.0% of preparation and `form` is 6.2-6.3%; preparation is ~176 ms a 5-second window.
+**Sharing helps most exactly where it matters** -- the worst tick duplicates 63.7% of its observed span
+against the window's 57.8% -- which a sum could not have shown.
+
+**The arithmetic, on measured rates.** Window: (82,844-34,946) x 0.272us + (50,828-25,016) x 0.185us =
+13.03 + 4.78 = **17.8 ms of ~176 ms (10.1%)**. Peak tick: (4,408-1,600) x 0.272us + (2,668-1,156) x
+0.185us = 0.76 + 0.28 = **1.04 ms of 8.90-9.15 ms (11.4%)**.
+
+**Why that is a NO.** The frame a player loses is 22-31 ms (D0555), of which the bake is ~7-9. Taking
+1.04 ms off it leaves a dropped frame. The cost is a shared structure indexed by absolute cell, living
+across a tick, with invalidation, and a correctness risk on the halo rule that
+`tests/test_terrain_shading_cost.gd` exists to protect. A tenth of preparation does not buy that.
+**The lever with the bigger arm is visible in the same data and is not this one:** the peak tick is
+**4-6 dig callbacks painting 441-462 cells at 21.1 us/cell against a 12.8 us window average** -- small
+rects each paying their own setup and halo. Merging a tick's dig rects before painting attacks the
+duplication at its source rather than sharing its result. NOT attempted here and NOT estimated into the
+ledger; it is the next session's, with an A/B, if the director wants the bake pursued at all.
+
+**Also here:** `tests/test_frame_meter.gd` is split out of `tests/test_perf_fixture.gd` at that file's
+400-line cap -- a seam, not a trim (what a workload does is one suite's, what the clock watching it can
+and cannot see is the other's). 82 assertions before, 12 + 70 = 82 after, so the move lost nothing.
+
+**Verified:** perf_fixture 70 -> 73 and frame_meter 12 asserted. Four mutations fire: an unguarded
+zero-cell build, `form_line` dropped from the window line, the peak pair taken as two independent maxima
+(posed so they disagree -- 100 with 45 reads 55% where the tick's own trade is 90%), and an unsupplied
+observation span printing as a measured overlap. Full local battery green.
+
+**Limits.** One host, one seed, one zoom, the `dig` workload only. The rates are window averages over a
+population that mixes dig and margin callbacks at different per-cell costs (14.1 against 8.8 us/cell), so
+the two totals above are arithmetic on measured rates and measured geometry, not a measured A/B of an
+implementation that does not exist. That is the right instrument for a build/do-not-build call and the
+wrong one for a claimed speed-up; no speed-up is claimed.

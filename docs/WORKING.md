@@ -265,6 +265,27 @@ The sentence now says "near enough", which is what the game tested; **no behavio
 12 m window itself should widen (or become a rectangle) is a feel call left to the director, with three
 options in the entry. And it is NOT why S128 failed: that was the hotbar, fixed in D0553.
 
+**The perf programme STOPS at D0556, and the director's own words are why:** "it's been like 5 days with
+no new features or UI improvements." Checked against the log rather than argued with -- 16 commits on
+2026-09-09, **14 of them measurement**. D0555 and D0556 are both worth having (the frame tail was the
+compositor, not the game; the bake's remaining treatment is worth 10% and will not stop the hitch), but
+they are instruments, and instruments are not what the game needed today. **The next session opens on
+gameplay and UI, not on the bake.** What is left of the perf queue, sized and parked: the shared
+neighbourhood is a NO (D0556); the lever with the bigger arm is merging a tick's dig rects before
+painting, unattempted and unestimated; Astra owns the fixture question in
+`docs/audits/2026-09-09-presentation-regime-handoff.md`.
+
+**Two shipped and UNMEASURED gameplay changes are the next batch's job:** D0553 (a stack keeps its
+number -- the hotbar stopped renumbering under the player, which is why two seats never delivered) and
+D0554 (the floor lesson stopped claiming what was in sight). Strangers 127-132 found the first; nothing
+has tested either fix.
+
+**One structural note so it is not rediscovered at a line cap:** `tests/test_perf_fixture.gd` reached
+400 lines and `tests/test_frame_meter.gd` was split out of it (D0556). Suites are registered by hand in
+`.github/workflows/harness.yml`, and a `_test_` function is registered by hand in `_initialize()` -- a
+test that is written and not listed is silently dead, and `ALL PASS` will not say so. Read the asserted
+COUNT after adding one; that is how tonight's was caught.
+
 ## Repository cleanup (director-approved)
 
 Tooling implementation complete (D0525): timing summaries, runner accounting/optional battery

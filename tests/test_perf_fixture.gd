@@ -19,9 +19,6 @@ const BODY_PX: int = Body.WIDTH_PX
 func _initialize() -> void:
 	_test_bake_cost_counts_both_phases_and_resets()
 	_test_slowest_receipt_keeps_its_own_cells_and_reasons()
-	_test_the_control_loop_is_fixed_work_and_is_reported()
-	_test_the_window_line_says_which_presentation_regime_produced_it()
-	_test_the_focus_share_is_a_share_of_the_frames_it_describes()
 	_test_each_workload_presses_what_it_is_named_for()
 	_test_the_dig_sweep_is_wider_than_the_miner()
 	_test_the_seat_parses_its_workload_and_refuses_a_typo()
@@ -29,6 +26,7 @@ func _initialize() -> void:
 	_test_the_setup_line_names_the_multiplier_a_per_cell_rate_carries()
 	_test_a_real_paint_charges_setup_and_cells_over_different_areas()
 	_test_a_real_paint_records_the_dilated_span_the_painters_actually_scan()
+	_test_the_neighbourhood_build_is_priced_in_the_unit_the_trade_is_offered_in()
 	_test_the_chunk_split_duplicates_halo_and_the_probe_measures_it()
 	_finish("perf_fixture")
 
@@ -71,70 +69,6 @@ func _test_bake_cost_counts_both_phases_and_resets() -> void:
 	BakeCost.reset()
 	_check(BakeCost.prep_cells == 0 and BakeCost.upload_cells == 0, "reset clears both phases")
 	_check(BakeCost.prep_tick_max_cells == 0, "reset clears the burst high-water mark")
-
-
-## The control loop must do the SAME work every time it is asked, or it measures itself rather than the
-## host. Its result is kept in `cal_sink` precisely so this can be asserted instead of assumed.
-func _test_the_control_loop_is_fixed_work_and_is_reported() -> void:
-	var m: FrameMeter = FrameMeter.new()
-	_check(m.calibration().contains("n=0"), "a fresh meter has taken no control samples")
-	for _i: int in FrameMeter.CAL_EVERY * 4:
-		m.note_process()
-	var first: int = m.cal_sink
-	var n: FrameMeter = FrameMeter.new()
-	for _i: int in FrameMeter.CAL_EVERY * 4:
-		n.note_process()
-	_check(first != 0, "the loop produced a result, so nothing about it was skipped")
-	_check(first == n.cal_sink, "two meters run the same fixed work: %d == %d" % [first, n.cal_sink])
-	_check(m.calibration().contains("p50=") and m.calibration().contains("spread="),
-		"the control reports a median and a spread: %s" % m.calibration())
-	# THE WINDOW LINE MUST CARRY IT. A control computed and not printed is a control nobody can check a
-	# past run against, and every run this fixture produces is read later, from its log, by someone else.
-	_check(m.report().contains("cal p50="), "the window report carries the control: %s" % m.report())
-	_check(m.report().contains("draw p50="), "and the draw phase, over every frame rather than the worst eight")
-	m.reset()
-	_check(m.calibration().contains("n=0"), "reset clears the control's samples with the frames'")
-
-
-func _test_the_focus_share_is_a_share_of_the_frames_it_describes() -> void:
-	# `focus` gates every frame number this programme publishes (the fixture withholds a window below
-	# 0.95), so a focus that can exceed 1.0 is a guard reporting more agreement than it measured. The
-	# first `_process` closes no frame, so its focus sample had no frame to belong to and the share was
-	# computed over n-1: a 15-frame window read 1.07. `[[guards-that-cannot-be-false]]`.
-	var m: FrameMeter = FrameMeter.new()
-	for _i: int in 16:
-		m.note_process()
-	var share: float = float(m.report().split("focus=")[1].split(" ")[0])
-	_check(share <= 1.0, "a share of the frames cannot exceed all of them: focus=%.2f" % share)
-	_check(m.report().contains("frames=15 "), "and the window still reports the 15 frames 16 calls close")
-
-
-func _test_the_window_line_says_which_presentation_regime_produced_it() -> void:
-	# THE THIRD CONTROL (D0555). `focus` was added because whether the compositor was presenting this
-	# window changed every frame number beside it; this is the same defect one layer down. Running with
-	# `--disable-vsync --max-fps 0` lets the app produce ~400 frames a second against a 120 Hz display,
-	# so it blocks on a drawable that does not exist yet -- 8.24-8.51 ms of WAITING, counted as draw
-	# time and as frame time. Measured: the same dig workload drops 28-30 frames a window vsynced and
-	# 22-35 unvsynced, but over 597 frames against 1598, so the RATE moved 2.5-4x on a game that did
-	# not change. A window report that cannot say which regime it came from cannot be compared with
-	# another one. `[[window-regime-is-inside-the-measurement]]`, `[[read-the-count-not-the-rate]]`.
-	var m: FrameMeter = FrameMeter.new()
-	for _i: int in FrameMeter.CAL_EVERY * 4:
-		m.note_process()
-	var line: String = m.report()
-	_check(line.contains("present vsync=") and line.contains("max_fps=") and line.contains("screen="),
-		"the window line carries the presentation regime: %s" % line)
-	# NAMED, NOT NUMBERED: a reader must not have to know the engine's enum to tell a run that waited on
-	# the display from one that did not, so the mode is a word and never the integer behind it.
-	var named: bool = false
-	for word: String in ["vsync=off", "vsync=on", "vsync=adaptive", "vsync=mailbox"]:
-		named = named or line.contains(word)
-	_check(named, "the vsync mode is a word, not the enum's integer: %s" % m.presentation())
-	# AND AN UNANSWERED REFRESH RATE READS AS UNANSWERED. `screen_get_refresh_rate` returns a negative
-	# fallback where the platform declines (headless is one), and printing that as 0.0Hz would be a rate
-	# nobody measured -- an invented identifying constant, which is the one thing a receipt may not carry.
-	_check(not m.presentation().contains("screen=0.0Hz") and not m.presentation().contains("-1"),
-		"an unanswered refresh rate is not reported as a measured one: %s" % m.presentation())
 
 
 ## Each workload presses exactly what its name says, on the ticks it says.
@@ -343,6 +277,31 @@ func _test_a_real_paint_records_the_dilated_span_the_painters_actually_scan() ->
 ##
 ## `capture_bursts` gates it, so it is set deliberately and cleared afterwards: with profiling off the
 ## probe must record nothing at all.
+func _test_the_neighbourhood_build_is_priced_in_the_unit_the_trade_is_offered_in() -> void:
+	# D0556. `dig_split` weighs the union trade in cells dilated by `RockTone.FORM_REACH` (6) and `setup`
+	# measures a span dilated by `WINDOW_MARGIN_CELLS` (9), so sizing the trade by setup's share of prep
+	# charges the saving to a clock that cannot measure it. `RockNeighborhood._init` spans exactly
+	# `grow(FORM_REACH)`. `[[budget-in-the-wrong-unit-is-green-forever]]`, one clock over.
+	BakeCost.reset()
+	_check(BakeCost.form_line() == "", "no builds means no line, never a 0.00us/dilated")
+	var began: int = Time.get_ticks_usec()
+	BakeCost.note_form(began, 529)
+	BakeCost.note_setup(began, 1600)
+	BakeCost.note(BakeCost.PREP, began, 121, 7, "dig")
+	_check(BakeCost.prep_forms == 1 and BakeCost.prep_form_cells == 529,
+		"one build counted, over the cells it spanned: 529")
+	_check(BakeCost.prep_form_usec <= BakeCost.prep_usec, "the build is contained in preparation, never"
+		+ " added to it: %d <= %d" % [BakeCost.prep_form_usec, BakeCost.prep_usec])
+	# A BUILD THAT DID NOT HAPPEN COSTS AND COUNTS NOTHING: `TerrainPainter` skips it with no tone or an
+	# empty rect, and a zero-cell build averaged in drags the very rate the trade is decided on.
+	BakeCost.note_form(Time.get_ticks_usec(), 0)
+	_check(BakeCost.prep_forms == 1 and BakeCost.prep_form_cells == 529,
+		"a skipped build is not a build: %d over %d cells" % [BakeCost.prep_forms, BakeCost.prep_form_cells])
+	_check(BakeCost.setup_line().contains("form=") and BakeCost.setup_line().contains("us/dilated"),
+		"the window line carries the build beside the setup it is not: %s" % BakeCost.setup_line())
+	BakeCost.reset()
+
+
 func _test_the_chunk_split_duplicates_halo_and_the_probe_measures_it() -> void:
 	var cell_px: int = 4
 	var per_chunk: int = BakeWindow.CHUNK_PX / cell_px
@@ -367,6 +326,26 @@ func _test_the_chunk_split_duplicates_halo_and_the_probe_measures_it() -> void:
 			% [BakeCost.dig_paid_dilated, BakeCost.dig_shared_dilated])
 	_check(BakeCost.split_line().contains("overlap="),
 		"and the line states the overlap: %s" % BakeCost.split_line())
+	# THE PEAK PAIR IS ONE TICK'S TRADE, never two independent maxima (D0556). The frame a player loses
+	# is dropped by ONE tick, so the peak is what decides whether the treatment is worth writing -- and a
+	# worst-paid tick reported beside some OTHER tick's shared span is a trade nobody was ever offered,
+	# which reads as a better one than any tick actually had. Posed so the two disagree: taking maxima
+	# apart would pair 100 with 45 and report 55% where the worst tick's own trade is 90%.
+	BakeCost.reset()
+	BakeCost.note_dig_span(100, 10, 400, 40)
+	BakeCost.note_dig_span(50, 45, 200, 180)
+	_check(BakeCost.dig_peak_paid == 100 and BakeCost.dig_peak_shared == 10,
+		"the peak tick reports its own shared span: paid=%d shared=%d"
+			% [BakeCost.dig_peak_paid, BakeCost.dig_peak_shared])
+	_check(BakeCost.dig_peak_paid_obs == 400 and BakeCost.dig_peak_shared_obs == 40,
+		"and the observation span of that same tick, not of the other one: paid=%d shared=%d"
+			% [BakeCost.dig_peak_paid_obs, BakeCost.dig_peak_shared_obs])
+	# THE OBSERVATION'S DILATION IS A SEPARATE TRADE and is silent unless it was supplied: a caller that
+	# passes only the neighbourhood span must not have a 100% observation overlap invented for it.
+	BakeCost.reset()
+	BakeCost.note_dig_span(100, 10)
+	_check(not BakeCost.split_line().contains("obs_span"),
+		"an unsupplied observation span is absent, not a measured zero: %s" % BakeCost.split_line())
 	BakeCost.reset()
 	BakeCost.capture_bursts = false
 	var q: BakeWindow.Plan = w.plan_tick(Rect2(0.0, 0.0, 8.0, 8.0), dug, null)

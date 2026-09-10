@@ -66,7 +66,9 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 		return
 	var cell_px: int = frame.obs.cell_px
 	var r: Rect2i = visit_rect(frame.obs, frame.view_world_rect, cell_px)
+	var form_began: int = Time.get_ticks_usec()
 	var neighbors: RockNeighborhood = RockNeighborhood.new(frame.obs, r) if frame.tone != null and r.has_area() else null
+	BakeCost.note_form(form_began, r.grow(RockTone.FORM_REACH).get_area() if neighbors != null else 0)
 	# THE NEIGHBOUR PROBE for the carved-edge terms (D0329): AO, the rim lip and the sky-form gradient all
 	# need to know whether the cell next door is rock. Bound once here rather than per cell, because a
 	# Callable built inside the loop is one allocation per cell per frame.

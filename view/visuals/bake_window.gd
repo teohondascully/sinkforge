@@ -332,16 +332,20 @@ func partials_of(rect: Rect2) -> Dictionary:
 func _note_dig_split(p: Plan, whole: Dictionary) -> void:
 	var union := Rect2()
 	var paid: int = 0
+	var paid_obs: int = 0
 	for i: int in p.partial:
 		var r: Rect2 = p.partial[i]
 		union = r if not union.has_area() else union.merge(r)
 		paid += cells_of(r).grow(RockTone.FORM_REACH).get_area()
+		paid_obs += cells_of(r).grow(WorldView.WINDOW_MARGIN_CELLS).get_area()
 	for i: int in whole:
 		var r: Rect2 = chunk_rect(i)
 		union = r if not union.has_area() else union.merge(r)
 		paid += cells_of(r).grow(RockTone.FORM_REACH).get_area()
+		paid_obs += cells_of(r).grow(WorldView.WINDOW_MARGIN_CELLS).get_area()
 	if paid > 0:
-		BakeCost.note_dig_span(paid, cells_of(union).grow(RockTone.FORM_REACH).get_area())
+		BakeCost.note_dig_span(paid, cells_of(union).grow(RockTone.FORM_REACH).get_area(),
+			paid_obs, cells_of(union).grow(WorldView.WINDOW_MARGIN_CELLS).get_area())
 
 
 func plan_tick(window_rect: Rect2, dug: Array, obs: Interface.Observation = null) -> Plan:
