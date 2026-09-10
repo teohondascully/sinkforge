@@ -22011,3 +22011,54 @@ mutations fire, one naming the offending lesson by id.
 **What this does NOT fix.** S130 also read the ore-vein panel's "hold to cut it", then pressed a NUMBER
 key at the seam twice expecting a panel like the forge's: nothing in the game says a seam is CUT rather
 than operated, and the two read alike to a newcomer. Open.
+
+## D0561 · 2026-09-10 · Strangers 133-138: delivery goes 0 to 4 of 6, the reach rule is read back correctly, and the east edge is now the wall
+
+**Decided:** the batch is classified from the receipts and the overnight gameplay work (D0553, D0554,
+D0557-D0560) is MEASURED as landing. The next wall named for the director is the world's east edge, which
+is a level-design question and not a wording one. No code changed in this entry.
+
+**The measurement.** Six seats, one snapshot, uncoached goal, haiku, all six VALID.
+
+| | 127-132 | 133-138 |
+|---|---|---|
+| reached `deliver` | 2 of 6 | **5 of 6** |
+| delivered | **0** | **4** |
+| reached `fuel` | 0 | 1 |
+
+First rung 6 of 6, fastest 1.3 s. Four seats ended holding a drill they were paid for. **D0553 is the
+reason**: the previous batch's two delivering seats failed because the hotbar renumbered under them the
+moment a stack drained, which is what smelting does.
+
+**The reach work is read back, unprompted, by strangers told nothing about it.** Three of six list it
+under their own heading *what the game told you well*: "the dashed/white ring on the ground marked the
+3.2-meter reach range" (S136), "Reach distances (3.2 metres) with visual markers (dashed rings)" (S137),
+"visual reach indicators (dashed circle showing 3.2m range)" (S138). Against 127-132, where D0521 drew
+the ring solid at IN REACH and **not one seat reported reading it**, this is the first batch in which
+blind strangers describe the reach rule correctly. S136 also gives the next refinement in one line: the
+number "only appeared after a failed attempt, not proactively".
+
+**TWO REPORTS ARE REFUTED BY THEIR OWN RECEIPTS, and this is why the rule exists.** S138 reported "the
+coal mining puzzle remained unsolved", verdict "No, I would not keep playing", biggest obstacle "the coal
+mining system" -- and ended holding **12 coal and 11 ore**, having never fed the forge. S134 reported
+"TOO FAR every time" at the CREW RIG "from 7+ different positions" and called delivery "a wall with no
+visible door" -- its receipts record `dropped_short` **once**, at burst 8, and **no `far` refusal at all**
+in 54 bursts; what they do record is `world_edge_right` at burst 30. Neither stranger is dishonest; a
+first-time player writes what it believes happened. `[[stranger-protocol-frames-not-report]]`, and it
+would have sent a reader hunting a delivery bug that the receipts say was never hit.
+
+**Mine, corrected inside the hour:** I read the last forty bursts of S134's observations, found no drop
+lesson, and wrote that it "never saw a drop lesson at all". It saw one at burst 8, outside the window I
+sampled. A window is a claim about a population and I did not name it before drawing from it.
+
+**What the batch says is left, in order.** (1) **The east edge**: `world_edge_right` fired for 3 of 6 and
+is the last thing BOTH failures did before running out of bursts. D0529's lesson fires exactly on its
+trigger and names the way back, and they walk there anyway -- 121-126 sent 14 of 24 seats east and the
+lesson has labelled the behaviour without moving it. That is the biggest wall now and it is about what
+the world puts east of the opening, which is the director's. (2) **Build the line**: four seats reached
+it, one passed it; whether BUILD's MOUTH target sits where a player reads it is unexamined. (3) Nothing
+joins "you are carrying coal" to "the forge is starved" though both are drawn. (4) The forge's recipe
+notation `1 [box] 2 -> [box] 1` was misread by S136.
+
+**Verified:** all six `stranger.py validate` VALID; classification read from `observation_*.json` rung,
+pack and refusal fields, never from a final message. Report and six journals under `docs/playtests/`.

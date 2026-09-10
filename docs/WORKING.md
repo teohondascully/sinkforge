@@ -324,6 +324,28 @@ whole layer: one metre is a rule to loosen (sim, the director's), 3.2 m is a thi
 **D0553 and D0554 remain shipped and unmeasured**; with D0557 that is three gameplay changes waiting on
 a batch, which is what the next stranger run is for.
 
+**MEASURED: strangers 133-138 (D0561), and the overnight gameplay work landed.** Six seats, one snapshot,
+uncoached, all VALID. **Delivery went from 0 of 6 to 4 of 6**; five reached `deliver` against two last
+batch; one reached `fuel`. First rung 6 of 6, fastest 1.3 s. D0553 (the hotbar keeping its number) is the
+reason. **Three of six strangers named the dashed reach ring and the 3.2 m under their own heading "what
+the game told you well"** -- against 127-132, where D0521's IN REACH state went unread by every seat.
+
+**The next wall is the world's east edge and it is the director's.** `world_edge_right` fired for 3 of 6
+and is the last thing BOTH failures did before their bursts ran out. D0529's lesson fires exactly on its
+trigger, names the way back, and they walk east anyway -- 121-126 sent 14 of 24 seats there. The lesson
+has labelled the behaviour without moving it, so the question is what the world puts east of the opening.
+
+**Also open, from the same batch:** BUILD's MOUTH (four seats reached `build`, one passed it, "TOO FAR
+despite visible proximity"); nothing joins "you are carrying coal" to "the forge is starved" though both
+are drawn (S138 stopped holding 12 coal and 11 ore, believing it had failed to get coal); and the forge's
+recipe notation `1 [box] 2 -> [box] 1` was misread. S136's refinement of the reach work, in one line: the
+3.2 m "only appeared after a failed attempt, not proactively".
+
+**Read the receipts, not the reports.** Two of six final reports are refuted by their own
+`observation_*.json` -- S138's "coal remained unsolved" (it held 12 coal) and S134's "TOO FAR every time
+at the RIG from 7+ positions" (one drop lesson in 54 bursts, no `far` refusal at all, and
+`world_edge_right` at burst 30).
+
 ## Repository cleanup (director-approved)
 
 Tooling implementation complete (D0525): timing summaries, runner accounting/optional battery

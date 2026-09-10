@@ -712,3 +712,24 @@ had aimed the fix at the wrong layer. `[[invented-label-for-real-data]]` is the 
 this one is worse, because I did not invent the number, I misread a docstring that was trying to warn me.
 
 The number is now printed by `tests/test_ring_word.gd` on every run rather than quoted from prose.
+
+## "S134 never saw a drop lesson" — a window I drew from without naming (D0561)
+
+Classifying strangers 133-138, I sampled the last forty bursts of S134's `observation_*.json`, found no
+drop lesson in them, and wrote in this session that it "never saw a drop lesson at all". It saw one:
+`dropped_short` at **burst 8**, outside the window I had sliced. I caught it two commands later, when a
+full pass over every burst printed the lesson timeline, and said so before it reached the report.
+
+**A window is a claim about a population.** I took the last forty of fifty-four bursts because the seat's
+failure was at the END of its run — a reasonable place to look, and the wrong place to conclude "never"
+from. The word "never" quantifies over everything, and nothing about a tail slice licenses it.
+`[[name-the-frame]]`: the number described the frame that produced it, and I had not named the frame.
+
+**What it would have cost.** Nothing, this time, because the fuller pass came before the write-up. Had it
+not, the report would have said the game showed S134 no drop lesson while it stood at the rig — pointing
+the next session at a missing-lesson bug that does not exist. The receipts say the opposite: the lesson
+fired early, the seat then walked to the world's east edge, and the real finding is the edge.
+
+The conclusion that survives is the one built on the full pass: S134's own final report ("TOO FAR every
+time at the CREW RIG, from 7+ positions") is refuted by its receipts — one `dropped_short` in 54 bursts
+and no `far` refusal at all. That stands, and it is why the batch is classified from receipts.
