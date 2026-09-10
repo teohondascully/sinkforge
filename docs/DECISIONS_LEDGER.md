@@ -22155,3 +22155,22 @@ Measured: `tests/test_grapple_body.gd` -- one hook in a 10 m shaft, 0 px before 
 ticks; chained hooks carry the body from row 55 to row 26. `_test_a_swing_into_a_wall_stops_at_the_wall`
 still passes, so the flat-wall case is unchanged.
 Reverse: CHEAP -- delete `_slide` and restore the two-line refusal.
+
+## D0568 · 2026-09-10 · sim/mining/footing.gd, sim/run/mine_hold.gd
+Decided: the footing spare rule applies only to a blow that is NOT aimed at or below the boots within
+`OUT_MARGIN` (1 cell) of the body's own columns. `Footing.spared_for(body, aim)` replaces the
+unconditional `Footing.of_body(body)` at the one call site.
+Alternative: leave D0509 as written, and let the `cut_through` lesson keep telling players "a hole has to
+be a little wider than you before you drop in".
+Why: D0509 is right about the case it names and its own words say which case that is -- "a blow on the
+vein one metre TO THE SIDE reaches under the body's own boots". It was written as "spare unless the aim
+is exactly one of the four", which also swallows a blow aimed straight down, because the bite is a disc
+two cells wide and each boot cell is 4 px. The consequence at the controls was never measured. Measured
+now, on the same naive input a player gives (point below yourself, hold): **0 rows in 8 bursts before,
+24 rows in 12 bursts after** -- six metres. The lesson quoted above is a description of this defect
+rather than a rule of the world, and item 36 of the queue will delete it.
+`OUT_MARGIN` is bounded, not chosen: `tests/test_interface_verbs.gd` fires D0509's side blow two columns
+clear of the boots and requires it spared, so the margin cannot reach 2. `tests/test_way_down.gd` pins
+that ordering between the two constants rather than leaving it to be rediscovered by a red in another
+file.
+Reverse: CHEAP -- call `of_body` at the call site again.

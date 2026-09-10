@@ -52,8 +52,9 @@ six-week decision.
          It now slides along the face, which is legacy's own behaviour. One hook: 0 px -> 82 px. Chained
          hooks: row 55 -> row 26 of a 10 m shaft. The last 1.5 m over the lip is geometric
          (`Grapple.MIN_LENGTH`) and is parked as P035 with three candidate answers.
-- [ ] 9  Descent as a verb, not a pixel-hunt. `Footing`'s spare rule (D0509) is right and its consequence
-         at the controls was never measured: four 4 px targets under the boots, every near miss silent.
+- [x] 9  Descent as a verb (D0568). The spare rule now applies only to blows that are not aimed at or
+         below the boots. Measured on the naive input a player actually gives -- point below yourself and
+         hold: **0 rows in 8 bursts before, 24 rows in 12 bursts after.** `tests/test_way_down.gd`.
 
 ### Phase 2 -- LIGHT (~55% of the gap to the reference)
 
