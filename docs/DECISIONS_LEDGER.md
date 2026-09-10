@@ -21663,3 +21663,99 @@ radius, which matches the screen but puts an authored framing constant inside `s
 rule deliberately is not (D0521 moved that to `core/` so the view could read the same line). **This is
 also not the reason S128 failed** -- that was the hotbar renumbering, fixed in D0553, and its receipts
 show the ingot moving between key 1 and key 2 three times in one run.
+
+## D0555 · 2026-09-09 · The draw phase was the process waiting for the display, and measuring at 400 fps hid the bake behind that wait
+
+**Decided:** the window report carries the presentation regime (`present vsync=on max_fps=0
+screen=120.0Hz`), and D0551's redirection away from the bake is WITHDRAWN. No sim or view behaviour
+changed; `shell/frame_meter.gd` gains one field and loses one off-by-one.
+
+**Why.** D0552 left ~8 ms of a 13.30 ms draw-phase p99 unexplained by painter peaks and called it "the
+presentation residual", the last item this programme had not measured. It is not a residual and there is
+nothing in it to optimise: **it is the process blocked in `RenderingServer.draw` on a drawable that does
+not exist yet.** Three things say so, and the third is causal rather than circumstantial.
+
+*Circumstantial.* `rcpu` -- the renderer's own CPU time for the viewport, printed beside `draw` on every
+SLOW line since D0414 -- reads **0.1 ms in 545 of the 653 slow frames this programme has ever logged**,
+while those frames' wall-clock draw phase has a p50 of 8.4 ms and a p90 of 16.3. It is not a dead
+instrument: it takes 0.0, 0.1, 0.2, 1.2, 1.3, 3.3, 3.5 and 6.6, where `rgpu` is uniformly 0.0 because
+Metal declines to answer. Astra's Metal System Trace (D0548) puts the GPU's own union at 1,052 ms of a
+20,477 ms capture, **5.1% busy**. Neither the renderer's CPU nor the GPU is in that phase.
+
+*Causal.* One workload (`still`, which prepares zero terrain), frontmost, `focus=1.00` in all 24 windows,
+control 71-96 us, quiet tick 0.47-0.52 ms, one variable -- the engine's frame cap:
+
+| cap | achieved | draw p50 | draw p99 | over 16.7 ms |
+|---|---|---|---|---|
+| 60 | 60.0 | 0.62-0.66 | **0.80-0.88** | (cap artefact) |
+| 90 | 90.0 | 0.57-0.58 | 0.74-5.02 | 0-3 / 450 |
+| 120 | 120.0 | 0.47-0.48 | 1.31-2.48 | **0 / 600, twice** |
+| 150 | 150.0 | 0.37-0.38 | **8.24-8.51** | 0 / 750 |
+| 200 | 195.0 | 0.33-0.34 | 8.46-9.61 | 1-2 / 977 |
+| 300 | 262-266 | 0.37-0.71 | 11.10-12.90 | 5-9 / 1324 |
+| none | 395-412 | 1.38-1.45 | **12.70-13.35** | 14-17 / 2065 |
+
+**The step lands between 120 and 150 and its height is 8.3 ms -- one 120 Hz slot, which is what the
+screen is** (`screen_get_refresh_rate` now says so in the line). Below the display's rate the draw phase
+is under a millisecond; above it, the app blocks. D0527's display-pacing hypothesis, explicitly left
+untested there and by D0551, is tested here and holds.
+
+**What that wait did to the numbers.** Every perf run this programme has taken passed `--disable-vsync
+--max-fps 0`, so the app produced ~3.4 frames for each one a 120 Hz display could present. That inflates
+the frame COUNT without changing the game, and the headline metric is a RATE over that count. Measured
+both ways, same tree, same seat, frontmost, `focus=1.00`:
+
+| arm | fps | frame p99 | over 16.7 ms |
+|---|---|---|---|
+| still, vsync (shipped) | 118.8-120.0 | 13.81-15.97 | 1-5 / 597 (0.2-0.8%) |
+| still, `--disable-vsync` | 399-416 | 14.27-16.39 | 14-20 / 2068 (0.7-1.0%) |
+| **dig, vsync (shipped)** | 119.2-119.8 | **23.37-25.45** | **28, 28, 28, 30 / 597 (4.7-5.0%)** |
+| dig, `--disable-vsync` | 320-358 | 17.09-21.25 | 22-35 / 1598 (1.2-2.2%) |
+
+**The numerator is the same and the denominator is not.** Dig drops 28-30 frames a window vsynced and
+22-35 unvsynced; the population is 597 against 1598, so the rate moved 2.5-4x on a game that did not
+change. `[[read-the-count-not-the-rate]]`. `project.godot` sets no vsync or `max_fps` key, so the vsync
+column is what a player runs: **one frame in twenty is a 22-31 ms stall while digging, against one in
+300 standing still.**
+
+**Withdrawn: D0551's "89% of the tail is there when the bake does nothing at all."** That arithmetic --
+still p99 15.73 against dig's 17.70, so the bake is worth 2.0 ms and "~11% of the p99" -- subtracted a
+floor that was not a property of the game. Both arms were sitting in the same ~13 ms drawable wait, and
+subtracting it from both left the difference between two waits, not between two workloads. Under the
+shipped regime the same comparison is 13.81-15.97 against 23.37-25.45: **the bake is worth ~9.5 ms of a
+25 ms p99, and 28 dropped frames against 1-5.** My own `--disable-vsync` arm reproduces D0551's numbers
+(still 14.27-16.39 vs its 15.73; dig 17.09-21.25 vs its 17.70), so this is that measurement with one
+flag changed and not a different one. D0549's chunk-split halo and D0550's sharing treatment are back at
+their original size; "worth ~11% of the p99, and that should be said before anyone spends a night on
+them" should not have been said.
+
+**Where the dropped frame goes.** Warm slow frames of the shipped dig run, decomposed against the
+painters' and HUD's own clocks: ~8.6 ms of vblank wait, ~3.5 ms painters, ~1.2 ms `refresh`, ~1.7 ms
+HUD, and **7.0-8.8 ms accounted for by none of them**. The same decomposition on `still` leaves
+**0.47-1.83 ms**. The difference is the terrain bake, which runs inside the redraw flush where no
+painter clock reaches it, and it matches the 7.551 ms/tick peak preparation the fixture already measured
+and then discounted.
+
+**The instrument changes.** (1) `presentation()` puts the regime in the window line beside `focus`, for
+the same reason `focus` is there: a variable outside the game that changes every number next to it, and
+three sets of numbers have already been voided for want of such a line. It is appended after the control,
+so `tools/perf_fixture.py`'s unanchored `PERF_RE` keeps matching -- Astra's file, not edited. The mode is
+a word, and a refresh rate the platform declines to answer reads `?`, never a fabricated `0.0Hz`.
+(2) `focus` was computed over a denominator one short of its numerator: the first `_process` closes no
+frame but sampled focus anyway, so a 15-frame window read **1.07**. It is 1/n, so a 600-frame window was
+inflated 0.17% and a true 0.9483 could clear the fixture's 0.95 guard -- the guard standing between this
+programme and another set of withdrawn numbers. `[[guards-that-cannot-be-false]]`.
+
+**Verified:** `tests/test_perf_fixture.gd` **72 -> 77** asserted. All four new assertions mutation-tested:
+dropping the field from the line, printing the enum's integer, printing the declined rate as `-1.0Hz`,
+and moving the focus sample back outside the frame it describes each fail exactly the assertion that
+names them. **The first mutation was a false green** -- `%.0s` is not a precision GDScript honours, so the
+field still printed and the suite passed; rewritten to remove the argument. **And the new test did not run
+at first:** `_initialize()` is a manual registration list, so a `_test_` function that is defined and not
+listed is silently dead -- caught by reading the asserted COUNT (72, unchanged) rather than `ALL PASS`.
+`[[gate-that-runs-nowhere]]`. Full local battery green: 173 checks PASS, 0 FAIL, 145/145 suites.
+
+**Limits.** One host (M4 Pro), one 120 Hz screen, one zoom, one seed, `still` and `dig` only, 900-tick
+windows, 2 repetitions in the regime comparison against D0551's 3. `--max-fps` sleeps where vsync blocks,
+so the cap ladder and the vsync arm are not the same mechanism -- they agree, which is why both are here.
+Nothing is claimed about a 60 Hz screen, and the bake's own treatment is measured but not yet attempted.

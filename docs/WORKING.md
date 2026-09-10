@@ -64,12 +64,31 @@ zoom 2, M4 Pro, window focused in 100% of frames.** All four workloads, 3 reps, 
 
 **The median clears 2.78 ms everywhere; sustained `fps_wall` straddles 360 rather than clearing it.**
 The earlier "400-530 fps, 360 already met on the average and the median" is WITHDRAWN: those numbers came
-from windows macOS was not presenting. **And the remaining tail is not the bake.** A still frame with
-zero terrain preparation carries a p99 of 15.73 ms and a worst frame of 26.25 ms, so 89% of dig's p99 is
-present when the bake does nothing; the draw phase's p99 is flat at 12.6-13.3 ms across all four and is
-LOWEST on the workload doing the most terrain work. The worst frame is a different story and does track
-the bake (dig exceeds still by 8.83 ms against a measured 7.551 ms peak preparation). The next target is
-the draw-phase floor, not another bake treatment.
+from windows macOS was not presenting.
+
+**READ THE TABLE ABOVE WITH D0555 IN HAND -- it was taken at `--disable-vsync --max-fps 0`, and that flag
+is inside the measurement.** At ~400 fps the app produces 3.4 frames for every one a 120 Hz screen can
+present, so it blocks in `RenderingServer.draw` on a drawable that does not exist yet: ~13 ms at the p99
+of every workload, `rcpu` 0.1 ms, GPU 5.1% busy. That wait is SLACK, not cost. Capping the rate below
+the display's drains it -- draw p99 is 0.80-2.48 ms at any cap up to 120 and 8.24-8.51 ms at 150, a step
+at the screen's own rate whose height is one 120 Hz slot. **"89% of the tail is there when the bake does
+nothing" is WITHDRAWN** (see `docs/CORRECTIONS.md`): both arms sat in the same wait, so subtracting one
+from the other compared two waits. `project.godot` sets no vsync key, so what a player runs is:
+
+| workload | regime | fps_wall | p99 | over 16.7 ms |
+|---|---|---|---|---|
+| still | vsync (shipped) | 118.8-120.0 | 13.81-15.97 ms | **1-5 / 597** |
+| dig | vsync (shipped) | 119.2-119.8 | **23.37-25.45 ms** | **28-30 / 597** |
+| still | `--disable-vsync` | 399-416 | 14.27-16.39 ms | 14-20 / 2068 |
+| dig | `--disable-vsync` | 320-358 | 17.09-21.25 ms | 22-35 / 1598 |
+
+**One frame in twenty is a 22-31 ms stall while digging, against one in 300 standing still**, and the
+dropped-frame COUNT barely moves between regimes while the RATE moves 2.5-4x. The bake is worth ~9.5 ms
+of the shipped p99, not the 2.0 ms D0551 sized it at, so D0549's halo and D0550's sharing are back at
+full size. A warm dropped dig frame is ~8.6 ms vblank wait + ~3.5 painters + ~1.2 refresh + ~1.7 HUD and
+**7.0-8.8 ms that no painter clock reaches** -- the bake, inside the redraw flush -- against 0.47-1.83 ms
+of the same residual on still. The window line now carries `present vsync= max_fps= screen=` so this
+cannot be read the wrong way again.
 
 **Landed since:** the minimap repaints changed cells rather than the world (D0536) -- it was rebuilding
 all ~17,000 logic cells on every terrain version change, 36.5-38.1 ms in one HUD chip on nineteen of

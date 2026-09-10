@@ -657,3 +657,37 @@ proof the standing claim was false and said so before gathering more. Three repe
 348.7 / 1.55 ms. One sample was never enough to overturn a claim, and it is the same
 `[[scrutiny-asymmetry]]` trap -- a number is most dangerous when it is changing, and I was the one
 changing it.
+
+## "89% of the tail is there when the bake does nothing" — withdrawn, and the flag that caused it (D0555)
+
+D0551 read its own valid dataset correctly and drew the wrong conclusion from it, and I wrote the
+redirection into the ledger, `docs/WORKING.md` and the corrections file above: still's p99 of 15.73 ms
+against dig's 17.70, therefore the bake is worth 2.0 ms, therefore "the next target is that floor, not
+another bake treatment", therefore D0549's and D0550's treatments "are simply worth ~11% of the p99, and
+that should be said before anyone spends a night on them."
+
+**The floor I subtracted was not a property of the game.** Every run in that dataset passed
+`--disable-vsync --max-fps 0`, which lets this app produce ~400 frames a second against a 120 Hz screen.
+It then blocks in `RenderingServer.draw` on a drawable that does not exist yet, and that block is ~13 ms
+at the p99 of **both** arms. Subtracting one from the other left the difference between two waits.
+Measured in the shipped regime -- no vsync flag, which is what `project.godot` gives a player -- the same
+comparison reads **13.81-15.97 for still against 23.37-25.45 for dig**, and the dropped-frame counts are
+**1-5 a window against 28-30**. The bake is worth ~9.5 ms of the p99, not 2.0.
+
+The tell was in the data the whole time and I had already quoted it: "the draw phase's p99 is flat across
+every workload -- and *lowest* on the workload doing the most terrain work." A phase whose p99 is
+indifferent to the work, and slightly *cheaper* when there is more of it, is not measuring the work.
+I wrote that sentence as evidence for the redirection when it was evidence against the instrument.
+`[[expected-null-carries-no-conclusion]]`: the treatment's domain was never checked before the null was
+allowed to exclude a cause.
+
+**The rate was the other half.** `over16.7ms` is a fraction, and the flag that inflated the wait also
+inflated the denominator: dig drops 28-30 frames a window either way, over 597 frames vsynced and 1598
+unvsynced. The rate moved 2.5-4x on a game that did not change, and it moved in the direction that made
+the defect look smaller. `[[read-the-count-not-the-rate]]` was already in the index, and the count was
+already in the log line beside the rate.
+
+**Not withdrawn:** D0551's frame-rate correction stands (`fps_wall` 348.7-394.6 under those flags, and
+the median frame time clears its budget), its refusal to claim a cause for the draw-phase floor stands
+and was the right call, and the nine entries of bake work it questioned were real. What is withdrawn is
+the sizing that told the next session not to bother with them.

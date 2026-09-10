@@ -54,9 +54,15 @@ func note_process() -> void:
 	if _last_process_usec >= 0:
 		last_frame_usec = now - _last_process_usec
 		_frames.append(last_frame_usec)
+		# SAMPLED WITH THE FRAME IT DESCRIBES, not with the call. The first `_process` closes no frame --
+		# there is nothing before it to measure against -- so a focus sample taken there has no frame to
+		# belong to, and `focus` was reported over a denominator one short of its numerator: a 15-frame
+		# window read **1.07**, a share of frames larger than all of them. It is 1/n, so a 600-frame
+		# window was inflated by 0.17% and a run at a true 0.9483 could read 0.95 and clear the fixture's
+		# guard. The guard is what stands between this programme and another set of withdrawn numbers.
+		if DisplayServer.window_is_focused():
+			_focused += 1
 	_last_process_usec = now
-	if DisplayServer.window_is_focused():
-		_focused += 1
 	_note_calibration()
 
 
@@ -190,6 +196,37 @@ func reset() -> void:
 	slow.clear()
 
 
+## THE PRESENTATION REGIME THIS WINDOW RAN IN: whether the swapchain made the process wait, and what it
+## was waiting for. The THIRD control, and it exists for the same reason as `_focused` -- a variable that
+## lives outside the game and changes every frame number in the line beside it.
+##
+## `--disable-vsync --max-fps 0` lets this app produce ~400 frames a second against a 120 Hz display, so
+## it blocks in `RenderingServer.draw` on a drawable that does not exist yet, and that block is counted in
+## `draw` and in the frame's own spacing. Measured on the `still` workload, frontmost, one variable (D0555):
+## the draw p99 is 0.74-2.48 ms at any cap up to 120 and 8.24-8.51 ms at a cap of 150 -- a step at the
+## display's rate whose height is one 120 Hz slot. That wait is SLACK, not cost, and counting it as cost
+## made a still frame look as expensive as a digging one.
+##
+## The number it wrecks is the RATE. A capped run and an uncapped run drop about the SAME NUMBER of frames
+## over 16.7 ms (dig: 28-30 a window vsynced, 22-35 unvsynced) over populations of 597 and 1598, so the
+## fraction moved 2.5-4x while nothing about the game changed. `over8.3ms=` and `over16.7ms=` may only be
+## compared between windows this field agrees on. `[[read-the-count-not-the-rate]]`.
+func presentation() -> String:
+	var mode: int = DisplayServer.window_get_vsync_mode()
+	var hz: float = DisplayServer.screen_get_refresh_rate()
+	return "present vsync=%s max_fps=%d screen=%s" % [VSYNC_NAMES.get(mode, "mode%d" % mode),
+		Engine.max_fps, "?" if hz <= 0.0 else "%.1fHz" % hz]
+
+
+## Named rather than printed as an integer: a reader must not have to know the engine's enum to tell a
+## run that waited on the display from one that did not. `screen_get_refresh_rate` returns a negative
+## fallback when the platform declines to answer (headless does), and that reads `?` rather than `0.0Hz`,
+## which would be a rate nobody could have measured.
+const VSYNC_NAMES: Dictionary = {
+	DisplayServer.VSYNC_DISABLED: "off", DisplayServer.VSYNC_ENABLED: "on",
+	DisplayServer.VSYNC_ADAPTIVE: "adaptive", DisplayServer.VSYNC_MAILBOX: "mailbox"}
+
+
 ## One line: render-frame p50/p99/max, the over-budget counts at 120 and 60 Hz, and the physics split.
 func report() -> String:
 	if _frames.size() < 2:
@@ -207,14 +244,15 @@ func report() -> String:
 	for d: int in f:
 		span_usec += d
 	var fps: float = float(f.size()) * 1e6 / float(maxi(span_usec, 1))
-	return "PERF frames=%d fps_wall=%.1f frame p50=%.2fms p99=%.2fms max=%.2fms over8.3ms=%d over16.7ms=%d focus=%.2f | draw p50=%.2fms p99=%.2fms baking p50=%.2fms n=%d quiet p50=%.2fms n=%d | physics hub p50=%.2fms p99=%.2fms n=%d | quiet p50=%.2fms p99=%.2fms n=%d | %s" % [
+	return "PERF frames=%d fps_wall=%.1f frame p50=%.2fms p99=%.2fms max=%.2fms over8.3ms=%d over16.7ms=%d focus=%.2f | draw p50=%.2fms p99=%.2fms baking p50=%.2fms n=%d quiet p50=%.2fms n=%d | physics hub p50=%.2fms p99=%.2fms n=%d | quiet p50=%.2fms p99=%.2fms n=%d | %s | %s" % [
 		f.size(), fps, _ms(_quantile(f, 0.5)), _ms(_quantile(f, 0.99)), _ms(f[f.size() - 1]), over120, over60,
 		float(_focused) / float(maxi(f.size(), 1)),
 		_ms(_quantile_of(_draws, 0.5)), _ms(_quantile_of(_draws, 0.99)),
 		_ms(_quantile_of(_draws_baking, 0.5)), _draws_baking.size(),
 		_ms(_quantile_of(_draws_quiet, 0.5)), _draws_quiet.size(),
 		_ms(_quantile_of(_hub, 0.5)), _ms(_quantile_of(_hub, 0.99)), _hub.size(),
-		_ms(_quantile_of(_quiet, 0.5)), _ms(_quantile_of(_quiet, 0.99)), _quiet.size(), calibration()]
+		_ms(_quantile_of(_quiet, 0.5)), _ms(_quantile_of(_quiet, 0.99)), _quiet.size(),
+		calibration(), presentation()]
 
 
 static func _quantile_of(samples: PackedInt64Array, q: float) -> int:

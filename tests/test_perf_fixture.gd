@@ -20,6 +20,8 @@ func _initialize() -> void:
 	_test_bake_cost_counts_both_phases_and_resets()
 	_test_slowest_receipt_keeps_its_own_cells_and_reasons()
 	_test_the_control_loop_is_fixed_work_and_is_reported()
+	_test_the_window_line_says_which_presentation_regime_produced_it()
+	_test_the_focus_share_is_a_share_of_the_frames_it_describes()
 	_test_each_workload_presses_what_it_is_named_for()
 	_test_the_dig_sweep_is_wider_than_the_miner()
 	_test_the_seat_parses_its_workload_and_refuses_a_typo()
@@ -92,6 +94,47 @@ func _test_the_control_loop_is_fixed_work_and_is_reported() -> void:
 	_check(m.report().contains("draw p50="), "and the draw phase, over every frame rather than the worst eight")
 	m.reset()
 	_check(m.calibration().contains("n=0"), "reset clears the control's samples with the frames'")
+
+
+func _test_the_focus_share_is_a_share_of_the_frames_it_describes() -> void:
+	# `focus` gates every frame number this programme publishes (the fixture withholds a window below
+	# 0.95), so a focus that can exceed 1.0 is a guard reporting more agreement than it measured. The
+	# first `_process` closes no frame, so its focus sample had no frame to belong to and the share was
+	# computed over n-1: a 15-frame window read 1.07. `[[guards-that-cannot-be-false]]`.
+	var m: FrameMeter = FrameMeter.new()
+	for _i: int in 16:
+		m.note_process()
+	var share: float = float(m.report().split("focus=")[1].split(" ")[0])
+	_check(share <= 1.0, "a share of the frames cannot exceed all of them: focus=%.2f" % share)
+	_check(m.report().contains("frames=15 "), "and the window still reports the 15 frames 16 calls close")
+
+
+func _test_the_window_line_says_which_presentation_regime_produced_it() -> void:
+	# THE THIRD CONTROL (D0555). `focus` was added because whether the compositor was presenting this
+	# window changed every frame number beside it; this is the same defect one layer down. Running with
+	# `--disable-vsync --max-fps 0` lets the app produce ~400 frames a second against a 120 Hz display,
+	# so it blocks on a drawable that does not exist yet -- 8.24-8.51 ms of WAITING, counted as draw
+	# time and as frame time. Measured: the same dig workload drops 28-30 frames a window vsynced and
+	# 22-35 unvsynced, but over 597 frames against 1598, so the RATE moved 2.5-4x on a game that did
+	# not change. A window report that cannot say which regime it came from cannot be compared with
+	# another one. `[[window-regime-is-inside-the-measurement]]`, `[[read-the-count-not-the-rate]]`.
+	var m: FrameMeter = FrameMeter.new()
+	for _i: int in FrameMeter.CAL_EVERY * 4:
+		m.note_process()
+	var line: String = m.report()
+	_check(line.contains("present vsync=") and line.contains("max_fps=") and line.contains("screen="),
+		"the window line carries the presentation regime: %s" % line)
+	# NAMED, NOT NUMBERED: a reader must not have to know the engine's enum to tell a run that waited on
+	# the display from one that did not, so the mode is a word and never the integer behind it.
+	var named: bool = false
+	for word: String in ["vsync=off", "vsync=on", "vsync=adaptive", "vsync=mailbox"]:
+		named = named or line.contains(word)
+	_check(named, "the vsync mode is a word, not the enum's integer: %s" % m.presentation())
+	# AND AN UNANSWERED REFRESH RATE READS AS UNANSWERED. `screen_get_refresh_rate` returns a negative
+	# fallback where the platform declines (headless is one), and printing that as 0.0Hz would be a rate
+	# nobody measured -- an invented identifying constant, which is the one thing a receipt may not carry.
+	_check(not m.presentation().contains("screen=0.0Hz") and not m.presentation().contains("-1"),
+		"an unanswered refresh rate is not reported as a measured one: %s" % m.presentation())
 
 
 ## Each workload presses exactly what its name says, on the ticks it says.
