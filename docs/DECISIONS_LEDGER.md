@@ -22515,3 +22515,31 @@ flattening the veil the multiply half alone reaches two thirds of the way. This 
 frame; the frame is queue item 49's, and it needs the director's screen.
 Reverse: N/A -- nothing was built. The measurements are the artifact.
 
+## D0581 · 2026-09-10 · docs/WORKING.md · phase 3 measured before it is built; three findings, one null
+Decided: measure items 19-22 before touching a constant, and park all four builds for a capture batch
+rather than blind-tuning appearance overnight. `/loop`'s own rule: a feel item is BUILT-PARKED with a
+capture, never "done".
+Why: five of phase 2's seven items turned out already built, and four claims of mine earlier tonight
+measured false. The cheapest thing available here is a number, and numbers are what these items lacked.
+1. ITEM 19'S COMPLAINT IS TRUE AND ITS FRAME IS DEPTH, NOT COLUMN. Clay's mean metre-to-metre luma step
+   is 0.0255 and uniform across columns (0.0242-0.0257), but the flattest seven-metre window falls
+   inside 1-10 m in ALL SIX columns sampled. `bedding_metres` warps the bed coordinate by up to +/-6 m
+   along x, so a one-column finding here would have been worthless; the population check is what makes
+   it a claim about the world. MECHANISM: `tone_depth_boost` is `1 + depth/256`, multiplying jitter AND
+   bedding, so it is 1.00 shallow and 1.47 at 120 m -- the tutorial's first ten metres are the least
+   textured rock in the world by construction. Not a bug in the boost, which exists to compensate for a
+   veil that does not darken up there; a side effect of it.
+2. ITEM 20: THE ROCKS SEPARATE ON HUE, NOT VALUE. Closest luma pair at 60 m is 0.029 against clay's own
+   within-patch spread of 0.037 -- the brightness ranges OVERLAP. The blue-minus-red axis carries it:
+   -0.129, -0.012, +0.031, spread 0.10.
+3. A NULL RESULT, reported because it was my own hypothesis and it was wrong. I expected the warm lamp
+   to compress the hue axis the rocks are told apart on -- `lamp_tint` multiplies blue by 0.690 and red
+   by 1.000, which looks like it must. Measured: it does the OPPOSITE. Under the lamp the cool spread
+   rises 0.1009 -> 0.1365 and the luma spread 0.0523 -> 0.0793, because the tint scales differences
+   along with levels. At T012's 0.38 the cool spread is 0.1459, so 0.62 costs about 6% -- real, small,
+   and the opposite sign from the prediction. It feeds P038 and it does not decide it.
+4. ITEM 21 IS GENUINELY UNBUILT and is the largest thing left in the phase. Nothing distinguishes a dug
+   cell from a generated one anywhere in `view/` or `sim/`. It needs per-cell provenance, which is sim
+   state with a save-format cost, so it is not a view change and wants a ruling before it is started.
+Reverse: N/A -- nothing was built. The measurements and the mechanism are the artifact.
+

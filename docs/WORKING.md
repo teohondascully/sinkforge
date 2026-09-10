@@ -193,12 +193,39 @@ left here.
          differ from each other. Two constants revisiting T017 were moved and REVERTED -- they had not
          moved the measured number anyway, because `GRAM_CLUMP[massive]` gates that term to 0.25 for the
          material I was sampling.
-- [ ] 19 Strata that vary with depth. The chip reads TOPSOIL at +2 m and at 7 m and they look identical.
-- [ ] 20 Material-specific rock reads: clay, hardrock and deepstone must differ at a glance.
-- [ ] 21 A cut face reads as cut, not as a natural cave wall.
-- [ ] 22 Rubble and scree at the foot of a cut. **Cosmetic debris stays SEPARATE from solid simulation**
-         (audit): particles can communicate a collapse without every speck obstructing a factory. Pairs
-         with phase 1 only for the cue, not for the cells.
+- [~] 19 **MEASURED, MECHANISM FOUND, BUILD PARKED (D0581).** Rock does vary with depth -- clay runs
+         0.376 at the surface to 0.211 at 10 m and back to 0.360 at 20 m, mean metre-to-metre luma step
+         0.0255. But the complaint is right about the place it was made: **the flattest seven-metre
+         window sits inside 1-10 m in all six columns sampled** (4-10, 3-9, 1-7, 1-7, 1-7, 2-8), and
+         that is exactly where the tutorial happens. The mean step is uniform across columns
+         (0.0242-0.0257), so this is a property of DEPTH, not of the column I first sampled -- checked
+         precisely because `bedding_metres` warps the bed coordinate by up to +/-6 m along x.
+         **THE MECHANISM:** `BeddingTone.tone_depth_boost` is `1 + depth/256`, so 1.00 at the surface
+         and 1.47 at 120 m, and it multiplies BOTH the jitter and the bedding. The shallow world gets
+         the least of both, by construction. The boost exists to compensate for the veil darkening the
+         deep, and near the surface there is nothing to compensate -- so this is a side effect, not a
+         bug in the boost. Fixing it means raising the RAW strata amplitude at short periods, which
+         revisits T017, and it is a look call that needs a frame. Parked for the capture batch.
+- [~] 20 **MEASURED: THE ROCKS SEPARATE ON HUE, NOT ON VALUE.** At 60 m the closest pair in luma is
+         **0.029** (clay 0.197, deepstone 0.168) against clay's own within-patch spread of **0.037** --
+         so their brightness ranges overlap and value alone cannot tell them apart. The blue-minus-red
+         axis does the work: clay -0.129, hardrock -0.012, deepstone +0.031, a spread of 0.10 unlit.
+         **A hypothesis of mine measured FALSE here and is reported rather than buried:** I expected the
+         warm lamp (`LAMP_TINT` 0.62 multiplies blue by 0.690) to compress exactly the axis carrying the
+         separation. It does the opposite -- under the lamp the cool spread RISES to 0.1365 and the luma
+         spread to 0.0793, because the lamp brightens everything and scales differences with it. T012's
+         ruled 0.38 gives 0.1459, so 0.62 costs about 6% of the hue separation: real, small, and the
+         opposite sign from what I predicted. Whether 0.10 of hue reads "at a glance" needs a person or
+         a vision judge asked WHAT IT SEES (never which it prefers). Parked for the capture batch.
+- [ ] 21 A cut face reads as cut, not as a natural cave wall. **GENUINELY UNBUILT, and the largest
+         remaining item in this phase.** Nothing anywhere distinguishes a dug cell from a generated one:
+         `RockTone` shades by grammar and noise fields, `GlintPainter` is the only thing that mentions a
+         "dug face" and it means exposed ore. Doing this needs per-cell provenance -- sim state, with a
+         save-format cost -- so it is not a view-side change and wants a ruling before it is started.
+- [~] 22 Rubble and scree at the foot of a cut. **Cosmetic debris stays SEPARATE from solid simulation**
+         (audit): particles can communicate a collapse without every speck obstructing a factory. The
+         particle channel already exists -- `SeatEffects.SLUMP_DUST` puffs a vacated cell (D0564) --
+         so this is a tuning-and-taste item on shipped machinery, not new machinery. Capture batch.
 
 ### Phase 4 -- AIR (~8%)
 
