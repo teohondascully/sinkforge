@@ -35,6 +35,8 @@ static func draw(frame: Frame, ci: CanvasItem, id: StringName, at: Vector2, alph
 	var ink: float = alpha * (0.55 + 0.4 * breath)
 	if reached:
 		ci.draw_circle(canvas, r, Color(TargetGuide.INK, alpha * TargetGuide.NEAR_FILL))
+	else:
+		reach_line(frame, ci, id, at, alpha)
 	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(TargetGuide.RIM, alpha * 0.6), TargetGuide.RING_WIDTH + 2.0, true)
 	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(TargetGuide.INK, ink), TargetGuide.RING_WIDTH, true)
 	for d: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
@@ -48,6 +50,64 @@ static func draw(frame: Frame, ci: CanvasItem, id: StringName, at: Vector2, alph
 	# THE RING SAYS WHICH THING (D0499, stranger 79 stood inside the seam's ring and strode past): one word
 	# under it, in this ink, laid out by `RingWord` -- and which side of the drop's line (D0521).
 	RingWord.draw_under(ci, frame, id, at, canvas, r, alpha, reached)
+
+
+## THE REACH LINE (D0557): the ground the body's CENTRE has to be standing inside, drawn as a circle the
+## player walks into. Only while the ringed target is a machine and the body is OUT of reach -- once it is
+## in, the line has said everything it had to say and the ring's own solid rim, fill and "· IN REACH" word
+## (D0521) are the state.
+##
+## D0521 gave the ring two states and strangers still could not read them. Three of them, in three
+## batches, said the same thing in their own words: S111 "the game showed me I was always too far but
+## never showed me WHERE close enough was"; S128 that a body length "gave no clear feedback about what
+## distance that actually represented"; S132 "the white ring marker shows the target exists, but all
+## attempts resulted in TOO FAR". Every one of those is the same complaint, and it is not about the
+## refusal -- it is that a state tells you which side of a line you are on and never where the line IS.
+## So the line is drawn. `Reach.NUM/DEN` metres from the metre's centre, which is the locus of
+## `in_reach` above and therefore cannot disagree with the drop by construction.
+##
+## DASHED AND UNBREATHING, deliberately. The ring breathes because it is asking to be looked at; this is
+## a fact about the floor and a second pulsing circle would read as a second target. Half the ring's ink,
+## so it sits behind the thing it is about.
+const REACH_DASHES: int = 28
+const REACH_DUTY: float = 0.55        ## of each dash's arc drawn, the rest gap
+const REACH_INK: float = 0.42         ## of the guide's alpha: a floor marking, not a target
+## THE LAST LINE DRAWN, for a suite to read off the real pass rather than restate the layout (the idiom
+## `RingWord.last_drawn` sets). Written by the draw, never by a caller.
+static var last_reach_line: Dictionary = {}
+
+
+## THE LINE'S RADIUS IN METRES, and the SAME number `in_reach` compares against -- `Reach.NUM/DEN` from
+## the metre's centre. Named rather than inlined so a suite can assert the drawn circle IS the locus of
+## the rule (a body a hair inside it is in reach, a hair outside is not) instead of asserting that some
+## circle was drawn at some radius that happens to look right.
+static func reach_radius_m() -> float:
+	return float(Reach.NUM) / float(Reach.DEN)
+
+
+## The circle at the drop's own radius around the ringed metre. Gated on `metre_target`, which is the
+## same predicate the IN REACH state is gated on -- so the line appears exactly where the rule governs
+## (a machine, and BUILD's mouth, which `Verbs.build` puts through the same `can_reach`) and never on a
+## cell target or a pile, which are not this rule's. Nothing when the metre is off the canvas.
+static func reach_line(frame: Frame, ci: CanvasItem, id: StringName, at: Vector2, alpha: float) -> void:
+	var o: Interface.Observation = frame.obs
+	if o == null or not RingWord.metre_target(id, o, at):
+		return
+	var m: float = float(Interface.Observation.LOGIC_PX)
+	var cell: Vector2i = RingWord.metre_of(at)
+	var centre: Vector2 = frame.canvas_of((Vector2(cell) + Vector2(0.5, 0.5)) * m)
+	var radius: float = reach_radius_m() * TargetGuide.o_px_per_m(frame)
+	if radius <= 0.0 or not Rect2(Vector2.ZERO, UiTheme.CANVAS).grow(radius).has_point(centre):
+		return
+	var ink := Color(TargetGuide.INK, alpha * REACH_INK)
+	var rim := Color(TargetGuide.RIM, alpha * REACH_INK * 0.6)
+	var step: float = TAU / float(REACH_DASHES)
+	for i: int in REACH_DASHES:
+		var a0: float = step * float(i)
+		var a1: float = a0 + step * REACH_DUTY
+		ci.draw_arc(centre, radius, a0, a1, 3, rim, TargetGuide.RING_WIDTH + 1.0, true)
+		ci.draw_arc(centre, radius, a0, a1, 3, ink, TargetGuide.RING_WIDTH - 0.5, true)
+	last_reach_line = {"cell": cell, "centre": centre, "radius": radius}
 
 
 ## THE DROP'S OWN RULE: the body's centre (`pos_x`/`pos_y`, the observation's `Fx` copy of `Body`'s) to the

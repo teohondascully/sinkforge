@@ -100,8 +100,11 @@ batch quit on a card.** One seat reaching the card is one observation, not a mea
 ## The other walls, unchanged or new
 
 - **The RIG's reach, twice (S128, S132).** Both stood beside a ringed RIG, pressed the number and Q, and
-  got TOO FAR repeatedly. `Reach.NUM/DEN` is 16/5 m = 3.2 m at legacy's cell, which is **one metre** in
-  this world (`core/reach.gd:13-15`). S132: "the white ring marker shows the target exists, but all
+  got TOO FAR repeatedly. `Reach.NUM/DEN` is 16/5 of a metre-cell, which is **3.2 m** in this world
+  too (`core/reach.gd`). CORRECTED 2026-09-09: this line first read "one metre", misreading a docstring
+  about `tile_px`; see `docs/CORRECTIONS.md` and D0557. It matters -- one metre would make this a rule to
+  loosen, and 3.2 m makes it a thing to DRAW, which is what D0557 does.
+  S132: "the white ring marker shows the target exists, but all
   attempts... resulted in TOO FAR." S128 concluded a body length "gave no clear feedback about what
   distance that actually represented". D0521 draws the ring solid when in reach; neither seat reported
   reading that state, which is worth a look at what the ring shows at the RIG specifically.

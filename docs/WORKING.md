@@ -286,6 +286,35 @@ has tested either fix.
 test that is written and not listed is silently dead, and `ALL PASS` will not say so. Read the asserted
 COUNT after adding one; that is how tonight's was caught.
 
+**D0557, and the pivot the director called for.** "It's been like 5 days with no new features or UI
+improvements" -- checked, and right about the day: 16 commits on 2026-09-09, 14 of them measurement.
+The perf programme is closed at D0556 and the work is gameplay again.
+
+**THE REACH LINE ships.** While the ringed target is a machine (or BUILD's mouth) and the body is out of
+reach, the ground the body's CENTRE must stand inside is drawn as a dashed circle at 3.2 m round the
+ringed metre. It vanishes when the body crosses it and D0521's solid rim, fill and "· IN REACH" word take
+over. No rule changed. Three strangers in three batches asked for this in their own words, most plainly
+S111: "the game showed me I was always too far but never showed me WHERE close enough was."
+
+**And the reach is 3.2 m, not one.** `docs/playtests/2026-09-09_strangers127-132_hotbar.md` published
+"one metre" off a misread docstring; corrected in place and in `docs/CORRECTIONS.md`. It moved the fix a
+whole layer: one metre is a rule to loosen (sim, the director's), 3.2 m is a thing to draw (view, mine).
+
+**The gameplay queue, from the last batch's own findings, in the strangers' words:**
+
+1. **The TOO FAR lesson goes stale.** S131: the message did not update as it walked. `{dist}` is
+   substituted once, on the drop; `Hints.active_text` re-substitutes every call, so the fix is to keep
+   `_subs` refreshed while the lesson stands, and to clear it when the body comes into reach. NOT DONE.
+2. **Coal is the floor.** S130 never got coal in 41 bursts: TOO FAR at the seam, then TOO FAR DOWN with
+   "dig at the white square first", then NOTHING THERE at the squares it chose. Refusals across the
+   batch: `air` 14, `far` 6, `sight` 2, `build_far` 2. This is the biggest wall left and it is untouched.
+3. **S131's "three forges, no labels" needs re-reading before anything is built for it** -- on a real
+   seat the nameplates DO read FORGE and CREW RIG, so the report and the build disagree and the report
+   has not been checked against a capture.
+
+**D0553 and D0554 remain shipped and unmeasured**; with D0557 that is three gameplay changes waiting on
+a batch, which is what the next stranger run is for.
+
 ## Repository cleanup (director-approved)
 
 Tooling implementation complete (D0525): timing summaries, runner accounting/optional battery

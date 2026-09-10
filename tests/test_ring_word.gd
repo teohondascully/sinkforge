@@ -25,7 +25,44 @@ func _initialize() -> void:
 	await _test_the_word_is_drawn_by_the_real_pass()
 	_test_the_deliver_ring_goes_to_a_dropped_stack_first()
 	await _test_the_ring_on_a_machine_reads_the_drops_own_reach()
+	_test_the_reach_line_is_the_locus_of_the_rule_it_draws()
 	_finish("ring_word")
+
+
+## D0557. The ring says WHICH SIDE of the drop's line the body is on; this says WHERE THE LINE IS. Three
+## strangers in three batches asked for the same thing in their own words -- S111 "never showed me where
+## close enough was", S128 that a body length "gave no clear feedback about what distance that actually
+## represented", S132 standing at a ringed RIG getting TOO FAR on every attempt.
+##
+## THE PIN IS THAT THE DRAWN CIRCLE IS THE LOCUS, not that a circle was drawn. A line at a radius that
+## merely looks about right is worse than none: it would teach a distance the drop then refuses, and the
+## player would trust it. So the assertion walks the body across the drawn radius and checks that
+## `Reach.in_reach_metre` -- the sim's own call, via the same path `Verbs.can_reach` uses -- flips there
+## and nowhere else. `[[constant-must-dominate-constant]]`: the drawn radius may not be its own authority.
+func _test_the_reach_line_is_the_locus_of_the_rule_it_draws() -> void:
+	var m: int = Interface.Observation.LOGIC_PX
+	var cell := Vector2i(40, 30)
+	var centre: Vector2i = Reach.metre_centre_fx(cell, m)
+	var radius_m: float = RingPainter.reach_radius_m()
+	_check(radius_m > 0.0, "the line has a radius to draw: %.2f m" % radius_m)
+	# A hair INSIDE the drawn circle is in reach; a hair OUTSIDE is not. Stepped along x from the metre's
+	# centre, in Fx world pixels, so the comparison is the sim's integers and not a float restatement.
+	var margin: float = 0.05
+	for dir: int in [1, -1]:
+		var inside: int = centre.x + dir * roundi((radius_m - margin) * float(m) * float(Fx.SCALE))
+		var outside: int = centre.x + dir * roundi((radius_m + margin) * float(m) * float(Fx.SCALE))
+		_check(Reach.in_reach_metre(inside, centre.y, cell, m),
+			"a body %.2f m from the metre's centre is inside the drawn line and in reach (dir %d)"
+				% [radius_m - margin, dir])
+		_check(not Reach.in_reach_metre(outside, centre.y, cell, m),
+			"and %.2f m is outside it and refused (dir %d)" % [radius_m + margin, dir])
+	# THE SAME ON THE DIAGONAL, because the rule is Euclidean and a circle is what that means. A square
+	# reach would pass every axis case above and fail here, which is the whole reason to draw a circle.
+	var diag: float = (radius_m + margin) / sqrt(2.0)
+	var step: int = roundi(diag * float(m) * float(Fx.SCALE))
+	_check(not Reach.in_reach_metre(centre.x + step, centre.y + step, cell, m),
+		"a body %.2f m out on each axis is %.2f m away and refused: the line is a circle, not a box"
+			% [diag, diag * sqrt(2.0)])
 
 
 ## D0521 (strangers 103-120): S119 stood at cell 128, the band's last, and pressed Q eleven times at TOO FAR

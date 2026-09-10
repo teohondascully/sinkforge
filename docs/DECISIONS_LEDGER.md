@@ -21822,3 +21822,54 @@ population that mixes dig and margin callbacks at different per-cell costs (14.1
 the two totals above are arithmetic on measured rates and measured geometry, not a measured A/B of an
 implementation that does not exist. That is the right instrument for a build/do-not-build call and the
 wrong one for a claimed speed-up; no speed-up is claimed.
+
+## D0557 · 2026-09-09 · THE REACH LINE: the ring says which side of the drop's line you are on, so now the line itself is drawn
+
+**Decided:** while the ringed target is a machine (or BUILD's mouth) and the body is OUT of reach, a
+dashed circle is drawn at `Reach.NUM/DEN` metres around the ringed metre's centre -- the ground the
+body's CENTRE has to be standing inside. It vanishes the moment the body crosses it, where D0521's
+solid rim, fill and "· IN REACH" word take over. No rule changed; nothing new is refused or allowed.
+
+**Why.** D0521 gave the ring two states and strangers still could not read them. Three of them, in three
+separate batches, asked for the same thing in their own words: S111 "the game showed me I was always too
+far but never showed me WHERE close enough was"; S128 that a body length "gave no clear feedback about
+what distance that actually represented"; S132, standing at a ringed RIG, "the white ring marker shows
+the target exists, but all attempts resulted in TOO FAR". That is one complaint, and it is not about the
+refusal. **A state tells you which side of a line you are on and never where the line is.** So draw it.
+
+**The pin is that the drawn circle IS the locus, not that a circle was drawn.** A line at a radius that
+merely looks about right would be worse than none: it teaches a distance the drop then refuses, and the
+player believes it. `reach_radius_m()` is named rather than inlined, and the suite walks the body across
+it and checks that `Reach.in_reach_metre` -- the sim's own call, the same path `Verbs.can_reach` takes --
+flips there and nowhere else, on both axes and on the diagonal. `[[constant-must-dominate-constant]]`:
+the drawn radius may not be its own authority.
+
+**Dashed and unbreathing, deliberately.** The ring breathes because it is asking to be looked at; this is
+a fact about the floor, and a second pulsing circle would read as a second target. Half the ring's ink so
+it sits behind the thing it is about. Inspected on a real seat at play zoom: the circle reads as a ground
+marking distinct from the target ring at its centre, about 200 px across on a 1280 px frame.
+
+**Corrected here, and it is mine:** `docs/playtests/2026-09-09_strangers127-132_hotbar.md` reports
+"`Reach.NUM/DEN` = 16/5 m = 3.2 m at legacy's cell, which is **one metre** in this world". That is wrong.
+`in_reach` compares against `(NUM/DEN) * tile_px` and the view passes `Interface.Observation.LOGIC_PX`,
+which IS the metre, so the radius is **3.2 metres** here as in legacy -- the docstring's "both are ONE
+METRE" is about `tile_px`, not about the reach. The suite now prints the number (3.15 m in reach, 3.25 m
+refused), so it cannot be misread again. It matters because it changes the diagnosis: the wall is not a
+cruelly tight reach, it is that nothing on screen distinguished 3.2 m from 5 m -- which is what this
+entry draws.
+
+**Verified:** `tests/test_ring_word.gd` **22 -> 28** asserted. Two mutations fire and each fails only the
+assertions that name it: giving the drawn radius a number of its own (2.0 m) breaks every "outside is
+refused" case, and making the reach rule a BOX instead of a circle breaks the diagonal case alone --
+which is the case that exists to catch exactly that. Full local battery green. The visual inspection was
+taken with the machine gate temporarily widened so the circle would draw on the ringed coal seam; the
+file was restored byte-identical (md5 b6a69190d5f1e1d4b784ed3b8ba5e7ee) before the battery ran, and no
+capture of shipped behaviour is claimed from it.
+
+**Not done, and named so it is not assumed:** the TOO FAR lesson's `{dist}` is still substituted once, on
+the drop, and goes stale as the player walks -- S131 reported exactly that ("the message not updating as
+it walked"). `Hints.active_text` re-substitutes every call, so the fix is to keep `_subs` refreshed while
+the lesson stands; it is a separate change and is not in this one. S131's other finding (several
+machines, and the lesson naming one of them by what it takes) is also open: the nameplates DO distinguish
+FORGE from CREW RIG on the real seat, so that report needs re-reading against a capture before anything
+is built for it.

@@ -691,3 +691,24 @@ already in the log line beside the rate.
 the median frame time clears its budget), its refusal to claim a cause for the draw-phase floor stands
 and was the right call, and the nine entries of bake work it questioned were real. What is withdrawn is
 the sizing that told the next session not to bother with them.
+
+## The reach is 3.2 metres, not one — my own playtest report published the wrong number (D0557)
+
+`docs/playtests/2026-09-09_strangers127-132_hotbar.md`, reporting S128's and S132's failures at the RIG:
+"`Reach.NUM/DEN` is 16/5 m = 3.2 m at legacy's cell, which is **one metre** in this world
+(`core/reach.gd:13-15`)."
+
+I read the docstring instead of the arithmetic. `in_reach` compares against `(NUM/DEN) * tile_px`, and
+every caller passes `Interface.Observation.LOGIC_PX`, which is 16 px and IS the metre. So the radius is
+**3.2 metres here, exactly as in legacy** -- the lines I cited say `tile_px` is one metre in both worlds,
+which is the opposite of what I took them to mean. Measured on the sim's own call: in reach at 3.15 m,
+refused at 3.25 m.
+
+**It changed the diagnosis, which is why it is here and not just fixed.** "Reach is one metre" makes the
+wall a cruelly tight rule and points at loosening it -- a sim change, on the director's desk. Reach of
+3.2 m makes the wall a LEGIBILITY problem: nothing on screen distinguished 3.2 m from the 5 m at which
+S128 was refused. That is what D0557 draws, and it is a view change that alters no rule. A wrong constant
+had aimed the fix at the wrong layer. `[[invented-label-for-real-data]]` is the neighbouring failure --
+this one is worse, because I did not invent the number, I misread a docstring that was trying to warn me.
+
+The number is now printed by `tests/test_ring_word.gd` on every run rather than quoted from prose.
