@@ -305,9 +305,15 @@ whole layer: one metre is a rule to loosen (sim, the director's), 3.2 m is a thi
 1. ~~**The TOO FAR lesson goes stale.**~~ DONE (D0558): it counts down every observe from where the body
    is now, and lets go the moment the body crosses into the drop's reach. The sentence also stopped
    reading "is 4 m to your ABOVE", which a PASS line had been quoting since D0517.
-2. **Coal is the floor.** S130 never got coal in 41 bursts: TOO FAR at the seam, then TOO FAR DOWN with
-   "dig at the white square first", then NOTHING THERE at the squares it chose. Refusals across the
-   batch: `air` 14, `far` 6, `sight` 2, `build_far` 2. This is the biggest wall left and it is untouched.
+2. **Coal is the floor** -- and the journal says the batch report mis-attributed it. D0560 read S130's
+   own words: it stood at the ringed coal seam, was refused, wrote "my reach is about a body length" (the
+   game's phrase), stepped that far, was refused again, and walked back to the forge. The wall was `far`,
+   not the 14 `air` refusals the report led with. TWO FIXES SHIPPED: the reach line now covers rock
+   (D0560 -- and rock's locus is a rounded rectangle, not the circle a machine gets), and the three
+   "about a body length" lessons now say 3.2 metres, substituted from `Reach` so the prose cannot drift.
+   STILL OPEN: S130 pressed a NUMBER key at the seam twice expecting a panel like the forge's. Nothing
+   says a seam is CUT rather than operated, and to a newcomer the two read alike. **Unmeasured -- the
+   next batch is the test of all of it.**
 3. ~~**S131's "three forges, no labels"**~~ DONE (D0559), and the capture changed what got built. There
    really are two forges; the far one had NO plate, because nameplates reached 6.4 m while the drop
    names a machine in words out to 12. One defect, not two. There is no ore-forge/coal-forge

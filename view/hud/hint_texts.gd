@@ -31,11 +31,11 @@ const EDGE_TEXT: String = "THE EDGE — the world ends here; there is nothing pa
 ## swing techniques so a player who is wading is told about the pump before being told how to swing. The
 ## refusals and the drop lessons sit above THE EDGE, so a hold on air at the boundary is answered first.
 const MOMENTS: Array[Dictionary] = [
-	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach. Your reach is about a body length: step closer, then hold [MINE]."},
+	{"id": &"too_far", "text": "TOO FAR — the red slashed square means the rock is past your reach, which is {reach} metres, not a step. The DASHED RING on the ground is exactly that far: stand inside it, then hold [MINE]."},
 	{"id": &"far_below", "text": "TOO FAR DOWN — what you point at lies under the ground, past your reach. Dig at the WHITE SQUARE first: the hole brings it into reach."},
 	{"id": &"cut_through", "text": "CUT THROUGH — the rock under the pointer is gone. Point at what is left of the WHITE SQUARE: a hole has to be a little wider than you before you drop in."},
 	{"id": &"aim_air", "text": "NOTHING THERE — the red slashed square is on open air: no rock under the pointer. Point at the rock or trunk itself; a trunk is thin, so aim at its middle."},
-	{"id": &"build_far", "text": "TOO FAR — the ring is past your reach. Your reach is about a body length: step closer, then press [BUILD] on it."},
+	{"id": &"build_far", "text": "TOO FAR — the ring is past your reach, which is {reach} metres. The DASHED RING on the ground is exactly that far: stand inside it, then press [BUILD] on it."},
 	{"id": &"build_here", "text": "STEP ASIDE — a machine cannot stand where you stand. Step out of the ring, then press [BUILD] on it."},
 	{"id": &"build_rock", "text": "IN THE ROCK — a machine stands in the open, not inside rock. Point at the open metre in the WHITE RING, right above the vein, then press [BUILD]."},
 	{"id": &"wrong_spot", "text": "WRONG SPOT — a Drill bores what is under it and pours that into what is under THAT: it belongs in the WHITE RING, over the vein, over the forge. Press [BUILD] on it to take it back."},
@@ -44,7 +44,7 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"mined_wrong", "text": "NOT ORE — that was {broke}, and the task wants ore. The ore is the silver-flecked rock inside the WHITE RING: cut that one."},
 	{"id": &"dropped_wrong", "text": "WRONG STACK — you dropped {dropped}; the machine beside you takes {wanted}. Press the number over the {wanted} in your bar to hold it, then [DROP]."},
 	{"id": &"left_working", "text": "STILL WORKING — the forge has more of your ore in it, and what it makes comes to you only while you stand beside it. Step back and wait: {more} more coming."},
-	{"id": &"dropped_floor", "text": "NO MACHINE HERE — nothing near enough takes that stack, so it fell at your feet; walk over it to pick it up again. A machine takes a drop from within a body length; the WHITE RING marks the one this step wants."},
+	{"id": &"dropped_floor", "text": "NO MACHINE HERE — nothing near enough takes that stack, so it fell at your feet; walk over it to pick it up again. A machine takes a drop from {reach} metres away; the WHITE RING marks the one this step wants."},
 	{"id": &"dropped_short", "text": "TOO FAR — the {eater} that takes {item} is {dist} m {dir}; your stack stays with you. Walk into its WHITE RING, stand beside it, then press the stack's NUMBER and [DROP]."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
 	{"id": &"world_edge_right", "text": EDGE_TEXT},
@@ -56,3 +56,21 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"wrapped", "text": "THE LINE CAUGHT — it bent around the rock instead of through it. A short line whips you round harder."},
 	{"id": &"hard_landing", "text": "HARD LANDING — a long drop costs your footing. A line fired on the way DOWN takes the fall instead of your legs."},
 ]
+
+
+## THE PLACEHOLDERS THAT ARE KNOWN BEFORE THE GAME STARTS: the way back from each world edge, which is
+## fixed per side (D0526), and the reach, which is a rule.
+##
+## `{reach}` IS SUBSTITUTED, NOT WRITTEN OUT (D0560). These three lessons said "your reach is about a body
+## length". A body is 1 m wide and 2.5 m tall and the reach is `Reach.NUM/DEN` = 3.2 m, so the sentence
+## was short by a factor of three in the reading a player is most likely to take. S130 read the MINE one
+## at the coal seam, wrote "my reach is about a body length", stepped about that far, was refused again,
+## and left without coal in 41 bursts. A number written into prose is a second copy of a constant that
+## cannot be made to track it -- the defect D0559 took out of three files -- so it is filled from the
+## rule. `[[constant-must-dominate-constant]]`.
+static func fixed_subs() -> Dictionary:
+	var reach: String = "%.1f" % (float(Reach.NUM) / float(Reach.DEN))
+	var out: Dictionary = {&"world_edge_right": {"{dir}": "LEFT"}, &"world_edge_left": {"{dir}": "RIGHT"}}
+	for id: StringName in [&"too_far", &"build_far", &"dropped_floor"]:
+		out[id] = {"{reach}": reach}
+	return out

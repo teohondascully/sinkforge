@@ -21954,3 +21954,60 @@ interface_verbs 65 unchanged, which is the point -- the drop's behaviour is iden
 fire: halving the label range reproduces the shipped defect exactly (6.0 m >= 12 m fails), and giving
 the lesson its own copy again (14.0) fails the agreement. Clutter inspected on the real seat at play
 zoom: three plates and the ring's word on screen at once, which reads cleanly. Full local battery green.
+
+## D0560 · 2026-09-09 · The reach line covers ROCK too, and rock's locus is a rounded rectangle, not a circle
+
+**Decided:** the reach line (D0557) is drawn for EVERY ringed target, not only machines, and its shape is
+the locus of whichever rule that target is under: a circle for a machine, a rounded rectangle for rock.
+D0557's gate on `metre_target` is replaced by `within_reach`, which asks the target's own question.
+
+**Why: this is S130's wall, and D0557 missed it by one predicate.** That seat spent 41 bursts failing to
+get coal. Its own journal, not the batch report's summary: it stood at the ringed coal seam, held MINE,
+was refused, wrote **"Message says coal seam is too far... Need to step closer -- my reach is about a
+body length"**, stepped closer, was refused again ("Still too far from coal seam"), gave up on mining and
+walked back to the forge to press keys at it. **The game told it "a body length"** -- the drop lesson's
+own phrase -- and reach is 3.2 m. D0557 drew the line that fixes exactly this and gated it on
+`metre_target`, which is false for a coal seam. The batch report had filed S130's wall as 14 `air`
+refusals; the journal says the refusals that stopped it were `far`.
+
+**Rock's locus is genuinely a different shape, and drawing the circle would have been wrong.** A machine
+is addressed by its METRE (`Reach.in_reach_metre`, one point) so its locus is a circle. Rock is addressed
+by the TERRAIN CELL the pointer lands on -- `Mining.in_reach` measures to `_cell_center_fx`, and a metre
+holds 4x4 cells -- so "can I cut this metre" is the box those cell centres span, inflated by the radius.
+That box is the metre inset by half a terrain cell, so the locus runs about **0.37 m wider on each
+axis** than the circle. **Measured: over 841 swept body positions, 104 of them (12%) are inside the
+cells' locus and outside the metre's circle.** A circle would have been conservative rather than
+over-promising, and still a shape that is not the rule -- which is the thing D0557 exists to refuse.
+
+**One code path.** `inner_of` returns the points the rule measures to: a machine's metre CENTRE (an empty
+rect) or rock's cell-centre box. The outline is that rect inflated by the radius, so the machine case
+closes into exactly the circle D0557 drew and nothing about machines changed.
+
+**And the gate is not `not reached`.** `reached` also asks `metre_target`, so it is false for every cell
+target at any distance: a line gated on it would have drawn on rock the body was standing on top of.
+`within_reach` reads the same geometry the drawing does, so the two cannot disagree about which rule they
+are under.
+
+**Verified:** `tests/test_ring_word.gd` **28 -> 30** asserted, and the new pin is a SWEEP, not a sample:
+the drawn gate is compared with the sim's own `Mining.in_reach` over 841 body positions around a metre
+and **disagrees at none of them**. Its second assertion is the control that the shape matters at all --
+104 positions where the cells admit and the circle refuses -- because a single posed point would pass on
+a circle too. Two mutations fire: measuring rock to the metre's centre gives exactly those 104
+disagreements (the same number, from the other side), and insetting the box by a whole terrain cell
+instead of half gives 40, so the pin catches a two-pixel error. Inspected on a real seat, shipped gate,
+no widening: the line draws round the ringed coal seam with the body just outside it. Full battery green.
+
+**AND THE SENTENCE THAT TAUGHT S130 THE WRONG DISTANCE IS FIXED IN THE SAME ENTRY.** Three lessons -- the
+MINE refusal, the BUILD refusal and NO MACHINE HERE -- read "your reach is about a body length". A body is
+1 m wide and 2.5 m tall; the reach is 3.2 m, so in the reading a player is likeliest to take, the game
+was short by a factor of three, and S130 quoted that phrase back in its journal one burst before giving
+up. They now read "{reach} metres" and point at the dashed ring, and `{reach}` is SUBSTITUTED from
+`Reach.NUM/DEN` rather than written out: a number in prose is a second copy of a constant and cannot be
+made to track it, which is the defect D0559 took out of three files earlier tonight. A sweep over every
+text asserts no lesson measures the reach in bodies any more, because the phrase had already been copied
+three times and a fourth would be written the same way. `tests/test_hints.gd` **57 -> 62** asserted; two
+mutations fire, one naming the offending lesson by id.
+
+**What this does NOT fix.** S130 also read the ore-vein panel's "hold to cut it", then pressed a NUMBER
+key at the seam twice expecting a panel like the forge's: nothing in the game says a seam is CUT rather
+than operated, and the two read alike to a newcomer. Open.

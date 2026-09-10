@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_the_grapple_is_known_by_lesson_or_by_throw()
 	_test_a_drop_that_hits_the_floor_teaches_once()
 	_test_world_edge_pins()
+	_test_every_reach_lesson_says_the_rule_and_never_a_body_length()
 	_finish("hints")
 
 
@@ -288,6 +289,39 @@ func _test_a_drop_that_hits_the_floor_teaches_once() -> void:
 ## and not a frame before; the middle of the world teaches nothing however long it stands there; the left
 ## boundary teaches it again with RIGHT, since the lesson is owed once at EACH edge; a second visit to a side
 ## already taught re-fires nothing. The observation the fixtures pose names no world size, and never fires.
+## D0560. Three lessons -- the MINE refusal, the BUILD refusal and NO MACHINE HERE -- said "your reach is
+## about a body length". A body is 1 m wide and 2.5 m tall and the reach is 3.2 m, so in the reading a
+## player is likeliest to take the sentence was short by a factor of three. S130 read the MINE one at the
+## ringed coal seam, wrote "my reach is about a body length", stepped about that far, was refused again,
+## and left without coal in 41 bursts.
+##
+## THE PIN DERIVES THE NUMBER THE SAME WAY THE GAME DOES, so a change to `Reach` moves both and neither
+## can drift: prose carrying a hand-written constant is the defect D0559 took out of three files.
+func _test_every_reach_lesson_says_the_rule_and_never_a_body_length() -> void:
+	var want: String = "%.1f" % (float(Reach.NUM) / float(Reach.DEN))
+	var subs: Dictionary = HintTexts.fixed_subs()
+	for id: StringName in [&"too_far", &"build_far", &"dropped_floor"]:
+		_check(String((subs.get(id, {}) as Dictionary).get("{reach}", "")) == want,
+			"%s carries the reach from the rule: %s == %s"
+				% [id, str((subs.get(id, {}) as Dictionary).get("{reach}", "<none>")), want])
+	# AND NO LESSON ANYWHERE STILL MEASURES IN BODIES. Swept over every text rather than the three, because
+	# the phrase was copied three times already and a fourth would be written the same way.
+	var offenders: PackedStringArray = PackedStringArray()
+	for group: Array in [HintTexts.MOMENTS, HintTexts.DEFS]:
+		for def: Dictionary in group:
+			if String(def.get("text", "")).findn("body length") >= 0:
+				offenders.append(String(def.get("id", "?")))
+	_check(offenders.is_empty(), "no lesson measures the reach in bodies any more (%s)" % ", ".join(offenders))
+	# The rendered sentence, not just the placeholder: a substitution nothing consumes is not a fix.
+	var h: Hints = Hints.new()
+	h.observe(_hint_obs(), 0.016)
+	for def: Dictionary in HintTexts.MOMENTS:
+		if def["id"] == &"too_far":
+			var text: String = String(def["text"]).replace("{reach}", want)
+			_check(text.contains(want + " metres") and not text.contains("{reach}"),
+				"the MINE refusal reads its metres and leaves no placeholder behind (%s)" % text.left(70))
+
+
 func _test_world_edge_pins() -> void:
 	var h: Hints = Hints.new()
 	var o: Interface.Observation = _hint_obs()

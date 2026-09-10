@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_the_deliver_ring_goes_to_a_dropped_stack_first()
 	await _test_the_ring_on_a_machine_reads_the_drops_own_reach()
 	_test_the_reach_line_is_the_locus_of_the_rule_it_draws()
+	_test_the_reach_line_on_rock_is_the_cells_locus_and_not_the_metres()
 	_finish("ring_word")
 
 
@@ -63,6 +64,56 @@ func _test_the_reach_line_is_the_locus_of_the_rule_it_draws() -> void:
 	_check(not Reach.in_reach_metre(centre.x + step, centre.y + step, cell, m),
 		"a body %.2f m out on each axis is %.2f m away and refused: the line is a circle, not a box"
 			% [diag, diag * sqrt(2.0)])
+
+
+## D0560. Rock is not addressed the way a machine is. `Mining.in_reach` measures to the TERRAIN CELL the
+## pointer lands on, and a metre holds 4x4 of them, so "can I cut this metre" is true for the box those
+## cell centres span inflated by the reach -- a rounded rectangle, not the circle a machine's single
+## metre-centre gives. S130 spent 41 bursts on this: refused at the ringed coal seam, told by the game
+## that reach is "about a body length", stepped closer, refused again, left without coal.
+##
+## SWEPT, NOT SAMPLED. The drawn gate is checked against the sim's own `Mining.in_reach` over a grid of
+## body positions around the metre, and the count of disagreements is the assertion -- a single posed
+## point would pass on a circle too. The second check is the CONTROL that the distinction is real: there
+## must EXIST a position the box admits and a metre-centre circle refuses, or this whole shape is a
+## no-op dressed as a fix. `[[print-the-discriminating-quantity]]`.
+func _test_the_reach_line_on_rock_is_the_cells_locus_and_not_the_metres() -> void:
+	var m: int = Interface.Observation.LOGIC_PX
+	var cell := Vector2i(40, 30)
+	var at := Vector2(float(cell.x * m + m / 2), float(cell.y * m + m / 2))
+	var o: Interface.Observation = Interface.Observation.new()
+	o.machines = []
+	var mismatch: int = 0
+	var circle_differs: int = 0
+	var first: String = ""
+	for dx: int in range(-70, 71, 5):
+		for dy: int in range(-70, 71, 5):
+			o.pos_x = (cell.x * m + m / 2 + dx) * Fx.SCALE
+			o.pos_y = (cell.y * m + m / 2 + dy) * Fx.SCALE
+			var drawn: bool = RingPainter.within_reach(o, &"smelt", at)
+			var truth: bool = _any_cell_in_reach(o, cell, m)
+			if drawn != truth:
+				mismatch += 1
+				if first == "":
+					first = "offset (%d, %d): drawn %s, Mining.in_reach %s" % [dx, dy, drawn, truth]
+			if truth != Reach.in_reach_metre(o.pos_x, o.pos_y, cell, m):
+				circle_differs += 1
+	_check(mismatch == 0,
+		"the drawn locus for rock agrees with Mining.in_reach at every one of %d swept positions (%d differ; %s)"
+			% [29 * 29, mismatch, first if first != "" else "none"])
+	_check(circle_differs > 0,
+		"...and it is NOT the metre-centre circle: %d of %d swept positions the cells admit and the circle refuses"
+			% [circle_differs, 29 * 29])
+
+
+## The sim's own answer: is ANY terrain cell of this metre within a hold's reach?
+func _any_cell_in_reach(o: Interface.Observation, metre: Vector2i, m: int) -> bool:
+	var per: int = m / Interface.Observation.CELL_PX
+	for cx: int in per:
+		for cy: int in per:
+			if Mining.in_reach(o.pos_x, o.pos_y, metre * per + Vector2i(cx, cy)):
+				return true
+	return false
 
 
 ## D0521 (strangers 103-120): S119 stood at cell 128, the band's last, and pressed Q eleven times at TOO FAR

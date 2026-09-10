@@ -158,8 +158,7 @@ func _init() -> void:
 	for def: Dictionary in DEFS:
 		if def.has("when"):
 			_gate_of[def["id"]] = def["when"]
-	_subs[&"world_edge_right"] = {"{dir}": "LEFT"}    # the way BACK from each edge is fixed per side (D0526)
-	_subs[&"world_edge_left"] = {"{dir}": "RIGHT"}
+	_subs.merge(HintTexts.fixed_subs())   # the placeholders that are known before the game starts
 
 
 ## The body among the EDGE_CELLS outermost cells of the world's right or left side, one moment a side (D0526).

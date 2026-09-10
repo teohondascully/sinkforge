@@ -35,8 +35,8 @@ static func draw(frame: Frame, ci: CanvasItem, id: StringName, at: Vector2, alph
 	var ink: float = alpha * (0.55 + 0.4 * breath)
 	if reached:
 		ci.draw_circle(canvas, r, Color(TargetGuide.INK, alpha * TargetGuide.NEAR_FILL))
-	else:
-		reach_line(frame, ci, id, at, alpha)
+	elif not within_reach(o, id, at):
+		reach_line(frame, ci, id, at, alpha)   # NOT `not reached`: that is false for every cell target
 	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(TargetGuide.RIM, alpha * 0.6), TargetGuide.RING_WIDTH + 2.0, true)
 	ci.draw_arc(canvas, r, 0.0, TAU, 40, Color(TargetGuide.INK, ink), TargetGuide.RING_WIDTH, true)
 	for d: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
@@ -85,29 +85,105 @@ static func reach_radius_m() -> float:
 	return float(Reach.NUM) / float(Reach.DEN)
 
 
-## The circle at the drop's own radius around the ringed metre. Gated on `metre_target`, which is the
-## same predicate the IN REACH state is gated on -- so the line appears exactly where the rule governs
-## (a machine, and BUILD's mouth, which `Verbs.build` puts through the same `can_reach`) and never on a
-## cell target or a pile, which are not this rule's. Nothing when the metre is off the canvas.
+## THE LOCUS OF THE RULE THIS TARGET IS UNDER, drawn as a dashed round-cornered outline: the places the
+## body's CENTRE may stand and still work this target.
+##
+## TWO TARGETS, TWO LOCI, AND THE SHAPE SAYS WHICH (D0560). A machine is addressed by its METRE
+## (`Reach.in_reach_metre`, one point), so its locus is a circle. Rock is addressed by the TERRAIN CELL
+## the pointer lands on (`Mining.in_reach` -> `Aim.in_reach_point` over `_cell_center_fx`) and a metre
+## holds 4x4 of them, so its locus is the box those cell centres span, inflated by the radius: a rounded
+## rectangle, about 0.37 m wider on each axis than the circle. Drawing the circle for rock would be
+## conservative rather than over-promising, and would still be a shape that is not the rule -- and the
+## whole argument for drawing this line is that a line which is only about right teaches a distance the
+## game then refuses. ONE PATH COVERS BOTH: for a machine `inner` is empty and the rounded rectangle
+## closes into exactly the circle D0557 drew.
+##
+## S130 IS WHY ROCK IS HERE. It stood at the ringed coal seam, was refused, wrote "my reach is about a
+## body length" -- the game's own words, from the drop lesson -- stepped closer, was refused again, and
+## walked back to the forge without coal, in 41 bursts. Reach is 3.2 m, and a cell target was the thing
+## it was standing at.
 static func reach_line(frame: Frame, ci: CanvasItem, id: StringName, at: Vector2, alpha: float) -> void:
 	var o: Interface.Observation = frame.obs
-	if o == null or not RingWord.metre_target(id, o, at):
+	if o == null or at == TargetGuide.NONE:
 		return
-	var m: float = float(Interface.Observation.LOGIC_PX)
-	var cell: Vector2i = RingWord.metre_of(at)
-	var centre: Vector2 = frame.canvas_of((Vector2(cell) + Vector2(0.5, 0.5)) * m)
 	var radius: float = reach_radius_m() * TargetGuide.o_px_per_m(frame)
-	if radius <= 0.0 or not Rect2(Vector2.ZERO, UiTheme.CANVAS).grow(radius).has_point(centre):
+	var inner: Rect2 = inner_of(frame, o, id, at)
+	if radius <= 0.0 or not Rect2(Vector2.ZERO, UiTheme.CANVAS).intersects(inner.grow(radius)):
 		return
 	var ink := Color(TargetGuide.INK, alpha * REACH_INK)
 	var rim := Color(TargetGuide.RIM, alpha * REACH_INK * 0.6)
-	var step: float = TAU / float(REACH_DASHES)
-	for i: int in REACH_DASHES:
-		var a0: float = step * float(i)
-		var a1: float = a0 + step * REACH_DUTY
-		ci.draw_arc(centre, radius, a0, a1, 3, rim, TargetGuide.RING_WIDTH + 1.0, true)
-		ci.draw_arc(centre, radius, a0, a1, 3, ink, TargetGuide.RING_WIDTH - 0.5, true)
-	last_reach_line = {"cell": cell, "centre": centre, "radius": radius}
+	_dash_round_rect(ci, inner, radius, ink, rim)
+	last_reach_line = {"cell": RingWord.metre_of(at), "inner": inner, "radius": radius}
+
+
+## The points the rule measures TO, in canvas pixels. A machine's is its metre's CENTRE -- an empty rect,
+## so the outline closes into a circle. Rock's is the box its terrain-cell centres span, which is the
+## metre inset by half a terrain cell on every side.
+static func inner_of(frame: Frame, o: Interface.Observation, id: StringName, at: Vector2) -> Rect2:
+	var m: float = float(Interface.Observation.LOGIC_PX)
+	var cell: Vector2i = RingWord.metre_of(at)
+	if RingWord.metre_target(id, o, at):
+		return Rect2(frame.canvas_of((Vector2(cell) + Vector2(0.5, 0.5)) * m), Vector2.ZERO)
+	var half: float = float(Interface.Observation.CELL_PX) * 0.5
+	var lo: Vector2 = frame.canvas_of(Vector2(cell) * m + Vector2(half, half))
+	var hi: Vector2 = frame.canvas_of(Vector2(cell + Vector2i.ONE) * m - Vector2(half, half))
+	return Rect2(lo, hi - lo)
+
+
+## `inner` inflated by `radius`, dashed: four quarter arcs at its corners and four straight sides. Each
+## piece is dashed on its own at a shared pitch rather than one dash pattern wrapped around the whole
+## perimeter -- wrapping would land the dashes differently on a circle than on a rectangle, and the two
+## shapes have to read as one family.
+static func _dash_round_rect(ci: CanvasItem, inner: Rect2, radius: float, ink: Color, rim: Color) -> void:
+	var quarter: float = TAU * 0.25
+	var per: int = maxi(2, REACH_DASHES / 4)
+	var corners: Array[Vector2] = [inner.end, Vector2(inner.position.x, inner.end.y), inner.position,
+		Vector2(inner.end.x, inner.position.y)]
+	for i: int in 4:
+		for d: int in per:
+			var a0: float = quarter * float(i) + quarter * float(d) / float(per)
+			var a1: float = a0 + quarter / float(per) * REACH_DUTY
+			ci.draw_arc(corners[i], radius, a0, a1, 3, rim, TargetGuide.RING_WIDTH + 1.0, true)
+			ci.draw_arc(corners[i], radius, a0, a1, 3, ink, TargetGuide.RING_WIDTH - 0.5, true)
+	var out: Rect2 = inner.grow(radius)
+	var pitch: float = quarter * radius / float(per)
+	_dash_line(ci, Vector2(inner.position.x, out.end.y), Vector2(inner.end.x, out.end.y), pitch, ink, rim)
+	_dash_line(ci, Vector2(inner.position.x, out.position.y), Vector2(inner.end.x, out.position.y), pitch, ink, rim)
+	_dash_line(ci, Vector2(out.position.x, inner.position.y), Vector2(out.position.x, inner.end.y), pitch, ink, rim)
+	_dash_line(ci, Vector2(out.end.x, inner.position.y), Vector2(out.end.x, inner.end.y), pitch, ink, rim)
+
+
+## One dashed straight run, at the pitch the arcs use so the outline reads as one line. A zero-length
+## side (the machine case, where `inner` is a point) draws nothing.
+static func _dash_line(ci: CanvasItem, a: Vector2, b: Vector2, pitch: float, ink: Color, rim: Color) -> void:
+	var span: float = a.distance_to(b)
+	if span <= 0.0:
+		return
+	var n: int = maxi(1, int(round(span / maxf(pitch, 1.0))))
+	for i: int in n:
+		var p0: Vector2 = a.lerp(b, float(i) / float(n))
+		var p1: Vector2 = a.lerp(b, (float(i) + REACH_DUTY) / float(n))
+		ci.draw_line(p0, p1, rim, TargetGuide.RING_WIDTH + 1.0, true)
+		ci.draw_line(p0, p1, ink, TargetGuide.RING_WIDTH - 0.5, true)
+
+
+## IS THE BODY INSIDE THIS TARGET'S OWN LOCUS? The reach line's gate, and it is NOT `reached` above:
+## `reached` also asks `metre_target`, so it is false for every cell target whatever the distance, and a
+## line gated on it would draw on rock the body is standing on top of. A machine is measured to its
+## metre's centre; rock to the nearest of its terrain-cell centres, which is the nearest point of the
+## same `inner` box the line is drawn around -- so the gate and the drawing cannot disagree about which
+## rule they are under. `[[guard-causes-what-it-bounds]]` in reverse: the guard reads the same geometry.
+static func within_reach(o: Interface.Observation, id: StringName, at: Vector2) -> bool:
+	if RingWord.metre_target(id, o, at):
+		return in_reach(o, at)
+	var m: int = Interface.Observation.LOGIC_PX
+	var half: int = Interface.Observation.CELL_PX / 2
+	var cell: Vector2i = RingWord.metre_of(at)
+	var lo := Vector2(cell * m + Vector2i(half, half))
+	var hi := Vector2((cell + Vector2i.ONE) * m - Vector2i(half, half))
+	var body := Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
+	var near: Vector2 = body.clamp(lo, hi)
+	return Reach.in_reach(o.pos_x, o.pos_y, int(round(near.x)) * Fx.SCALE, int(round(near.y)) * Fx.SCALE, m)
 
 
 ## THE DROP'S OWN RULE: the body's centre (`pos_x`/`pos_y`, the observation's `Fx` copy of `Body`'s) to the
