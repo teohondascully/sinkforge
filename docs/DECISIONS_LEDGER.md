@@ -22174,3 +22174,29 @@ clear of the boots and requires it spared, so the margin cannot reach 2. `tests/
 that ordering between the two constants rather than leaving it to be rediscovered by a red in another
 file.
 Reverse: CHEAP -- call `of_body` at the call site again.
+
+## D0569 · 2026-09-10 · view/visuals/veil_light.gd, view/visuals/veil.gdshader
+Decided: the veil's light level bottoms out at `DEEP_FLOOR` (0.55) instead of running to zero. Legacy's
+ratios are untouched above it; the floor only decides where the deep stops getting darker.
+Alternative: leave it, or move `AMBIENT_DARK` (0.66) and `MASS_SHADE` (0.55) themselves -- rejected
+because those are legacy's own numbers with legacy's own addresses, and a floor is one new constant that
+can be read, tested and reversed without re-deriving anything above it.
+Why: MEASURED against the director's reference (`docs/media/reference/`), 5x5 mean luma, same method on
+both. Ours vs the reference: deep rock **0.0195 vs 0.15-0.19**, rock beside a lamp 0.158 vs 0.377, a
+lamp's pool none vs 0.515, a cave's void 0.053 vs 0.116. Our whole underground lived in the bottom sixth
+of the range; the reference's darkest point ANYWHERE is 0.116. The stack that produced 0.02 is
+`AMBIENT_DARK` and `MASS_SHADE` multiplying to about 0.08 of clay's own 0.26 base.
+It does not flatten depth and the reference is the evidence: its deep rock (0.19) is BRIGHTER than its
+surface rock (0.148). Depth there is hue and contrast against warm light, never a crush toward black --
+Astra's diagnosis point 3 as a number.
+Measured after, on a fresh capture: deep rock 0.0195 -> **0.0765**, cave void 0.053 -> **0.132** against
+the reference's 0.116, surface rock 0.112 -> 0.121 against 0.148. HONEST LIMIT: the two captures are
+different scenes at different positions, so those pixel pairs are indicative and not a controlled A/B.
+What IS exact is the arithmetic in `VeilLight.level_rgb`, which `tests/test_flat_planes.gd` now pins on
+both sides of the floor. A fixed lighting bench belongs with the match loop (queue item 49).
+Deep rock is about half way to the reference. The rest is the lamp pools, which is queue item 11 and is
+what the reference actually has: the frame is lit, not merely un-darkened.
+`tests/test_flat_planes.gd` lost one assertion and gained four. The old one required `level_rgb(1.0 -
+AMBIENT_DARK)` to be exactly `AMBIENT_LIGHT` -- legacy's ratio at a point now UNDER the floor, so it
+could only have been kept by keeping the underground eight times too dark. `[[reversed-rule-has-a-pinning-suite]]`.
+Reverse: CHEAP -- set `DEEP_FLOOR` to 0.0 in both files.

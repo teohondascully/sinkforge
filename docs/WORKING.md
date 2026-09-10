@@ -58,9 +58,13 @@ six-week decision.
 
 ### Phase 2 -- LIGHT (~55% of the gap to the reference)
 
-- [ ] 10 **Edge occlusion at every cut face.** Highest-value single item in the queue: it fixes rock-vs-
-         carved legibility, gives every gallery a floor and ceiling, and is the precondition for z being
-         legible at all. `RockNeighborhood` already spans `FORM_REACH` = 6 cells and throws it away.
+- [x] 10 **Edge occlusion -- ALREADY PRESENT, and the real defect was the opposite one (D0569).** The AO
+         and rim light are implemented and correct (`rock_tone.gd:229-246`, legacy's own 0.125 per open
+         neighbour); `rock_tone.gd`'s header claiming they are "deliberately not here" is stale. Probed
+         directly: luma 0.26 (interior) to 0.06 (fully carved), a 4.1x range. The frame read flat because
+         the WHOLE underground sat in the bottom sixth of the value range -- deep rock at 0.0195 against
+         the reference's 0.15-0.19. Fixed by flooring the veil, not by adding occlusion. Capture:
+         `docs/media/moments/2026-09-10-deep-floor.png`.
 - [ ] 11 Machines and lamps emit real light. `veil_light.gd`, `veil_sources.gd`, `light_painter.gd` exist;
          the forges draw fire and illuminate nothing. Astra's diagnosis point 3, still unfixed.
 - [ ] 12 Lamp falloff with a warm-to-cool colour shift over distance.

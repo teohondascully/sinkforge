@@ -178,9 +178,22 @@ func _test_the_sky_floor_follows_every_mutator_and_the_light_terms_pin() -> void
 	_check(g2.sky_floor[1] == 10, "clearing the last solid returns the column to all-air")
 	var cols: PackedInt32Array = WindowPlanes.columns_of(Rect2i(-2, 0, 8, 1), g2.sky_floor, 99)
 	_check(cols.size() == 8 and cols[0] == 99 and cols[1] == 99 and cols[3] == 10 and cols[7] == 99, "a column window pads past the world with the sentinel on both sides")
-	var deep: Color = VeilLight.level_rgb(1.0 - VeilPainter.AMBIENT_DARK)
-	_check(deep.is_equal_approx(VeilLight.AMBIENT_LIGHT), "at the ambient the light level is legacy's AMBIENT_LIGHT, a colour")
-	_check(VeilLight.level_rgb(1.0).is_equal_approx(Color.WHITE) and VeilLight.level_rgb(0.17).b > VeilLight.level_rgb(0.17).r, "full light is white; below the ambient the hue stays cool")
+	# LEGACY'S SHAPE ABOVE THE FLOOR, AND THE FLOOR BELOW IT (D0569). This used to read `level_rgb(1.0 -
+	# AMBIENT_DARK)` and require exactly `AMBIENT_LIGHT`, which is legacy's ratio at legacy's ambient --
+	# a point now UNDER `DEEP_FLOOR`, so the floor answers there instead and that assertion could only
+	# have been kept by keeping the underground eight times too dark. Legacy's arithmetic is unchanged
+	# everywhere it still applies, and this pins both halves rather than dropping the one that moved.
+	_check(VeilLight.DEEP_FLOOR > 1.0 - VeilPainter.AMBIENT_DARK,
+		"the floor is above legacy's own ambient, which is why that point now reads the floor (%.2f > %.2f)"
+			% [VeilLight.DEEP_FLOOR, 1.0 - VeilPainter.AMBIENT_DARK])
+	_check(VeilLight.level_rgb(0.0).is_equal_approx(VeilLight.level_rgb(VeilLight.DEEP_FLOOR)),
+		"no light at all and floor-light are the same colour: the deep bottoms out and never goes black")
+	var lifted: Color = VeilLight.level_rgb(VeilLight.DEEP_FLOOR)
+	_check(0.2126 * lifted.r + 0.7152 * lifted.g + 0.0722 * lifted.b > 0.5,
+		"and it bottoms out bright enough to carry a material's own colour (luma %.3f)"
+			% [0.2126 * lifted.r + 0.7152 * lifted.g + 0.0722 * lifted.b])
+	_check(VeilLight.level_rgb(1.0).is_equal_approx(Color.WHITE) and VeilLight.level_rgb(0.6).b > VeilLight.level_rgb(0.6).r,
+		"full light is still white; between the floor and full light the hue still cools, legacy's own lerp")
 	var datum: float = float(MaterialLook.SURFACE_ROW)
 	_check(is_equal_approx(VeilLight.sky_light(datum - 20.0, datum), 1.0), "open air above the datum is fully lit")
 	var open_deep: float = VeilLight.sky_light(datum + 40.0, datum + 200.0)   # 10 m down an open shaft

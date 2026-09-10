@@ -34,6 +34,7 @@ uniform float key_gain = 3.0;
 uniform float openness_saturate = 2.2;
 // `skylight_ceiling` and legacy's `_skylight_alpha(row, surf)` (VeilLight.sky_light)
 uniform float ambient_dark = 0.66;
+uniform float deep_floor = 0.55;   // `VeilLight.DEEP_FLOOR` -- the two must move together
 uniform float sky_reach_m = 12.0;
 uniform float surface_line_m = 2.0;
 uniform float sky_fade_m = 16.0;
@@ -140,7 +141,7 @@ void fragment() {
 		s *= mix(1.0, void_floor, under);
 	}
 	// `VeilLight.level_rgb`: the dark is a colour -- white at full light, `ambient_light` at the ambient
-	float lit_s = clamp(s, 0.0, 1.0);
+	float lit_s = clamp(max(s, deep_floor), 0.0, 1.0);
 	vec3 cool = ambient_light * (lit_s / (1.0 - ambient_dark));
 	vec3 rgb = mix(vec3(lit_s), cool, clamp((1.0 - lit_s) / ambient_dark, 0.0, 1.0));
 	// `lamp_lift`: each cut lifts what the previous left; the lamp lifts toward ITS colour (legacy `_light_tint`)
