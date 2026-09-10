@@ -22313,3 +22313,44 @@ thing that was too dark, so whatever lands must be per-band.
 Reverse: N/A -- nothing shipped. The successor is queue item A8: isolate D0569's floor, lift AMBIENT
 while preserving shape modulation, and only then ask whether any material still measures short.
 
+## D0576 · 2026-09-10 · sim/mining/slump.gd · four correctness fixes Astra reproduced
+Decided: `_landed` defers a cell a grain arrived in this step; a refusal is re-queued when it is a
+transient and dropped only when it is a rest; the examined-work budget is `LOOK_PER_TICK` and the queue
+is read through a cursor; an overflowing wake spills instead of vanishing.
+Alternative: ship the automaton as it was. It passed 33 assertions and a ten-thousand-step fuzz.
+Why: none of the four is a style call, and my suite was green through all of them.
+1. A GRAIN COULD MOVE TWICE IN A STEP. `_next` defers the destinations of moves made THIS step, and the
+   file's header claimed that bought "at most one cell per step". It does not: a destination already in
+   the queue when the step began gets popped as an occupant afterwards and falls again. Overlapping wake
+   neighbourhoods produce that constantly -- `after_break` wakes three cells per break, `_move` three
+   more per move. The pose that catches it is order-sensitive (break (10,26) THEN (10,27); reverse them
+   and the bug does not fire), which is exactly why one grain and one wake never found it.
+2. EARTH THE BODY BLOCKED WAS FORGOTTEN. `target` answers "stay" for two unlike reasons and `settle`
+   treated them alike. Rock beneath you is permanent; the body's cell box and a body of water are not,
+   and neither wakes anything when it leaves. Block a grain with the rect, walk away, and it hangs over
+   open air with an empty queue. The re-check calls `target` again with the transients lifted rather
+   than duplicating the rule, so the two answers cannot drift; it runs only on the refusal path.
+3. FOUR MOVES WAS NOT FOUR CHECKS. `SETTLE_PER_TICK` bounded moves and nothing bounded looks, so a tick
+   could call `target` up to 4096 times to find four movers -- each one a `pop_front` that shifts the
+   array. `sim/fluid/MODULE.md` makes the active set a hard constraint and I had not profiled it.
+4. OVERFLOW WAS SILENT. `_wake` was a no-op past the cap. It now spills, and the defer is 2 * QUEUE_CAP.
+   The comparison the constant drew to `TileGrid.SOLIDITY_LOG_CAP` is WITHDRAWN: the grid falls back to
+   an all-changed signal, which is a defer, and this file dropped. Past 8192 the wake is refused and
+   COUNTED in `refused_wakes` -- a stated bound, not a solved problem, and out of reach of anything the
+   game can do today. A cave-in verb or a blast would reach it; the answer then is the grid's own, an
+   overflow flag and a regional rescan. In `docs/NEEDS_DIRECTOR.md` rather than built on speculation.
+AND THE TEST THAT WAS LYING, which is the part worth keeping. `_test_a_supported_cell_never_moves` woke
+(11,29), whose neighbourhood is row 28. The subject at (10,29) was never queued, so "it did not move"
+was true of a cell the automaton never looked at. Measured, both ways, on this tree: delete the rest
+clause in `target` and the OLD test prints `PASS: a cell resting on rock stays where it is`; the fixed
+test prints `FAIL` on the same line. That is `[[instrument-cannot-register-subject]]` for the second
+time in this one file, and the fix is not just a better wake -- the control now travels inside the
+measurement, so a wake that stops reaching the subject goes red instead of going quiet.
+The overflow test did the same thing to itself and its own control caught it before it could: a burst
+over every cell of the shared 64x48 grid is 3008 unique wakes against a 4096 cap, so it could not
+overflow and the assertion beneath it was unfalsifiable. It has its own 160x120 world now.
+MEASURED: 48 asserted in `tests/test_slump.gd`, up from 33. Full battery 149/149 suites, 28/28 gates.
+Three new guards mutation-witnessed (3, 2 and 2 assertions red respectively when deleted).
+Reverse: CHEAP for 3 and 4 (delete `LOOK_PER_TICK`, the cursor and `_spill`). 1 and 2 are behaviour and
+their tests would go red, which is the point.
+

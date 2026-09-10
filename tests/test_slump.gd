@@ -29,6 +29,9 @@ func _initialize() -> void:
 	_test_a_step_conserves_every_loose_cell()
 	_test_two_identical_worlds_settle_identically()
 	_test_nothing_moves_until_a_blow_wakes_it()
+	_test_a_grain_does_not_fall_through_an_already_queued_cell()
+	_test_a_grain_the_body_blocks_is_not_forgotten()
+	_test_an_overflowing_wake_is_deferred_not_dropped()
 	_test_the_view_is_told_what_moved_and_what_it_was()
 	_finish("slump")
 
@@ -87,12 +90,30 @@ func _test_an_unsupported_cell_falls_one_cell_a_step() -> void:
 	_check(_count(grid, LOOSE) == 1, "and there is still exactly one loose cell")
 
 
+## REST, AND THE CONTROL THAT MAKES IT A MEASUREMENT (A6). This test used to wake (11,29), whose
+## neighbourhood is row 28 -- three rows of cells that are not the subject. The subject at (10,29) was
+## never queued, so "it did not move" was true of a cell the automaton never looked at, and deleting the
+## rest clause outright left the assertion green. That is this repo's house failure class and it is the
+## second time this file has produced it.
+##
+## Two things fix it. The wake now goes through (10,30), whose neighbourhood contains the subject. And
+## the control travels inside the measurement: the SAME pose and the SAME wake with a LOOSE floor
+## instead of a firm one must move. If the wake ever stops reaching the subject, the control goes red
+## and says so, which is the thing a bare "it stayed put" can never do.
 func _test_a_supported_cell_never_moves() -> void:
 	var grid: TileGrid = _grid()
 	grid.set_material(Vector2i(10, 30), FIRM)
 	grid.set_material(Vector2i(10, 29), LOOSE)
-	_run(grid, _water(), [Vector2i(11, 29)], 20)
+	_run(grid, _water(), [Vector2i(10, 30)], 20)
 	_check(grid.get_material(Vector2i(10, 29)) == LOOSE, "a cell resting on rock stays where it is")
+
+	var control: TileGrid = _grid()
+	control.set_material(Vector2i(10, 30), LOOSE)      # the only difference: the floor is loose too
+	control.set_material(Vector2i(10, 29), LOOSE)
+	_run(control, _water(), [Vector2i(10, 30)], 20)
+	_check(control.get_material(Vector2i(10, 29)) != LOOSE,
+			"CONTROL: the identical wake DOES reach (10,29) -- with a loose floor beneath it the cell "
+			+ "leaves. The rest above is a refusal the automaton made, not a cell it never examined.")
 
 
 func _test_firm_material_never_moves() -> void:
@@ -240,6 +261,115 @@ func _test_nothing_moves_until_a_blow_wakes_it() -> void:
 ## what left them, so `SeatEffects._slump` can puff dust of the right colour at the right place. Pinned
 ## because a dust cloud at the wrong cell, or in the wrong colour, is a defect nobody would ever see in a
 ## failing assertion -- it would just look slightly wrong forever.
+## A1 -- A GRAIN MOVES ONE CELL A STEP EVEN WHEN ITS DESTINATION WAS ALREADY QUEUED.
+##
+## Reproduced by Astra on `c52d6baf`. `_next` defers the destinations of moves made this step, which is
+## why the simple version of this test passes: pose one grain, wake it, and nothing else is in the queue
+## to collide with. The hole is a destination queued BEFORE the step began, which overlapping wake
+## neighbourhoods produce constantly -- `after_break` wakes three cells per break and `_move` three more
+## per move, so in any real collapse the cell below a grain is usually already waiting.
+##
+## The pose is exact about queue ORDER, because the bug needs the destination to be popped AFTER its
+## occupant. `after_break` wakes `c+UP`, `c+UP+LEFT`, `c+UP+RIGHT` in that order per cell, so breaking
+## (10,26) then (10,27) queues [(10,25),(9,25),(11,25),(10,26),(9,26),(11,26)] -- the grain first, its
+## destination fourth. Reverse those two breaks and the bug does not fire, which is exactly why one
+## grain and one wake never caught it.
+func _test_a_grain_does_not_fall_through_an_already_queued_cell() -> void:
+	var grid: TileGrid = _grid()
+	grid.set_material(Vector2i(10, 30), FIRM)
+	grid.set_material(Vector2i(10, 25), LOOSE)
+	var s: Slump = Slump.new()
+	s.after_break(grid, [Vector2i(10, 26), Vector2i(10, 27)])
+	_check(s.pending() == 6,
+			"CONTROL: the two breaks queued six cells (%d) -- the grain at (10,25) AND its destination "
+			% s.pending() + "(10,26). With the destination unqueued this test cannot fail.")
+
+	s.settle(grid, _water())
+	_check(grid.get_material(Vector2i(10, 26)) == LOOSE,
+			"one step, one cell: the grain is at (10,26)")
+	_check(grid.get_material(Vector2i(10, 27)) == "",
+			"and NOT at (10,27). It was popped as an occupant, then again as a destination, and fell "
+			+ "twice on one step's budget.")
+	_check(s.moved_this_tick.size() == 1,
+			"the step's own account agrees: %d cell(s) moved, not two" % s.moved_this_tick.size())
+	_check(_count(grid, LOOSE) == 1, "and there is still exactly one grain")
+
+
+## A2 -- EARTH HELD UP BY THE BODY IS WAITING, NOT RESTING.
+##
+## Also reproduced by Astra. `target` answers "stay" for two unlike reasons and `settle` treated them the
+## same: rock beneath you is permanent and the cell should leave the queue, but the body's cell box moves
+## on its own and wakes nothing when it does. Block a grain with the rect, walk the body away, and the
+## grain hung forever over open air with an empty queue. Water is the same shape -- it drains.
+##
+## The bounded-queue assertion is not decoration. The fix requeues the refused cell every step, so the
+## obvious way to get it wrong is a queue that grows by one a tick for as long as a player stands still.
+func _test_a_grain_the_body_blocks_is_not_forgotten() -> void:
+	var grid: TileGrid = _grid()
+	grid.set_material(Vector2i(10, 30), FIRM)
+	grid.set_material(Vector2i(10, 25), LOOSE)
+	var water: WaterPlane = _water()
+	var standing := Rect2i(10, 26, 1, 1)              # the body, exactly under the grain
+	var s: Slump = Slump.new()
+	s.after_break(grid, [Vector2i(10, 26)])
+	for _i: int in 20:
+		s.settle(grid, water, standing)
+	_check(grid.get_material(Vector2i(10, 25)) == LOOSE,
+			"twenty steps and the earth has not fallen on the player (D0566 still holds)")
+	_check(s.pending() > 0,
+			"...and the grain is STILL OWED A LOOK. This is the assertion Astra's repro needed: at rest "
+			+ "it would be dropped, and nothing would ever wake it again.")
+	_check(s.pending() <= 3,
+			"the requeue is bounded, not a leak: %d cell(s) pending after twenty blocked steps"
+			% s.pending())
+
+	s.settle(grid, water)                            # the body walks away
+	_check(grid.get_material(Vector2i(10, 26)) == LOOSE,
+			"the step after the body leaves, the earth comes down -- with no new blow to wake it")
+	_check(_count(grid, LOOSE) == 1, "and nothing was duplicated waiting")
+
+
+## A3 -- A WAKE PAST THE QUEUE'S BOUND IS LATE, NOT LOST, AND THE ONE REMAINING LOSS IS COUNTED.
+##
+## `QUEUE_CAP` used to make `_wake` a plain no-op, so a collapse wider than the cap silently shed cells
+## and the world stopped part-way with nothing anywhere recording why. Two halves, because the contract
+## has two halves: a burst between the cap and twice the cap is fully deferred, and a burst past twice
+## the cap is refused with a witness. Both are asserted so that neither can quietly become the other.
+##
+## ITS OWN, LARGER WORLD, and the control is why: the shared 64x48 grid holds 3072 cells, so a burst
+## over every one of them tops out at 3008 unique wakes and CANNOT reach a 4096 cap. The first version
+## of this test posed nothing and its control said so before the assertion could lie.
+func _test_an_overflowing_wake_is_deferred_not_dropped() -> void:
+	var big_w: int = 160
+	var big_h: int = 120
+	var deferred: Slump = Slump.new()
+	var grid: TileGrid = TileGrid.new(big_w, big_h, 7)
+	deferred.after_break(grid, _rows(big_w, 1, 39))          # ~6080 cells: over one bound, under two
+	_check(deferred.pending() > Slump.QUEUE_CAP,
+			"CONTROL: the burst really did overflow the LIVE queue -- %d pending against a cap of %d"
+			% [deferred.pending(), Slump.QUEUE_CAP])
+	_check(deferred.refused_wakes == 0,
+			"and not one wake was refused (%d): the overflow went to the spill, which is a defer"
+			% deferred.refused_wakes)
+
+	var flooded: Slump = Slump.new()
+	flooded.after_break(grid, _rows(big_w, 1, big_h))         # ~19040 cells: past both bounds
+	_check(flooded.refused_wakes > 0,
+			"past BOTH bounds a wake is refused -- and it is counted (%d), which is the whole "
+			% flooded.refused_wakes + "difference from the silent version. A stated limit, not a "
+			+ "solved problem; see the constant's header for what would actually fix it.")
+	_check(flooded.pending() >= Slump.QUEUE_CAP,
+			"the cells it did keep are still owed a look: %d pending" % flooded.pending())
+
+
+## Every cell in rows [from, to) of a `w`-wide world, as a break list.
+func _rows(w: int, from: int, to: int) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for y: int in range(from, to):
+		for x: int in w:
+			cells.append(Vector2i(x, y))
+	return cells
+
 func _test_the_view_is_told_what_moved_and_what_it_was() -> void:
 	var grid: TileGrid = _grid()
 	var water: WaterPlane = _water()

@@ -54,9 +54,32 @@ extends RefCounted
 ## a cell moves 4 px a step, so a lone falling cell descends at 240 px/s against the body's 150 px/s run.
 const SETTLE_PER_TICK: int = 4
 
-## A queue this long is a collapse nobody is watching any more; further cells are dropped rather than
-## grown without bound. `TileGrid.SOLIDITY_LOG_CAP` is 4096 for the same reason.
+## The live queue's bound. A wake past it goes to `_spill` and rejoins as the queue drains, so the real
+## defer is 2 * QUEUE_CAP cells (A3). The comparison this constant used to draw to
+## `TileGrid.SOLIDITY_LOG_CAP` was wrong and is withdrawn: the grid does not DROP its overflow, it falls
+## back to an all-changed signal, which is a defer, and this file dropped silently.
+##
+## AND THE LIMIT THAT REMAINS, stated rather than implied. Past 8192 pending cells the spill is full too
+## and a wake is refused -- counted in `refused_wakes`, never silent, but still lost. That is a stated
+## bound and not a solved problem. It is out of reach of anything the game can do today: a blow breaks a
+## handful of cells and wakes three each, and `_move` adds at most sixteen wakes a tick against a budget
+## of four moves, so the queue has never been observed above a few dozen. A cave-in verb, a blast or a
+## drill sweeping a face WOULD reach it, and the answer then is `TileGrid`'s own -- an overflow flag and
+## a rescan of the affected region, not a third buffer. Logged for the director rather than built on
+## speculation about a burst source that does not exist yet.
 const QUEUE_CAP: int = 4096
+
+## The EXAMINED-work budget, which is not the moved-work budget (A4). `SETTLE_PER_TICK` bounds how many
+## cells MOVE; nothing bounded how many were looked at, so a tick could call `target` 4096 times to find
+## four movers -- and every one of those calls was a `pop_front`, which shifts the whole array. A queue
+## of at-rest cells cost O(n^2) a tick to discover it had nothing to do. 64 is ~16 candidates per mover,
+## and `sim/fluid/MODULE.md` makes the active set a hard constraint, so this is the constraint's shape
+## here. Cells not reached this tick are still queued; they are examined next tick.
+const LOOK_PER_TICK: int = 64
+
+## Consumed prefix length that triggers a compaction. The queue is read through `_head` rather than
+## `pop_front` so a step is O(looked) and not O(looked * queue); the prefix is reclaimed in one slice.
+const COMPACT_AT: int = 256
 
 const DOWN := Vector2i(0, 1)
 const UP := Vector2i(0, -1)
@@ -64,8 +87,15 @@ const LEFT := Vector2i(-1, 0)
 const RIGHT := Vector2i(1, 0)
 
 var _queue: Array[Vector2i] = []
+var _head: int = 0                           ## read cursor into `_queue`; see `COMPACT_AT`
+var _spill: Array[Vector2i] = []             ## wakes deferred past `QUEUE_CAP`, drained as room appears
 var _queued: Dictionary = {}                 ## cell -> true while queued: one blow breaks several cells
 var _next: Array[Vector2i] = []              ## woken FOR THE NEXT step, never this one (see `settle`)
+var _landed: Dictionary = {}                 ## cells a grain ARRIVED in this step; they rest until next
+## Wake EVENTS refused because the live queue and the spill were both full -- events, not distinct
+## cells, because a refused cell is re-offered by the next thing that wakes it and refused again. The
+## count exists so that the one lossy path in a deterministic automaton has a witness; see `_wake`.
+var refused_wakes: int = 0
 var moved_this_tick: Array[Vector2i] = []    ## the cells that EMPTIED this step, for the view's dust
 ## What moved, for the dust's colour. ONE material a step, exactly as `Mining.broke_material` is one a
 ## tick: clay is the only loose material, so a step cannot mix two today. If a second material is ever
@@ -85,34 +115,82 @@ func after_break(grid: TileGrid, cells: Array[Vector2i]) -> void:
 		_wake(grid, c + UP + RIGHT)
 
 
-## One step of the collapse: up to `SETTLE_PER_TICK` queued cells that can still move, do. Cells that
-## cannot move are dropped from the queue -- they are at rest, and something must break near them to wake
-## them again.
+## One step of the collapse: up to `SETTLE_PER_TICK` queued cells that can still move, do, and at most
+## `LOOK_PER_TICK` are examined to find them. A cell that cannot move leaves the queue ONLY when its
+## refusal is permanent -- see the transient clause below.
 ##
-## A CELL MOVES AT MOST ONE CELL PER STEP, which is the whole reason `_next` exists. The destination of a
-## move is woken for the FOLLOWING step, not this one: queued into `_queue` directly it would be popped
-## again a few iterations later and fall again, and a single grain would descend `SETTLE_PER_TICK` cells
-## in one frame while the budget said four cells had moved. The first version of this file did exactly
-## that and `tests/test_slump.gd`'s "one step moves the cell exactly one cell down" is what caught it.
+## A CELL MOVES AT MOST ONE CELL PER STEP, and `_next` alone did not buy that (A1). `_next` defers the
+## destinations of moves made THIS step, which stops a grain being re-popped from cells this step put it
+## in. It does nothing about a destination that was ALREADY in the queue when the step began -- and
+## overlapping wake neighbourhoods put one there routinely, because `after_break` wakes three cells per
+## break and `_move` wakes three more per move. Astra reproduced it: a grain at (10,25) went through
+## (10,26) to (10,27) inside one `settle`, two cells for one step's budget of one. `_landed` closes it
+## from the other side: a cell a grain ARRIVED in this step is deferred on sight, whatever queued it.
+##
+## A REFUSAL IS NOT ALWAYS A REST (A2). `target` returns the cell itself for two unlike reasons: rock or
+## the world's floor beneath it, which is permanent and means the cell should leave the queue; or the
+## body's cell box or a body of water, which will move on its own and wake nothing when it does. The
+## second case used to hit the same bare `continue` and the grain hung forever with an empty queue --
+## reproduced by blocking a destination with `occupied` and then removing the rect. The second `target`
+## call asks the same rule with the transients lifted, so the two answers cannot drift apart; it runs
+## only on the refusal path, which is the cold one.
 func settle(grid: TileGrid, water: WaterPlane, occupied: Rect2i = Rect2i()) -> void:
 	moved_this_tick.clear()
+	_landed.clear()
 	var looked: int = 0
-	while moved_this_tick.size() < SETTLE_PER_TICK and not _queue.is_empty() and looked < QUEUE_CAP:
+	while moved_this_tick.size() < SETTLE_PER_TICK and _head < _queue.size() and looked < LOOK_PER_TICK:
 		looked += 1
-		var c: Vector2i = _queue.pop_front()
+		var c: Vector2i = _queue[_head]
+		_head += 1
 		_queued.erase(c)
+		if _landed.has(c):
+			_next.append(c)                                  # a grain arrived here this step (A1)
+			continue
 		var to: Vector2i = target(grid, water, c, occupied)
 		if to == c:
+			if target(grid, water, c, occupied, true) != c:
+				_next.append(c)                              # held by the body or by water (A2)
 			continue
 		_move(grid, c, to)
+		_landed[to] = true
 		moved_this_tick.append(c)
+	_compact()
 	for c: Vector2i in _next:
 		_wake(grid, c)
 	_next.clear()
+	_drain_spill()
 
 
+## Cells still owed a look, live queue and deferred spill together. A caller asking "has the world
+## finished answering?" means both, and the spill is not a second, quieter queue.
 func pending() -> int:
-	return _queue.size()
+	return (_queue.size() - _head) + _spill.size()
+
+
+## Reclaim the consumed prefix in one slice rather than shifting the array on every read. Deferred until
+## the prefix is worth the copy, or taken for free when the queue empties.
+func _compact() -> void:
+	if _head == 0:
+		return
+	if _head >= _queue.size():
+		_queue.clear()
+		_head = 0
+	elif _head >= COMPACT_AT:
+		_queue = _queue.slice(_head)
+		_head = 0
+
+
+## Deferred wakes rejoin the live queue as room appears (A3). A burst wider than `QUEUE_CAP` is a
+## collapse arriving faster than the budget answers it, which is a reason to be late and not a reason to
+## lose cells.
+func _drain_spill() -> void:
+	var room: int = QUEUE_CAP - (_queue.size() - _head)
+	if room <= 0 or _spill.is_empty():
+		return
+	var n: int = mini(room, _spill.size())
+	for i: int in range(n):
+		_queue.append(_spill[i])
+	_spill = _spill.slice(n)
 
 
 ## Where the loose cell at `c` goes this step, or `c` itself when it is at rest.
@@ -133,17 +211,23 @@ func pending() -> int:
 ## The left/right preference is `(c.x + c.y) & 1`. A fixed preference gives every pile in the world the
 ## same lean; a parity is still perfectly deterministic, needs no state, and breaks the lean up spatially
 ## so a heap spreads instead of walking.
-static func target(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rect2i = Rect2i()) -> Vector2i:
+##
+## `lift_transients` asks the same question with the body and the water taken out of the world, which is
+## how `settle` tells a rest from a wait (A2). It is not a second rule: every other clause is shared, so
+## the two answers cannot drift.
+static func target(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rect2i = Rect2i(),
+		lift_transients: bool = false) -> Vector2i:
 	if not grid.in_bounds(c) or not WorldMaterials.is_loose(grid.get_material(c)):
 		return c
 	var below: Vector2i = c + DOWN
-	if _open(grid, water, below, occupied):
+	if _open(grid, water, below, occupied, lift_transients):
 		return below
 	if not grid.in_bounds(below) or not WorldMaterials.is_loose(grid.get_material(below)):
 		return c                     # bedrock, a machine, the world's floor or open water: this is rest
 	var first: Vector2i = LEFT if ((c.x + c.y) & 1) == 0 else RIGHT
 	for side: Vector2i in [first, -first]:
-		if _open(grid, water, c + side, occupied) and _open(grid, water, c + side + DOWN, occupied):
+		if _open(grid, water, c + side, occupied, lift_transients) \
+				and _open(grid, water, c + side + DOWN, occupied, lift_transients):
 			return c + side + DOWN
 	return c
 
@@ -151,8 +235,13 @@ static func target(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rec
 ## Room for a loose cell to arrive: in the world, no rock, dry, and not where the body is standing. See
 ## the header on why wet and occupied are both closed. An empty `occupied` rect contains no point, so the
 ## default argument means "nothing is standing anywhere" without a branch.
-static func _open(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rect2i = Rect2i()) -> bool:
-	return grid.in_bounds(c) and not grid.is_solid(c) and water.water_at(c) == 0 and not occupied.has_point(c)
+static func _open(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rect2i = Rect2i(),
+		lift_transients: bool = false) -> bool:
+	if not grid.in_bounds(c) or grid.is_solid(c):
+		return false
+	if lift_transients:
+		return true                  # the body and the water are asked to step aside, the rock is not
+	return water.water_at(c) == 0 and not occupied.has_point(c)
 
 
 ## Carry the material from `from` to `to` and wake what the vacancy may release: the cell above `from` and
@@ -170,10 +259,17 @@ func _move(grid: TileGrid, from: Vector2i, to: Vector2i) -> void:
 
 
 func _wake(grid: TileGrid, c: Vector2i) -> void:
-	if _queued.has(c) or not grid.in_bounds(c) or _queue.size() >= QUEUE_CAP:
+	if _queued.has(c) or not grid.in_bounds(c):
 		return
 	_queued[c] = true
-	_queue.append(c)
+	if _queue.size() - _head < QUEUE_CAP:
+		_queue.append(c)
+		return
+	if _spill.size() < QUEUE_CAP:
+		_spill.append(c)             # late, not lost (A3)
+		return
+	_queued.erase(c)
+	refused_wakes += 1               # both bounds full: counted, so a replay divergence has a name
 
 
 ## THE CONSERVATION PROBE, for the suite and the invariant: how many loose cells the window holds. A step
