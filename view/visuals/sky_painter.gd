@@ -103,8 +103,10 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 	var dl: float = DAYLIGHT
 	# Sky palette: a moody night eased toward a subdued day blue (overcast underworld, not beach
 	# postcard) by the daylight level. Dusk and dawn pass through a brief warm blush at the horizon.
-	var top_c: Color = Color(0.045, 0.06, 0.105).lerp(Color(0.21, 0.32, 0.50), dl)
-	var hor_c: Color = Color(0.125, 0.135, 0.185).lerp(Color(0.46, 0.55, 0.66), dl)
+	# THE GRADIENT'S TWO ENDS LIVE IN `SkyLight` (D0589), because the godray's colour is derived from the
+	# same zenith and a second copy here is how a beam and the sky it comes from drift apart.
+	var top_c: Color = SkyLight.zenith_tone(dl)
+	var hor_c: Color = SkyLight.horizon_tone(dl)
 	var blush: float = clampf(1.0 - absf(dl - 0.5) * 2.0, 0.0, 1.0)     # peaks mid-transition
 	hor_c = hor_c.lerp(Color(0.62, 0.42, 0.34), blush * 0.35)           # dusk/dawn ember at the horizon
 	var grad_top: float = HORIZON_Y - 420.0 * SCALE

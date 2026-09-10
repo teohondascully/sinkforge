@@ -22674,3 +22674,36 @@ Astra's ruling: no d3/d4 yet; select the player project first; the recommended n
 (extend a line, earn pumping, claim a wet chamber) rather than another recipe counter -- which also
 reaches `pump`, the machine P042 had set aside as a separate question.
 Reverse: docs only.
+
+## D0589 · 2026-09-10 · view/visuals/sky_light.gd (new), sky_painter.gd, light_painter.gd · a godray is the sky seen through a hole
+Decided: the godray's colour and strength are DERIVED from the sky, in a new `SkyLight` beside
+`SkyPainter` -- the same split `VeilPainter`/`VeilLight` already draws. `LightPainter` holds neither any
+more.
+Why: Astra's D6 ruling -- "a night sky should not coexist with sunlight-like shafts merely because
+separate painters use unrelated constants". The source said it outright. `light_painter.gd`'s header
+closed with "day/night -- this build has no day clock, so the godrays run at full day", and it was true:
+a warm `RAY` at `Color(1.0, 0.95, 0.76)` and no level term at all. D0583 moved the sky to night
+(`DAYLIGHT` 0.15) and gave the ground a night level; the shafts were the half that did not move, so a
+night sky poured noon sunlight down every hole in it. Same mismatch D0583 fixed, one painter further on.
+The tone is a HUE, not a brightness: `sky_tint` carries the zenith to full value, because the level is
+carried separately and a dark night sky multiplied by a small alpha as well would dim the beam twice and
+it would not be visible at all.
+THE LEVEL IS DERIVED, NOT CHOSEN (`[[constant-must-dominate-constant]]`): `lerpf(VeilLight.NIGHT_LEVEL,
+1.0, DAYLIGHT)` -- the SAME factor the ground above the surface already takes, so a beam and the floor it
+lands on cannot disagree about the hour. At the shipped 0.15 that is 0.5325 where it used to be 1.0. Two
+constants survive and they are now ORDERED rather than independent: `DAYLIGHT` says how the sky LOOKS,
+`NIGHT_LEVEL` says what it DELIVERS at `DAYLIGHT` 0.
+FOUND WHILE WRITING IT, and it is why the test pins what it pins: `sky_tint(0.0)` reproduces
+`SkyPainter.STAR_COLD` to four places -- (0.4286, 0.5714, 1.0) against (0.429, 0.571, 1.0). That constant
+was authored by a different route entirely (the night zenith held at hue 225.0, saturation 0.571, full
+value). Two derivations of one blue that agree, so the suite pins the new function against a number the
+repo already believed instead of one I would have written down myself
+(`[[control-inside-the-measurement]]`).
+NOT A DAYLIGHT RE-TUNE: `ray_tone(1.0)` is legacy's `RAY` byte for byte and `ray_level(1.0)` is 1.0, both
+asserted. This changes night and nothing else.
+The gradient's four end colours moved into `SkyLight` too, and `SkyPainter.paint` now calls for them --
+a second copy of the zenith beside a beam derived from it is exactly how the two drift apart again.
+Mutation-tested, four ways, each firing the guard that names it: level pinned to 1.0 (the original
+defect) fired 4; no normalisation fired the hue guard at 11 of 11 off; a drifting gradient zenith fired
+the one-zenith guard at 10 mismatches; dropping the sun at noon fired the unchanged-daylight guard.
+Reverse: CHEAP -- `ray_level` returns 1.0 and `ray_tone` returns `RAY_SUN`.

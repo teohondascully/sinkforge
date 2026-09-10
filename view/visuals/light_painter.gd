@@ -13,7 +13,11 @@ extends RefCounted
 ## records, the placed torches and conduits with the power field, the wet cells, the surface heights,
 ## and the scene's falling items for the motes. Every radius is legacy's, in metres (its cell), and
 ## becomes world px through `LOGIC_PX`. Not here: the sonar echoes (dead), the ore seam glow (S4, the
-## glint's neighbour), and day/night -- this build has no day clock, so the godrays run at full day.
+## glint's neighbour). DAY/NIGHT IS NO LONGER ABSENT: this header used to close "this build has no day
+## clock, so the godrays run at full day", and it was true and it was the bug -- D0583 moved the sky to
+## night and gave the ground a night level, and the shafts kept pouring noon sunlight down every hole.
+## `SkyLight.ray_tone`/`ray_level` (D0589) derive both from the sky, so nothing here holds an opinion
+## about the hour.
 
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)
 const LAMP_RADIUS_M: float = 5.6
@@ -31,7 +35,7 @@ const TORCH_GLOW := Color(1.0, 0.60, 0.24)
 const TORCH_R_M: float = 3.0
 const CONDUIT_GLOW := Color(1.0, 0.78, 0.36)
 const MOTE_R_M: float = 1.0
-const RAY := Color(1.0, 0.95, 0.76)
+## The beam's colour and strength are `SkyLight`'s now (D0589); `RAY_SUN` there is this constant, kept.
 const WATER_SHEEN := Color(0.32, 0.66, 0.98)
 const WATER_SHEEN_BASE: float = 0.07
 const WATER_SHEEN_LEVEL: float = 0.11
@@ -239,6 +243,8 @@ func paint_frame(frame: Frame, ci: CanvasItem) -> void:
 
 ## Where a dug shaft admits the sky below the enclosing ground, a soft daylight beam pours down it.
 func _paint_godrays(o: Interface.Observation, ci: CanvasItem, t: float, view: Rect2) -> void:
+	var tone: Color = SkyLight.ray_tone()
+	var level: float = SkyLight.ray_level()
 	var n: int = int(MaterialLook.CELLS_PER_METRE)
 	var col0: int = floori(view.position.x / M) - 1
 	var col1: int = ceili(view.end.x / M) + 1
@@ -254,15 +260,18 @@ func _paint_godrays(o: Interface.Observation, ci: CanvasItem, t: float, view: Re
 		var y1: float = float(ray["end_row"]) * CELL + (M * 0.4 if bool(ray["lands"]) else 0.0)
 		var shimmer: float = 0.85 + 0.15 * sin(t * 0.7 + float(lc) * 1.3)
 		var mouth_light: float = ray["mouth_light"]
+		# `mouth_light` and `floor_light` stay pure GEOMETRY -- how open this mouth is, how far down the
+		# beam still reaches. The hour multiplies the light EMITTED, which is why `level` lands on the
+		# alphas and not on the ray dictionary (D0589).
 		for pass_i: int in 2:
 			var half_w: float = (M * 0.46) if pass_i == 0 else (M * 0.24)
-			var a: float = (0.10 if pass_i == 0 else 0.14) * mouth_light * shimmer
+			var a: float = (0.10 if pass_i == 0 else 0.14) * mouth_light * shimmer * level
 			var a_end: float = a * (float(ray["floor_light"]) / maxf(mouth_light, 0.01)) * 0.5
 			var cx: float = x + M * 0.5
 			ci.draw_polygon(PackedVector2Array([Vector2(cx - half_w, y0), Vector2(cx + half_w, y0), Vector2(cx + half_w * 0.8, y1), Vector2(cx - half_w * 0.8, y1)]),
-				PackedColorArray([Color(RAY, a), Color(RAY, a), Color(RAY, a_end), Color(RAY, a_end)]))
+				PackedColorArray([Color(tone, a), Color(tone, a), Color(tone, a_end), Color(tone, a_end)]))
 		if bool(ray["lands"]) and float(ray["floor_light"]) > 0.06:
-			draw_glow(ci, Vector2(x + M * 0.5, float(ray["end_row"]) * CELL), 1.6 * M, RAY, 0.18 * float(ray["floor_light"]) * shimmer)
+			draw_glow(ci, Vector2(x + M * 0.5, float(ray["end_row"]) * CELL), 1.6 * M, tone, 0.18 * float(ray["floor_light"]) * shimmer * level)
 
 
 ## A faint cool bloom off the water's SKIN -- the top and the sides of a body, never its middle -- so a
