@@ -733,3 +733,46 @@ fired early, the seat then walked to the world's east edge, and the real finding
 The conclusion that survives is the one built on the full pass: S134's own final report ("TOO FAR every
 time at the CREW RIG, from 7+ positions") is refuted by its receipts — one `dropped_short` in 54 bursts
 and no `far` refusal at all. That stands, and it is why the batch is classified from receipts.
+
+## "This does NOT flatten depth" — a claim about a clamp I never did the arithmetic on (D0576, D0577)
+
+D0569 floored the veil at 0.55 to lift an underground that measured 0.0195 against a reference's 0.15,
+and I wrote into `veil_light.gd`'s own header that the floor "does NOT flatten depth", with the
+reference's brighter-deep-than-surface reading as the evidence. Astra checked the arithmetic. Underground
+`sky` is `1 - AMBIENT_DARK` = 0.34 and `shade` cannot exceed `1 + KEY_STRENGTH` = 1.30, so the combined
+output tops out at **0.442 — strictly below the 0.55 floor**. Every solid cell below the scatter band
+clamped to the floor. Measured after they said so: buried rock, mid rock, a lit cut face, cave air and
+true void all returned rgb (0.5500, 0.5610, 0.6382). Not flattened depth — flattened *everything*.
+
+**The prose reasoned about the term I was thinking about, and the code multiplied all of them.** I
+checked the floor against the depth term (`sky`), which the reference discussion was about, and never
+against the product it was actually applied to. Three constants, one multiplication.
+`[[caveat-in-prose-does-not-protect]]`, one layer up: I did not merely state a limit and then violate
+it, I stated the limit's *inverse* and shipped it as a header.
+
+**It cost a second, larger error.** With the veil constant underground, `material_colour` was the only
+term left varying — so when the deep still measured short, brightening materials looked like the only
+available lever. That was D0575: three per-material scale factors, a broken port provenance, and a real
+gate red (`test_material_palette.gd`, coal 0.0933 against a 0.1426 floor). It was a symptom treatment on
+a self-inflicted wound, and it is withdrawn. `[[stacked-faults-attribution]]` runs in this direction too:
+a fault of mine made every nearby measurement look like it needed its own fix.
+
+**And the suite was pinning it.** `test_flat_planes.gd` asserted `level_rgb(0.0) == level_rgb(DEEP_FLOOR)`
+— "no light at all and floor-light are the same colour" — which is the flattening written down as a
+feature. Green, true, and load-bearing in the wrong direction: `[[reversed-rule-has-a-pinning-suite]]`.
+It now pins *distinctness and order* across the five things that exist underground, and restoring D0569's
+clamp turns four assertions red.
+
+The same audit reproduced two slump bugs my 33 green assertions missed (a grain moving twice in a step; a
+grain the body blocked being dropped from the queue forever), and a third test of mine that was vacuous
+in this repo's house way — `[[instrument-cannot-register-subject]]`, for the second time in that one
+file. Measured both ways on this tree: delete the rest clause in `Slump.target` and the old test prints
+`PASS: a cell resting on rock stays where it is`; the fixed test prints `FAIL` on the same line. D0576.
+
+**What survives.** The brightness reading that motivated D0569 was correct and is unchanged — our
+underground really did live in the bottom sixth of the range. What replaces the clamp is an ambient the
+deep is *lifted by* rather than clamped to, ramped by depth so it cannot touch the surface, with the two
+constants picked off a measured sweep rather than chosen. The lesson is narrower than "check your
+arithmetic": **a guard placed on a combined quantity needs its bound checked against that quantity's
+actual range, not against the one term the guard was designed for.**
+

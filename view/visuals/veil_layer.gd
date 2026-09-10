@@ -66,6 +66,11 @@ func _init(ore: OrePainter = null, falling: FallingItems = null) -> void:
 		material.set_shader_parameter(&"sky_fade_m", VeilLight.SKY_FADE_M)
 		material.set_shader_parameter(&"ambient_light", Vector3(VeilLight.AMBIENT_LIGHT.r, VeilLight.AMBIENT_LIGHT.g, VeilLight.AMBIENT_LIGHT.b))
 		material.set_shader_parameter(&"void_floor", VeilLight.VOID_FLOOR)
+		# BOUND, not left to the shader's own default (D0577). `deep_floor` never was, so the header
+		# saying "the two must move together" was enforced by nothing at all and a drift between them
+		# would have shown up only as a frame nobody could explain.
+		material.set_shader_parameter(&"deep_ambient", VeilLight.DEEP_AMBIENT)
+		material.set_shader_parameter(&"deep_gain", VeilLight.DEEP_GAIN)
 		var tint: Color = VeilLight.lamp_tint()
 		material.set_shader_parameter(&"lamp_tint", Vector3(tint.r, tint.g, tint.b))
 

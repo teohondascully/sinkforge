@@ -69,29 +69,35 @@ DERIVED from inter-rock separation, so widening the palette moved its own bar. C
 **Every item below was reproduced by a second party, not proposed.** They are correctness debt, and
 phase 2 cannot be measured honestly while A8 stands.
 
-- [ ] A1 **Slump moves a grain twice in one tick.** `_next` defers cells woken BY a move; it does not
+- [x] A1 **DONE (D0576).** Slump moves a grain twice in one tick. `_next` defers cells woken BY a move; it does not
        protect a destination that was ALREADY in the queue. Overlapping wake neighbourhoods put a
        grain through (10,26) to (10,27) in one `settle()`. Fix, regression test, mutation-witness.
-- [ ] A2 **Slump forgets a grain whose blocker leaves.** A cell blocked by the body rect (or by water)
+- [x] A2 **DONE (D0576).** Slump forgets a grain whose blocker leaves. A cell blocked by the body rect (or by water)
        returns `target() == c`, hits the bare `continue`, and is dropped from the queue forever;
        nothing wakes it when the body walks away. Distinguish rest from transient refusal.
-- [ ] A3 **Overflow must defer, not forget.** `QUEUE_CAP` silently drops work. The comparison I drew to
+- [x] A3 **DONE (D0576), with a stated residual bound.** Overflow must defer, not forget. `QUEUE_CAP` silently drops work. The comparison I drew to
        `TileGrid.SOLIDITY_LOG_CAP` is misleading -- the grid falls back to an all-changed signal, which
        is a defer. Slump has no such fallback.
-- [ ] A4 **Four movements is not four checks.** A tick may inspect 4096 candidates, and `pop_front()`
+- [x] A4 **DONE (D0576).** Four movements is not four checks. A tick may inspect 4096 candidates, and `pop_front()`
        shifts the array on every one. Budget examined work separately from moved work; queue cursor or
        ring buffer. `sim/fluid/MODULE.md` makes the active set a hard constraint and I never profiled it.
 - [ ] A5 **Machine occupancy is absent from `Slump._open()`.** It checks terrain, water and the player
        rect -- not machine bases. Define and test what falling earth does to machinery.
-- [ ] A6 **One slump test is still vacuous.** The supported-cell test wakes row 28 while its subject sits
+- [x] A6 **DONE (D0576), reproduced both ways.** One slump test is still vacuous. The supported-cell test wakes row 28 while its subject sits
        on row 29, so its unchanged result does not establish the subject was evaluated. This is
        `[[instrument-cannot-register-subject]]` for the SECOND time in this one file.
 - [ ] A7 **Save/load drops the pending queue, so two identical factories diverge on a reload.** Not a
        cosmetic frame. Ruling or fix; `TreeFall` shares the property and that does not excuse it.
-- [ ] A8 **Isolate D0569's floor -- IT IS ERASING DEEP ROCK'S SHAPE.** See item 10. Preserve shape
+- [x] A8 **DONE (D0577) -- and it was erasing more than shape.** See item 10. Preserve shape
        modulation and lift AMBIENT instead of clamping combined output; compare against the current
        clamp with materials and lights held fixed. **Do not brighten materials to compensate before
        this is isolated** -- that is precisely the mistake D0575 was.
+       **RESULT:** not just mass/key -- buried rock, mid rock, a lit cut face, cave air and true void
+       all returned one identical value, rgb (0.5500, 0.5610, 0.6382). The clamp cannot be rescued by a
+       smaller floor: the underground's brightest possible output is 0.442, so any floor that lifts the
+       deep to the reference's brightness sits above the entire range. Replaced with a depth-ramped
+       ambient LIFT (`lit = mix(s, 0.48 + 0.69*s, d/AMBIENT_DARK)`), which restores two-thirds of the
+       lost contrast at the brightness D0569 wanted and leaves the surface bit-identical.
 - [ ] A9 **Grapple `_slide` checks destinations, not swept paths.** "Every candidate is a subset of the
        requested move" is not a collision-safety proof; a direct helper probe accepted a move across an
        intervening solid floor because the endpoint was clear. The pre-existing full-projection path

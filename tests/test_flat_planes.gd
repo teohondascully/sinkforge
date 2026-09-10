@@ -17,6 +17,7 @@ func _initialize() -> void:
 	_test_the_layer_packs_the_lamp_and_the_cuts_as_the_shader_reads_them()
 	_test_seat_flags_parse_and_a_warp_finds_a_floor()
 	_test_the_sky_floor_follows_every_mutator_and_the_light_terms_pin()
+	_test_the_deep_is_lifted_not_flattened()
 	_finish("flat_planes")
 
 
@@ -155,6 +156,52 @@ func _test_seat_flags_parse_and_a_warp_finds_a_floor() -> void:
 ## and equal to a from-scratch scan after fuzzing; `WindowPlanes.columns_of` pads past the world; and
 ## `VeilLight`'s terms pin legacy's numbers: the deep is `AMBIENT_LIGHT`, the scatter under a column's
 ## surface reaches the ambient over `SKY_FADE_M`, open air above the surface is lit by depth alone.
+## THE VEIL'S UNDERGROUND MUST STAY DISTINGUISHABLE FROM ITSELF (D0577). Split out of the sky-floor
+## test, which the size gate found at 69 lines once these arrived -- and they belong apart anyway: that
+## one is about `sky_floor` bookkeeping and this one is about whether the deep still has a picture in it.
+func _test_the_deep_is_lifted_not_flattened() -> void:
+	# THE DEEP IS LIFTED, NOT CLAMPED (D0577), AND THIS BLOCK IS WHERE THE OLD ONE WENT WRONG. It used
+	# to assert `level_rgb(0.0) == level_rgb(DEEP_FLOOR)` -- "no light at all and floor-light are the
+	# same colour" -- which is a clamp's flattening written down as a FEATURE. It was true, it was
+	# green, and it was pinning the defect: underground `shade * sky` cannot exceed 0.442 against a
+	# floor of 0.55, so EVERY solid cell, cave and void below the scatter band returned one value.
+	# Measured before the fix: buried rock, mid rock, a lit cut face, cave air and true void all
+	# returned rgb (0.5500, 0.5610, 0.6382). What replaces it pins DISTINCTNESS and ORDER, which no
+	# clamp can satisfy -- a floor collapses the five to one and every assertion below goes red at once.
+	var sky_deep: float = 1.0 - VeilPainter.AMBIENT_DARK
+	var buried: float = (1.0 - VeilPainter.MASS_SHADE) * 0.70 * sky_deep   # darkest mass, key against
+	var mid: float = (1.0 - VeilPainter.MASS_SHADE) * sky_deep             # plain buried rock
+	var face: float = 1.30 * sky_deep                                      # a cut face, key with it
+	var air: float = 1.00 * sky_deep                                       # cave air over a wall
+	var hollow: float = VeilLight.VOID_FLOOR * sky_deep                    # true void, no wall behind
+	_check(face <= 1.0 - VeilPainter.AMBIENT_DARK + 0.11 and face < VeilLight.DEEP_AMBIENT,
+		"CONTROL: the BRIGHTEST thing the underground can produce before the lift is %.4f, which is " % face
+			+ "below DEEP_AMBIENT (%.2f). A clamp at that value is why the five collapsed to one, and "
+			% VeilLight.DEEP_AMBIENT + "it is why this cannot be fixed by choosing a smaller floor.")
+	var levels: Array[float] = []
+	for shade: float in [hollow, buried, mid, air, face]:
+		var c: Color = VeilLight.level_rgb(shade)
+		levels.append(0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b)
+	_check(levels[0] < levels[2] and levels[1] < levels[2] and levels[2] < levels[3] and levels[3] < levels[4],
+		"the underground is ORDERED: void %.4f and dark rock %.4f both under mid rock %.4f, under cave "
+			% [levels[0], levels[1], levels[2]] + "air %.4f, under a lit cut face %.4f"
+			% [levels[3], levels[4]])
+	_check(levels[4] - levels[1] > 0.15,
+		"and it SPANS: %.4f between the darkest rock and a lit face. The shipped clamp spanned 0.0000 "
+			% (levels[4] - levels[1]) + "-- that is the residual this bound sits above, not zero.")
+	# The surface must be bit-identical to the pre-lift build, which is what the depth ramp buys and what
+	# D0575 failed to do by scaling materials instead. This is legacy's own ratio, restored: at legacy's
+	# ambient the colour IS `AMBIENT_LIGHT`. The D0569 build could not make this assertion at all.
+	_check(VeilLight.level_rgb(1.0 - VeilPainter.AMBIENT_DARK, 0.0).is_equal_approx(VeilLight.AMBIENT_LIGHT),
+		"at the surface the lift is absent and legacy's arithmetic answers exactly: level_rgb(%.2f) is "
+			% sky_deep + "AMBIENT_LIGHT")
+	_check(not VeilLight.level_rgb(mid, 0.0).is_equal_approx(VeilLight.level_rgb(mid)),
+		"CONTROL: the same shade reads differently at the surface and in the deep, so the ramp is doing "
+			+ "something -- with deep_t ignored these two would be equal and the assertion above vacuous")
+	_check(VeilLight.level_rgb(1.0).is_equal_approx(Color.WHITE) and VeilLight.level_rgb(0.6).b > VeilLight.level_rgb(0.6).r,
+		"full light is still white; below it the hue still cools, legacy's own lerp")
+
+
 func _test_the_sky_floor_follows_every_mutator_and_the_light_terms_pin() -> void:
 	var g: TileGrid = _fuzzed(123)
 	var bad: int = 0
@@ -178,22 +225,6 @@ func _test_the_sky_floor_follows_every_mutator_and_the_light_terms_pin() -> void
 	_check(g2.sky_floor[1] == 10, "clearing the last solid returns the column to all-air")
 	var cols: PackedInt32Array = WindowPlanes.columns_of(Rect2i(-2, 0, 8, 1), g2.sky_floor, 99)
 	_check(cols.size() == 8 and cols[0] == 99 and cols[1] == 99 and cols[3] == 10 and cols[7] == 99, "a column window pads past the world with the sentinel on both sides")
-	# LEGACY'S SHAPE ABOVE THE FLOOR, AND THE FLOOR BELOW IT (D0569). This used to read `level_rgb(1.0 -
-	# AMBIENT_DARK)` and require exactly `AMBIENT_LIGHT`, which is legacy's ratio at legacy's ambient --
-	# a point now UNDER `DEEP_FLOOR`, so the floor answers there instead and that assertion could only
-	# have been kept by keeping the underground eight times too dark. Legacy's arithmetic is unchanged
-	# everywhere it still applies, and this pins both halves rather than dropping the one that moved.
-	_check(VeilLight.DEEP_FLOOR > 1.0 - VeilPainter.AMBIENT_DARK,
-		"the floor is above legacy's own ambient, which is why that point now reads the floor (%.2f > %.2f)"
-			% [VeilLight.DEEP_FLOOR, 1.0 - VeilPainter.AMBIENT_DARK])
-	_check(VeilLight.level_rgb(0.0).is_equal_approx(VeilLight.level_rgb(VeilLight.DEEP_FLOOR)),
-		"no light at all and floor-light are the same colour: the deep bottoms out and never goes black")
-	var lifted: Color = VeilLight.level_rgb(VeilLight.DEEP_FLOOR)
-	_check(0.2126 * lifted.r + 0.7152 * lifted.g + 0.0722 * lifted.b > 0.5,
-		"and it bottoms out bright enough to carry a material's own colour (luma %.3f)"
-			% [0.2126 * lifted.r + 0.7152 * lifted.g + 0.0722 * lifted.b])
-	_check(VeilLight.level_rgb(1.0).is_equal_approx(Color.WHITE) and VeilLight.level_rgb(0.6).b > VeilLight.level_rgb(0.6).r,
-		"full light is still white; between the floor and full light the hue still cools, legacy's own lerp")
 	var datum: float = float(MaterialLook.SURFACE_ROW)
 	_check(is_equal_approx(VeilLight.sky_light(datum - 20.0, datum), 1.0), "open air above the datum is fully lit")
 	var open_deep: float = VeilLight.sky_light(datum + 40.0, datum + 200.0)   # 10 m down an open shaft

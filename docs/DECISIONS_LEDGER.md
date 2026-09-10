@@ -22354,3 +22354,43 @@ Three new guards mutation-witnessed (3, 2 and 2 assertions red respectively when
 Reverse: CHEAP for 3 and 4 (delete `LOOK_PER_TICK`, the cursor and `_spill`). 1 and 2 are behaviour and
 their tests would go red, which is the point.
 
+## D0577 · 2026-09-10 · view/visuals/veil_light.gd, veil.gdshader, veil_layer.gd · replaces D0569
+Decided: the deep is LIFTED by an ambient, not CLAMPED to a floor, and the lift is ramped by depth.
+`lit = mix(s, DEEP_AMBIENT + DEEP_GAIN * s, d / AMBIENT_DARK)` with 0.48 and 0.69. `DEEP_FLOOR` is gone.
+Alternative: keep the clamp and choose a smaller floor. It cannot work and the test says why -- the
+brightest thing the underground can produce before any lift is 0.442, so ANY floor that raises the deep
+to the reference's brightness is above the whole range and collapses it. A floor low enough to preserve
+the range is too low to move the brightness. One dial cannot do both jobs.
+Why: D0569 clamped the COMBINED output at 0.55 while the combined output underground cannot exceed
+`sky` 0.34 * `shade` 1.30 = 0.442. Every solid cell, every cave, every void below the scatter band
+therefore returned exactly one value -- measured, five structurally different things all at rgb (0.5500,
+0.5610, 0.6382). D0569's own header claimed it "does NOT flatten depth"; it flattened everything, and
+the arithmetic that shows it is three constants. Astra found it. In `docs/CORRECTIONS.md`.
+TWO DIALS, AND WHY THE SECOND ONE EARNS ITS KEEP. A pure `F + (1-F)s` fixes contrast at `1-F`, and at
+the brightness this scene needs that is 45% of the original spread. `DEEP_GAIN` separates "how bright is
+the deep's ambient" from "how much of the shaped light survives it", which are different questions.
+RAMPED BY DEPTH so the surface is untouched -- `d / AMBIENT_DARK` is already computed in the shader and
+is exactly "how underground is this pixel", 0 above the surface line. Surface rock is bit-identical to
+the pre-D0569 build, which is what D0575 failed at from the other side: a uniform brightening that put
+the deep right blew the surface to 0.194 against a reference of 0.148.
+MEASURED, on hardrock's base at 60 m (0.2763), materials and lights held fixed, F swept over
+[0.40, 0.60] and G over [0.45, 0.77]:
+    model                     mid rock  cut face  cave air   void    spread
+    no floor (pre-D0569)       0.0439    0.1261    0.0975   0.0341   0.0953
+    clamp to 0.55 (D0569)      0.1559    0.1559    0.1559   0.1559   0.0000
+    THIS (F 0.48, G 0.69)      0.1657    0.2196    0.2007   0.1592   0.0626
+    the reference              0.15 - 0.19 on rock, ~0.074 of spread across the underground
+Two-thirds of the contrast D0569 destroyed, at the brightness D0569 was reaching for. NOT the closest
+swept point to the reference's spread -- (0.44, 0.77) gives 0.0700 -- but the one that keeps mid rock in
+the MIDDLE of the reference's band instead of at its edge. The rest is for the frame-judged loop (queue
+item 49), not for a constant fitted to one lossy JPEG.
+AND THE UNIFORMS ARE NOW BOUND. `deep_floor` never was: the shader carried a default and the header said
+"the two must move together", enforced by nothing. A drift would have surfaced only as a frame nobody
+could explain.
+THE SUITE WAS PINNING THE DEFECT. `test_flat_planes.gd` asserted `level_rgb(0.0) == level_rgb(DEEP_FLOOR)`
+-- the flattening as a feature. It now pins distinctness and ORDER across void < dark rock < mid rock <
+cave air < cut face, plus a span above 0.15 whose floor is the shipped clamp's measured 0.0000, plus a
+control that the surface and the deep answer differently. Restoring D0569's clamp turns 4 assertions
+red; ignoring the depth ramp turns 2 red. Both witnessed.
+Reverse: CHEAP -- two constants and one `mix`. The tests would go red, which is the point.
+

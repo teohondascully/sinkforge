@@ -34,7 +34,8 @@ uniform float key_gain = 3.0;
 uniform float openness_saturate = 2.2;
 // `skylight_ceiling` and legacy's `_skylight_alpha(row, surf)` (VeilLight.sky_light)
 uniform float ambient_dark = 0.66;
-uniform float deep_floor = 0.55;   // `VeilLight.DEEP_FLOOR` -- the two must move together
+uniform float deep_ambient = 0.48;  // `VeilLight.DEEP_AMBIENT` -- these two and the file must move together
+uniform float deep_gain = 0.69;     // `VeilLight.DEEP_GAIN`
 uniform float sky_reach_m = 12.0;
 uniform float surface_line_m = 2.0;
 uniform float sky_fade_m = 16.0;
@@ -140,8 +141,12 @@ void fragment() {
 	if (void_here) {
 		s *= mix(1.0, void_floor, under);
 	}
-	// `VeilLight.level_rgb`: the dark is a colour -- white at full light, `ambient_light` at the ambient
-	float lit_s = clamp(max(s, deep_floor), 0.0, 1.0);
+	// `VeilLight.level_rgb`: the dark is a colour -- white at full light, `ambient_light` at the ambient.
+	// The deep is LIFTED by its ambient, not clamped to it, and the lift is ramped by `d / ambient_dark`
+	// so it is exactly zero above the surface line (D0577). A clamp here erased mass, key, depth, cave
+	// and void alike -- every underground pixel returned one value.
+	float deep_t = ambient_dark > 0.0 ? clamp(d / ambient_dark, 0.0, 1.0) : 0.0;
+	float lit_s = clamp(mix(s, deep_ambient + deep_gain * s, deep_t), 0.0, 1.0);
 	vec3 cool = ambient_light * (lit_s / (1.0 - ambient_dark));
 	vec3 rgb = mix(vec3(lit_s), cool, clamp((1.0 - lit_s) / ambient_dark, 0.0, 1.0));
 	// `lamp_lift`: each cut lifts what the previous left; the lamp lifts toward ITS colour (legacy `_light_tint`)

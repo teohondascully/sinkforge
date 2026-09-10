@@ -15,8 +15,9 @@ const VOID_FLOOR: float = 0.35                    ## legacy `:111` -- unlit noth
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)        ## legacy `:150` -- the miner's warm head-lamp
 const SKY_FADE_M: float = VeilPainter.SKY_FADE_M  ## legacy `SKY_FADE 16`: rows of scatter under the first rock
 
-## THE FLOOR THE DEEP NEVER GOES BELOW (D0569), and it is MEASURED rather than chosen. Both sides of the
-## comparison were sampled the same way, a 5x5 mean luma off a real frame:
+## THE DEEP'S AMBIENT (D0577), and the story of the constant it replaces is the reason it is shaped
+## this way. D0569 put a FLOOR here -- `max(s, 0.55)` on the COMBINED output -- because our underground
+## sat in the bottom sixth of the value range against a reference whose darkest point anywhere is 0.116:
 ##
 ##                          ours (frame_0030)   the reference
 ##     deep / unlit rock          0.0195           0.15 - 0.19
@@ -24,27 +25,54 @@ const SKY_FADE_M: float = VeilPainter.SKY_FADE_M  ## legacy `SKY_FADE 16`: rows 
 ##     a lamp's pool              none             0.515
 ##     a cave's void              0.053            0.116
 ##
-## Our whole underground lived in the bottom sixth of the range and the reference's never goes near
-## black: its darkest rock is 0.15 and its DARKEST POINT ANYWHERE is a void at 0.116. Legacy's own ratios
-## are all still here and unchanged above this floor -- `AMBIENT_DARK` 0.66 and `MASS_SHADE` 0.55 stack
-## to about 0.08 of the material's own colour for buried rock, which is what put clay's 0.26 base at
-## 0.02. The floor is the multiplier the deep bottoms out at: 0.55 puts that same clay at 0.147 against
-## the reference's 0.15.
+## The brightness reading was right. The instrument was not. Underground `sky` is `1 - AMBIENT_DARK` =
+## 0.34 and `shade` tops out at `1 + KEY_STRENGTH` = 1.30, so the combined output cannot exceed 0.442 --
+## strictly under a floor of 0.55. Every solid cell, every cave, every void below the scatter band
+## therefore clamped to exactly one value. Measured on this tree, five structurally different things all
+## returned rgb (0.5500, 0.5610, 0.6382): buried rock, mid rock, a lit cut face, cave air and true void.
+## D0569's own header said "this does NOT flatten depth" and it flattened everything, not merely depth.
+## Astra found it; the arithmetic is three constants and I did not do it. `tests/test_flat_planes.gd`
+## now pins distinctness directly, so no successor to this constant can go quiet the same way.
 ##
-## This does NOT flatten depth, and the reference is the evidence: its deep rock (0.19) is BRIGHTER than
-## its surface rock (0.148). Depth there is carried by hue and by contrast against warm light, never by
-## crushing toward black -- which is Astra's diagnosis point 3 ("nothing in the frame is warm against
-## anything cool") stated as a number.
+## WHAT REPLACES IT: an ambient the deep is LIFTED BY rather than clamped TO, which is what ambient
+## light actually is -- `lit = DEEP_AMBIENT + DEEP_GAIN * s`, an affine remap that moves the whole range
+## up and keeps every ordering inside it. `DEEP_GAIN` is a second dial because one is not enough: a pure
+## `F + (1-F)s` fixes contrast at `1-F`, and at the brightness this scene needs that compresses to 45%.
 ##
-## `view/visuals/veil.gdshader` carries the same floor as a `deep_floor` uniform with the same default;
-## the two must move together or the shader and this file disagree about the same pixel.
-const DEEP_FLOOR: float = 0.55
+## AND IT IS RAMPED BY DEPTH, so it cannot reach the surface. `veil.gdshader` already computes `d`, the
+## depth darkening, and `d / AMBIENT_DARK` is exactly "how underground is this pixel" -- 0 above the
+## surface line, 1 in the deep. The lift is mixed in by that ramp, so surface rock is bit-identical to
+## the pre-D0569 build. This is the failure D0575 hit from the other direction: a uniform brightening
+## that landed the deep correctly blew the surface out to 0.194 against a reference of 0.148.
+##
+## THE NUMBERS ARE A MEASURED POINT ON A SWEEP, not a taste call. Held fixed: materials, lights, the
+## scene. Varied: F over [0.40, 0.60] and G over [0.45, 0.77]. Read off hardrock's base at 60 m (0.2763):
+##
+##     model                    mid rock   cut face   cave air    void    spread
+##     no floor (pre-D0569)      0.0439     0.1261     0.0975    0.0341   0.0953
+##     clamp to 0.55 (D0569)     0.1559     0.1559     0.1559    0.1559   0.0000
+##     THIS (F 0.48, G 0.69)     0.1657     0.2196     0.2007    0.1592   0.0626
+##     the reference             0.15 - 0.19 on rock, ~0.074 of spread across the underground
+##
+## Two-thirds of the contrast D0569 destroyed, at the brightness D0569 was reaching for. It is not the
+## closest point on the sweep to the reference's spread (F 0.44, G 0.77 gives 0.0700) -- it is the one
+## that keeps mid rock in the MIDDLE of the reference's band rather than at its edge, and the remaining
+## difference is for the frame-judged loop in `docs/WORKING.md` item 49 to close, not for a number fitted
+## to one lossy JPEG.
+##
+## `view/visuals/veil.gdshader` carries both as uniforms with the same defaults; they must move together
+## or the shader and this file disagree about the same pixel.
+const DEEP_AMBIENT: float = 0.48
+const DEEP_GAIN: float = 0.69
 
 
 ## Legacy `_light_level(darkness)`: white at no darkness, `AMBIENT_LIGHT` at `AMBIENT_DARK`, and the same
 ## hue scaled down past it (mass shading and the void floor take a cell below the ambient).
-static func level_rgb(s: float) -> Color:
-	var lit: float = clampf(maxf(s, DEEP_FLOOR), 0.0, 1.0)
+## `deep_t` is `d / AMBIENT_DARK` from the shader: 0 at the surface, 1 in the deep. It defaults to the
+## deep because that is the case this file exists to document; pass 0.0 to ask what the surface does.
+static func level_rgb(s: float, deep_t: float = 1.0) -> Color:
+	var lifted: float = DEEP_AMBIENT + DEEP_GAIN * s
+	var lit: float = clampf(lerpf(s, lifted, clampf(deep_t, 0.0, 1.0)), 0.0, 1.0)
 	var toward: float = clampf((1.0 - lit) / VeilPainter.AMBIENT_DARK, 0.0, 1.0)
 	var scale: float = lit / (1.0 - VeilPainter.AMBIENT_DARK)
 	var cool := Color(AMBIENT_LIGHT.r * scale, AMBIENT_LIGHT.g * scale, AMBIENT_LIGHT.b * scale)
