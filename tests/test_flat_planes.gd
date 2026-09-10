@@ -192,9 +192,17 @@ func _test_the_deep_is_lifted_not_flattened() -> void:
 	# The surface must be bit-identical to the pre-lift build, which is what the depth ramp buys and what
 	# D0575 failed to do by scaling materials instead. This is legacy's own ratio, restored: at legacy's
 	# ambient the colour IS `AMBIENT_LIGHT`. The D0569 build could not make this assertion at all.
-	_check(VeilLight.level_rgb(1.0 - VeilPainter.AMBIENT_DARK, 0.0).is_equal_approx(VeilLight.AMBIENT_LIGHT),
-		"at the surface the lift is absent and legacy's arithmetic answers exactly: level_rgb(%.2f) is "
-			% sky_deep + "AMBIENT_LIGHT")
+	# Legacy's exact ratio still answers at the surface, now through the night level (D0583): the lift is
+	# absent there, so `lit` is simply `s * NIGHT_LEVEL`, and feeding the s that lands on legacy's own
+	# ambient gives legacy's own colour. This pins BOTH -- move either constant and it goes red.
+	_check(VeilLight.level_rgb((1.0 - VeilPainter.AMBIENT_DARK) / VeilLight.NIGHT_LEVEL, 0.0)
+			.is_equal_approx(VeilLight.AMBIENT_LIGHT),
+		"at the surface there is no lift, only the night level, and legacy's arithmetic answers exactly "
+			+ "underneath it: level_rgb(%.3f, 0.0) is AMBIENT_LIGHT"
+			% ((1.0 - VeilPainter.AMBIENT_DARK) / VeilLight.NIGHT_LEVEL))
+	_check(VeilLight.NIGHT_LEVEL < 1.0,
+		"and the night level actually darkens the surface (%.2f) -- at 1.0 the assertion above would "
+			% VeilLight.NIGHT_LEVEL + "hold for the wrong reason")
 	_check(not VeilLight.level_rgb(mid, 0.0).is_equal_approx(VeilLight.level_rgb(mid)),
 		"CONTROL: the same shade reads differently at the surface and in the deep, so the ramp is doing "
 			+ "something -- with deep_t ignored these two would be equal and the assertion above vacuous")

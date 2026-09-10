@@ -54,7 +54,15 @@ const HORIZON_Y: float = float(MaterialLook.SURFACE_ROW * Interface.TERRAIN_CELL
 ##
 ## A single frame cannot show both sun and moon, and a value that shows neither would waste the gate.
 ## Parked for the ◆ as a look call: `docs/NEEDS_DIRECTOR.md` P015.
-const DAYLIGHT: float = 0.35
+##
+## MOVED TO NIGHT, 2026-09-10 (D0583), and the reason is coherence rather than taste. The ground now
+## carries a night level (`VeilLight.NIGHT_LEVEL`), because it was measured lit for noon -- 0.344 on the
+## dirt beside the player, a 0.479 tree canopy -- under a sky that read 0.086 at the zenith. A dusk sky
+## over a night ground is the same mismatch from the other side. 0.15 keeps the horizon blush the header
+## above warns 0.0 would flatten, and puts the starfield well inside its `< 0.85` window instead of at
+## the faint edge of it. P015 is still the director's call; this is a coherent frame to make it on
+## rather than a frame composed to show the most features at once.
+const DAYLIGHT: float = 0.15
 const DAY_PHASE: float = 0.70
 
 ## The two star tints, both taken from the sky paint() lays down below. STAR_COLD is the night zenith

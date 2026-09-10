@@ -39,8 +39,12 @@ const MARGIN_RIGHT: float = 12.0
 const LARGE_BOX := Vector2(200.0, 330.0)
 const LARGE_SPAN_M: float = 64.0
 const VOID_COLOR := Color(0.05, 0.06, 0.09)
-const ROCK_DARKEN: float = 0.35     ## the band colour is authored for lit rock; a chart of it reads darker
-const WALL_DARKEN: float = 0.62
+## The band colours are authored for LIT rock. The chart already toned them; against a night world
+## (D0583) it was still the brightest object in the frame -- a bright tan panel in the corner of a dark
+## picture. These are `Color.darkened` amounts, so LARGER is darker: 0.70 puts the chart under the world
+## it charts. (Written as 0.20 first, which made it brighter; the capture said so immediately.)
+const ROCK_DARKEN: float = 0.70
+const WALL_DARKEN: float = 0.82
 const LARGE_DIM := Color(0.02, 0.02, 0.04, 0.55)   ## the world defocused behind the large form
 const ORE_COLOR := Color(0.95, 0.80, 0.40)
 const SEEN_ORE_DARKEN: float = 0.30   ## a seen ore cell on the map: the ore family's colour, toned to the chart

@@ -88,6 +88,36 @@ static func apply_tone(base: Color, tone: Vector2) -> Color:
 	return col.darkened(-tone.y * 1.05).lerp(STRATA_COOL, -tone.y * 0.20)
 
 
+## FOLIAGE IS NOT ROCK, AND ITS FEATURES ARE CELLS RATHER THAN METRES (D0584).
+##
+## `_cell_jitter` samples in METRES -- its three sines have periods of 17, 48 and 23 m -- which is right
+## for a hillside of clay and meaningless inside a tree. A canopy is about six cells across, a metre and
+## a half, so every leaf cell in a tree drew essentially the SAME jitter and the canopy rendered as one
+## flat rectangle of green. Measured on the opening frame before this: canopy luma 0.479, the brightest
+## and most saturated thing in the picture, and uniform across its whole area.
+##
+## AND IT WAS BEING BEDDED. `matrix_color` passes `country_rock = not rec.has("nugget_color")`, which is
+## true of `leaves` and `wood`, so `_strata`'s sedimentary hue bands were running on tree canopies. A
+## tree is not sedimentary. Plants take this instead and take no bedding at all.
+##
+## Two octaves keyed on the CELL: clumps about four cells across, which is a bough's worth of leaves,
+## and a per-cell break-up over them. Plus one slow term on the column alone, so two trees standing side
+## by side are not the same green -- the variation between individuals `docs/WORKING.md` item 27 asks
+## for, at the only scale a 4 px cell can express it.
+const FOLIAGE_AMOUNT: float = 0.30
+const FOLIAGE_INDIVIDUAL: float = 0.10
+
+
+static func foliage_tone(col: int, row: int) -> Vector2:
+	var x: float = float(col)
+	var y: float = float(row)
+	var clump: float = sin(x * 0.90 + y * 0.55) + sin(x * 0.41 - y * 1.13)
+	var fleck: float = sin(x * 2.30 - y * 1.90)
+	var individual: float = sin(x * 0.08)
+	var n: float = (clump * 0.5) * 0.68 + fleck * 0.32
+	return Vector2(n * FOLIAGE_AMOUNT + individual * FOLIAGE_INDIVIDUAL, 0.0)
+
+
 ## Legacy `world_renderer.gd:1613-1619 _strata`. Sedimentary banding: the ground's own structure.
 ##
 ## Bands run horizontally -- the direction you cut across as you sink -- at three INCOMMENSURABLE

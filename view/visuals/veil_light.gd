@@ -65,14 +65,28 @@ const SKY_FADE_M: float = VeilPainter.SKY_FADE_M  ## legacy `SKY_FADE 16`: rows 
 const DEEP_AMBIENT: float = 0.48
 const DEEP_GAIN: float = 0.69
 
+## THE SURFACE IS LIT FOR NOON UNDER A NIGHT SKY, and this is the factor that ends that (D0583).
+## Measured on the real tutorial frame: the sky reads 0.086 at the top and 0.254 at the horizon -- night
+## -- while the ground beside the player reads **0.344** and a tree canopy reads **0.479**, the
+## brightest, most saturated thing in the frame. The reference's surface rock at night is 0.148. Nothing
+## was wrong with any one painter: the sky is drawn as night, terrain takes `sky_light` = 1.0 above the
+## surface line, and `leaves`/`wood` carry `depth_darken: 0.0` because "a tree stands in the sky". Three
+## correct decisions that never met.
+##
+## RAMPED OUT WITH DEPTH, so D0577's tuning is untouched: at `deep_t` 1 this is exactly 1.0 and the deep
+## is bit-identical. It only ever darkens what the sky can still see, which is the only place a night
+## level means anything. 0.45 puts surface ground at 0.155 against the reference's 0.148.
+const NIGHT_LEVEL: float = 0.45
+
 
 ## Legacy `_light_level(darkness)`: white at no darkness, `AMBIENT_LIGHT` at `AMBIENT_DARK`, and the same
 ## hue scaled down past it (mass shading and the void floor take a cell below the ambient).
 ## `deep_t` is `d / AMBIENT_DARK` from the shader: 0 at the surface, 1 in the deep. It defaults to the
 ## deep because that is the case this file exists to document; pass 0.0 to ask what the surface does.
 static func level_rgb(s: float, deep_t: float = 1.0) -> Color:
+	var t: float = clampf(deep_t, 0.0, 1.0)
 	var lifted: float = DEEP_AMBIENT + DEEP_GAIN * s
-	var lit: float = clampf(lerpf(s, lifted, clampf(deep_t, 0.0, 1.0)), 0.0, 1.0)
+	var lit: float = clampf(lerpf(s, lifted, t) * lerpf(NIGHT_LEVEL, 1.0, t), 0.0, 1.0)
 	var toward: float = clampf((1.0 - lit) / VeilPainter.AMBIENT_DARK, 0.0, 1.0)
 	var scale: float = lit / (1.0 - VeilPainter.AMBIENT_DARK)
 	var cool := Color(AMBIENT_LIGHT.r * scale, AMBIENT_LIGHT.g * scale, AMBIENT_LIGHT.b * scale)

@@ -71,6 +71,7 @@ func _init(ore: OrePainter = null, falling: FallingItems = null) -> void:
 		# would have shown up only as a frame nobody could explain.
 		material.set_shader_parameter(&"deep_ambient", VeilLight.DEEP_AMBIENT)
 		material.set_shader_parameter(&"deep_gain", VeilLight.DEEP_GAIN)
+		material.set_shader_parameter(&"night_level", VeilLight.NIGHT_LEVEL)
 		var tint: Color = VeilLight.lamp_tint()
 		material.set_shader_parameter(&"lamp_tint", Vector3(tint.r, tint.g, tint.b))
 

@@ -161,6 +161,11 @@ func matrix_color(material: StringName, col: int, row: int) -> Color:
 		return Color(0.42, 0.34, 0.24)  # the pre-Slice-0 debug brown: an unmapped material stays visible
 	var base: Color = _to_color(rec["base_color"])
 	base = _depth_darkened(base, rec, row)
+	# A PLANT IS NOT ROCK (D0584). `leaves` and `wood` carry no `nugget_color`, so they read as country
+	# rock here and took sedimentary bedding on a tree canopy -- and the jitter's features are tens of
+	# metres, so a six-cell canopy drew one flat value. Foliage has its own term at the cell's scale.
+	if String(rec.get("kind", "")) == "plant":
+		return BeddingTone.apply_tone(base, BeddingTone.foliage_tone(col, row))
 	var country_rock: bool = not rec.has("nugget_color")
 	return BeddingTone.apply_tone(base, BeddingTone.cell_tone(col, row, country_rock, grammar_of(material)))
 

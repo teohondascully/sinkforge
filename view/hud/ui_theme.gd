@@ -28,9 +28,12 @@ extends RefCounted
 ## Legacy's finding, ported with the constants: the HUD used to hold the two brightest values in the
 ## frame, which pulled the eye to the chrome and away from the play space. Both are stepped down here.
 ## **Nothing in the UI should ever be brighter than lit rock.**
-const UI_BG := Color(0.07, 0.08, 0.115, 0.90)        ## panel fill; 90% because furniture sits over the world
-const UI_EDGE := Color(0.30, 0.34, 0.42)             ## panel border
-const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.45)    ## top bevel highlight -> panels read as RAISED, not outlined
+## PANEL FILL. 0.90 was authored against a world lit for noon; the world is night now (D0583) and a
+## 90%-opaque plate over it is the brightest thing on screen. 0.66 lets the world through the furniture
+## instead of the furniture sitting on top of it -- queue item 35, "make what remains belong".
+const UI_BG := Color(0.07, 0.08, 0.115, 0.66)
+const UI_EDGE := Color(0.20, 0.23, 0.30)             ## panel border, toned with the fill (D0583)
+const UI_EDGE_HI := Color(0.52, 0.58, 0.68, 0.26)    ## top bevel highlight -> panels read as RAISED, not outlined
 
 ## The modal plate, opaque on purpose. `UI_BG` is 90% because furniture is meant to sit over the world;
 ## a modal is not furniture, and at 0.90 legacy's objective banner read straight through the settings
