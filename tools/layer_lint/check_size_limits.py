@@ -63,6 +63,36 @@ def find_gd_files():
     return gd_files_excluding(ROOT, EXCLUDED_TOP)
 
 
+## CODEGEN OUTPUT IS EXEMPT FROM `FILE_LIMIT`, AND ONLY FROM THAT (D0574).
+##
+## `FILE_LIMIT` is a readability rule: a file a person has to hold in their head should fit in one. A
+## file `tools/data_codegen/generate.py` writes is not held in anyone's head, and capping it caps
+## something else entirely -- HOW MANY DATA RECORDS THE GAME MAY HAVE. That is not a style question and
+## the gate was never asked it.
+##
+## Measured, which is why this is here at all: `data/starts/generated.gd` was 378 lines and adding ONE
+## scenario record (four fixtures) took it to 412 and failed the gate. A minimal two-fixture version
+## lands on exactly 400 -- clearing the gate and leaving it for the next person. The record in question
+## was a lighting bench, and it was reverted rather than the gate bypassed (P037).
+##
+## THE SET OF FILES SCANNED IS UNCHANGED, deliberately. `tools/quality_check/test_quality_check.py` pins
+## `scan.find_gd_files()` and this module's file list EQUAL, and the duplication, complexity and coupling
+## gates all read the same corpus; narrowing it here would silently narrow theirs. Only the per-file line
+## cap is skipped, and `FUNC_LIMIT` still applies to every function inside a generated file.
+##
+## The predicate is deliberately narrow: the file must be NAMED `generated.gd` and sit under `data/`. A
+## hand-written file cannot become exempt by being long, and a generated file somewhere else does not
+## become exempt by being generated -- if codegen starts writing elsewhere, this has to be widened on
+## purpose. `tools/layer_lint/test_check_size_limits.py` mutation-guards both halves.
+## EXACTLY `data/<kind>/generated.gd`, three parts. Not "somewhere under data/": the codegen writes one
+## file per data KIND and nothing else, and the first version of this predicate accepted a bare
+## `data/generated.gd` -- which is not codegen output and would have been exempted on the strength of its
+## name. The test that pins the near misses is what found it.
+def is_generated(rel) -> bool:
+    parts = Path(rel).parts
+    return len(parts) == 3 and parts[0] == "data" and parts[2] == "generated.gd"
+
+
 def module_doc_violations(root: Path) -> tuple[list, int]:
     """Returns (violations, files_checked) for MODULE.md against MODULE_DOC_LIMIT.
 
@@ -122,10 +152,13 @@ def main() -> int:
 
     fails = []
     warns = []
+    generated = 0
     for rel in files:
         lines = (ROOT / rel).read_text(encoding="utf-8", errors="replace").splitlines()
         n = len(lines)
-        if n > FILE_LIMIT:
+        if is_generated(rel):
+            generated += 1                      # FILE_LIMIT does not apply; FUNC_LIMIT below still does
+        elif n > FILE_LIMIT:
             fails.append(f"{rel}: {n} lines (limit {FILE_LIMIT})")
         elif n > FILE_WARN:
             warns.append(f"{rel}: {n} lines (warn at {FILE_WARN})")
@@ -133,6 +166,9 @@ def main() -> int:
             if length > FUNC_LIMIT:
                 fails.append(f"{rel}:{start}: func {name}() is {length} lines (limit {FUNC_LIMIT})")
 
+    if generated:
+        print(f"check_size_limits: {generated} codegen'd file(s) exempt from the {FILE_LIMIT}-line cap "
+              f"(FUNC_LIMIT still applied) -- see is_generated()")
     module_fails, module_count = module_doc_violations(ROOT)
     fails += module_fails
 

@@ -22253,3 +22253,23 @@ The suite ETA divides by `jobs` because remaining suites finish about `jobs` at 
 early in a sweep: it is a straight-line mean over a population whose slowest member is 164 s. It is
 printed as `~` and never as a fact.
 Reverse: CHEAP -- delete `progress_line` and `gate_progress` and their two call sites.
+
+## D0574 · 2026-09-10 · tools/layer_lint/check_size_limits.py · resolves P037
+Decided: `data/<kind>/generated.gd` is exempt from `FILE_LIMIT`, and from that alone. `FUNC_LIMIT` still
+applies to every function inside one, and the SET of files scanned is unchanged.
+Alternative: split the codegen to one file per record, or leave the cap and cap the number of data
+records with it.
+Why: `FILE_LIMIT` is a readability rule about a file a person holds in their head. Codegen output is not
+held in anyone's head, and capping it caps something the gate was never asked -- how many data records
+the game may have. Measured: `data/starts/generated.gd` was 378 lines and ONE scenario record took it to
+412; a minimal version lands on exactly 400, clearing the gate and leaving it for the next person.
+The file set is deliberately untouched: `tools/quality_check/test_quality_check.py` pins `scan`'s corpus
+and this module's EQUAL, and the duplication, complexity and coupling gates read the same one. Narrowing
+it here would have silently narrowed theirs.
+The predicate is exactly three parts. The first version accepted any `generated.gd` under `data/`,
+including a bare `data/generated.gd`, which is not codegen output and would have been exempted on the
+strength of its name -- caught by the near-miss half of the new test, not by the positive half. A gate
+that stops exempting turns red loudly; one that exempts too much is silent forever, so both halves are
+pinned (12 branches).
+This unblocks D0570's `lighting_bench`, which was reverted rather than bypassing the gate.
+Reverse: CHEAP -- delete `is_generated` and its branch.

@@ -1,0 +1,26 @@
+# THE LIGHTING BENCH (D0570): a scenario record, not a start of play, and a sibling of `beacon_probe`
+# (D0407) for the same reason -- a capture needs to witness a state no start of play produces.
+#
+# `beacon_probe` stands ONE machine with nothing to process, which is exactly a machine that emits no
+# light: `VeilSources.machine_strength` returns 0.0 for an unfuelled burner, by design. Measuring the
+# lamp pool against it therefore measured a scene with one light in it, and a first attempt at "machines
+# do not light the rock" was really an instrument that could not register its subject.
+#
+# This record puts every KIND of light in one frame at a fixed place, so the phase-2 and phase-3 work has
+# one reproducible number per source instead of a different scene each time:
+#   - a torch, which is `data/machines/torch.yaml` and is otherwise reachable from no start at all
+#     (queue item 43's seven orphans, one of them exercised here rather than only listed)
+#   - a forge with coal on the floor beside it, so a FUELLED burner's pool can be measured
+#   - bare hardrock either end, far from every source: the unlit floor of the value range
+#   - the miner's own head-lamp, which arrives with the body
+#
+# Reached with `--start=lighting_bench --warp=128,322`. The chamber is deliberately long: the falloff of
+# a single source has to be readable across it without another source washing it out.
+id: lighting_bench
+site: shallow_clay
+spawn_col_m: 32
+fixtures:
+  - {kind: room, dx: -14, dy: 60, w: 40, h: 5, floor: hardrock}
+  - {kind: machine, id: torch, dx: -8, dy: 63}
+  - {kind: machine, id: processor, dx: 12, dy: 63}
+  - {kind: pile, item: coal, count: 20, dx: 13, dy: 63}

@@ -1196,7 +1196,7 @@ without undoing it.
 
 **Not a root blocker.** Phase 3 (rock texture, strata, cobbles) is independent and continues.
 
-## P037 · 2026-09-10 · the 400-line file cap now blocks adding a DATA record
+## P037 · 2026-09-10 · the 400-line file cap now blocks adding a DATA record  **[RESOLVED D0574]**
 
 **Measurement.** `data/starts/generated.gd` is 378 lines. Adding one scenario record -- four fixtures --
 took it to **412** and `check_size_limits.py` failed. A minimal two-fixture record lands on exactly 400,
@@ -1215,3 +1215,11 @@ and the numbers are handed over here rather than acted on.
 **Consequence tonight:** the `lighting_bench` record (D0570) is reverted and the bench falls back to
 `beacon_probe`. The measurements it produced stand and are in P036 -- they were taken before the gate
 ran -- but the torch-and-forge comparison is not reproducible until this is cleared.
+
+**P037 RESOLVED, same night (D0574).** The director handed `tools/` ownership over, so this was mine to
+fix rather than hand off. `data/<kind>/generated.gd` is now exempt from `FILE_LIMIT` and from nothing
+else: `FUNC_LIMIT` still applies inside it, and the set of files scanned is unchanged so the duplication,
+complexity and coupling gates keep their corpus. D0570's `lighting_bench` is restored.
+
+**P034 is the same shape and is NOT resolved by it.** `interface/observation.gd` is hand-written and
+stays capped, correctly. Its 120-site split is still owed.

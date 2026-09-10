@@ -20,7 +20,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from check_size_limits import MODULE_DOC_LIMIT, module_doc_violations  # noqa: E402
+from check_size_limits import MODULE_DOC_LIMIT, module_doc_violations, is_generated  # noqa: E402
 from gate_test_support import Observations  # noqa: E402
 
 LOG = Observations("test_check_size_limits")
@@ -57,10 +57,30 @@ def run_checks(trees: list) -> None:
                 checked == 0 and not violations, f"{checked} checked, {len(violations)} violation(s)")
 
 
+def check_generated_exemption() -> None:
+    """D0574: codegen output is exempt from FILE_LIMIT, and the exemption must not be able to widen.
+
+    The risk is not that it fails to fire -- a gate that stops exempting turns red loudly. The risk is
+    that it exempts something it should not, which is silent forever. So both halves are pinned: what
+    IS generated, and the near misses that must not be."""
+    for rel, want, why in (
+        ("data/starts/generated.gd", True, "the real one, and the file that forced this"),
+        ("data/materials/generated.gd", True, "any data kind, not a hard-coded list of them"),
+        ("data/starts/tutorial.gd", False, "a hand-written file under data/ is NOT exempt"),
+        ("view/hud/generated.gd", False, "generated.gd outside data/ is NOT exempt"),
+        ("generated.gd", False, "at the tree root it is not under data/ and is NOT exempt"),
+        ("data/generated.gd", False, "directly under data/ is not a data KIND's output"),
+        ("data/starts/generated.gd.uid", False, "a sibling that merely starts with the name"),
+        ("interface/observation.gd", False, "the other file at the cap stays capped (P034)"),
+    ):
+        LOG.observe(f"is_generated({rel}) is {want}: {why}", is_generated(rel) is want, str(is_generated(rel)))
+
+
 def main() -> int:
     trees: list = []
     try:
         run_checks(trees)
+        check_generated_exemption()
     finally:
         for root in trees:
             shutil.rmtree(root, ignore_errors=True)

@@ -73,6 +73,40 @@ const RECORDS: Dictionary = {
 			},
 		],
 	},
+	"lighting_bench": {
+		"id": "lighting_bench",
+		"site": "shallow_clay",
+		"spawn_col_m": 32,
+		"fixtures": [
+			{
+				"kind": "room",
+				"dx": -14,
+				"dy": 60,
+				"w": 40,
+				"h": 5,
+				"floor": "hardrock",
+			},
+			{
+				"kind": "machine",
+				"id": "torch",
+				"dx": -8,
+				"dy": 63,
+			},
+			{
+				"kind": "machine",
+				"id": "processor",
+				"dx": 12,
+				"dy": 63,
+			},
+			{
+				"kind": "pile",
+				"item": "coal",
+				"count": 20,
+				"dx": 13,
+				"dy": 63,
+			},
+		],
+	},
 	"tutorial": {
 		"id": "tutorial",
 		"site": "shallow_clay",
