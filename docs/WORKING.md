@@ -80,8 +80,19 @@ six-week decision.
 
 ### Phase 3 -- ROCK (~25% of the gap)
 
-- [ ] 17 Kill the 4 px per-cell jitter. Correct at legacy's 32 px cell, television static at 4 px.
-- [ ] 18 Cobble and boulder grammar at 0.5-2 m (`gram_map.gd`, `rock_tone.gd`, `bedding_tone.gd`).
+- [x] 17 **PREMISE MEASURED FALSE.** There is no 4 px static. `BeddingTone._cell_jitter` divides by
+         `CELLS_PER_METRE` before sampling, so its features are 17-48 METRES; `_strata`'s periods are
+         18/7/4 m. Measured on a run of rock, the mean absolute luma step GROWS with scale (pixel 0.0118,
+         cell 0.0174, metre 0.0238), which is the signature of structure, not noise. Handed back to Astra
+         in `docs/audits/2026-09-10-overnight-queue-audit-request.md` §2.4 with a request for the frame
+         where the static reads.
+- [x] 18 **DISSOLVED BY A POPULATION FIX, same audit §2.4.** "Our rock is 3x flatter than the reference"
+         compared our DEEP massive stone against the reference's SURFACE clastic rock -- the reference
+         frame reads "+2 m OPEN SKY". Like for like, our surface clay's metre-scale energy is 0.047-0.172
+         against the reference's 0.071-0.133: the same range, and both vary more band to band than they
+         differ from each other. Two constants revisiting T017 were moved and REVERTED -- they had not
+         moved the measured number anyway, because `GRAM_CLUMP[massive]` gates that term to 0.25 for the
+         material I was sampling.
 - [ ] 19 Strata that vary with depth. The chip reads TOPSOIL at +2 m and at 7 m and they look identical.
 - [ ] 20 Material-specific rock reads: clay, hardrock and deepstone must differ at a glance.
 - [ ] 21 A cut face reads as cut, not as a natural cave wall.
