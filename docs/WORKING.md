@@ -124,6 +124,20 @@ picture-identical -- `RockNeighborhood.code()` indexes by absolute cell -- but i
 threads shared state through `Frame` into `TerrainPainter` and needs a byte-identical capture and an
 interleaved A/B, which D0547 has only just made possible.
 
+**The painter instrument could not see a burst either (D0552).** `draw_cost.gd` read only the last
+draw and a running total, so a painter costing 0.5 ms every tick and one costing 0.1 ms with an 8 ms
+spike looked identical. `PaintLayer.max_draw_usec` now records the peak. On a still frame doing no
+terrain work: **`machine_painter` peaks at 4.15 ms against a 0.48 ms average -- 8.6x**, with sky 2.65,
+veil 1.77, miner 1.66. Real and actionable. **It does not explain the tail:** host-normalised those
+peaks sum to ~5.1 ms against a 13.30 ms draw p99, and that sum is an impossible frame where all four
+peak at once, so the painters are at most ~38% of it. The rest is presentation, which `--hidden` removes
+by construction -- the next `--front` run has a specific question to answer instead of a guess.
+
+**Measurement protocol (2026-09-09):** `--hidden` is the DEFAULT for CPU-phase work; it agrees with
+`--front` to 0.2% once control-normalised, and it never touches the director's screen. Frame claims
+(`fps_wall`, p50/p99, worst frame, draw phase) need `--front`, which owns the screen for the run, so
+they are batched and announced rather than fired ad hoc.
+
 **Streaming coverage is verified and the prefetch is not starved:** 96 chunks streamed as margin at
 default zoom and 128 at wide zoom, with **zero arriving on screen unpainted**, before and after.
 

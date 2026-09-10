@@ -27,6 +27,7 @@ func _initialize() -> void:
 	await _test_the_frame_asks_for_walls_exactly_when_a_per_frame_painter_reads_them()
 	await _test_a_static_layer_is_queued_only_when_the_camera_or_the_world_moved()
 	await _test_the_real_stack_opts_named_painters_out_and_leaves_the_rest_animated()
+	await _test_a_painters_peak_is_not_overwritten_by_a_later_cheaper_frame()
 	_finish("world_view")
 
 
@@ -361,3 +362,38 @@ func _test_the_real_stack_opts_named_painters_out_and_leaves_the_rest_animated()
 		"CONTROL: the painters that read the cosmetic clock are still animated (%d animated layers) -- "
 		% animated_labels.size() + "a stack that marked everything static would pass the row above")
 	scene.queue_free()
+
+
+## A PAINTER'S PEAK, which `last_draw_usec` (one frame's snapshot) and `sum_draw_usec` (a total an average
+## is taken from) between them cannot report: a painter costing 0.5 ms every tick and one costing 0.1 ms
+## with an 8 ms spike look identical in both. D0551 measured a STILL frame at a 13.30 ms draw p99 against
+## painters averaging 2.15 ms/tick, which is that shape. Pinned WITHOUT a duration bound -- one in a
+## shared suite measures the host (`[[timing-layers-need-add-excl]]`) -- by comparing the peak against the
+## largest `last_draw_usec` observed here; the expensive first draw poses one, and the check below fails
+## loudly rather than vacuously if it did not.
+func _test_a_painters_peak_is_not_overwritten_by_a_later_cheaper_frame() -> void:
+	var view: WorldView = await _mount()
+	var calls: Array[int] = [0]
+	var layer: PaintLayer = view.add_painter(func(_f: Frame, _ci: CanvasItem) -> void:
+		calls[0] += 1
+		var spin: int = 200000 if calls[0] == 1 else 1   # the FIRST draw is the expensive one
+		var acc: int = 0
+		for i: int in spin:
+			acc += i)
+	var seen: Array[int] = []
+	for _i: int in 4:
+		view.refresh()
+		await process_frame
+		await process_frame
+		seen.append(layer.last_draw_usec)
+	var largest: int = 0
+	for v: int in seen:
+		largest = maxi(largest, v)
+	_check(calls[0] >= 2, "the painter drew more than once (%d)" % calls[0])
+	_check(largest > seen[seen.size() - 1],
+		"the test posed a real peak followed by a cheaper frame -- largest %d us, last %d us; "
+		% [largest, seen[seen.size() - 1]] + "without that this assertion could not discriminate")
+	_check(layer.max_draw_usec == largest,
+		"the peak is the largest single draw observed (%d us), not the last (%d us) nor a total"
+			% [largest, layer.last_draw_usec])
+	view.queue_free()

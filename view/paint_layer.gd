@@ -61,6 +61,18 @@ var queues: int = 0
 ## D0531: this is time spent inside the painters, so it does not move when the display paces the process.
 var sum_draw_usec: int = 0
 
+## THE PEAK ONE DRAW OF THIS LAYER COST, over the run (D0552). The two counters above cannot register a
+## burst, and the docstrings for both say why without drawing the conclusion: `last_draw_usec` is one
+## frame's snapshot and `sum_draw_usec` is a total a per-tick average is taken from. A painter that costs
+## 2 ms every tick and one that costs 0.2 ms with an occasional 20 ms spike report the same average and
+## are completely different frames to sit through.
+##
+## This exists because D0551 measured a still frame -- zero terrain preparation, nothing moving -- with a
+## p99 of 15.73 ms against painters averaging 2.15 ms a tick. A 6x gap between mean and tail is the same
+## shape that hid the bake's 9 ms burst behind 0.56 ms/tick (D0540), one layer down, and the instrument
+## that would show it did not exist. See `[[an-average-cannot-see-a-burst]]`.
+var max_draw_usec: int = 0
+
 
 ## THE BIND REFUSES A DEAD CALLABLE, LOUDLY, and D0289 is why that guard is here rather than in a
 ## comment. A `Callable` bound to a method on a `RefCounted` stores an object ID and **does not keep the
@@ -110,3 +122,4 @@ func _draw() -> void:
 	_paint.call(frame, self)
 	last_draw_usec = Time.get_ticks_usec() - began
 	sum_draw_usec += last_draw_usec
+	max_draw_usec = maxi(max_draw_usec, last_draw_usec)

@@ -21515,3 +21515,51 @@ an earlier attempt at focus 0.82-0.90 because the director was using the machine
 discarded, not averaged in. GPU cost is separately measured at 5.14% of a capture (D0548), consistent
 with a CPU-bound frame. No cause for the draw-phase floor is claimed here -- D0527 attributed still-frame
 spikes to display pacing and a slow host, and that is a hypothesis this dataset does not test.
+
+## D0552 · 2026-09-09 · The painter instrument could not see a burst either, and now it can
+
+**Context:** D0551 measured a STILL frame -- nothing moving, zero terrain preparation, zero cells painted
+-- at a draw-phase p99 of **13.30 ms** against painters averaging **2.15 ms a tick**. A 6x gap between
+mean and tail is the shape that hid the bake's 9 ms burst behind 0.56 ms/tick (D0540), and the instrument
+that would show it did not exist: `view/draw_cost.gd` reads only `last_draw_usec` (one frame's snapshot)
+and `sum_draw_usec` (a total an average is taken from). Both describe a painter that never spikes exactly
+as they describe one that does. Third instance of `[[an-average-cannot-see-a-burst]]` in this programme.
+
+**Built:** `PaintLayer.max_draw_usec`, stamped in the same `_draw` that already stamps the other two, and
+`DrawCost.peaks()` ranking painters by their slowest single draw. Two mutants killed (peak overwritten by
+the last draw; peak never updated). The pin carries NO duration bound -- one in a shared suite measures
+the host -- and instead compares the recorded peak against the largest `last_draw_usec` the test itself
+observed, with an explicit check that a peak was actually posed so it cannot pass vacuously.
+
+**Found, on a still frame doing no terrain work at all:**
+
+| painter | peak single draw | at the usual host speed | its average (D0531) |
+|---|---|---|---|
+| `machine_painter.paint_frame` | 4.15 ms | ~2.08 ms | 0.48 ms |
+| `sky_painter.paint` | 2.10-2.65 ms | ~1.32 ms | 0.93 ms |
+| `veil_layer.paint_frame` | 1.77 ms | ~0.89 ms | -- |
+| `miner_draw.paint` | 1.43-1.66 ms | ~0.83 ms | -- |
+
+**`machine_painter` peaks at 8.6x its own average** while nothing is happening. That is a real and
+actionable burst, and it was invisible to every instrument the build had.
+
+**But it does not explain the tail, and that is the more important half.** Host-normalised, the four
+peaks sum to about **5.1 ms against a 13.30 ms draw p99** -- and that sum is an impossible frame in which
+every painter peaks at once. So the painters account for at most ~38% of the draw-phase tail. The
+remainder is in presentation, which `--hidden` removes by definition and which only a `--front` run can
+measure. That is a brief for the next screen run rather than a guess, and D0527's display-pacing
+hypothesis remains untested.
+
+**Corrected mid-entry, mine:** the first version of `peaks()` printed `(all=12.10ms)`, summing maxima
+that may never occur in the same frame -- D0541's join, which I had spent the evening correcting one
+layer up. Renamed to `sum_of_separate_peaks=..., not one frame`, with the reason in the source.
+
+**Zero screen used.** Measured entirely in `--hidden`, which the director's new protocol makes the
+default for CPU-phase work: control-normalised, hidden and `--front` agree on bake preparation to
+**0.2%** (15.18 us/cell at cal 74 against 12.12-12.34 at cal 59-60; the raw 25% was host drift, which is
+what D0527 built the calibration loop to catch).
+
+**Limits.** One workload (still), one host, hidden regime, and the host was loaded (control 120 us
+against the usual ~60) so the raw peaks are roughly double and the normalisation is an assumption D0527
+justifies but this run does not re-prove. The peak is accumulated over a whole run, not reset per window
+like `BakeCost`, so it is the worst draw of the run and is labelled that way.

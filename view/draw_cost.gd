@@ -47,6 +47,31 @@ static func report(layers: Array[PaintLayer]) -> String:
 ## The whole frame's line: the world painters ranked, the refresh and observe cost, the two plane caches'
 ## rebuild counts against the ticks drawn, and the HUD chips ranked -- a budget that left the HUD out was
 ## measuring part of the frame (D0390).
+## THE SLOWEST SINGLE DRAW EACH PAINTER HAD, worst first -- the statistic `report` and `frame_report`
+## between them cannot produce (D0552). One frame's snapshot and a per-tick average both describe a
+## painter that never spikes exactly as they describe one that does.
+static func peaks(layers: Array[PaintLayer], top: int = 4) -> String:
+	var rows: Array[Dictionary] = []
+	for layer: PaintLayer in layers:
+		if layer.max_draw_usec > 0:
+			rows.append({"label": layer.label, "usec": layer.max_draw_usec})
+	if rows.is_empty():
+		return ""
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["usec"] > b["usec"])
+	var parts: PackedStringArray = PackedStringArray()
+	for i: int in mini(top, rows.size()):
+		parts.append("%s=%.2fms" % [rows[i]["label"], float(rows[i]["usec"]) / 1000.0])
+	# THE SUM IS OF INDEPENDENT MAXIMA AND IS NOT A FRAME ANYONE SAT THROUGH. D0541 caught exactly this
+	# join one layer up -- a peak duration and a peak area maximised separately and then reported as one
+	# event -- so the name says what it is rather than inviting the same reading. It is an upper bound on
+	# a worst frame, useful only as that.
+	var bound: int = 0
+	for r: Dictionary in rows:
+		bound += int(r["usec"])
+	return " | peak_draw " + " ".join(parts) + " (sum_of_separate_peaks=%.2fms, not one frame)" % (
+		float(bound) / 1000.0)
+
+
 static func frame_report(layers: Array[PaintLayer], hud: Array[PaintLayer], refresh_usec: int,
 		observe_usec: int, iface: Interface, ticks: int) -> String:
 	var rebuilds: String = ""
@@ -70,7 +95,7 @@ static func frame_report(layers: Array[PaintLayer], hud: Array[PaintLayer], refr
 	return "%s | refresh=%.2fms (observe=%.2fms) queued=%d/%d drawn=%.3fms/tick%s%s" % [report(layers),
 		float(refresh_usec) / 1000.0, float(observe_usec) / 1000.0,
 		queued, ticks * layers.size(), float(drawn_usec) / 1000.0 / float(maxi(ticks, 1)),
-		rebuilds, chips]
+		rebuilds, chips] + peaks(layers)
 
 
 ## The painter's own name, for the report. **THE METHOD NAME ALONE IS NOT AN IDENTIFIER**: four painters
