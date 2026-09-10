@@ -1312,3 +1312,36 @@ nothing has woken them, and they will collapse the first time a player digs with
 did yesterday. That is strictly a fidelity fix and is neutral on all three readings above. **Nothing is
 blocked on this** — it is a design question the measurement happened to expose, and it will matter more
 once a player can reach more of the world.
+
+## P042 · Two-thirds of the crafting content is unreachable, and one ruling would reach all of it
+
+**Measured, not estimated.** 16 machine records, 4 starts, 2 demand tiers, 6 recipes.
+
+| | |
+|---|---|
+| machines no start places AND no demand names | **6** — `rope`, `pump`, `plate_press`, `iron_forge`, `gear_mill`, `blast_furnace` |
+| recipes reachable today | **2** — `mine_ore` (drill), `smelt_ingot` (processor) |
+| recipes stranded behind an orphan | **4** — `press_plate`, `smelt_iron`, `mill_gear`, `smelt_rich` |
+| demand tiers on file | **2** — `d1`, `d2` |
+
+**The queue said seven orphans; it is six.** `torch` is placed by a start and is reachable. Recorded
+because the queue's list has been quoted twice and would have been quoted again.
+
+**Why the two items are really one.** Queue item 42 wants `d3` and `d4`; item 43 wants the orphans
+reached or deleted. A demand tier is the authoritative unlock path, so **a `d3`/`d4` that name the
+orphan machines reaches four machines and four recipes in a single data change** — no new systems, no
+new art, and the recipes already exist and are already tested. `rope` and `pump` carry no recipe and are
+a separate, smaller question.
+
+**What I need from you, and it is genuinely a design call rather than a gap I can close.** What should
+tier three and tier four ASK FOR? The ladder is the game's spine — `mine → smelt → deliver → build →
+fuel → auto → hopper → power → winch` — and what a tier demands decides what the next hour of play is
+about. I can write the records the moment the shape is decided; I should not decide it.
+
+**A shape, offered as a starting point and not a recommendation:** d3 asks for a plate (reaching
+`plate_press` + `press_plate`), d4 asks for something that needs iron (reaching `iron_forge` +
+`smelt_iron`, and `blast_furnace` + `smelt_rich` behind it). That is one machine and one recipe per
+tier, which is the pacing d1 and d2 already set.
+
+**This is the "workshop the player can finish and trust" item.** The audit's closing line named that as
+the broader objective; this is the measurement of how far the build is from it.

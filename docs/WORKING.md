@@ -278,16 +278,33 @@ nothing and saved most of a night.
 - [ ] 35 Seven dark rounded rectangles down to three.
 - [ ] 36 Cut instructional prose; every lesson the world can embody becomes a cue. **This removes work
          shipped on 2026-09-09 and that is correct.**
-- [ ] 37 Machine label collisions ("MOUTH" is drawn on top of "FORGE") and proximity gating.
+- [~] 37 **HALF ALREADY BUILT, AND THE OTHER HALF IS NOW NAMED.** `view/visuals/machine_labels.gd`
+         already solves plate-on-plate: runs collapse to one plate with a count, and neighbours that
+         would overlap are shelf-packed onto a second row, with the aimed machine packed first.
+         `tests/test_machine_painter.gd:128` pins all of it. **THE REAL DEFECT IS THAT "MOUTH" IS NOT A
+         PLATE.** It is a `RingWord` -- the word under a target ring -- and `RingWord` and
+         `MachineLabels` are two independent systems with no shared packing, so a ring word can land on
+         a machine plate and neither knows. That is the collision the queue reported, and it is a view
+         change with a frame to judge, so it is for the capture batch.
 - [ ] 38 The recipe line has no words: "1 [grey] 2 [orange] -> 1 [yellow]".
 - [ ] 39 A diegetic depth and band indicator.
 
 ### Phase 8 -- CONTENT
 
-- [ ] 40 BUILD's MOUTH target sits where a player reads it.
+- [~] 40 **THE CUE ALREADY EXISTS (D0521).** `core/reach.gd` is the one reach rule -- 3.2 m, held as
+         16/5 so the squared compare stays exact -- and `RingWord.draw_under` appends **IN_REACH** to a
+         metre target's word when the body is inside it. The remaining gap is the one D0557 named and
+         did not close: nothing distinguishes 3.2 m from the 5 m a player reads as "next to it", so the
+         ring is visible from far outside the reach it is gating. A frame item.
 - [ ] 41 Join "you are carrying coal" to "the forge is starved". Both are drawn; nothing connects them.
-- [ ] 42 d3 and d4. The demand ladder is the authoritative unlock path and it has two entries.
-- [ ] 43 The seven orphan machines: reach them or delete them.
+- [~] 42 **MEASURED AND PUT TO THE DIRECTOR (P042).** Two tiers on file, `d1` and `d2`. This is content
+         design -- what a tier should ASK for is the director's call -- but it pairs exactly with 43.
+- [~] 43 **MEASURED, AND THE QUEUE'S OWN COUNT WAS WRONG (P042).** Six orphans, not seven: `torch` IS
+         placed by a start. The six are `rope`, `pump`, `plate_press`, `iron_forge`, `gear_mill`,
+         `blast_furnace`. **Four of them strand a recipe apiece** -- `press_plate`, `smelt_iron`,
+         `mill_gear`, `smelt_rich` -- so of the game's **6 recipes only 2 are reachable** (`mine_ore` on
+         the drill, `smelt_ingot` on the processor). Two-thirds of the crafting content cannot be
+         reached by any route the game currently offers.
 
 ### Phase 9 -- VERIFY
 
