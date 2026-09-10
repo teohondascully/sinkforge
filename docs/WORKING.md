@@ -1,6 +1,6 @@
 # Working state
 
-**Last updated: 2026-09-10 (the director's 49-item overnight queue is below and `/loop` drives it; three Opus playthroughs found the game unfinishable past rung 6 and `docs/NORTH_STAR.md` records what that means; loose material falls at D0562).**
+**Last updated: 2026-09-10 (Astra's audit answered in full -- D0575 withdrawn, D0576-D0579 fix what it reproduced; D0577 found D0569's floor had made the veil a CONSTANT underground; D0583-D0586 relit the frame after three hours with the director's screen. Ten queue items turned out already built.)**
 
 ## Overnight queue
 
@@ -217,7 +217,7 @@ left here.
          ruled 0.38 gives 0.1459, so 0.62 costs about 6% of the hue separation: real, small, and the
          opposite sign from what I predicted. Whether 0.10 of hue reads "at a glance" needs a person or
          a vision judge asked WHAT IT SEES (never which it prefers). Parked for the capture batch.
-- [ ] 21 A cut face reads as cut, not as a natural cave wall. **GENUINELY UNBUILT, and the largest
+- [ ] 21 **NEEDS A RULING FIRST (per-cell provenance is sim state).** A cut face reads as cut, not as a natural cave wall. **GENUINELY UNBUILT, and the largest
          remaining item in this phase.** Nothing anywhere distinguishes a dug cell from a generated one:
          `RockTone` shades by grammar and noise fields, `GlintPainter` is the only thing that mentions a
          "dug face" and it means exposed ore. Doing this needs per-cell provenance -- sim state, with a
@@ -248,12 +248,14 @@ left here.
          same value. Plants now take a cell-scale `foliage_tone` with clumps, a per-cell break-up and a
          per-column term so no two trees match, and they no longer take sedimentary bedding. The
          SILHOUETTE is still rectangular; that is generation, not view, and is a separate item.
-- [ ] 28 Grass tufts with height variation, not a one-cell hard green stripe.
+- [ ] 28 Grass tufts with height variation. **NOT ATTEMPTED.** `SurfaceTone` already carries moss,
+         roots, blades and hanging tufts, all WITHIN the cap cell. Real height variation means drawing
+         into the air row above the surface, which is a new painter rather than a constant.
 - [x] 29 **ALREADY BUILT, AND NOW ACTUALLY VISIBLE (D0583).** `SkyPainter` has had a starfield, sun,
          moon, clouds, the Sinkforge crown and three parallax ridgelines since D0244. `DAYLIGHT` was
          pinned at 0.35 (dusk) explicitly to show the most features at once, not because it looked
          right. At 0.15 the stars read and the sky agrees with the ground.
-- [ ] 30 Falling and drifting leaves.
+- [ ] 30 Falling and drifting leaves. **NOT ATTEMPTED** -- needs an ambient emitter keyed to canopies.
 
 ### Phase 6 -- FRAME AND CAMERA
 
@@ -290,8 +292,11 @@ nothing and saved most of a night.
          darkened (`ROCK_DARKEN` 0.35 -> 0.70 -- these are `Color.darkened` AMOUNTS, so larger is
          darker; written as 0.20 first, which made it brighter, and the capture said so at once). The
          COUNT is unchanged; what changed is that the furniture no longer sits on top of the world.
-- [ ] 36 Cut instructional prose; every lesson the world can embody becomes a cue. **This removes work
-         shipped on 2026-09-09 and that is correct.**
+- [~] 36 Cut instructional prose. **PLATES TONED, COPY UNTOUCHED, DELIBERATELY.** The audit is right
+         that this must not become an absolute -- "replace it only when an embodied cue actually
+         communicates the same information reliably" -- and the GRAPPLE lesson teaches SHIFT-to-throw
+         and W-to-climb, which nothing in the world currently says. The plates carrying it are quieter
+         (D0583); the sentences stand until something replaces them.
 - [~] 37 **HALF ALREADY BUILT, AND THE OTHER HALF IS NOW NAMED.** `view/visuals/machine_labels.gd`
          already solves plate-on-plate: runs collapse to one plate with a count, and neighbours that
          would overlap are shelf-packed onto a second row, with the aimed machine packed first.
@@ -325,23 +330,54 @@ nothing and saved most of a night.
 - [ ] 44 Opus playthrough again, same route as item 1. The only honest test of phases 1-5.
 - [ ] 45 A stranger batch STARTED AT RUNG 4, six seats, haiku, pinned mission.
 - [ ] 46 Astra's fixture question (`docs/audits/2026-09-09-presentation-regime-handoff.md`).
-- [ ] 47 Full battery, CI green on all required jobs, everything pushed, tree clean. Read the JOBS.
-- [ ] 48 The wrap: `docs/WORKING.md`, `docs/BRIEF.md`, the ledger.
+- [x] 47 **DONE.** Battery 179/179 (151 suites + 28 gates), tree clean, 12 commits pushed to origin.
+- [x] 48 **DONE.** `docs/BRIEF.md` leads with the five findings; the ledger carries D0575-D0586; this
+         file is current; P038-P043 are the open director questions.
 
 ### Phase 10 -- THE MATCH LOOP (the director's closing instruction; does not terminate on its own)
 
-- [ ] 49 Cycle: capture our frame at the reference's own camera, put it beside
-         `docs/media/reference/2026-09-10-lighting-reference.jpg`, name the largest remaining
-         difference, fix that one thing, capture again. Repeat. **Lighting and rock only** -- the
-         mockup's HUD is our HUD and its second depth plane is an open fork, neither is in the match.
+- [~] 49 **FIRST PASS DONE, THREE OF FOUR CONDITIONS MOVED.** See below.
 
-         **THE STOPPING RULE, which this item did not have and which the audit supplies.** Numerical
-         match against a single JPEG is REJECTED as the terminus: the reference is one lossy frame at
-         one camera of a scene we do not have, and driving a distance metric to zero against it would
-         overfit to its compression. It is ART DIRECTION. The loop stops on four readable conditions,
-         judged on OUR frames: materials read as themselves at play zoom; carved space is spatially
-         separable from solid rock; the lighting is attractive rather than merely bright; and it holds
-         under a MOVING camera, not only in a still. Each pass records which of the four it moved.
+### Phase 10 -- THE MATCH LOOP: first pass, 2026-09-10
+
+**The stopping rule this item was given** (written earlier tonight, from the audit): numerical match
+against a single JPEG is rejected as the terminus. The loop stops on four readable conditions, judged on
+our frames: **materials read as themselves at play zoom; carved space is spatially separable from solid
+rock; the lighting is attractive rather than merely bright; and it holds under a moving camera.** Each
+pass records which of the four it moved.
+
+**Pass 1 moved three of the four.** Captures:
+`docs/media/moments/2026-09-10-before-night.png` (the opening frame as it was),
+`-after-night-surface.png`, `-after-night-deep.png`.
+
+| condition | before | after | moved? |
+|---|---|---|---|
+| materials read as themselves | canopy 0.479 luma, flat, brighter than lit ground; three trees identical | foliage clumped at cell scale, trees differ from each other, no sedimentary bedding on a tree | **yes** |
+| carved space separable from rock | a void and mid rock both resolved near 0.58 -- no dark end in the deep | void darkened after the ambient lift; carved shapes read as holes | **yes** |
+| lighting attractive, not merely bright | sky 0.086 at the zenith over ground at 0.344 -- night sky, noon ground | night level on the surface, night sky, lamp is the brightest thing in the frame | **yes** |
+| holds under a moving camera | not tested | **not tested** | no |
+
+**Measured against the reference, on a real 45 m frame:**
+
+| | before tonight | now | reference |
+|---|---|---|---|
+| unlit deep rock | 0.0195 | **0.1926** | 0.190 |
+| the lamp's pool | 0.210 | 0.4355 | 0.515 |
+| rock 1 m from the lamp | 0.157 | 0.2758 | 0.377 |
+| surface ground at night | 0.344 | 0.155 | 0.148 |
+
+**What the loop should take next, in order:**
+
+1. **The fourth condition is untested.** Every judgement above is a still. A moving camera is where
+   pixel-snap, the veil's per-frame field sampling and the parallax ridgelines can all fail, and none of
+   it shows in a screenshot. This wants a short recorded pan, not another capture.
+2. **Rock a metre from the lamp is the largest remaining numeric gap** (0.276 against 0.377). The
+   multiply half is at its ceiling there, so it is the additive pass's falloff shape, not a veil
+   constant.
+3. **Tree silhouettes are still rectangles.** The canopy now reads as foliage but its outline is a
+   block, and that outline is generation rather than view.
+4. **The shallow world is still the flattest rock in it** (D0581) -- the flattest seven-metre window is
+   inside 1-10 m in every column sampled, which is exactly where the tutorial happens.
 
 ### Explicitly DEFERRED, with the reason (do not quietly pick these up)
 
