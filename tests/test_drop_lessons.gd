@@ -12,6 +12,7 @@ const S: int = Fx.SCALE
 
 func _initialize() -> void:
 	_test_short_drop_pins()
+	_test_the_standing_lesson_counts_down_and_lets_go_at_the_line()
 	_test_fed_receipt_pins()
 	_test_fed_receipt_eater_pins()
 	_test_receipt_ring_word_pins()
@@ -28,10 +29,48 @@ func _drop_obs(pack: Array, held: StringName, machines: Array[Dictionary]) -> In
 	return o
 
 
+## D0558. S131 walked with "TOO FAR -- the FORGE that takes ore is 8 m to your LEFT" on the dock and
+## reported "the message not updating as it walked". It did not: `{dist}` was substituted once, at the
+## drop. A distance that is wrong the instant you obey it is worse than no distance -- the player obeys
+## it, arrives where it said, is refused again, and stops believing the next one.
+##
+## The forge is 5 m left of the body here and the drop's reach is 3.2 m, so the walk crosses the line
+## between cell 9 (4 m, still refused) and cell 8 (3 m, in reach). The lesson must count down over the
+## first and be GONE at the second -- gone rather than corrected, because a lesson still saying TOO FAR
+## when the drop would now succeed teaches the wrong thing, and its going is the "close enough" signal.
+func _test_the_standing_lesson_counts_down_and_lets_go_at_the_line() -> void:
+	var forge: Array[Dictionary] = [{"cell": Vector2i(5, 10), "id": &"processor", "name": "Forge", "recipe": &"smelt_ingot", "input": {}, "output": {}}]
+	var h: Hints = Hints.new()
+	h.observe(_drop_obs([["coal", 6]], &"coal", forge), 0.016)
+	var short: Interface.Observation = _drop_obs([["coal", 6]], &"coal", forge)
+	short.drop_went = &"short"
+	short.drop_short_cell = Vector2i(5, 10)
+	h.observe(short, 0.016)
+	_check(h.active_text().contains("is 5 m to your LEFT"),
+		"the lesson opens at 5 m (%s)" % h.active_text().left(52))
+	# ONE METRE CLOSER, no drop pressed: the standing lesson re-reads the world it is describing.
+	h.observe(_at_cell(_drop_obs([["coal", 6]], &"coal", forge), 9), 0.016)
+	_check(h.active_id() == &"dropped_short" and h.active_text().contains("is 4 m to your LEFT"),
+		"...and reads 4 m after a metre's walk, without a second drop (%s)" % h.active_text().left(52))
+	# ACROSS THE DROP'S OWN LINE (3.2 m): the lesson has nothing left to say and lets go.
+	h.observe(_at_cell(_drop_obs([["coal", 6]], &"coal", forge), 8), 0.016)
+	_check(h.active_id() != &"dropped_short",
+		"...and is gone once the body is inside the drop's reach at 3 m (%s)" % h.active_id())
+	_check(not h.active_text().contains("TOO FAR"),
+		"nothing on the plate still says TOO FAR while the drop would succeed (%s)" % h.active_text().left(52))
+
+
+## The same posed observation, standing at the centre of another logic cell on the same row.
+func _at_cell(o: Interface.Observation, col: int) -> Interface.Observation:
+	o.pos_x = (col * 16 + 8) * S
+	return o
+
+
 ## D0517 (strangers 103-108, D0513's `short`): a drop REFUSED for a forge in sight but out of reach -- five
 ## metres left, coal selected, the pack unchanged -- teaches TOO FAR with the forge, the coal, the five and
 ## the LEFT filled in; the slot's word for it is TOO FAR, yielding to the lesson the first time and said
-## again on the next short drop. The way is ABOVE/BELOW when the rise outweighs the run; a cell with no
+## again on the next short drop. The way is ABOVE YOU/BELOW YOU when the rise outweighs the run (it carries
+## its own preposition, D0558: "to your ABOVE" is not English); a cell with no
 ## machine record reads MACHINE.
 func _test_short_drop_pins() -> void:
 	var forge: Array[Dictionary] = [{"cell": Vector2i(5, 10), "id": &"processor", "name": "Forge", "recipe": &"smelt_ingot", "input": {}, "output": {}}]
@@ -56,7 +95,7 @@ func _test_short_drop_pins() -> void:
 	var h2: Hints = Hints.new()
 	h2.observe(_drop_obs([["coal", 6]], &"coal", forge), 0.016)
 	h2.observe(above, 0.016)
-	_check(h2.active_text().find("is 4 m to your ABOVE") >= 0, "four metres up and one across: the way is ABOVE (%s)" % h2.active_text().left(60))
+	_check(h2.active_text().find("is 4 m ABOVE you") >= 0, "four metres up and one across: the way is ABOVE YOU, not the \"to your ABOVE\" this read before D0558 (%s)" % h2.active_text().left(60))
 	var bare: Interface.Observation = _drop_obs([["ore", 2]], &"ore", [])
 	bare.drop_went = &"short"
 	bare.drop_short_cell = Vector2i(17, 10)

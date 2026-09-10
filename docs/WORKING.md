@@ -302,9 +302,9 @@ whole layer: one metre is a rule to loosen (sim, the director's), 3.2 m is a thi
 
 **The gameplay queue, from the last batch's own findings, in the strangers' words:**
 
-1. **The TOO FAR lesson goes stale.** S131: the message did not update as it walked. `{dist}` is
-   substituted once, on the drop; `Hints.active_text` re-substitutes every call, so the fix is to keep
-   `_subs` refreshed while the lesson stands, and to clear it when the body comes into reach. NOT DONE.
+1. ~~**The TOO FAR lesson goes stale.**~~ DONE (D0558): it counts down every observe from where the body
+   is now, and lets go the moment the body crosses into the drop's reach. The sentence also stopped
+   reading "is 4 m to your ABOVE", which a PASS line had been quoting since D0517.
 2. **Coal is the floor.** S130 never got coal in 41 bursts: TOO FAR at the seam, then TOO FAR DOWN with
    "dig at the white square first", then NOTHING THERE at the squares it chose. Refusals across the
    batch: `air` 14, `far` 6, `sight` 2, `build_far` 2. This is the biggest wall left and it is untouched.

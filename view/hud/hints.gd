@@ -208,6 +208,7 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	note(&"dropped_wrong", drop["wrong"])
 	note(&"dropped_floor", o.drop_went == &"floor" and not drop["wrong"])   # no machine in sight takes it (D0428, stranger 5; D0517)
 	note(&"dropped_short", drop["short"])
+	_refresh_short(o)
 	_refusals.drop(drop["slot"])                                              # the slot names every drop, not just the first (D0496)
 	if o.drop_went == &"fed":
 		_let_go(drop["receipt"])
@@ -232,6 +233,25 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 			_had[def["item"]] = int(counts.get(def["item"], 0)) > 0
 		_primed = true
 	refresh(counts, delta)
+
+
+## KEEP THE STANDING "TOO FAR" HONEST, and let go of it the moment it stops being true (D0558). The
+## lesson names metres and a direction, and it was substituted once -- at the drop -- so it went stale as
+## soon as the player obeyed it. S131 walked with "the FORGE that takes ore is 8 m to your LEFT" on the
+## dock and reported the message not updating. `active_text` re-substitutes every call, so the numbers
+## only had to be kept fresh.
+##
+## AND WHEN THE BODY REACHES THE MACHINE THE LESSON GOES, which is the point rather than tidiness: a
+## lesson that says TOO FAR while the drop would now succeed is teaching the wrong thing, and its
+## disappearance is the "close enough" signal three strangers said nothing gave them (D0557 draws the
+## same line on the ground). The queue is filtered too, exactly as `_let_go` does -- promoting a stale
+## TOO FAR onto the plate one tick after the body arrived is the same defect through the other door.
+func _refresh_short(o: Interface.Observation) -> void:
+	if not _drops.refresh_short(o, _subs) and _subs.has(&"dropped_short"):
+		_subs.erase(&"dropped_short")
+		if _active == &"dropped_short":
+			_active = &""
+		_queue = _queue.filter(func(id: StringName) -> bool: return id != &"dropped_short")
 
 
 ## A drop that FED a machine (D0517): the plate lets go of any drop lesson -- the one up, and any queued,

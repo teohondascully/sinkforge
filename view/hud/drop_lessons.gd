@@ -23,6 +23,10 @@ const WANTED_RANGE_M: float = 12.0        ## `Verbs.FAR_EATER_M`, the range the 
 const LESSONS: Array[StringName] = [&"dropped_floor", &"dropped_wrong", &"dropped_short"]
 
 var _prev_counts: Dictionary = {}
+## THE MACHINE THE STANDING "TOO FAR" LESSON NAMED, kept so its metres can be recomputed while the lesson
+## is up (D0558). `o.drop_short_cell` is one observe wide and then a window of ticks (D0434), and the
+## lesson outlives both.
+var _short_cell: Vector2i = Vector2i(-1, -1)
 
 
 ## One observe: the pack's fall, then which drop lesson is TRUE, what the slot says, and the receipt.
@@ -84,11 +88,41 @@ func _wrong_stack(o: Interface.Observation, counts: Dictionary, fell: Dictionary
 func _short_drop(o: Interface.Observation, subs: Dictionary) -> bool:
 	if o.drop_went != &"short":
 		return false
-	var d: Vector2 = cell_px(o.drop_short_cell) - body_px(o)
-	var way: String = ("BELOW" if d.y > 0.0 else "ABOVE") if absf(d.y) > absf(d.x) else ("RIGHT" if d.x > 0.0 else "LEFT")
-	subs[&"dropped_short"] = {"{eater}": eater_label(o.machine_at(o.drop_short_cell)), "{item}": Hotbar.item_label(o.held_item).to_lower(),
-		"{dist}": str(roundi(d.length() / float(Interface.Observation.LOGIC_PX))), "{dir}": way}
+	_short_cell = o.drop_short_cell
+	subs[&"dropped_short"] = _short_subs(o, o.drop_short_cell, Hotbar.item_label(o.held_item).to_lower())
 	return true
+
+
+## THE LESSON'S METRES, RECOMPUTED FROM WHERE THE BODY IS NOW (D0558). S131 walked while "TOO FAR -- the
+## FORGE that takes ore is 8 m to your LEFT" stood on the dock and reported that "the message did not
+## update as it walked". It did not: `{dist}` was substituted once, at the drop. `Hints.active_text`
+## re-substitutes on every call, so the number only had to be kept fresh -- and a distance that is wrong
+## the instant you obey it is worse than no distance, because the player obeys it and then distrusts the
+## next one. Returns false once the body is INSIDE the drop's own reach, which is the moment the lesson
+## has nothing left to say: `Hints` lets go of it there, and that letting-go is the "close enough" signal
+## three strangers said was missing (D0557 draws the same line on the ground).
+func refresh_short(o: Interface.Observation, subs: Dictionary) -> bool:
+	if _short_cell == Vector2i(-1, -1):
+		return false
+	if Reach.in_reach_metre(o.pos_x, o.pos_y, _short_cell, Interface.Observation.LOGIC_PX):
+		_short_cell = Vector2i(-1, -1)
+		return false
+	var held: Dictionary = subs.get(&"dropped_short", {})
+	subs[&"dropped_short"] = _short_subs(o, _short_cell, String(held.get("{item}", "that stack")))
+	return true
+
+
+## The placeholders for one reading of the lesson, from the body's CURRENT position. `{item}` is carried
+## in by the caller rather than read off `o.held_item`: the hand may have moved to another stack since
+## the drop, and the lesson is about the stack that was refused.
+func _short_subs(o: Interface.Observation, cell: Vector2i, item: String) -> Dictionary:
+	var d: Vector2 = cell_px(cell) - body_px(o)
+	# THE DIRECTION CARRIES ITS OWN PREPOSITION (D0558). The sentence used to read "is 4 m to your
+	# ABOVE", which is not English, and this lesson is the one a stranger reads while standing still
+	# and refused. `EDGE_TEXT` keeps its own "to your {dir}" and is always given LEFT or RIGHT.
+	var way: String = ("BELOW you" if d.y > 0.0 else "ABOVE you") if absf(d.y) > absf(d.x) else ("to your RIGHT" if d.x > 0.0 else "to your LEFT")
+	return {"{eater}": eater_label(o.machine_at(cell)), "{item}": item,
+		"{dist}": str(roundi(d.length() / float(Interface.Observation.LOGIC_PX))), "{dir}": way}
 
 
 ## The receipt for a drop that FED a machine (D0517): "6 COAL → FORGE" -- the pack's fall in that item and

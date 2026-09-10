@@ -21873,3 +21873,43 @@ the lesson stands; it is a separate change and is not in this one. S131's other 
 machines, and the lesson naming one of them by what it takes) is also open: the nameplates DO distinguish
 FORGE from CREW RIG on the real seat, so that report needs re-reading against a capture before anything
 is built for it.
+
+## D0558 · 2026-09-09 · The TOO FAR lesson counts down as you walk, and lets go the moment the drop would work
+
+**Decided:** while the TOO FAR lesson stands, its metres and direction are recomputed every observe from
+where the body is NOW; when the body crosses into the drop's reach the lesson is dropped from the plate
+and the queue. Also: the direction carries its own preposition, because the sentence read **"is 4 m to
+your ABOVE"**. No rule changed.
+
+**Why.** S131 walked with "TOO FAR — the FORGE that takes ore is 8 m to your LEFT" on the dock and
+reported, in as many words, that the message did not update as it walked. It did not: `{dist}` was
+substituted once, on the drop (`DropLessons._short_drop`), and `o.drop_short_cell` is one observe wide
+and then a short window of ticks (D0434) while the lesson outlives both. **A distance that is wrong the
+instant you obey it is worse than no distance** -- the player walks where it said, is refused again, and
+stops believing the next one. `Hints.active_text` already re-substitutes on every call, so the numbers
+only had to be kept fresh; `DropLessons` now remembers the machine the standing lesson named.
+
+**Letting go is the point, not tidiness.** A lesson still reading TOO FAR while the drop would succeed
+teaches the wrong thing, and its disappearance is the "close enough" signal three strangers said nothing
+gave them -- the same gap D0557 draws on the ground. The queue is filtered as well as the plate, exactly
+as `_let_go` does for a fed drop: promoting a stale TOO FAR one tick after the body arrived is the same
+defect through the other door.
+
+**"To your ABOVE" was shipped prose.** The template was `is {dist} m to your {dir}` with `{dir}` in
+{ABOVE, BELOW, LEFT, RIGHT}, and a suite had been printing "is 4 m to your ABOVE" in a PASS line since
+D0517 without anyone reading it. The direction is now a phrase that carries its own preposition ("ABOVE
+you", "to your LEFT"), and `EDGE_TEXT` keeps its own wording untouched -- it has the same `{dir}` and is
+only ever given LEFT or RIGHT, so it was never wrong. A green assertion's own message is shipped text;
+this one had been quoting the defect back for six batches.
+
+**Verified:** `tests/test_drop_lessons.gd` **19 -> 23** asserted, `tests/test_hints.gd` 57 unchanged. The
+pin walks the posed body across the drop's line -- the forge is 5 m left and reach is 3.2 m, so cell 9 is
+4 m and still refused and cell 8 is 3 m and inside -- and reads the plate at each step. Two mutations,
+each failing only its own half: removing the per-observe refresh leaves the lesson reading 5 m forever
+(three assertions), and refreshing without letting go counts correctly down to 3 m and keeps a TOO FAR on
+the plate that the drop would no longer give (two assertions). Full local battery green.
+
+**Still open from the same batch:** coal is the floor (S130, no coal in 41 bursts: TOO FAR at the seam,
+then TOO FAR DOWN, then NOTHING THERE), and S131's "three forges, no labels" needs re-reading against a
+capture before anything is built for it -- the nameplates read FORGE and CREW RIG on a real seat, so the
+report and the build disagree and the report has not been checked.

@@ -45,7 +45,7 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"dropped_wrong", "text": "WRONG STACK — you dropped {dropped}; the machine beside you takes {wanted}. Press the number over the {wanted} in your bar to hold it, then [DROP]."},
 	{"id": &"left_working", "text": "STILL WORKING — the forge has more of your ore in it, and what it makes comes to you only while you stand beside it. Step back and wait: {more} more coming."},
 	{"id": &"dropped_floor", "text": "NO MACHINE HERE — nothing near enough takes that stack, so it fell at your feet; walk over it to pick it up again. A machine takes a drop from within a body length; the WHITE RING marks the one this step wants."},
-	{"id": &"dropped_short", "text": "TOO FAR — the {eater} that takes {item} is {dist} m to your {dir}; your stack stays with you. Walk into its WHITE RING, stand beside it, then press the stack's NUMBER and [DROP]."},
+	{"id": &"dropped_short", "text": "TOO FAR — the {eater} that takes {item} is {dist} m {dir}; your stack stays with you. Walk into its WHITE RING, stand beside it, then press the stack's NUMBER and [DROP]."},
 	{"id": &"in_water", "text": "AQUIFER — water slows you. A POWERED PUMP drains it."},
 	{"id": &"world_edge_right", "text": EDGE_TEXT},
 	{"id": &"world_edge_left", "text": EDGE_TEXT},
