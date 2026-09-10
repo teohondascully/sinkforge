@@ -831,3 +831,31 @@ staircase step moves **1,571 cells** for the 15 it dug. That is P043, and it is 
 is load-bearing and oldest — this one, D0569's floor ("does NOT flatten depth"), and P036's arithmetic
 were all premises written into source or a ledger and then reasoned from rather than re-checked.
 
+
+## 2026-09-10 · "One ruling would reach all of it" — P042's central claim, and it was never checked
+
+**What I wrote, in `docs/NEEDS_DIRECTOR.md` P042, and repeated in the decision brief as D2:** that a
+`d3`/`d4` naming the orphan machines "reaches four machines and four recipes in a single data change —
+no new systems, no new art, and the recipes already exist and are already tested."
+
+**It is false.** Astra found the first link: `data/materials/ore_iron.yaml` yields `ore`, while
+`data/recipes/smelt_iron.yaml` consumes `iron`. Checking the whole graph rather than that one pair,
+**nothing in the game produces `iron` and nothing produces `rich_ore`** — the only two items any recipe
+consumes that no material yields and no recipe outputs. A `d3` granting `iron_forge` grants a machine
+that can never run once.
+
+**What made it durable.** I counted the machines and I counted the recipes, and I checked that each
+orphan recipe HAD a machine. I never asked the other question — whether its INPUTS existed. The two
+counts were both right; the join between them was never computed. `[[two-instruments-are-not-a-cover]]`:
+two correct counts are not a reachability proof, and the population they had to be reconciled over was
+the item ids, which neither of them ranged over.
+
+**And the shape of the number flattered it.** "6 orphan machines, 4 stranded recipes, one data change"
+is a tidy story with a cheap ending, which is exactly the kind of claim that gets quoted forward instead
+of re-derived — I quoted it twice myself, once into P042 and once into the brief Astra was reading.
+`[[scrutiny-asymmetry]]`, and the same lesson as the entry above it: the claim was load-bearing, so it
+was met as a premise.
+
+**The correction is a strictly better item.** The four unreachable recipes are unreachable TWICE over —
+no machine and no input — so the gap is one chain to author, not six switches to flip. That is a sharper
+statement of the work than the wrong version was, and it is the one the director can rule on.

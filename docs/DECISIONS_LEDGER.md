@@ -22654,3 +22654,23 @@ structure larger than the neighbourhood each read a different input and each rem
 The `lift_transients` parameter is a DIFFERENT sense of the word (the body and the water stepping aside)
 and is correct; it was checked, not swept.
 Reverse: prose only -- no behaviour moved.
+
+## D0588 · 2026-09-10 · docs/NEEDS_DIRECTOR.md, docs/CORRECTIONS.md · the content gap is a chain, not six switches
+Decided: P042's central claim is withdrawn, the item retitled, and Astra's ruling recorded against it.
+No data changed.
+Why: P042 said a `d3`/`d4` naming the orphan machines "reaches four machines and four recipes in a
+single data change". Astra caught the first link -- `ore_iron` yields `ore`, `smelt_iron` consumes
+`iron` -- and the whole graph, computed over `data/` with `yield_of`'s real default rule
+(`sim/world/materials.gd:53`, an absent `yields` means the material's own id), is worse than that pair:
+**`iron` and `rich_ore` are consumed by recipes and produced by nothing at all.**
+The set of recipes whose MACHINE is unobtainable and the set whose INPUTS are unproducible are the SAME
+FOUR -- `smelt_iron`, `smelt_rich`, `press_plate`, `mill_gear`. They are unreachable twice over, so
+neither half of the fix does anything alone.
+Costed, so the ruling is cheap when it comes: `ore` is supplied by `mine_ore`, a SOURCE recipe with
+empty inputs, so `smelt_ingot` never depended on `ore_iron`'s yield. One word (`ore_iron` yields `iron`)
+takes producible-input recipes from 2 of 6 to 5 of 6; `glimmer` yielding `rich_ore` takes it to 6 of 6.
+That is the input half only -- the machine half is a demand tier and stays the director's.
+Astra's ruling: no d3/d4 yet; select the player project first; the recommended next beat is RECLAMATION
+(extend a line, earn pumping, claim a wet chamber) rather than another recipe counter -- which also
+reaches `pump`, the machine P042 had set aside as a separate question.
+Reverse: docs only.

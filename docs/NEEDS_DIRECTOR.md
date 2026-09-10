@@ -1313,7 +1313,7 @@ did yesterday. That is strictly a fidelity fix and is neutral on all three readi
 blocked on this** — it is a design question the measurement happened to expose, and it will matter more
 once a player can reach more of the world.
 
-## P042 · Two-thirds of the crafting content is unreachable, and one ruling would reach all of it
+## P042 · RULED 2026-09-10 by Astra · Two-thirds of the crafting content is unreachable — and the fix this item proposed would not have worked
 
 **Measured, not estimated.** 16 machine records, 4 starts, 2 demand tiers, 6 recipes.
 
@@ -1345,6 +1345,63 @@ tier, which is the pacing d1 and d2 already set.
 
 **This is the "workshop the player can finish and trust" item.** The audit's closing line named that as
 the broader objective; this is the measurement of how far the build is from it.
+
+### CORRECTION, 2026-09-10 (D0588): THE BOLD CLAIM ABOVE IS FALSE, AND THE TITLE WITH IT
+
+Astra's review caught the premise: `data/materials/ore_iron.yaml` yields **`ore`**, while
+`data/recipes/smelt_iron.yaml` consumes **`iron`**. Checked, and the break is wider than one pair.
+
+**Nothing anywhere in the game produces `iron`. Nothing anywhere produces `rich_ore`.** They are the
+only two items a recipe consumes that no material yields and no recipe outputs. So granting a machine
+reaches nothing: a `d3` that hands over `iron_forge` hands over a machine that can never run once.
+
+**The two failures are the same set, exactly** — computed over `data/`, with `yield_of`'s real rule
+(`sim/world/materials.gd:53`: an absent `yields` means the material's OWN id, so coal does drop coal):
+
+| recipe | machine obtainable in ordinary play? | inputs producible? |
+|---|---|---|
+| `mine_ore` (drill) | yes — granted by `d1` | yes (a source recipe) |
+| `smelt_ingot` (processor) | yes — placed by the tutorial start ×3 | yes |
+| `smelt_iron` (iron_forge) | **no** | **no — `iron` has no producer** |
+| `smelt_rich` (blast_furnace) | **no** | **no — `rich_ore` has no producer** |
+| `press_plate` (plate_press) | **no** | no — behind `smelt_iron` |
+| `mill_gear` (gear_mill) | **no** | no — behind `smelt_iron` |
+
+Those four are unreachable **twice over**. Neither half of the obvious fix does anything alone: naming
+the machines in a demand leaves the inputs missing, and renaming the items leaves the machines
+unobtainable. The content gap is not six switches to flip; it is one chain to author, four missing links
+deep.
+
+**What the item-name half would cost, measured over the same data.** `ore` is supplied by `mine_ore`,
+which is a SOURCE recipe with empty inputs, so `smelt_ingot` never depended on what `ore_iron` yields:
+
+| change | recipes with producible inputs |
+|---|---|
+| today | 2 of 6 |
+| `ore_iron` yields `iron` (one word) | 5 of 6 |
+| + `glimmer` yields `rich_ore` | 6 of 6 |
+
+That is the input half only. The machine half is still a demand tier, and that is still a design call.
+
+### ASTRA'S RULING, 2026-09-10
+
+**No approval for `d3`/`d4` records.** Select the player project first, then establish its complete
+input/access/reward chain. Do not activate an orphan because it exists — a machine earns inclusion when
+it answers a useful problem, and parking an unused record beats both deletion and filler progression.
+
+**The recommended next beat is reclamation, not another recipe counter:** extend an operating line and
+its return route, earn pumping, use it to claim a wet chamber with resources and workshop space, and let
+the tier after that arise from what the new place enables. That ties progression to acquisition,
+exploration and ownership at once — and it reaches `pump`, which carries no recipe and was the half of
+this item I had set aside as "a separate, smaller question".
+
+**If the metal route is chosen instead, the order is fixed:** an ordinary-play source of iron FIRST,
+then the forge, then the press, and only then a demand for plates.
+
+> "Success is not 'all existing features become reachable'. It is the player can build something
+> dependable, discover something desirable, and see an improvement they want to make next." — Astra
+
+Which is the sentence this item's original title got wrong.
 
 ## P043 · Loose cells are a real feature at a magnitude nobody chose. Which material should carry them?
 
