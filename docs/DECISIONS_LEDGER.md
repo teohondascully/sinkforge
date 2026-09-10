@@ -22492,3 +22492,26 @@ A11's test also failed on its own control twice before it measured anything: `bo
 bores nothing at all. Both are recorded in the test.
 Reverse: CHEAP for all three -- one dictionary argument, one drain, one call on load.
 
+## D0580 · 2026-09-10 · docs/WORKING.md · queue item 14's depth ramp is declined, and P036 is doubly wrong
+Decided: do not add a depth-varying haze to the background wall plane. The foreground/background
+separation item 14 asks for already exists and measures real; the depth ramp on top of it is refused.
+Alternative: ramp `WallPainter.RECESS` or `COOL_MIX` with depth.
+Why: `view/visuals/wall_painter.gd`'s own header records the regression that would recreate -- "the wall
+was darkened once in its own paint and again by the shadow veil, so the veil compounded a value that had
+already been crushed, and a lit chamber came out as a black rectangle." Legacy MEASURED that. D0577 has
+just restored the veil's depth response after D0569 erased it entirely, so adding a second depth term to
+the wall now would rebuild that fault at the exact moment the first term started working again.
+MEASURED, three materials at 2, 20, 60 and 120 m, 8x8 patches: the wall plane runs at 0.54-0.77 of the
+front plane's luma and is consistently cooler on the blue-minus-red axis (clay front -0.167 against the
+wall's -0.045; hardrock -0.017 against +0.033; deepstone +0.037 against +0.061). The ratio does not
+trend with depth, which is the point -- the veil owns depth and this plane owns distance.
+AND THE NUMBER THAT MATTERS FOR PHASE 2, measured on the same pass: after D0577 the MULTIPLY half gives
+lit deep rock 0.163 (deepstone) to 0.234 (hardrock) against the reference's 0.377, and the additive pass
+adds about 0.148 of luma at a pool centre (`LAMP_BLOOM` 0.17 through `LAMP_COLOR`). 0.234 + 0.148 is
+0.382. So P036 -- "a lit cell can never exceed the material's own base colour, and the reference's lit
+rock is brighter than any of ours" -- is wrong TWICE: wrong about the model, because the light pass has
+always been additive (D0373), and wrong about the arithmetic, because once D0569's floor stopped
+flattening the veil the multiply half alone reaches two thirds of the way. This is arithmetic, not a
+frame; the frame is queue item 49's, and it needs the director's screen.
+Reverse: N/A -- nothing was built. The measurements are the artifact.
+

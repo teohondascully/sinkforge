@@ -117,6 +117,13 @@ phase 2 cannot be measured honestly while A8 stands.
 
 ### Phase 2 -- LIGHT (~55% of the gap to the reference)
 
+**FIVE OF THIS PHASE'S SEVEN ITEMS TURNED OUT TO BE ALREADY BUILT** (10, 11, 13, 15, 16), and 23 in
+phase 4 with them. That is the phase's real finding and it is worth stating plainly: the frame did not
+read as 2026 because effects were missing, it read that way because **D0569's floor was erasing the
+underground's entire value structure** -- rock, cave and void all returning one identical colour. The
+effects were drawing correctly onto a flat field. D0577 is the fix; item 14 is the only unbuilt item
+left here.
+
 - [~] 10 **Edge occlusion -- ALREADY PRESENT (D0569), but the fix I shipped beside it is WRONG.** The
          AO and rim light are implemented and correct (`rock_tone.gd:229-246`, legacy's own 0.125 per
          open neighbour); `rock_tone.gd`'s header calling them "deliberately not here" is stale. Probed
@@ -139,16 +146,37 @@ phase 2 cannot be measured honestly while A8 stands.
          0.340, 0.226) where ours read nearly neutral. The distance colour shift is folded into P036.
 - [x] 13 **ALREADY PRESENT.** `VeilLight.sky_light` does exactly this and `tests/test_flat_planes.gd`
          pins it: the same depth reads 0.56 down an open shaft against 0.42 under rock.
-- [ ] 14 Depth haze. **Bounded experiment, per audit.** Separate distant/background space from playable
-         surfaces -- do not wash everything equally and do not conceal ore. NOT `haze_painter.gd`, which
-         is the HEAT plume (item 26); this is a different effect and the queue conflated them.
-- [ ] 15 Light shafts down open holes. **INSPECT THE EXISTING GODRAYS FIRST -- `LightPainter` already
-         draws them; do not add a duplicate pass.** `sky_floor` is enough for vertical sky access and
-         insufficient for angled light and lateral occlusion; say which one this item is buying.
-- [ ] 16 Emissive bloom on forge fire. **BLOOM IS ALREADY PRESENT** (`LightPainter`, the additive pass
-         of item 11). Improve source coherence and restraint before adding another pass. Bloom accents
-         illumination; it does not substitute for it, and reaching for it before A8 lands would be that
-         substitution.
+- [x] 14 **THE PLANE SEPARATION IS PRESENT AND MEASURES REAL; THE DEPTH RAMP IS DECLINED, WITH CAUSE
+         (D0580).** The audit's framing was "separate distant/background space from playable surfaces;
+         do not wash everything equally or conceal ore" -- and `WallPainter` already does exactly that:
+         `RECESS 0.32` and a `COOL_MIX 0.30` drift toward `(0.16, 0.19, 0.30)`, its own header calling
+         it "the same rock a plane back, flatter and cooler". Measured across three materials at 2, 20,
+         60 and 120 m: the wall runs at **0.54-0.77 of the front plane's luma** and is consistently
+         cooler (clay front -0.167 on the blue-minus-red axis against the wall's -0.045; hardrock
+         -0.017 against +0.033). Not a wash, and ore is on the front plane so nothing conceals it.
+         **The depth ramp is the part that is declined, and the reason is written in that file already:**
+         "the wall was darkened once in its own paint and again by the shadow veil, so the veil
+         compounded a value that had already been crushed, and a lit chamber came out as a black
+         rectangle." Legacy measured that regression. D0577 has just restored the veil's depth response
+         after D0569 erased it, so a second depth term on the wall would recreate the exact fault the
+         file warns about, at the exact moment the first term started working again.
+         **What is genuinely unbuilt** is ambient particulate in lit air OUTSIDE a lift shaft --
+         `AmbiencePainter.updraft_motes` covers lift shafts, `FallingItems.motes` covers drops, and
+         neither is general. That is a feel item, so it is BUILT-PARKED for the announced capture batch
+         rather than judged here.
+- [x] 15 **ALREADY PRESENT AND ALREADY PINNED.** `LightPainter._paint_godrays` draws two tapered
+         polygon passes per qualifying column plus a shimmer and a floor pool where the ray lands,
+         called unconditionally from `paint_frame`, no gating flag. `tests/test_light_painter.gd:87`
+         `_test_the_godray()` pins seven properties of it. **THE LIMIT, which is the useful part:**
+         `godray()` takes three terrain ROWS -- the column's own surface and its two neighbours -- so it
+         can only ever express a VERTICAL drop. Angled light and a ray occluded from the side are
+         outside what the rule can say, exactly as the audit predicted. Anything angled is a different
+         pass and a different item.
+- [x] 16 **ALREADY PRESENT AND ALREADY PINNED.** `LAMP_BLOOM` 0.17 with `lamp_flick`, `FURNACE_EMBER`
+         and `BURNER_GLOW` on the machine pools, all on the ADD canvas.
+         `_test_the_lamp_bloom_scales_with_depth` and `_test_machine_pools_by_kind_and_status` cover
+         them. Per the audit: improve source coherence and restraint before adding a pass, and bloom
+         accents illumination rather than substituting for it -- which is what D0577 was for.
 
 ### Phase 3 -- ROCK (~25% of the gap)
 
@@ -174,7 +202,9 @@ phase 2 cannot be measured honestly while A8 stands.
 
 ### Phase 4 -- AIR (~8%)
 
-- [ ] 23 Dust motes in lit volumes.
+- [x] 23 **ALREADY PRESENT AND ALREADY PINNED**, in two places: `AmbiencePainter.updraft_motes` (six
+         per lift shaft, fading as they climb, none under rock) and `FallingItems.motes` (one per drop
+         for the light pass). `test_ambience_painter.gd` and `test_falling_items.gd`.
 - [ ] 24 Debris particles on a dig.
 - [ ] 25 Impact puff when slumped material lands.
 - [x] 26 **ALREADY PRESENT.** `haze_painter.gd` is the plume over a working furnace (D0379). Note this is

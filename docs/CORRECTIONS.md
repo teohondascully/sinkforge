@@ -776,3 +776,29 @@ constants picked off a measured sweep rather than chosen. The lesson is narrower
 arithmetic": **a guard placed on a combined quantity needs its bound checked against that quantity's
 actual range, not against the one term the guard was designed for.**
 
+## P036 was wrong a second way, and the first correction did not catch it (D0580)
+
+The entry above withdraws P036's premise: I claimed the renderer multiplies only, and the light pass has
+been additive since D0373. That correction was right and incomplete. **P036 was also wrong about its own
+arithmetic**, and the reason nobody noticed is that the arithmetic was done through the defect.
+
+P036 said a lit cell can never exceed the material's base colour, so the reference's lit rock (0.377)
+was out of reach. Measured after D0577 removed D0569's floor: the multiply half alone gives lit deep
+rock **0.163 to 0.234**, and the additive pass adds about **0.148** of luma at a pool centre
+(`LAMP_BLOOM` 0.17 through `LAMP_COLOR`). 0.234 + 0.148 = 0.382, against a reference of 0.377.
+
+**Every number P036 quoted was measured while the veil was a constant.** D0569 clamped the combined
+output at 0.55 when the underground's whole range tops out at 0.442, so every measurement taken between
+D0569 and D0577 was taken through a flat field. The conclusion "no light constant can reach it" was true
+of that build and false of the model — `[[name-the-frame]]`, where the frame was a bug I had introduced
+myself four commits earlier.
+
+**The general shape.** When a measurement says a target is unreachable, check whether the instrument is
+standing on something you changed. Two of my six false claims tonight (this one and the rock-texture
+premise) were measurements taken through a condition I had introduced and forgotten was there.
+
+A sixth, smaller one, for the tally rather than for the lesson: I reported twice in-session that "godrays
+have no test at all". `tests/test_light_painter.gd:87` has `_test_the_godray()` with seven assertions.
+The grep behind the claim ended in `| head -8` and the godray lines fell below the cut. Nothing shipped
+on it. `[[read-the-count-not-the-rate]]`'s neighbour: a truncated list is not an empty one.
+
