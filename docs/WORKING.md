@@ -41,7 +41,9 @@ six-week decision.
 
 ### Phase 1 -- THE WORLD BEHAVES (finish what item 5 started)
 
-- [ ] 6  Dust and settle: the visual half of the slump. Without it a fall reads as a glitch, not material.
+- [x] 6  Dust and settle (D0564). A vacated cell puffs; the step knocks the camera in proportion to how
+         much moved. Capture: `docs/media/moments/2026-09-10-slump-dust.png`. PARKED: it rides
+         `Interface.services()` rather than the door, because `observation.gd` is at its file cap (P034).
 - [ ] 7  Undermining drops a mass -- verify end to end in a seat and make the consequence visible.
 - [ ] 8  **THE TRAP.** A player who digs down cannot climb out: 515 commands, zero metres. Jump apex is
          4.6 m (`JUMP_VELOCITY_PX_S` 365 against `GRAVITY_PX_S2` 900) against a 5.2 m shaft, and the

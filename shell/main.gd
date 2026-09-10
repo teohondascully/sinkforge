@@ -305,7 +305,8 @@ func _hud_keys(page_open: bool) -> void:
 
 func _effects(delta: float) -> void:
 	var frame: Frame = view.current_frame()
-	effects.tick(frame, particles, look, falling, view.view_world_rect(), delta, Settings.screen_shake)
+	effects.tick(frame, particles, look, falling, view.view_world_rect(), delta, Settings.screen_shake,
+		(door.services()["hold"] as MineHold).slump)
 	if audio != null:
 		audio.note_frame(frame, delta)
 		audio.set_levels(Settings.sound_db(), Settings.ambience_db(), Settings.music_db())   # every slider, live (D0410)

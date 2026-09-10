@@ -356,7 +356,7 @@ func _outcome(detail: StringName) -> Result:
 ## exterior, and the shell writing it is what the door exists to keep everything else from doing.
 func services() -> Dictionary:
 	return {"world": _world, "items": _items, "machines": _machines, "body": _body, "mining": _mining,
-		"plan": _plan, "lode": _lode, "seen": _seen}
+		"plan": _plan, "lode": _lode, "seen": _seen, "hold": _hold}
 
 
 ## After a load: the consumed channel and the hold start clean, as a fresh process would have them.

@@ -1105,3 +1105,26 @@ while still reading as a shaft rather than as an open world — and it costs 4 s
 
 **Blocked behind this ruling:** making `CameraRig.ZOOM_LEVELS[0]` the default zoom, which is the single
 largest visible improvement still on the table.
+
+## P034 · 2026-09-10 · `interface/observation.gd` is at its file cap and the door is now closed
+
+**Measurement:** the file is exactly 400 lines against `check_size_limits.py`'s `FILE_LIMIT = 400`.
+Adding two fields for D0564 took it to 408 and the gate failed. It cannot take another observation field
+of any kind, from anyone, until it is split.
+
+**Why it is not a five-minute fix.** The file's own banners already mark the seam (`--- THE MINING VERB'S
+OWN STATE ---`, `--- THE HUB'S PLANES ---`), but GDScript has no partial classes, so a split means the
+observation becomes composed and every `o.field` becomes `o.part.field`. The cheapest sub-block to lift
+is the re-exported sim constants (`CELL_PX`, `LOGIC_PX`, `TICK_HZ` and eight more, restated there because
+`view` may not reach into `sim/`). Measured blast radius: **120 call sites**, of which `LOGIC_PX` is 40
+and `CELL_PX` is 36.
+
+**What I did instead, and it is a workaround:** D0565 routed the slump's per-tick cells through
+`Interface.services()` as an argument to `SeatEffects.tick`, the channel `FallingItems` already uses.
+It works and it is honest, but it is the second event type in this build that reaches the view without
+going through the door, and a third would be a pattern rather than an exception.
+
+**Recommendation:** lift the constants block to its own `class_name` in `interface/` and rewrite the 120
+sites mechanically in one commit. It is a large diff and a tiny risk -- every site is a constant read,
+the compiler catches every miss, and no behaviour moves. Roughly an hour. Do it before the next feature
+that needs an observation field, not after.

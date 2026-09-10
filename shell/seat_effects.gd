@@ -12,6 +12,8 @@ const LAND_DUST_SPEED: int = 120   ## px/s of fall below which a landing raises 
 const SHAKE_BREAK_PX: float = 1.6  ## a broken cell, at world px: a knock, not a quake
 const SHAKE_LAND_PX: float = 2.4   ## the hardest landing; scaled down by how hard
 const SHAKE_LAND_FULL: int = 420   ## px/s of fall that earns the full landing shake
+const SLUMP_DUST: int = 3          ## flecks a vacated cell sheds: fewer than a break's 5, and up to four a tick
+const SHAKE_SLUMP_PX: float = 1.1  ## a full step of collapse, under a break's knock; scaled by how much moved
 
 var _was_on_floor: bool = true
 var _fall_speed: int = 0
@@ -20,11 +22,12 @@ var shake_px: float = 0.0          ## what this tick asks of the camera; the rig
 
 ## One tick: advance the pool, spawn off the observation, hand the frame to the audio.
 func tick(frame: Frame, particles: Particles, look: MaterialLook, falling: FallingItems, view_rect: Rect2,
-		delta: float, shake_on: bool) -> void:
+		delta: float, shake_on: bool, slump: Slump = null) -> void:
 	shake_px = 0.0
 	particles.advance(delta)
 	if frame != null and frame.obs != null:
 		_mining(frame.obs, particles, look)
+		_slump(frame.obs, particles, look, slump)
 		_landing(frame.obs, particles, look, shake_on)
 		WaterDrips.spawn(frame.obs, particles, view_rect, delta)
 	var landings: Dictionary = falling.take_landings()
@@ -48,6 +51,34 @@ func _mining(o: Interface.Observation, particles: Particles, look: MaterialLook)
 		# A blow that did not break the cell still chips it: a fleck per swing off the struck face.
 		var struck: Vector2 = (Vector2(o.aim_cell) + Vector2(0.5, 0.5)) * float(o.cell_px)
 		particles.chip(struck, look.cell_color(o.material_at(o.aim_cell), o.aim_cell.x, o.aim_cell.y), atan2(float(o.mining_swing_dir.y), float(o.mining_swing_dir.x)) + PI)
+
+
+## EARTH COMING DOWN (D0564, D0565): a puff at every cell loose material just left, and a knock in
+## proportion to how much of the step's budget the collapse used. Without this a slump reads as a glitch
+## -- cells teleporting down a row with no event -- which is the failure `docs/NORTH_STAR.md` T3 names:
+## a removal with no debris is the world declining to explain itself.
+##
+## THE SLUMP ARRIVES AS AN ARGUMENT, NOT THROUGH THE OBSERVATION, and that is not the shape I wanted.
+## `interface/observation.gd` sits at exactly the 400-line file cap, and the honest way to grow it is the
+## split its own banners already mark -- but the constants block alone has 120 call sites, which is a
+## refactor and not a line. So the slump rides the channel `falling` already rides: an object the shell
+## holds through `Interface.services()`, which is where `main.gd` already gets the body and the world.
+## `CrumblePainter`'s header warns against a second path from the sim to the view that can disagree with
+## the observation; that warning is about DUPLICATING a channel, and this duplicates nothing -- there is
+## no observation field for a slump to disagree with. Move it to the door when the file is split.
+##
+## The dust spawns at the VACATED cell, not the destination, because that is where the eye already was:
+## the cell the player was looking at is the one that emptied. The destination redraws solid on the same
+## frame and needs no help being noticed.
+func _slump(o: Interface.Observation, particles: Particles, look: MaterialLook, slump: Slump) -> void:
+	if slump == null or slump.moved_this_tick.is_empty():
+		return
+	for cell: Vector2i in slump.moved_this_tick:
+		var at: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(o.cell_px)
+		particles.dust(at, look.cell_color(slump.moved_material, cell.x, cell.y), SLUMP_DUST)
+	# A single grain trickling is not a collapse. The knock rides the FRACTION of the step's budget that
+	# moved, so a wall coming down is felt and one cell settling is not.
+	shake_px = maxf(shake_px, SHAKE_SLUMP_PX * (float(slump.moved_this_tick.size()) / float(Slump.SETTLE_PER_TICK)))
 
 
 ## A hard landing raises the floor's dust at the feet (D0403, V37) and knocks the camera in proportion:

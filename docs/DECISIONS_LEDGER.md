@@ -22092,3 +22092,30 @@ budget is in the wrong unit for the thing it is bounding -- the same shape as D0
 margin lane. `tests/test_slump.gd` "one step moves the cell exactly one cell down" is the witness and it
 failed before this change.
 Reverse: CHEAP -- one field and three lines.
+
+## D0564 · 2026-09-10 · shell/seat_effects.gd, view/fx/particles.gd (read only)
+Decided: a slumped cell sheds a dust puff at the cell it VACATED, three flecks against a break's five,
+and the step knocks the camera by `SHAKE_SLUMP_PX` scaled by the fraction of the step's budget that
+actually moved -- so a wall coming down is felt and one grain settling is not.
+Alternative: reuse `CrumblePainter`, which already draws four chunks and a warm break-flash per broken
+cell. Rejected: a slumped cell is not destroyed, it MOVES, so the chunks would fly off a cell whose
+material is being drawn solid one row below on the same frame -- the same matter twice.
+Why: D0562 made the earth move and nothing said so. A cell teleporting down a row with no event reads
+as a glitch rather than as material, which is exactly the failure `docs/NORTH_STAR.md` T3 names. The
+dust spawns at the vacated cell rather than the destination because that is where the eye already was.
+Capture: `docs/media/moments/2026-09-10-slump-dust.png` -- an undercut mound's flank, mid-collapse.
+Reverse: CHEAP -- drop the `_slump` call in `SeatEffects.tick`.
+
+## D0565 · 2026-09-10 · interface/interface.gd, shell/seat_effects.gd, shell/main.gd
+Decided: the slump reaches the shell as an ARGUMENT through `Interface.services()`, the channel
+`FallingItems` already rides, rather than as a field on the observation.
+Alternative: `Observation.slumped_cells` and `slumped_material`, which is where it belongs and is what
+this change was written as first.
+Why: `interface/observation.gd` sits at EXACTLY the 400-line file cap, so the door cannot take another
+field. The honest fix is the split the file's own banners already mark, and it is not a small one: the
+re-exported sim constants block alone has 120 call sites across the tree. Rather than shave someone
+else's comments to make room, or run a 120-site refactor inside a queue item about dust, the event takes
+the channel that exists. `CrumblePainter`'s header warns against a second sim-to-view path that can
+disagree with the observation; that warning is about DUPLICATING a channel and this duplicates nothing,
+because there is no observation field for a slump to disagree with. Logged to `docs/NEEDS_DIRECTOR.md`.
+Reverse: CHEAP now, and CHEAPER after the split -- move two fields to the door and delete one argument.

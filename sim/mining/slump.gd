@@ -60,6 +60,11 @@ var _queue: Array[Vector2i] = []
 var _queued: Dictionary = {}                 ## cell -> true while queued: one blow breaks several cells
 var _next: Array[Vector2i] = []              ## woken FOR THE NEXT step, never this one (see `settle`)
 var moved_this_tick: Array[Vector2i] = []    ## the cells that EMPTIED this step, for the view's dust
+## What moved, for the dust's colour. ONE material a step, exactly as `Mining.broke_material` is one a
+## tick: clay is the only loose material, so a step cannot mix two today. If a second material is ever
+## flagged loose, this becomes the LAST one moved rather than a lie -- the dust is a colour, not a claim,
+## and the alternative is a per-cell allocation on the hot path for a shade nobody can name.
+var moved_material: StringName = &""
 
 
 ## Wake the cells a blow left unsupported: the cell above each break and its two lateral-up neighbours,
@@ -146,6 +151,7 @@ static func _open(grid: TileGrid, water: WaterPlane, c: Vector2i) -> bool:
 ## `to` is queued last so a column comes down top-first, which is the order that reads as a collapse.
 func _move(grid: TileGrid, from: Vector2i, to: Vector2i) -> void:
 	var material: StringName = grid.get_material(from)
+	moved_material = material
 	grid.excavate(from)
 	grid.set_material(to, material)
 	_wake(grid, from + UP)

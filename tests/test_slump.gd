@@ -29,6 +29,7 @@ func _initialize() -> void:
 	_test_a_step_conserves_every_loose_cell()
 	_test_two_identical_worlds_settle_identically()
 	_test_nothing_moves_until_a_blow_wakes_it()
+	_test_the_view_is_told_what_moved_and_what_it_was()
 	_finish("slump")
 
 
@@ -233,3 +234,29 @@ func _test_nothing_moves_until_a_blow_wakes_it() -> void:
 	_check(s.pending() > 0, "a blow beneath it wakes it")
 	s.settle(grid, _water())
 	_check(grid.get_material(Vector2i(40, 21)) == LOOSE, "and then it falls")
+
+
+## WHAT THE VIEW IS HANDED (D0564): `moved_this_tick` is the cells that EMPTIED, and `moved_material` is
+## what left them, so `SeatEffects._slump` can puff dust of the right colour at the right place. Pinned
+## because a dust cloud at the wrong cell, or in the wrong colour, is a defect nobody would ever see in a
+## failing assertion -- it would just look slightly wrong forever.
+func _test_the_view_is_told_what_moved_and_what_it_was() -> void:
+	var grid: TileGrid = _grid()
+	var water: WaterPlane = _water()
+	for x: int in range(6, 15):
+		grid.set_material(Vector2i(x, 30), FIRM)
+	grid.set_material(Vector2i(10, 25), LOOSE)
+	var s: Slump = Slump.new()
+	_check(s.moved_material == &"", "nothing has moved yet, so no material is claimed")
+	s.after_break(grid, [Vector2i(10, 26)])
+	s.settle(grid, water)
+	_check(s.moved_this_tick.size() == 1 and s.moved_this_tick[0] == Vector2i(10, 25),
+		"the reported cell is the one that EMPTIED, not the one that filled: %s" % [s.moved_this_tick])
+	_check(s.moved_material == LOOSE, "and the material is what left it: %s" % s.moved_material)
+	_check(not grid.is_solid(Vector2i(10, 25)), "the reported cell really is empty now")
+	s.settle(grid, water)
+	_check(s.moved_this_tick.size() == 1 and s.moved_this_tick[0] == Vector2i(10, 26),
+		"the list is THIS step's, not cumulative: %s" % [s.moved_this_tick])
+	for _t: int in 20:
+		s.settle(grid, water)
+	_check(s.moved_this_tick.is_empty(), "and it empties when the collapse is over, so the dust stops")
