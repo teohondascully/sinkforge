@@ -327,6 +327,23 @@ func partials_of(rect: Rect2) -> Dictionary:
 ## whole either way (a partial over unpainted pixels would leave the rest of it a hole). The window lane
 ## comes last, budgeted by `BakeLane` against `obs`, the tick's own observation. The two maps are disjoint
 ## by construction: partials go only to painted chunks, the window lane only to unpainted ones.
+## The tick's dig pieces measured against their union, for D0548's headroom probe. Profiling only, and
+## pure arithmetic on rects -- no walk, and outside every phase clock, so it cannot enter a measurement.
+func _note_dig_split(p: Plan, whole: Dictionary) -> void:
+	var union := Rect2()
+	var paid: int = 0
+	for i: int in p.partial:
+		var r: Rect2 = p.partial[i]
+		union = r if not union.has_area() else union.merge(r)
+		paid += cells_of(r).grow(RockTone.FORM_REACH).get_area()
+	for i: int in whole:
+		var r: Rect2 = chunk_rect(i)
+		union = r if not union.has_area() else union.merge(r)
+		paid += cells_of(r).grow(RockTone.FORM_REACH).get_area()
+	if paid > 0:
+		BakeCost.note_dig_span(paid, cells_of(union).grow(RockTone.FORM_REACH).get_area())
+
+
 func plan_tick(window_rect: Rect2, dug: Array, obs: Interface.Observation = null) -> Plan:
 	var p := Plan.new()
 	# THE WINDOW'S OWN MOVEMENT SINCE THE LAST PLAN, recorded here because this is the only place that
@@ -353,6 +370,8 @@ func plan_tick(window_rect: Rect2, dug: Array, obs: Interface.Observation = null
 	else:
 		for i: int in influenced:
 			whole[i] = true
+	if BakeCost.capture_bursts:
+		_note_dig_split(p, whole)
 	for i: int in whole:
 		p.reasons[i] = "dig"
 	for i: int in p.partial:

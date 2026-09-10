@@ -90,6 +90,28 @@ stay so. Default-zoom dig, both arms: the work is bit-identical -- 876 dig callb
 margin callbacks at 9.821 ms to four dig callbacks at 9.486 ms. The picture is byte-identical at a
 settled tick. No timing improvement is claimed.
 
+**The runner can measure frames again, and the GPU is measured at last (Astra's D0547, verified as D0548).**
+`--front` was emitting `--unfocused` unconditionally, so the one regime a frame rate can be claimed from
+was launched refusing focus -- which is why frame metrics were WITHHELD at focus 0.00 in every run of
+D0542 through D0546. Astra fixed it (foreground requested by the launched PID), added source/settings/
+engine provenance with comparison guards, and captured a real Metal trace. **GPU execution is 5.14% of a
+20.477 s dig capture** (1,052 ms union of 19,958 intervals; Fragment 76.9%, Compute 16.6%, Vertex 6.5%) --
+the first evidence for the CPU-bound premise this programme has assumed throughout. Verified here by
+source read, an independent brute-force check of the interval union over 3,000 random cases, and a full
+battery (173 gates, 145 suites) under a working-tree guard. **Still open: `FOCUS_MIN = 0.95` and the
+option-conflict guard are UNPINNED** -- lowering the threshold to 0.50 keeps every test green, on the one
+number that decides whether a frame measurement may be believed. Reported to Astra, whose file it is.
+
+**Half the dig's dilated work is the chunk split (D0549).** `plan_tick` computes one `dig_rect` and
+`partials_of` cuts it along chunk boundaries; each piece then builds its own `RockNeighborhood` over its
+own dilated rect, so adjacent halos overlap. Measured across three windows: **overlap 50.8%, 50.8%,
+49.2%** -- about 1,050-1,130 dilated cells a dig tick computed twice and drawing nothing, a ceiling of
+~74-76 ms against ~157-162 ms of dig preparation. The per-tick and per-callback accumulators, wired on
+opposite sides of the frame, agree exactly (50,828 both ways). A sharing treatment would be
+picture-identical -- `RockNeighborhood.code()` indexes by absolute cell -- but is NOT implemented: it
+threads shared state through `Frame` into `TerrainPainter` and needs a byte-identical capture and an
+interleaved A/B, which D0547 has only just made possible.
+
 **Streaming coverage is verified and the prefetch is not starved:** 96 chunks streamed as margin at
 default zoom and 128 at wide zoom, with **zero arriving on screen unpainted**, before and after.
 

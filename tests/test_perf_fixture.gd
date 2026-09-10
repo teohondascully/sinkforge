@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_the_setup_line_names_the_multiplier_a_per_cell_rate_carries()
 	_test_a_real_paint_charges_setup_and_cells_over_different_areas()
 	_test_a_real_paint_records_the_dilated_span_the_painters_actually_scan()
+	_test_the_chunk_split_duplicates_halo_and_the_probe_measures_it()
 	_finish("perf_fixture")
 
 
@@ -288,4 +289,44 @@ func _test_a_real_paint_records_the_dilated_span_the_painters_actually_scan() ->
 	_check(not BakeCost.prep_by_reason.get("unknown", {}).has("dilated"),
 		"with profiling off the density walk does not run at all")
 	ci.free()
+	BakeCost.reset()
+
+
+## THE HEADROOM PROBE MEASURES THE SPLIT, AND RUNS (D0549). `plan_tick` cuts one dig rect along chunk
+## boundaries, and each piece dilates by `FORM_REACH` independently, so adjacent pieces' halos overlap.
+## The probe records the pieces' total dilated span against their union's. Two things are pinned: that a
+## dig crossing a boundary really does pay more than its union (the finding), and that the probe is driven
+## from `plan_tick` rather than only by a test calling it (the wiring).
+##
+## `capture_bursts` gates it, so it is set deliberately and cleared afterwards: with profiling off the
+## probe must record nothing at all.
+func _test_the_chunk_split_duplicates_halo_and_the_probe_measures_it() -> void:
+	var cell_px: int = 4
+	var per_chunk: int = BakeWindow.CHUNK_PX / cell_px
+	var w := BakeWindow.new()
+	w.plan(Vector2i(3000, 1000), cell_px)
+	w.set_margin(0)                              # the dig rect is then exactly the dug cells' box
+	# two cells straddling a chunk boundary, so the dig rect is cut in two
+	var edge: int = 60 * per_chunk
+	var dug: Array = [Vector2i(edge - 1, 300), Vector2i(edge, 300)]
+	for i: int in w.chunk_count():
+		if w.chunk_rect(i).intersects(w.dig_rect(dug)):
+			w.note_painted(i)                    # painted, so the dig plans PARTIALS rather than wholes
+	BakeCost.reset()
+	BakeCost.capture_bursts = true
+	var p: BakeWindow.Plan = w.plan_tick(Rect2(0.0, 0.0, 8.0, 8.0), dug, null)
+	_check(p.partial.size() >= 2,
+		"the dig rect was cut along the chunk boundary into %d pieces" % p.partial.size())
+	_check(BakeCost.dig_split_ticks == 1,
+		"the probe ran from plan_tick, not only from a test: %d tick(s)" % BakeCost.dig_split_ticks)
+	_check(BakeCost.dig_paid_dilated > BakeCost.dig_shared_dilated,
+		"the pieces' dilated spans exceed their union's, which is the finding: %d > %d"
+			% [BakeCost.dig_paid_dilated, BakeCost.dig_shared_dilated])
+	_check(BakeCost.split_line().contains("overlap="),
+		"and the line states the overlap: %s" % BakeCost.split_line())
+	BakeCost.reset()
+	BakeCost.capture_bursts = false
+	var q: BakeWindow.Plan = w.plan_tick(Rect2(0.0, 0.0, 8.0, 8.0), dug, null)
+	_check(q != null and BakeCost.dig_split_ticks == 0,
+		"with profiling off the probe records nothing")
 	BakeCost.reset()

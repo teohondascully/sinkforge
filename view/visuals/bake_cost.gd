@@ -137,6 +137,28 @@ static func note_density(reason: String, solid: int, dilated: int) -> void:
 	prep_by_reason[reason] = part
 
 
+## HOW MUCH OF THE DIG'S DILATED WORK IS THE CHUNK SPLIT'S FAULT (D0548 headroom probe).
+##
+## `BakeWindow.plan_tick` computes ONE `dig_rect` for the tick and then `partials_of` cuts it along chunk
+## boundaries, because a chunk is the paint unit -- each is its own `CanvasItem` with its own `_draw`. Every
+## piece then builds its own `RockNeighborhood` over `cells.grow(FORM_REACH)` (`terrain_painter.gd:69`), and
+## adjacent pieces' halos OVERLAP across every shared boundary. D0546 showed cost tracks the dilated span,
+## so that overlap is paid work that draws nothing.
+##
+## `paid` is the sum of the pieces' dilated spans; `shared` is the dilated span of their union -- what ONE
+## neighbourhood covering the whole dig rect would need. The ratio is the ceiling on any sharing treatment
+## and nothing more: it says what could be saved, never that saving it is free or correct.
+static var dig_paid_dilated: int = 0
+static var dig_shared_dilated: int = 0
+static var dig_split_ticks: int = 0
+
+
+static func note_dig_span(paid: int, shared: int) -> void:
+	dig_paid_dilated += paid
+	dig_shared_dilated += shared
+	dig_split_ticks += 1
+
+
 ## One region setup, timed from `began` to now, over the `observed` cells the envelope actually covered.
 ## Charged INSIDE a PREP callback, so it is a slice of `prep_usec` and never an addition to it.
 static func note_setup(began: int, observed: int) -> void:
@@ -152,6 +174,9 @@ static func reset() -> void:
 	prep_setup_usec = 0
 	prep_setup_cells = 0
 	prep_setups = 0
+	dig_paid_dilated = 0
+	dig_shared_dilated = 0
+	dig_split_ticks = 0
 	_tick = -1
 	_tick_cells = 0
 	_tick_usec = 0
@@ -175,7 +200,7 @@ static func report(ticks: int) -> String:
 		float(prep_usec) / float(maxi(prep_cells, 1)),
 		float(upload_usec) / 1000.0 / t, uploads, upload_cells,
 		float(upload_usec) / float(maxi(upload_cells, 1)), prep_tick_max_cells,
-		float(prep_tick_max_usec) / 1000.0] + setup_line() + reason_line()
+		float(prep_tick_max_usec) / 1000.0] + setup_line() + split_line() + reason_line()
 
 
 ## The share of preparation that was region setup, and the area that setup actually observed against the
@@ -189,6 +214,15 @@ static func setup_line() -> String:
 		100.0 * float(prep_setup_usec) / float(maxi(prep_usec, 1)),
 		prep_setup_cells, prep_cells,
 		float(prep_setup_cells) / float(maxi(prep_cells, 1))]
+
+
+## What the chunk split costs the dig, as a ceiling on sharing: paid against shared dilated span.
+static func split_line() -> String:
+	if dig_split_ticks == 0:
+		return ""
+	return " | dig_split ticks=%d paid_dilated=%d shared_dilated=%d overlap=%.1f%%" % [
+		dig_split_ticks, dig_paid_dilated, dig_shared_dilated,
+		100.0 * float(dig_paid_dilated - dig_shared_dilated) / float(maxi(dig_paid_dilated, 1))]
 
 
 ## The window's preparation split by why each chunk was selected, slowest reason first. Empty when

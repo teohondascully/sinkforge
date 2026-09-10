@@ -21363,3 +21363,74 @@ no simulation, scheduling or art changes. Detailed status and local artifacts ar
 `docs/audits/2026-09-09-runner-gpu-closeout.md`. Two Python test programs pass, and a real trace
 contains 19,958 active game GPU intervals. Focus remains susceptible to desktop contention, and
 exact shader parity remains open. No FPS gain or full-battery certification is claimed.
+
+## D0548 · 2026-09-09 · Astra's D0547 verified independently, certified by battery, and two guards found unpinned
+
+**Context:** Astra committed `ca07c1fb` locally and explicitly did not claim a battery or CI. Their
+closeout is [here](audits/2026-09-09-runner-gpu-closeout.md). Verifying a peer's claims is the standing
+protocol, and "their tests pass" is a claim, not evidence.
+
+**Verified by reading, not trusting.** `--front` no longer emits `--unfocused`
+(`perf_fixture.py:84`, `([] if front else ["--unfocused"])`) -- the fix matches the diagnosis I handed
+them; conflicting options are refused (`:530`); `FOCUS_MIN` is still 0.95 (`:299`) and was not quietly
+lowered to make runs pass. `metal_trace.union_ns` was checked against an independent brute-force
+point-set union over 3,000 random interval sets: **all agree**, and overlap is never added.
+
+**Their GPU arithmetic cross-checks.** The three channel unions sum to 1,063.070 ms against an overall
+union of 1,052.345 -- 1.0% MORE, which is exactly what overlapping channels must produce and precisely
+what their report warns against adding. **GPU execution is 5.14% of the 20.477 s capture**, the first
+evidence in this programme for the CPU-bound premise everything has assumed. Their caveats stand: boot
+included, another process active, diagnostic rather than benchmark.
+
+**Certified:** full local battery on `ca07c1fb`, **173 gates PASS 0 FAIL, 145 suites passed 0 failed**,
+with a working-tree guard (contents of every tracked file plus the dirty list, hashed before and after)
+that held identical across the run. Pushed on that basis.
+
+**Two guards are unpinned, and one matters.** Mutation-testing their suite: reverting the `--front` fix
+FAILS ("foreground seat refuses focus or reads physical input") -- that one is pinned. But **removing
+the conflict guard passes, and lowering `FOCUS_MIN` from 0.95 to 0.50 passes.** Their own closeout says
+"Do not lower the 0.95 guard" and nothing enforces it: a future session can lower it and every test stays
+green, and runs that should be WITHHELD would report frame numbers instead. That is this repository's
+house failure -- a guard that cannot be false -- sitting on the one threshold that decides whether a
+frame number may be believed, at the moment `--front` finally makes frame numbers possible.
+
+**Decided: reported, not fixed by me.** `tools/test_perf_fixture.py` is Astra's, I committed their files
+by accident today (see `docs/CORRECTIONS.md`), and editing them unilaterally an hour later is the wrong
+lesson to draw. The pin is theirs to add.
+
+
+## D0549 · 2026-09-09 · Half the dig's dilated work is the chunk split duplicating halos
+
+**Context:** D0546 found that a bake callback's cost tracks the DILATED span
+(`cells.grow(RockTone.FORM_REACH)`, the region `RockNeighborhood` builds and scans three times per
+callback) rather than the painted rect or the solid cells. This measures how much of that span is
+avoidable, before anything is built to avoid it.
+
+**The structure, from the source.** `BakeWindow.plan_tick:345` computes ONE `dig_rect(dug)` for the
+tick; `partials_of` then cuts it along chunk boundaries because a chunk is the paint unit -- each is its
+own `CanvasItem` with its own `_draw`. Every piece builds its own neighbourhood over its own dilated
+rect, so adjacent pieces' halos OVERLAP across every shared boundary. The dig's rect was never scattered;
+the multiplication is the split.
+
+**Measured (900-tick dig, zoom 2, three windows): the overlap is 50.8%, 50.8% and 49.2%** -- about
+1,050-1,130 dilated cells a dig tick that are computed twice or more and draw nothing. At D0546's
+measured 2.95 us a dilated cell that is a **ceiling of ~74-76 ms against ~157-162 ms of dig preparation
+in a window, about 47%**.
+
+**The two instruments agree exactly, and they were never wired together.** `paid_dilated=50828` from the
+per-TICK accumulator in `plan_tick` equals the `50828dilated` from the per-CALLBACK accumulator in
+`BakeChunk.paint`. One counts plans, the other counts draw callbacks, on opposite sides of the frame.
+An agreement like that is worth more than either number alone.
+
+**Ceiling, not a saving, and stated as such.** It bounds what a sharing treatment could recover; it does
+not say the neighbourhood is the whole per-callback cost, nor that sharing is correct or free.
+
+**What makes the treatment viable, checked before proposing it:** `RockNeighborhood.code()` indexes by
+ABSOLUTE cell (`i = (row - _span.position.y) * w + col - _span.position.x`), so one built over a larger
+span answers identically for any rect inside it, and its `_full_solid` short circuit agrees with the
+computed values by construction (`_full_solid` means no air within FORM_REACH of the whole span, which
+implies distance 7 and AO 0 for every contained cell). So building ONE neighbourhood over the tick's dig
+rect and sharing it across that rect's pieces would be picture-identical rather than an approximation --
+same chunks, same cells, same scheduling. **Not implemented here.** It threads shared state through
+`Frame` into `TerrainPainter` and must be verified with a byte-identical capture and an interleaved A/B,
+which is now possible for the first time because D0547 fixed `--front`.
