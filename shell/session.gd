@@ -12,6 +12,7 @@ const KEY_BODY: String = "body"
 const KEY_MINING: String = "mining"
 const KEY_PLAN: String = "plan"
 const KEY_LODE: String = "lode_work"
+const KEY_SLUMP: String = "slump"      ## the collapse a save interrupted (D0579); absent in an older save: nothing was falling
 const KEY_SEEN: String = "seen"        ## the map's memory (D0400); absent in a save from before it: nothing seen
 
 
@@ -24,6 +25,7 @@ static func capture(door: Interface) -> Dictionary:
 	env[KEY_MINING] = (s["mining"] as Mining).capture()
 	env[KEY_PLAN] = (s["plan"] as DigPlan).capture()
 	env[KEY_LODE] = (s["lode"] as LodeWork).capture()
+	env[KEY_SLUMP] = ((s["hold"] as MineHold).slump).capture()
 	env[KEY_SEEN] = (s["seen"] as SeenPlane).capture()
 	return env
 
@@ -45,6 +47,17 @@ static func restore(door: Interface, data: Dictionary) -> bool:
 	if data.get(KEY_SEEN) is Dictionary:
 		(s["seen"] as SeenPlane).restore(data[KEY_SEEN])
 	door.reset_transients()
+	# THE COLLAPSE A SAVE INTERRUPTED RESUMES (A7). `Slump`'s queue is transient, so a world coming back
+	# had its standing-but-unsupported earth standing forever, and nothing short of a fresh blow nearby
+	# would wake it. That is not only a wrong-looking frame: two identical factories evolve differently
+	# depending on whether their player reloaded. The set is rebuilt from the world itself by the
+	# automaton's own rule, so nothing here has a second opinion about what "unsupported" means.
+	# SERVICES ARE RE-READ HERE, AFTER `reset_transients`, and that is not defensive tidiness: it
+	# replaces `_hold` with a fresh `MineHold`, so the `s` captured at the top of this function holds
+	# the DISCARDED one. Writing to that queue reached nothing at all, and the round-trip test in
+	# `tests/test_slump_world.gd` is what said so.
+	var after: Dictionary = door.services()
+	((after["hold"] as MineHold).slump).restore(data.get(KEY_SLUMP, []))
 	return true
 
 

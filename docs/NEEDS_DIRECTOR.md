@@ -1223,3 +1223,92 @@ complexity and coupling gates keep their corpus. D0570's `lighting_bench` is res
 
 **P034 is the same shape and is NOT resolved by it.** `interface/observation.gd` is hand-written and
 stays capped, correctly. Its 120-site split is still owed.
+
+## P038 · Does `LAMP_TINT` 0.62 supersede your T012 ruling, or overrule it? (A12)
+
+**Astra's objection, and it is a fair one.** T012 (2026-09-05) ruled: *"keep it warm, and if it reads
+more campfire than headlamp ease it toward 0.38"* — a number, from you. D0571 moved it to **0.62** and
+justified that by your standing instruction to match the 2026-09-10 reference. Astra's read: that may
+well be right under the newer brief, but **a session must not infer that a numerical ruling evaporated**.
+So this asks explicitly rather than assuming.
+
+**The measurement D0571 moved on.** The reference's rock beside a lamp is rgb (0.553, 0.340, 0.226) — a
+strongly amber 0.377 luma. Ours read (0.237, 0.211, 0.171), nearly neutral. 0.38 toward `LAMP_COLOR`
+lands on (1.00, 0.93, 0.81), which is white with a hint of warmth.
+
+**What changed underneath it, and this matters.** T012 was ruled when the deep was near black, where any
+warmth reads as a lot. D0577 has since rebuilt the underground's light model (D0569's floor was erasing
+every distinction below the scatter band), so the ground the lamp is judged against is a different
+colour now. **0.62 has not been re-judged since that landed.** It may now be too warm.
+
+**Three answers, any of which I can act on:**
+1. 0.62 stands — the reference supersedes T012's easing.
+2. Back to 0.38 — T012's number holds and the reference is mood, not target.
+3. Re-judge it on a frame after D0577, which is my own recommendation: the constant was chosen against a
+   deep that no longer exists. This is queue item 49's business.
+
+**T017 needs nothing.** Its two constants were tried and reverted the same night; no landed override
+remains there.
+
+## P039 · `Slump`'s overflow is bounded at 8192 cells and then counted, not deferred (D0576)
+
+Astra: *"Overflow must defer work, not forget it."* Half done. A wake past `QUEUE_CAP` now spills and
+rejoins as the queue drains, so the real defer is 2 × 4096. Past that a wake is **refused and counted**
+in `refused_wakes` — a stated bound with a witness, which is a real improvement on a silent drop, and
+not a solved problem.
+
+**It is out of reach of anything the game can do today.** A blow breaks a handful of cells and wakes
+three each; `_move` adds at most sixteen wakes a tick against a budget of four moves. The queue has
+never been observed above a few dozen.
+
+**What would reach it:** a cave-in verb, a blast, or a drill sweeping a whole face. If any of those is on
+the roadmap, the answer is `TileGrid`'s own — an overflow flag and a rescan of the affected region, which
+is the shape `Slump.reseed` already has (D0579). **Not built on speculation about a feature that does not
+exist.** Tell me if one is coming and it gets built first.
+
+## P040 · `sim/body/grapple.gd` is the second file at exactly its 400-line cap
+
+`interface/observation.gd` has been at the cap since P034, owing a 120-site split. `grapple.gd` joined it
+tonight: D0578's fix wanted a `give_back()` method on `Grapple` — the correct home, since it restores a
+winch invariant — and that took the file to 413. The restore now lives in `BodySwing` instead, which is
+two lines rather than thirteen and sits beside the refusal it answers, so it is a defensible place. **It
+was not chosen on the merits, it was chosen by the cap**, and that is recorded here so nobody reads it
+later as a considered layering call.
+
+**No action requested yet.** Flagged because two capped files is a trend, and the next change to either
+will pay for the split. The line cap is doing its job — this is what it feels like when it does.
+
+## P041 · The generated world holds 1061 unsupported loose cells. Should it arrive settled?
+
+**Found by a test failing, not by looking.** D0579's first attempt rebuilt `Slump`'s queue on load by
+scanning for unsupported loose cells. `tests/test_boot_snapshot.gd` went red: a restored session and a
+freshly generated one signed *identically at rest* and diverged the moment they ticked.
+
+**The measurement, on `shallow_clay` seed 12345, the tutorial world:**
+
+| | |
+|---|---|
+| world | 256 x 1104 = 282,624 cells |
+| loose cells (clay) | 28,572 |
+| **unsupported at generation** | **1,061** |
+| still pending after 2,000 settle steps | 3,876 (it cascades) |
+| conservation across the whole run | exact — 28,572 before and after |
+
+So one in twenty-seven loose cells in the shipped world is standing on nothing. They sit there because
+nothing has woken them, and they will collapse the first time a player digs within a cell or two of one.
+
+**Three readings, and I do not think this is mine to pick:**
+
+1. **It is correct as it is.** The world is a snapshot mid-geology; earth answers when disturbed, and a
+   player discovering that a bank drops when they cut near it is the whole point of D0562.
+2. **The world should arrive at rest.** Settle at generation, once, and ship the settled shape. Honest —
+   "this is what this terrain looks like when it stops moving" — but it changes the generated world, and
+   the cascade above says it changes it a lot. Every determinism golden and world signature moves with it.
+3. **The generator should not produce them.** Unsupported loose material is arguably a generation bug,
+   not a physics opportunity. Most expensive of the three and the only one that fixes the cause.
+
+**What I did instead, and why it does not depend on this answer.** The queue now travels with the save
+(D0579), so a reload resumes exactly the collapse it interrupted and a fresh world behaves exactly as it
+did yesterday. That is strictly a fidelity fix and is neutral on all three readings above. **Nothing is
+blocked on this** — it is a design question the measurement happened to expose, and it will matter more
+once a player can reach more of the world.

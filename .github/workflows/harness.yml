@@ -512,7 +512,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 150 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 151 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -579,6 +579,7 @@ jobs:
             res://tests/test_tree_fall.gd \
             res://tests/test_slump.gd \
             res://tests/test_slump_body.gd \
+            res://tests/test_slump_world.gd \
             res://tests/test_way_down.gd \
             res://tests/test_minimap.gd \
             res://tests/test_page_draw.gd \

@@ -22442,3 +22442,53 @@ assertion demanded NO line be taken at all, which is wrong: a slack line reeling
 pull, and the tick it goes taut is the tick the refusal starts. One step, then nothing.
 Reverse: CHEAP -- one constant, one call, one moved line. The tests would go red, which is the point.
 
+## D0579 · 2026-09-10 · sim/mining/slump.gd, sim/run/mine_hold.gd, sim/world/world.gd, shell/session.gd
+Decided: earth packs around MACHINES as it packs around the player; a DRILL wakes the earth the way a
+hand blow does; and a LOAD rebuilds the collapse a save interrupted. A5, A11 and A7 of Astra's audit.
+Alternative for each: leave it. Each was a real hole and none of the three was visible from inside the
+automaton, which is why 33 green assertions did not see any of them.
+A5 -- MACHINES. They live in `sim/machines`' registry keyed by metre and never make terrain solid, so
+`TileGrid.is_solid` cannot see one and falling earth wrote rock into a working machine's cell. `Slump`
+takes the closed cells as a plain `Dictionary`, never a `Machines` object: the same reason `occupied` is
+a `Rect2i` and not a `Body`, and `sim/mining/MODULE.md` says the module takes neither. `MineHold` builds
+it, GATED ON A LIVE QUEUE -- nothing is settling on almost every tick and on those it costs one
+comparison. Packing around is the answer rather than burying or destroying because it is what D0566
+already decided for the player, and consistency is worth more here than a second opinion.
+A11 -- THE DRILL. Only a hand blow seeded the queue, so the world answered a pickaxe and ignored the
+machine doing the same work. In a game about automating the digging that is exactly backwards.
+`World.bore_one` now records what it excavated and `MineHold` drains it. NOT a second read of
+`TileGrid.take_solidity_changes`: that log has one consumer and draining it twice gives each half the
+other's cells. A dedicated channel beside `Mining.broke_cells`, which is the shape already in use.
+A7 -- A RELOAD. The queue is transient, so a save mid-collapse came back with the earth standing and
+nothing to wake it. The queue now TRAVELS WITH THE SAVE: `Slump.capture`/`restore` and a `slump` key on
+the envelope, in the order the FIFO would have read them. A save from before the key carries no
+collapse, which is exactly what those saves meant, so nothing old breaks.
+THE FIRST VERSION DERIVED IT INSTEAD, and the measurement is why it is not in the tree. `Slump.reseed`
+scanned the world for unsupported loose cells on load -- elegant, needed no format change, and asked the
+automaton's own rule so nothing could drift. `tests/test_boot_snapshot.gd` failed it: a restored session
+and a freshly generated one signed IDENTICALLY at rest and diverged after ticking. The cause, measured:
+the generated tutorial world contains **1061 unsupported loose cells** out of 28,572 loose cells, so a
+load woke a collapse a fresh session never had. Letting it run cascades -- 3,876 still pending after
+2,000 settle steps, conservation exact throughout. Deriving the queue would collapse a tenth of the
+world's loose earth on every load. Whether the world SHOULD arrive settled is a real question and a good
+one; it is the director's, it is P041, and it is not a thing to decide inside a save-format fix.
+`reseed` is REMOVED rather than left for a future caller: nothing calls it, and a tested dead function
+is worse than an absent one. The measurement it produced is the valuable part and it is here and in P041.
+AND THE ROUND-TRIP TEST CAUGHT A BUG IN THIS ENTRY'S OWN FIX, which is the part worth keeping.
+`Interface.reset_transients()` does `_hold = MineHold.new()`, so the `services()` dictionary read at the
+top of `Session.restore` holds the DISCARDED hold. The first version seeded that queue and reached
+nothing whatsoever. The direct `reseed` assertion sitting beside it was green through the entire
+mistake, because it never went near the load path. That is the third instance tonight of
+`[[instrument-cannot-register-subject]]`, and the second where a helper was green while its call site
+was dead -- so every guard here is posed through the real seam: `MineHold.step` for A5 and A11,
+`Session.from_save` for A7.
+MEASURED: `tests/test_slump_world.gd`, 29 asserted. Six guards mutation-witnessed -- machines no longer
+closing a cell 2 red, the drill no longer waking 1 red, the closed set never built 2 red, the save no
+longer carrying the queue 1 red, the load no longer reading it 1 red, and the stale-services bug
+re-introduced 1 red. Full battery 179/179 with `test_boot_snapshot.gd` green.
+A11's test also failed on its own control twice before it measured anything: `bore_one` returns
+`WorldMaterials.yield_of`, which is `&""` for plain rock even when the bore worked, and
+`DepositPlane.ore_deposit_at` answers 0 for anything not `is_ore_like`, so a drill posed over hardrock
+bores nothing at all. Both are recorded in the test.
+Reverse: CHEAP for all three -- one dictionary argument, one drain, one call on load.
+

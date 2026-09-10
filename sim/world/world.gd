@@ -173,6 +173,21 @@ func logic_ore_body(logic_cell: Vector2i) -> bool:
 ## bored out after its sixteen cells' yields (legacy's 250 a metre, 16 a cell here, D0349). Returns the
 ## material freed, or &"" when nothing in the metre is borable. Water displacement does not apply: an
 ## excavation makes room, it takes none.
+## Terrain cells a DRILL excavated, since the last drain. `Mining` already publishes `broke_cells` for a
+## hand blow and `MineHold` wakes the earth around them; a bored cell had no such channel, so the world
+## answered a pickaxe and ignored a drill (A11). In an automation game the drill is the normal case, and
+## an inconsistent terrain response is worse there than in a game where the player swings every blow.
+## Drained by `MineHold.step`. NOT `TileGrid.take_solidity_changes`, which has one consumer already --
+## draining it twice would give each half the other's cells.
+var bored_terrain_cells: Array[Vector2i] = []
+
+
+func take_bored_terrain_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = bored_terrain_cells.duplicate()
+	bored_terrain_cells.clear()
+	return out
+
+
 func bore_one(logic_cell: Vector2i) -> StringName:
 	for terrain_cell: Vector2i in terrain_cells_of(logic_cell):
 		var left: int = deposits.ore_deposit_at(grid, terrain_cell)
@@ -184,6 +199,7 @@ func bore_one(logic_cell: Vector2i) -> StringName:
 		else:
 			deposits.set_deposit(terrain_cell, 0)
 			grid.excavate(terrain_cell)
+			bored_terrain_cells.append(terrain_cell)
 		return item
 	return &""
 

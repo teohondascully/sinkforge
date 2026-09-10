@@ -81,12 +81,12 @@ phase 2 cannot be measured honestly while A8 stands.
 - [x] A4 **DONE (D0576).** Four movements is not four checks. A tick may inspect 4096 candidates, and `pop_front()`
        shifts the array on every one. Budget examined work separately from moved work; queue cursor or
        ring buffer. `sim/fluid/MODULE.md` makes the active set a hard constraint and I never profiled it.
-- [ ] A5 **Machine occupancy is absent from `Slump._open()`.** It checks terrain, water and the player
+- [x] A5 **DONE (D0579).** Machine occupancy is absent from `Slump._open()`. It checks terrain, water and the player
        rect -- not machine bases. Define and test what falling earth does to machinery.
 - [x] A6 **DONE (D0576), reproduced both ways.** One slump test is still vacuous. The supported-cell test wakes row 28 while its subject sits
        on row 29, so its unchanged result does not establish the subject was evaluated. This is
        `[[instrument-cannot-register-subject]]` for the SECOND time in this one file.
-- [ ] A7 **Save/load drops the pending queue, so two identical factories diverge on a reload.** Not a
+- [x] A7 **DONE (D0579) -- the queue travels WITH the save.** Deriving it on load was tried and measured wrong: the generated world holds 1061 unsupported loose cells, so a rebuild-on-load collapsed a tenth of the world's loose earth on every load. `test_boot_snapshot.gd` caught it. See P041. Not a
        cosmetic frame. Ruling or fix; `TreeFall` shares the property and that does not excuse it.
 - [x] A8 **DONE (D0577) -- and it was erasing more than shape.** See item 10. Preserve shape
        modulation and lift AMBIENT instead of clamping combined output; compare against the current
@@ -108,10 +108,10 @@ phase 2 cannot be measured honestly while A8 stands.
 - [x] A10 **DONE (D0578).** `tools/run_suites.sh` ETA divides by parallelism twice. Elapsed wall time per completed
        suite already carries concurrent throughput; dividing again by `SWEEP_JOBS` understates every
        estimate. "Approximate" does not excuse the arithmetic. (My own tool, D0573.)
-- [ ] A11 **Hand mining and drilling give inconsistent terrain response.** Only a hand blow seeds the
+- [x] A11 **DONE (D0579).** Hand mining and drilling give inconsistent terrain response. Only a hand blow seeds the
        slump queue. In an automation game the drill is the normal case. Shared event distribution, not
        a permanent exclusion -- and NOT a second destructive read of `take_solidity_changes()`.
-- [ ] A12 **Ask the director to confirm T012's supersession explicitly.** `LAMP_TINT` 0.62 replaced a
+- [x] A12 **DONE -- asked as P038 in `docs/NEEDS_DIRECTOR.md`, with a recommendation.** Confirm T012's supersession. `LAMP_TINT` 0.62 replaced a
        ruled 0.38. It may be right under the newer reference brief, but a session must not infer that a
        numerical ruling evaporated. T017 was reverted, so no landed override remains there.
 

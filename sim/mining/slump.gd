@@ -134,7 +134,7 @@ func after_break(grid: TileGrid, cells: Array[Vector2i]) -> void:
 ## reproduced by blocking a destination with `occupied` and then removing the rect. The second `target`
 ## call asks the same rule with the transients lifted, so the two answers cannot drift apart; it runs
 ## only on the refusal path, which is the cold one.
-func settle(grid: TileGrid, water: WaterPlane, occupied: Rect2i = Rect2i()) -> void:
+func settle(grid: TileGrid, water: WaterPlane, occupied: Rect2i = Rect2i(), closed: Dictionary = {}) -> void:
 	moved_this_tick.clear()
 	_landed.clear()
 	var looked: int = 0
@@ -146,9 +146,9 @@ func settle(grid: TileGrid, water: WaterPlane, occupied: Rect2i = Rect2i()) -> v
 		if _landed.has(c):
 			_next.append(c)                                  # a grain arrived here this step (A1)
 			continue
-		var to: Vector2i = target(grid, water, c, occupied)
+		var to: Vector2i = target(grid, water, c, occupied, false, closed)
 		if to == c:
-			if target(grid, water, c, occupied, true) != c:
+			if target(grid, water, c, occupied, true, closed) != c:
 				_next.append(c)                              # held by the body or by water (A2)
 			continue
 		_move(grid, c, to)
@@ -216,28 +216,36 @@ func _drain_spill() -> void:
 ## how `settle` tells a rest from a wait (A2). It is not a second rule: every other clause is shared, so
 ## the two answers cannot drift.
 static func target(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rect2i = Rect2i(),
-		lift_transients: bool = false) -> Vector2i:
+		lift_transients: bool = false, closed: Dictionary = {}) -> Vector2i:
 	if not grid.in_bounds(c) or not WorldMaterials.is_loose(grid.get_material(c)):
 		return c
 	var below: Vector2i = c + DOWN
-	if _open(grid, water, below, occupied, lift_transients):
+	if _open(grid, water, below, occupied, lift_transients, closed):
 		return below
 	if not grid.in_bounds(below) or not WorldMaterials.is_loose(grid.get_material(below)):
 		return c                     # bedrock, a machine, the world's floor or open water: this is rest
 	var first: Vector2i = LEFT if ((c.x + c.y) & 1) == 0 else RIGHT
 	for side: Vector2i in [first, -first]:
-		if _open(grid, water, c + side, occupied, lift_transients) \
-				and _open(grid, water, c + side + DOWN, occupied, lift_transients):
+		if _open(grid, water, c + side, occupied, lift_transients, closed) \
+				and _open(grid, water, c + side + DOWN, occupied, lift_transients, closed):
 			return c + side + DOWN
 	return c
 
 
-## Room for a loose cell to arrive: in the world, no rock, dry, and not where the body is standing. See
+## `closed` is a set of cells earth may not enter that the grid does not know about -- MACHINES (A5).
+## They live in `sim/machines`' own registry keyed by logic cell and never make the terrain solid, so
+## `is_solid` cannot see one and falling earth used to write rock into a working machine's cell. It
+## arrives as plain cell data rather than as a `Machines` object because this module takes none: the
+## same reason `occupied` is a `Rect2i` and not a `Body`. Earth packs AROUND machinery exactly as D0566
+## made it pack around the player -- consistent, non-destructive, and the readable picture.
+##
+## Room for a loose cell to arrive: in the world, no rock, dry, not closed, and not where the body is
+## standing. See
 ## the header on why wet and occupied are both closed. An empty `occupied` rect contains no point, so the
 ## default argument means "nothing is standing anywhere" without a branch.
 static func _open(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rect2i = Rect2i(),
-		lift_transients: bool = false) -> bool:
-	if not grid.in_bounds(c) or grid.is_solid(c):
+		lift_transients: bool = false, closed: Dictionary = {}) -> bool:
+	if not grid.in_bounds(c) or grid.is_solid(c) or closed.has(c):
 		return false
 	if lift_transients:
 		return true                  # the body and the water are asked to step aside, the rock is not
@@ -270,6 +278,45 @@ func _wake(grid: TileGrid, c: Vector2i) -> void:
 		return
 	_queued.erase(c)
 	refused_wakes += 1               # both bounds full: counted, so a replay divergence has a name
+
+
+## THE PENDING COLLAPSE, CARRIED ACROSS A SAVE (A7, D0579). The queue used to be transient, so a save
+## taken mid-collapse came back with the earth standing and nothing to wake it -- and that is not merely
+## a wrong-looking frame: two otherwise identical factories evolve differently depending on whether their
+## player reloaded.
+##
+## ORDER IS PART OF THE STATE, not a detail. The queue is FIFO and the order decides which cell moves
+## next, so the spill follows the live queue and `_next` follows both -- exactly where each would have
+## been read from had the save never happened.
+##
+## THE ALTERNATIVE WAS TO DERIVE IT ON LOAD by scanning for unsupported cells, and it was tried first
+## and measured wrong. The generated tutorial world holds **1061 unsupported loose cells** out of 28,572
+## loose cells: deriving the queue would collapse a tenth of the world's loose earth the moment anyone
+## loaded a save, cascading (3,876 still pending after 2,000 settle steps) while a freshly generated
+## session sat still. `tests/test_boot_snapshot.gd` caught it -- the two sessions signed identically at
+## rest and diverged after ticking. Whether the world SHOULD arrive settled is a real question and it is
+## the director's, in `docs/NEEDS_DIRECTOR.md`; it is not a thing to decide inside a save-format fix.
+func capture() -> Array[Vector2i]:
+	var out: Array[Vector2i] = _queue.slice(_head)
+	out.append_array(_spill)
+	out.append_array(_next)
+	return out
+
+
+## A save from before this key carries no collapse, which is exactly what those saves meant.
+func restore(cells: Array) -> void:
+	_queue.clear()
+	_spill.clear()
+	_next.clear()
+	_queued.clear()
+	_landed.clear()
+	_head = 0
+	refused_wakes = 0
+	for c: Vector2i in cells:
+		if _queued.has(c):
+			continue
+		_queued[c] = true
+		_queue.append(c)
 
 
 ## THE CONSERVATION PROBE, for the suite and the invariant: how many loose cells the window holds. A step

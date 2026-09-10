@@ -290,7 +290,7 @@ func apply(command: Command) -> Result:
 			_tick += 1
 			_verbs.tick()
 			var building: bool = _verbs.selected_machine_def() != null or _verbs.selected_build_material() != &""
-			_hold.step(command.input, _world, _items, _mining, _plan, _lode, _body, building)
+			_hold.step(command.input, _world, _items, _machines, _mining, _plan, _lode, _body, building)
 			HubTick.advance(_tick, _world, _items, _machines, _rates)
 			if _tick % HubTick.HUB_TICK_DIVISOR == 0:   # the map's memory, at the hub's cadence (D0400)
 				_seen.mark(WorldSurroundings.logic_of(Vector2i(Body._px_to_cell(_body.pos_x), Body._px_to_cell(_body.pos_y))))

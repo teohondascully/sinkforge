@@ -25,12 +25,9 @@ var crown: TreeFall = TreeFall.new()   ## the leaves a cut trunk leaves unsuppor
 var slump: Slump = Slump.new()         ## the loose cells a blow left unsupported (D0562)
 
 
-func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: DigPlan, lode: LodeWork, body: Body, building: bool) -> void:
+func step(frame: InputFrame, world: World, items: Items, machines: Machines, mining: Mining, plan: DigPlan, lode: LodeWork, body: Body, building: bool) -> void:
 	refusal = &""
-	crown.crumble(world.grid)   # last tick's unsupported leaves, whatever this tick aims at
-	# Last tick's unsupported earth. The body's own cell box is closed to it (D0566): earth packs around
-	# a player, it does not bury one. The world answers a blow late, never in the same frame.
-	slump.settle(world.grid, world.water, body_cells(body))
+	_answer_last_tick(world, machines, body)
 	if not frame.mine_held:
 		plan.clear()            # the plan lives while the button is held (D0477): a release forgets every mark
 	if not frame.has_aim:
@@ -97,6 +94,38 @@ func _why_not(world: World, body: Body, cell: Vector2i) -> StringName:
 ## The body's cell box, for `Slump`: the terrain cells its collider covers, inclusive. Computed HERE
 ## rather than in `sim/mining` because that module's contract says in as many words that it "takes no
 ## `Body` object" -- so the body stays on this side of the line and only a rectangle crosses it.
+## WHAT THE WORLD OWES FROM LAST TICK, before this one's aim is read. The answer to a blow is always
+## late, never in the same frame.
+##
+## The order is deliberate. A DRILL's cells are woken first (A11) -- only a hand blow used to seed the
+## queue, so the world answered a pickaxe and ignored the machine doing the same work, which in a game
+## about automating the digging is exactly backwards. Then last tick's unsupported earth settles, with
+## the body's cell box closed to it (D0566: earth packs around a player, it does not bury one) and every
+## machine's cells closed the same way (A5).
+func _answer_last_tick(world: World, machines: Machines, body: Body) -> void:
+	crown.crumble(world.grid)   # last tick's unsupported leaves, whatever this tick aims at
+	slump.after_break(world.grid, world.take_bored_terrain_cells())
+	slump.settle(world.grid, world.water, body_cells(body),
+			machine_cells(world, machines, slump.pending() > 0))
+
+
+## The terrain cells every machine stands on, or an empty set when nothing is settling. Machines live on
+## the METRE grid and never make terrain solid, so `TileGrid.is_solid` cannot see one; without this,
+## falling earth writes rock into a working machine's cell (A5).
+##
+## GATED ON A LIVE QUEUE, which is what keeps it off the hot path: nothing is settling on the
+## overwhelming majority of ticks, and on those this returns an empty dictionary without touching the
+## registry at all.
+static func machine_cells(world: World, machines: Machines, live: bool = true) -> Dictionary:
+	var closed: Dictionary = {}
+	if machines == null or not live:
+		return closed
+	for m: MachineState in machines.machines:
+		for c: Vector2i in world.terrain_cells_of(m.logic_cell):
+			closed[c] = true
+	return closed
+
+
 static func body_cells(body: Body) -> Rect2i:
 	var left: int = Aim.floor_div(body.pos_x / Fx.SCALE - Body.WIDTH_PX / 2, Mining.CELL_PX)
 	var right: int = Aim.floor_div(body.pos_x / Fx.SCALE + Body.WIDTH_PX / 2 - 1, Mining.CELL_PX)
