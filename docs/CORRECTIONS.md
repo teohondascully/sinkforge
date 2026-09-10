@@ -630,3 +630,30 @@ hour. It reported "GUARD OK" over a run during which Astra wrote D0547, a new au
 further changes to two `tools/` files. The quantity that discriminates is the WORKING tree, not HEAD's:
 `git status --porcelain` plus a content hash of the tracked files. The re-verification passed (173
 gates, 145 suites) but it is not a verification of any single tree state, and it is recorded that way.
+
+## "360 fps is already met on the average and the median" — withdrawn on the first valid frame data (D0551)
+
+`docs/WORKING.md` carried, since the five-pass programme: "The dig workload runs at 400-530 frames a
+second with a frame p50 of 1.4-1.8 ms, so the director's 360 fps (2.78 ms) is already met on the average
+and the median."
+
+**The frame rate half is withdrawn.** Those runs drew into windows macOS was not presenting -- the same
+regime `[[window-regime-is-inside-the-measurement]]` recorded at 114 against 381 fps for identical work,
+and the reason `--front` exists. `--front` could not deliver it either: it launched the seat with
+`--unfocused` until Astra's D0547, so every frame number since D0542 was WITHHELD at focus 0.00. On a
+quiet desktop with the fix, three repetitions of each workload at 100% focus give **sustained `fps_wall`
+of 348.7-394.6, straddling 360 rather than clearing it.** The median FRAME TIME claim survives: 1.46-1.62
+ms against a 2.78 ms budget.
+
+**And the same dataset moves the target.** A still frame with zero terrain preparation has a p99 of 15.73
+ms; dig's is 17.70. **89% of the tail is there when the bake does nothing at all**, and the draw phase's
+p99 is flat across every workload. Nine ledger entries of bake work are worth about 2 ms of the p99 --
+real, bounded, and not where the rest of the tail lives. `[[an-average-cannot-see-a-burst]]` got the
+programme to per-tick peaks; this is the mirror, `[[name-the-frame]]`: the peak was real and the frame it
+described was not the one the player waits on.
+
+**Mine, and corrected inside the same hour:** I read a SINGLE repetition (182.9 fps, p50 3.06 ms) as
+proof the standing claim was false and said so before gathering more. Three repetitions put dig at
+348.7 / 1.55 ms. One sample was never enough to overturn a claim, and it is the same
+`[[scrutiny-asymmetry]]` trap -- a number is most dangerous when it is changing, and I was the one
+changing it.

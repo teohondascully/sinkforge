@@ -21471,3 +21471,47 @@ to measure the union observation's cost against the halo saving before threading
 over the union as well, so both costs are paid once -- is larger, touches `frame_for`, and needs its own
 picture proof. Neither is started. What is landed here is the premise, the mutation that breaks it, and
 the constraint, so the next pass begins from an accurate design instead of a hopeful one.
+
+## D0551 · 2026-09-09 · The first valid frame numbers, and they say the remaining tail is not the bake
+
+**Context:** every frame number in this programme has been WITHHELD since D0542 (focus 0.00) because
+`--front` was launching the seat with `--unfocused` -- Astra's D0547 fixed it. The director stepped away
+from the machine and authorised one clean run. This is the first complete valid frame dataset the
+programme has ever had: all four workloads, 3 repetitions, 900 ticks, zoom 2, `--front`, **window
+focused in 100% of frames**, controls 1.37-1.44.
+
+| workload | fps_wall | p50 | p99 | observed max | over 16.7 ms | bake prep |
+|---|---|---|---|---|---|---|
+| still | 394.6 | 1.62 ms | 15.73 ms | 26.25 ms | 94/11248 (0.84%) | **0.000 ms/tick, 0 cells** |
+| walk | 381.3 | 1.52 ms | 16.51 ms | 32.21 ms | 111/11425 (0.97%) | 0.070 ms/tick |
+| dig | 348.7 | 1.55 ms | 17.70 ms | 35.08 ms | 139/9426 (1.47%) | 0.537, peak 7.551 |
+| fall | 377.9 | 1.46 ms | 17.79 ms | 35.45 ms | 138/11186 (1.23%) | 0.395 ms/tick |
+
+**The median target is met; the tail is not, and the tail is nearly workload-independent.** Median frame
+time is 1.46-1.62 ms against a 2.78 ms budget on every workload. But **a STILL frame, with literally zero
+terrain preparation, has a p99 of 15.73 ms and a worst frame of 26.25 ms** -- 5.7x the budget with
+nothing to prepare. Against dig's 17.70 ms p99, **89% of the tail is present when the bake does nothing
+at all.** The draw phase says the same thing more directly: its p99 is 13.30 / 13.27 / 12.61 / 13.23 ms
+across still / walk / dig / fall -- flat, and *lowest* on the workload doing the most terrain work.
+
+**What this redirects.** D0522 through D0550 targeted preparation bursts. That work was real -- the peak
+still moved, and the worst-frame difference agrees with it: dig's max exceeds still's by 8.83 ms against
+a measured peak preparation of 7.551 ms, which is a good independent match. But on the p99 the bake is
+worth about 2.0 ms of 17.70, and **the remaining tail is somewhere in the draw/present phase and is there
+when nothing is happening.** The next target is that floor, not another bake treatment. D0549's chunk-split
+halo and D0550's sharing treatment are still real and still bounded -- they are simply worth ~11% of the
+p99, and that should be said before anyone spends a night on them.
+
+**Corrected here:** `docs/WORKING.md` said the dig workload "runs at 400-530 frames a second... so the
+director's 360 fps (2.78 ms) is already met on the average and the median". The 400-530 figures came from
+windows macOS was not presenting. Measured properly, sustained `fps_wall` is **348.7-394.6, straddling
+360 rather than clearing it**, while the median FRAME TIME does clear the budget comfortably. Those two
+disagree because the tail drags the rate, which is precisely the thing left to fix. Also corrected: my own
+first reading of a SINGLE repetition (182.9 fps, p50 3.06 ms) as evidence the claim was false -- three
+repetitions put dig at 348.7/1.55, and one repetition was never enough to overturn anything.
+
+**Limits.** One host (M4 Pro), one zoom, one seed, 900-tick windows. `still` and `walk` were WITHHELD in
+an earlier attempt at focus 0.82-0.90 because the director was using the machine; those runs are
+discarded, not averaged in. GPU cost is separately measured at 5.14% of a capture (D0548), consistent
+with a CPU-bound frame. No cause for the draw-phase floor is claimed here -- D0527 attributed still-frame
+spikes to display pacing and a slow host, and that is a hypothesis this dataset does not test.

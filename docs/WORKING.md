@@ -52,12 +52,24 @@ rather than report it. It refused four of its own first runs, correctly. A scrip
 the machine's real keyboard and mouse -- `PlayInput.verbs` read the hardware on every seat, driven or
 not, so a keystroke typed by whoever owns the laptop could change what MINE snaps to.
 
-**Where the frame stands, `--front`, 1280x720, zoom 2, M4 Pro.** The dig workload runs at 400-530 frames
-a second with a frame p50 of 1.4-1.8 ms, so the director's 360 fps (2.78 ms) is already met on the
-average and the median. What fails is the tail, and `fps_wall` itself is unreliable: three runs whose
-painter CPU agreed within 2% and whose control agreed within 2% read 381, 533 and 410. The stable
-quantities are painter CPU per tick (2.4 ms), bake preparation (12 us a cell, 0.53 ms/tick), the physics
-tick (0.65 ms) and the worst frame.
+**Where the frame stands -- MEASURED VALID for the first time (D0551), `--front`, quiet desktop, 1280x720,
+zoom 2, M4 Pro, window focused in 100% of frames.** All four workloads, 3 reps, controls 1.37-1.44:
+
+| workload | fps_wall | p50 | p99 | max | over 16.7 ms | bake prep |
+|---|---|---|---|---|---|---|
+| still | 394.6 | 1.62 ms | 15.73 ms | 26.25 ms | 0.84% | **0.000 ms/tick** |
+| walk | 381.3 | 1.52 ms | 16.51 ms | 32.21 ms | 0.97% | 0.070 ms/tick |
+| dig | 348.7 | 1.55 ms | 17.70 ms | 35.08 ms | 1.47% | 0.537, peak 7.551 |
+| fall | 377.9 | 1.46 ms | 17.79 ms | 35.45 ms | 1.23% | 0.395 ms/tick |
+
+**The median clears 2.78 ms everywhere; sustained `fps_wall` straddles 360 rather than clearing it.**
+The earlier "400-530 fps, 360 already met on the average and the median" is WITHDRAWN: those numbers came
+from windows macOS was not presenting. **And the remaining tail is not the bake.** A still frame with
+zero terrain preparation carries a p99 of 15.73 ms and a worst frame of 26.25 ms, so 89% of dig's p99 is
+present when the bake does nothing; the draw phase's p99 is flat at 12.6-13.3 ms across all four and is
+LOWEST on the workload doing the most terrain work. The worst frame is a different story and does track
+the bake (dig exceeds still by 8.83 ms against a measured 7.551 ms peak preparation). The next target is
+the draw-phase floor, not another bake treatment.
 
 **Landed since:** the minimap repaints changed cells rather than the world (D0536) -- it was rebuilding
 all ~17,000 logic cells on every terrain version change, 36.5-38.1 ms in one HUD chip on nineteen of
