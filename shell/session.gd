@@ -47,11 +47,15 @@ static func restore(door: Interface, data: Dictionary) -> bool:
 	if data.get(KEY_SEEN) is Dictionary:
 		(s["seen"] as SeenPlane).restore(data[KEY_SEEN])
 	door.reset_transients()
-	# THE COLLAPSE A SAVE INTERRUPTED RESUMES (A7). `Slump`'s queue is transient, so a world coming back
-	# had its standing-but-unsupported earth standing forever, and nothing short of a fresh blow nearby
-	# would wake it. That is not only a wrong-looking frame: two identical factories evolve differently
-	# depending on whether their player reloaded. The set is rebuilt from the world itself by the
-	# automaton's own rule, so nothing here has a second opinion about what "unsupported" means.
+	# THE COLLAPSE A SAVE INTERRUPTED RESUMES (A7, D0579). Without this, a world coming back had its
+	# standing-but-unsupported earth standing forever and nothing short of a fresh blow nearby would wake
+	# it -- not only a wrong-looking frame: two identical factories evolve differently depending on
+	# whether their player reloaded.
+	# THE QUEUE IS CARRIED IN THE SAVE, NOT REBUILT FROM THE WORLD, and the distinction is the whole of
+	# the fix (D0587). Rebuilding by scanning for unsupported cells was tried FIRST and measured wrong:
+	# the generated tutorial world holds 1,061 unsupported loose cells, so a scan would collapse a tenth
+	# of its loose earth the moment anyone loaded, while a freshly generated session sat still.
+	# `tests/test_boot_snapshot.gd` is that measurement. This comment used to describe the scan.
 	# SERVICES ARE RE-READ HERE, AFTER `reset_transients`, and that is not defensive tidiness: it
 	# replaces `_hold` with a fresh `MineHold`, so the `s` captured at the top of this function holds
 	# the DISCARDED one. Writing to that queue reached nothing at all, and the round-trip test in

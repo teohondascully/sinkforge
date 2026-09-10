@@ -27,15 +27,22 @@ extends RefCounted
 ## at 8 m refills **100%**, leaving 0 of the 10 cells of headroom a body needs to walk; one 1 m staircase
 ## step moves **1,571 cells** for the 15 it dug and none of the 15 stays open. Three attempts to keep
 ## both behaviours all failed the same way -- a cohesion clause, and dropping the upward wake, each gave
-## the corridor back and removed the collapse entirely. A tunnel roof and an undermined mass are
-## LOCALLY IDENTICAL (loose cells, open below, solid to the sides), so no rule that reads only
-## neighbours can distinguish them. The fix is a material, not a constant: cohesive rock holds a tunnel,
-## granular material slumps, which is the line Noita itself draws. Director's call; nothing here changes
-## until it is made.
+## the corridor back and removed the collapse entirely. A tunnel roof and an undermined mass present the
+## SAME LOCAL INPUTS (loose cells, open below, solid to the sides), so no rule reading only that
+## neighbourhood can separate them.
+##
+## THAT IS WHY THE THREE TESTED SHORTCUTS FAILED. IT IS NOT A PROOF THAT EVERY ALTERNATIVE MUST (D0587).
+## The claim as first written -- "no rule can distinguish them" -- is only the tautology that identical
+## inputs give identical outputs, and it says nothing about a rule that reads a DIFFERENT input. A
+## material property, a support state carried on the cell, or a structure larger than the neighbourhood
+## are each untested and each would separate the two cases. The line Noita draws is the material one:
+## cohesive rock holds a tunnel, granular material slumps. Director's call; nothing here changes until it
+## is made.
 ##
 ## SHAPE LIFTED FROM `TreeFall` (D0438), DELIBERATELY. Same seam (`MineHold.step` calls `settle` before
-## the tick's aim and `after_break` after a blow), same transient queue, same reversal: drop the two calls
-## in `MineHold.step` and the world is scenery again. It is not lifted from `WaterFlow`, whose active set
+## the tick's aim and `after_break` after a blow), same reversal: drop the two calls in `MineHold.step`
+## and the world is scenery again. THE QUEUE IS NOT `TreeFall`'S IN ONE RESPECT -- this one is saved and
+## restored (`capture`/`restore`, D0579), because a collapse that a save interrupts must resume. It is not lifted from `WaterFlow`, whose active set
 ## is seeded off `TileGrid.take_solidity_changes` -- that log has one consumer and draining it twice would
 ## give each half the other's cells.
 ##
@@ -55,11 +62,10 @@ extends RefCounted
 ##    claim, and it keeps the water invariants exactly true.
 ##  - **Nothing is paid for a slumped cell.** The material moves; it does not enter the pack. A collapse
 ##    that paid out would be a payout for standing still.
-##  - **Only a hand blow seeds the queue.** A drill boring and a machine placed do not (yet) wake the
-##    cells around them. That is the same seam `TreeFall` has had since D0438 and the same one-line fix.
-##  - **The queue is transient, like `TreeFall`'s.** A save taken mid-collapse leaves the rest standing
-##    until something nearby is next cut. A held column is a wrong-looking frame, not a corrupt world:
-##    every cell is still exactly one material in exactly one place.
+##  - **A machine placed does not seed the queue.** A hand blow does (`MineHold.step`) and since D0579 so
+##    does a drill (`MineHold._answer_last_tick` drains `World.take_bored_terrain_cells`); building over
+##    earth still does not wake what it undercuts. Same seam `TreeFall` has had since D0438, same one-line
+##    fix. `sim/items/build_verbs.gd` has no slump call -- that is the whole of the gap.
 ##
 ## DETERMINISM. No RNG, no float, no tick index. The queue is FIFO and every cell entering it does so in a
 ## fixed order; the left/right choice is `(c.x + c.y) & 1`, which is a property of the cell and not of

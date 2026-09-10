@@ -22627,3 +22627,30 @@ the landing is the half a player is looking at. Half the particle count: a landi
 not a cell coming apart.
 Reverse: CHEAP -- one array, one loop.
 
+
+## D0587 · 2026-09-10 · sim/mining/slump.gd, shell/session.gd · the prose that outlived its code
+Decided: four header claims withdrawn or qualified, one of them a comment that described the design its
+own code had already rejected.
+Why: Astra's review of the decision brief closed on a caution -- "the current source still contains old
+slump comments describing transient saves despite the new save capture/restore path." Checked against
+the code, and it was four things, not one:
+  1. `slump.gd` "**The queue is transient, like `TreeFall`'s.** A save taken mid-collapse leaves the rest
+     standing" -- FALSE since D0579. `capture()` is at :308 and `restore()` at :332 of the same file.
+  2. `slump.gd` "same transient queue" in the `TreeFall` lineage note -- same fact, second site.
+  3. `slump.gd` "A drill boring and a machine placed do not (yet) wake the cells around them" -- half
+     false since D0579: `MineHold._answer_last_tick` drains `World.take_bored_terrain_cells` into
+     `after_break`. Machines still do not; `sim/items/build_verbs.gd` has no slump call, and that is the
+     whole of the remaining gap.
+  4. `session.gd`, and this is the one worth the entry: "The set is rebuilt from the world itself by the
+     automaton's own rule" sat FOUR LINES ABOVE `restore(data.get(KEY_SLUMP, []))`. It does not describe
+     stale behaviour -- it describes the REJECTED alternative, the load-time scan that
+     `tests/test_boot_snapshot.gd` measured collapsing 1,061 of the generated world's loose cells on
+     every load. A future session reading only that comment would have re-derived the defect the test
+     already caught.
+Also qualified, per Astra: "no rule that reads only neighbours can distinguish them" is only the
+tautology that identical inputs give identical outputs. It explains why the three tested shortcuts
+failed. It is NOT a proof that no rule can -- a material property, a per-cell support state, or a
+structure larger than the neighbourhood each read a different input and each remain untested.
+The `lift_transients` parameter is a DIFFERENT sense of the word (the body and the water stepping aside)
+and is correct; it was checked, not swept.
+Reverse: prose only -- no behaviour moved.
