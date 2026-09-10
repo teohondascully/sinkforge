@@ -227,6 +227,14 @@ with an empty pack (D0412); T040's fork. Unresolved and unchanged: the grapple, 
 the pad, evaluator diagnostics in observations. The rig-as-consumer economy (A' step 7) is still
 unimplemented; the rig pays the drill for two ingots (D0485) and the winch pair for six (D0492).
 
+**D0553, the hotbar fixed (director's ruling on D0544's finding).** A stack now keeps its number: a
+drained stack leaves a gap that holds its slot, the item returns to that number when picked up again, a
+new item takes the leftmost gap before growing the bar, and an empty pack still draws no bar. `items` is
+untouched, so the signature, conservation and text-order walks are unchanged; saves carry the gaps in a
+new optional `pack_order` field whose absence is not an error. The empty well draws empty but keeps its
+key digit. Nine assertions, three mutants killed. **Whether it moves delivery is for the next batch to
+measure** -- strangers 127-132 are the before.
+
 ## Repository cleanup (director-approved)
 
 Tooling implementation complete (D0525): timing summaries, runner accounting/optional battery

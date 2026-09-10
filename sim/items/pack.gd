@@ -18,6 +18,24 @@ extends SignedPlane
 ## walks `ids()`, which is text order (`Ordering`, D0346).
 
 var items: Dictionary = {}   # item id: StringName -> count (insertion-ordered, see above)
+
+## THE SLOT A STACK KEEPS WHILE THE PLAYER HOLDS IT (D0553).
+##
+## The hotbar used to be `items`' own key order, and `remove()` erased a stack drained to 0 "so the
+## hotbar never shows an empty slot". That comment named the benefit and not the cost: draining a stack
+## SHIFTED EVERY STACK AFTER IT DOWN A NUMBER, and re-acquiring the item appended it at the END. So the
+## rung that asks a player to drain stacks into a machine is exactly the rung that invalidates the
+## numbers its own card tells them to press ("press each stack's NUMBER and Q"). Strangers 127-132
+## measured it: four of six fed or selected the wrong stack, and the ONLY seat that delivered was the one
+## whose bar never reordered (D0544).
+##
+## So the order is held here instead of being read off `items`. A drained stack leaves a GAP that keeps
+## its number; the item returns to that number if it is picked up again; a NEW item takes the leftmost
+## gap before it grows the bar, so the bar stays compact without any held stack ever moving.
+##
+## This is presentation and selection order only. `items` is untouched, so the state signature,
+## conservation, `ids()` (text order, D0346) and the save envelope all behave exactly as before.
+var order: Array[StringName] = []
 static var _bulk_class: Dictionary = {}  # memo of `is_bulk_item`: a pure function of the records
 
 
@@ -41,24 +59,41 @@ func is_empty() -> bool:
 func add(item: StringName, n: int) -> void:
 	if n <= 0:
 		return
+	_remember(item)
 	_store(item, count(item) + n)
 
 
-## Take up to `n` of `item` out; returns how many came out. A stack drained to 0 leaves the pack, so
-## the hotbar never shows an empty slot (legacy `_take_from_pack`).
+## Take up to `n` of `item` out; returns how many came out. A stack drained to 0 leaves `items` -- that
+## is legacy `_take_from_pack` and the signature depends on it -- but KEEPS ITS SLOT in `order`, so the
+## numbers either side of it do not move (D0553). An entirely empty pack forgets its order, because a
+## bar of nothing but gaps is not a bar and D0412 says an empty pack draws none.
 func remove(item: StringName, n: int) -> int:
 	var removed: int = mini(n, count(item))
 	if removed <= 0:
 		return 0
 	_store(item, count(item) - removed)
+	if items.is_empty():
+		order.clear()
 	return removed
+
+
+## Give `item` a slot if it does not hold one: the leftmost gap, or a new slot at the end. Called only
+## when something is actually going in, so a refused pickup never rearranges the bar.
+func _remember(item: StringName) -> void:
+	if order.has(item):
+		return
+	for i: int in order.size():
+		if count(order[i]) <= 0:
+			order[i] = item
+			return
+	order.append(item)
 
 
 ## The carried pack as an ordered list of {item, count} for the inventory hotbar, in pickup order.
 func slots() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	for item: StringName in items:
-		out.append({"item": item, "count": int(items[item])})
+	for item: StringName in order:
+		out.append({"item": item, "count": count(item)})
 	return out
 
 

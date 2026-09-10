@@ -19,7 +19,7 @@ func _initialize() -> void:
 	_test_drop_feeds_an_eater_else_tosses_forward_else_straight_down_and_grace_holds_it()
 	_test_collect_reach_and_configure()
 	_test_winch_link_is_two_presses()
-	_test_the_selection_follows_its_item_as_stacks_drain()
+	_test_the_selection_holds_its_slot_as_stacks_drain()
 	_finish("verbs")
 
 
@@ -150,26 +150,40 @@ func _test_winch_link_is_two_presses() -> void:
 	_check(verbs.link_winch(Vector2i(14, 9)) == &"", "out of reach")
 
 
-## D0412 (the review's hotbar finding): the pack compacts when a stack drains, so a bare index re-pointed
-## BUILD and DROP at whatever slid into the numbered position. The selection now follows the item it was
-## given: coal in slot 3 stays selected when the ore in slot 1 is dropped and coal becomes slot 2; and when
-## the followed item itself is gone the index stays put, so the next thing there is what is selected.
-func _test_the_selection_follows_its_item_as_stacks_drain() -> void:
+## D0412 built this because THE PACK COMPACTED: a stack draining slid everything after it down a number,
+## so a bare index re-pointed BUILD and DROP at whatever took the position, and the selection had to
+## follow its item to stay honest. **D0553 removed that compaction at the source** -- a stack now keeps
+## its number and a drained one leaves a gap -- so the assertions below assert the NEW rule, and the
+## three they replace (selection sliding from 3 to 2, then landing on `wood`) described the defect.
+##
+## The follow is NOT dead and is re-pinned as what it now is: a BACKSTOP. An index only moves when the
+## pack empties completely and forgets its order (D0412's own "an empty pack draws no bar"), and the last
+## case below is exactly that -- refilled in a different sequence, coal lands on a different number, and
+## the follow is the only thing that keeps the selection on the coal.
+func _test_the_selection_holds_its_slot_as_stacks_drain() -> void:
 	_rig()
 	_carry(&"ore", 4)
 	_carry(&"wood", 1)
 	_carry(&"coal", 2)
 	verbs.select(2)
 	_check(verbs.selected == 2 and verbs.followed == &"coal" and verbs.selected_item() == &"coal", "digit 3 selects the coal and remembers it")
-	items.pack.remove(&"ore", 4)             # the ore stack drains; wood and coal compact left
+	items.pack.remove(&"ore", 4)             # the ore drains; since D0553 nothing slides
 	verbs.tick()
-	_check(verbs.selected == 1 and verbs.selected_item() == &"coal", "the ore gone, the selection follows the coal to slot 2 (index %d)" % verbs.selected)
+	_check(verbs.selected == 2 and verbs.selected_item() == &"coal", "the ore gone, coal is STILL slot 3 and still selected (index %d) -- before D0553 both slid to 2" % verbs.selected)
 	items.pack.remove(&"coal", 2)
 	verbs.tick()
-	_check(verbs.selected == 1 and verbs.followed == &"coal" and verbs.selected_item() == &"wood", "the coal itself gone, the index stays and the pack's last stack is what is selected")
+	_check(verbs.selected == 2 and verbs.followed == &"coal" and verbs.selected_item() == &"coal", "the coal itself gone, its own empty slot stays selected -- the selection does not jump to another item")
 	_carry(&"coal", 1)
 	verbs.tick()
-	_check(verbs.selected == 1 and verbs.selected_item() == &"coal", "coal picked up again lands in slot 2 and is followed there")
+	_check(verbs.selected == 2 and verbs.selected_item() == &"coal", "coal picked up again returns to ITS slot 3, still selected")
+	# THE BACKSTOP'S OWN CASE: empty the pack, so the order is forgotten, then refill in a new sequence.
+	items.pack.remove(&"coal", 1)
+	items.pack.remove(&"wood", 1)
+	_check(items.pack.slots().is_empty(), "the pack is empty, so it has forgotten its order")
+	_carry(&"coal", 1)
+	_carry(&"ore", 1)
+	verbs.tick()
+	_check(verbs.selected == 0 and verbs.selected_item() == &"coal", "refilled in a new order, coal is slot 1 now and the FOLLOW is what keeps it selected (index %d)" % verbs.selected)
 	verbs.select(7)
 	_check(verbs.followed == &"" and verbs.selected == 7, "a digit past the pack selects the empty index and follows nothing")
 	_check(verbs.state_signature().find("coal") < 0 and verbs.state_signature().begins_with("v7,,"), "the followed item is in the signature (%s)" % verbs.state_signature().substr(0, 12))

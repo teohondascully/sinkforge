@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_the_tooltip_and_the_pointer()
 	_test_pack_full_only_without_room()
 	_test_geometry_is_legacys_under_the_scale()
+	_test_a_drained_slot_draws_empty_but_keeps_its_key()
 	await _test_paint_runs_through_the_hud_host()
 	_finish("hotbar")
 
@@ -153,3 +154,21 @@ func _test_paint_runs_through_the_hud_host() -> void:
 	_check(int(ran[0]) > 0, "paint() ran inside the HUD host's draw pass (%d)" % int(ran[0]))
 	_check(int(ran[1]) == 1, "and the frame it drew carried the two carried items")
 	view.queue_free()
+
+
+## A GAP IS AN EMPTY WELL THAT STILL SHOWS ITS NUMBER (D0553). The sim keeps a drained stack's slot so
+## the stacks either side do not move; the bar must then render that slot as EMPTY rather than as a
+## stack of zero. "x0" in a well would be a worse lie than the renumbering this replaces.
+func _test_a_drained_slot_draws_empty_but_keeps_its_key() -> void:
+	var f: Frame = _frame(["ore", "coal", "clay"], 1, 10)
+	(f.obs.pack[0] as Dictionary)["count"] = 0          # key 1 drained, coal still key 2
+	var laid: Dictionary = Hotbar.layout(f, _font(), Hotbar.NO_POINTER)
+	var wells: Array = laid["wells"]
+	_check(wells.size() == 3, "three wells, the gap included (%d)" % wells.size())
+	_check(not (wells[0] as Dictionary).has("item"),
+		"the drained well carries no item, so nothing draws an icon or a count in it")
+	_check(String((wells[0] as Dictionary)["key"]) == "1",
+		"but it still shows its key: the player can see that 1 is theirs and empty")
+	_check((wells[1] as Dictionary).has("item")
+		and (wells[1] as Dictionary)["item"] == &"coal",
+		"and coal is still the second well, which is the whole point of keeping the gap")

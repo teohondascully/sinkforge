@@ -20,6 +20,7 @@ func _initialize() -> void:
 	_test_refusals_name_their_reason_and_touch_nothing()
 	_test_dangling_winch_routes_reconcile_without_losing_cargo()
 	_test_write_is_durable_and_read_recovers()
+	_test_the_hotbars_gaps_survive_a_round_trip()
 	_cleanup()
 	_finish("save_game")
 
@@ -214,3 +215,36 @@ func _cleanup() -> void:
 	for suffix: String in ["", SaveGame.TMP_SUFFIX, SaveGame.BAK_SUFFIX]:
 		if FileAccess.file_exists(SCRATCH + suffix):
 			DirAccess.remove_absolute(SCRATCH + suffix)
+
+
+## THE BAR'S SLOT ORDER, GAPS INCLUDED, SURVIVES A SAVE (D0553). `pack` alone cannot carry it: a drained
+## stack keeps its number and holds no count, so it has no entry there to restore from. A reload that
+## reshuffled the bar would be the same defect strangers 127-132 hit, just rarer and harder to see.
+## Also pinned: a save written BEFORE `pack_order` existed still loads, with the order `pack`'s own keys
+## give -- absence is not corruption.
+func _test_the_hotbars_gaps_survive_a_round_trip() -> void:
+	var i1: Items = _hub_items()
+	var m1: Machines = _hub_machines(i1)
+	i1.pack.add(&"ore", 5)
+	i1.pack.add(&"coal", 4)
+	i1.pack.add(&"clay", 2)
+	i1.pack.remove(&"ore", 5)                       # key 1 becomes a gap; coal must stay on key 2
+	var env: Dictionary = SaveGame.capture(i1.world, i1, m1)
+	_check((env.get("pack_order", []) as Array).size() == 3,
+		"the envelope carries all three slots, gap included (%s)" % [env.get("pack_order", [])])
+	var i2: Items = _hub_items()
+	var m2: Machines = _hub_machines(i2)
+	_check(SaveGame.restore(i2.world, i2, m2, env), "restore accepted the capture")
+	var back: Array[Dictionary] = i2.pack.slots()
+	_check(back.size() == 3 and back[0]["item"] == &"ore" and int(back[0]["count"]) == 0,
+		"the gap came back on key 1 rather than being dropped")
+	_check(back[1]["item"] == &"coal" and back[2]["item"] == &"clay",
+		"so coal is still key 2 and clay still key 3 after a reload")
+	var old: Dictionary = env.duplicate(true)
+	old.erase("pack_order")                          # a save written before the field existed
+	var i3: Items = _hub_items()
+	var m3: Machines = _hub_machines(i3)
+	_check(SaveGame.restore(i3.world, i3, m3, old),
+		"a save with no pack_order still loads: the field is optional, not required")
+	_check(i3.pack.slots().size() == 2,
+		"and it restores what `pack` alone can say -- the two stacks that still hold something")

@@ -84,7 +84,11 @@ static func layout(frame: Frame, font: Font, pointer: Vector2 = NO_POINTER) -> D
 		sel_lit = sel_lit or active
 		var well: Dictionary = {"rect": rect, "index": i, "active": active,
 			"key": ("0" if i == 9 else str(i + 1)) if i < 10 else ""}
-		if i < slots.size():
+		# A GAP DRAWS AS AN EMPTY WELL, KEY DIGIT AND ALL (D0553). A stack drained to 0 keeps its number so
+		# the stacks either side of it do not move, and the well below only draws an icon and a count when
+		# `item` is set -- so leaving it unset here is the whole rendering change. The digit still shows,
+		# which is the point: the player can see that 2 is still theirs and simply empty.
+		if i < slots.size() and int(slots[i]["count"]) > 0:
 			well["item"] = slots[i]["item"]
 			well["count"] = int(slots[i]["count"])
 			if rect.has_point(pointer):
@@ -93,7 +97,7 @@ static func layout(frame: Frame, font: Font, pointer: Vector2 = NO_POINTER) -> D
 		wells.append(well)
 	var backing := Rect2(UiTheme.px(x0 - 8.0), UiTheme.px(HOTBAR_BAND_TOP), UiTheme.px(total_w + 16.0), UiTheme.px(HOTBAR_BAND_H))
 	var label: Dictionary = {}
-	if sel >= w0 and sel < mini(w0 + n, slots.size()):
+	if sel >= w0 and sel < mini(w0 + n, slots.size()) and int(slots[sel]["count"]) > 0:
 		var text: String = item_label(slots[sel]["item"])
 		var lw: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LABEL_SIZE)).x
 		var lx: float = UiTheme.px(x0 + float(sel - w0) * (SLOT + SLOT_GAP)) + (UiTheme.px(SLOT) - lw) * 0.5

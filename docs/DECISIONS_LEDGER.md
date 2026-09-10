@@ -21563,3 +21563,59 @@ what D0527 built the calibration loop to catch).
 against the usual ~60) so the raw peaks are roughly double and the normalisation is an assumption D0527
 justifies but this run does not re-prove. The peak is accumulated over a whole run, not reset per window
 like `BakeCost`, so it is the worst draw of the run and is labelled that way.
+
+## D0553 · 2026-09-09 · A stack keeps its number, and the hotbar stops renumbering under the player
+
+**Context:** D0544's batch found the first wall in six batches that explains failures at three different
+rungs at once. `Pack.remove` erased a stack drained to 0 -- "so the hotbar never shows an empty slot",
+which named the benefit and not the cost. Draining a stack **shifted every stack after it down a
+number**, and re-acquiring the item **appended it at the end**. The rung that asks a player to drain
+stacks into a machine is therefore exactly the rung that invalidates the numbers its own card tells them
+to press ("press each stack's NUMBER and Q"). Four of six strangers fed or selected the wrong stack;
+S131's bar reordered twice; S132's ingot moved from key 2 to key 1 mid-run; and the ONLY seat that
+delivered was the one whose bar never reordered and carried no clay at all. Director's ruling: fix it.
+
+**Decided:** the slot order becomes explicit state (`Pack.order`) rather than an emergent property of
+`items`' key order. A drained stack leaves a GAP that keeps its number; the item returns to that number
+if picked up again; a NEW item takes the leftmost gap before growing the bar; an entirely empty pack
+forgets its order, so D0412's "an empty pack draws no bar" still holds.
+
+**`items` is untouched, deliberately.** The signature, conservation, `ids()` (text order, D0346) and the
+existing save field all behave exactly as before -- `_term_of` already returned `Vector2i.ZERO` for a
+zero count, and the bulk cap sums counts so a gap costs nothing. The change is confined to what the bar
+shows and what a digit selects. `core/signed_plane.gd`'s erase-on-zero is shared infrastructure and was
+NOT touched.
+
+**Saves carry the gaps.** `pack` alone cannot: a gap holds no count, so it has no entry there to restore
+from, and a reload would reshuffle the bar -- the same defect, rarer and harder to see. A new OPTIONAL
+`pack_order` envelope field carries it, and its ABSENCE is not an error: a save written before this field
+exists restores exactly as it used to. Pinned both ways.
+
+**The empty well draws empty.** `Hotbar.layout` sets no `item` for a zero-count slot, so nothing paints
+an icon or a count there, but the KEY DIGIT still draws -- the player sees that 2 is still theirs and
+simply empty. "x0" in a well would be a worse lie than the renumbering it replaces.
+
+**Verified.** Nine new assertions across three suites. **Three mutants killed:** `slots()` reading
+`items` again (the pre-D0553 behaviour) fails the three assertions that describe the old bug by name;
+a drained stack losing its slot fails the same three; a new item always appending fails the gap-reuse
+assertion. Selecting a gap and pressing drop is a harmless no-op -- `Items.drop_item` already returns 0
+when `remove` yields nothing.
+
+**A green suite was pinning the defect, and the battery found it.** `tests/test_verbs.gd` went red on
+three assertions -- "the ore gone, the selection follows the coal to slot 2", and two more. They were
+correct: D0412 built "the selection follows its item" BECAUSE the pack compacted, and its docstring says
+so ("a bare index re-pointed BUILD and DROP at whatever slid into the numbered position"). D0553 removes
+the compaction at the source, so those three described a defect rather than a rule. Rewritten to the new
+behaviour: coal stays on slot 3 when the ore above it drains, and when coal itself drains the selection
+stays on coal's OWN empty slot rather than jumping to another item.
+
+**And the follow is re-pinned as what it now is -- a backstop, not the primary defence.** An index can
+still move in exactly one case: the pack empties completely and forgets its order, then refills in a
+different sequence. That case is now a test, and removing the follow mechanism entirely fails it and
+nothing else -- so the mechanism is justified rather than left looking dead.
+`[[reversed-rule-has-a-pinning-suite]]`.
+
+**Not claimed:** that this fixes delivery. It removes a mechanism four of six seats hit; whether seats
+get further is for the next batch to measure, and the batch is the test. The observation's `pack` now
+carries gaps, so stranger receipts will show them -- which is the instrument reporting the new truth,
+not a change to the mission.

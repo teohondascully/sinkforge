@@ -29,6 +29,30 @@ const REQUIRED_KEYS: Array[String] = [
 ## Fields whose absence would change the world's future and which therefore may not be defaulted: an
 ## error path that returned the passing value (legacy's own finding).
 const NO_DEFAULT_KEYS: Array[String] = ["world_seed", "width", "height"]
+## The slot order as plain strings for the envelope. A gap is a real entry here and holds no count.
+static func _order_strings(pack: Pack) -> Array:
+	var out: Array = []
+	for item: StringName in pack.order:
+		out.append(String(item))
+	return out
+
+
+## Restore the bar's order, ignoring anything not actually carried so a hand-edited or stale envelope
+## cannot invent a slot for an item the pack does not hold.
+static func _restore_order(pack: Pack, saved: Variant) -> void:
+	if not (saved is Array) or (saved as Array).is_empty():
+		return
+	var rebuilt: Array[StringName] = []
+	for name: Variant in (saved as Array):
+		var item := StringName(str(name))
+		if not rebuilt.has(item):
+			rebuilt.append(item)
+	for item: StringName in pack.order:          # anything carried but unnamed by the envelope keeps a slot
+		if not rebuilt.has(item):
+			rebuilt.append(item)
+	pack.order = rebuilt
+
+
 const MACHINE_INT_FIELDS: Array[String] = ["progress_ticks", "route_toggle", "fuel", "fed", "mode", "stage"]
 
 enum Read { NONE, OK, RECOVERED, CORRUPT }
@@ -67,7 +91,8 @@ static func capture(world: World, items: Items, machines: Machines) -> Dictionar
 		"water": world.water.levels.duplicate(),
 		"deposits": world.deposits.deposits.duplicate(), "lode": world.deposits.lode.duplicate(),
 		"lode_max": world.deposits.lode_max.duplicate(),
-		"pack": items.pack.items.duplicate(), "ground": items.piles.ground.duplicate(true),
+		"pack": items.pack.items.duplicate(), "pack_order": _order_strings(items.pack),
+		"ground": items.piles.ground.duplicate(true),
 		"sink": items.piles.sink.duplicate(),
 		"produced": items.total_produced.duplicate(), "consumed": items.total_consumed.duplicate(),
 		"machines": saved,
@@ -134,7 +159,12 @@ static func _stage(data: Dictionary) -> Dictionary:
 		return {}
 	var items: Items = Items.new(world)
 	for item: Variant in (env["pack"] as Dictionary):
-		items.pack.add(item, int((env["pack"] as Dictionary)[item]))   # envelope order: the hotbar's
+		items.pack.add(item, int((env["pack"] as Dictionary)[item]))
+	# THE HOTBAR'S SLOT ORDER, INCLUDING ITS GAPS (D0553). `pack` alone cannot carry it: a drained stack
+	# keeps its number but holds no count, so it has no entry there to be restored from. OPTIONAL, and
+	# absence is not an error -- a save written before this field exists restores exactly as it used to,
+	# with the order `pack`'s own keys give, which is what the loop above just built.
+	_restore_order(items.pack, env.get("pack_order", []))
 	items.piles.ground = (env["ground"] as Dictionary).duplicate(true)
 	items.piles.sink = (env["sink"] as Dictionary).duplicate()
 	items.total_produced = (env["produced"] as Dictionary).duplicate()

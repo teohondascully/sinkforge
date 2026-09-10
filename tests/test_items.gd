@@ -23,6 +23,7 @@ func _initialize() -> void:
 	_test_deposit_plane_reads_and_signature()
 	_test_conservation_invariant_and_its_positive_control()
 	_test_pack_signature_agrees_with_the_rebuild()
+	_test_a_drained_stack_keeps_its_slot_and_the_others_do_not_move()
 	_finish("items")
 
 
@@ -276,3 +277,40 @@ func _test_pack_signature_agrees_with_the_rebuild() -> void:
 	b.add(&"coal", 1)
 	b.add(&"ore", 3)
 	_check(a.state_signature() == b.state_signature() and a.slots() != b.slots(), "same contents in a different pickup order: same signature, different hotbar order (order is view state)")
+
+
+## THE HOTBAR DOES NOT RENUMBER UNDER THE PLAYER (D0553), which is what strangers 127-132 measured going
+## wrong: the smelt rung asks a player to drain stacks into a machine, draining a stack shifted every
+## stack after it down a number, and the card meanwhile says "press each stack's NUMBER and Q". Four of
+## six fed or selected the wrong stack; the only seat that delivered was the one whose bar never
+## reordered (D0544). Each assertion below states the OLD behaviour it is replacing, because a reader
+## comparing this against `git log` should be able to see what changed and why.
+func _test_a_drained_stack_keeps_its_slot_and_the_others_do_not_move() -> void:
+	var it: Items = _fresh()
+	it.pack.add(&"ore", 6)
+	it.pack.add(&"coal", 3)
+	it.pack.add(&"clay", 2)
+	var before: Array[Dictionary] = it.pack.slots()
+	_check(before.size() == 3 and before[1]["item"] == &"coal",
+		"three stacks in pickup order, coal on key 2")
+	it.pack.remove(&"ore", 6)                        # the smelt rung: drain a stack into a machine
+	var after: Array[Dictionary] = it.pack.slots()
+	_check(after.size() == 3 and after[1]["item"] == &"coal" and after[2]["item"] == &"clay",
+		"draining key 1 leaves coal on 2 and clay on 3 -- before D0553 they slid to 1 and 2")
+	_check(after[0]["item"] == &"ore" and int(after[0]["count"]) == 0,
+		"and key 1 is that stack's own GAP, not somebody else's stack")
+	it.pack.add(&"ore", 4)
+	_check(it.pack.slots()[0]["item"] == &"ore" and int(it.pack.slots()[0]["count"]) == 4,
+		"picking the item up again returns it to ITS number -- before, it appended at the end")
+	it.pack.remove(&"ore", 4)
+	it.pack.add(&"ingot", 2)
+	var reused: Array[Dictionary] = it.pack.slots()
+	_check(reused.size() == 3 and reused[0]["item"] == &"ingot",
+		"a NEW item takes the leftmost gap rather than growing the bar (%d slots)" % reused.size())
+	_check(reused[1]["item"] == &"coal" and reused[2]["item"] == &"clay",
+		"and the stacks the player is still holding never moved at all")
+	it.pack.remove(&"ingot", 2)
+	it.pack.remove(&"coal", 3)
+	it.pack.remove(&"clay", 2)
+	_check(it.pack.slots().is_empty(),
+		"an entirely empty pack forgets its order, so D0412's empty pack still draws no bar")
