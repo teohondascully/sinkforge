@@ -139,15 +139,20 @@ void fragment() {
 		shade = mass * (1.0 + key_strength * key);
 	}
 	float s = shade * sky;
-	if (void_here) {
-		s *= mix(1.0, void_floor, under);
-	}
 	// `VeilLight.level_rgb`: the dark is a colour -- white at full light, `ambient_light` at the ambient.
 	// The deep is LIFTED by its ambient, not clamped to it, and the lift is ramped by `d / ambient_dark`
 	// so it is exactly zero above the surface line (D0577). A clamp here erased mass, key, depth, cave
 	// and void alike -- every underground pixel returned one value.
 	float deep_t = ambient_dark > 0.0 ? clamp(d / ambient_dark, 0.0, 1.0) : 0.0;
-	float lit_s = clamp(mix(s, deep_ambient + deep_gain * s, deep_t) * mix(night_level, 1.0, deep_t), 0.0, 1.0);
+	float lit_s = mix(s, deep_ambient + deep_gain * s, deep_t) * mix(night_level, 1.0, deep_t);
+	// THE VOID IS DARKENED AFTER THE LIFT, NOT BEFORE IT (D0585). Ambient light is light ON A SURFACE and
+	// a true void has none, so `deep_ambient`'s constant term must not be handed to it. Applied before,
+	// a void at s 0.119 and mid rock at s 0.153 both came out near 0.58 -- the deep had no dark end at
+	// all. Measured on a real 45 m frame: void 0.214 against the reference's darkest-anywhere 0.116.
+	if (void_here) {
+		lit_s *= mix(1.0, void_floor, under);
+	}
+	lit_s = clamp(lit_s, 0.0, 1.0);
 	vec3 cool = ambient_light * (lit_s / (1.0 - ambient_dark));
 	vec3 rgb = mix(vec3(lit_s), cool, clamp((1.0 - lit_s) / ambient_dark, 0.0, 1.0));
 	// `lamp_lift`: each cut lifts what the previous left; the lamp lifts toward ITS colour (legacy `_light_tint`)

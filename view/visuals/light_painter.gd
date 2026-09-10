@@ -17,7 +17,10 @@ extends RefCounted
 
 const LAMP_COLOR := Color(1.0, 0.82, 0.50)
 const LAMP_RADIUS_M: float = 5.6
-const LAMP_BLOOM: float = 0.17        ## legacy: at 0.32 it washed the pool's centre to cream
+## legacy: at 0.32 it washed the pool's centre to cream. Raised from 0.17 (D0585) against a measured
+## gap: rock a metre from the lamp read 0.241 where the reference reads 0.377, and the multiply half is
+## already at its ceiling there (base x `lamp_tint`), so the shortfall is this pass's alone.
+const LAMP_BLOOM: float = 0.23
 const IDLE_GLOW: float = 0.12         ## what is left of a machine's pool once it stops working
 const MACHINE_POOL_R_M: float = 2.6
 const MACHINE_POOL_LINK: int = ceili(MACHINE_POOL_R_M)

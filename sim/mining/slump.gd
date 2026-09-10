@@ -116,6 +116,10 @@ var _landed: Dictionary = {}                 ## cells a grain ARRIVED in this st
 ## count exists so that the one lossy path in a deterministic automaton has a witness; see `_wake`.
 var refused_wakes: int = 0
 var moved_this_tick: Array[Vector2i] = []    ## the cells that EMPTIED this step, for the view's dust
+## ...and the cells earth ARRIVED in, which is a different picture and a different cue (D0586). A puff
+## at the vacated cell says "something left here"; a puff where it landed says "something hit here", and
+## the landing is the half a player is looking at. Queue item 25.
+var landed_this_tick: Array[Vector2i] = []
 ## What moved, for the dust's colour. ONE material a step, exactly as `Mining.broke_material` is one a
 ## tick: clay is the only loose material, so a step cannot mix two today. If a second material is ever
 ## flagged loose, this becomes the LAST one moved rather than a lie -- the dust is a colour, not a claim,
@@ -155,6 +159,7 @@ func after_break(grid: TileGrid, cells: Array[Vector2i]) -> void:
 ## only on the refusal path, which is the cold one.
 func settle(grid: TileGrid, water: WaterPlane, occupied: Rect2i = Rect2i(), closed: Dictionary = {}) -> void:
 	moved_this_tick.clear()
+	landed_this_tick.clear()
 	_landed.clear()
 	var looked: int = 0
 	while moved_this_tick.size() < SETTLE_PER_TICK and _head < _queue.size() and looked < LOOK_PER_TICK:
@@ -173,6 +178,7 @@ func settle(grid: TileGrid, water: WaterPlane, occupied: Rect2i = Rect2i(), clos
 		_move(grid, c, to)
 		_landed[to] = true
 		moved_this_tick.append(c)
+		landed_this_tick.append(to)
 	_compact()
 	for c: Vector2i in _next:
 		_wake(grid, c)

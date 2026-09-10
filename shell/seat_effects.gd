@@ -12,7 +12,8 @@ const LAND_DUST_SPEED: int = 120   ## px/s of fall below which a landing raises 
 const SHAKE_BREAK_PX: float = 1.6  ## a broken cell, at world px: a knock, not a quake
 const SHAKE_LAND_PX: float = 2.4   ## the hardest landing; scaled down by how hard
 const SHAKE_LAND_FULL: int = 420   ## px/s of fall that earns the full landing shake
-const SLUMP_DUST: int = 3          ## flecks a vacated cell sheds: fewer than a break's 5, and up to four a tick
+const SLUMP_DUST: int = 3
+const SLUMP_LAND_DUST: int = 2   ## the impact puff, item 25: a thump, not a cell coming apart          ## flecks a vacated cell sheds: fewer than a break's 5, and up to four a tick
 const SHAKE_SLUMP_PX: float = 1.1  ## a full step of collapse, under a break's knock; scaled by how much moved
 
 var _was_on_floor: bool = true
@@ -76,6 +77,12 @@ func _slump(o: Interface.Observation, particles: Particles, look: MaterialLook, 
 	for cell: Vector2i in slump.moved_this_tick:
 		var at: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(o.cell_px)
 		particles.dust(at, look.cell_color(slump.moved_material, cell.x, cell.y), SLUMP_DUST)
+	# AND WHERE IT LANDED (D0586, queue item 25). The puff above says "something left here"; this one
+	# says "something hit here", and the impact is the half a player is watching. Half the count, because
+	# a landing is a compact thump rather than a cell coming apart.
+	for cell: Vector2i in slump.landed_this_tick:
+		var onto: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(o.cell_px)
+		particles.dust(onto, look.cell_color(slump.moved_material, cell.x, cell.y), SLUMP_LAND_DUST)
 	# A single grain trickling is not a collapse. The knock rides the FRACTION of the step's budget that
 	# moved, so a wall coming down is felt and one cell settling is not.
 	shake_px = maxf(shake_px, SHAKE_SLUMP_PX * (float(slump.moved_this_tick.size()) / float(Slump.SETTLE_PER_TICK)))

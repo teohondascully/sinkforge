@@ -22570,3 +22570,60 @@ across three suites red with it; adding a granular material is content design. B
 in P043 with three options and a recommendation.
 Reverse: N/A -- a comment change.
 
+## D0583 · 2026-09-10 · view/visuals/veil_light.gd, veil.gdshader, sky_painter.gd · the world was lit for noon
+Decided: a `NIGHT_LEVEL` of 0.45 on the veil, ramped out with depth, and `SkyPainter.DAYLIGHT` moved
+from 0.35 (dusk) to 0.15 (night).
+Alternative: brighten the sky to day instead. Rejected -- the reference is a night scene and the whole
+lighting programme is calibrated against it.
+Why: MEASURED on the real opening frame. The sky read 0.086 at the zenith and 0.254 at the horizon --
+night -- while the ground beside the player read **0.344** and a tree canopy read **0.479**, the
+brightest and most saturated thing in the picture. The reference's surface rock at night is 0.148. No
+single painter was wrong: the sky is drawn as night, terrain takes `sky_light` = 1.0 above the surface
+line, and `leaves`/`wood` carry `depth_darken: 0.0` because "a tree stands in the sky". Three correct
+local decisions that had never been looked at together in one frame.
+RAMPED BY `deep_t`, so at depth it is exactly 1.0 and D0577's tuning is bit-identical. A night level
+only means anything where the sky can still be seen.
+`SkyPainter`'s own header called `DAYLIGHT` "the one knob the director may want to turn" and said the
+0.35 was chosen "to show the director the MOST of this painter in one frame ... not a claim that they
+look right". A dusk sky over a night ground is the same mismatch from the other side. 0.15 keeps the
+horizon blush that header warns 0.0 would flatten, and puts the starfield well inside its `< 0.85`
+window rather than at the faint edge of it. P015 is still the director's; this is a coherent frame to
+rule on rather than a composed one.
+MEASURED AFTER: surface ground 0.155 against the reference's 0.148, and the miner's lamp is the
+brightest thing in the frame rather than a tree.
+Reverse: CHEAP -- two constants.
+
+## D0584 · 2026-09-10 · view/visuals/bedding_tone.gd, material_look.gd · foliage is not rock
+Decided: plant materials take a cell-scale `foliage_tone` and no bedding at all.
+Why: `_cell_jitter` samples in METRES -- periods of 17, 48 and 23 m. A tree canopy is about six cells
+across, a metre and a half, so EVERY leaf cell in a tree drew essentially the same jitter value and the
+canopy rendered as one flat rectangle of green. And `matrix_color` passes `country_rock = not
+rec.has("nugget_color")`, which is true of `leaves` and `wood`, so `_strata`'s sedimentary hue bands
+were running on tree canopies. A tree is not sedimentary.
+What replaces it: two octaves keyed on the CELL -- clumps about four cells across, a bough's worth of
+leaves, and a per-cell break-up over them -- plus one slow term on the column alone, so two trees side
+by side are not the same green. That is queue item 27's "variation between individuals" at the only
+scale a 4 px cell can express it.
+Reverse: CHEAP -- delete the branch in `matrix_color`.
+
+## D0585 · 2026-09-10 · view/visuals/veil.gdshader, light_painter.gd · the void is darkened after the lift
+Decided: `void_floor` multiplies the lit value AFTER the ambient lift, not the shade before it. And
+`LAMP_BLOOM` 0.17 -> 0.23.
+Why: ambient light is light ON A SURFACE, and a true void has none, so `DEEP_AMBIENT`'s constant term
+must not be handed to it. Applied before the lift, a void at s 0.119 and mid rock at s 0.153 both came
+out near 0.58 -- the deep had no dark end at all, and the one distinction that matters most to a mining
+game (where is rock, where is a hole) was being erased a second time, in a different place from D0569.
+MEASURED on a real 45 m frame, against the reference: unlit deep rock 0.1926 (reference 0.190 -- dead
+on), the lamp's pool 0.4088 -> 0.4355 (0.515), rock a metre from the lamp 0.2414 -> 0.2758 (0.377).
+The remaining lamp shortfall is this additive pass's alone: the multiply half is already at its ceiling
+there (base x `lamp_tint`), which is why `LAMP_BLOOM` moved rather than a veil constant.
+Reverse: CHEAP -- move three lines back above the lift.
+
+## D0586 · 2026-09-10 · sim/mining/slump.gd, shell/seat_effects.gd · a puff where the earth LANDS
+Decided: `Slump` publishes `landed_this_tick` beside `moved_this_tick`, and the seat puffs at both.
+Why: queue item 25 asks for an impact puff when slumped material lands. D0564 shipped a puff at the cell
+that EMPTIED, which is a different picture -- "something left here" against "something hit here" -- and
+the landing is the half a player is looking at. Half the particle count: a landing is a compact thump,
+not a cell coming apart.
+Reverse: CHEAP -- one array, one loop.
+

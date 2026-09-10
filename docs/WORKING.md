@@ -232,17 +232,27 @@ left here.
 - [x] 23 **ALREADY PRESENT AND ALREADY PINNED**, in two places: `AmbiencePainter.updraft_motes` (six
          per lift shaft, fading as they climb, none under rock) and `FallingItems.motes` (one per drop
          for the light pass). `test_ambience_painter.gd` and `test_falling_items.gd`.
-- [ ] 24 Debris particles on a dig.
-- [ ] 25 Impact puff when slumped material lands.
+- [x] 24 **ALREADY PRESENT.** `SeatEffects` fires `particles.debris` along the swing direction plus a
+         `dust` puff on every break, and `particles.chip` on a strike that does not break.
+- [x] 25 **DONE (D0586).** D0564 puffed the cell that EMPTIED; `Slump` now publishes
+         `landed_this_tick` and the seat puffs where the earth arrives too. Half the count -- a landing
+         is a thump, not a cell coming apart.
 - [x] 26 **ALREADY PRESENT.** `haze_painter.gd` is the plume over a working furnace (D0379). Note this is
          HEAT haze, not the atmospheric depth haze item 14 wants -- those are two different things and
          the queue conflated them.
 
 ### Phase 5 -- SURFACE (~7%)
 
-- [ ] 27 Trees: real canopies, trunk texture, variation between individuals.
+- [~] 27 **BUILT (D0584), CAPTURED.** The canopy was one flat rectangle of green because `_cell_jitter`
+         samples in METRES (17-48 m periods) and a canopy is 1.5 m across -- every leaf cell drew the
+         same value. Plants now take a cell-scale `foliage_tone` with clumps, a per-cell break-up and a
+         per-column term so no two trees match, and they no longer take sedimentary bedding. The
+         SILHOUETTE is still rectangular; that is generation, not view, and is a separate item.
 - [ ] 28 Grass tufts with height variation, not a one-cell hard green stripe.
-- [ ] 29 Sky: star field and horizon glow.
+- [x] 29 **ALREADY BUILT, AND NOW ACTUALLY VISIBLE (D0583).** `SkyPainter` has had a starfield, sun,
+         moon, clouds, the Sinkforge crown and three parallax ridgelines since D0244. `DAYLIGHT` was
+         pinned at 0.35 (dusk) explicitly to show the most features at once, not because it looked
+         right. At 0.15 the stars read and the sky agrees with the ground.
 - [ ] 30 Falling and drifting leaves.
 
 ### Phase 6 -- FRAME AND CAMERA
@@ -275,7 +285,11 @@ nothing and saved most of a night.
 
 ### Phase 7 -- HUD (~5%, and the one that removes shipped work)
 
-- [ ] 35 Seven dark rounded rectangles down to three.
+- [~] 35 **TONED (D0583), CAPTURED.** Against a night world a 90%-opaque plate is the brightest thing
+         on screen. `UI_BG` 0.90 -> 0.66, `UI_EDGE` and the bevel toned with it, and the minimap's chart
+         darkened (`ROCK_DARKEN` 0.35 -> 0.70 -- these are `Color.darkened` AMOUNTS, so larger is
+         darker; written as 0.20 first, which made it brighter, and the capture said so at once). The
+         COUNT is unchanged; what changed is that the furniture no longer sits on top of the world.
 - [ ] 36 Cut instructional prose; every lesson the world can embody becomes a cue. **This removes work
          shipped on 2026-09-09 and that is correct.**
 - [~] 37 **HALF ALREADY BUILT, AND THE OTHER HALF IS NOW NAMED.** `view/visuals/machine_labels.gd`
