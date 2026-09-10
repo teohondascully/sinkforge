@@ -21434,3 +21434,40 @@ rect and sharing it across that rect's pieces would be picture-identical rather 
 same chunks, same cells, same scheduling. **Not implemented here.** It threads shared state through
 `Frame` into `TerrainPainter` and must be verified with a byte-identical capture and an interleaved A/B,
 which is now possible for the first time because D0547 fixed `--front`.
+
+## D0550 · 2026-09-09 · The sharing premise is proven, and it costs an observation the naive plan forgot
+
+**Context:** D0549 measured that ~50% of the dig's dilated span is halo the chunk split computes twice,
+and proposed sharing one `RockNeighborhood` across a dig rect's pieces. Two things had to be true before
+building it: that a wider span answers identically, and that the wiring is what it looked like. The first
+is now proven. The second is not what it looked like.
+
+**Proven: a wider span answers identically for the cells it contains.**
+`tests/test_terrain_shading_cost.gd` builds a neighbourhood over one 6x5 piece and another over the
+26x22 dig rect containing it, over five material patterns, and asserts both that they agree AND that the
+wide one matches the DIRECT probe path -- the reference `solid` Callable that reads the observation, the
+same ground truth `_test_region_edges` uses. Agreement alone would not do: both could be wrong the same
+way. 600 comparisons pass.
+
+**It is not obvious and it is not free of assumptions.** `RockNeighborhood._scan` starts its distance at
+7 at the SPAN'S OWN EDGE and walks, so a span beginning further away carries a different history into the
+same cell. What rescues it is that the distance is capped at 7 and the halo is exactly `FORM_REACH` (6):
+a piece's edge row is already at the cap, and a wider span walking the same rows reaches the cap too.
+**Mutation-tested: `FORM_REACH = 3` turns the assertion red.** `FORM_REACH = 5` still passes, so 6 has
+margin and this test does NOT establish a minimal safe halo -- it establishes that the shipped halo works
+for these patterns and that shrinking it materially breaks the premise.
+
+**The constraint the plan missed.** `RockNeighborhood.new(obs, cells)` reads
+`BakeData.solid_bytes(obs, cells.grow(FORM_REACH))`, so a neighbourhood over the UNION needs an
+observation covering the union. Each piece still observes its own rect, because the painters read
+`frame.obs` for materials. **So sharing is not a pure saving: it removes ~50% of the neighbourhood work
+and adds one union-sized observation per dig tick.** D0545 measured observation at 12.7-14.0% of
+preparation, so the trade is probably favourable -- but "probably" is not a measurement, and the naive
+version of this treatment would have been written as free.
+
+**Decided: stop here rather than implement on a design just found incomplete.** The honest next step is
+to measure the union observation's cost against the halo saving before threading shared state through
+`Frame` into `TerrainPainter`. The alternative design -- letting a dig tick's pieces share ONE observation
+over the union as well, so both costs are paid once -- is larger, touches `frame_for`, and needs its own
+picture proof. Neither is started. What is landed here is the premise, the mutation that breaks it, and
+the constraint, so the next pass begins from an accurate design instead of a hopeful one.

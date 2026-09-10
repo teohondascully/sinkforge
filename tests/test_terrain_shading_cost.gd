@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_check(tone.lamina_calls == 1, "bedded material still evaluates its partings")
 	_test_solid_probe()
 	_test_region_edges()
+	_test_a_wider_span_answers_identically_for_the_cells_it_contains()
 	if "--profile-shading" in OS.get_cmdline_user_args():
 		_profile()
 	_finish("terrain_shading_cost")
@@ -112,3 +113,47 @@ func _test_region_edges() -> void:
 					equal = (expected == actual) and equal
 					checked += 1
 	_check_over(checked, equal, "region shading is float-colour identical across solid, air, cuts and observation borders")
+
+
+## THE PREMISE OF SHARING ONE NEIGHBOURHOOD ACROSS A DIG RECT'S PIECES (D0549). `plan_tick` cuts one dig
+## rect along chunk boundaries and each piece builds its own `RockNeighborhood` over its own dilated span,
+## so ~50% of the dilated work is halo computed twice. Sharing one is only worth proposing if a WIDER span
+## answers exactly what a narrower one does for the cells they share.
+##
+## It is not obvious that it does. `_scan` starts its distance at 7 at the SPAN'S OWN EDGE and walks, so a
+## span that starts further away carries a different history into the same cell. What rescues it is that
+## the distance is capped at 7 and the halo is exactly `FORM_REACH` (6): a piece's topmost row is 6 rows
+## from its own span edge, so its distance is already the cap, and a wider span walking the same rows
+## reaches the cap too. This asserts that rather than trusting the argument -- if `FORM_REACH` and the cap
+## ever stop matching, this goes red and the sharing treatment must not ship.
+func _test_a_wider_span_answers_identically_for_the_cells_it_contains() -> void:
+	var obs := Interface.Observation.new()
+	obs.window = Rect2i(-9, 90, 35, 31)
+	obs.legend = PackedStringArray(["", "hardrock"])
+	obs.materials.resize(obs.window.get_area())
+	var tone := RockTone.new(17)
+	var solid: Callable = func(c: int, r: int) -> bool: return obs.solid_at(Vector2i(c, r))
+	var piece := Rect2i(2, 100, 6, 5)          # one chunk-sized partial
+	var union := Rect2i(-4, 94, 26, 22)        # the whole tick's dig rect, containing it
+	var checked: int = 0
+	var equal: bool = true
+	for pattern: int in range(5):
+		for i: int in obs.materials.size():
+			obs.materials[i] = 1 if pattern == 0 or (pattern != 1 and (i * 13 + i / 35) % (pattern + 2) != 0) else 0
+		var narrow := RockNeighborhood.new(obs, piece)
+		var wide := RockNeighborhood.new(obs, union)
+		for y: int in range(piece.position.y, piece.end.y):
+			for x: int in range(piece.position.x, piece.end.x):
+				# NARROW == WIDE is not enough on its own: both could be wrong the same way. The wide one
+				# is also held against the REFERENCE probe path, which reads the observation directly and
+				# is the ground truth `_test_region_edges` above uses.
+				equal = (narrow.at(x, y) == wide.at(x, y)) and equal
+				for grammar: int in range(3):
+					var base := Color(0.3, 0.4, 0.5)
+					equal = (tone.shade(base, x, y, grammar, solid)
+						== tone.shade(base, x, y, grammar, solid, wide.at(x, y))) and equal
+					checked += 1
+				checked += 1
+	_check_over(checked, equal,
+		"a neighbourhood over the whole dig rect answers the same code as one over a single piece, "
+		+ "and matches the direct probe for those cells")
