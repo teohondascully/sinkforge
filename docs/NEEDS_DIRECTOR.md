@@ -1128,3 +1128,31 @@ going through the door, and a third would be a pattern rather than an exception.
 sites mechanically in one commit. It is a large diff and a tiny risk -- every site is a constant read,
 the compiler catches every miss, and no behaviour moves. Roughly an hour. Do it before the next feature
 that needs an observation field, not after.
+
+## P035 · 2026-09-10 · the last metre and a half out of a shaft belongs to no verb
+
+**Measurement.** With D0567's fix the line now lifts a body out of a shaft it dug: row 55 to row 26 of a
+10 m shaft in `tests/test_grapple_body.gd`. It stops there, and the stop is geometric rather than a bug.
+`Grapple.MIN_LENGTH` is 25.6 px and forbids winching closer than that to the hitch; the topmost SOLID
+wall cell of a player-dug shaft is the shaft's own mouth, because everything above it is sky. So a reeled
+body hangs about six rows -- **a metre and a half** -- under the lip, and no chain of hooks closes it.
+
+**What was tried on the rig and did not work.** Cutting the line to jump drops the body, because it is
+airborne the instant the rope goes and a jump needs a floor: it falls the entire shaft again. Holding
+mantle on the rope does not fire, toward the anchor or away from it -- `PlayInput` arms `mantle_hold`
+from climb-up plus a direction, and the body is not in a state that consumes it.
+
+**Three candidate answers, and this is the ruling I need.**
+1. **A lip mantle from the rope.** The body is already within `Body.MANTLE_PX` (2 m) of the surface when
+   the reel stops; let the mantle fire while hanging. Smallest change, and it makes the rope's ending
+   feel like a climb rather than a stall.
+2. **Let the reel pass MIN_LENGTH when the hitch is a corner.** Cheapest of all, one condition, but
+   MIN_LENGTH exists so the winch never hauls a body into its own anchor and this weakens that.
+3. **Rule that the player digs the last step**, and say so in the world rather than in a sentence. It is
+   a mining game and they are holding a pick. This costs nothing and may be the most honest answer.
+
+**Recommendation: (1).** It is the one that makes the primitive `docs/GDD.md` §1 already calls
+load-bearing feel finished, and (3) is a fine fallback that (1) does not preclude.
+
+**Not a root blocker.** The trap itself is fixed; this is the difference between "you can get out" and
+"getting out feels good". Phase 1 continues.

@@ -47,10 +47,11 @@ six-week decision.
 - [x] 7  Undermining drops a mass (D0566). Verified in a seat (the capture above is a mound's flank mid-
          collapse) and pinned headless. Found and fixed a session-ender on the way: a full burial ejected
          the body to the far corner of the world, so earth now packs around a player. `test_slump_body.gd`.
-- [ ] 8  **THE TRAP.** A player who digs down cannot climb out: 515 commands, zero metres. Jump apex is
-         4.6 m (`JUMP_VELOCITY_PX_S` 365 against `GRAVITY_PX_S2` 900) against a 5.2 m shaft, and the
-         grapple anchors then reels nothing once its line wraps on the shaft lip. **Outranks every
-         cosmetic item in this queue: the game is currently unfinishable.**
+- [x] 8  **THE TRAP -- fixed (D0567).** `BodySwing` refused the line's constrained position outright
+         whenever it would clip rock, which in a shaft is every tick, so the reel did nothing forever.
+         It now slides along the face, which is legacy's own behaviour. One hook: 0 px -> 82 px. Chained
+         hooks: row 55 -> row 26 of a 10 m shaft. The last 1.5 m over the lip is geometric
+         (`Grapple.MIN_LENGTH`) and is parked as P035 with three candidate answers.
 - [ ] 9  Descent as a verb, not a pixel-hunt. `Footing`'s spare rule (D0509) is right and its consequence
          at the controls was never measured: four 4 px targets under the boots, every near miss silent.
 

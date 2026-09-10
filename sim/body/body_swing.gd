@@ -57,9 +57,11 @@ static func step(body: Body, grid: TileGrid, input: InputFrame) -> void:
 	if not g.taut:
 		return
 	body.gait.fall_from_y = swung.y      # a fall the rope caught is over; the landing is not priced from above it
-	if swung != centre and _blocked_at(body, grid, swung):
-		g.taut = false                   # the stand-in for the re-resolve (see the header)
-		return
+	if swung != centre:
+		swung = _slide(body, grid, centre, swung)
+		if swung == centre:
+			g.taut = false               # nothing of the move fits: the stand-in for the re-resolve
+			return
 	body.pos_x = swung.x
 	body.pos_y = swung.y
 	body.swung_this_tick = true
@@ -88,6 +90,32 @@ static func coast(body: Body, input: InputFrame, top: int, decel: int) -> void:
 		return
 	var rate: int = GROUND_COAST_PER_TICK if body.on_floor else AIR_COAST_PER_TICK
 	body.vel_x = travel * maxi(top, absi(body.vel_x) - rate)
+
+
+## AS MUCH OF THE CONSTRAINED MOVE AS FITS (D0567). The full move first; failing that the VERTICAL
+## component alone, then the horizontal. Each candidate is collision-checked against the same box
+## predicate the axis resolvers use, so nothing here can put the body inside rock -- every candidate is a
+## subset of a move the constraint already wanted.
+##
+## THIS IS THE TRAP'S FIX AND IT IS NOT THE PARKED RESOLVER RULING. The header above describes the yield
+## this replaces: "a projected position whose box would overlap rock is refused... it differs at a corner,
+## where legacy would slide the body along the face and this holds it." Held is what a player in a
+## vertical shaft gets, on every tick, forever: the constrained position is always diagonally into the
+## wall, so the reel was refused every tick and a driver with the source open rose zero metres in 515
+## commands. Sliding along the face is legacy's own behaviour and strictly less refusal than before; the
+## full two-axis re-resolve legacy does after the move is still parked and still the resolver's.
+##
+## VERTICAL IS TRIED FIRST, deliberately. Both orders fix the shaft, because the horizontal candidate is
+## blocked there and falls through -- but the line exists to buy vertical space (`docs/GDD.md` §1), and
+## when both axes are clear the one that gets you out of the hole is the one to spend the tick on.
+static func _slide(body: Body, grid: TileGrid, from: Vector2i, to: Vector2i) -> Vector2i:
+	if not _blocked_at(body, grid, to):
+		return to
+	if to.y != from.y and not _blocked_at(body, grid, Vector2i(from.x, to.y)):
+		return Vector2i(from.x, to.y)
+	if to.x != from.x and not _blocked_at(body, grid, Vector2i(to.x, from.y)):
+		return Vector2i(to.x, from.y)
+	return from
 
 
 static func _blocked_at(body: Body, grid: TileGrid, at: Vector2i) -> bool:

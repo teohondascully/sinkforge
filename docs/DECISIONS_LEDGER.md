@@ -22134,3 +22134,24 @@ occupied and out-of-bounds cells." One rule, two verbs.
 The body stays on `sim/run`'s side of the line: `MineHold.body_cells` computes the rectangle, because
 `sim/mining/MODULE.md` says that module "takes no `Body` object" and only a `Rect2i` crosses.
 Reverse: CHEAP -- pass an empty rect, which contains no point, and the earth buries again.
+
+## D0567 · 2026-09-10 · sim/body/body_swing.gd
+Decided: when the line's constrained position would put the body in rock, take as much of that move as
+fits -- the vertical component alone, then the horizontal -- instead of refusing the whole move.
+`BodySwing._slide`. Every candidate is a subset of the move the constraint already wanted and is checked
+against the same box predicate the axis resolvers use, so nothing here can place the body inside rock.
+Alternative: leave the yield as it was and wait for the parked resolver ruling (plan §8), which is what
+the file's header says it is waiting for.
+Why: THE TRAP. `body_swing.gd`'s own header already described this exact behaviour and its cost -- "a
+projected position whose box would overlap rock is refused... it differs at a corner, where legacy would
+slide the body along the face and this holds it" -- and nobody had measured what "holds it" means in a
+vertical shaft, where the constrained position is ALWAYS diagonally into the wall. It means the reel is
+refused on every tick forever. An Opus playthrough on 2026-09-10 spent **515 commands and rose zero
+metres** out of a shaft it dug. `docs/GDD.md` §1 calls the rope "the vertical traversal primitive, not
+one feature among several. Fast attach, fast climb, no fumbling"; none of that was true.
+This is NOT the parked ruling. The full two-axis re-resolve legacy runs after the move is still the
+resolver's and still parked. This is strictly less refusal than before, and it is legacy's own answer.
+Measured: `tests/test_grapple_body.gd` -- one hook in a 10 m shaft, 0 px before and 82 px after over 300
+ticks; chained hooks carry the body from row 55 to row 26. `_test_a_swing_into_a_wall_stops_at_the_wall`
+still passes, so the flat-wall case is unchanged.
+Reverse: CHEAP -- delete `_slide` and restore the two-line refusal.

@@ -35,6 +35,8 @@ func _initialize() -> void:
 	_test_it_keeps_its_speed_on_release()
 	_test_a_jump_cuts_a_taut_line_with_a_kick()
 	_test_a_swing_into_a_wall_stops_at_the_wall()
+	_test_it_climbs_out_of_a_shaft_it_dug()
+	_test_it_chains_hooks_the_whole_way_out()
 	_test_the_swing_is_a_consenting_mover_and_signs()
 	_test_through_the_door()
 	_finish("grapple_body")
@@ -296,3 +298,99 @@ func _test_through_the_door() -> void:
 	var saved: Dictionary = Session.capture(door)
 	var other: Interface = Interface.new(_rig(), _stand(10), Mining.new())
 	_check(Session.restore(other, saved) and other.state_signature() == before, "the session round-trips a body on a line")
+
+
+## --- THE SHAFT (D0567) ----------------------------------------------------------------------------
+
+const SHAFT_LEFT: int = 18         ## a 6-cell shaft: 24 px, against a 16 px body
+const SHAFT_RIGHT: int = 24
+const SHAFT_TOP: int = 20
+const SHAFT_FLOOR: int = 60        ## 40 rows deep: 160 px, ten metres
+## MEASURED, not guessed. One hook on this rig can lift about 99 px before `MIN_LENGTH` stops the reel
+## (the anchor sits at y=96 and the body cannot come within 25.6 px of it), and it delivers 82. A floor
+## written before the thing was run would have been a claim about the fix rather than about the rig.
+const SHAFT_LIFT_FLOOR_PX: int = 80
+
+
+## Solid world with one narrow vertical shaft cut in it: the shape a player leaves behind after digging
+## down, and the shape three Opus playthroughs could not climb out of.
+func _shaft_rig() -> TileGrid:
+	var grid: TileGrid = TileGrid.new(W, H, 2)
+	for col: int in range(W):                       # open sky above SHAFT_TOP, so "out" means OUT: there
+		for row: int in range(SHAFT_TOP, H):        # is a real surface to stand on at the mouth
+			grid.set_material(Vector2i(col, row), &"hardrock")
+	for col: int in range(SHAFT_LEFT, SHAFT_RIGHT):
+		for row: int in range(SHAFT_TOP, SHAFT_FLOOR):
+			grid.excavate(Vector2i(col, row))
+	return grid
+
+
+## THE TRAP, and the single most expensive finding of 2026-09-10. A driver with the source open spent
+## **515 commands and rose zero metres** out of a shaft it had dug, using jump, mantle, both grapple
+## bindings and cut-the-ceiling-then-jump. `Body.JUMP_VELOCITY_PX_S` 365 against `GRAVITY_PX_S2` 900 is
+## an apex of 74 px, and the shaft was 5.2 m, so the legs cannot do it and the line is the only way up --
+## which is what `docs/GDD.md` §1 says in bold: the rope "should be treated as the vertical traversal
+## primitive, not one feature among several. Fast attach, fast climb, no fumbling."
+##
+## `_test_it_lifts` already pins the reel in OPEN AIR and has passed since D0360. It passes because
+## nothing is beside the body. In a shaft the constrained position is diagonally into the wall, and
+## `BodySwing.step` refused it outright -- see that file's own header: "it differs at a corner, where
+## legacy would slide the body along the face and this holds it." Held, every tick, forever.
+func _test_it_climbs_out_of_a_shaft_it_dug() -> void:
+	var grid: TileGrid = _shaft_rig()
+	var body: Body = Body.new(((SHAFT_LEFT + 3) * CELL) * S, (SHAFT_FLOOR * CELL - Body.HEIGHT_PX / 2) * S)
+	_settle(body, grid)
+	_check(body.on_floor, "the body starts standing at the bottom of the shaft")
+	var y0: int = body.pos_y
+	# The anchor is the shaft WALL near the top, which is the only solid thing a player down here can
+	# reach: straight up is open air all the way to the surface and a hook thrown at it finds nothing.
+	if _hook(body, grid, Vector2i(SHAFT_LEFT - 1, SHAFT_TOP + 4), 80) < 0:
+		_check(false, "the hook bit the shaft wall")
+		return
+	for _i: int in 300:
+		body.tick(_input(0, 1), grid)
+	var gained: int = (y0 - body.pos_y) / S
+	print("  [OBSERVED] one hook in a 10 m shaft: rose %d px in 300 ticks (floor %d)" % [gained, SHAFT_LIFT_FLOOR_PX])
+	_check(gained >= SHAFT_LIFT_FLOOR_PX,
+		"one hook lifts the body off the shaft floor (%d px >= %d in 300 ticks)" % [gained, SHAFT_LIFT_FLOOR_PX])
+	_check(PropertyChecks.solid_overlap_count(body, grid) == 0, "...without ever ending inside the wall")
+
+
+## AND THE WHOLE WAY OUT, which is the question the queue actually asked: one hook buys about two metres
+## before `MIN_LENGTH` stops the reel, so escaping a ten-metre shaft is a CHAIN of throws, each biting
+## the wall a little higher. `Grapple.fire` chains by design -- "the new hook flies while the old line
+## holds, and the anchor swaps only when the new one bites" -- so this is the shape the verb was built
+## for and nothing here is a special case. If this passes, a player who digs down can get back up.
+func _test_it_chains_hooks_the_whole_way_out() -> void:
+	var grid: TileGrid = _shaft_rig()
+	var body: Body = Body.new(((SHAFT_LEFT + 3) * CELL) * S, (SHAFT_FLOOR * CELL - Body.HEIGHT_PX / 2) * S)
+	_settle(body, grid)
+	var start_row: int = Aim.cell_of(body.pos_x, body.pos_y).y
+	# The anchor is NOT clamped to the shaft's mouth. The wall runs the full height of the world, a player
+	# throws at whatever is above them, and clamping it here was the first version's mistake: it left the
+	# body permanently `MIN_LENGTH` below the highest anchor it was allowed, stalling one row short.
+	for _cycle: int in 16:
+		var here: int = Aim.cell_of(body.pos_x, body.pos_y).y
+		if here <= SHAFT_TOP + 6:
+			break
+		# Clamped to SHAFT_TOP because that is the topmost SOLID row of the wall: above it is sky, and a
+		# hook thrown at sky finds nothing. A player aims at rock.
+		_hook(body, grid, Vector2i(SHAFT_LEFT - 1, maxi(SHAFT_TOP, here - 10)), 40)
+		for _i: int in 70:
+			body.tick(_input(0, 1), grid)
+	var climbed: int = Aim.cell_of(body.pos_x, body.pos_y).y
+	# THE REEL CEILING, derived rather than guessed. The topmost SOLID wall cell is `SHAFT_TOP`, and
+	# `Grapple.MIN_LENGTH` forbids winching closer than that to the hitch, so no chain of hooks can ever
+	# raise the body's centre above roughly SHAFT_TOP + MIN_LENGTH-in-cells. The last stretch is the
+	# legs' and always was: it is about a metre and a half against a 4.6 m apex.
+	var reel_ceiling: int = SHAFT_TOP + (Grapple.MIN_LENGTH / Fx.SCALE) / CELL + 2
+	print("  [OBSERVED] chained hooks: row %d -> %d (the reel ceiling is %d)" % [start_row, climbed, reel_ceiling])
+	_check(climbed <= reel_ceiling, "chained hooks carry the body to the reel's ceiling (row %d, ceiling %d)" % [climbed, reel_ceiling])
+	_check(PropertyChecks.solid_overlap_count(body, grid) == 0, "...and it never ends the climb inside rock")
+	# THE LAST METRE AND A HALF IS NOT THE LINE'S, and it is not asserted here. `Grapple.MIN_LENGTH`
+	# forbids winching closer than 25.6 px to the hitch, and the topmost SOLID wall cell of a shaft is its
+	# own mouth, so a reeled body hangs about six rows under the lip by geometry and no chain of hooks
+	# closes that. Measured on this rig: cutting the line to jump drops the body (it is airborne the
+	# instant the rope goes, and a jump needs a floor) and it falls the whole shaft; holding mantle on the
+	# rope does not fire either, toward the anchor or away from it. Logged as P035 with the numbers. What
+	# a player has that this rig does not is a pick, which is why the end-to-end lives in a seat.
