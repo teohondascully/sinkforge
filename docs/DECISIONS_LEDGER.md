@@ -22273,3 +22273,43 @@ that stops exempting turns red loudly; one that exempts too much is silent forev
 pinned (12 branches).
 This unblocks D0570's `lighting_bench`, which was reverted rather than bypassing the gate.
 Reverse: CHEAP -- delete `is_generated` and its branch.
+
+## D0575 · 2026-09-10 · data/materials/ · PROPOSED, AUDITED, WITHDRAWN BEFORE IT SHIPPED
+Decided: withdraw it. The three country rocks' `base_color` were to scale per material -- clay x1.15,
+hardrock x1.80, deepstone x2.26, with glimmer x1.35 to hold the reveal above them. Nothing landed. The
+diff is kept at `scratchpad/withdrawn/D0575-material-bands.patch`; the tree is back at D0189's values.
+Alternative: commit it after a full battery, which is what I was about to do when the director stopped
+the run and sent it to Astra.
+Why it is withdrawn, and it is three separate reasons, each sufficient:
+1. ITS PREMISE IS FALSE. I wrote that the composite is `material x veil_light` and therefore a lit cell
+   can never exceed the material's base colour (P036). The VEIL multiplies -- but `view/view_stack.gd`
+   `_mount_light` mounts `LightPainter` and `OrePainter` on a `BLEND_MODE_ADD` canvas above it, and
+   D0373's own header says "THE LIGHT PASS IS AN ADD OVER THE VEIL ... legacy's third blend". An
+   additive pass has existed the whole time and already draws lamp bloom, machine pools, godrays and
+   water sheen. Raising albedo was never the only door. P036 is WITHDRAWN, not answered.
+2. IT WAS COMPENSATING FOR D0569'S OWN DAMAGE. `DEEP_FLOOR = 0.55` clamps the combined output, and
+   underground the combined output tops out at 0.442 (`sky` 0.34 x `shade` <= 1.30). Every solid cell
+   below the scatter band therefore pins to exactly 0.55: the mass and key terms are not attenuated,
+   they are erased. The flatness D0575 measured and set out to fix was in large part a flatness D0569
+   had just introduced. Raising albedo on top of that is a symptom treatment on a self-inflicted wound.
+3. IT FAILS A REAL GATE. `tests/test_material_palette.gd`: coal 0.0933 from dug space against a 0.1426
+   floor. Reproduced independently and here. The qualification matters more than the number -- that
+   floor is DERIVED from inter-rock separation, so spreading the palette moved its own bar. Coal did
+   not get darker. Any future version of this work has to reason about the relationship, not brighten
+   coal until the gate goes quiet.
+AND ONE ARITHMETIC ERROR OF MY OWN, recorded because it is the kind that survives review: I reported
+the result as "consistently 65-78% of the reference". The table below gives 78%, 65%, **52%** and 74%.
+The lamp pool is the worst cell and I quoted a range that excluded it. The measurements themselves
+stand -- they were taken on the fixed bench (D0570), a controlled A/B, and they are the honest input to
+whatever replaces this:
+                          shipped   D0575    reference
+    unlit deep rock        0.091    0.149      0.190
+    rock 1 m from a forge  0.157    0.244      0.377
+    the lamp's pool        0.210    0.270      0.515
+    surface rock (night)   0.121    0.110      0.148
+A uniform x2.26 was tried first and blew out the surface (surface clay 0.194 against a reference 0.148;
+the frame stopped reading as night). That finding survives the withdrawal: shallow clay was never the
+thing that was too dark, so whatever lands must be per-band.
+Reverse: N/A -- nothing shipped. The successor is queue item A8: isolate D0569's floor, lift AMBIENT
+while preserving shape modulation, and only then ask whether any material still measures short.
+

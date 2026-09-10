@@ -56,27 +56,93 @@ six-week decision.
          below the boots. Measured on the naive input a player actually gives -- point below yourself and
          hold: **0 rows in 8 bursts before, 24 rows in 12 bursts after.** `tests/test_way_down.gd`.
 
+### Phase 1b -- THE AUDIT'S CORRECTIONS (Astra, 2026-09-10; runs BEFORE phase 2)
+
+**Why this phase exists and why it is first.** Astra audited `c52d6baf` plus staged D0575 and
+reproduced two slump bugs my passing tests miss, one lighting-model error that inverts the conclusion
+phase 2 was built on, and one arithmetic error in my own reported range. **D0575 is WITHDRAWN from the
+tree** (diff preserved at `scratchpad/withdrawn/D0575-material-bands.patch`): it raised albedo to
+compensate for damage A8 caused, and it failed a real gate -- `test_material_palette.gd`, coal 0.0933
+against a 0.1426 floor, reproduced here. Astra's qualification is the load-bearing half: that floor is
+DERIVED from inter-rock separation, so widening the palette moved its own bar. Coal did not get darker.
+
+**Every item below was reproduced by a second party, not proposed.** They are correctness debt, and
+phase 2 cannot be measured honestly while A8 stands.
+
+- [ ] A1 **Slump moves a grain twice in one tick.** `_next` defers cells woken BY a move; it does not
+       protect a destination that was ALREADY in the queue. Overlapping wake neighbourhoods put a
+       grain through (10,26) to (10,27) in one `settle()`. Fix, regression test, mutation-witness.
+- [ ] A2 **Slump forgets a grain whose blocker leaves.** A cell blocked by the body rect (or by water)
+       returns `target() == c`, hits the bare `continue`, and is dropped from the queue forever;
+       nothing wakes it when the body walks away. Distinguish rest from transient refusal.
+- [ ] A3 **Overflow must defer, not forget.** `QUEUE_CAP` silently drops work. The comparison I drew to
+       `TileGrid.SOLIDITY_LOG_CAP` is misleading -- the grid falls back to an all-changed signal, which
+       is a defer. Slump has no such fallback.
+- [ ] A4 **Four movements is not four checks.** A tick may inspect 4096 candidates, and `pop_front()`
+       shifts the array on every one. Budget examined work separately from moved work; queue cursor or
+       ring buffer. `sim/fluid/MODULE.md` makes the active set a hard constraint and I never profiled it.
+- [ ] A5 **Machine occupancy is absent from `Slump._open()`.** It checks terrain, water and the player
+       rect -- not machine bases. Define and test what falling earth does to machinery.
+- [ ] A6 **One slump test is still vacuous.** The supported-cell test wakes row 28 while its subject sits
+       on row 29, so its unchanged result does not establish the subject was evaluated. This is
+       `[[instrument-cannot-register-subject]]` for the SECOND time in this one file.
+- [ ] A7 **Save/load drops the pending queue, so two identical factories diverge on a reload.** Not a
+       cosmetic frame. Ruling or fix; `TreeFall` shares the property and that does not excuse it.
+- [ ] A8 **Isolate D0569's floor -- IT IS ERASING DEEP ROCK'S SHAPE.** See item 10. Preserve shape
+       modulation and lift AMBIENT instead of clamping combined output; compare against the current
+       clamp with materials and lights held fixed. **Do not brighten materials to compensate before
+       this is isolated** -- that is precisely the mistake D0575 was.
+- [ ] A9 **Grapple `_slide` checks destinations, not swept paths.** "Every candidate is a subset of the
+       requested move" is not a collision-safety proof; a direct helper probe accepted a move across an
+       intervening solid floor because the endpoint was clear. The pre-existing full-projection path
+       shares the weakness. Four witnesses before this is called closed: (1) the maximum correction
+       reachable through normal reeling and pivot changes, (2) thin barriers along that correction path,
+       (3) repeated blocked reeling then release -- the rope shortens even when the move is refused,
+       (4) velocity and landing bookkeeping against the ACCEPTED displacement, not the requested one.
+- [ ] A10 **`tools/run_suites.sh:118` ETA divides by parallelism twice.** Elapsed wall time per completed
+       suite already carries concurrent throughput; dividing again by `SWEEP_JOBS` understates every
+       estimate. "Approximate" does not excuse the arithmetic. (My own tool, D0573.)
+- [ ] A11 **Hand mining and drilling give inconsistent terrain response.** Only a hand blow seeds the
+       slump queue. In an automation game the drill is the normal case. Shared event distribution, not
+       a permanent exclusion -- and NOT a second destructive read of `take_solidity_changes()`.
+- [ ] A12 **Ask the director to confirm T012's supersession explicitly.** `LAMP_TINT` 0.62 replaced a
+       ruled 0.38. It may be right under the newer reference brief, but a session must not infer that a
+       numerical ruling evaporated. T017 was reverted, so no landed override remains there.
+
 ### Phase 2 -- LIGHT (~55% of the gap to the reference)
 
-- [x] 10 **Edge occlusion -- ALREADY PRESENT, and the real defect was the opposite one (D0569).** The AO
-         and rim light are implemented and correct (`rock_tone.gd:229-246`, legacy's own 0.125 per open
-         neighbour); `rock_tone.gd`'s header claiming they are "deliberately not here" is stale. Probed
-         directly: luma 0.26 (interior) to 0.06 (fully carved), a 4.1x range. The frame read flat because
-         the WHOLE underground sat in the bottom sixth of the value range -- deep rock at 0.0195 against
-         the reference's 0.15-0.19. Fixed by flooring the veil, not by adding occlusion. Capture:
-         `docs/media/moments/2026-09-10-deep-floor.png`.
-- [x] 11 Machines and lamps emit light -- BUILT-PARKED with the measurement (D0570, D0571). They DO emit;
-         a machine's pool was 2.8 m and lit its own casing. Widened to 5 m and warmed the lamp. The bench
-         then found the real wall: **our lights multiply, so a lit cell can never exceed the material's
-         own base colour, and the reference's lit rock (0.377) is brighter than any of ours.** P036 with
-         two candidate answers and a recommendation. Capture: `docs/media/moments/2026-09-10-lighting-bench.png`. The bench's own start record
-         is reverted for now (P037: the codegen output hit the same 400-line cap).
+- [~] 10 **Edge occlusion -- ALREADY PRESENT (D0569), but the fix I shipped beside it is WRONG.** The
+         AO and rim light are implemented and correct (`rock_tone.gd:229-246`, legacy's own 0.125 per
+         open neighbour); `rock_tone.gd`'s header calling them "deliberately not here" is stale. Probed
+         directly: luma 0.26 (interior) to 0.06 (fully carved), a 4.1x range.
+         **THE ERROR: `DEEP_FLOOR = 0.55` clamps the COMBINED output, and underground the combined
+         output can never reach it.** `sky = 1 - 0.66 = 0.34`; `shade = mass * (1 + 0.30*key)` with
+         `mass <= 1.0`, so `shade <= 1.30` and `s = shade*sky <= 0.442 < 0.55`. Every solid cell below
+         the scatter band therefore clamps to exactly 0.55 and the mass/key term is not attenuated, it
+         is **erased**. My ledger line saying the floor "does not flatten depth" is false. Astra found
+         it; the arithmetic is three constants and I did not do it. Reopened as **A8**.
+- [~] 11 Machines and lamps emit light (D0570, D0571). They DO emit; a machine's pool was 2.8 m and lit
+         its own casing. Widened to 5 m, warmed the lamp. **P036 IS WITHDRAWN: the premise was false.**
+         I wrote that "our lights multiply, so a lit cell can never exceed the material's base colour".
+         The VEIL multiplies -- but `view/view_stack.gd:_mount_light` mounts `LightPainter` and
+         `OrePainter` on an ADD-blended canvas above it, which D0373 documents as legacy's own third
+         blend. An additive pass already exists and already draws lamp bloom, machine pools, godrays and
+         water sheen. Raising albedo was never the only door. The real question is which term is
+         deficient -- material, ambient, direct, surface response or glow -- and A8 answers it first.
 - [x] 12 Lamp warmth (D0571). `LAMP_TINT` 0.38 -> 0.62, measured against the reference's amber (0.553,
          0.340, 0.226) where ours read nearly neutral. The distance colour shift is folded into P036.
-- [ ] 13 Sky light on the surface band, dying with depth.
-- [ ] 14 Depth haze (`haze_painter.gd`).
-- [ ] 15 Light shafts down open holes (`post_fx.gdshader`).
-- [ ] 16 Emissive bloom on forge fire.
+- [x] 13 **ALREADY PRESENT.** `VeilLight.sky_light` does exactly this and `tests/test_flat_planes.gd`
+         pins it: the same depth reads 0.56 down an open shaft against 0.42 under rock.
+- [ ] 14 Depth haze. **Bounded experiment, per audit.** Separate distant/background space from playable
+         surfaces -- do not wash everything equally and do not conceal ore. NOT `haze_painter.gd`, which
+         is the HEAT plume (item 26); this is a different effect and the queue conflated them.
+- [ ] 15 Light shafts down open holes. **INSPECT THE EXISTING GODRAYS FIRST -- `LightPainter` already
+         draws them; do not add a duplicate pass.** `sky_floor` is enough for vertical sky access and
+         insufficient for angled light and lateral occlusion; say which one this item is buying.
+- [ ] 16 Emissive bloom on forge fire. **BLOOM IS ALREADY PRESENT** (`LightPainter`, the additive pass
+         of item 11). Improve source coherence and restraint before adding another pass. Bloom accents
+         illumination; it does not substitute for it, and reaching for it before A8 lands would be that
+         substitution.
 
 ### Phase 3 -- ROCK (~25% of the gap)
 
@@ -96,14 +162,18 @@ six-week decision.
 - [ ] 19 Strata that vary with depth. The chip reads TOPSOIL at +2 m and at 7 m and they look identical.
 - [ ] 20 Material-specific rock reads: clay, hardrock and deepstone must differ at a glance.
 - [ ] 21 A cut face reads as cut, not as a natural cave wall.
-- [ ] 22 Rubble and scree at the foot of a cut (pairs with phase 1 -- the material already moves).
+- [ ] 22 Rubble and scree at the foot of a cut. **Cosmetic debris stays SEPARATE from solid simulation**
+         (audit): particles can communicate a collapse without every speck obstructing a factory. Pairs
+         with phase 1 only for the cue, not for the cells.
 
 ### Phase 4 -- AIR (~8%)
 
 - [ ] 23 Dust motes in lit volumes.
 - [ ] 24 Debris particles on a dig.
 - [ ] 25 Impact puff when slumped material lands.
-- [ ] 26 Heat shimmer over forges (`heat_haze.gdshader` exists).
+- [x] 26 **ALREADY PRESENT.** `haze_painter.gd` is the plume over a working furnace (D0379). Note this is
+         HEAT haze, not the atmospheric depth haze item 14 wants -- those are two different things and
+         the queue conflated them.
 
 ### Phase 5 -- SURFACE (~7%)
 
@@ -116,7 +186,10 @@ six-week decision.
 
 - [ ] 31 Clamp the camera at the world edge (Astra's point 4).
 - [ ] 32 Default zoom to `CameraRig.ZOOM_LEVELS[0]`. **Blocked behind 33.**
-- [ ] 33 World width to 64 m per P031. Unblocks 32 and closes the east edge.
+- [ ] 33 World width to 64 m per P031. Unblocks 32 and closes the east edge. **Widening only postpones
+         an empty east edge -- give the new space a discoverable purpose or it buys nothing** (audit).
+         Re-check generation, saves, minimap cost and traversal at the WIDEST zoom; the previous
+         streaming measurements do not carry over.
 - [ ] 34 The east edge, T036: cliff, bore wall, dark rock to the canvas, or a wider world.
 
 ### Phase 7 -- HUD (~5%, and the one that removes shipped work)
@@ -149,6 +222,14 @@ six-week decision.
          `docs/media/reference/2026-09-10-lighting-reference.jpg`, name the largest remaining
          difference, fix that one thing, capture again. Repeat. **Lighting and rock only** -- the
          mockup's HUD is our HUD and its second depth plane is an open fork, neither is in the match.
+
+         **THE STOPPING RULE, which this item did not have and which the audit supplies.** Numerical
+         match against a single JPEG is REJECTED as the terminus: the reference is one lossy frame at
+         one camera of a scene we do not have, and driving a distance metric to zero against it would
+         overfit to its compression. It is ART DIRECTION. The loop stops on four readable conditions,
+         judged on OUR frames: materials read as themselves at play zoom; carved space is spatially
+         separable from solid rock; the lighting is attractive rather than merely bright; and it holds
+         under a MOVING camera, not only in a still. Each pass records which of the four it moved.
 
 ### Explicitly DEFERRED, with the reason (do not quietly pick these up)
 
