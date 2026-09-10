@@ -802,3 +802,32 @@ have no test at all". `tests/test_light_painter.gd:87` has `_test_the_godray()` 
 The grep behind the claim ended in `| head -8` and the godray lines fell below the cut. Nothing shipped
 on it. `[[read-the-count-not-the-rate]]`'s neighbour: a truncated list is not an empty one.
 
+## "The routing step was unbuildable" — the premise the slump was built on (D0582)
+
+`sim/mining/slump.gd`'s header justified the whole feature by claiming `docs/GDD.md` §13's "holes:
+gravity routing. free. dug, not built" was "unbuildable, because nothing in the world moved unless a
+verb moved it." **That step was already built**, and by a system this file never touches:
+`sim/items/landing.gd`'s `column_landing` walks a dropped item down its column through open air and into
+a machine's buffer if it meets one, and `Items.resettle_pile_above` re-drops a pile when the metre under
+it is bored out. Items have always fallen through holes you dig.
+
+**The conflation was between terrain falling and items falling through dug space.** They are different
+systems with different owners, and "gravity routing" is the second one. Astra's audit reached this
+independently — "moving clay terrain is not transporting consumable coal into a forge" — and I recorded
+their conclusion in the queue without noticing it also invalidated the header of the file I had written.
+
+**What made it durable.** The claim was written into the source as justification, so every later reader
+— including me, four days later, quoting it back in a queue item — met it as an established premise
+rather than a claim to check. `[[superseded-draft-above-its-amendment]]`: prose that was never true,
+shipped beside the code that refutes it. The check that would have caught it is one grep for who else
+moves an item down a column, and it takes a minute.
+
+**The feature survives the correction, and its scope does not.** Slump does buy something real — the
+world answering a blow, which `docs/NORTH_STAR.md` §2.1 says nothing did. But asked for the first time
+what it costs, on the real world: a body-height corridor at 4 m or 8 m refills **100%**, and one 1 m
+staircase step moves **1,571 cells** for the 15 it dug. That is P043, and it is the director's.
+
+**The general shape, and it is the third time tonight.** A number or a claim is most dangerous where it
+is load-bearing and oldest — this one, D0569's floor ("does NOT flatten depth"), and P036's arithmetic
+were all premises written into source or a ledger and then reasoned from rather than re-checked.
+

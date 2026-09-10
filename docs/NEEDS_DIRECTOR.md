@@ -1345,3 +1345,71 @@ tier, which is the pacing d1 and d2 already set.
 
 **This is the "workshop the player can finish and trust" item.** The audit's closing line named that as
 the broader objective; this is the measurement of how far the build is from it.
+
+## P043 · Loose cells are a real feature at a magnitude nobody chose. Which material should carry them?
+
+**The director asked whether the cascading dig was a bug or a feature.** It is a feature — D0562/D0563/
+D0566 — but only half of the observed behaviour was ever designed, and the other half had never been
+measured until the question was asked.
+
+**Designed:** loose material falls when unsupported; it slides diagonally rather than standing in a
+column (an angle of repose); undermining a mass drops it; dust and a camera knock in proportion.
+
+**Never designed, measured for the first time on 2026-09-10, on the real generated world:**
+
+| dig | outcome |
+|---|---|
+| body-height corridor, 20 m long, 4 m down | **100% refilled**, 0 of 10 cells of headroom |
+| same at 8 m down | **100% refilled**, 0 of 10 |
+| same at 16 m / 30 m | 91% / 54% refilled, 0 and 2 of 10 |
+| one 1 m staircase step (15 cells dug) | **1,571 cells moved (105×)**, 0 of 15 still open |
+| eight-step staircase (128 cells dug) | **4,014 cells moved (31×)**, 33% of the dig survives |
+
+**You cannot cut a walkable corridor anywhere in the tutorial world.** Nobody decided a staircase should
+seal behind the player; it fell out of `clay` — the tutorial's own bedrock — carrying the flag.
+
+**Three attempts to keep both behaviours, all measured, all failed identically:**
+
+| variant | corridor headroom | undermined bank |
+|---|---|---|
+| today (a fall wakes the cell above) | 0 / 10 | drops — works |
+| require ≥1 solid of LEFT/RIGHT/UP | 10 / 10 | **0 rows — gone** |
+| no upward wake (one layer, then stop) | 9 / 10 | **0 rows — gone** |
+
+**This is not a tuning problem.** A tunnel roof and an undermined mass are locally identical — loose
+cells, open space below, solid rock to the sides — so no rule reading only neighbours can tell them
+apart. You get "the world answers a blow" or "corridors survive", never both.
+
+**And the justification the feature was built on was false**, corrected in `slump.gd`'s header and in
+`docs/CORRECTIONS.md`. GDD §13's "holes: gravity routing" was already implemented in
+`sim/items/landing.gd`; items have always fallen through dug space. Terrain falling was never needed
+for it. Astra's audit said the same independently.
+
+**THE QUESTION.** The mechanic is worth keeping — it is the only thing in the build that makes the world
+answer a blow, and it is now correct and carrying 77 assertions across three suites. It needs a material
+that should actually slump. Cohesive rock holds a tunnel; granular material flows. Noita draws exactly
+this line, and it is the north star here.
+
+1. **A new granular material** — sand or gravel as a strata band, or spoil produced by digging that
+   piles up where you leave it. Clay stops being loose. My recommendation, and the one that makes the
+   mechanic teach something ("this stuff moves, that stuff doesn't").
+2. **Leave clay loose and design around it** — the world is genuinely unstable and shoring becomes a
+   verb. Coherent, much larger, and it makes the first hour about fighting the earth.
+3. **Park it** — drop the two calls in `MineHold.step` (the reversal its own header names) and keep the
+   machinery for when a material earns it.
+
+Option 1 is a few minutes once the material is decided; the material itself is content design and is
+yours. **Nothing changes until this is ruled on** — the flag is still on clay as this is written.
+
+### DIRECTOR'S RULING, 2026-09-10: HOLD. Do not fix it.
+
+> *"You dont have to jump the gun in fixing the cascade of loose cells. Who knows, maybe its a game
+> mechanic? in the same way minecraft builds and redstone contraptions can utilize falling sand somehow.
+> We don't know yet."*
+
+**The measurements stand as a description, not as a defect report.** Falling sand is load-bearing in
+Minecraft precisely because it is exploitable — duplicators, TNT cannons, gravity-fed farms — and none
+of that was designed either. A material that flows into any space you cut is a constraint players build
+*against*, and a corridor that needs shoring is a different game from one that doesn't, not a broken
+one. This entry stays open as a design question with no owed action; nothing above is to be treated as a
+queue item until the director says otherwise.

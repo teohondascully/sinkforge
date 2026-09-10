@@ -22543,3 +22543,30 @@ measured false. The cheapest thing available here is a number, and numbers are w
    state with a save-format cost, so it is not a view change and wants a ruling before it is started.
 Reverse: N/A -- nothing was built. The measurements and the mechanism are the artifact.
 
+## D0582 · 2026-09-10 · sim/mining/slump.gd · the header's justification was false; the scoping is P043
+Decided: correct the header. No behaviour changes; the flag stays on clay until the director rules.
+Why: the director asked whether the cascading dig they were seeing was a bug or a feature. It is a
+feature -- and answering properly meant measuring what had never been measured, which turned up two
+things. First, the file's stated justification is false: GDD §13's "holes: gravity routing" was already
+implemented in `sim/items/landing.gd` (`column_landing` walks a dropped item down its column into a
+machine's buffer) and terrain falling was never needed for it. `docs/CORRECTIONS.md`. Second, the scope
+is wrong, and by a wide margin.
+MEASURED on the real generated world, `shallow_clay` seed 12345:
+    a body-height corridor 20 m long at 4 m down    100% refilled,  0 of 10 cells of headroom
+    the same at 8 m                                 100% refilled,  0 of 10
+    the same at 16 m / 30 m                          91% / 54%,     0 and 2 of 10
+    one 1 m staircase step, 15 cells dug            1,571 cells moved (105x), 0 of 15 still open
+    an eight-step staircase, 128 cells dug          4,014 cells moved (31x),  33% of the dig survives
+A player cannot cut a walkable corridor anywhere in the tutorial world.
+AND NO LOCAL RULE FIXES IT, which is the finding rather than the numbers. Two variants were built and
+measured: a cohesion clause (a loose cell is held when >= 1 of LEFT/RIGHT/UP is solid) and dropping the
+upward wake in `_move` so a blow drops one layer and stops. Both gave the corridor back -- 10/10 and
+9/10 headroom -- and both removed the collapse entirely: an undermined bank dropped 0 rows under each.
+A tunnel roof and an undermined mass are LOCALLY IDENTICAL: loose cells, open below, solid to the sides.
+Nothing that reads only neighbours can distinguish them, so the two behaviours cannot coexist in one
+material. The fix is a material, not a constant.
+NOT ACTED ON, deliberately. Removing `loose` from clay leaves no loose material and takes 77 assertions
+across three suites red with it; adding a granular material is content design. Both are the director's,
+in P043 with three options and a recommendation.
+Reverse: N/A -- a comment change.
+

@@ -1,18 +1,37 @@
 class_name Slump
 extends RefCounted
 
-## LOOSE MATERIAL FALLS (D0562). Until now the earth was scenery: `docs/GDD.md` §1 calls the terrain the
-## factory and §13 puts "holes: gravity routing. free. dug, not built" at position two of the automation
-## chain, above every machine -- and that step was unbuildable, because nothing in the world moved unless
-## a verb moved it. An Opus playthrough on 2026-09-10 cut forty-two cells out from under a standing mass
-## and the mass hung there; `docs/NORTH_STAR.md` §2.1 is the table of what the world did in reply to
-## everything a player can do to it, and every row of it said "nothing".
+## LOOSE MATERIAL FALLS (D0562). A cell whose material is `loose` and whose support is gone moves down
+## one cell a step, and slides diagonally when it cannot fall straight, which is an angle of repose
+## rather than a column standing on a corner.
 ##
-## This is the smallest change that makes the world answer: a cell whose material is `loose` and whose
-## support is gone moves down one cell a step, and slides diagonally when it cannot fall straight, which
-## is an angle of repose rather than a column standing on a corner. Clay is the only loose material today
-## (`data/materials/clay.yaml`) and it is the whole tutorial world's rock, so the change is felt
-## immediately without touching hardrock, deepstone or any ore.
+## WHY: the earth was scenery. An Opus playthrough on 2026-09-10 cut forty-two cells out from under a
+## standing mass and the mass hung there; `docs/NORTH_STAR.md` §2.1 is the table of what the world did
+## in reply to everything a player can do to it, and every row of it said "nothing". This is the
+## smallest change that makes the world answer a blow.
+##
+## **AND THE JUSTIFICATION THIS HEADER USED TO GIVE WAS FALSE (D0582).** It said `docs/GDD.md` §13's
+## "holes: gravity routing. free. dug, not built" was "unbuildable, because nothing in the world moved
+## unless a verb moved it". That step was ALREADY BUILT and this file has nothing to do with it:
+## `sim/items/landing.gd`'s `column_landing` walks a dropped item down its column through open air and
+## into a machine's buffer if it meets one, and `Items.resettle_pile_above` re-drops a pile when the
+## metre under it is bored out. Items already fall through holes you dig. TERRAIN falling and ITEMS
+## falling through dug space are different systems and the original header conflated them. Astra's audit
+## reached the same conclusion independently ("slump is not the fuel-routing breakthrough"). What this
+## file actually buys is the world answering a blow, which is worth having on its own and is the only
+## claim it should make.
+##
+## **THE SCOPING IS AN OPEN QUESTION AND THE MEASUREMENTS ARE UNCOMFORTABLE (P043).** `clay` is the only
+## loose material and it is the tutorial world's own rock, so every corridor a new player cuts is cut
+## through material that flows. Measured on the real generated world: a body-height corridor at 4 m and
+## at 8 m refills **100%**, leaving 0 of the 10 cells of headroom a body needs to walk; one 1 m staircase
+## step moves **1,571 cells** for the 15 it dug and none of the 15 stays open. Three attempts to keep
+## both behaviours all failed the same way -- a cohesion clause, and dropping the upward wake, each gave
+## the corridor back and removed the collapse entirely. A tunnel roof and an undermined mass are
+## LOCALLY IDENTICAL (loose cells, open below, solid to the sides), so no rule that reads only
+## neighbours can distinguish them. The fix is a material, not a constant: cohesive rock holds a tunnel,
+## granular material slumps, which is the line Noita itself draws. Director's call; nothing here changes
+## until it is made.
 ##
 ## SHAPE LIFTED FROM `TreeFall` (D0438), DELIBERATELY. Same seam (`MineHold.step` calls `settle` before
 ## the tick's aim and `after_break` after a blow), same transient queue, same reversal: drop the two calls
