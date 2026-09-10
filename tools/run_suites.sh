@@ -111,11 +111,16 @@ progress_line() {
   local done_n; done_n=$(find "$out" -name '*.result' 2>/dev/null | wc -l | tr -d ' ')
   local elapsed=$(( $(date +%s) - SWEEP_START ))
   local eta="?"
-  # Wall-clock projection from the mean completed suite, scaled by parallelism: with `jobs` workers the
-  # remaining suites finish about `jobs` at a time. It is a straight-line estimate over a population whose
-  # slowest member is 164 s, so it reads LOW early in a sweep -- named `~` rather than reported as fact.
+  # Wall-clock projection from the mean completed suite. `elapsed / done_n` is already WALL time per
+  # suite, so it carries the parallelism inside it: with `jobs` workers, suites complete `jobs` times
+  # faster in wall-clock terms and that is exactly what the mean measures. It read
+  # `/ (done_n * SWEEP_JOBS)`, which divides by parallelism a SECOND time and understates every estimate
+  # by a factor of `jobs` (Astra, A10). It was invisible locally because the battery runs `jobs=1` and
+  # dividing by one is free; at the `jobs=4` CI uses it reported a quarter of the true remaining time.
+  # "Approximate" is not a licence for wrong arithmetic. Still a straight-line estimate over a population
+  # whose slowest member is 164 s, so it reads LOW early in a sweep -- named `~` rather than as fact.
   if [ "$done_n" -gt 0 ] && [ "$elapsed" -gt 0 ]; then
-    eta="$(( (elapsed * (SWEEP_TOTAL - done_n)) / (done_n * SWEEP_JOBS) ))s"
+    eta="$(( (elapsed * (SWEEP_TOTAL - done_n)) / done_n ))s"
   fi
   printf 'run_suites: [%3d/%3d] %3d%% | %4ds elapsed | ~%-6s left | %s %s (%ss)\n' \
     "$done_n" "$SWEEP_TOTAL" "$(( done_n * 100 / SWEEP_TOTAL ))" "$elapsed" "$eta" \

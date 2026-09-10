@@ -22394,3 +22394,51 @@ control that the surface and the deep answer differently. Restoring D0569's clam
 red; ignoring the depth ramp turns 2 red. Both witnessed.
 Reverse: CHEAP -- two constants and one `mix`. The tests would go red, which is the point.
 
+## D0578 · 2026-09-10 · sim/body/body_swing.gd, tools/run_suites.sh · A9 and A10, from Astra's audit
+Decided: the swing's correction is bounded by the body's own box; a refused pull gives its line back;
+the landing datum is written from the accepted position, not the requested one.
+Alternative: a swept-path collision test. It is the general answer and it is not needed here -- the
+bound makes the endpoint test sound by construction, for a hundredth of the work and none of the risk
+of a second, subtly different collision predicate living beside the axis resolvers'.
+Why: D0567 argued safety from "every candidate is a subset of a move the constraint already wanted".
+That is true of the candidate SET and says nothing about the PATH; `_slide` tests destinations only.
+Astra probed it and a move straight across an intervening floor was accepted because the far side was
+clear. They called it a proof gap rather than a reproduced exploit. IT IS REACHABLE, and this entry is
+the mechanism they did not have: `Grapple.reel` shortens the line on every ANCHORED tick with up held,
+before anything knows the constrained position will be refused. In a shaft the refusal is every tick, so
+the line ratcheted in at 7 px a tick while the body stood still and the correction owed grew until one
+later tick had to move the body hundreds of pixels in one step. `MIN_FREE` is the only bound on it.
+THE BOUND IS DERIVED, NOT CHOSEN. Move a `WIDTH_PX`-wide box by `d`: origin spans `[x-8, x+8]`,
+destination `[x+d-8, x+d+8]`, and a solid can sit between them touched by neither only when
+`d > WIDTH_PX`. At or under the body's own width there is no gap to hide in. `MAX_CORRECTION` is
+`Body.WIDTH_PX * Fx.SCALE` and the suite asserts the RELATION, not the literal. A normal tick asks for
+about 14 px (7 of speed, 7 of reel) against a bound of 16, so ordinary swings are untouched.
+THE RESTORE LIVES IN `BodySwing`, NOT AS A `Grapple` METHOD, and the reason is the file cap. A
+`give_back()` on `Grapple` is the better home on encapsulation grounds and it put that file at 413
+against a 400 limit -- it had been sitting at exactly 400. `BodySwing` already writes `g.taut` directly,
+so remembering the pre-reel length and restoring it at the refusal is not a new kind of reach, it is two
+lines instead of thirteen, and it puts the restore beside the refusal it answers. The cap decided this;
+recorded so nobody reads it as a considered layering call. `sim/body/grapple.gd` is now a second file at
+its cap, after `interface/observation.gd` (P034).
+AND A10 IN THE SAME COMMIT, because it is one line of the same audit: `tools/run_suites.sh`'s ETA
+divided by `SWEEP_JOBS` on top of a mean that already carries parallelism, understating every estimate
+by a factor of `jobs`. Invisible locally -- the battery runs `jobs=1` -- and a quarter of the truth at
+the `jobs=4` CI uses.
+MEASURED: 13 asserted in the new `tests/test_grapple_safety.gd`; `test_grapple_body.gd` is unchanged at
+39 and back under the file cap. One swing pass from a posed 283 px
+overhang moves 16 px, not 283. Thirty refused ticks with up held take 0 px of line, against 7 a tick.
+AND TWO OF THE THREE GUARDS WERE NOT WITNESSED ON THE FIRST TRY, which is the part worth recording.
+The bound's test called `_step_toward` directly, so deleting the CALL in `step` left every assertion
+green -- the helper was tested and the code path was not. The landing datum's test ran in a shaft, where
+`_slide` tries the vertical candidate first and the accepted y therefore EQUALS the requested y, so the
+two could not be told apart there either; it needs a ceiling refusing a rise while the horizontal
+candidate is free. Both are `[[instrument-cannot-register-subject]]`, and both were found by running the
+mutation rather than by reading the test. Now: bound removed 1 red, give_back call removed 1 red,
+landing priced pre-slide 1 red. All three re-witnessed after the restore moved.
+The entombment test earned its control twice over. A 16 px box at an arbitrary x straddles FIVE 4 px
+columns, so a pocket cut to the cells the box touches is 20 px wide and the body drifts the spare 4 --
+the control caught exactly that and the body is snapped to the cell grid before packing. And the first
+assertion demanded NO line be taken at all, which is wrong: a slack line reeling in is not a refused
+pull, and the tick it goes taut is the tick the refusal starts. One step, then nothing.
+Reverse: CHEAP -- one constant, one call, one moved line. The tests would go red, which is the point.
+

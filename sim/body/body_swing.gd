@@ -48,6 +48,7 @@ static func step(body: Body, grid: TileGrid, input: InputFrame) -> void:
 	if input.grapple_pressed and input.has_aim:
 		g.fire(hand, aim_fx(input))
 	g.advance(grid, hand)
+	var line_before: int = g.length      # see the refusal below: a refused pull must not ratchet (D0578)
 	g.reel(input.climb_dir)
 	if g.state != Grapple.State.ANCHORED:
 		return
@@ -56,12 +57,22 @@ static func step(body: Body, grid: TileGrid, input: InputFrame) -> void:
 	var swung: Vector2i = g.constrain_position_fx(centre)
 	if not g.taut:
 		return
-	body.gait.fall_from_y = swung.y      # a fall the rope caught is over; the landing is not priced from above it
+	swung = _step_toward(centre, swung)
 	if swung != centre:
 		swung = _slide(body, grid, centre, swung)
 		if swung == centre:
 			g.taut = false               # nothing of the move fits: the stand-in for the re-resolve
+			# AND THE WINCH GIVES ITS LINE BACK (D0578). `reel` shortens on every ANCHORED tick with up
+			# held, before anything can know this refusal is coming. In a shaft the refusal is every
+			# tick, so the line came in at 7 px a tick while the body stood still and the correction
+			# owed grew until one tick had to move the body further than its own box -- which is exactly
+			# the distance where `_slide`'s endpoint checks stop being sound. See `MAX_CORRECTION`.
+			g.length = line_before
 			return
+	# THE ACCEPTED POSITION, not the requested one (A9). This was set from the pre-slide `swung`, so a
+	# tick whose move was trimmed or refused still priced the landing from a place the body never
+	# reached -- and the refusal path above returns with it already written.
+	body.gait.fall_from_y = swung.y      # a fall the rope caught is over; the landing is not priced from above it
 	body.pos_x = swung.x
 	body.pos_y = swung.y
 	body.swung_this_tick = true
@@ -108,6 +119,37 @@ static func coast(body: Body, input: InputFrame, top: int, decel: int) -> void:
 ## VERTICAL IS TRIED FIRST, deliberately. Both orders fix the shaft, because the horizontal candidate is
 ## blocked there and falls through -- but the line exists to buy vertical space (`docs/GDD.md` §1), and
 ## when both axes are clear the one that gets you out of the hole is the one to spend the tick on.
+## THE CORRECTION IS BOUNDED BY THE BODY'S OWN BOX, and that bound is the reason the endpoint checks in
+## `_slide` are a correctness argument instead of an assumption (A9).
+##
+## `_slide` tests DESTINATIONS, never the swept path between them, and D0567's header claimed safety
+## from "every candidate is a subset of a move the constraint already wanted". That is true of the
+## candidate SET and says nothing about what the body passes through on the way. A helper probe accepts
+## a move straight across an intervening floor when the far side is clear.
+##
+## Whether that is reachable is a question about DISTANCE, and it has an exact answer. The body's box is
+## `WIDTH_PX` wide. Move it by `d` horizontally and the origin box spans `[x-8, x+8]`, the destination
+## `[x+d-8, x+d+8]`: a solid can sit between them, touched by neither, only when `d > WIDTH_PX`. Under
+## that, the two boxes overlap or touch and nothing can hide in the gap because there is no gap. So the
+## bound is not a chosen number -- it is the body's own width, and `tests/test_grapple_body.gd` asserts
+## the relation rather than the literal.
+##
+## A normal tick never reaches it: the overshoot is the body's speed (`SWING_MAX_SPEED`, 7 px a tick)
+## plus the reel (7 px), about 14 against a bound of 16. What DID reach it was the ratchet -- see
+## `Grapple.give_back`. Both halves are fixed, and this one is the backstop that holds even if some
+## future path finds another way to owe a large correction: the body converges to the circle over
+## several ticks instead of snapping to it in one.
+const MAX_CORRECTION: int = Body.WIDTH_PX * Fx.SCALE
+
+
+static func _step_toward(from: Vector2i, to: Vector2i) -> Vector2i:
+	var d: Vector2i = to - from
+	var far: int = Fx.isqrt_ceil(Fx.length_sq(d.x, d.y))
+	if far <= MAX_CORRECTION or far == 0:
+		return to
+	return from + Vector2i((d.x * MAX_CORRECTION) / far, (d.y * MAX_CORRECTION) / far)
+
+
 static func _slide(body: Body, grid: TileGrid, from: Vector2i, to: Vector2i) -> Vector2i:
 	if not _blocked_at(body, grid, to):
 		return to

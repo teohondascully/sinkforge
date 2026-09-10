@@ -98,14 +98,14 @@ phase 2 cannot be measured honestly while A8 stands.
        deep to the reference's brightness sits above the entire range. Replaced with a depth-ramped
        ambient LIFT (`lit = mix(s, 0.48 + 0.69*s, d/AMBIENT_DARK)`), which restores two-thirds of the
        lost contrast at the brightness D0569 wanted and leaves the surface bit-identical.
-- [ ] A9 **Grapple `_slide` checks destinations, not swept paths.** "Every candidate is a subset of the
+- [x] A9 **DONE (D0578), and it was reachable, not only a proof gap.** Grapple `_slide` checks destinations, not swept paths. "Every candidate is a subset of the
        requested move" is not a collision-safety proof; a direct helper probe accepted a move across an
        intervening solid floor because the endpoint was clear. The pre-existing full-projection path
        shares the weakness. Four witnesses before this is called closed: (1) the maximum correction
        reachable through normal reeling and pivot changes, (2) thin barriers along that correction path,
        (3) repeated blocked reeling then release -- the rope shortens even when the move is refused,
        (4) velocity and landing bookkeeping against the ACCEPTED displacement, not the requested one.
-- [ ] A10 **`tools/run_suites.sh:118` ETA divides by parallelism twice.** Elapsed wall time per completed
+- [x] A10 **DONE (D0578).** `tools/run_suites.sh` ETA divides by parallelism twice. Elapsed wall time per completed
        suite already carries concurrent throughput; dividing again by `SWEEP_JOBS` understates every
        estimate. "Approximate" does not excuse the arithmetic. (My own tool, D0573.)
 - [ ] A11 **Hand mining and drilling give inconsistent terrain response.** Only a hand blow seeds the
