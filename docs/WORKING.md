@@ -247,13 +247,31 @@ left here.
 
 ### Phase 6 -- FRAME AND CAMERA
 
-- [ ] 31 Clamp the camera at the world edge (Astra's point 4).
-- [ ] 32 Default zoom to `CameraRig.ZOOM_LEVELS[0]`. **Blocked behind 33.**
-- [ ] 33 World width to 64 m per P031. Unblocks 32 and closes the east edge. **Widening only postpones
-         an empty east edge -- give the new space a discoverable purpose or it buys nothing** (audit).
-         Re-check generation, saves, minimap cost and traversal at the WIDEST zoom; the previous
-         streaming measurements do not carry over.
-- [ ] 34 The east edge, T036: cliff, bore wall, dark rock to the canvas, or a wider world.
+**THREE OF FOUR ALREADY BUILT, and that makes TEN across the whole queue** (10, 13, 15, 16, 23, 26, 31,
+32, 33, and half of 11). **The queue was authored from stale diagnoses.** Several items came from
+Astra's earlier observation notes and from a triage pass that read the source's intent rather than
+running against the current tree -- item 31's "the frame shows the void past the world" was fixed by
+D0333 on 2026-09-01, item 33 asks for a 64 m world that already exists, and item 10's premise was
+inverted. The lesson for the rest of the queue: **measure the item before building it.** It has cost
+nothing and saved most of a night.
+
+- [x] 31 **ALREADY PRESENT (D0333, 2026-09-01), CALLED, AND TESTED.** `CameraRig.set_world_limits` /
+         `clamp_to_limits`, applied inside `step()`, called from `shell/main.gd:106` with the grid's
+         pixel bounds, covered by three assertions in `tests/test_camera_rig.gd`. Astra's point 4 was
+         written before D0333 landed and the queue inherited it stale.
+- [x] 32 **ALREADY SATISFIED.** `Settings.zoom_idx` defaults to **0** and `shell/main.gd:89` reads
+         `ZOOM_LEVELS[zoom_idx]`, so the boot zoom already IS `ZOOM_LEVELS[0]` = 2.00. Measured on the
+         real world: 2.00 shows 40.0 m of a 64.0 m world, so nothing is framed with void at the default.
+- [x] 33 **ALREADY DONE -- THE WORLD IS ALREADY 64 m.** Measured, not read: `WorldSeeder.load_world`
+         gives 256 cells x 4 px = 1024 world px = **64.0 m**, which is exactly what P031's ruling asked
+         for. The audit's caution ("widening only postpones an empty east edge") still applies to item
+         34, and now applies to a width that already exists rather than to one being proposed.
+- [ ] 34 The east edge, T036: cliff, bore wall, dark rock to the canvas, or a wider world. **THE ONE
+         REAL ITEM IN THIS PHASE, and widening is no longer among its answers.** Measured across the
+         zoom ladder on the 64 m world: 2.00 shows 40.0 m (no void), 1.40 shows 57.1 m (no void), 1.00
+         shows 80.0 m (**256 px of void**), 0.66 shows 121.2 m (**915 px of void**). So the defect is
+         real but it is confined to the two widest zooms, and it is a QUESTION about what the world ends
+         with, not a width to change. Four candidate answers are already written in T036.
 
 ### Phase 7 -- HUD (~5%, and the one that removes shipped work)
 
