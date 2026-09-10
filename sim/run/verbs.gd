@@ -47,7 +47,7 @@ var _drop_grace: Dictionary = {}       # logic_cell -> ticks remaining
 ## for a fed or a floor drop.
 var last_drop: StringName = &""
 var last_drop_short: Vector2i = NONE
-const FAR_EATER_M: int = 12
+const FAR_EATER_M: int = Reach.NAMED_M
 
 
 func _init(p_world: World, p_items: Items, p_machines: Machines, p_body: Body) -> void:

@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_test_what_a_stalled_machine_asks_for()
 	_test_the_ports()
 	_test_the_aim_and_the_gates()
+	_test_a_nameplate_reaches_as_far_as_the_games_own_sentences()
 	_test_plates_collapse_runs_and_pack_shelves()
 	_test_the_construction_flash()
 	_test_the_bubble_stands_down_while_the_ladder_runs()
@@ -100,6 +101,28 @@ func _test_the_aim_and_the_gates() -> void:
 	_check(not MachinePainter.text_visible(out, near, Vector2i(-1, -1)) and not MachinePainter.label_visible(out, near, Vector2i(-1, -1)),
 		"zoomed out past the text gate nothing reads, even up close")
 	_check(MachinePainter.text_visible(out, near, near), "...except the aimed machine")
+
+
+## D0559. The drop names a machine in words out to `Reach.NAMED_M` -- "the FORGE that takes ore is 8 m to
+## your LEFT" -- and the nameplate reached 6.4 m, so the game said a name for a machine the player could
+## not find a name on. S131: "multiple forges existed but no clear labels distinguishing ore-forge vs
+## coal-forge", in the same report as the 8 m sentence. Both halves were this.
+##
+## THE ASSERTION IS THE ORDER, not either number. A nameplate may reach further than the sentence -- that
+## is a taste call about clutter and the director's to make -- but it may never reach LESS far, because
+## then the game names what it will not label. `[[constant-must-dominate-constant]]`: two literals that
+## must be ordered cannot both be literals, and this pair had drifted to a factor of two while a comment
+## in a third file claimed they matched.
+func _test_a_nameplate_reaches_as_far_as_the_games_own_sentences() -> void:
+	_check(MachinePainter.LABEL_NEAR_M >= float(Reach.NAMED_M),
+		"a nameplate reaches at least as far as the game will name a machine in a sentence: %.1f m >= %d m"
+			% [MachinePainter.LABEL_NEAR_M, Reach.NAMED_M])
+	# AND THE THREE READERS ARE ONE NUMBER, not three that happen to agree today. `Verbs` is sim and
+	# `DropLessons` is view, which may not depend on sim, so the range lives in core and both read it.
+	_check(Verbs.FAR_EATER_M == Reach.NAMED_M,
+		"the drop's search is the core range, not a copy: %d == %d" % [Verbs.FAR_EATER_M, Reach.NAMED_M])
+	_check(is_equal_approx(DropLessons.WANTED_RANGE_M, float(Reach.NAMED_M)),
+		"and so is the lesson's: %.1f == %d" % [DropLessons.WANTED_RANGE_M, Reach.NAMED_M])
 
 
 func _test_plates_collapse_runs_and_pack_shelves() -> void:

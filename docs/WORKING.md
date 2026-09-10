@@ -308,9 +308,12 @@ whole layer: one metre is a rule to loosen (sim, the director's), 3.2 m is a thi
 2. **Coal is the floor.** S130 never got coal in 41 bursts: TOO FAR at the seam, then TOO FAR DOWN with
    "dig at the white square first", then NOTHING THERE at the squares it chose. Refusals across the
    batch: `air` 14, `far` 6, `sight` 2, `build_far` 2. This is the biggest wall left and it is untouched.
-3. **S131's "three forges, no labels" needs re-reading before anything is built for it** -- on a real
-   seat the nameplates DO read FORGE and CREW RIG, so the report and the build disagree and the report
-   has not been checked against a capture.
+3. ~~**S131's "three forges, no labels"**~~ DONE (D0559), and the capture changed what got built. There
+   really are two forges; the far one had NO plate, because nameplates reached 6.4 m while the drop
+   names a machine in words out to 12. One defect, not two. There is no ore-forge/coal-forge
+   distinction -- both run `smelt_ingot` -- so that phrase in the report is a stranger's invention that
+   I copied down; the missing thing was a NAME. The range now lives in `Reach.NAMED_M` and all three
+   readers share it.
 
 **D0553 and D0554 remain shipped and unmeasured**; with D0557 that is three gameplay changes waiting on
 a batch, which is what the next stranger run is for.

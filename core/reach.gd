@@ -18,6 +18,20 @@ extends RefCounted
 const NUM: int = 16
 const DEN: int = 5
 
+## THE RANGE AT WHICH THE GAME WILL NAME A MACHINE IN A SENTENCE, in metres (D0559). `Verbs`' drop looks
+## this far for an eater before letting a stack fall, and names the one it finds ("the FORGE that takes
+## ore is 8 m to your LEFT"); `DropLessons` reads the same range to decide which machine a WRONG STACK is
+## about; and `MachinePainter` must write a machine's NAME on screen at least this far, or the game says
+## a name for something the player cannot find a name on.
+##
+## It lives here for D0521's reason, one rule further on: three files had their own copy -- `Verbs`'
+## `FAR_EATER_M = 12`, `DropLessons`' `WANTED_RANGE_M = 12.0` "`Verbs.FAR_EATER_M`, the range the drop's
+## TOO FAR already uses", and `MachinePainter`'s `LABEL_NEAR_M = 6.4`, which was NOT a copy and did not
+## agree. A comment naming the constant it must match is not a guard, and this one had drifted to half.
+## `view` may not depend on `sim`, so a shared number cannot live in `sim`; it lives at the floor and
+## every layer reads it. `[[constant-must-dominate-constant]]`.
+const NAMED_M: int = 12
+
 
 ## Is the `Fx` point within reach of the body? Squared, never `sqrt`. The axis reject first BOUNDS the
 ## operands: without it a body at the bottom of a 4096 px world squaring a full-height delta runs near

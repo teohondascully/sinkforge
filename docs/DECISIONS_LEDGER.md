@@ -21913,3 +21913,44 @@ the plate that the drop would no longer give (two assertions). Full local batter
 then TOO FAR DOWN, then NOTHING THERE), and S131's "three forges, no labels" needs re-reading against a
 capture before anything is built for it -- the nameplates read FORGE and CREW RIG on a real seat, so the
 report and the build disagree and the report has not been checked.
+
+## D0559 · 2026-09-09 · A nameplate must reach as far as the game's own sentences: the naming range moves to core and the label follows it
+
+**Decided:** `Reach.NAMED_M = 12` is the one range at which this game will name a machine, and
+`Verbs.FAR_EATER_M`, `DropLessons.WANTED_RANGE_M` and `MachinePainter.LABEL_NEAR_M` all read it instead
+of holding their own numbers. The visible change: **a machine's nameplate now reaches 12 m where it
+reached 6.4.** No rule changed -- the drop searched 12 m before and searches 12 m now.
+
+**Why, and it is S131's report read properly.** That seat wrote two things in the same report: "TOO FAR
+-- the FORGE that takes ore is 8 m to your LEFT", and "multiple forges existed but no clear labels
+distinguishing ore-forge vs coal-forge". I filed those as two findings. They are one. **The drop names a
+machine in words out to 12 m and the nameplate stopped at 6.4**, so the game said a name for a machine
+the player could not find a name on. At 8 m the sentence was the only thing in the world that knew.
+
+**Checked against a capture before building, per D0557's own note**, and the capture changed what got
+built. On a real seat at the smelt rung there are genuinely **two forges** -- one beside the body, one
+about 9 m to the lower right -- and before this change the second carried no plate at all. So S131 was
+not confused: it was describing something real. What it got wrong was the explanation, and so did I when
+I copied its words down. **There is no ore-forge and no coal-forge**; both run `smelt_ingot` and both
+take ore and coal. A stranger seeing two identical unnamed boxes invented a distinction to explain why
+the game kept pointing at one of them, and the report carried that invention into `docs/playtests/`.
+The defect was never a missing distinction, it was a missing NAME.
+
+**Why the constant moved rather than being copied a fourth time.** `Verbs` is `sim`, `DropLessons` and
+`MachinePainter` are `view`, and `view` may not depend on `sim` (`tools/layer_lint`: view -> interface,
+core, data). So a number all three must agree on cannot live in `sim`; D0521 moved the reach rule to
+`core/` for exactly this and this is that rule one step on. What was there before was worse than a copy:
+`DropLessons` carried `12.0` with the comment "`Verbs.FAR_EATER_M`, the range the drop's TOO FAR already
+uses" -- true -- while `MachinePainter` carried `6.4` from "legacy REACH_CELLS 3.2 x 2", which was not a
+copy of anything and had never agreed. **A comment naming the constant it must match is not a guard.**
+`[[constant-must-dominate-constant]]`.
+
+**The pin is the ORDER, not either number.** A nameplate may reach FURTHER than the sentence -- that is a
+clutter judgment and the director's -- but never less far, or the game names what it will not label. The
+suite asserts `LABEL_NEAR_M >= Reach.NAMED_M` and that the three readers are one number.
+
+**Verified:** `tests/test_machine_painter.gd` **50 -> 53** asserted; drop_lessons 23, hints 57 and
+interface_verbs 65 unchanged, which is the point -- the drop's behaviour is identical. Two mutations
+fire: halving the label range reproduces the shipped defect exactly (6.0 m >= 12 m fails), and giving
+the lesson its own copy again (14.0) fails the agreement. Clutter inspected on the real seat at play
+zoom: three plates and the ring's word on screen at once, which reads cleanly. Full local battery green.

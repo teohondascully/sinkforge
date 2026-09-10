@@ -19,7 +19,7 @@ extends RefCounted
 ## ink), and the plate lets go of any drop lesson the tick a drop feeds: a receipt and a refusal never show
 ## together.
 
-const WANTED_RANGE_M: float = 12.0        ## `Verbs.FAR_EATER_M`, the range the drop's TOO FAR already uses
+const WANTED_RANGE_M: float = float(Reach.NAMED_M)   ## the one range, in core (D0559), not a copy of it
 const LESSONS: Array[StringName] = [&"dropped_floor", &"dropped_wrong", &"dropped_short"]
 
 var _prev_counts: Dictionary = {}

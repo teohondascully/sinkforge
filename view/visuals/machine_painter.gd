@@ -27,7 +27,13 @@ const CELL: float = float(Interface.Observation.LOGIC_PX)
 const CHROME_SCALE: float = CELL / 32.0
 const TEXT_ZOOM: float = 1.3      ## legacy 0.65: would 8 px type survive at this scale
 const DETAIL_ZOOM: float = 1.24   ## legacy 0.62: rivets and vents only when resolvable
-const LABEL_NEAR_M: float = 6.4   ## legacy REACH_CELLS 3.2 × 2, in metres: the ring you are about to touch
+## A NAMEPLATE MUST REACH AS FAR AS THE GAME'S OWN SENTENCES DO (D0559). This was 6.4 -- "legacy
+## REACH_CELLS 3.2 x 2, in metres: the ring you are about to touch" -- while the drop names a machine in
+## words out to `Reach.NAMED_M` (12 m). S131 read "TOO FAR -- the FORGE that takes ore is 8 m to your
+## LEFT", looked left at 8 m, and found machines with no names on them: "multiple forges existed but no
+## clear labels distinguishing ore-forge vs coal-forge". Both halves of that sentence were the same
+## defect. Derived, never written: the two must be ordered and a literal cannot hold that.
+const LABEL_NEAR_M: float = float(Reach.NAMED_M)
 const WORK_ANIM_FPS: float = 4.0
 const CONSTRUCT_DUR: float = 0.38
 const PROGRESS_BAR_H: float = 3.0 ## legacy px
