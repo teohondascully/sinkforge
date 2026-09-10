@@ -1,5 +1,106 @@
 # Brief
 
+## What was learned — the queue was measuring the wrong things, and a fix of mine was the cause (D0575-D0581)
+
+Astra audited the overnight run and was right on every claim I could check mechanically. **P036 is
+withdrawn, not answered:** I wrote that the renderer multiplies only, and `view/view_stack.gd`'s
+`_mount_light` has mounted the light pass on a `BLEND_MODE_ADD` canvas since D0373, whose header says so
+in capitals. D0575 — three per-material `base_color` scales — is withdrawn with it; it also failed a real
+gate (`test_material_palette.gd`, coal 0.0933 against a 0.1426 floor) and the audit's qualification is
+the load-bearing half: that floor is *derived* from inter-rock separation, so widening the palette moved
+its own bar.
+
+**The larger finding is that D0569 had turned the veil into a constant.** Its floor clamped the COMBINED
+output at 0.55 while the underground's output cannot exceed `sky` 0.34 × `shade` 1.30 = 0.442. Measured:
+buried rock, mid rock, a lit cut face, cave air and true void all returned rgb (0.5500, 0.5610, 0.6382)
+— one colour for every structurally different thing below the scatter band. The file's own header said
+the floor "does NOT flatten depth". D0577 replaces it with a depth-ramped ambient LIFT, restoring
+two-thirds of the destroyed contrast at the brightness D0569 was reaching for, and leaving the surface
+bit-identical. **This is why D0575 looked necessary:** with the veil constant, material colour was the
+only term left varying.
+
+**Every number P036 quoted was measured through that flat field.** Post-D0577 the multiply half alone
+gives lit deep rock 0.163–0.234 and the additive pass adds ~0.148 at a pool centre — 0.382 against a
+reference of 0.377. `[[name-the-frame]]`, where the frame was a bug I had introduced four commits before.
+
+## What was learned — ten queue items were already built
+
+Measured, not read: items 10, 13, 15, 16, 23, 26, 31, 32, 33 and half of 11. The camera's world-edge
+clamp landed at D0333 and is called from `shell/main.gd:106`; the default zoom already IS
+`ZOOM_LEVELS[0]`; the world is already 64 m, which is what P031's ruling asked for; godrays, bloom and
+motes are all implemented and pinned. **The queue was authored from stale diagnoses** — earlier
+observation notes and a triage pass that read intent rather than running against the tree. Measuring an
+item before building it cost nothing and saved most of a night. It also caught the queue quoting seven
+orphan machines when there are six.
+
+## What was learned — a helper can be green while its call site is dead, three times in one night
+
+`[[instrument-cannot-register-subject]]`, three fresh instances, each found by running the mutation
+rather than by reading the test. D0578's correction bound was tested by calling the helper directly, so
+deleting the call in `BodySwing.step` left every assertion green. Its landing-datum guard was tested in a
+shaft, where `_slide` tries the vertical candidate first and the accepted y therefore always equals the
+requested one. And D0579's reseed seeded a `MineHold` that `Interface.reset_transients()` had already
+replaced — the direct assertion beside it was green through the whole mistake. Every guard in those two
+entries is now posed through the real seam.
+
+## What was learned — the world is not at rest, and most of the crafting content cannot be reached
+
+Two measurements that were not the point of anything and are the most useful things found:
+
+- **1,061 of the generated world's 28,572 loose cells are unsupported** (`shallow_clay`, seed 12345).
+  They sit there until a player digs near one. Found because deriving the slump queue on load made a
+  restored session diverge from a fresh one, and `test_boot_snapshot.gd` said so. The queue now travels
+  with the save instead. Whether the world *should* arrive settled is P041.
+- **Four of six recipes are unreachable.** Six machines are named by no start and no demand, and four of
+  them strand a recipe each. `mine_ore` and `smelt_ingot` are the whole reachable crafting tree. A
+  `d3`/`d4` naming those machines would reach four machines and four recipes in one data change; what
+  the tiers should ask for is the director's, and it is P042.
+
+## What was learned — a null result, reported because it was mine
+
+I expected the warm lamp to erode the axis the three country rocks are told apart on: they separate on
+hue (closest luma pair 0.029, *smaller* than clay's own within-patch spread of 0.037), and `lamp_tint`
+multiplies blue by 0.690 against red's 1.000. Measured, it does the opposite — under the lamp the cool
+spread across the three rises from 0.1009 to 0.1365. T012's ruled 0.38 gives 0.1459, so 0.62 costs about
+6% of the hue separation: real, small, and the opposite sign from the prediction. It feeds P038 and does
+not decide it.
+
+## What was learned — the frame was lit for a sky it was not under (D0583-D0586)
+
+With the director's screen for three hours, the decisive finding was not on the 49-item queue. **The sky
+was painted as night and the world was lit for noon.** Measured on the opening frame: zenith 0.086,
+horizon 0.254, ground beside the player **0.344**, tree canopy **0.479** — the brightest and most
+saturated thing in the picture, against a reference whose surface rock at night is 0.148. No painter was
+wrong on its own: the sky is drawn as night, terrain takes `sky_light` = 1.0 above the surface line, and
+`leaves`/`wood` carry `depth_darken: 0.0` because "a tree stands in the sky". Three correct local
+decisions that had never been seen together in one frame.
+
+Two root causes underneath the art complaints, neither findable without looking at a picture:
+
+- **Foliage was being shaded as rock.** `_cell_jitter` samples in METRES (17-48 m periods) and a canopy
+  is 1.5 m across, so every leaf cell in a tree drew the same value — that is why canopies were flat
+  rectangles. They were also taking `_strata`'s sedimentary hue bands, because `leaves` carries no
+  `nugget_color` and so read as country rock.
+- **The deep had no dark end.** `void_floor` multiplied the shade BEFORE D0577's ambient lift, so the
+  lift's constant 0.48 handed it straight back: a void at s 0.119 and mid rock at s 0.153 both resolved
+  near 0.58. Ambient is light on a surface; a void has none.
+
+| | before tonight | now | reference |
+|---|---|---|---|
+| unlit deep rock | 0.0195 | **0.1926** | 0.190 |
+| surface ground at night | 0.344 | 0.155 | 0.148 |
+| the lamp's pool | 0.210 | 0.4355 | 0.515 |
+| rock 1 m from the lamp | 0.157 | 0.2758 | 0.377 |
+
+**A method note that paid for itself in one cycle.** Setting the minimap's `ROCK_DARKEN` to 0.20 to
+darken it made it BRIGHTER — `Color.darkened()` takes an amount, not a multiplier. The capture said so
+immediately. Every measurement above was taken headless, but none of the three findings would have been
+found that way.
+
+**Item 49's stopping rule moved three of its four conditions** — materials read as themselves, carved
+space is separable from rock, and the lighting is attractive rather than merely bright. The fourth,
+**holds under a moving camera**, is untested and every judgement here is a still.
+
 ## What was learned — reliable evidence has several boundaries (D0547)
 
 `--front` contradicted itself by sending `--unfocused`; fixed, with PID-scoped activation added.
