@@ -28,9 +28,14 @@ const TORCH_GLOW_R_M: float = 7.6              ## the wide soft glow that makes 
 const TORCH_GLOW_S: float = 0.52
 const TORCH_CORE_R_M: float = 4.4              ## the hot core at the flame
 const TORCH_CORE_S: float = 0.94
-const MACHINE_R_M: float = 2.8
-const MACHINE_S: float = 0.6                   ## the cool working glow, any kind
-const FURNACE_S: float = 0.85
+## A MACHINE LIGHTS ITS ROOM (D0571). Legacy's 2.8 m and 0.6, measured on the lighting bench, lifted the
+## rock one metre from a fuelled forge from 0.091 to 0.151 luma and to nothing at all by two metres. The
+## reference has rock beside a light at 0.377. Legacy's own torch is the scale that works and its comment
+## says why -- `TORCH_GLOW_R_M` 7.6, "the wide soft glow that makes a room habitable" -- so a machine's
+## pool moves toward that rather than staying a halo on its own casing.
+const MACHINE_R_M: float = 5.0
+const MACHINE_S: float = 0.75                  ## the cool working glow, any kind
+const FURNACE_S: float = 0.95
 const BURNER_S: float = 0.9                    ## and dark when it runs dry
 const LIFT_S_BASE: float = 0.35
 const LIFT_S_POWER: float = 0.55

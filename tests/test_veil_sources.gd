@@ -48,15 +48,23 @@ func _test_the_tint() -> void:
 	_check(is_equal_approx(VeilSources.CULL_M, 7.6), "the cull margin is the torch's wide glow, the widest pool (%.1f m)" % VeilSources.CULL_M)
 
 
+## THE MACHINE TABLE. Read against the CONSTANTS, not against literals: D0571 moved the furnace and the
+## generic machine off legacy's numbers after the lighting bench measured what legacy's numbers actually
+## produce on this build (a machine that lit its own casing and nothing else, 0.151 luma at one metre
+## against an unlit 0.091). The SHAPE is what this suite exists to pin -- which kinds gate on status and
+## which do not, which gate on fuel, which on power -- and a suite written against literals goes red
+## every time a taste constant moves while asserting nothing new about the shape.
 func _test_the_machine_table() -> void:
-	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"iron_forge", Vector2i(3, 3))), 0.85), "a furnace cuts 0.85")
-	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"iron_forge", Vector2i(3, 3), &"no_input")), 0.85), "...working or not: legacy's veil table has no status gate")
+	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"iron_forge", Vector2i(3, 3))), VeilSources.FURNACE_S), "a furnace cuts FURNACE_S (%.2f)" % VeilSources.FURNACE_S)
+	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"iron_forge", Vector2i(3, 3), &"no_input")), VeilSources.FURNACE_S), "...working or not: legacy's veil table has no status gate")
+	_check(VeilSources.FURNACE_S > VeilSources.MACHINE_S, "a furnace still outshines a cool machine (%.2f > %.2f)" % [VeilSources.FURNACE_S, VeilSources.MACHINE_S])
+	_check(VeilSources.MACHINE_R_M <= VeilSources.TORCH_GLOW_R_M, "and a machine's pool never exceeds the torch's, which is the widest (%.1f <= %.1f)" % [VeilSources.MACHINE_R_M, VeilSources.TORCH_GLOW_R_M])
 	_check(VeilSources.machine_strength(_rec(&"generator", Vector2i(4, 3), &"no_fuel")) == 0.0, "a burner with no coal cuts nothing: dark when it runs dry")
 	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"generator", Vector2i(4, 3), &"working", {"fuel": 2})), 0.9), "...fuelled it cuts 0.9")
 	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"generator", Vector2i(4, 3), &"working", {"input": {&"coal": 1}})), 0.9), "...and coal in its input counts as fuel")
 	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"lift", Vector2i(5, 3), &"working", {"power_permille": 1000})), 0.9), "a powered lift cuts 0.35 + 0.55")
 	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"lift", Vector2i(5, 3), &"working", {"power_permille": 0})), 0.35), "...an unpowered one its 0.35 base")
-	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"drill", Vector2i(6, 3))), 0.6), "any other machine the cool 0.6")
+	_check(is_equal_approx(VeilSources.machine_strength(_rec(&"drill", Vector2i(6, 3))), VeilSources.MACHINE_S), "any other machine the cool MACHINE_S (%.2f)" % VeilSources.MACHINE_S)
 
 
 ## D0401 (T014): a machine that wants something cuts the veil a second time in its status colour, and it
@@ -113,7 +121,7 @@ func _test_the_placed_sources_and_the_cull() -> void:
 	_check(is_equal_approx(float(wide["radius"]), 7.6 * 4.0) and is_equal_approx(float(wide["strength"]), 0.52) and is_equal_approx(float(core["radius"]), 4.4 * 4.0) and is_equal_approx(float(core["strength"]), 0.94), "the torch: 7.6 m at 0.52 and a 4.4 m core at 0.94, in cells")
 	_check((wide["centre"] as Vector2).is_equal_approx(Vector2(22.0, 10.0)), "centred on the logic cell's centre in terrain cells (%s)" % str(wide["centre"]))
 	var drill: Dictionary = cuts[0]
-	_check(is_equal_approx(float(drill["radius"]), 2.8 * 4.0) and drill["tint"] == VeilSources.light_tint(MachineLook.color(&"drill", &"drill", true)), "the machine cut at 2.8 m in its casing colour's tint")
+	_check(is_equal_approx(float(drill["radius"]), VeilSources.MACHINE_R_M * 4.0) and drill["tint"] == VeilSources.light_tint(MachineLook.color(&"drill", &"drill", true)), "the machine cut at MACHINE_R_M (%.1f m) in its casing colour's tint" % VeilSources.MACHINE_R_M)
 	var far: Array[Dictionary] = VeilSources.cuts(o, [], [], 0.0, Rect2(500.0, 500.0, 10.0, 10.0))
 	_check(far.is_empty(), "every source past the cull rect is dropped (%d)" % far.size())
 	_check(VeilSources.cuts(null, [], [], 0.0, WIDE).is_empty(), "no observation, no cuts")

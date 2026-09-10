@@ -72,7 +72,14 @@ static func under_rock(row: float, surf: float) -> float:
 ## call queued in `docs/TASTE_QUEUE.md` -- an amber pool against a blue-grey dark is the warm-against-cool
 ## the frame had none of. THE DIRECTOR RULED (T012, 2026-09-05): keep it warm, and if it reads more
 ## campfire than headlamp ease it toward 0.38 -- so 0.38 it is, and the warmth stays the point.
-const LAMP_TINT: float = 0.38
+## RAISED FROM 0.38 (D0571). T012's ruling was "keep it warm, and if it reads more campfire than headlamp
+## ease it toward 0.38", made when the deep was near black and any warmth read as a lot. Against the
+## reference the pool is not warm enough by a wide margin: its rock beside a lamp is rgb (0.553, 0.340,
+## 0.226), a strongly amber 0.377 luma, where ours reads (0.237, 0.211, 0.171) -- nearly neutral. 0.38
+## toward LAMP_COLOR lands on (1.00, 0.93, 0.81), which is white with a hint. The director's standing
+## instruction is now to match that reference, which supersedes the easing rather than contradicting the
+## ruling behind it: the ruling was "keep it warm" and this is warmer.
+const LAMP_TINT: float = 0.62
 
 
 ## The colour the lamp reveals rock in: legacy `_light_tint(LAMP_COLOR)` at this build's own lean.

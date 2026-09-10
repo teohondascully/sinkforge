@@ -65,9 +65,14 @@ six-week decision.
          the WHOLE underground sat in the bottom sixth of the value range -- deep rock at 0.0195 against
          the reference's 0.15-0.19. Fixed by flooring the veil, not by adding occlusion. Capture:
          `docs/media/moments/2026-09-10-deep-floor.png`.
-- [ ] 11 Machines and lamps emit real light. `veil_light.gd`, `veil_sources.gd`, `light_painter.gd` exist;
-         the forges draw fire and illuminate nothing. Astra's diagnosis point 3, still unfixed.
-- [ ] 12 Lamp falloff with a warm-to-cool colour shift over distance.
+- [x] 11 Machines and lamps emit light -- BUILT-PARKED with the measurement (D0570, D0571). They DO emit;
+         a machine's pool was 2.8 m and lit its own casing. Widened to 5 m and warmed the lamp. The bench
+         then found the real wall: **our lights multiply, so a lit cell can never exceed the material's
+         own base colour, and the reference's lit rock (0.377) is brighter than any of ours.** P036 with
+         two candidate answers and a recommendation. Capture: `docs/media/moments/2026-09-10-lighting-bench.png`. The bench's own start record
+         is reverted for now (P037: the codegen output hit the same 400-line cap).
+- [x] 12 Lamp warmth (D0571). `LAMP_TINT` 0.38 -> 0.62, measured against the reference's amber (0.553,
+         0.340, 0.226) where ours read nearly neutral. The distance colour shift is folded into P036.
 - [ ] 13 Sky light on the surface band, dying with depth.
 - [ ] 14 Depth haze (`haze_painter.gd`).
 - [ ] 15 Light shafts down open holes (`post_fx.gdshader`).

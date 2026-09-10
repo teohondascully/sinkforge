@@ -22200,3 +22200,40 @@ what the reference actually has: the frame is lit, not merely un-darkened.
 AMBIENT_DARK)` to be exactly `AMBIENT_LIGHT` -- legacy's ratio at a point now UNDER the floor, so it
 could only have been kept by keeping the underground eight times too dark. `[[reversed-rule-has-a-pinning-suite]]`.
 Reverse: CHEAP -- set `DEEP_FLOOR` to 0.0 in both files.
+
+## D0570 · 2026-09-10 · data/starts/lighting_bench.yaml
+Decided: a `lighting_bench` scenario record -- a 40 m chamber 60 m down with a torch at one end, a forge
+and a pile of coal at the other, and bare rock between -- plus a bench script that boots it at a fixed
+warp, zoom and tick and samples fixed pixels.
+Alternative: keep measuring lighting off whatever playtest frame was to hand, which is what D0569 did and
+what D0569's own "HONEST LIMIT" paragraph says was indicative rather than controlled.
+Why: two lighting measurements in a row measured something other than their subject. The first compared
+pixels from two different scenes at two different positions. The second used `beacon_probe`, whose one
+machine has no input -- and `VeilSources.machine_strength` returns 0.0 for an unfuelled burner BY DESIGN,
+so "machines do not light the rock" was measured on a machine correctly emitting nothing.
+`[[instrument-cannot-register-subject]]`. Every phase 2 and 3 number now comes off one frame.
+It also stands a `torch`, which is one of the seven machines reachable from no start at all (queue item
+43) -- exercised rather than only listed.
+Reverse: CHEAP -- delete the record; nothing in play references it.
+**REVERTED THE SAME HOUR, and the reason is P037.** `data/starts/generated.gd` is 378 lines and this
+record took the codegen output to 412 against `check_size_limits.py`'s 400. A minimal two-fixture version
+lands on exactly 400, which clears the gate and blocks whoever comes next. The gate is not bypassed and
+the record is gone; the bench falls back to `beacon_probe`, and the measurements this record produced
+were taken before the gate ran and stand as recorded in P036.
+
+## D0571 · 2026-09-10 · view/visuals/veil_sources.gd, view/visuals/veil_light.gd
+Decided: a machine's pool widens to 5.0 m (was 2.8) at 0.75/0.95 strength (was 0.6/0.85), and the lamp's
+tint warms to 0.62 (was 0.38).
+Alternative: leave legacy's numbers.
+Why: on the bench, rock one metre from a fuelled forge read 0.151 luma and rock two metres from it read
+0.104, against an unlit floor of 0.091 -- a machine lit its own casing and nothing else. Legacy's own
+torch is the scale that works and its comment says so: `TORCH_GLOW_R_M` 7.6, "the wide soft glow that
+makes a room habitable". The lamp's warmth is measured too: the reference's rock beside a light is rgb
+(0.553, 0.340, 0.226), strongly amber; ours was (0.237, 0.211, 0.171), nearly neutral. T012's ruling was
+"keep it warm, and if it reads more campfire than headlamp ease it toward 0.38" -- made when the deep was
+near black and any warmth read as a lot. The director's standing instruction is now to match that
+reference, which is warmer; this follows the ruling's reason rather than its number.
+MEASURED AFTER, and the honesty matters more than the result: 1 m from the forge 0.151 -> 0.157, 2 m
+0.104 -> 0.114, 1 m from the torch 0.116 -> 0.130, the lamp pool 0.214 -> 0.210 but visibly warmer in
+its channels. **These are marginal, and the bench then said why.** See P036.
+Reverse: CHEAP -- four constants.

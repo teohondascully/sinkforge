@@ -1162,3 +1162,56 @@ at all. Full round trip: dig down 3.5 m (21 bursts), grapple and reel to the lip
 chip 5 m -> 2 m), cut a step into the lip and walk out (3 bursts, chip 1 m, "ENTERING TOPSOIL").
 **27 bursts** against 515-and-never. So P035 is polish, not a blocker: the player CAN get out today, and
 the ruling is only about whether the last metre and a half should feel like a climb or like a dig.
+
+## P036 · 2026-09-10 · our lights can only ever DARKEN, and the reference's add
+
+**Measurement, all off the `lighting_bench` frame and the reference, same 5x5 mean luma.**
+
+| | ours | reference |
+|---|---|---|
+| unlit deep rock | 0.091 | 0.190 |
+| rock beside a light | 0.157 | **0.377** |
+| a material's own base colour | deepstone 0.197, clay 0.255, hardrock 0.350 | |
+
+**The structural fact.** The composite is `material_colour x veil_light`, and `veil_light` tops out at
+white. So a lit cell can never be brighter than the material's own base colour. The reference's lit rock
+is **0.377**, which is brighter than deepstone's base (0.197) and clay's (0.255) and close to hardrock's
+(0.350). No amount of tuning `MACHINE_S`, `LAMP_TINT` or the radii reaches it, which is exactly why
+D0571's four constants moved the numbers by two or three hundredths. I raised them, measured, and the
+bench said the lever was the wrong one.
+
+**Two ways out, and this is the ruling I need.**
+1. **Brighten the material base colours by roughly 2x** and let the existing multiply do the rest. The
+   arithmetic lands both ends: deepstone at 0.40 base reads 0.184 unlit (reference 0.190) and about 0.32
+   beside a light. Cheap, all in `data/materials/*.yaml`, and it keeps one lighting model. It changes
+   every frame in the game including the surface, and the appearance values are lifted verbatim from
+   legacy (D0189) -- so this is deliberately breaking a port's provenance, which is why it is a ruling.
+2. **Add an additive light pass over the multiply**, so a source can push a cell above its own albedo the
+   way a real light does. Truer, and it is what the reference's frame actually is. It is a new term in
+   `veil.gdshader` and in `VeilPainter`, and it needs its own clamp so a pool cannot blow out to white.
+
+**Recommendation: (1) first, measured on the bench, then (2) only if the frame still reads flat.** (1) is
+reversible in data and answers most of the gap; (2) is the better model and can land on top of it later
+without undoing it.
+
+**Not a root blocker.** Phase 3 (rock texture, strata, cobbles) is independent and continues.
+
+## P037 · 2026-09-10 · the 400-line file cap now blocks adding a DATA record
+
+**Measurement.** `data/starts/generated.gd` is 378 lines. Adding one scenario record -- four fixtures --
+took it to **412** and `check_size_limits.py` failed. A minimal two-fixture record lands on exactly 400,
+which clears the gate and blocks the next person instead. The file is codegen output
+(`tools/data_codegen/generate.py`), so this is a style rule about human readability capping how many
+start records the game may have.
+
+**It is the second cap to block real work tonight.** `interface/observation.gd` sits at exactly 400 and
+cannot take another observation field (P034), which is why D0565's slump event rides
+`Interface.services()` instead of the door.
+
+**Recommendation:** exclude codegen'd files from `FILE_LIMIT` the way `legacy/` is already excluded, or
+have the codegen emit one file per record. `tools/` is Astra's, so this is theirs to land; the finding
+and the numbers are handed over here rather than acted on.
+
+**Consequence tonight:** the `lighting_bench` record (D0570) is reverted and the bench falls back to
+`beacon_probe`. The measurements it produced stand and are in P036 -- they were taken before the gate
+ran -- but the torch-and-forge comparison is not reproducible until this is cleared.
