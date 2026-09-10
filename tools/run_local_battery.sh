@@ -68,9 +68,25 @@ if [ "${#GATES[@]}" -eq 0 ]; then
 	exit 2
 fi
 
+# PROGRESS, ON STDERR (D0573). The gate half runs 28 steps and the suite half runs 149, and until now
+# both were silent until they finished -- eight minutes with nothing on screen. `run_suites.sh` reports
+# its own suites; this reports the gates. STDERR, because callers grep this script's STDOUT for `^PASS`
+# and `^FAIL` to count a battery, and a progress line carrying either word would be counted as a result.
+gate_progress() {
+	local i="$1" n="$2" t0="$3"
+	local elapsed=$(( $(date +%s) - t0 ))
+	local eta="?"
+	[ "$i" -gt 0 ] && [ "$elapsed" -gt 0 ] && eta="$(( (elapsed * (n - i)) / i ))s"
+	printf 'run_local_battery: gates [%2d/%2d] %3d%% | %3ds elapsed | ~%s left\n' \
+		"$i" "$n" "$(( i * 100 / n ))" "$elapsed" "$eta" >&2
+}
+
 echo "run_local_battery: ${#GATES[@]} gate step(s) from harness.yml's 'gates' job"
 GATE_FAILED=0
+GATE_I=0
+GATE_START=$(date +%s)
 for gate in "${GATES[@]}"; do
+	GATE_I=$((GATE_I + 1))
 	# The label skips shell preamble (`set -e`, blank lines) so a multi-line gate step is named by what it
 	# actually runs rather than by its first housekeeping line.
 	label="$(printf '%s' "$gate" | grep -vE '^[[:space:]]*(set |#|$)' | head -1)"
@@ -79,8 +95,10 @@ for gate in "${GATES[@]}"; do
 		python3 tools/verification_receipt.py --store "$LOCAL_GATE_RECEIPTS" "$gate"
 	else bash -c "$gate"; fi ) >"$BATTERY_TMP/gate.log" 2>&1; then
 		echo "PASS  gate: $label"
+		gate_progress "$GATE_I" "${#GATES[@]}" "$GATE_START"
 	else
 		echo "FAIL  gate: $label"
+		gate_progress "$GATE_I" "${#GATES[@]}" "$GATE_START"
 		cat "$BATTERY_TMP/gate.log"
 		GATE_FAILED=$((GATE_FAILED + 1))
 	fi

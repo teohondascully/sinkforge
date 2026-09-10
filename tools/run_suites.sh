@@ -97,20 +97,50 @@ done
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
+# PROGRESS, ON STDERR, AND THE CHANNEL IS THE POINT (D0573). The sweep is `xargs -P`, so every result
+# file is written as its worker finishes but nothing is READ until the loop below -- which meant eight
+# minutes of silence and then the whole report at once. This emits one line per completed suite as it
+# lands.
+#
+# It goes to STDERR and must stay there. Callers grep this script's STDOUT for `^PASS` and `^FAIL` to
+# count a sweep (`run_local_battery.sh` does, and so does every session that has ever read a battery),
+# and a progress line carrying either word on stdout would be counted as a result. The counts here are
+# deliberately bracketed rather than bare for the same reason.
+progress_line() {
+  local out="$1" verdict="$2" suite="$3" secs="$4"
+  local done_n; done_n=$(find "$out" -name '*.result' 2>/dev/null | wc -l | tr -d ' ')
+  local elapsed=$(( $(date +%s) - SWEEP_START ))
+  local eta="?"
+  # Wall-clock projection from the mean completed suite, scaled by parallelism: with `jobs` workers the
+  # remaining suites finish about `jobs` at a time. It is a straight-line estimate over a population whose
+  # slowest member is 164 s, so it reads LOW early in a sweep -- named `~` rather than reported as fact.
+  if [ "$done_n" -gt 0 ] && [ "$elapsed" -gt 0 ]; then
+    eta="$(( (elapsed * (SWEEP_TOTAL - done_n)) / (done_n * SWEEP_JOBS) ))s"
+  fi
+  printf 'run_suites: [%3d/%3d] %3d%% | %4ds elapsed | ~%-6s left | %s %s (%ss)\n' \
+    "$done_n" "$SWEEP_TOTAL" "$(( done_n * 100 / SWEEP_TOTAL ))" "$elapsed" "$eta" \
+    "$verdict" "${suite##*/}" "$secs" >&2
+}
+export -f progress_line
+
 run_one() {
   local index="$1" out="$2" godot="$3"
   local suite; suite="$(sed -n "$((index + 1))p" "$out/suites")"
   local t0; t0=$(date +%s)
+  local verdict=FAIL
   if "$ROOT/tools/run_gd_test.sh" "$godot" "$suite" > "$out/$index.log" 2>&1; then
-    echo "PASS $(( $(date +%s) - t0 )) $suite" > "$out/$index.result"
-  else
-    echo "FAIL $(( $(date +%s) - t0 )) $suite" > "$out/$index.result"
+    verdict=PASS
   fi
+  local secs=$(( $(date +%s) - t0 ))
+  echo "$verdict $secs $suite" > "$out/$index.result"
+  progress_line "$out" "$verdict" "$suite" "$secs"
 }
 export -f run_one
 export ROOT
 
 START=$(date +%s)
+SWEEP_START=$START; SWEEP_TOTAL=${#SUITES[@]}; SWEEP_JOBS=$JOBS
+export SWEEP_START SWEEP_TOTAL SWEEP_JOBS
 printf '%s\n' "${SUITES[@]}" > "$OUT/suites"
 for (( i=0; i<${#SUITES[@]}; i++ )); do echo "$i"; done | xargs -P "$JOBS" -I{} bash -c 'run_one "$@"' _ {} "$OUT" "$GODOT"
 SCHEDULER_RC=$?

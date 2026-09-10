@@ -22237,3 +22237,19 @@ MEASURED AFTER, and the honesty matters more than the result: 1 m from the forge
 0.104 -> 0.114, 1 m from the torch 0.116 -> 0.130, the lamp pool 0.214 -> 0.210 but visibly warmer in
 its channels. **These are marginal, and the bench then said why.** See P036.
 Reverse: CHEAP -- four constants.
+
+## D0573 · 2026-09-10 · tools/run_suites.sh, tools/run_local_battery.sh
+Decided: both halves of the battery report progress as they run -- a line per completed gate and per
+completed suite, with a running count, percent, elapsed and a projected time left. On STDERR.
+Alternative: leave it silent, which is what a `xargs -P` sweep that reads no result until the end does.
+Why: the director's, in as many words -- 28 gate steps and 149 suites ran for about eight and a half
+minutes with nothing on screen and then reported everything at once.
+STDERR is the load-bearing part, not a detail. Every caller counts a battery by grepping this script's
+STDOUT for `^PASS` and `^FAIL` (`[[battery-tail-hides-reds]]` is the rule that made that the habit), so
+a progress line carrying either word on stdout would be counted as a result. The counts are bracketed
+for the same reason. Verified: stdout PASS count is 177 before and after, and `tools/test_run_suites.sh`
+still passes -- including its own check that a passing suite's output is NOT echoed.
+The suite ETA divides by `jobs` because remaining suites finish about `jobs` at a time, and it reads LOW
+early in a sweep: it is a straight-line mean over a population whose slowest member is 164 s. It is
+printed as `~` and never as a fact.
+Reverse: CHEAP -- delete `progress_line` and `gate_progress` and their two call sites.
