@@ -1156,3 +1156,9 @@ load-bearing feel finished, and (3) is a fine fallback that (1) does not preclud
 
 **Not a root blocker.** The trap itself is fixed; this is the difference between "you can get out" and
 "getting out feels good". Phase 1 continues.
+
+**P035 UPDATE, same day, measured in a seat on `ea6a9f36`.** Candidate (3) already works with no change
+at all. Full round trip: dig down 3.5 m (21 bursts), grapple and reel to the lip (**3 bursts**, depth
+chip 5 m -> 2 m), cut a step into the lip and walk out (3 bursts, chip 1 m, "ENTERING TOPSOIL").
+**27 bursts** against 515-and-never. So P035 is polish, not a blocker: the player CAN get out today, and
+the ruling is only about whether the last metre and a half should feel like a climb or like a dig.
