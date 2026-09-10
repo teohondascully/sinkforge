@@ -28,7 +28,9 @@ var slump: Slump = Slump.new()         ## the loose cells a blow left unsupporte
 func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: DigPlan, lode: LodeWork, body: Body, building: bool) -> void:
 	refusal = &""
 	crown.crumble(world.grid)   # last tick's unsupported leaves, whatever this tick aims at
-	slump.settle(world.grid, world.water)   # and last tick's unsupported earth: the world answers a blow late, never in the same frame
+	# Last tick's unsupported earth. The body's own cell box is closed to it (D0566): earth packs around
+	# a player, it does not bury one. The world answers a blow late, never in the same frame.
+	slump.settle(world.grid, world.water, body_cells(body))
 	if not frame.mine_held:
 		plan.clear()            # the plan lives while the button is held (D0477): a release forgets every mark
 	if not frame.has_aim:
@@ -90,3 +92,14 @@ func _why_not(world: World, body: Body, cell: Vector2i) -> StringName:
 	if not Mining.in_reach(body.pos_x, body.pos_y, cell):
 		return &"far"
 	return &"sight"
+
+
+## The body's cell box, for `Slump`: the terrain cells its collider covers, inclusive. Computed HERE
+## rather than in `sim/mining` because that module's contract says in as many words that it "takes no
+## `Body` object" -- so the body stays on this side of the line and only a rectangle crosses it.
+static func body_cells(body: Body) -> Rect2i:
+	var left: int = Aim.floor_div(body.pos_x / Fx.SCALE - Body.WIDTH_PX / 2, Mining.CELL_PX)
+	var right: int = Aim.floor_div(body.pos_x / Fx.SCALE + Body.WIDTH_PX / 2 - 1, Mining.CELL_PX)
+	var top: int = Aim.floor_div(body.pos_y / Fx.SCALE - Body.HEIGHT_PX / 2, Mining.CELL_PX)
+	var bottom: int = Aim.floor_div(body.pos_y / Fx.SCALE + Body.HEIGHT_PX / 2 - 1, Mining.CELL_PX)
+	return Rect2i(left, top, right - left + 1, bottom - top + 1)

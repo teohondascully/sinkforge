@@ -22,6 +22,13 @@ extends RefCounted
 ##
 ## WHAT THIS DELIBERATELY DOES NOT DO, each a real limit and not an oversight:
 ##
+##  - **Loose material never falls onto the body** (D0566). `occupied` is the body's cell box and is
+##    treated exactly as rock is. This is the same refusal `BuildVerbs.place_block` already makes ("refuses
+##    solid, OCCUPIED and out-of-bounds cells"), and it is here because the alternative was measured: with
+##    a whole bank of clay coming down into a tunnel the body was standing in, the body was buried, and
+##    `Body._enforce_grid_bounds` ejected it to cell (38, 35) -- the far corner of a 40-cell world.
+##    `tests/test_slump_body.gd` is that measurement. Earth now packs AROUND the player instead, which is
+##    also the more readable picture. Reverse by passing an empty rect.
 ##  - **Loose material never falls into water.** A wet target is treated as occupied. `WaterPlane` has a
 ##    `displace` for "rock arrived", but it removes the water rather than moving it, and `sim/fluid`'s
 ##    module contract says every conservation violation must live in one named, gated function. Silt
@@ -87,14 +94,14 @@ func after_break(grid: TileGrid, cells: Array[Vector2i]) -> void:
 ## again a few iterations later and fall again, and a single grain would descend `SETTLE_PER_TICK` cells
 ## in one frame while the budget said four cells had moved. The first version of this file did exactly
 ## that and `tests/test_slump.gd`'s "one step moves the cell exactly one cell down" is what caught it.
-func settle(grid: TileGrid, water: WaterPlane) -> void:
+func settle(grid: TileGrid, water: WaterPlane, occupied: Rect2i = Rect2i()) -> void:
 	moved_this_tick.clear()
 	var looked: int = 0
 	while moved_this_tick.size() < SETTLE_PER_TICK and not _queue.is_empty() and looked < QUEUE_CAP:
 		looked += 1
 		var c: Vector2i = _queue.pop_front()
 		_queued.erase(c)
-		var to: Vector2i = target(grid, water, c)
+		var to: Vector2i = target(grid, water, c, occupied)
 		if to == c:
 			continue
 		_move(grid, c, to)
@@ -126,24 +133,26 @@ func pending() -> int:
 ## The left/right preference is `(c.x + c.y) & 1`. A fixed preference gives every pile in the world the
 ## same lean; a parity is still perfectly deterministic, needs no state, and breaks the lean up spatially
 ## so a heap spreads instead of walking.
-static func target(grid: TileGrid, water: WaterPlane, c: Vector2i) -> Vector2i:
+static func target(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rect2i = Rect2i()) -> Vector2i:
 	if not grid.in_bounds(c) or not WorldMaterials.is_loose(grid.get_material(c)):
 		return c
 	var below: Vector2i = c + DOWN
-	if _open(grid, water, below):
+	if _open(grid, water, below, occupied):
 		return below
 	if not grid.in_bounds(below) or not WorldMaterials.is_loose(grid.get_material(below)):
 		return c                     # bedrock, a machine, the world's floor or open water: this is rest
 	var first: Vector2i = LEFT if ((c.x + c.y) & 1) == 0 else RIGHT
 	for side: Vector2i in [first, -first]:
-		if _open(grid, water, c + side) and _open(grid, water, c + side + DOWN):
+		if _open(grid, water, c + side, occupied) and _open(grid, water, c + side + DOWN, occupied):
 			return c + side + DOWN
 	return c
 
 
-## Room for a loose cell to arrive: in the world, no rock, and dry. See the header on why wet is closed.
-static func _open(grid: TileGrid, water: WaterPlane, c: Vector2i) -> bool:
-	return grid.in_bounds(c) and not grid.is_solid(c) and water.water_at(c) == 0
+## Room for a loose cell to arrive: in the world, no rock, dry, and not where the body is standing. See
+## the header on why wet and occupied are both closed. An empty `occupied` rect contains no point, so the
+## default argument means "nothing is standing anywhere" without a branch.
+static func _open(grid: TileGrid, water: WaterPlane, c: Vector2i, occupied: Rect2i = Rect2i()) -> bool:
+	return grid.in_bounds(c) and not grid.is_solid(c) and water.water_at(c) == 0 and not occupied.has_point(c)
 
 
 ## Carry the material from `from` to `to` and wake what the vacancy may release: the cell above `from` and

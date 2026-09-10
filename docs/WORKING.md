@@ -44,7 +44,9 @@ six-week decision.
 - [x] 6  Dust and settle (D0564). A vacated cell puffs; the step knocks the camera in proportion to how
          much moved. Capture: `docs/media/moments/2026-09-10-slump-dust.png`. PARKED: it rides
          `Interface.services()` rather than the door, because `observation.gd` is at its file cap (P034).
-- [ ] 7  Undermining drops a mass -- verify end to end in a seat and make the consequence visible.
+- [x] 7  Undermining drops a mass (D0566). Verified in a seat (the capture above is a mound's flank mid-
+         collapse) and pinned headless. Found and fixed a session-ender on the way: a full burial ejected
+         the body to the far corner of the world, so earth now packs around a player. `test_slump_body.gd`.
 - [ ] 8  **THE TRAP.** A player who digs down cannot climb out: 515 commands, zero metres. Jump apex is
          4.6 m (`JUMP_VELOCITY_PX_S` 365 against `GRAVITY_PX_S2` 900) against a 5.2 m shaft, and the
          grapple anchors then reels nothing once its line wraps on the shaft lip. **Outranks every

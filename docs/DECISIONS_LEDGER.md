@@ -22119,3 +22119,18 @@ the channel that exists. `CrumblePainter`'s header warns against a second sim-to
 disagree with the observation; that warning is about DUPLICATING a channel and this duplicates nothing,
 because there is no observation field for a slump to disagree with. Logged to `docs/NEEDS_DIRECTOR.md`.
 Reverse: CHEAP now, and CHEAPER after the split -- move two fields to the door and delete one argument.
+
+## D0566 · 2026-09-10 · sim/mining/slump.gd, sim/run/mine_hold.gd
+Decided: loose material never falls into the cells the body occupies. `Slump.settle` takes the body's
+cell box and treats it exactly as it treats rock, so a collapse packs AROUND the player.
+Alternative: let the earth bury the body, which is what D0562 shipped and what "terrain does not
+negotiate with the player" argues for. It is also Noita's answer.
+Why: measured, not argued. `tests/test_slump_body.gd` stands a body in a tunnel and brings the whole
+bank down on it. Buried, `Body._enforce_grid_bounds` ejected it to cell **(38, 35)** -- the far corner of
+a 40-cell world. There is no death in this build and no dig-out affordance strong enough to escape a
+full burial, so the choice was not "buried or not" but "packed around or teleported across the world".
+It is also the refusal `BuildVerbs.place_block` already makes, in its own words: "Refuses solid,
+occupied and out-of-bounds cells." One rule, two verbs.
+The body stays on `sim/run`'s side of the line: `MineHold.body_cells` computes the rectangle, because
+`sim/mining/MODULE.md` says that module "takes no `Body` object" and only a `Rect2i` crosses.
+Reverse: CHEAP -- pass an empty rect, which contains no point, and the earth buries again.
