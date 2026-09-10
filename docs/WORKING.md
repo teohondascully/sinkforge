@@ -235,6 +235,17 @@ new optional `pack_order` field whose absence is not an error. The empty well dr
 key digit. Nine assertions, three mutants killed. **Whether it moves delivery is for the next batch to
 measure** -- strangers 127-132 are the before.
 
+**D0554, chasing the batch's second wall.** Two seats reached `deliver` and neither delivered; S128 saw
+"NO MACHINE HERE — nothing in sight takes that stack" for 24 of 38 bursts and never once saw
+`dropped_short`, the only lesson carrying metres and a direction. A headless probe reproduced its exact
+positions through the real command path: the sim is correct -- the refusal fires inside `FAR_EATER_M`
+(12 m) exactly as D0513 specifies. What was wrong is the sentence. **A radius cannot match a rectangle:**
+the play view is 40 x 22.5 m, half-extents 20.0 and 11.25, and 12 sits between them, so "in sight" was
+false in both directions -- denying a machine filling the screen to the left, naming one off the top.
+The sentence now says "near enough", which is what the game tested; **no behaviour changed**. Whether the
+12 m window itself should widen (or become a rectangle) is a feel call left to the director, with three
+options in the entry. And it is NOT why S128 failed: that was the hotbar, fixed in D0553.
+
 ## Repository cleanup (director-approved)
 
 Tooling implementation complete (D0525): timing summaries, runner accounting/optional battery

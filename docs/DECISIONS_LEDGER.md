@@ -21619,3 +21619,47 @@ nothing else -- so the mechanism is justified rather than left looking dead.
 get further is for the next batch to measure, and the batch is the test. The observation's `pack` now
 carries gaps, so stranger receipts will show them -- which is the instrument reporting the new truth,
 not a change to the mission.
+
+## D0554 · 2026-09-09 · "Nothing in sight" was a claim about the world that a 12 m radius decided
+
+**Context:** chasing D0544's second wall -- two of the six strangers reached `deliver` and neither ever
+delivered. S128 saw `dropped_floor` ("NO MACHINE HERE — nothing in sight takes that stack") for 24 of its
+38 bursts and never once saw `dropped_short`, the lesson written for exactly its situation and the only
+one carrying metres and a direction.
+
+**Reproduced against the real command path, not reasoned about.** A headless probe posed the body at the
+terrain cells S128's receipts record, gave it two ingots, selected the stack and pressed DROP through
+`Interface.apply(Command.drop())`:
+
+| terrain cell | metre | distance to the rig (34,20) | `drop_went` |
+|---|---|---|---|
+| (164,75) | (41,18) | 7.3 m | short |
+| (182,75) | (45,18) | 11.2 m | short |
+| (187,75) | (46,18) | 12.2 m | **floor** |
+| (158,83) | (39,20) | 5.0 m | short |
+| (146,75) | (36,18) | 2.8 m | fed |
+
+**The sim is correct.** `FAR_EATER_M` is 12 m and the refusal fires inside it exactly as D0513 specifies.
+What is wrong is what the lesson SAYS on the other side of that line.
+
+**A radius cannot match a rectangle.** The authored play view is 1280x720 at zoom 2 and 16 px to the
+metre: **40 m wide by 22.5 m tall**, half-extents 20.0 and 11.25. Twelve sits BETWEEN them, so the
+sentence "nothing in sight takes that stack" is false in both directions at once -- it denies a machine
+filling the screen 15 m to the left, and it will name one 12 m above that is off the top of the screen.
+The lesson asserted a fact about what the player can SEE, and the thing deciding it was a scalar that
+cannot express a screen. `[[not-carried-is-a-claim-about-the-world]]`.
+
+**Fixed here, and only this:** the sentence now reads "nothing NEAR ENOUGH takes that stack", which is
+what the game actually tested. No behaviour changed, no constant moved, no refusal boundary moved. The
+pin in `tests/test_hints.gd` that quoted the old phrase is updated with the geometry in its comment, so
+the next reader meets the reason rather than the string.
+
+**Left for the director, deliberately NOT taken:** whether the 12 m refusal window should change. Three
+defensible answers and each is a feel call, not a correctness one. (a) Leave it: 12 m is close to the
+view's vertical half-extent, and a drop is a short-range act. (b) Widen it toward 20 m so the refusal
+covers what a player can see left and right at play zoom -- strictly more of D0513's own intent, since
+its point was not to spill a stack you clearly meant to feed. (c) Make it a rectangle rather than a
+radius, which matches the screen but puts an authored framing constant inside `sim/`, where the reach
+rule deliberately is not (D0521 moved that to `core/` so the view could read the same line). **This is
+also not the reason S128 failed** -- that was the hotbar renumbering, fixed in D0553, and its receipts
+show the ingot moving between key 1 and key 2 three times in one run.

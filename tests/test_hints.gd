@@ -270,8 +270,13 @@ func _test_a_drop_that_hits_the_floor_teaches_once() -> void:
 	# drop, and named no machine while a second machine's bubble stood on screen; the lesson points at the
 	# WHITE RING and never says BESIDE. D0517 (strangers 103-108): `floor` now means no machine in sight takes
 	# the stack, so the headline is true and the text says so, and says the pile is the player's to walk over.
-	_check("nothing in sight takes that stack" in h.active_text() and "walk over it to pick it up" in h.active_text() and "WHITE RING" in h.active_text() and "BESIDE it" not in h.active_text(),
-		"NO MACHINE HERE says nothing in sight takes it, the pile is yours to walk over, and names the ring (%s)" % h.active_text())
+	# "IN SIGHT" WAS A CLAIM ABOUT THE WORLD THAT A CONSTANT DECIDED (D0554). The refusal window is
+	# `Verbs.FAR_EATER_M`, a 12 m RADIUS, and the authored play view is a 40 x 22.5 m RECTANGLE. Twelve
+	# sits between its half-extents -- past 11.25 m vertically, short of 20 m horizontally -- so the
+	# sentence was wrong in BOTH directions: it could deny a machine filling the screen to the left, and
+	# name one off the top. "near enough" says what the game actually tested. `[[not-carried-is-a-claim-about-the-world]]`.
+	_check("nothing near enough takes that stack" in h.active_text() and "walk over it to pick it up" in h.active_text() and "WHITE RING" in h.active_text() and "BESIDE it" not in h.active_text(),
+		"NO MACHINE HERE says nothing NEAR ENOUGH takes it, the pile is yours to walk over, and names the ring (%s)" % h.active_text())
 	for _i: int in 30:
 		h.observe(_hint_obs(), 0.5)
 	h.observe(floor, 0.016)
