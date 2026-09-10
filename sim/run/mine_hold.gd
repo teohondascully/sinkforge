@@ -22,11 +22,13 @@ var aim_is_lode: bool = false
 ## read this field.
 var refusal: StringName = &""
 var crown: TreeFall = TreeFall.new()   ## the leaves a cut trunk leaves unsupported (T034, D0438)
+var slump: Slump = Slump.new()         ## the loose cells a blow left unsupported (D0562)
 
 
 func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: DigPlan, lode: LodeWork, body: Body, building: bool) -> void:
 	refusal = &""
 	crown.crumble(world.grid)   # last tick's unsupported leaves, whatever this tick aims at
+	slump.settle(world.grid, world.water)   # and last tick's unsupported earth: the world answers a blow late, never in the same frame
 	if not frame.mine_held:
 		plan.clear()            # the plan lives while the button is held (D0477): a release forgets every mark
 	if not frame.has_aim:
@@ -68,6 +70,7 @@ func step(frame: InputFrame, world: World, items: Items, mining: Mining, plan: D
 	if mining.broke_this_tick:
 		items.yield_break(mining.broke_cells, mining.broke_materials)
 		crown.after_break(world.grid, mining.broke_cells, mining.broke_materials)
+		slump.after_break(world.grid, mining.broke_cells)
 
 
 ## Workable by hand: an exposed lode, or solid rock in reach and in sight (legacy `_workable` 1786).

@@ -12,6 +12,12 @@ fields:
   # geological name is not the economy's item name: `ore_iron` yields `ore`, the id every recipe, the
   # objective ladder and the pickup label speak. The one place the two vocabularies meet.
   yields: {required: false, type: str}
+  # LOOSE (D0562): this material falls when its support goes, and slides diagonally rather than standing
+  # on a corner. `sim/mining/slump.gd` is the automaton; `WorldMaterials.is_loose` is the read. Optional;
+  # absent reads as false, so a new material is structural until someone says otherwise. Ore and fuel are
+  # deliberately NOT loose: `DepositPlane.deposits` is keyed by cell and a moving ore block would have to
+  # carry its yield with it, which is a second problem wearing the first one's clothes.
+  loose: {required: false, type: bool}
 
   # Appearance, lifted from legacy/src/data/material_def.gd (D0189). Every field is OPTIONAL: a material
   # with no appearance block still validates and falls back in tests/body/material_look.gd (Slice 0; moves to view/ at Slice 3), so adding a

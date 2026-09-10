@@ -22062,3 +22062,33 @@ notation `1 [box] 2 -> [box] 1` was misread by S136.
 
 **Verified:** all six `stranger.py validate` VALID; classification read from `observation_*.json` rung,
 pack and refusal fields, never from a final message. Report and six journals under `docs/playtests/`.
+
+## D0562 · 2026-09-10 · sim/mining/slump.gd, data/materials/clay.yaml, sim/run/mine_hold.gd
+Decided: loose material falls. A `loose` flag on a material record, and an automaton on `TreeFall`'s
+seam that moves an unsupported loose cell down one cell a step and slides it diagonally when it cannot
+fall straight -- but only when the cell BELOW it is itself loose, which is what makes the rule an angle
+of repose rather than a grain that dribbles off every ledge. Clay carries the flag and nothing else
+does, so the tutorial world's own rock is the material that answers back. Water is treated as a floor,
+so `WaterFlow`'s conservation is untouched. Nothing is paid for a slumped cell.
+Alternative: leave the earth as scenery, which is what it has been. Or lift `WaterFlow`'s active-set
+shape instead, seeded off `TileGrid.take_solidity_changes` -- rejected because that log has one consumer
+and draining it twice would give each half the other's cells. Or make ore loose too -- rejected because
+`DepositPlane.deposits` is keyed by cell and a moving ore block would have to carry its yield with it.
+Why: three payoffs from one change. It is the feel fix (`docs/NORTH_STAR.md` §2.1 is a table of what the
+world did in reply to everything a player can do to it, and every row said "nothing"); it is the stated
+identity ("the terrain is the factory", GDD §1); and it is the precondition for GDD §13's position two,
+"holes: gravity routing. free. dug, not built" -- named as the player's FIRST automation and unbuildable
+until now because nothing in the world moved unless a verb moved it.
+Reverse: CHEAP -- drop the two calls in `MineHold.step` and the world is scenery again. The flag and the
+suite can stay.
+
+## D0563 · 2026-09-10 · sim/mining/slump.gd
+Decided: a cell moves at most ONE cell per step, enforced by deferring a move's destination into `_next`
+and splicing it into the queue only after the step's loop ends.
+Alternative: wake the destination directly, which is what the first version did.
+Why: the destination re-enters the same loop a few iterations later and falls again, so one grain
+descends `SETTLE_PER_TICK` cells in a single frame while the budget reports that four cells moved. The
+budget is in the wrong unit for the thing it is bounding -- the same shape as D0543's finding about the
+margin lane. `tests/test_slump.gd` "one step moves the cell exactly one cell down" is the witness and it
+failed before this change.
+Reverse: CHEAP -- one field and three lines.

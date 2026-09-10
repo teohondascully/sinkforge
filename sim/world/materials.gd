@@ -27,6 +27,15 @@ static func is_soil(material_id: StringName) -> bool:
 	return bool(record.get("soil", false))
 
 
+## LOOSE (D0562): this material falls when nothing holds it up, and slides diagonally rather than standing
+## on a corner -- the record's optional `loose` flag. Absent or unknown reads false, so a material is
+## structural until someone says otherwise, exactly as `is_soil` treats soil. `sim/mining/slump.gd` is the
+## only consumer and its header carries the reasoning.
+static func is_loose(material_id: StringName) -> bool:
+	var record: Dictionary = MaterialsRecords.RECORDS.get(material_id, {})
+	return bool(record.get("loose", false))
+
+
 ## Ore-like: a block whose yield is a deposit (`kind: ore` or `kind: fuel` in `data/materials`). Legacy's
 ## `_is_ore_like` (`factory_sim.gd:1466`) was a four-name literal list; the record's kind is the same
 ## question with no list to keep in step.

@@ -1,6 +1,140 @@
 # Working state
 
-**Last updated: 2026-09-10 (the perf programme closed at D0556; four gameplay/UI changes shipped and then MEASURED by strangers 133-138, D0561: delivery 0 -> 4 of 6).**
+**Last updated: 2026-09-10 (the director's 49-item overnight queue is below and `/loop` drives it; three Opus playthroughs found the game unfinishable past rung 6 and `docs/NORTH_STAR.md` records what that means; loose material falls at D0562).**
+
+## Overnight queue
+
+**Authored 2026-09-10 by the director, merging the original 30-item overnight queue with the 48-item
+frame-gap triage taken from `docs/media/reference/2026-09-10-lighting-reference.jpg`.** `/loop` drives
+this to exhaustion. `docs/NORTH_STAR.md` is the standard every item here is judged against.
+
+**THE DIRECTOR'S INSTRUCTIONS, VERBATIM, because they are the whole shape of the run:**
+- *"Your goal is to complete all items in the queue overnight without stopping, and if you ever reach a
+  blocker, move to the next item and document."*
+- *"At the end of the queue, you must cycle back and forth with side by side comparisons of the
+  reference image lighting and our game until they match perfectly."*
+- *"I'm more concerned about just the entire Tiny Glade / Noita north star for design feel and
+  uniqueness. This game doesn't pass as 2026, it passes as 2016."*
+
+**THE ORDERING RULE, and it is not cost.** A z-axis engine overhaul is a live fork (see NEEDS_DIRECTOR).
+Every item below is either z-DURABLE (per-cell appearance, screen-space effects, sim rules, content --
+you would apply the same work to each plane) or z-FRAGILE (the bake window/chunk structure, the
+single-plane observation array, the minimap, the save format). **This queue is ordered so that a night's
+work survives that decision either way.** Nothing z-fragile is in it.
+
+**AND THE SEQUENCING FINDING THAT PUT PHASE 2 WHERE IT IS:** the z spike must NOT run before the
+lighting lands. Both planes are the same brown noise today, so a layer switch would be visually
+illegible and would feel bad for reasons that have nothing to do with z -- a false negative on a
+six-week decision.
+
+**If an item's output is a new sentence on screen, it is the wrong item.** (`NORTH_STAR.md` §4.)
+
+### Phase 0 -- SEE IT FIRST-HAND (done 2026-09-10)
+
+- [x] 1  Opus playthrough, rung 0, judging feel. Seven HUD rectangles; the dig leaves no readable mark.
+- [x] 2  Opus playthrough from the BUILD door. Rungs 4 and 5 work under a competent driver: 4 commands.
+- [x] 3  Opus playthrough of rungs 6-9, never played by anyone. **Rung 6 works and is invisible; rung 7
+         is effectively unreachable; 8 and 9 are blocked behind it, not behind their own content.**
+- [x] 4  `docs/NORTH_STAR.md` -- the missing document. Written.
+- [x] 5  Loose material falls, with an angle of repose (D0562, `sim/mining/slump.gd`, 27 asserted,
+         all four guards mutation-witnessed).
+
+### Phase 1 -- THE WORLD BEHAVES (finish what item 5 started)
+
+- [ ] 6  Dust and settle: the visual half of the slump. Without it a fall reads as a glitch, not material.
+- [ ] 7  Undermining drops a mass -- verify end to end in a seat and make the consequence visible.
+- [ ] 8  **THE TRAP.** A player who digs down cannot climb out: 515 commands, zero metres. Jump apex is
+         4.6 m (`JUMP_VELOCITY_PX_S` 365 against `GRAVITY_PX_S2` 900) against a 5.2 m shaft, and the
+         grapple anchors then reels nothing once its line wraps on the shaft lip. **Outranks every
+         cosmetic item in this queue: the game is currently unfinishable.**
+- [ ] 9  Descent as a verb, not a pixel-hunt. `Footing`'s spare rule (D0509) is right and its consequence
+         at the controls was never measured: four 4 px targets under the boots, every near miss silent.
+
+### Phase 2 -- LIGHT (~55% of the gap to the reference)
+
+- [ ] 10 **Edge occlusion at every cut face.** Highest-value single item in the queue: it fixes rock-vs-
+         carved legibility, gives every gallery a floor and ceiling, and is the precondition for z being
+         legible at all. `RockNeighborhood` already spans `FORM_REACH` = 6 cells and throws it away.
+- [ ] 11 Machines and lamps emit real light. `veil_light.gd`, `veil_sources.gd`, `light_painter.gd` exist;
+         the forges draw fire and illuminate nothing. Astra's diagnosis point 3, still unfixed.
+- [ ] 12 Lamp falloff with a warm-to-cool colour shift over distance.
+- [ ] 13 Sky light on the surface band, dying with depth.
+- [ ] 14 Depth haze (`haze_painter.gd`).
+- [ ] 15 Light shafts down open holes (`post_fx.gdshader`).
+- [ ] 16 Emissive bloom on forge fire.
+
+### Phase 3 -- ROCK (~25% of the gap)
+
+- [ ] 17 Kill the 4 px per-cell jitter. Correct at legacy's 32 px cell, television static at 4 px.
+- [ ] 18 Cobble and boulder grammar at 0.5-2 m (`gram_map.gd`, `rock_tone.gd`, `bedding_tone.gd`).
+- [ ] 19 Strata that vary with depth. The chip reads TOPSOIL at +2 m and at 7 m and they look identical.
+- [ ] 20 Material-specific rock reads: clay, hardrock and deepstone must differ at a glance.
+- [ ] 21 A cut face reads as cut, not as a natural cave wall.
+- [ ] 22 Rubble and scree at the foot of a cut (pairs with phase 1 -- the material already moves).
+
+### Phase 4 -- AIR (~8%)
+
+- [ ] 23 Dust motes in lit volumes.
+- [ ] 24 Debris particles on a dig.
+- [ ] 25 Impact puff when slumped material lands.
+- [ ] 26 Heat shimmer over forges (`heat_haze.gdshader` exists).
+
+### Phase 5 -- SURFACE (~7%)
+
+- [ ] 27 Trees: real canopies, trunk texture, variation between individuals.
+- [ ] 28 Grass tufts with height variation, not a one-cell hard green stripe.
+- [ ] 29 Sky: star field and horizon glow.
+- [ ] 30 Falling and drifting leaves.
+
+### Phase 6 -- FRAME AND CAMERA
+
+- [ ] 31 Clamp the camera at the world edge (Astra's point 4).
+- [ ] 32 Default zoom to `CameraRig.ZOOM_LEVELS[0]`. **Blocked behind 33.**
+- [ ] 33 World width to 64 m per P031. Unblocks 32 and closes the east edge.
+- [ ] 34 The east edge, T036: cliff, bore wall, dark rock to the canvas, or a wider world.
+
+### Phase 7 -- HUD (~5%, and the one that removes shipped work)
+
+- [ ] 35 Seven dark rounded rectangles down to three.
+- [ ] 36 Cut instructional prose; every lesson the world can embody becomes a cue. **This removes work
+         shipped on 2026-09-09 and that is correct.**
+- [ ] 37 Machine label collisions ("MOUTH" is drawn on top of "FORGE") and proximity gating.
+- [ ] 38 The recipe line has no words: "1 [grey] 2 [orange] -> 1 [yellow]".
+- [ ] 39 A diegetic depth and band indicator.
+
+### Phase 8 -- CONTENT
+
+- [ ] 40 BUILD's MOUTH target sits where a player reads it.
+- [ ] 41 Join "you are carrying coal" to "the forge is starved". Both are drawn; nothing connects them.
+- [ ] 42 d3 and d4. The demand ladder is the authoritative unlock path and it has two entries.
+- [ ] 43 The seven orphan machines: reach them or delete them.
+
+### Phase 9 -- VERIFY
+
+- [ ] 44 Opus playthrough again, same route as item 1. The only honest test of phases 1-5.
+- [ ] 45 A stranger batch STARTED AT RUNG 4, six seats, haiku, pinned mission.
+- [ ] 46 Astra's fixture question (`docs/audits/2026-09-09-presentation-regime-handoff.md`).
+- [ ] 47 Full battery, CI green on all required jobs, everything pushed, tree clean. Read the JOBS.
+- [ ] 48 The wrap: `docs/WORKING.md`, `docs/BRIEF.md`, the ledger.
+
+### Phase 10 -- THE MATCH LOOP (the director's closing instruction; does not terminate on its own)
+
+- [ ] 49 Cycle: capture our frame at the reference's own camera, put it beside
+         `docs/media/reference/2026-09-10-lighting-reference.jpg`, name the largest remaining
+         difference, fix that one thing, capture again. Repeat. **Lighting and rock only** -- the
+         mockup's HUD is our HUD and its second depth plane is an open fork, neither is in the match.
+
+### Explicitly DEFERRED, with the reason (do not quietly pick these up)
+
+- **The chute, the feeder, holes-as-routing** (GDD §13 positions two and three). Wanted, and they are
+  design rather than implementation: far better decided once the world behaves and can be seen, and they
+  are the items a z ruling would most change. Designing the routing primitives twice is the expensive
+  mistake.
+- **The z spike.** Cheap and informative, but only AFTER phase 2. See the sequencing finding above.
+- **Minimap restyle.** z-fragile, low value.
+- **Miner sprite work.** He is 40 px tall and his lamp is already the best-reading thing in the build.
+- **Any further bake-pipeline perf work.** The programme is closed and a z ruling would redo it.
+- **New HUD text of any kind. Permanently.** `NORTH_STAR.md` §4.
 
 ## Performance programme — the five passes, September 8
 

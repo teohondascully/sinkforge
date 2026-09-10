@@ -14,6 +14,7 @@ const RECORDS: Dictionary = {
 		"hardness": 1.0,
 		"display_name": "Clay",
 		"soil": true,
+		"loose": true,
 		"base_color": [
 			0.34,
 			0.24,
