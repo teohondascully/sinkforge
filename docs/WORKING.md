@@ -1,6 +1,6 @@
 # Working state
 
-**Last updated: 2026-09-09 (performance programme and its audit; gameplay measured by strangers 127-132, D0544).**
+**Last updated: 2026-09-10 (the perf programme closed at D0556; four gameplay/UI changes shipped and then MEASURED by strangers 133-138, D0561: delivery 0 -> 4 of 6).**
 
 ## Performance programme — the five passes, September 8
 
