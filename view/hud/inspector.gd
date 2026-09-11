@@ -199,6 +199,33 @@ static func fit_text(font: Font, text: String, size: int, max_w: float) -> Strin
 	return "…"
 
 
+## ONE CHIP'S TEXT, AND WHETHER IT SAYS WHAT THE THING IS (item 38, D0594). The recipe line read
+## "1 [grey] 2 [orange] -> 1 [yellow]" -- a swatch and a count, and nothing naming either end. A player
+## who has not memorised the palette cannot read their own factory off it.
+##
+## The name comes from `Hotbar.item_label`, which is already the one authority for what an item is called
+## (a machine's record `display_name`, a material's own, else the id spaced and capitalised). A second
+## spelling of "Iron ore" in this file is how the card and the pack come to disagree.
+static func chip_text(entry: Dictionary, named: bool) -> String:
+	if not named:
+		return " %d" % int(entry["count"])
+	return " %d %s" % [int(entry["count"]), Hotbar.item_label(entry["item"])]
+
+
+## How wide the recipe row actually draws: each chip's swatch, its text and its gap, plus the arrow.
+##
+## THE ROW WAS NEVER MEASURED AT ALL BEFORE THIS, which is a latent defect this item exposed rather than
+## created: `layout` sized the card from the name and the mode/status/rate lines only, so a long recipe
+## already drew past the panel's right edge and nothing said so. Adding names without measuring would
+## have made a silent overflow a loud one.
+static func recipe_width(font: Font, ins: Array, outs: Array, named: bool) -> float:
+	var w: float = font.get_string_size("->", HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(ARROW_SIZE)).x + UiTheme.px(8.0)
+	for entry: Dictionary in (ins + outs):
+		w += UiTheme.px(14.0) + UiTheme.px(8.0) + font.get_string_size(
+			chip_text(entry, named), HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LINE_SIZE)).x
+	return w
+
+
 ## Everything the panel decides. `plate_shown` is the stand-down.
 static func layout(frame: Frame, font: Font, plate_shown: bool = false, top: float = -1.0) -> Dictionary:
 	if frame == null or frame.obs == null or font == null or plate_shown:
@@ -219,6 +246,11 @@ static func layout(frame: Frame, font: Font, plate_shown: bool = false, top: flo
 			widest = maxf(widest, font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LINE_SIZE)).x)
 			lines.append({"key": spec[0], "text": text, "ink": spec[1]})
 	var pad: float = UiTheme.px(PAD)
+	# NAMES WHEN THEY FIT, COUNTS WHEN THEY DO NOT, decided by measuring rather than by hoping. A card
+	# capped at MAX_W cannot always carry "1 Iron ingot 1 Ingot -> 2 Gear"; when it cannot, the row falls
+	# back to the swatch-and-count form it had, which is worse but never clipped.
+	var named: bool = recipe_width(font, ins, outs, true) + pad * 2.0 <= UiTheme.px(MAX_W)
+	widest = maxf(widest, recipe_width(font, ins, outs, named))
 	var width: float = clampf(widest + pad * 2.0, UiTheme.px(MIN_W), UiTheme.px(MAX_W))
 	var name: String = fit_text(font, info["name"], UiTheme.pt(NAME_SIZE), width - pad * 2.0)
 	for l: Dictionary in lines:
@@ -229,7 +261,7 @@ static func layout(frame: Frame, font: Font, plate_shown: bool = false, top: flo
 	var rect := Rect2(origin, Vector2(width, UiTheme.px(10.0) + float(rows) * UiTheme.px(LINE_H) + UiTheme.px(4.0)))
 	return {"rect": rect, "name": name, "x0": origin.x + pad, "y0": origin.y + UiTheme.px(20.0),
 		"line_h": UiTheme.px(LINE_H), "in": ins, "out": outs, "has_recipe": has_recipe, "lines": lines,
-		"holding": holding, "rows": rows}
+		"holding": holding, "rows": rows, "named": named}
 
 
 func paint(frame: Frame, ci: CanvasItem) -> void:
@@ -243,10 +275,10 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	ci.draw_string(font, Vector2(x0, y), l["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(NAME_SIZE), NAME_INK)
 	y += l["line_h"]
 	if bool(l["has_recipe"]):
-		var x: float = _chips(ci, font, x0, y, l["in"])
+		var x: float = _chips(ci, font, x0, y, l["in"], bool(l.get("named", false)))
 		ci.draw_string(font, Vector2(x, y), "->", HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(ARROW_SIZE), ARROW_INK)
 		x += font.get_string_size("->", HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(ARROW_SIZE)).x + UiTheme.px(8.0)
-		_chips(ci, font, x, y, l["out"])
+		_chips(ci, font, x, y, l["out"], bool(l.get("named", false)))
 		y += l["line_h"]
 	for line: Dictionary in l["lines"]:
 		ci.draw_string(font, Vector2(x0, y), line["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LINE_SIZE), line["ink"])
@@ -258,13 +290,13 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 
 
 ## A run of item chips (a colour swatch + count) left to right; returns the x just past them.
-static func _chips(ci: CanvasItem, font: Font, x0: float, y: float, items: Array) -> float:
+static func _chips(ci: CanvasItem, font: Font, x0: float, y: float, items: Array, named: bool = false) -> float:
 	var x: float = x0
 	for entry: Dictionary in items:
 		var sw := Rect2(x, y - UiTheme.px(11.0), UiTheme.px(12.0), UiTheme.px(12.0))
 		ci.draw_rect(sw, ItemLook.color(entry["item"]))
 		ci.draw_rect(sw, Color(0.0, 0.0, 0.0, 0.4), false, 1.0)
-		var label: String = " %d" % int(entry["count"])
+		var label: String = chip_text(entry, named)
 		ci.draw_string(font, Vector2(x + UiTheme.px(14.0), y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LINE_SIZE), CHIP_INK)
 		x += UiTheme.px(14.0) + font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(LINE_SIZE)).x + UiTheme.px(8.0)
 	return x

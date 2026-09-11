@@ -22861,3 +22861,27 @@ assuming 120 for a missing rate fires the refuse-never-guess guard. (The first a
 measured nothing -- `git checkout --` restores from the INDEX, and the file was not staged, so the
 restore reverted to HEAD and removed the function under test. Redone from a staged baseline.)
 Reverse: CHEAP -- `summarise` stops emitting the two notes and the report's `elif` goes.
+
+## D0594 · 2026-09-11 · view/hud/inspector.gd · the recipe line says what the things are
+Decided: each recipe chip carries its item's NAME, from `Hotbar.item_label`, and the row is measured into
+the card's width. Names when they fit, the old swatch-and-count when they do not.
+Why: queue item 38 -- the line read "1 [grey] 2 [orange] -> 1 [yellow]". A swatch and a count and nothing
+naming either end, so a player who has not memorised the palette cannot read their own factory off it.
+ONE AUTHORITY FOR THE NAME. `Hotbar.item_label` already decides what an item is called (a machine
+record's `display_name`, a material's own, else the id spaced and capitalised). A second spelling in this
+file is how the card and the pack come to disagree, and the mutation that proves the guard is exactly
+that: `String(&"ore_iron").capitalize()` gives **"Ore Iron"** where the pack says **"Iron ore"**.
+IT EXPOSED A LATENT DEFECT IT DID NOT CREATE. `layout` sized the card from the name and the
+mode/status/rate lines ONLY -- the recipe row was never measured at all, so a long recipe already drew
+past the panel's right edge and nothing said so. Adding names without measuring would have turned a
+silent overflow into a loud one, so `recipe_width` now feeds `widest`.
+THE FALLBACK IS REAL CODE THAT NO SHIPPED DATA REACHES. Measured over the records: all six recipes fit
+named, the widest being `mill_gear` at 450 px against a 600 px cap ("1 Iron ingot 1 Ingot -> 2 Gear").
+So the unnamed branch is posed by hand in the suite with a synthetic six-input recipe rather than left
+untested -- `[[error-path-returns-passing-value]]`: a path that never runs is a path nobody has watched
+return the passing answer.
+Mutation-tested three ways, each on its own guard: `chip_text` ignoring `named` (the defect restored),
+`recipe_width` returning 0 (the row stops being measured), and a second spelling of the name.
+NOT JUDGED ON A FRAME -- the director is using the screen. Whether a named row reads better than a
+compact glyph row at play zoom belongs to item 49.
+Reverse: CHEAP -- `named` is forced false and the row stops being measured.

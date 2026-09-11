@@ -68,8 +68,58 @@ func _initialize() -> void:
 	_test_the_hopper_and_the_winch()
 	_test_recipe_machines_and_the_rate()
 	_test_the_panel_rules()
+	_test_the_recipe_line_says_what_the_things_are()
 	await _test_paint_runs_through_the_hud_host()
 	_finish("inspector")
+
+
+## ITEM 38, D0594: the recipe line read "1 [grey] 2 [orange] -> 1 [yellow]" -- a swatch and a count and
+## nothing naming either end. These assertions pin that every shipped recipe now names its items, that
+## the name comes from the pack's own authority rather than a second spelling, that the row is MEASURED
+## into the card's width (it never was), and that the fallback fires when a row cannot fit.
+func _test_the_recipe_line_says_what_the_things_are() -> void:
+	var font: Font = ThemeDB.fallback_font
+	_check(Inspector.chip_text({"item": &"ore", "count": 2}, false) == " 2",
+		"unnamed is the old form, a bare count (%s)" % Inspector.chip_text({"item": &"ore", "count": 2}, false))
+	_check(Inspector.chip_text({"item": &"ore", "count": 2}, true) == " 2 Ore",
+		"named says what it is (%s)" % Inspector.chip_text({"item": &"ore", "count": 2}, true))
+	# ONE AUTHORITY FOR THE NAME. A second spelling here is how the card and the pack come to disagree.
+	_check(Inspector.chip_text({"item": &"ore_iron", "count": 1}, true).ends_with(Hotbar.item_label(&"ore_iron")),
+		"and the name IS `Hotbar.item_label`'s, not a second table (%s)" % Inspector.chip_text({"item": &"ore_iron", "count": 1}, true))
+
+	# EVERY SHIPPED RECIPE FITS IN NAMED FORM -- measured over the real records, not asserted of one.
+	var bare: int = 0
+	for rid: String in RecipesRecords.RECORDS:
+		var r: Dictionary = RecipesRecords.RECORDS[rid]
+		var ins: Array = _entries(r.get("inputs", {}))
+		var outs: Array = _entries(r.get("outputs", {}))
+		if Inspector.recipe_width(font, ins, outs, true) + UiTheme.px(Inspector.PAD) * 2.0 > UiTheme.px(Inspector.MAX_W):
+			bare += 1
+	_check(bare == 0, "all %d shipped recipes fit with their names (%d fall back)" % [RecipesRecords.RECORDS.size(), bare])
+
+	# THE FALLBACK IS REAL CODE AND NOTHING IN `data/` REACHES IT, so it is posed by hand rather than left
+	# untested -- an error path that never runs is an error path nobody has seen return the passing value.
+	var huge: Array = []
+	for i: int in 6:
+		huge.append({"item": &"a_very_long_item_name_indeed_%d" % i, "count": 99})
+	_check(Inspector.recipe_width(font, huge, huge, true) + UiTheme.px(Inspector.PAD) * 2.0 > UiTheme.px(Inspector.MAX_W),
+		"a row too long for the card is detected (%.0f px against a %.0f px cap)" % [
+			Inspector.recipe_width(font, huge, huge, true), UiTheme.px(Inspector.MAX_W)])
+	_check(Inspector.recipe_width(font, huge, huge, false) < Inspector.recipe_width(font, huge, huge, true),
+		"and the unnamed form it falls back to is strictly narrower")
+
+	# THE ROW IS MEASURED INTO THE CARD, which it never was before: `layout` sized from the name and the
+	# mode/status/rate lines only, so a long recipe already drew past the panel edge and nothing said so.
+	_check(Inspector.recipe_width(font, _entries({&"ore": 2, &"coal": 1}), _entries({&"ingot": 1}), true)
+			> Inspector.recipe_width(font, _entries({&"ore": 2}), _entries({&"ingot": 1}), true),
+		"a recipe with more inputs measures wider, so width tracks content")
+
+
+func _entries(counts: Dictionary) -> Array:
+	var out: Array = []
+	for k: Variant in counts:
+		out.append({"item": StringName(String(k)), "count": int(counts[k])})
+	return out
 
 
 func _obs(aim: Vector2i = Vector2i(30, 30)) -> Interface.Observation:

@@ -1,6 +1,6 @@
 # Working state
 
-**Last updated: 2026-09-10 (Astra's audit answered in full -- D0575 withdrawn, D0576-D0579 fix what it reproduced; D0577 found D0569's floor had made the veil a CONSTANT underground; D0583-D0586 relit the frame after three hours with the director's screen. Ten queue items turned out already built.)**
+**Last updated: 2026-09-11 (Astra's D1-D8 rulings executed. D0587 withdrew four header claims, one of them arguing for the design its own file had rejected; D0588 found the content gap is a chain, not six switches; D0589-D0590 gave the shafts and the world's edge a coherent night; D0591's new gate then corrected the orphan count to NINE; D0592-D0594 joined the pack to the machines, answered Astra's fixture question and gave the recipe line words.)**
 
 ## Overnight queue
 
@@ -337,7 +337,16 @@ nothing and saved most of a night.
          `MachineLabels` are two independent systems with no shared packing, so a ring word can land on
          a machine plate and neither knows. That is the collision the queue reported, and it is a view
          change with a frame to judge, so it is for the capture batch.
-- [ ] 38 The recipe line has no words: "1 [grey] 2 [orange] -> 1 [yellow]".
+- [x] 38 **DONE (D0594).** The recipe line has no words: "1 [grey] 2 [orange] -> 1 [yellow]" -- a swatch
+         and a count, naming neither end. Each chip now carries the item's name from `Hotbar.item_label`,
+         the pack's own authority, so the card and the pack cannot spell a thing differently. **Names
+         when they fit, counts when they do not**, decided by measuring the row. All 6 shipped recipes
+         fit; the fallback is posed by hand in the suite because nothing in `data/` reaches it.
+         **It also closed a latent defect it did not create:** the recipe row was never measured into the
+         card's width at all -- `layout` sized from the name and the mode/status/rate lines only, so a
+         long recipe already drew past the panel's right edge and nothing said so. Three mutations
+         witnessed, including a second name spelling, which yields "Ore Iron" where the pack says
+         "Iron ore".
 - [ ] 39 A diegetic depth and band indicator.
 
 ### Phase 8 -- CONTENT
