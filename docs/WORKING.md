@@ -347,7 +347,14 @@ nothing and saved most of a night.
          metre target's word when the body is inside it. The remaining gap is the one D0557 named and
          did not close: nothing distinguishes 3.2 m from the 5 m a player reads as "next to it", so the
          ring is visible from far outside the reach it is gating. A frame item.
-- [ ] 41 Join "you are carrying coal" to "the forge is starved". Both are drawn; nothing connects them.
+- [~] 41 **BUILT (D0592), NOT YET JUDGED ON A FRAME.** Join "you are carrying coal" to "the forge is
+         starved". Both are drawn; nothing connected them -- checked, and `hotbar.gd` contained no
+         reference to a machine, a need or a want. A stack a machine in sight is asking for now wears
+         **that machine's own `feed` mark, in that machine's own lamp colour** (`view/hud/wanted_rule.gd`):
+         one glyph in two places rather than new language. Gated on `StatusLook`'s **`feeds`**, not on
+         "has a need" -- `no_power`, `blocked` and `unlinked` all raise bubbles and none is answered by
+         anything in your pack. Three mutations witnessed. The mark's size and placement belong to item
+         49's loop; the director is using the screen.
 - [~] 42 **MEASURED AND PUT TO THE DIRECTOR (P042).** Two tiers on file, `d1` and `d2`. This is content
          design -- what a tier should ASK for is the director's call -- but it pairs exactly with 43.
 - [~] 43 **MEASURED, AND THE QUEUE'S OWN COUNT WAS WRONG (P042).** Six orphans, not seven: `torch` IS
