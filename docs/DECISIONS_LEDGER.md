@@ -22791,3 +22791,37 @@ refuses a verdict.
 Astra's scoping, followed: build the graph and a member-listing reported-only gate now; defer the
 blocking verdict, a `shipped:` schema field, and every quantity/fuel increment until P042 is answered.
 Reverse: delete the step and the two files.
+
+## D0592 · 2026-09-10 · view/hud/wanted_rule.gd (new), hotbar.gd · the pack knows what the machine is asking for
+Decided: a stack a machine in sight is asking for wears that machine's own `feed` mark, in that machine's
+own lamp colour, in the top-right of its hotbar well.
+Why: queue item 41 -- "Join 'you are carrying coal' to 'the forge is starved'. Both are drawn; nothing
+connects them." Checked, and the premise held: `MachinePainter._draw_status` floats a need bubble with
+`need_item(rec)` inside it, `Hotbar` draws every stack carried, and `hotbar.gd` contained no reference to
+a machine, a need or a want. The player holding coal beside a red forge made the join themselves.
+THE ANSWER IS ONE GLYPH IN TWO PLACES rather than new language. The machine already wears `StatusLook`'s
+`feed` mark -- "pointing UP, at the need bubble it is asking for" -- so the slot repeats it. Nothing here
+invents a vocabulary, which is what makes the two read as one statement instead of two notifications.
+NOT COLOUR ALONE, on `StatusLook`'s own recorded finding: "green working against red no-fuel is the
+single most common colour confusion there is, with amber starved joining them; for a deuteranope those
+three lamps were one lamp." A slot that only changed colour would have reintroduced exactly that. The
+mark is the channel; the colour agrees with it, and the suite asserts both are present and that the two
+item-needs differ in each.
+THE GATE IS `feeds`, NOT `wants_bubble`, and this is the judgment call worth the entry.
+`BubbleRule.wants_bubble` is TRUE for `no_power`, `blocked` and `unlinked` as well -- all three raise a
+bubble -- but none is answered by anything in the pack: walking over with coal fixes no power cut.
+`StatusLook`'s table already draws that distinction as `feeds` ("whether a floating need bubble, which
+can ONLY draw an item, can tell the truth about this status"), so that field decides it rather than a
+second list here that could come to disagree with it. The suite pins all three, and prints
+`wants_bubble`'s own answer beside each so the difference is visible in the PASS line rather than
+inferred.
+The population is the observation's machines, windowed to roughly the view. Stated in the file: it errs
+toward marking a machine just off the edge over missing one just inside it, which is the cheaper mistake.
+`_mark_wanted` is a separate pass rather than a branch in the well loop, which was already at the
+function-length cap -- and where a slot SITS is not the same question as what it means.
+Mutation-tested, three ways, each on its own guard: gating on `wants_bubble` fires the three
+no-item-can-fix cases; marking every slot fires the exactly-coal case; a fixed tint fires both palette
+guards.
+NOT JUDGED ON A FRAME -- the director is using the screen. The rule is measured; the mark's size and
+placement belong to item 49's match loop.
+Reverse: CHEAP -- delete the `_mark_wanted` call and the `w.has("wanted")` block.

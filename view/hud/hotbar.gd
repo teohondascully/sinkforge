@@ -95,6 +95,7 @@ static func layout(frame: Frame, font: Font, pointer: Vector2 = NO_POINTER) -> D
 				tooltip = {"item": slots[i]["item"], "count": int(slots[i]["count"]),
 					"anchor": Vector2(rect.get_center().x, rect.position.y)}
 		wells.append(well)
+	_mark_wanted(wells, o)
 	var backing := Rect2(UiTheme.px(x0 - 8.0), UiTheme.px(HOTBAR_BAND_TOP), UiTheme.px(total_w + 16.0), UiTheme.px(HOTBAR_BAND_H))
 	var label: Dictionary = {}
 	if sel >= w0 and sel < mini(w0 + n, slots.size()) and int(slots[sel]["count"]) > 0:
@@ -108,6 +109,19 @@ static func layout(frame: Frame, font: Font, pointer: Vector2 = NO_POINTER) -> D
 		"more_left": w0 > 0, "more_right": w0 + n < slots.size(),
 		"mark_y": UiTheme.px(y + SLOT * 0.5), "label": label,
 		"tooltip": tooltip_layout(font, tooltip) if not tooltip.is_empty() else {}}
+
+
+## JOIN THE PACK TO THE MACHINES (item 41, D0592). A stack a machine in sight is asking for carries that
+## machine's own status, so `paint` can wear the machine's own mark. A separate pass rather than a branch
+## inside the well loop, which is already at the function-length cap and is about LAYOUT -- where a slot
+## sits is not the same question as what it means.
+static func _mark_wanted(wells: Array[Dictionary], o: Interface.Observation) -> void:
+	var wanted: Dictionary = WantedRule.wanted(o)
+	if wanted.is_empty():
+		return
+	for w: Dictionary in wells:
+		if w.has("item") and wanted.has(w["item"]):
+			w["wanted"] = wanted[w["item"]]
 
 
 ## The hovered slot's tooltip: name and count, and one purpose line, clamped on-canvas above the slot.
@@ -166,6 +180,14 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 			var cw: float = font.get_string_size(cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(COUNT_SIZE)).x
 			ci.draw_rect(Rect2(r.end.x - cw - UiTheme.px(5.0), r.end.y - UiTheme.px(13.0), cw + UiTheme.px(4.0), UiTheme.px(12.0)), Color(0.03, 0.03, 0.05, 0.85))
 			ci.draw_string(font, Vector2(r.end.x - cw - UiTheme.px(3.0), r.end.y - UiTheme.px(3.0)), cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(COUNT_SIZE), UiTheme.UI_TEXT)
+		if w.has("wanted"):
+			# THE MACHINE'S OWN MARK, in the machine's own lamp colour: the `feed` triangle points UP at
+			# the need bubble over the machine asking for this. Top-right, clear of the key digit at
+			# top-left and the count at bottom-right. Never colour alone -- `StatusLook`'s own finding.
+			var mc: Vector2 = Vector2(r.end.x - UiTheme.px(6.0), r.position.y + UiTheme.px(6.0))
+			var tint: Color = WantedRule.tint(w["wanted"])
+			ci.draw_circle(mc, UiTheme.px(5.0), Color(0.03, 0.03, 0.05, 0.88))
+			StatusLook.draw_mark(ci, mc, UiTheme.px(3.4), &"feed", tint)
 	var backing: Rect2 = l["backing"]
 	if bool(l["more_left"]):
 		_more_mark(ci, Vector2(backing.position.x - UiTheme.px(5.0), l["mark_y"]), -1.0)
