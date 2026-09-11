@@ -1,5 +1,40 @@
 # Brief
 
+## What was learned — every claim about how it LOOKS, made without a frame, was wrong. Four for four.
+
+The director lent the screen late in the session. Four separate things I had measured, asserted and
+shipped as correct turned out to be wrong the moment a frame existed, and no test could have said so:
+
+| claim | what a frame showed |
+|---|---|
+| the beyond reads as receding earth (D0590) | luma **0.022-0.054** against the terrain's 0.185 — blue where the ground is brown. A hole, not a wall. |
+| the grass draws (D0595) | **it drew nothing at all.** A colour per point; `draw_multiline_colors` asserts `colors * 2 == points` natively. |
+| "at 0.15 the stars read" (D0583) | the starfield had **never once been drawn** — sub-pixel radii, in a 47 px band behind the trees. |
+| band colours suit the beyond (first draft) | luma 0.381 against a 0.190 reference: a garish striped wall brighter than the terrain. |
+
+**Each was green under a complete, honest suite.** The grass had 20 assertions and not one touched the
+draw. The starfield had `visible_stars()` returning 42 and a suite asserting the field was "non-empty and
+does not lattice" — both true of the LIST while zero pixels reached the screen. The beyond had a
+brightness guard that passed because it asked "is this dark enough", not "is this the colour of the
+ground beside it".
+
+**The shape is one thing, and it is the house failure class in its rendering form:** measuring a function
+is not measuring a picture. A painter's suite can be complete, green, and about nothing anyone can see.
+The only assertion that closes it is one made on the data the painter hands the engine — which is why
+`GrassPainter.batch` and `SurroundPainter.mass_color` are now split out and pinned, each opening with a
+control that the fixture can register its subject at all.
+
+**And the second-order lesson cost more than the first.** My initial repair to the grass suite — run
+`paint` on a real canvas in a real draw pass — was itself wrong: the posed world grew no blades, so the
+draw never ran and re-applying the bug left the suite green. I had written the instrument and declared it
+good. Only the mutation caught it. Three times this session a mutation contradicted a conclusion I had
+already reached and reported.
+
+**What the frames also settled, positively:** the beyond now continues the edge column's own material, so
+the seam needs no calibration at all; the stars fill the sky; and the grass gives the ground a soft edge
+in place of a one-cell line. Evidence: `docs/media/moments/2026-09-11-*.png`, before and after on both.
+
+
 ## What was learned — prose outlives code, and one comment was advocating the design its own file rejected (D0587)
 
 Astra's review of the decision brief closed on a caution about "old slump comments describing transient

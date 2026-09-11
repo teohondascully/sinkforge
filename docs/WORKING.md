@@ -272,7 +272,12 @@ left here.
          same value. Plants now take a cell-scale `foliage_tone` with clumps, a per-cell break-up and a
          per-column term so no two trees match, and they no longer take sedimentary bedding. The
          SILHOUETTE is still rectangular; that is generation, not view, and is a separate item.
-- [~] 28 **BUILT (D0595), NOT YET JUDGED ON A FRAME.** The note was right: `SurfaceTone`'s moss, roots,
+- [x] 28 **DONE AND JUDGED ON A FRAME (D0595, D0596).** It shipped INERT: the batch was built with a
+         colour per point and `draw_multiline_colors` asserts `colors * 2 == points` natively, so every
+         call drew nothing while the 20-assertion suite stayed green (`docs/CORRECTIONS.md`). Fixed, and
+         the suite now proves the batch is non-empty before asserting anything about it. On the frame the
+         blades read: the ground has a soft green edge instead of a one-cell line.
+         *(original)* **BUILT (D0595).** The note was right: `SurfaceTone`'s moss, roots,
          blades and hanging tufts are all WITHIN the cap cell -- a texture on the top face, not a
          silhouette against the sky -- so this needed a painter. `GrassPainter` draws blades of varying
          height into the air row above a soil surface, in the TREES' own green (`leaves`' `base_color`
@@ -281,10 +286,15 @@ left here.
          sine at 0.83, a 7.6-column period, so the tips would have leaned in a repeating 30 px wave.
          Two incommensurable frequencies now, and the suite pins the distinct count. No sway yet --
          that needs the clock and should be weighed on a frame. Four mutations witnessed.
-- [x] 29 **ALREADY BUILT, AND NOW ACTUALLY VISIBLE (D0583).** `SkyPainter` has had a starfield, sun,
-         moon, clouds, the Sinkforge crown and three parallax ridgelines since D0244. `DAYLIGHT` was
-         pinned at 0.35 (dusk) explicitly to show the most features at once, not because it looked
-         right. At 0.15 the stars read and the sky agrees with the ground.
+- [x] 29 **CORRECTED 2026-09-11 (D0598): "AND NOW ACTUALLY VISIBLE" WAS FALSE.** The starfield had never
+         once been drawn. Two scale errors, neither reachable without rendering a frame: every star's
+         radius was `(1.1..1.9) * SCALE` = **0.14 to 0.24 world px**, sub-pixel; and the whole field sat
+         in a 47 px band ON the horizon, behind the trees. Measured on a real night capture:
+         `visible_stars()` returned 42 while the sky held **zero pixels above 0.12 luma across 111,600
+         samples**. Both fixed and mutation-pinned; the sky now reads as a night sky.
+         *(The rest of the original entry stands.)* `SkyPainter` has had a starfield, sun, moon, clouds,
+         the Sinkforge crown and three parallax ridgelines since D0244. `DAYLIGHT` was pinned at 0.35
+         (dusk) explicitly to show the most features at once, not because it looked right.
 - [ ] 30 Falling and drifting leaves. **NOT ATTEMPTED** -- needs an ambient emitter keyed to canopies.
 
 ### Phase 6 -- FRAME AND CAMERA
@@ -308,7 +318,12 @@ nothing and saved most of a night.
          gives 256 cells x 4 px = 1024 world px = **64.0 m**, which is exactly what P031's ruling asked
          for. The audit's caution ("widening only postpones an empty east edge") still applies to item
          34, and now applies to a width that already exists rather than to one being proposed.
-- [x] 34 **DONE (D0590).** Astra's D7 ruling picked among T036's four: a deliberate noninteractive
+- [x] 34 **DONE, AND CORRECTED TWICE ON REAL FRAMES (D0590 -> D0597).** The first two versions guessed
+         what the rock past the edge looks like and a capture refused both: band colours at luma 0.381
+         against a 0.190 reference, then `deepstone` double-lit at **0.022-0.054 against the terrain's
+         0.185** -- a hole, not a wall. It now takes the edge column's OWN material, so the seam is
+         continuous by construction. Measured after: 0.185 inside, 0.136 just outside, 0.087 far out.
+         *(original)* **DONE (D0590).** Astra's D7 ruling picked among T036's four: a deliberate noninteractive
          continuation, no wider world, and the bore-wall lore DEFERRED rather than taken. What stood
          past the edge was not void -- `SkyPainter` fills below the horizon across the whole view, so it
          was the sky's own blue at luma 0.1968, ground-coloured sky where earth should be. It is now
