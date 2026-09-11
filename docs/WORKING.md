@@ -278,7 +278,15 @@ nothing and saved most of a night.
          gives 256 cells x 4 px = 1024 world px = **64.0 m**, which is exactly what P031's ruling asked
          for. The audit's caution ("widening only postpones an empty east edge") still applies to item
          34, and now applies to a width that already exists rather than to one being proposed.
-- [ ] 34 The east edge, T036: cliff, bore wall, dark rock to the canvas, or a wider world. **THE ONE
+- [x] 34 **DONE (D0590).** Astra's D7 ruling picked among T036's four: a deliberate noninteractive
+         continuation, no wider world, and the bore-wall lore DEFERRED rather than taken. What stood
+         past the edge was not void -- `SkyPainter` fills below the horizon across the whole view, so it
+         was the sky's own blue at luma 0.1968, ground-coloured sky where earth should be. It is now
+         stratified `deepstone` that recedes over 12 m, measured at a near-constant 60-75% of the
+         in-world rock at every depth: darker than both the fill it replaced and the terrain it
+         continues, with no step at the surface and no black at the far end. **Not yet judged on a
+         frame** -- the director is using the screen; the capture belongs to item 49.
+         *(superseded)* The east edge, T036: cliff, bore wall, dark rock to the canvas, or a wider world. **THE ONE
          REAL ITEM IN THIS PHASE, and widening is no longer among its answers.** Measured across the
          zoom ladder on the 64 m world: 2.00 shows 40.0 m (no void), 1.40 shows 57.1 m (no void), 1.00
          shows 80.0 m (**256 px of void**), 0.66 shows 121.2 m (**915 px of void**). So the defect is
@@ -324,6 +332,59 @@ nothing and saved most of a night.
          `mill_gear`, `smelt_rich` -- so of the game's **6 recipes only 2 are reachable** (`mine_ore` on
          the drill, `smelt_ingot` on the processor). Two-thirds of the crafting content cannot be
          reached by any route the game currently offers.
+         **CORRECTED 2026-09-10 (D0588): they are unreachable TWICE OVER.** Astra caught that
+         `ore_iron` yields `ore` while `smelt_iron` consumes `iron`; checking the whole graph,
+         **`iron` and `rich_ore` are consumed by recipes and produced by nothing anywhere**. The set of
+         recipes whose MACHINE is unobtainable and the set whose INPUTS are unproducible are the same
+         four, so neither half of the fix does anything alone. P042's "one ruling would reach all of it"
+         is withdrawn.
+- [ ] 50 **A PROGRESSION GRAPH, GENERATED FROM `data/`, THAT CAN FAIL.** The director's ask: map every
+         craftable as both an economy to read and a validation that new content enters the tree rather
+         than being dropped in isolated. Scoped against the repo (agent pass, 2026-09-10) -- these are
+         the facts that decide its shape, all verified in-tree:
+         - **Prior art is null.** `tools/schema_validator` does per-file fields and types only and says
+           so in its docstring; it does no cross-record reference checking of any kind.
+           `tests/test_economy.gd` is a `ProductionRate` ring buffer with zero recipe assertions;
+           `test_reach.gd` and `test_reachability_sweep.gd` are name collisions (arm reach, body
+           traversal). **What exists to build on is `tools/data_codegen/generate.py`** -- it already
+           loads every YAML under `data/` and already has a `--check` gate mode.
+         - **A build cost cannot be added to a machine record.** `data/machines/SCHEMA.yaml` lists
+           `craft_cost`/`craft_count` under `forbidden:`, enforced by the validator, on a director's
+           ruling: "not as code, not as a craft_cost data field." So the proposal's quantity increment
+           has no field to stand on. The cost that DOES exist is the rig's `wants:`.
+         - **Three quarters of "what consumes an item" is in code, not data.** `Machines.machine_eats`
+           is a union of four rules -- the coal-burner set, `winch_head` + bulk, `rig` + the current
+           demand, and `recipe.inputs`. Only the last is in `data/`. A data-only checker models one
+           quarter of consumption and is blind to the rest; say so in its own output or it overclaims.
+         - **Nothing in the data marks which start is the shipped one.** `tutorial` is named only by
+           `shell/main.gd`'s `const START`. `site:` splits "stamps world geometry" from "stamps a pack",
+           which is the wrong axis -- `beacon_probe` and `lighting_bench` both carry it and both say in
+           their own first line that they are scenario records, not starts of play. Without a
+           discriminator the gate would count a bench's placed machine as shipped progression. Needs an
+           optional `shipped:` on the starts schema (absent reads false, this schema family's own
+           convention) plus an assertion that `main.gd`'s `START` names a record carrying it. **A
+           hand-maintained list inside the checker is the option to refuse** -- same shape as the
+           allowlist `check_ci_not_shrunk` exists to reject.
+         - **A naive scan would be fooled today.** `data/strata/shallow_clay.yaml` has a top-level
+           `iron:` key that is terrain-gen tuning, not an item. Anything grepping `data/` for
+           item-shaped strings "finds" iron and declares `smelt_iron` fed.
+         - **The AND semantics are the likely silent bug.** A recipe is reachable only when ALL its
+           inputs are; plain graph search declares it reachable on one. The fixpoint used for D0588 --
+           repeatedly fire every recipe whose inputs are all available -- is the correct semantics.
+           Cycles are not rejected wholesale: reject only a cycle that cannot START from a seed.
+         - **It lands RED on today's tree**, so it ships `continue-on-error` (reported-only, the
+           `coverage_check.py` precedent) or it waits on P042. It cannot block work on a design call it
+           cannot make.
+         Deliverable in this repo's conventions: `tools/layer_lint/check_content_reachable.py` with
+         `tools/layer_lint/test_check_content_reachable.py` beside it, one step in harness.yml's `gates`
+         job (which buys `run_local_battery` pickup, a `check_ci_not_shrunk` floor, and mutation-test
+         enrolment for free), QUALITY gate **37, appended** -- gate numbers are addresses. Population
+         line first, then members, then one PASS/FAIL line. **Mutation cases that matter:** an empty
+         `data/recipes/` must FAIL rather than pass vacuously; a seeded cycle must PASS where an unseeded
+         one FAILS; and flipping `dev_kit` into the shipped set must CHANGE the verdict -- if it does
+         not, the fixture exclusion is decorative and the whole proof is unfalsified.
+         **Build (a) the graph and a member-listing reported-only gate. Defer the blocking verdict, the
+         `shipped:` field and every quantity/fuel increment until P042 is answered.**
 
 ### Phase 9 -- VERIFY
 
