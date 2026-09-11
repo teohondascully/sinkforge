@@ -351,8 +351,9 @@ func _test_the_real_stack_opts_named_painters_out_and_leaves_the_rest_animated()
 	# The bake declines with no render target, which is every headless run, so the two baked painters
 	# mount as ordinary layers here -- and they are static on that path by the definition that put them
 	# in the bake at all. `--sky` is off, so the backdrop stands in for the sky painter.
-	var want: PackedStringArray = PackedStringArray(["backdrop_painter.paint", "ore_painter.paint_lode",
-		"seam_painter.paint", "terrain_painter.paint", "wall_painter.paint"])
+	# `grass_painter.paint` joined at D0595: no sway, so it is pure over the camera and the observation.
+	var want: PackedStringArray = PackedStringArray(["backdrop_painter.paint", "grass_painter.paint",
+		"ore_painter.paint_lode", "seam_painter.paint", "terrain_painter.paint", "wall_painter.paint"])
 	_check(static_labels == want,
 		"the real stack opts exactly these painters out of the per-tick redraw: got %s, want %s"
 		% [static_labels, want])

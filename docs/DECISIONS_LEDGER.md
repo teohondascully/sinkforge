@@ -22885,3 +22885,35 @@ Mutation-tested three ways, each on its own guard: `chip_text` ignoring `named` 
 NOT JUDGED ON A FRAME -- the director is using the screen. Whether a named row reads better than a
 compact glyph row at play zoom belongs to item 49.
 Reverse: CHEAP -- `named` is forced false and the row stops being measured.
+
+## D0595 · 2026-09-11 · view/visuals/grass_painter.gd (new), view_stack.gd · the ground stops being a line
+Decided: a static `GrassPainter` draws blades of varying height into the AIR ROW above a soil surface,
+batched into one `draw_multiline_colors` call, under the veil.
+Why: queue item 28. `SurfaceTone` already carries moss, roots, blades and hanging tufts and every one of
+them is drawn WITHIN the cap cell -- they are a texture on the top face, not a silhouette against the
+sky. So the ground still ended at a hard horizontal line one cell thick, which is the single most 2016
+thing about a surface. The item's own note was right that this needs a painter rather than a constant.
+THE GREEN IS THE TREES', NOT A SECOND ONE: `leaves`' own `base_color` from the records, varied per column
+by `BeddingTone.foliage_tone` -- the function that gives two trees side by side different greens (D0584).
+One place decides what a plant looks like in this world, so grass and canopy cannot drift apart.
+UNDER THE VEIL, WHICH IS THE WHOLE OF ITS LIGHTING. Registered on the water's rung and BEFORE it, so the
+veil multiplies the blades exactly as it multiplies the ground they stand in and a flooded tuft reads
+under the surface. An additive pass would have needed its own copy of the light model, and D0589 is this
+night's evidence for where that ends.
+ONE DRAW CALL FOR THE FIELD. At the widest zoom the view holds ~1,900 soil columns; a `draw_line` apiece
+would be ~1,900 calls a frame for decoration, which is how a cosmetic becomes a performance item.
+Registered STATIC: pure over the camera rect and the observation, so it rebuilds when the world or the
+camera moves rather than on a clock. `tests/test_world_view.gd` pins the static set and went red on this
+addition, which is the pin doing its job.
+THE SUITE REFUSED THE FIRST VERSION AND IT WAS RIGHT. `blade_lean` shipped with ONE sine at 0.83 -- a
+period of about 7.6 columns, 30 px of surface -- so the tips would have leaned in a regular repeating
+wave: a comb with a wobble. 400 columns gave 211 distinct leans against the height's 383. Two
+incommensurable frequencies put it at 339, and the suite pins the COUNT rather than the constants.
+NO SWAY, DELIBERATELY, and it is the obvious next thing: sway needs the clock, which means `animated`,
+which means rebuilding the batch every tick. That is a real cost against a real charm and it should be
+weighed on a frame, not assumed here. Item 28 asked for height variation.
+Mutation-tested four ways, each on its own guard: a constant height fires three; grass on every material
+fires the barren list; the single-sine lean fires the distinct-lean count at exactly the 211 it was
+caught at; a green of its own fires both canopy guards.
+NOT JUDGED ON A FRAME -- the director is using the screen. Height, density and colour are item 49's.
+Reverse: CHEAP -- delete one line in `_mount_ground`.

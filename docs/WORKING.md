@@ -272,9 +272,15 @@ left here.
          same value. Plants now take a cell-scale `foliage_tone` with clumps, a per-cell break-up and a
          per-column term so no two trees match, and they no longer take sedimentary bedding. The
          SILHOUETTE is still rectangular; that is generation, not view, and is a separate item.
-- [ ] 28 Grass tufts with height variation. **NOT ATTEMPTED.** `SurfaceTone` already carries moss,
-         roots, blades and hanging tufts, all WITHIN the cap cell. Real height variation means drawing
-         into the air row above the surface, which is a new painter rather than a constant.
+- [~] 28 **BUILT (D0595), NOT YET JUDGED ON A FRAME.** The note was right: `SurfaceTone`'s moss, roots,
+         blades and hanging tufts are all WITHIN the cap cell -- a texture on the top face, not a
+         silhouette against the sky -- so this needed a painter. `GrassPainter` draws blades of varying
+         height into the air row above a soil surface, in the TREES' own green (`leaves`' `base_color`
+         varied by `BeddingTone.foliage_tone`, D0584's function), under the veil, batched into ONE
+         `draw_multiline_colors` call. **Its own suite refused the first version:** `blade_lean` had one
+         sine at 0.83, a 7.6-column period, so the tips would have leaned in a repeating 30 px wave.
+         Two incommensurable frequencies now, and the suite pins the distinct count. No sway yet --
+         that needs the clock and should be weighed on a frame. Four mutations witnessed.
 - [x] 29 **ALREADY BUILT, AND NOW ACTUALLY VISIBLE (D0583).** `SkyPainter` has had a starfield, sun,
          moon, clouds, the Sinkforge crown and three parallax ridgelines since D0244. `DAYLIGHT` was
          pinned at 0.35 (dusk) explicitly to show the most features at once, not because it looked

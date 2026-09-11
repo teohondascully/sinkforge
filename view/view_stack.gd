@@ -52,6 +52,7 @@ const TERRAIN_Z: int = -52  ## was -50; two rungs made for the factory under the
 ## compensation and the veil's attenuation were the same number and cancelled exactly.
 const LODE_Z: int = -58   ## the lode's live metal over the wall bake that leaves its socket bare (6l, D0374)
 const WATER_Z: int = -51  ## over the terrain, under the veil: deep water reads dark, daylit bright (6a, D0362)
+const GRASS_Z: int = -51  ## the blades standing in the air above the ground: water's rung, registered BEFORE it so a flooded tuft reads under the surface (item 28, D0595)
 const BODY_Z: int = -46  ## the miner, UNDER the veil: lit by his own lamp like everything else (D0391); legacy drew him at 60, over it, with a halo instead
 const VEIL_Z: int = -45
 const TOOTH_Z: int = -44  ## the rock tooth: absolute levels added over the veil so deep rock keeps its grain (6p, D0379)
@@ -229,6 +230,11 @@ static func _mount_ground(view: WorldView) -> void:
 	# header already said so -- "Static, because it keeps nothing" -- and `FrameGate` takes the lode plane's
 	# identity, which `HubPlanes` rebuilds on exactly the key that would change this picture.
 	view.add_painter(OrePainter.paint_lode, false).z_index = LODE_Z
+	# THE GROUND STOPS BEING A LINE (item 28, D0595). STATIC: a pure function of the camera rect and the
+	# observation -- the blades do not sway, so no clock reaches this. Registered BEFORE the water and on
+	# the same rung, so water draws over a flooded tuft rather than under it. Under the veil like the
+	# ground the blades stand in, which is the whole of their lighting.
+	view.add_painter(GrassPainter.paint, false).z_index = GRASS_Z
 	view.add_painter(WaterPainter.paint).z_index = WATER_Z   # ANIMATED: the surface waves on the clock
 
 
