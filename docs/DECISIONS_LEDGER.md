@@ -22934,3 +22934,41 @@ So the invariant is checked on the DATA, and the test opens with the control: "t
 grows blades (168 points) -- without this the rest is vacuous". Mutation-tested both ways: colour-per-
 point fires the invariant (168 colours, 168 points), an emptied batch fires the control.
 Reverse: inline `batch` back into `paint`, and lose the only assertion that reaches the engine.
+
+## D0597 · 2026-09-11 · view/visuals/surround_painter.gd · the beyond is the edge column, continued
+Decided: the earth past the world's edge takes the edge column's OWN material at each row, with no
+material constant, no mass-shade term and no lighting of its own. `recede` is all this file still decides.
+Why: D0590 guessed twice and a real frame refused both.
+  1. `band_color` at full strength -- luma 0.381 against the reference's 0.190, caught by probing.
+  2. `deepstone`, fully mass-shaded, lit by `VeilLight` AND drawn under the veil. **Measured on a real
+     1920x1080 capture: luma 0.022-0.054 against the 0.185 of the terrain it was continuing** -- three to
+     eight times too dark, blue where the ground is brown, reading as a hole cut in the canvas. That is
+     the one thing this painter exists to prevent, and only a frame said so.
+Both failures are one mistake: every constant here was a guess at what the terrain looks like, and the
+terrain was right there to be asked. Measured after: 0.185 inside the edge, 0.136 just outside, 0.087 far
+out, in the terrain's own hue.
+AND THE QUADS CARRY FOUR COLOURS, NOT TWO. One colour per metre-quad drew the beyond as flat horizontal
+BANDS with a hard seam every metre -- visible on the first capture, the same featurelessness this painter
+exists to remove at a smaller scale. Top and bottom now take their own row's colour.
+An open cell at the edge takes the WALL behind it; where there is neither, the fallback brown.
+Mutation-tested: a fixed bedrock and a flat colour each fire the continuity guard and the
+different-material guard. The suite also now drives a real canvas, per D0596.
+`docs/media/moments/2026-09-11-edge-as-a-hole.png` and `-edge-continued.png`.
+Reverse: CHEAP -- one line in `_mount_behind_the_world`.
+
+## D0598 · 2026-09-11 · view/visuals/sky_painter.gd · the starfield has never been visible
+Decided: a star's radius is not scaled by `SCALE`, and the field spreads across the sky that is ON SCREEN
+rather than over a fixed band.
+Why: TWO independent scale errors, both invisible without a frame.
+  1. The radius was `(1.1..1.9) * SCALE`, and `SCALE` is 4/32 -- so every star was **0.14 to 0.24 world
+     px**. Sub-pixel. `SCALE` exists so a LENGTH "subtends the same fraction of a screenful of CELLS as
+     it did there", which is right for a ridgeline and wrong for a point of light.
+  2. Placement spanned `380 * SCALE` = 47.5 px, about 12 cells. Legacy's screen showed ~34 cells, so that
+     filled a third of its sky; this world shows ~135 at play zoom, so the same 12 cells became a ribbon
+     sitting ON the horizon, behind the trees and the ground.
+MEASURED on a real night capture before the fix: `visible_stars()` returned 42 while the sky band held
+**ZERO pixels above 0.12 luma across 111,600 samples**, range 0.027-0.045. After: 2,653 pixels changed,
+2,577 of them brighter. `docs/media/moments/2026-09-11-before-stars.png` and `-after-stars-and-grass.png`.
+Mutation-tested: restoring the fixed band fires the spread guard at "46 px of 909 available", which is
+the defect's own number.
+Reverse: CHEAP -- both are one line each.

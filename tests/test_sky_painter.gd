@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_the_horizon_sits_on_the_surface_datum()
 	_test_the_starfield_is_not_empty_and_does_not_lattice()
 	await _test_paint_runs_against_a_real_frame_and_canvas()
+	_test_the_starfield_fills_the_sky_that_is_on_screen()
 	_finish("sky_painter")
 
 
@@ -136,3 +137,41 @@ func _test_paint_runs_against_a_real_frame_and_canvas() -> void:
 		"paint() ran to completion inside a real draw pass (%d time(s)) -- the counter increments on the "
 		% int(ran[0]) + "line AFTER the call, so a mid-paint failure would leave it at zero")
 	view.queue_free()
+
+
+## THE STARFIELD WAS NEVER VISIBLE, AND THE SKY WAS MOVED TO NIGHT PARTLY BECAUSE IT WOULD BE (D0598).
+##
+## Legacy placed stars over a band `380` of ITS pixels tall against ITS 32 px cell -- about 12 cells,
+## which filled a third of a screen showing ~34 of them. This world shows ~135 cells of height at play
+## zoom, so the same 12 cells became a 47 px ribbon sitting ON the horizon, behind the trees. Measured on
+## a real 1920x1080 night capture: `visible_stars` returned 42 and the sky held ZERO pixels above 0.12
+## luma across 111,600 samples. D0583's "at 0.15 the stars read" was false.
+##
+## So the band is the SKY THAT IS ON SCREEN, and this pins that rather than the old constant: stars must
+## reach the top of the view and must stay clear of the horizon, at any view height.
+func _test_the_starfield_fills_the_sky_that_is_on_screen() -> void:
+	var tall := Rect2(0.0, -600.0, 1920.0, 1000.0)
+	var stars: Array = SkyPainter.visible_stars(tall, 0.0, SkyPainter.HORIZON_Y - 420.0 * SkyPainter.SCALE)
+	_check(stars.size() > 20, "a tall night view holds stars at all (%d)" % stars.size())
+	var lo: float = 9e9
+	var hi: float = -9e9
+	for st: Dictionary in stars:
+		var y: float = (st["pos"] as Vector2).y
+		lo = minf(lo, y)
+		hi = maxf(hi, y)
+	var horizon: float = SkyPainter.HORIZON_Y - 90.0 * SkyPainter.SCALE
+	_check(hi <= horizon + 0.001, "none falls below the horizon line (lowest %.1f against %.1f)" % [hi, horizon])
+	_check(lo < tall.position.y + tall.size.y * 0.25,
+		"and they reach the TOP of the view, not a ribbon at the bottom (highest %.1f, view top %.1f)" % [lo, tall.position.y])
+	var span: float = hi - lo
+	_check(span > (horizon - tall.position.y) * 0.5,
+		"the field spans most of the visible sky: %.0f px of %.0f available" % [span, horizon - tall.position.y])
+	# THE CONTROL, and it is the one the old constant would have failed: a SHORTER view must still be
+	# filled, rather than the field keeping a fixed pixel height that happens to suit one zoom.
+	var shortv := Rect2(0.0, 100.0, 1920.0, 200.0)
+	var few: Array = SkyPainter.visible_stars(shortv, 0.0, SkyPainter.HORIZON_Y - 420.0 * SkyPainter.SCALE)
+	var s_lo: float = 9e9
+	for st2: Dictionary in few:
+		s_lo = minf(s_lo, (st2["pos"] as Vector2).y)
+	_check(few.size() > 20 and s_lo < 160.0,
+		"and a short view is filled from ITS top too (%d stars, highest %.1f)" % [few.size(), s_lo])

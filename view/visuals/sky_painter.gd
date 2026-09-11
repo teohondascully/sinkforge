@@ -241,9 +241,18 @@ static func visible_stars(view: Rect2, cam_x: float, grad_top: float) -> Array:
 		# x alone goes to 38 distinct gaps where the linear form had three.
 		var sx: float = view.position.x + fposmod(
 			float(Seams.grain(Vector2i(i, 101)) % 4093) * SCALE + cam_x * 0.04, view.size.x)
-		var sy: float = grad_top - 60.0 * SCALE + float(Seams.grain(Vector2i(i, 202)) % 380) * SCALE
-		if sy > HORIZON_Y - 90.0 * SCALE:
+		# SPREAD ACROSS THE SKY THAT IS ACTUALLY ON SCREEN, not over a fixed band (D0598). Legacy's
+		# `% 380` was 380 of ITS pixels over ITS 32 px cell -- about 12 cells, which filled a third of a
+		# screen that showed ~34 cells. This world shows ~135 cells of height at play zoom, so the same
+		# 12 cells became a 47 px ribbon sitting ON the horizon, behind the trees and the ground.
+		# MEASURED on a 1920x1080 night capture before this: `visible_stars` returned 42 and the sky held
+		# ZERO pixels above 0.12 luma over 111,600 samples. The starfield has never been visible, and
+		# D0583 moved the whole sky to night partly on the premise that it would be.
+		var ceiling: float = view.position.y
+		var floor_y: float = HORIZON_Y - 90.0 * SCALE
+		if floor_y <= ceiling:
 			continue
+		var sy: float = ceiling + float(Seams.grain(Vector2i(i, 202)) % 997) / 997.0 * (floor_y - ceiling)
 		out.append({"i": i, "pos": Vector2(sx, sy)})
 	return out
 
@@ -264,7 +273,13 @@ static func _stars(frame: Frame, ci: CanvasItem, view: Rect2, cam: Vector2,
 		var tw: float = 0.72 + 0.28 * sin(
 			frame.anim_time * (1.1 + float(Seams.grain(Vector2i(i, 303)) % 13) * 0.13) + float(i))
 		var tint: Color = STAR_WARM if Seams.grain(Vector2i(i, 606)) % 5 == 0 else STAR_COLD
-		ci.draw_circle(Vector2(sx, sy), (1.1 + float(Seams.grain(Vector2i(i, 404)) % 3) * 0.4) * SCALE,
+		# NOT SCALED BY `SCALE`, AND IT WAS (D0598). A star's radius is a mark on the sky, not a world
+		# length: `SCALE` exists so that a LENGTH "subtends the same fraction of a screenful of CELLS as
+		# it did there", which is right for a ridgeline and wrong for a point of light. At 4/32 it put
+		# every star at **0.14 to 0.24 world px** -- sub-pixel, drawing nothing. Measured on a real 1920
+		# x1080 night capture: `visible_stars()` returned 42 and the sky band held ZERO pixels above 0.20
+		# luma across 111,600 samples, range 0.027-0.045. The starfield has never once been visible.
+		ci.draw_circle(Vector2(sx, sy), 1.1 + float(Seams.grain(Vector2i(i, 404)) % 3) * 0.4,
 			Color(tint.r, tint.g, tint.b, star_a * tw * quiet * 0.8))
 
 

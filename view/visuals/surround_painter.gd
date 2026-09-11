@@ -40,20 +40,6 @@ extends RefCounted
 ## above the surface and the deep's ambient lift below it exactly as real terrain does (D0583, D0589). It
 ## cannot disagree with the world about the hour or the depth, because it is asking the same functions.
 
-## Rock with rock on every side: what `VeilPainter.MASS_SHADE` costs a fully-buried cell.
-##
-## RAMPED IN, NOT APPLIED FLAT, for the same reason the real veil ramps it: a cell at an opening is not
-## mass-shaded, and the beyond's top row IS at an opening -- the sky is directly above it. Applied flat,
-## the surface row measured 0.041 against the 0.155 of the ground standing beside it, a four-fold step
-## that would have drawn a black bar along the top of the boundary. `VeilLight.under_rock` is the ramp
-## the veil already uses over its own scatter band, so the two agree by construction.
-const BEYOND_SHADE: float = 1.0 - VeilPainter.MASS_SHADE
-
-
-## How much of the light survives the mass at a row: none of it lost at the surface, `BEYOND_SHADE` deep.
-static func mass_shade(row: int, surf_row: float) -> float:
-	return lerpf(1.0, BEYOND_SHADE, VeilLight.under_rock(float(row), surf_row))
-
 ## How far the mass recedes before it reaches its floor, and what is left of it there. `RECEDE_M` is
 ## `VeilPainter.SKY_REACH_M`, the distance this world already uses for "how far light carries": the
 ## beyond fading over the same span as the sky's own reach keeps one scale in the picture rather than
@@ -62,8 +48,6 @@ static func mass_shade(row: int, surf_row: float) -> float:
 const RECEDE_M: float = VeilPainter.SKY_REACH_M
 const RECEDE_FLOOR: float = 0.22
 
-## The country rock past the edge. `hardrock` rather than the band's own material: see `mass_color`.
-const BEDROCK: StringName = &"deepstone"
 const FALLBACK: Color = Color(0.42, 0.34, 0.24)   ## `matrix_color`'s own unmapped-material brown
 
 const CELL: float = float(Interface.Observation.CELL_PX)
@@ -75,31 +59,39 @@ static func recede(dist_m: float) -> float:
 	return lerpf(1.0, RECEDE_FLOOR, clampf(dist_m / RECEDE_M, 0.0, 1.0))
 
 
-## THE MATERIAL IS BEDROCK AND IT IS NOT THE BAND'S COLOUR, which is the trap this function fell into
-## once and `BackdropPainter`'s own header had already named: legacy's band colours "were authored as
-## ANNOUNCEMENT colours -- type on a dark plate, every one between 0.44 and 0.96 in its brightest channel
-## -- and are far too bright to use as fills at full strength", which is why that painter only ever takes
-## 10% of one. Measured on the first draft of this file, which used `band_color` at full strength: the
-## beyond came out at luma 0.3658 where the reference's unlit deep rock is 0.190, a garish orange-and-blue
-## striped wall brighter than the terrain in front of it -- and `the_seal`'s band colour is PURPLE
-## (`data/bands/the_seal.yaml`, [0.72, 0.44, 0.86]).
+## THE BEYOND IS THE EDGE COLUMN, CONTINUED. Not a chosen material and not a chosen darkness: the colour
+## at a row is the colour `MaterialLook` gives the cell just INSIDE the boundary at that same row, so the
+## seam is continuous by construction rather than by calibration.
 ##
-## So it takes `matrix_color`, the path the terrain itself takes, which carries the material's own
-## `depth_darken` and `BeddingTone`'s bedding -- and it takes ONE material rather than the band's, because
-## undifferentiated bedrock is the more truthful picture: past the edge is not more of the player's world,
-## it is the rock their world is cut into. The bedding still lands, because `BeddingTone` is keyed on
-## (col, row) and the columns here are the world's own continued outward, so a bed running off the edge
-## keeps running.
+## TWO GUESSES CAME BEFORE THIS AND A REAL FRAME REFUSED BOTH (D0597).
+##   1. `band_color` at full strength -- `BackdropPainter`'s header had already named that trap. Measured
+##      luma 0.381 against the reference's 0.190: a garish orange-and-blue wall brighter than the terrain.
+##   2. `deepstone`, fully mass-shaded, lit by `VeilLight` and then drawn UNDER the veil. Measured on a
+##      real capture at luma **0.022-0.054 against the terrain's 0.185** -- three to eight times too dark,
+##      reading as a hole cut in the canvas, which is the one thing this painter exists to prevent. Both
+##      halves were wrong: the material was a guess (dark basement rock beside the surface's clay) and the
+##      lighting was applied twice.
+## The lesson is the same one twice over, so it is worth writing down: every constant here was a guess at
+## what the terrain looks like, and the terrain was right there to be asked.
+##
+## So there is no material constant, no mass-shade term and no lighting of its own. The veil lights it as
+## it lights everything under `VEIL_Z`, and `recede` is the only thing this file still decides.
 ##
 ## Separated from `paint` so it is assertable: a colour is the part that can be silently wrong, and a test
 ## calling `paint` could only assert that it did not crash (the lesson `BackdropPainter.fill_color` was
 ## split out for).
-static func mass_color(look: MaterialLook, col: int, row: int, surf_row: float) -> Color:
-	var sky: float = VeilLight.sky_light(float(row), surf_row)
-	var deep_t: float = clampf((1.0 - sky) / VeilPainter.AMBIENT_DARK, 0.0, 1.0)
-	var lit: Color = VeilLight.level_rgb(mass_shade(row, surf_row) * sky, deep_t)
-	var base: Color = FALLBACK if look == null else look.matrix_color(BEDROCK, col, row)
-	return Color(base.r * lit.r, base.g * lit.g, base.b * lit.b)
+static func mass_color(look: MaterialLook, o: Interface.Observation, edge_col: int, row: int) -> Color:
+	if look == null or o == null:
+		return FALLBACK
+	var at := Vector2i(edge_col, row)
+	var material: StringName = &""
+	if o.in_window(at):
+		material = o.material_at(at)
+		if material == &"" and o.has_walls:
+			material = o.wall_at(at)      # an open cell at the edge still has the wall behind it
+	if material == &"":
+		return FALLBACK
+	return look.matrix_color(material, edge_col, row)
 
 
 static func paint(frame: Frame, ci: CanvasItem) -> void:
@@ -132,11 +124,16 @@ static func _side(frame: Frame, ci: CanvasItem, view: Rect2, x0: float, x1: floa
 		var y0: float = maxf(float(row) * CELL, top)
 		var y1: float = minf(float(row + step) * CELL, view.end.y)
 		if y1 > y0:
-			var c: Color = mass_color(frame.look, int(floor(near_x / CELL)) + dir * (row & 7), row, surf_row)
-			var a: Color = _dim(c, recede(absf(x0 - near_x) / M))
-			var b: Color = _dim(c, recede(absf(x1 - near_x) / M))
+			# FOUR COLOURS, NOT TWO (D0597). Each quad spans a metre, and a single colour per quad drew the
+			# beyond as flat horizontal BANDS with a hard seam at every metre -- visible on the first real
+			# capture, and the same featurelessness this painter exists to remove, at a smaller scale. The
+			# top and bottom of each quad take their own row's colour, so the strata blend down the face.
+			var c_top: Color = mass_color(frame.look, o, edge_col, row)
+			var c_bot: Color = mass_color(frame.look, o, edge_col, row + step)
+			var near: float = recede(absf(x0 - near_x) / M)
+			var far: float = recede(absf(x1 - near_x) / M)
 			ci.draw_polygon(PackedVector2Array([Vector2(x0, y0), Vector2(x1, y0), Vector2(x1, y1), Vector2(x0, y1)]),
-				PackedColorArray([a, b, b, a]))
+				PackedColorArray([_dim(c_top, near), _dim(c_top, far), _dim(c_bot, far), _dim(c_bot, near)]))
 		row += step
 
 

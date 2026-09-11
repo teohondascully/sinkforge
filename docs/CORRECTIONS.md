@@ -917,3 +917,27 @@ rather than passing vacuously.
 **The general shape.** Every pure-function assertion in that file was true while the feature was absent.
 Purity is what makes a function testable and it is also what lets a suite be complete, green, and about
 nothing that reaches the screen. A painter needs one assertion on the thing it hands the engine.
+
+## 2026-09-11 · "At 0.15 the stars read" — they had never once been drawn (D0583 → D0598)
+
+**What I wrote, in D0583 and in `sky_painter.gd`'s own header:** that moving `DAYLIGHT` to 0.15 "puts the
+starfield well inside its `< 0.85` window instead of at the faint edge of it", and that "at 0.15 the
+stars read". That reasoning moved the entire sky to night.
+
+**The starfield was invisible, and had been since it was written.** Two scale errors, neither reachable
+without rendering a frame: every star's radius was `(1.1..1.9) * SCALE` = **0.14 to 0.24 world pixels**,
+sub-pixel; and the whole field was placed in a 47 px band sitting ON the horizon, behind the trees.
+Measured on a real 1920x1080 night capture: `visible_stars()` returned 42 and the sky held **zero pixels
+above 0.12 luma across 111,600 samples**.
+
+**What made it durable.** The check I ran was `DAYLIGHT < 0.85` — the gate the code itself tests — and it
+was true. `tests/test_sky_painter.gd` asserted the starfield was "non-empty and does not lattice", which
+was also true: `visible_stars()` returns 42 positions whether or not a single pixel reaches the screen.
+Both instruments measured the list, and the claim was about the picture.
+`[[instrument-cannot-register-subject]]`, and the same shape as D0596 the same night: a suite complete,
+green, and about nothing the player can see.
+
+**The general lesson, and it is the one the whole night keeps landing on.** Every claim about how the
+game LOOKS that was made without a frame this session has been wrong: the band colours (D0590), the
+beyond's darkness (D0597), the grass that never drew (D0596), and this. Four for four. Measuring a
+function is not measuring a picture, and no amount of assertion density closes that gap.
