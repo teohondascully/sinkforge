@@ -1,5 +1,78 @@
 # Brief
 
+## What was learned — prose outlives code, and one comment was advocating the design its own file rejected (D0587)
+
+Astra's review of the decision brief closed on a caution about "old slump comments describing transient
+saves". Checked, it was four claims, and three were the ordinary kind — a header that said the queue was
+transient after D0579 made it persistent, in two places, and a bullet saying the drill does not wake
+earth after D0579 made it do so.
+
+**The fourth was a different animal.** `shell/session.gd` said "the set is rebuilt from the world itself
+by the automaton's own rule" — four lines above `restore(data.get(KEY_SLUMP, []))`. It does not describe
+stale behaviour. It describes the load-time SCAN that was tried first and measured wrong: the generated
+world holds 1,061 unsupported loose cells, so a scan collapses a tenth of its loose earth on every load,
+and `tests/test_boot_snapshot.gd` is what caught it. A session reading only that comment would have
+re-derived the defect the test already rejected. `[[superseded-draft-above-its-amendment]]` in its worst
+form — not prose that is merely wrong, but prose that ARGUES FOR the thing the code beside it refuses.
+
+## What was learned — two correct counts are not a reachability proof, and the wrong one was mine (D0588)
+
+P042 said a `d3`/`d4` naming the orphan machines "reaches four machines and four recipes in a single data
+change". Astra caught the first link: `ore_iron` yields `ore`, `smelt_iron` consumes `iron`. Computing the
+whole graph — with `yield_of`'s real default rule, that an absent `yields` means the material's own id —
+**`iron` and `rich_ore` are consumed by recipes and produced by nothing anywhere.**
+
+The set of recipes whose MACHINE is unobtainable and the set whose INPUTS are unproducible are the same
+four. They are unreachable twice over, so neither half of the obvious fix does anything alone.
+
+**What made it durable:** I counted the machines, counted the recipes, and checked that each stranded
+recipe HAD a machine. I never asked whether its INPUTS existed. Both counts were right; the join between
+them was never computed, and the population it had to be reconciled over — the item ids — was one neither
+count ranged over. `[[two-instruments-are-not-a-cover]]`. And the shape of the number flattered it: "six
+orphans, four recipes, one data change" is a tidy story with a cheap ending, so it got quoted forward
+twice instead of re-derived, once into P042 and once into the brief Astra was reading.
+
+## What was learned — a file can state its own bug in its header and be read past (D0589)
+
+`light_painter.gd`'s header closed: "day/night — this build has no day clock, so the godrays run at full
+day." True when written. D0583 then moved the sky to night and gave the ground a night level, and the
+shafts were the half that did not move — a night sky pouring noon sunlight down every hole. The sentence
+naming the defect had been sitting in the file the whole time, in a header I had edited that same night.
+
+The fix derives both the beam's hue and its level from the sky (`SkyLight`), so no painter holds a second
+opinion about the weather. It also turned up a free control: `sky_tint(0.0)` reproduces
+`SkyPainter.STAR_COLD` to four places, and that constant was authored by a completely different route
+(the night zenith held at hue 225.0, saturation 0.571). Two derivations of one blue that agree, so the
+suite pins the new function against a number the repo already believed rather than one I chose.
+
+## What was learned — the two defects in the new painter were both invisible to reasoning (D0590)
+
+The earth past the world's edge — which the sim has called rock since D0457 and the view never drew. Both
+of its bugs came out of probing numbers, and neither would have appeared in a test I would have thought
+to write:
+
+1. The first draft took band colours as the material. `BackdropPainter`'s header had **already named that
+   trap** — they are announcement colours, "far too bright to use as fills at full strength". Measured at
+   luma 0.381 against the reference's 0.190 for unlit deep rock: a garish orange-and-blue wall brighter
+   than the terrain in front of it, and `the_seal`'s band colour is purple.
+2. The mass shade was applied flat. But the beyond's top row sits directly under the sky and is not
+   mass-shaded: 0.041 against the 0.155 of the ground beside it, a four-fold step that draws a black bar
+   along the boundary.
+
+The second now has a guard **because nothing else in the suite could see it** — the spread and
+distinct-colour counts both survive it. That guard exists only because the mutation run asked what a flat
+shade would break, and the answer was nothing.
+
+## What was learned — a blocked item was blocked by an unchecked cost premise
+
+Item 21 ("a cut face reads as cut") had stood as *needs a ruling first: per-cell provenance is sim state,
+with a save-format cost*. Astra ruled not to build the provenance plane at all. Checking what the cheaper
+version would actually cost: `bake_data.gd`'s **G channel uses 4 of its 8 bits**, so 4 are free for a
+geometry-derived finish code. The item was never waiting on a save format. The real cost is that the
+baked path and the CPU path must compute the same finish — which that file's own header warns about, for
+the hash it already shares. A blocked item's stated blocker is a claim like any other.
+
+
 ## What was learned — the queue was measuring the wrong things, and a fix of mine was the cause (D0575-D0581)
 
 Astra audited the overnight run and was right on every claim I could check mechanically. **P036 is
