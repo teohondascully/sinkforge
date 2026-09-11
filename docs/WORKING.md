@@ -217,11 +217,35 @@ left here.
          ruled 0.38 gives 0.1459, so 0.62 costs about 6% of the hue separation: real, small, and the
          opposite sign from what I predicted. Whether 0.10 of hue reads "at a glance" needs a person or
          a vision judge asked WHAT IT SEES (never which it prefers). Parked for the capture batch.
-- [ ] 21 **NEEDS A RULING FIRST (per-cell provenance is sim state).** A cut face reads as cut, not as a natural cave wall. **GENUINELY UNBUILT, and the largest
-         remaining item in this phase.** Nothing anywhere distinguishes a dug cell from a generated one:
-         `RockTone` shades by grammar and noise fields, `GlintPainter` is the only thing that mentions a
-         "dug face" and it means exposed ore. Doing this needs per-cell provenance -- sim state, with a
-         save-format cost -- so it is not a view-side change and wants a ruling before it is started.
+- [ ] 21 **RULED 2026-09-10 (Astra, D8): DO NOT BUILD THE PROVENANCE PLANE. Now scoped, not blocked.**
+         A cut face reads as cut, not as a natural cave wall. Nothing anywhere distinguishes a dug cell
+         from a generated one: `RockTone` shades by grammar and noise fields, `GlintPainter` is the only
+         thing that mentions a "dug face" and it means exposed ore.
+         **The ruling splits the item into three things this entry had fused into one:**
+         *fresh activity* (dust, tool marks, briefly exposed brighter edges), *surface finish* (straight,
+         rough, chipped, worked) and *historical provenance* (this surface exists because a player changed
+         it). The first two carry most of the payoff with no permanent record. The third is deferred --
+         and Astra names the questions it would open that this entry never asked: does the bit belong to
+         the emptied cell or the surviving face, does slump move it, does rebuilding erase it, do drills
+         leave a different mark? Also: geometry-based styling is sound as *"this shape receives this
+         finish"* and unreliable if advertised as *detecting player excavation* -- natural straight edges
+         and irregular player cuts both defeat that reading.
+         **THE COST ASSUMPTION IN THE OLD ENTRY WAS WRONG, and checking it is what unblocks this.** It is
+         not a save-format change, because it need not be sim state at all. And the bake has room:
+         `bake_data.gd`'s **G channel uses 4 of its 8 bits** -- 0-1 grammar, 2 speck, 3 lit facet -- so
+         **bits 4-7 are free** for a finish code the CPU computes from the grid's own shape.
+         **The real cost is the one that file warns about in its own header:** the baked path and the CPU
+         path (`RockTone.shade`'s `edges`) must compute the same finish, because "a second copy of a hash
+         is how two renderers come to disagree about which cells glint". So the deliverable is one
+         classifier called from both, plus the shader read -- a focused session, and the largest single
+         item left in the phase, but no longer one waiting on anyone.
+         **Fresh activity is separable and cheaper.** Break dust and a per-swing chip already ship
+         (`SeatEffects._mining`, 5 dust a cell), and `CrumblePainter` already flashes warm at the instant
+         of impact. What is missing from Astra's list is the briefly-brighter exposed FACE, which is a
+         stateful view-side painter on `CrumblePainter`'s exact pattern (spawn off `obs.mining_broke_cells`,
+         gate on the tick advancing, derive age from a stored spawn time) and touches no sim state and no
+         save. **Not started: it is a taste call and the director is using the screen, so it should be
+         built when it can be judged on a frame rather than shipped unjudged.**
 - [~] 22 Rubble and scree at the foot of a cut. **Cosmetic debris stays SEPARATE from solid simulation**
          (audit): particles can communicate a collapse without every speck obstructing a factory. The
          particle channel already exists -- `SeatEffects.SLUMP_DUST` puffs a vacated cell (D0564) --
