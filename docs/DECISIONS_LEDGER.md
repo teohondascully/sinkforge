@@ -22707,3 +22707,44 @@ Mutation-tested, four ways, each firing the guard that names it: level pinned to
 defect) fired 4; no normalisation fired the hue guard at 11 of 11 off; a drifting gradient zenith fired
 the one-zenith guard at 10 mismatches; dropping the sun at noon fired the unchanged-daylight guard.
 Reverse: CHEAP -- `ray_level` returns 1.0 and `ray_tone` returns `RAY_SUN`.
+
+## D0590 · 2026-09-10 · view/visuals/surround_painter.gd (new), view_stack.gd · the earth past the edge of the world
+Decided: the region outside the grid is painted as bedrock -- stratified, receding, unlit -- on the
+`--sky` path only. T036 and queue item 34 close on this; the manufactured-bore-wall lore does NOT land.
+Why: the sim has answered "rock" for every cell outside the grid since D0457 ("a cell past the grid
+blocks like rock, so the body stops at the edge"), and the view never drew it. The body walked into a
+wall that was not pictured. Astra's D7 ruling picks among T036's four candidates: a camera clamp cannot
+solve a viewport wider than the world, so render "a deliberate noninteractive continuation"; do not
+enlarge the simulation to fill the screen; and prefer a visibly geological boundary, taking the bore wall
+only if you want its implications rather than because it conveniently conceals an edge.
+WHAT WAS ACTUALLY THERE was not empty canvas, which is worth recording because the queue said "void":
+`SkyPainter` fills below the horizon across the WHOLE view, so past the edge stood the sky's own
+below-horizon blue at luma 0.1968. Ground-coloured sky where earth should be. Confined to the two widest
+zooms -- 2.00 and 1.40 show none of it, 1.00 shows 256 px, 0.66 shows 915 px.
+TWO THINGS MEASURED WRONG ON THE WAY, both caught by probing rather than by reasoning:
+  1. The first draft took `MaterialLook.band_color` as the material. `BackdropPainter`'s own header had
+     already named that trap -- the band colours "were authored as ANNOUNCEMENT colours... far too bright
+     to use as fills at full strength", which is why that painter takes 10% of one. Measured: the beyond
+     came out at luma 0.3811 against the reference's 0.190 for unlit deep rock, a garish orange-and-blue
+     striped wall BRIGHTER than the terrain in front of it, and `the_seal`'s band colour is purple. It
+     takes `matrix_color` on `deepstone` now -- the path the terrain itself takes, on the basement rock,
+     because past the edge is not more of the player's strata, it is the rock their world is cut into.
+  2. The mass shade was applied FLAT at `1 - MASS_SHADE`. But the beyond's top row sits directly under
+     the sky and is not mass-shaded at all: measured 0.041 against the 0.155 of the ground beside it, a
+     four-fold step that would have drawn a black bar along the whole top of the boundary. Ramped through
+     `VeilLight.under_rock`, the veil's own scatter band, so the two agree by construction.
+Result, measured: the beyond runs 0.091 at the surface to 0.144 deep -- a near-constant 60-75% of the
+in-world rock at every depth, so it is darker than both the sky fill it replaced and the terrain it
+continues, with no hard step anywhere. It recedes over `SKY_REACH_M` to `RECEDE_FLOOR` 0.22, which is not
+zero on purpose: black past the edge reads as a hole cut in the canvas, the one thing this is here to
+stop looking like.
+Drawn a metre at a time in the material's own bedding rather than as one rectangle, because what read as
+broken about the sky fill was that it was FEATURELESS, not that it was the wrong hue. 55 distinct colours
+over 60 m of depth.
+Mutation-tested, four ways, each firing its own guard: band_color back (fires both brightness guards),
+`RECEDE_FLOOR` 0.0 (fires the not-black guard), no recede (fires the floor and clamp guards), flat mass
+shade (fires the black-bar guard, which was added BECAUSE nothing else in the suite could see it).
+NOT JUDGED ON A FRAME. The director is using the screen, so this ships measured but not looked at; the
+capture belongs to item 49's match loop. `build_stack` hit 53 of its 50 lines and the backdrop choice
+became `_mount_behind_the_world` -- cap-driven, and the two answers genuinely are exclusive.
+Reverse: CHEAP -- delete one line in `_mount_behind_the_world`.

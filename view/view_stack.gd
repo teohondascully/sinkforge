@@ -40,6 +40,7 @@ extends RefCounted
 
 const BACKDROP_Z: int = -200
 const SKY_Z: int = -100
+const SURROUND_Z: int = -80  ## the earth past the world's edge: over the sky's below-horizon fill, under the real terrain (T036, D0590)
 const WALL_Z: int = -60
 const TERRAIN_Z: int = -52  ## was -50; two rungs made for the factory under the veil (D0393)
 ## THE VEIL LANDED 2026-09-01 (D0302, lamp D0306); this paragraph used to say it had not, and said so
@@ -101,6 +102,21 @@ static func build(scene: Node2D, iface: Interface, look: MaterialLook, camera: C
 
 
 ## The same build, returning the stack with its handles.
+## WHAT STANDS BEHIND THE WORLD, and the two answers are exclusive. `--sky` REPLACES the backdrop rather
+## than layering over it (D0244): the fill is opaque and would cover the starfield completely.
+static func _mount_behind_the_world(view: WorldView, sky: bool) -> void:
+	if not sky:
+		# STATIC: one `draw_rect` whose colour is `look.band_color(obs.cell.y)` and nothing else (D0531).
+		view.add_painter(BackdropPainter.paint, false).z_index = BACKDROP_Z
+		return
+	view.add_painter(SkyPainter.paint).z_index = SKY_Z   # ANIMATED: the clouds drift, the stars twinkle, the crown pulses
+	# THE EARTH PAST THE EDGE (T036, D0590), over the sky's below-horizon fill and under the real terrain.
+	# STATIC: a pure function of the camera rect and the observation -- no clock reaches it. Only on this
+	# path, because the other one is `BackdropPainter`'s opaque 12,000 px fill and there is no void behind
+	# it to answer for.
+	view.add_painter(SurroundPainter.paint, false).z_index = SURROUND_Z
+
+
 static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, camera: Camera2D,
 		sky: bool, falling: FallingItems = null, payouts: Payouts = null) -> ViewStack:
 	var stack: ViewStack = ViewStack.new()
@@ -108,13 +124,7 @@ static func build_stack(scene: Node2D, iface: Interface, look: MaterialLook, cam
 	stack.view = view
 	scene.add_child(view)
 	view.setup(iface, look, camera)
-	# `--sky` REPLACES the backdrop rather than layering over it (D0244): the fill is opaque and would
-	# cover the starfield completely.
-	if sky:
-		view.add_painter(SkyPainter.paint).z_index = SKY_Z   # ANIMATED: the clouds drift, the stars twinkle, the crown pulses
-	else:
-		# STATIC: one `draw_rect` whose colour is `look.band_color(obs.cell.y)` and nothing else (D0531).
-		view.add_painter(BackdropPainter.paint, false).z_index = BACKDROP_Z
+	_mount_behind_the_world(view, sky)
 	# THE TWO STATIC PAINTERS GO INTO THE BAKE, not onto a per-frame layer (D0326, `docs/PORT_ORDER.md` V1).
 	# They are the only two on this stack whose picture cannot change unless the terrain does, and they are
 	# the expensive ones: legacy measured the terrain pass at ~72% of all frame draw calls. Registered in
