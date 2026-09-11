@@ -88,13 +88,26 @@ static func grassy(material: StringName) -> bool:
 	return bool((MaterialsRecords.RECORDS.get(material, {}) as Dictionary).get("soil", false))
 
 
-static func paint(frame: Frame, ci: CanvasItem) -> void:
+## THE FIELD AS DATA, so it can be asserted instead of only drawn (D0595). Returns
+## `{points, colors}` ready for `draw_multiline_colors`.
+##
+## SPLIT OUT AFTER A REAL BUG GOT THROUGH. The batch was first built with a colour per POINT, and
+## `draw_multiline_colors` asserts `colors.size() * 2 == points.size()` in NATIVE code: the call failed,
+## drew nothing, and printed only an engine-level ERROR -- no script error, no failed assertion, exit 0.
+## This file's own suite was 20 for 20 while the grass did not exist. Two unrelated boot suites went red
+## instead, because they drive the real stack and `run_gd_test.sh`'s D0149 guard reads engine ERROR lines.
+##
+## A test calling `paint` with a canvas is NOT enough to catch it either, which is the second lesson: the
+## posed world produced no blades, so the draw never ran and the mutation stayed green. The invariant has
+## to be checked on the DATA, and that is what this function exists for.
+static func batch(frame: Frame) -> Dictionary:
+	var empty: Dictionary = {"points": PackedVector2Array(), "colors": PackedColorArray()}
 	if frame == null or frame.obs == null:
-		return
+		return empty
 	var o: Interface.Observation = frame.obs
 	var view: Rect2 = frame.view_world_rect
 	if view.size.x <= 0.0:
-		return
+		return empty
 	var points := PackedVector2Array()
 	var colors := PackedColorArray()
 	var col: int = maxi(int(floor(view.position.x / CELL)) - 1, 0)
@@ -109,11 +122,18 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 				var h: float = blade_height(col, blade) * CELL
 				points.append(Vector2(fx, foot_y))
 				points.append(Vector2(fx + blade_lean(col, blade) * CELL, foot_y - h))
-				colors.append(tint)
+				# ONE COLOUR PER SEGMENT, NOT PER POINT -- the invariant above, and the whole of the bug.
 				colors.append(tint)
 		col += 1
-	if not points.is_empty():
-		ci.draw_multiline_colors(points, colors, WIDTH_PX)
+	return {"points": points, "colors": colors}
+
+
+static func paint(frame: Frame, ci: CanvasItem) -> void:
+	var b: Dictionary = batch(frame)
+	var points: PackedVector2Array = b["points"]
+	if points.is_empty() or ci == null:
+		return
+	ci.draw_multiline_colors(points, b["colors"], WIDTH_PX)
 
 
 ## The walkable surface row of a column, or -1 where the column has none inside the window.

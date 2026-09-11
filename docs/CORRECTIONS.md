@@ -888,3 +888,32 @@ accepting a list.
 **Found by the gate on its first run against the real tree** (`check_content_reachable.py`, QUALITY gate
 37, **D0591**), not by re-reading the claim — which is the argument for that gate in one line: the count
 had been read twice and corrected once, and none of that reached the fact that a bench is not the game.
+
+## 2026-09-11 · The grass did not exist, and its own 20-assertion suite said it did (D0595 → D0596)
+
+**What shipped, in D0595:** `GrassPainter` built its batch with a colour per POINT.
+`draw_multiline_colors` asserts `colors.size() * 2 == points.size()` in NATIVE code, so **every call
+failed and drew nothing.** The feature was inert from the moment it landed.
+
+**What said so, and what did not.** The suite written for it was 20 of 20 — every assertion was on a pure
+function (`blade_height`, `blade_lean`, `grassy`, `blade_color`), and not one of them touched the draw.
+The failure surfaced in **`test_main_boot` and `test_settings_live`**, two suites with nothing to do with
+grass, because they boot the real stack and `tools/run_gd_test.sh`'s D0149 guard reads engine-level ERROR
+lines. Exit code 0, no script error, no failed assertion — `[[error-path-returns-passing-value]]` in its
+native-call form.
+
+**Then the fix for the test was wrong too, and that is the sharper half.** I added a test that ran `paint`
+with a real canvas inside a real draw pass, re-applied the bug as a mutation, and **it stayed green.** The
+posed world produced no blades, so the batch was empty and the draw was never reached.
+`[[instrument-cannot-register-subject]]`: a draw test that draws nothing registers nothing, and it
+reports that as a pass. I had written the instrument and declared it good without running the mutation
+first — the mutation is the only thing that caught it.
+
+**What the suite does now.** `batch()` is split out so the field is data, and the test **proves the batch
+is non-empty before asserting anything about it** — the control that the first version lacked. Two
+mutations witnessed: the colour-per-point bug fires the invariant, and an emptied batch fires the control
+rather than passing vacuously.
+
+**The general shape.** Every pure-function assertion in that file was true while the feature was absent.
+Purity is what makes a function testable and it is also what lets a suite be complete, green, and about
+nothing that reaches the screen. A painter needs one assertion on the thing it hands the engine.

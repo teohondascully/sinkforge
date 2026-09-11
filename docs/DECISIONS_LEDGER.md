@@ -22917,3 +22917,20 @@ fires the barren list; the single-sine lean fires the distinct-lean count at exa
 caught at; a green of its own fires both canopy guards.
 NOT JUDGED ON A FRAME -- the director is using the screen. Height, density and colour are item 49's.
 Reverse: CHEAP -- delete one line in `_mount_ground`.
+
+## D0596 · 2026-09-11 · view/visuals/grass_painter.gd · the batch is data, so it can be asserted
+Decided: `batch(frame)` is split out of `paint`, and the suite proves the batch is non-empty before
+asserting anything about it.
+Why: D0595 shipped with a colour per POINT and `draw_multiline_colors` asserts
+`colors.size() * 2 == points.size()` natively -- so every call failed, drew nothing, and the grass did
+not exist. Its own 20-assertion suite was green throughout, because every assertion was on a pure
+function and none touched the draw. `test_main_boot` and `test_settings_live` caught it, having nothing
+to do with grass: they boot the real stack and `run_gd_test.sh`'s D0149 guard reads engine ERROR lines.
+THE FIRST REPAIR TO THE SUITE WAS ALSO WRONG. A test that ran `paint` with a real canvas inside a real
+draw pass stayed GREEN with the bug re-applied: the posed world grew no blades, so the batch was empty
+and the draw was never reached. Only the mutation said so. `[[instrument-cannot-register-subject]]` --
+a draw test that draws nothing registers nothing and reports it as a pass.
+So the invariant is checked on the DATA, and the test opens with the control: "the posed surface actually
+grows blades (168 points) -- without this the rest is vacuous". Mutation-tested both ways: colour-per-
+point fires the invariant (168 colours, 168 points), an emptied batch fires the control.
+Reverse: inline `batch` back into `paint`, and lose the only assertion that reaches the engine.

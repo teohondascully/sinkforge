@@ -16,6 +16,8 @@ func _initialize() -> void:
 	_test_only_soil_carries_grass()
 	_test_the_green_is_the_trees_own_and_varies_between_columns()
 	_test_paint_refuses_a_frame_it_cannot_read()
+	_test_the_batch_obeys_the_engines_own_contract()
+	await _test_the_draw_itself_runs_on_a_real_canvas()
 	_finish("grass_painter")
 
 
@@ -105,3 +107,112 @@ func _test_paint_refuses_a_frame_it_cannot_read() -> void:
 	f.view_world_rect = Rect2()
 	GrassPainter.paint(f, null)
 	_check(true, "a null frame, a frame with no observation and a zero-width view all draw nothing")
+
+
+## THE BATCH ITSELF, AND THIS TEST EXISTS BECAUSE A REAL BUG GOT THROUGH EVERY OTHER ONE (D0595).
+##
+## `draw_multiline_colors` asserts `colors.size() * 2 == points.size()` in NATIVE code. The first version
+## built a colour per POINT: the call failed, drew nothing, and printed only an engine-level ERROR -- no
+## script error, no failed assertion, exit 0. This file was 20 of 20 while the grass did not exist. Two
+## unrelated boot suites went red instead, because they drive the real stack and `run_gd_test.sh`'s D0149
+## guard reads engine ERROR lines.
+##
+## THE FIRST ATTEMPT AT THIS TEST ALSO FAILED TO CATCH IT, and that is the sharper half. It ran `paint`
+## with a real canvas inside a real draw pass -- and the posed world produced NO BLADES, so the draw was
+## never reached and restoring the bug left the suite green. `[[instrument-cannot-register-subject]]`: a
+## draw test that draws nothing registers nothing. So this poses the field, PROVES it is non-empty first,
+## and only then asserts the invariant on the data.
+func _test_the_batch_obeys_the_engines_own_contract() -> void:
+	var f: Frame = Frame.new()
+	f.obs = _grassy_obs()
+	f.view_world_rect = Rect2(0.0, 0.0, 160.0, 400.0)
+	var b: Dictionary = GrassPainter.batch(f)
+	var points: PackedVector2Array = b["points"]
+	var colors: PackedColorArray = b["colors"]
+	# THE CONTROL, FIRST. Every assertion below is vacuous on an empty batch, which is exactly how the
+	# first version of this test passed while the subject was gone.
+	_check(points.size() > 0, "the posed surface actually grows blades (%d points) -- without this the rest is vacuous" % points.size())
+	_check(colors.size() * 2 == points.size(),
+		"ONE COLOUR PER SEGMENT, which is what `draw_multiline_colors` asserts natively: %d colours, %d points" % [
+			colors.size(), points.size()])
+	_check(points.size() % 2 == 0, "and the points come in pairs, one segment apiece (%d)" % points.size())
+	# Blades stand UP from their foot: the second point of each pair is above the first.
+	var upward: int = 0
+	for i: int in range(0, points.size(), 2):
+		if points[i + 1].y < points[i].y:
+			upward += 1
+	_check(upward == points.size() / 2, "every blade stands up from its foot (%d of %d)" % [upward, points.size() / 2])
+	# And nothing grows where there is no soil.
+	var bare: Frame = Frame.new()
+	bare.obs = _grassy_obs(&"hardrock")
+	bare.view_world_rect = Rect2(0.0, 0.0, 160.0, 400.0)
+	_check((bare.obs != null) and (GrassPainter.batch(bare)["points"] as PackedVector2Array).is_empty(),
+		"CONTROL: the same surface in hardrock grows nothing")
+
+
+## A window of solid `material` from row 20 down, so every column has a walkable surface at row 20.
+func _grassy_obs(material: StringName = &"clay") -> Interface.Observation:
+	var w: int = 48
+	var h: int = 48
+	var o: Interface.Observation = Interface.Observation.new()
+	o.world_cells = Vector2i(w, h)
+	o.window = Rect2i(0, 0, w, h)
+	o.logic_window = Rect2i(0, 0, w / 4, h / 4)
+	o.legend = PackedStringArray(["", String(material)])
+	o.materials = PackedByteArray()
+	o.materials.resize(w * h)
+	o.water = PackedByteArray()
+	o.water.resize(w * h)
+	for col: int in w:
+		for row: int in range(20, h):
+			o.materials[row * w + col] = 1
+	var surf := PackedInt32Array()
+	for _col: int in w:
+		surf.append(20 * Interface.Observation.CELL_PX * Fx.SCALE)
+	o.surface_y = surf
+	return o
+
+
+## THE DRAW PATH, AND THIS TEST EXISTS BECAUSE IT WAS MISSING (D0595).
+##
+## Every other assertion in this file calls a pure function, and the first version shipped a real bug none
+## of them could see: `draw_multiline_colors` asserts `colors.size() * 2 == points.size()` in NATIVE code,
+## and the batch was built with a colour per POINT. The call failed, drew nothing, and printed only an
+## engine-level ERROR -- no script error, no failed assertion, exit code 0. `test_main_boot` and
+## `test_settings_live` went red because they boot the real stack and `tools/run_gd_test.sh`'s D0149 guard
+## reads engine ERROR lines; this suite stayed green at 20 of 20.
+##
+## So the guard already existed and this suite simply never REACHED the draw. It does now: a real
+## `WorldView`, a real canvas, a clay surface under the camera, and the painter run inside an actual draw
+## pass. A colour-per-point regression prints the ERROR again and the harness fails THIS file, where the
+## subject is, instead of two unrelated boot suites.
+func _test_the_draw_itself_runs_on_a_real_canvas() -> void:
+	var items: Items = _hub_items(20, 20)
+	var machines: Machines = _hub_machines(items)
+	var world: World = items.world
+	for col: int in range(20 * 4):
+		for row: int in range(60, 80):
+			world.set_solid(Vector2i(col, row), &"clay")   # a clay surface for blades to stand in
+	var body: Body = Body.new(Fx.from_int(40), Fx.from_int(56 * 4) - Body.HEIGHT_PX / 2 * Fx.SCALE)
+	var door: Interface = Interface.new(world.grid, body, Mining.new(), world, items, machines)
+	var view: WorldView = WorldView.new()
+	var cam: Camera2D = Camera2D.new()
+	root.add_child(view)
+	view.add_child(cam)
+	view.setup(door, MaterialLook.new(), cam)
+	var ran: Array = [0, 0]
+	view.add_painter(func(f: Frame, ci: CanvasItem) -> void:
+		GrassPainter.paint(f, ci)
+		ran[0] = int(ran[0]) + 1
+		if f != null and f.obs != null and f.view_world_rect.size.x > 0.0:
+			ran[1] = 1)
+	await process_frame
+	view.refresh()
+	for _i: int in 3:
+		await process_frame
+	_check(int(ran[0]) > 0, "paint() ran inside a real draw pass (%d time(s))" % int(ran[0]))
+	_check(int(ran[1]) == 1, "and the frame it drew carried an observation and a non-empty view rect")
+	# The real assertion is made by the harness, not by this line: if the batch is malformed again, the
+	# engine prints an ERROR during that draw and `run_gd_test.sh` fails this file for it.
+	_check(true, "and the engine raised no draw error -- `run_gd_test.sh`'s D0149 guard is the witness")
+	view.queue_free()
