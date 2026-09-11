@@ -859,3 +859,32 @@ was met as a premise.
 **The correction is a strictly better item.** The four unreachable recipes are unreachable TWICE over —
 no machine and no input — so the gap is one chain to author, not six switches to flip. That is a sharper
 statement of the work than the wrong version was, and it is the one the director can rule on.
+
+## 2026-09-10 · "Six orphan machines, not seven" — the correction was wrong too, and a bench is why
+
+**What I wrote,** in `docs/WORKING.md` item 43 and `docs/NEEDS_DIRECTOR.md` P042: "**The queue said seven
+orphans; it is six.** `torch` is placed by a start and is reachable. Recorded because the queue's list
+has been quoted twice and would have been quoted again."
+
+**`torch` is placed by `data/starts/lighting_bench.yaml`, whose own first line says it is "a scenario
+record, not a start of play".** It appears in no other start. Under the start the game actually boots --
+`shell/main.gd`'s `const START`, which is `tutorial` -- torch is an orphan, and so are `conduit` and
+`lift`, which appear only in `dev_kit`. **The count is nine.**
+
+**What made it durable, and it is the sharper lesson:** this was itself a *correction*. I had gone
+looking for an error in the queue's number, found one, and stopped at the first thing that moved the
+count — without asking what "placed by a start" had to mean for the claim to be about the shipped game.
+`[[scrutiny-asymmetry]]` says a number is most dangerous when it is CHANGING, and that corrections feel
+verified. This is that, exactly: the corrected number was quoted onward with more confidence than the
+original, into P042 and into the decision brief Astra read.
+
+**The structural cause is that nothing in `data/` marks which start is the shipped one.** `site:` is
+present on `tutorial`, `beacon_probe` and `lighting_bench` alike — it separates "stamps world geometry"
+from "stamps a pack", which is the wrong axis. The only machine-readable discriminator in the repository
+is one GDScript constant. A human counting by eye has no partition to count against, which is why the
+count was wrong twice and why `check_content_reachable.py` (gate 37) reads that constant rather than
+accepting a list.
+
+**Found by the gate on its first run against the real tree** (`check_content_reachable.py`, QUALITY gate
+37, **D0591**), not by re-reading the claim — which is the argument for that gate in one line: the count
+had been read twice and corrected once, and none of that reached the fact that a bench is not the game.

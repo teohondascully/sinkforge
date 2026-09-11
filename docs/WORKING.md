@@ -356,13 +356,26 @@ nothing and saved most of a night.
          `mill_gear`, `smelt_rich` -- so of the game's **6 recipes only 2 are reachable** (`mine_ore` on
          the drill, `smelt_ingot` on the processor). Two-thirds of the crafting content cannot be
          reached by any route the game currently offers.
+         **CORRECTED AGAIN, 2026-09-10 (D0591): the orphan count is NINE, and this entry's own
+         correction was the error.** "Six, not seven -- `torch` IS placed by a start" is true only if a
+         *lighting bench* counts as the game. `torch` appears in `data/starts/lighting_bench.yaml` and
+         nowhere else; `conduit` and `lift` are `dev_kit` only. Under `shell/main.gd`'s `const START`
+         the orphans are `blast_furnace`, `conduit`, `gear_mill`, `iron_forge`, `lift`, `plate_press`,
+         `pump`, `rope`, `torch`. Found by gate 37 on its first run, not by re-reading.
          **CORRECTED 2026-09-10 (D0588): they are unreachable TWICE OVER.** Astra caught that
          `ore_iron` yields `ore` while `smelt_iron` consumes `iron`; checking the whole graph,
          **`iron` and `rich_ore` are consumed by recipes and produced by nothing anywhere**. The set of
          recipes whose MACHINE is unobtainable and the set whose INPUTS are unproducible are the same
          four, so neither half of the fix does anything alone. P042's "one ruling would reach all of it"
          is withdrawn.
-- [ ] 50 **A PROGRESSION GRAPH, GENERATED FROM `data/`, THAT CAN FAIL.** The director's ask: map every
+- [~] 50 **FIRST INCREMENT BUILT AND IT FOUND ONE (D0591).** `tools/layer_lint/check_content_reachable.py`,
+         QUALITY gate 37, registered in the gates job **reported-only** because what it is red about is
+         P042. Seven mutation cases witnessed, including a seeded production loop that PASSES beside an
+         unseeded one that FAILS (a topological sort rejects both) and a machine placed only by a bench
+         that must not count as shipped. **On its first run it corrected this file:** the orphan count is
+         **nine**, not six -- see item 43. Still deferred per Astra: the blocking verdict, a `shipped:`
+         schema field, and every quantity/fuel increment. Original scoping below.
+         **A PROGRESSION GRAPH, GENERATED FROM `data/`, THAT CAN FAIL.** The director's ask: map every
          craftable as both an economy to read and a validation that new content enters the tree rather
          than being dropped in isolated. Scoped against the repo (agent pass, 2026-09-10) -- these are
          the facts that decide its shape, all verified in-tree:

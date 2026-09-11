@@ -22748,3 +22748,46 @@ NOT JUDGED ON A FRAME. The director is using the screen, so this ships measured 
 capture belongs to item 49's match loop. `build_stack` hit 53 of its 50 lines and the backdrop choice
 became `_mount_behind_the_world` -- cap-driven, and the two answers genuinely are exclusive.
 Reverse: CHEAP -- delete one line in `_mount_behind_the_world`.
+
+## D0591 · 2026-09-10 · tools/layer_lint/check_content_reachable.py (new), harness.yml, docs/QUALITY.md · the content graph, generated and falsifiable
+Decided: QUALITY gate 37 -- a structural reachability check over `data/`, reported-only for now.
+Why: the director asked for the craftables mapped as both an economy to read and a validation that new
+content enters the tree rather than arriving isolated. The case for it is that a hand count in this area
+has now been wrong TWICE, and the second time was a correction (see `docs/CORRECTIONS.md`): P042's "one
+ruling would reach all of it" was false, and the "seven orphans, actually six" fix was false too.
+WHAT IT DOES. One JOINT fixpoint over recipes and demand tiers, because they gate each other -- a tier's
+grants pay for the machine that makes what the next tier wants, so running them separately is exactly
+what lets a tier award the machine its own `wants` needed. Reports MEMBERS and the rule behind them,
+never a total, because a total cannot be re-measured by reading it.
+THE SHIPPED START IS READ FROM `shell/main.gd`'s `const START`. Nothing in `data/` distinguishes the game
+from a bench: `site:` is on `tutorial`, `beacon_probe` and `lighting_bench` alike and separates "stamps
+world geometry" from "stamps a pack", which is the wrong axis. The gate REFUSES a verdict when that
+constant names no record, because a partition falling back to every start would count a lighting bench's
+placed forge as shipped progression -- which is the error the hand count actually made.
+IT FOUND ONE ON ITS FIRST RUN. `torch` is placed only by `lighting_bench`; under the shipped start the
+orphan machines are NINE, not six. `conduit` and `lift` are `dev_kit` only.
+WHAT IT DELIBERATELY DOES NOT MODEL, and it says so in its own output rather than only here:
+`Machines.machine_eats` is a union of four rules -- the coal-burner set, `winch_head` plus bulk, `rig`
+plus the live demand, and `recipe.inputs` -- and only the last is in `data/`. So it answers "can this
+recipe ever run", never "is this item ever wanted". A machine that burns fuel is reachable here on its
+recipe alone. Nor does it scan `data/` for item-shaped strings: `data/strata/shallow_clay.yaml` has a
+top-level `iron:` key that is terrain-gen tuning, and a scan would "find" iron and declare `smelt_iron`
+fed -- so it reads named fields out of named record kinds.
+NO QUANTITY, FUEL OR BUILD-COST CHECK, and that is not a scoping choice: `data/machines/SCHEMA.yaml`
+lists `craft_cost`/`craft_count` under `forbidden:`, enforced, on a director's ruling that the
+one-time-purchase economy stays dead "not as code, not as a craft_cost data field". There is no field for
+a build cost to live in.
+REPORTED-ONLY (`--report-only`, exits 0). It lands red on today's tree and what it is red ABOUT is P042,
+an open director question about what tiers three and four should ask for. A gate that blocks every push
+on a design call it cannot make is worse than no gate. Drop the flag when P042 is answered; the mutation
+tests run unconditionally either way.
+Mutation-tested, 7 cases, each witnessed: a complete economy passes (the control, without which every
+other case is meaningless); a recipe with one of two inputs is unreachable (plain graph search would call
+it reachable); a self-feeding loop WITH a seed passes while the same loop WITHOUT one fails (a
+topological sort rejects both, and that is the likeliest silent mis-write); a machine placed only by a
+bench does not count as shipped (without this the fixture exclusion is decorative and the whole proof
+unfalsified); an empty recipe set is a broken scan rather than a clean tree; a `START` naming no record
+refuses a verdict.
+Astra's scoping, followed: build the graph and a member-listing reported-only gate now; defer the
+blocking verdict, a `shipped:` schema field, and every quantity/fuel increment until P042 is answered.
+Reverse: delete the step and the two files.

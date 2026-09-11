@@ -214,6 +214,35 @@ trimmed back to the limit rather than split, and the pattern repeated a fourth t
 
     Since D0284 it compares more than names, because comparing names only was its own stated hole: **a job that keeps its NAME but is gutted to `run: true` used to pass** — name intact, teeth gone, rollup still green. Each job now also carries an enforcement **fingerprint** that may not shrink: the set of **work tokens** its enforcing steps invoke (every `res://`/`https://` URI, every word ending `.py`/`.sh`/`.gd`/`.bash`/`.yml`/`.yaml`, every `./binary`, and every `uses:` action with its `with:` key names, action version stripped), the **count of enforcing run-steps that do work** (a step holding only comments, blanks, `true`, `:`, `exit`, `set`, `echo` or `printf` is not one), and whether the job has **gained a job-level `if:`**. A step counts as enforcing only if it has no `if:` and no truthy `continue-on-error:` — the third gutting vector, and the one invisible to any text comparison, since flipping a BLOCKING step to `continue-on-error: true` leaves the name, the step and the command all present and removes the enforcement entirely. The count exists because tokens alone cannot see every gutting: the `Gate mutation tests` step's real work is a `find`-driven loop containing no path-shaped token, and the Godot download step's is `curl`/`unzip`/`mv`/`chmod` — reduce either to `run: true` and the token sets are identical. Reordered steps, changed flags, changed positional arguments, a renamed step running the same tool, a split step, a bumped action version and a changed `with:` value all PASS; merging two steps into one fails, on the same policy as a rename and with the same one-line remedy. A deliberate enforcement change is declared in the commit message too — `CI-Enforcement-Changed: <job-name> -- <why>`, job-granular on purpose, because a token-granular marker would be a file-based allowlist wearing a disguise. What it still cannot see: whether the tools it names actually work, or a step rewritten to run a different tool of the same name. Mutation-tested against the real `harness.yml` (11 mutants, each with an `applied=True` witness and a byte-for-byte restore) and committed as `tools/layer_lint/test_check_ci_not_shrunk.py`, 21 branches, including the case where deleting the step that runs this gate is what trips this gate. `docs/DECISIONS_LEDGER.md` D0284.
 
+
+37. **Every recipe, machine and demand tier is reachable from a new game.** `docs/CORRECTIONS.md`
+    records the claim this exists for: P042 said a `d3`/`d4` naming the orphan machines "reaches four
+    machines and four recipes in a single data change", and it was false. Two counts had been made and
+    both were right -- six machines no start places and no demand names, four recipes stranded behind
+    them -- but the JOIN between them was never computed, and it is the whole answer: `iron` and
+    `rich_ore` are consumed by recipes and produced by nothing anywhere, so the same four recipes are
+    unreachable TWICE over and neither half of the obvious fix does anything alone. A hand count here
+    has now been wrong twice; the second time was a *correction*, which lowered seven orphan machines to
+    six on the strength of `torch` being "placed by a start" -- by `lighting_bench`, a scenario record.
+    Under the shipped start there are nine. That is the "count without membership" shape, so
+    `tools/layer_lint/check_content_reachable.py` reports MEMBERS and the rule behind them, never a
+    total. One joint fixpoint over recipes and tiers, because they gate each other: a tier's grants pay
+    for the machine that makes what the next tier wants, and running them separately is what lets a tier
+    award the very machine its own `wants` needed. **The shipped start is read from `shell/main.gd`'s
+    `const START`**, not guessed and not listed in the tool, because nothing in `data/` distinguishes the
+    game from a bench -- and the gate refuses a verdict if that constant names no record, since a
+    partition that silently fell back to every start would count a lighting bench's placed forge as
+    shipped progression. **What it does NOT model, and says so in its own output:**
+    `Machines.machine_eats` is a union of four rules and only `recipe.inputs` is in `data/`, so this
+    answers "can this recipe ever run", never "is this item ever wanted". **Reported-only for now**
+    (D0591): it lands red on today's tree and what it is red about is P042, an open director question;
+    a gate that blocks every push on a design call it cannot make is worse than no gate. Drop
+    `--report-only` when P042 is answered. Mutation-tested at
+    `tools/layer_lint/test_check_content_reachable.py`, seven cases, including a seeded production loop
+    that must PASS beside an unseeded one that must FAIL (a topological sort rejects both), and a machine
+    placed only by a bench that must not count as shipped -- without that last case the fixture exclusion
+    would be decorative and the whole proof unfalsified. `docs/DECISIONS_LEDGER.md` D0591.
+
 ---
 
 ## 6. Repository hygiene
