@@ -18,6 +18,17 @@ carry the working.
 
 ## D1 · The z-axis fork — one layer of depth
 
+> **RULED 2026-09-10 (Astra): yes to a bounded prototype, no to a migration** — and two things below are
+> withdrawn. `WallPainter` is NOT the occlusion answer: it deliberately skips cells behind solid
+> foreground, so it can never reveal a body behind an opaque mass. And six weeks was never an established
+> estimate. The fragility list below (rendering, observation, map, saves) was called "substantially
+> incomplete", correctly. **The expanded audit is
+> `docs/audits/2026-09-10-second-plane-dependency-audit.md`**, which measures it: 347 cell-taking
+> signatures, **70% of them in `sim/`**; the replay surface is ONE field in one file; the save envelope is
+> every plane at once; and the rope — anchor, tip and six pivots, all in Fx world pixels — is the
+> dependency nobody had asked about.
+
+
 **The largest decision on the list, and the only one with a deadline.**
 
 The director has a mockup they like: the 2D grid keeps its gravity basis but gains ONE extra plane of
