@@ -49,8 +49,11 @@ def check(name: str, got: str, want_prefix: str) -> None:
 
 
 def win(cal: float = 60.0, fps: float = 400.0, chunks: int = 5, body: tuple = (10, 20),
-        focus: float = 1.0) -> dict:
-    return {"cal_p50": cal, "fps_wall": fps, "prep_chunks": chunks, "body": body, "focus": focus}
+        focus: float = 1.0, hz: float = 120.0) -> dict:
+    w = {"cal_p50": cal, "fps_wall": fps, "prep_chunks": chunks, "body": body, "focus": focus}
+    if hz:
+        w["screen_hz"] = hz
+    return w
 
 
 def run_identity() -> dict:
@@ -119,6 +122,34 @@ def test_pacing_rule() -> None:
     # the frame does not care what the display did with the finished picture. Refusing them here would
     # throw away good measurements of exactly what the performance passes move.
     check("paced phases survive", pf.verdict("dig", paced), "VALID")
+
+
+def test_count_survives_what_the_rate_does_not() -> None:
+    """Astra's open question (D0593): a paced window may still report the over-budget COUNT.
+
+    The rule is arithmetic, not a judgment: a paced frame is presented on a slot boundary, so a threshold
+    survives iff ONE SLOT does not already exceed it. At 120 Hz the slot is 8.3333 ms, which is above 8.3
+    and below 16.7 -- so the two thresholds this fixture reports fall on opposite sides of the same line,
+    and withholding them together was throwing away the good one.
+    """
+    paced = [win(fps=120.0, hz=120.0), win(fps=119.0, hz=120.0)]
+    check("rate still withheld", pf.frame_note(paced), "WITHHELD")
+    check("over16 survives 120Hz", pf.count_note(paced, "over16"), "VALID")
+    check("over8 destroyed at 120Hz", pf.count_note(paced, "over8"), "WITHHELD")
+    # 60 Hz: the slot is 16.6667 ms, still under 16.7 by a hair. The threshold holds by ONE slot rather
+    # than two, and the note must say which -- a reader checking this needs the arithmetic, not a verdict.
+    slow = [win(fps=120.0, hz=60.0)]
+    check("over16 survives 60Hz", pf.count_note(slow, "over16"), "VALID")
+    check("over8 destroyed at 60Hz", pf.count_note(slow, "over8"), "WITHHELD")
+    # 144 Hz: 6.9444 ms, under BOTH thresholds, so even the 8.3 count becomes readable. This is the
+    # control that proves the rule is about the slot and not a hardcoded opinion about which field is good.
+    fast = [win(fps=120.0, hz=144.0)]
+    check("over8 survives 144Hz", pf.count_note(fast, "over8"), "VALID")
+    # An unpaced set needs no reasoning at all.
+    check("unpaced needs no note", pf.count_note([win(fps=400.0)], "over8"), "VALID")
+    # REFUSE, NEVER GUESS: a window that did not report its refresh rate cannot be judged. An older log
+    # predates the `screen=` field entirely, and assuming 120 would silently validate a 60 Hz machine.
+    check("no screen is withheld", pf.count_note([win(fps=120.0, hz=0.0)], "over16"), "WITHHELD")
 
 
 def test_parser() -> None:
@@ -314,7 +345,8 @@ def test_saved_identity() -> None:
 
 def main() -> int:
     for fn in (test_work_rule, test_movement_rule, test_control_rule, test_one_window_rule,
-               test_window_regime_rule, test_pacing_rule, test_parser, test_reporting_contracts,
+               test_window_regime_rule, test_pacing_rule, test_count_survives_what_the_rate_does_not,
+               test_parser, test_reporting_contracts,
                test_process_completion, test_paired_burst_summary, test_focus_argv, test_setup_summary,
                test_saved_identity, test_front_requests_only_its_pid):
         fn()

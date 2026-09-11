@@ -22825,3 +22825,39 @@ guards.
 NOT JUDGED ON A FRAME -- the director is using the screen. The rule is measured; the mark's size and
 placement belong to item 49's match loop.
 Reverse: CHEAP -- delete the `_mark_wanted` call and the `w.has("wanted")` block.
+
+## D0593 · 2026-09-10 · tools/perf_fixture.py, test_perf_fixture.py · the count survives what the rate does not
+Decided: `count_note(warm, field)` beside `frame_note`. A paced window now reports the over-16.7 ms COUNT
+while `fps_wall` and the percentiles stay withheld. `over8.3ms` stays withheld at 60 and 120 Hz.
+Why: this answers the question Astra left open in
+`docs/audits/2026-09-09-presentation-regime-handoff.md` -- "can a vsynced window report the over-budget
+COUNT and the phase clocks while still withholding `fps_wall` and the percentiles?" -- which had been
+parked because `tools/` was theirs. It is mine now, so it is answered.
+THE ANSWER IS ARITHMETIC, NOT TASTE, which is why it could be settled without a run. A paced frame is
+presented on a slot boundary, so its measured time is a whole multiple of `1000 / screen_hz`. A threshold
+T survives pacing IFF ONE SLOT DOES NOT ALREADY EXCEED IT -- if it does, every frame trips the count and
+the field reports only that the display is on.
+The two thresholds this fixture reports fall on OPPOSITE SIDES of that line on the machine it is measured
+on. At 120 Hz the slot is 8.3333 ms:
+  * `over8.3ms` is destroyed -- 8.3333 > 8.3, so an idle frame counts as over budget. This half was
+    already known: the module docstring records D0527 watching it "count nearly all of them".
+  * `over16.7ms` survives -- two slots is 16.6667 ms, UNDER 16.7, so a two-slot frame does not trip it
+    and only one needing three or more does. Under pacing the field means "needed more than two slots",
+    which is the same defect a 60 Hz budget is about.
+So withholding them together was throwing away the good one. Astra's own evidence already said so and
+nobody had drawn the consequence: dig dropped 28-30 frames a window vsynced and 22-35 unvsynced -- the
+COUNT held while the denominator moved 2.5-4x (`[[read-the-count-not-the-rate]]`).
+DERIVED FROM THE REPORTED REFRESH RATE, never hardcoded to 120: `PRESENT_RE` parses the `screen=` field
+D0555 appended to the PERF line. At 144 Hz the slot is 6.9444 ms and even `over8.3ms` becomes readable,
+which the suite asserts -- the control that proves the rule is about the slot and not an opinion about
+which field is good.
+REFUSE, NEVER GUESS: a paced window with no `screen_hz` (an older log, or a display that would not
+report) is WITHHELD rather than assumed. Assuming 120 would silently validate a 60 Hz machine, where the
+slot is 16.6667 ms and the 16.7 threshold holds by ONE slot rather than two.
+The report prints the surviving count WITHOUT a denominator, deliberately: the population is the
+display's, so a fraction there would be the exact number pacing wrecks.
+Mutation-tested, three ways: `count_note` always VALID fires 3 guards; the comparison flipped fires 5;
+assuming 120 for a missing rate fires the refuse-never-guess guard. (The first attempt at the last two
+measured nothing -- `git checkout --` restores from the INDEX, and the file was not staged, so the
+restore reverted to HEAD and removed the function under test. Redone from a staged baseline.)
+Reverse: CHEAP -- `summarise` stops emitting the two notes and the report's `elif` goes.

@@ -66,6 +66,10 @@ PERF_RE = re.compile(
     r"over8\.3ms=(\d+) over16\.7ms=(\d+) focus=([\d.]+) \| draw p50=([\d.]+)ms p99=([\d.]+)ms.*?"
     r"quiet p50=([\d.]+)ms p99=([\d.]+)ms n=\d+ \| "
     r"cal p50=(\d+)us p99=(\d+)us max=(\d+)us spread=([\d.]+) n=(\d+)")
+# The presentation control `shell/frame_meter.gd` appends to the PERF line (D0555). `screen` is what
+# makes `count_note` possible: a threshold can only be judged against the refresh slot it competes with.
+PRESENT_RE = re.compile(r"present vsync=(\S+) max_fps=(-?\d+) screen=([\d.]+)Hz")
+
 PAINT_RE = re.compile(r"^painters total=([\d.]+)ms.*?drawn=([\d.]+)ms/tick")
 REASON_RE = re.compile(r"(\w+)=([\d.]+)ms/(\d+)cb/(\d+)cells(?:/(\d+)solid/(\d+)dilated)?")
 BAKE_RE = re.compile(
@@ -217,6 +221,10 @@ def parse_windows(out):
             cur.update(zip(("frames", "fps_wall", "p50", "p99", "max", "over8", "over16",
                             "focus", "draw_p50", "draw_p99", "quiet_p50", "quiet_p99", "cal_p50", "cal_p99",
                             "cal_max", "cal_spread", "cal_n"), (float(g) for g in m.groups())))
+            pres = PRESENT_RE.search(line)
+            if pres:
+                cur["vsync"], cur["max_fps"] = pres.group(1), int(pres.group(2))
+                cur["screen_hz"] = float(pres.group(3))
             continue
         m = PAINT_RE.match(line)
         if m:
@@ -335,6 +343,58 @@ def descent_note(s):
             "crossed only terrain the bake already held, so this run cannot certify streaming coverage.")
 
 
+# The over-budget thresholds `shell/frame_meter.gd` reports, in ms.
+OVER_THRESHOLDS = {"over8": 8.3, "over16": 16.7}
+
+
+def count_note(warm, field):
+    """Whether an OVER-BUDGET COUNT survives display pacing. Astra's open question, answered (D0593).
+
+    `frame_note` withholds the whole frame block when a window was paced, and for `fps_wall` and the
+    percentiles that is right: a frame that fitted inside a refresh interval measures as exactly one
+    refresh interval, so those numbers describe the compositor. The counts are a different question and
+    were being withheld with them.
+
+    A paced frame is presented on a slot boundary, so its measured time is a whole multiple of
+    `1000 / screen_hz`. A threshold `T` therefore survives pacing **iff one slot does not already exceed
+    it** -- if it does, every frame trips the count and the field says only "the display is on".
+
+    On the 120 Hz display this programme is measured on, the slot is 8.3333 ms:
+
+      * `over8.3ms` is DESTROYED. 8.3333 > 8.3, so a perfectly idle frame counts as over budget. This
+        half was already known -- the module docstring records D0527 watching it "count nearly all of
+        them" -- but it was never separated from the other threshold.
+      * `over16.7ms` SURVIVES. Two slots is 16.6667 ms, which is UNDER 16.7, so a two-slot frame does not
+        trip it and only a frame needing three or more does. Under pacing the field means "needed more
+        than two slots", which is the same defect a 60 Hz budget is about.
+
+    The evidence agrees: `docs/audits/2026-09-09-presentation-regime-handoff.md` measured dig dropping
+    28-30 frames a window vsynced and 22-35 unvsynced -- the COUNT held while the denominator moved 2.5-4x
+    (`[[read-the-count-not-the-rate]]`). So the count was never the compositor's number.
+
+    Returns VALID or a WITHHELD line naming the arithmetic, so the reader can check it rather than trust
+    it. A window with no `screen_hz` -- an older log, or a display that would not report -- is WITHHELD
+    rather than assumed, on the same rule every note here follows: refuse, never guess.
+    """
+    threshold = OVER_THRESHOLDS[field]
+    paced = [w for w in warm if PACED_BAND[0] <= w["fps_wall"] <= PACED_BAND[1]]
+    if not paced:
+        return "VALID"
+    blind = [w for w in paced if not w.get("screen_hz")]
+    if blind:
+        return ("WITHHELD: %d of %d paced windows did not report `screen=`; a threshold cannot be judged "
+                "against a refresh slot of unknown length." % (len(blind), len(paced)))
+    worst = max(1000.0 / w["screen_hz"] for w in paced)
+    if worst > threshold:
+        return ("WITHHELD: %d of %d warm windows were paced, and one refresh slot is %.4f ms, which "
+                "already exceeds the %.1f ms threshold -- every frame trips this count and it measures "
+                "the display." % (len(paced), len(warm), worst, threshold))
+    return ("VALID: %d of %d warm windows were paced, but a slot is %.4f ms and %d of them fit under the "
+            "%.1f ms threshold, so the count means \"needed more than %d slot(s)\" and not \"the display "
+            "is on\"." % (len(paced), len(warm), worst, int(threshold // worst), threshold,
+                          int(threshold // worst)))
+
+
 def frame_note(warm):
     """Whether the FRAME statistics may be read: `fps_wall`, the percentiles and the over-budget counts.
 
@@ -374,7 +434,9 @@ def summarise(workload, runs, hidden=False):
     s = {"workload": workload, "reps": len(runs), "warm_windows": len(warm),
          "run": dict(PROVENANCE),
          "verdict": verdict(workload, warm),
-         "frames": HIDDEN_FRAMES if hidden else frame_note(warm)}
+         "frames": HIDDEN_FRAMES if hidden else frame_note(warm),
+         "over16_note": HIDDEN_FRAMES if hidden else count_note(warm, "over16"),
+         "over8_note": HIDDEN_FRAMES if hidden else count_note(warm, "over8")}
     if not runs or any(len(r) < 3 for r in runs):
         s["verdict"] = "VOID: every repetition must contain a cold and at least two warm windows"
     identities = [w["receipt"]["identity"] for w in cold if "receipt" in w]
@@ -451,6 +513,13 @@ def render(s):
               % (s["warm_fps_wall"], s["warm_p50"], s["warm_p99"], s["warm_max"],
                  s["warm_over16_total"], s["warm_frames"]))
         print("  cold frame    fps_wall %.1f  p50 %.2f ms" % (s["cold_fps_wall"], s["cold_p50"]))
+    elif s.get("over16_note", "").startswith("VALID"):
+        # THE COUNT SURVIVES WHAT THE RATE DOES NOT (D0593). Printed WITHOUT the denominator on purpose:
+        # the population is the display's, so a fraction here would be the very number pacing wrecks.
+        # `[[read-the-count-not-the-rate]]`, and that fraction is what moved 2.5-4x while nothing changed.
+        print("  warm frame    RATE WITHHELD, COUNT VALID -- over16.7 %.0f frame(s) across %d warm window(s)"
+              % (s["warm_over16_total"], s["warm_windows"]))
+        print("                %s" % s["over16_note"])
 
 
 def compare(before, after, allow_seat_change=False):

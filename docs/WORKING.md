@@ -434,7 +434,15 @@ nothing and saved most of a night.
 
 - [ ] 44 Opus playthrough again, same route as item 1. The only honest test of phases 1-5.
 - [ ] 45 A stranger batch STARTED AT RUNG 4, six seats, haiku, pinned mission.
-- [ ] 46 Astra's fixture question (`docs/audits/2026-09-09-presentation-regime-handoff.md`).
+- [x] 46 **ANSWERED (D0593).** Astra's fixture question
+         (`docs/audits/2026-09-09-presentation-regime-handoff.md`): can a vsynced window report the
+         over-budget COUNT while still withholding `fps_wall` and the percentiles? **Yes for
+         `over16.7ms`, no for `over8.3ms`, and the rule is arithmetic.** A paced frame lands on a slot
+         boundary, so a threshold survives iff one slot does not already exceed it. At 120 Hz the slot is
+         8.3333 ms -- above 8.3, below 16.7 -- so the two thresholds fall on opposite sides of the same
+         line and withholding them together was discarding the good one. Derived from the `screen=` field
+         rather than hardcoded: at 144 Hz even the 8.3 count becomes readable, which the suite asserts as
+         its control. Three mutations witnessed.
 - [x] 47 **DONE.** Battery 179/179 (151 suites + 28 gates), tree clean, 12 commits pushed to origin.
 - [x] 48 **DONE.** `docs/BRIEF.md` leads with the five findings; the ledger carries D0575-D0586; this
          file is current; P038-P043 are the open director questions.
