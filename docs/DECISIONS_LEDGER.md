@@ -23259,3 +23259,14 @@ QUALITY.md plus tool output. Consolidated into a dated report: 30 ENFORCED (7 ca
 8/10/26 honestly scoped), 3 ADVISORY (14, 33, 37), 4 NO-CODE (17/18/20/21, process rules now labelled),
 0 CANNOT-FAIL. Gates 15/16's QUALITY text updated: the corpus healed at D0609 (one scenario naming
 C003) -- VOID no longer applies. Every commit hash cited in the report was verified against git log.
+
+## D0619 · 2026-09-11 · docs/BRIEF.md · the meta-analysis findings recorded; stale C003 line corrected
+
+The four meta questions the audit opened with now have measured answers in BRIEF.md: (1) the
+instrument:game ratio is a velocity gate wearing an absolute number's clothes -- 50.7k/32.3k is
+informational, and tests/ alone (35.9k) exceeds sim+interface+shell while harness/ and experiment/
+hold zero code lines; (2) the ledger is read -- 450/615 entries back-reference, 994 citations, 59%
+correction-shaped; (3) CORRECTIONS.md is the load-bearing projection of that network; (4) the prose
+earns its 31% comment density in sim/ when it is load-bearing (named defects, dated numbers), and this
+arc collected direct instances. Also corrected BRIEF's own stale line: it still read "C003 remains
+BLOCKED" after bf662a85 made the claim executable -- a document-staleness instance of the same class.

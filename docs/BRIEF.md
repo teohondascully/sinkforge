@@ -1,5 +1,59 @@
 # Brief
 
+## What was learned — the audit instrument itself had the defect it was built to find (gate-reconciliation arc, 2026-09-11)
+
+The 37-gate reconciliation (`docs/audits/2026-09-11-gate-reconciliation.md`: 30 ENFORCED, 3 ADVISORY,
+4 NO-CODE, 0 CANNOT-FAIL) started from "does the enforcing code exist and does it fail" — and the
+answer that kept surfacing was that **the measuring instrument shares the failure class it measures**:
+
+- Gate 24's bounds probe ran and reported, but could not see its own defect class — an instrument
+  that never fails is indistinguishable from one that always passes.
+- Gate 5's enforcer declared "autoloads/singletons" in its docstring while carrying no pattern for
+  either — the declaration lived in `project.godot`, outside every file the tool greps. A docstring
+  overclaim inside the tool whose own header warns about docstring overclaims.
+- `gate_status.py`, built to answer "is it wired", missed two wiring shapes: test citations reached
+  through a glob-run step, and `--report-only` steps that map exit 1 to 0. Both classified gates wrong
+  until the matcher grew up.
+- `check_corrections_freshness.py` — built to catch a filename-substring false positive — false-
+  positived on its *own* filename in a header (D0617).
+
+The pattern is not "the checks are bad". It is that **a check's declared subject and its actual
+subject diverge silently**, and only a mutation (or a live fire) ever closes the gap. Every gate
+re-armed this arc carries a test that watched it go red.
+
+## What was learned — the ratio everyone quotes is the number the gate refuses to gate on
+
+The famous instrument:game ratio (measured this arc: tests+tools ≈ 50.7k vs game ≈ 32.3k, ratio 1.57)
+is *informational, never gated* — gate 7's real property is **velocity** (instrument growth ≤ 2× game
+growth over trailing 10 commits, blocking only at zero game growth). The absolute number gets quoted
+because it is easy to state; the velocity number is what the project actually defends. Two further
+measurements sharpen it: `tests/` alone is 35.9k lines — more than `sim/`+`interface/`+`shell/`
+combined — while `harness/` and `experiment/` contain **zero code lines**, skeleton layers that exist
+in the architecture and in gate 15's corpus check but not in code. The ratio question has the wrong
+numerator: the instrument is big where it is *test*, and empty where it claims to be *harness*.
+
+## What was learned — the ledger is read, and CORRECTIONS.md is the load-bearing product
+
+Of 615 ledger entries, **450 (73%) back-reference earlier entries — 994 citations total — and 59%
+are correction-shaped** (corrects/wrong/supersedes/falsified). That is a citation network, not a
+write-only log: entries routinely cite the entry they supersede, and this arc's own queue direction
+changed when P042's ruling was read back out of it. `docs/CORRECTIONS.md` (943 lines) is the
+projection of that network the project actually consumes — every "confidently wrong" the regime is
+built to catch, with the deepest chain (D0059→D0137, six weeks, five corrections) traced end to end.
+If one artifact explains why this codebase's green tests are trustworthy-ish, it is the corrections
+record, because it documents the exact shape of every past green-that-wasn't.
+
+## What was learned — the prose earns its lines, measurably
+
+`sim/` runs 31% comment lines (3,009 of 9,697). The cost is real — gate 3/4 caps exist partly because
+of it — but this arc collected the counter-evidence directly: `run_suites.sh`'s header documents why
+verdicts key on exit codes not `grep 'ALL PASS'` (a real false-green history, D0262), which is
+precisely the sentence that stops the next agent reintroducing it; `hints.gd`'s D-annotated detector
+table made the T030 lesson a one-line `note()` because the mechanism's contract was written down.
+Prose-heavy code pays when the prose is *load-bearing* — named defects, dated numbers, "the detector
+cannot tell its subject from its failure text". It fails when it merely narrates. The check that
+distinguishes them is unautomatable, which is why it lives in the ledger.
+
 ## What was learned — every claim about how it LOOKS, made without a frame, was wrong. Four for four.
 
 The director lent the screen late in the session. Four separate things I had measured, asserted and
@@ -297,7 +351,9 @@ display-install command fails locally on macOS while CI reports success. This is
 
 Public setup and build status now describe the implemented game and missing rig economy.
 Onboarding no longer instructs a new agent to repeat the pivot.
-C003 remains BLOCKED with current dependencies, rather than claiming saves and interfaces do not exist.
+C003 is executable as of 2026-09-11: `tests/test_cold_start_d1.gd` drives a scripted bot through
+`apply()`/`observe()` to `demand_satisfied(d1)` in 414 ticks (bf662a85); remaining gaps are the
+constrained envelope, pacing threshold, and save/reload fidelity — documented on the claim file.
 WORKING is a short current-state page. BACKLOG routes work to existing P/T/V records.
 Five prior operational documents and the preceding gameplay brief are preserved under
 `docs/archive/cleanup-2026-09-07/`. No code, tests, historical evidence, or gameplay rules were removed.
