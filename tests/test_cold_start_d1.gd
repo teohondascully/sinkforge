@@ -14,6 +14,7 @@ extends "res://tests/test_base.gd"
 func _initialize() -> void:
 	_test_the_scenario_record_runs_to_d1_through_the_driver()
 	_test_the_resulting_state_is_a_checkpoint_that_reloads_identically()
+	_test_a_mid_run_checkpoint_resumes_the_same_route_to_the_goal()
 	_finish("cold_start_d1")
 
 
@@ -67,3 +68,36 @@ func _test_the_resulting_state_is_a_checkpoint_that_reloads_identically() -> voi
 	_check(s1[0] != a[0], "30 ticks with a held jump moved the body (the equality below is not a no-op)")
 	_check(s1[0] == s2[0] and s1[1] == s2[1] and s1[2] == s2[2] and s1[3] == s2[3] and s1[4] == s2[4] and s1[5] == s2[5] and s1[6] == s2[6],
 		"...and the restored session's saved parts moved to the same place")
+
+
+## The stronger half of "valid checkpoint": not just that the END state reloads, but that a save taken
+## MID-RUN resumes to the same goal. The route's seam is the leg index (a delivered stack reads as
+## un-mined, so the bot cannot re-derive leg progress from the pack -- `execute(anchor, from, to)` takes
+## the range explicitly). Checkpoint after leg 3: ore and coal delivered, the forge holding work in
+## flight -- a machine's buffers, progress and the body's position all mid-motion in the envelope.
+func _test_a_mid_run_checkpoint_resumes_the_same_route_to_the_goal() -> void:
+	var record: Dictionary = ScenarioRecords.RECORDS["cold_start_to_d1"]
+	var booted: Dictionary = ScenarioDriver.boot(record)
+	_check(bool(booted["ok"]), "the world boots for the checkpoint leg (%s)" % booted.get("reason", ""))
+	if not bool(booted["ok"]):
+		return
+	var bot: ColdStartBot = ScenarioDriver.bot_for(record)
+	bot.attach(booted["world"], booted["items"], booted["body"], booted["iface"], booted["env"])
+	var first: Dictionary = bot.execute(booted["anchor"], 0, 3)
+	_check(bool(first["legs_ok"]), "the first three legs ran before the checkpoint (%d ticks)" % first["ticks"])
+
+	var env: Dictionary = Session.capture(booted["iface"])
+	var restored: Interface = Session.from_save(bytes_to_var(var_to_bytes(env)))
+	_check(restored != null, "the mid-run state re-loads (%s)" % SaveGame.last_invalid)
+	if restored == null:
+		return
+	var rs: Dictionary = restored.services()
+	var resumed: ColdStartBot = ScenarioDriver.bot_for(record)
+	resumed.attach(rs["world"], rs["items"], rs["body"], restored, Interface.Envelope.oracle_over(rs["world"].grid))
+	var second: Dictionary = resumed.execute(booted["anchor"], 3, -1)
+	_check(bool(second["legs_ok"]), "the resumed route finished its legs on the restored session (%d ticks)" % second["ticks"])
+	var rep: Dictionary = ScenarioDriver.await_goal(record,
+		{"ok": false, "reason": "", "ticks_used": 0, "goal_event": {}, "legs_ok": true,
+			"conservation_error": null, "envelope": &"oracle"}, resumed)
+	_check(bool(rep["ok"]), "demand_satisfied d1 arrived on the session that lived through a save and a load (reason=%s, ticks=%d+%d)" % [rep["reason"], first["ticks"], rep["ticks_used"]])
+	_check(rep["conservation_error"] == null, "conservation held across the checkpoint")

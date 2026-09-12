@@ -77,12 +77,16 @@ full falsifiable form:
 - **The threshold is still unset.** The scripted floor is now measured (414 ticks); a human-pacing
   threshold wants either a real playthrough number or a director ruling on what multiple of the bot
   floor counts as completable.
-- **Checkpoint re-derivation is now exercised (D0621).** The suite captures the run's resulting state
-  through `Session`, round-trips it through the binary serializer, and asserts the restored session
-  signs identically on every saved part and stays identical under 30 further ticks. The leg's first
-  run found a real defect: `Items._rubble` — signed state since D0354 — had never been written to the
-  envelope; the key exists now. What remains unproven is *mid-run* resume — the checkpoint is taken at
-  the goal, not partway through.
+- **Checkpoint re-derivation is now exercised (D0621), at the end AND mid-run.** The suite captures
+  the run's resulting state through `Session`, round-trips it through the binary serializer, and
+  asserts the restored session signs identically on every saved part and stays identical under 30
+  further ticks. A second leg checkpoints after route leg 3 (ore and coal delivered, the forge holding
+  work in flight), restores onto fresh services, and a new bot instance resumes the route's remaining
+  legs to the same goal (125 + 291 ticks vs the uninterrupted 414). The leg seam is explicit —
+  `ColdStartBot.execute(anchor, from_leg, to_leg)` — because a delivered stack reads as un-mined and
+  the policy cannot re-derive progress from the pack. The first end-state run found a real defect:
+  `Items._rubble` — signed state since D0354 — had never been written to the envelope; the key exists
+  now.
 
 The previous blockers are resolved: the rig demand transaction (`sim/economy/demands.gd` + the rig
 runner), D1's unlock (`drill` granted at stage advance), economy records (`data/progression`), the
@@ -118,3 +122,4 @@ its first real checkpoint.
 | 2026-09-11 | D0605+D0609 | d1 wants 2 ingots | 414 ticks | PASSING | `test_cold_start_d1.gd` + `scenarios/cold_start_to_d1.yaml`. Scripted bot through apply/observe only; conservation clean. First-failed via the same commit's event-kind mutation. Threshold still unset. |
 | 2026-09-11 | D0620 | d1 wants 2 ingots | within 30000-tick budget | PASSING | Same run now driven by `harness/driver` consuming the generated scenario record — yaml is the single source, the suite asserts over the driver's report. Event-suppression mutation re-verified red. |
 | 2026-09-11 | D0621 | d1 wants 2 ingots | 414 ticks; checkpoint re-loads signature-identically | PASSING | The resulting-state clause is exercised: `Session.capture` → binary serializer → `from_save` → saved parts sign identically and stay so under 30 ticks. Found and fixed `Items._rubble` missing from the envelope (signed since D0354, unsaved until now). Verbs selection differs by design (D0355). Mid-run resume still unproven. |
+| 2026-09-11 | D0621 (mid-run) | d1 wants 2 ingots | 125+291 ticks across a save/load vs 414 uninterrupted | PASSING | Checkpoint after leg 3 (forge holding work in flight) restores onto fresh services and a fresh bot resumes the route to the same goal. `execute(anchor, from_leg, to_leg)` is the seam -- delivered stacks are not pack-idempotent. Mutation witness: stripping machine buffers from the capture starves the resumed forge and the goal never fires. |

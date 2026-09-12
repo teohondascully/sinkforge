@@ -38,21 +38,30 @@ func attach(p_world: World, p_items: Items, p_body: Body, p_iface: Interface, p_
 	env = p_env
 
 
-## The route. `anchor` is the fixture's dy-0 logic cell (one row under the spawn air metre).
+## The route, legs `from_leg..to_leg` (default: all of it). `anchor` is the fixture's dy-0 logic cell
+## (one row under the spawn air metre). The leg range exists for C003's mid-run checkpoint: a fresh bot
+## attached to a RESTORED session continues the same route from the leg the save interrupted --
+## legs are not pack-idempotent (a delivered stack reads as un-mined), so the seam is the leg index,
+## not the world state.
 ## Returns {legs_ok}: every leg completed inside the budget. Named `execute`, not `run` --
 ## check_claim_references reads `func run(` as a check-registering file and this is a policy.
-func execute(anchor: Vector2i) -> Dictionary:
+func execute(anchor: Vector2i, from_leg: int = 0, to_leg: int = -1) -> Dictionary:
 	var vein: Array = [anchor + Vector2i(-1, 0), anchor + Vector2i(-2, 0)]
 	var coal: Array = [anchor + Vector2i(5, 0), anchor + Vector2i(6, 0)]
 	var forge_m: Vector2i = anchor + Vector2i(-3, 0)
 	var rig_m: Vector2i = anchor + Vector2i(2, 0)
+	var legs: Array[Callable] = [
+		func() -> bool: return mine_until(vein, ORE_WANT, "ore"),
+		func() -> bool: return deliver_to(forge_m, &"ore"),
+		func() -> bool: return mine_until(coal, COAL_WANT, "coal"),
+		func() -> bool: return deliver_to(forge_m, &"coal"),
+		func() -> bool: return await_and_collect(&"ingot", 2, forge_m),
+		func() -> bool: return deliver_to(rig_m, &"ingot"),
+	]
+	var last: int = legs.size() if to_leg < 0 else mini(to_leg, legs.size())
 	var ok: bool = true
-	ok = mine_until(vein, ORE_WANT, "ore") and ok
-	ok = deliver_to(forge_m, &"ore") and ok
-	ok = mine_until(coal, COAL_WANT, "coal") and ok
-	ok = deliver_to(forge_m, &"coal") and ok
-	ok = await_and_collect(&"ingot", 2, forge_m) and ok
-	ok = deliver_to(rig_m, &"ingot") and ok
+	for i: int in range(from_leg, last):
+		ok = legs[i].call() and ok
 	return {"legs_ok": ok, "ticks": ticks}
 
 

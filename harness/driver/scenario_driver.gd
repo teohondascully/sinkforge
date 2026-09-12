@@ -11,54 +11,65 @@ extends RefCounted
 ## is a spatial window only); the driver reports the envelope it actually used so a claim cannot
 ## silently read oracle as constrained.
 
-## The report's shape: {ok, reason, ticks_used, goal_event, legs_ok, conservation_error, envelope}.
+## The report's shape: {ok, reason, ticks_used, goal_event, legs_ok, conservation_error, envelope,
+## session}. The phases are public (`boot`, `bot_for`, `await_goal`) so a suite can compose them
+## around a `Session.capture`/`from_save` pair -- the save lives in `shell/`, a layer harness may not
+## reach, so a mid-run checkpoint is necessarily test-side (D0621). `run` is those pieces composed;
+## the checkpoint leg drives the same machinery, not a parallel copy.
 static func run(record: Dictionary) -> Dictionary:
 	var out: Dictionary = {"ok": false, "reason": "", "ticks_used": 0, "goal_event": {},
 		"legs_ok": false, "conservation_error": null, "envelope": &"oracle"}
-	var boot: Dictionary = _boot(record)
-	if not bool(boot["ok"]):
-		out["reason"] = boot["reason"]
+	var booted: Dictionary = boot(record)
+	if not bool(booted["ok"]):
+		out["reason"] = booted["reason"]
 		return out
-	# The live door rides the report so a suite can checkpoint the resulting state through
-	# `Session.capture` (shell/ is the save's layer; harness may not reach it, tests may).
-	out["session"] = boot["iface"]
+	out["session"] = booted["iface"]
 
-	var budget: int = int(record.get("budget_ticks", 30000))
-	var bot: ColdStartBot = null
-	match StringName(record.get("agent", "")):
-		&"cold_start":
-			bot = ColdStartBot.new(budget)
-		_:
-			out["reason"] = "no bot registered for agent '%s'" % record.get("agent", "")
-			return out
-	bot.attach(boot["world"], boot["items"], boot["body"], boot["iface"], boot["env"])
-	var rep: Dictionary = bot.execute(boot["anchor"])
+	var bot: ColdStartBot = bot_for(record)
+	if bot == null:
+		out["reason"] = "no bot registered for agent '%s'" % record.get("agent", "")
+		return out
+	bot.attach(booted["world"], booted["items"], booted["body"], booted["iface"], booted["env"])
+	var rep: Dictionary = bot.execute(booted["anchor"])
 	out["legs_ok"] = rep["legs_ok"]
 	out["ticks_used"] = rep["ticks"]
+	return await_goal(record, out, bot)
 
-	# The goal: idle until the record's event shows on o.events, or the budget ends.
+
+## The goal half of `run`: idle the world (through the bot's own tick, so a resumed bot drives the
+## session it was re-attached to) until the record's event shows on `o.events`, or the budget ends.
+static func await_goal(record: Dictionary, out: Dictionary, bot: ColdStartBot) -> Dictionary:
+	var budget: int = int(record.get("budget_ticks", 30000))
 	var goal: Dictionary = record.get("goal", {})
 	var want_kind: StringName = StringName(goal.get("type", ""))
 	var want_id: StringName = StringName(goal.get("id", ""))
 	while bot.ticks < budget:
-		var o: Interface.Observation = boot["iface"].observe(boot["env"])
+		var o: Interface.Observation = bot.iface.observe(bot.env)
 		for ev: Dictionary in o.events:
 			if ev.get("kind") == want_kind and (want_id == &"" or ev.get("id") == want_id):
 				out["goal_event"] = ev
 				out["ok"] = true
 				out["reason"] = "goal met"
 				out["ticks_used"] = bot.ticks
-				out["conservation_error"] = Invariants.check_item_conservation(boot["items"], 5)
+				out["conservation_error"] = Invariants.check_item_conservation(bot.items, 5)
 				return out
 		bot.tick(0)
 	out["reason"] = "goal event never fired inside %d ticks" % budget
 	out["ticks_used"] = bot.ticks
-	out["conservation_error"] = Invariants.check_item_conservation(boot["items"], 5)
+	out["conservation_error"] = Invariants.check_item_conservation(bot.items, 5)
 	return out
 
 
+## The `agent` field's bot, unattached; null when no bot is registered for it.
+static func bot_for(record: Dictionary) -> ColdStartBot:
+	match StringName(record.get("agent", "")):
+		&"cold_start":
+			return ColdStartBot.new(int(record.get("budget_ticks", 30000)))
+	return null
+
+
 ## Boot the world a record names. Returns {ok, reason, world, items, machines, iface, env, anchor}.
-static func _boot(record: Dictionary) -> Dictionary:
+static func boot(record: Dictionary) -> Dictionary:
 	var world_spec: Dictionary = record.get("world", {})
 	var site_id: StringName = StringName(world_spec.get("site", ""))
 	var site: Dictionary = StrataData.get_site(site_id)
