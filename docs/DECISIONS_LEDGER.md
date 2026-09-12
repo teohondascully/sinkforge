@@ -23678,3 +23678,22 @@ quantization bound with headroom, far under the stair the assertion exists to re
 metre+). Chose loosening the bound over re-deriving a tighter one because the semantic -- "a line, not
 a stair" -- is about metres, not the table's step size.
 Reverse: revert this diff; the old array is in history and re-breaks CI on purpose, per the note above it.
+
+## D0656 · 2026-09-12 · /tmp/lighting_bench_p036.png · the P036 capture the doubled palette still owed
+
+P036's option (1) shipped at `6c7d05b9` (D0630) on arithmetic alone; its own close-out named the
+`lighting_bench` capture "the remaining visual confirmation". Ran the bench headed -- NOT headless,
+the headless renderer is a dummy that saves blank frames (capture_moments.sh's header):
+`godot --path . -- --start=lighting_bench --warp=128,322 --fresh --muted --screenshot-tick=120
+--screenshot-out=/tmp/lighting_bench_p036.png` (D0570's record: 40 m chamber 60 m down, torch at one
+end, fuelled-end forge, bare hardrock the unlit floor of the range; boot `warped to feet cell
+(119,317)`, shutter at `body_cell=(120,313)`, zoom 2.00 -> 12 img px/cell, body at screen centre).
+5x5 mean luma off the PNG, the same instrument P036 used: lit rock peaks at **0.77** in the headlamp
+pool on the ceiling rock (img 1060,560) -- a frame the OLD palette could never paint, where the
+multiply capped at base 0.35 x veil<=1. Lit hardrock floor under the torch reads **0.60**, the
+chamber floor row **0.35-0.56** end to end, rock beside a source **0.42-0.60** against the old
+bench's 0.157. The doubled material bases land in the output; option (2)'s additive pass stays
+parked, per the entry's own condition -- the frame no longer reads flat at the sources.
+The capture is routine run output (EVIDENCE.md): left at the /tmp path, regenerable byte-for-byte
+from the command above on this commit; the numbers, not the PNG, are the record.
+Reverse: none -- a measurement, not a change.
