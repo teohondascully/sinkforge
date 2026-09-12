@@ -23044,3 +23044,19 @@ prefix and reported clean -- caught by the mutation test written alongside, befo
 trusted. Same story as D0115: the guard you haven't seen fail is a decoration.
 Reverse: remove `FORBIDDEN_AUTOLOAD_PREFIXES`/`autoload_violations` and the test file; the docstring
 reverts to an overclaim.
+
+## D0602 · 2026-09-11 · docs/QUALITY.md · the gate list now says which gates are gates
+Decided: each of the 37 numbered gates states its audited status inline. Amendments: gate 4's
+complexity clause marked measured-not-gated; gate 5 now cites the real enforcement point; gates 6, 10,
+14 marked no-enforcing-code; gate 12 rewritten to match ADR 0010's refusal policy (the "every
+historical version loads" text described a regime the project deliberately does not run); gates 15-16
+marked armed-but-empty-corpus; gates 17, 20, 21 reclassified as process rules; gate 18 rewritten --
+shared CI runners cannot carry a ms-budget gate, which is exactly the contention perf_fixture refuses
+to report on; gate 24's line now names the D0600 probe fix. The preamble's "every gate is CI-enforced"
+is replaced with the audited split: 24 enforced, 2 advisory, 9 no-code-or-process, 2 empty-corpus.
+Why: the 2026-09-11 fresh-eyes audit mutation-tested all 37 gates against the tree rather than the
+prose and found the count above. A list that says "gate" for a process rule makes the enforced set
+look bigger than it is -- the same stated-vs-measured gap this project's corrections file is full of.
+Not changed: no numbers renumbered (gate numbers are addresses), no claim removed -- reclassified
+entries keep their text with their status stated.
+Reverse: docs only.

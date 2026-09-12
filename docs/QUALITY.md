@@ -27,7 +27,7 @@ enforced right now"**: it enumerates this list programmatically, cross-reference
 `.github/workflows/harness.yml`, and reports NO-CODE, ADVISORY, PASS, or FAIL per gate — never a prose
 assertion. `docs/DECISIONS_LEDGER.md` D0143.
 
-Every gate below is intended to be CI-enforced. A PR that fails any gate does not merge. No gate is lowered to make CI green; that rule is itself a gate.
+Every gate below is intended to be CI-enforced **where enforcement is mechanical**. The 2026-09-11 audit (D0602) mutation-tested all 37 and found the honest split: 24 enforced, 2 advisory (gates 33, 37), 9 with no enforcing code or reclassified as process rules, 2 armed over an empty corpus (gates 15–16). Each gate's own line now states which it is. A PR that fails an enforced gate does not merge. No gate is lowered to make CI green; that rule is itself a gate.
 
 ### Structure
 
@@ -39,9 +39,9 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
    scope-expansion decision (which Python files start failing a gate that's never gated them, whether test
    code gets a different fence per D0106) deliberately left for a dedicated future item, not decided as a
    side effect of documenting the gap.
-4. **Function size.** No function over 50 lines. Cyclomatic complexity ≤ 10.
-5. **No global singletons.** No autoloads in `sim/`.
-6. **`MODULE.md` present and current** in every module directory.
+4. **Function size.** No function over 50 lines, enforced hard by `check_size_limits.py`. Cyclomatic complexity is **measured and reported, never gated** — `tools/quality_check/complexity.py` runs `continue-on-error` and self-describes "no gate"; the `≤ 10` number this line used to declare was never enforced anywhere (D0602).
+5. **No global singletons.** No autoloads in `sim/`. `tools/layer_lint/check_project_settings.py` fails on an `[autoload]` entry targeting `res://core/` or `res://sim/` — the declaration lives in `project.godot`, outside every file a `.gd` grep can see (D0601).
+6. **`MODULE.md` present and current** in every module directory. **Audited status: only the 100-line cap on found files is enforced** (`check_size_limits.py`); nothing checks presence per directory or currency of content, and `view/` ships zero `MODULE.md` files today (D0602).
 7. **Instrument LOC growth may not outpace game LOC growth.** A trailing-10-commit velocity check —
    `harness/ + experiment/ + tools/ + tests/`'s net line growth may not exceed 2x `core/ + sim/ + interface/
    + view/ + shell/`'s, once growth clears a floor. `tools/layer_lint/check_loc_ratio.py`. **The ABSOLUTE
@@ -92,30 +92,30 @@ Every gate below is intended to be CI-enforced. A PR that fails any gate does no
    `test_replay_determinism`'s own stub remains a standing mechanism check for the hash-and-replay
    plumbing itself, not this gate's subject.
 9. **Conservation.** Property test: over 10,000 random ticks with fuzzed commands, total material is conserved modulo declared sinks.
-10. **No softlock.** From any reachable state, the player can reach the surface.
-11. **Movement acceptance suite** green against the hostile chamber. See `docs/ARCHITECTURE.md` §9.
-12. **Save migration.** Every historical save version loads, tested against stored fixtures.
+10. **No softlock.** From any reachable state, the player can reach the surface. **Audited status: no enforcing code** — no suite asserts surface-reachability from arbitrary reachable states (D0602). The testable shape would be scoped ("from the deepest reachable point of the tutorial site, scripted ascent reaches row 0"), not the universal claim.
+11. **Movement acceptance suite** green against the hostile chamber. See `docs/ARCHITECTURE.md` §9. Enforced via `test_body_acceptance.gd`, `test_hostile_chamber.gd`, `test_movement_course.gd` in the suites job.
+12. **Save integrity.** Save envelopes are versioned; a version outside the supported set is refused by name and leaves live state untouched (`tests/test_save_game.gd`). Historical pre-pivot envelopes are deliberately refused, not migrated (`docs/adr/0010-data-codegen.md`'s sibling ruling, ADR 0010): there are no stored cross-version fixtures because there is no supported historical version to migrate from. The earlier text of this gate described a migration regime the project intentionally does not run (D0602).
 13. **Schema.** Every file in `data/` validates.
-14. **Coverage.** ≥ 85% line coverage on `core/` and `sim/`. `view/` and `shell/` exempt; chasing coverage in rendering code is theater.
+14. **Coverage.** ≥ 85% line coverage on `core/` and `sim/` remains the aspiration; **it has no enforcing code and cannot get one cheaply** — GDScript has no coverage instrumentation. The honest proxy in CI is gate 33's function-name ratchet, which is advisory (D0602).
 
 ### Claims
 
-15. **Every harness layer names a claim.** A check that cannot state which claim it serves does not merge. This is the single most important process gate in this document.
-16. **Every scenario names a claim.**
-17. **No claim regresses.** A change that moves a passing claim to failing fails the build and names the claim.
+15. **Every harness layer names a claim.** A check that cannot state which claim it serves does not merge. This is the single most important process gate in this document. Enforced by `check_claim_references.py` — which currently reports **VOID over an empty corpus** (zero scenarios, zero qualifying harness files), so the declared property asserts nothing today; only the 40-active-claim cap can fire (D0602).
+16. **Every scenario names a claim.** Same check, same empty-corpus caveat as gate 15 (D0602).
+17. **No claim regresses.** A change that moves a passing claim to failing fails the build and names the claim. **Process rule, not a CI gate** — claims are not executable artifacts in CI, so no machinery exists; enforcement is review (D0602).
 
 ### Performance
 
-18. **Benchmark scenarios within budget**, with a documented tolerance band for CI noise (15%).
-19. **Perf checks refuse to report on an unsuitable host.** A contended machine produces VOID, not PASS and not FAIL.
+18. **Benchmark timings are recorded; budgets are asserted locally, not in CI.** Shared CI runners cannot carry a ms-budget gate — that is exactly the contention `perf_fixture.py` refuses to report on. Suite timings are uploaded as the `suite-timing` artifact every run; scenario budgets are asserted through `tools/perf_fixture.py` verdicts on suitable hosts (D0602). The earlier "within budget in CI" reading was never enforced.
+19. **Perf checks refuse to report on an unsuitable host.** A contended machine produces VOID, not PASS and not FAIL. `tools/perf_fixture.py`; the refusal rules are mutation-tested in CI by `tools/test_perf_fixture.py`.
 
 ### Process
 
-20. **ADR required** for any change to: tick phase order, save schema, layer boundaries, the behavior primitive set, the determinism strategy, the four design rules, or the language decision.
-21. **Public API documented.** Every symbol in a module interface file has a doc comment stating contract and invariants.
+20. **ADR required** for any change to: tick phase order, save schema, layer boundaries, the behavior primitive set, the determinism strategy, the four design rules, or the language decision. **Process rule** — no mechanical check can know whether a diff "should" have shipped an ADR; enforcement is review (D0602).
+21. **Public API documented.** Every symbol in a module interface file has a doc comment stating contract and invariants. **Process rule** — nothing counts undocumented symbols today (D0602).
 22. **Generated data records are fresh.** Every `data/<kind>/generated.gd` matches what `tools/data_codegen/generate.py` would produce right now from its `data/<kind>/*.yaml` source. `tools/data_codegen/generate.py --check`, `docs/adr/0004-data-codegen.md`. Appended here rather than inserted near gate 13 ("Schema") — several gate scripts cite their own number in their own docstrings, and renumbering would make those citations wrong; gate numbers are addresses, same reason `docs/DECISIONS_LEDGER.md` entries are.
 23. **`docs/WORKING.md` is not stale.** Its stated "Last updated" date is not older than `HEAD`'s own commit date. `tools/layer_lint/check_working_freshness.py`. A proxy, not a guarantee — a session can bump the date without saying anything true — but it catches the specific, common failure of commits landing on top of a working-tree summary nobody touched.
-24. **The body never leaves the grid.** Its own collision box stays inside the grid's declared `[0,width)x[0,height)` extent every tick, not just along `HostileChamber`'s scripted traversal route. `tests/test_bounds_invariant.gd`, `docs/DECISIONS_LEDGER.md` D0055. Appended here rather than near gate 11 ("Movement acceptance suite") for the same reason gate 22 sits here — gate numbers are addresses.
+24. **The body never leaves the grid.** Its own collision box stays inside the grid's declared `[0,width)x[0,height)` extent every tick, not just along `HostileChamber`'s scripted traversal route. `tests/test_bounds_invariant.gd`, `docs/DECISIONS_LEDGER.md` D0055 — and per D0600, the edge-pressure probe inside that suite now asserts containment per tick, not just the report latch: the audit found that disabling `_enforce_grid_bounds`'s correction left this suite ALL PASS over a real out-of-bounds body until the probe learned to check. Appended here rather than near gate 11 ("Movement acceptance suite") for the same reason gate 22 sits here — gate numbers are addresses.
 25. **Movement acceptance covers the chamber's full reachable extent, not only the scripted route.** A real out-of-bounds launch found in play was invisible to gate 11's own scripted-input run because the traversal path and the reachable space are different sets. `tests/test_reachability_sweep.gd`, `docs/DECISIONS_LEDGER.md` D0055.
 26. **A goalless input fuzzer runs every commit, at a bounded fast size.** `ScriptedTraverse` proves one known route still works; it cannot find a defect that route never triggers (`docs/DECISIONS_LEDGER.md` D0055-D0059, four of which were exactly this). `tests/test_body_fuzz_fast.gd` (100 seeds x 500 ticks, ~5s) asserts six invariants hard-zero on every push/PR — `embedded`, `grounded_no_floor`, `overflow`, `discontinuity`, `deadlock`, `translation_consent` — but **this gate COVERS only the first five, and `translation_consent` is not one of them** (`docs/DECISIONS_LEDGER.md` D0280). The assertion is real and stays; its green is not evidence. The only mechanism in `sim/body` that can produce an unconsented translation is the ceiling corner nudge, and this fixture fires it **0 times in 50,000 ticks** on the fast window and **0 times in 1,500,000 ticks** on the full nightly sweep — measured, and printed on every run as `corner_corrections=` on the probe's own `FUZZ_SUMMARY` line, so the claim is re-checkable from any run's output rather than trusted from this sentence. Restoring the D0213 defect leaves this suite ALL PASS while `tests/test_corner_consent.gd` goes to 4 FAILURE(S) on the same tree, which is what "asserts it but cannot register it" means here. **The real coverage for that class is `tests/test_corner_consent.gd`**, which builds its own grid from constants and so poses the mechanic identically on every platform; `tests/test_shaft_replay_determinism.gd` asserts it a second time in a world that actually produces corner corrections, platform permitting. **`bounds` and `floor_selection` are counted and printed but NOT gated** (`docs/DECISIONS_LEDGER.md` D0241): under random input the body walks into the world edge constantly and the bounds clamp is the intended recovery, so a hard zero there would assert against the design rather than against a defect. A principled bound for `bounds` is downstream of the fuzz-population work (`docs/NEEDS_DIRECTOR.md` P001/P004). Until then this gate's claim is six asserted of eight counted — and, per D0280 above, five COVERED, which is the number that matters when this gate is cited as evidence; `tests/test_body_fuzz.gd` (the full 1000x1500 sweep) runs nightly and gates against a named, counted residual (`docs/DECISIONS_LEDGER.md` D0060/D0061) rather than a hard zero the known residual would otherwise make permanently red.
 27. **No untracked file exists outside the shipped `.gitignore`.** A local-only exclusion (`.git/info/exclude`, the global excludesfile) is invisible to a fresh clone; anything the project actually depends on staying hidden must be a real, tracked `.gitignore` pattern instead. `tools/layer_lint/check_untracked_files.py`, `docs/DECISIONS_LEDGER.md` D0062/D0063 — found fifteen real document paths, one of them 3,447 lines, hidden this way since before this gate existed.
