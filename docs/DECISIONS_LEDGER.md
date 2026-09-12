@@ -23264,3 +23264,13 @@ one row. Side fix: `_digit_down` used to read the driver directly and stayed liv
 deafened -- through `Controls.pressed` it deafens with everything else. The settings page's completeness
 test (every `defaults()` action listed) is the guard: the suite goes red if a future action is added
 without a row.
+
+## D0616 · 2026-09-11 · docs/WORKING.md, docs/archive/working/WORKING-2026-09-11.md · WORKING.md reset to 86 lines; the 931-line file is archived
+
+CONTEXT.md's contract is "current state, not a log ... 150 lines"; the file had grown to 931 by
+accumulating the overnight queue's phase detail, the performance programme's dated notes, and three
+generations of cleanup summaries. Same move as D0159: the full file is preserved verbatim at
+`docs/archive/working/WORKING-2026-09-11.md`, and the live page keeps the director's verbatim
+instructions, the queue's open items (21, 30, 39, 44, 45, 51, 52, the match loop), the current-stage
+paragraph, the 24-seat opening funnel, and pointers rather than copies for the programme detail.
+check_working_freshness passes; every link in the new page resolves.
