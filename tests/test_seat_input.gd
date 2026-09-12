@@ -36,6 +36,20 @@ func _seat() -> Main:
 	return main
 
 
+## A press through the live pipeline: the event is delivered in one tree iteration, then four sim
+## ticks run while it is still held so the tick's edge and the body's verbs read the settled state.
+func _press(main: Main, code: int) -> void:
+	Input.parse_input_event(_key(code, true))
+	await process_frame
+	for _i: int in 4:
+		main._physics_process(1.0 / 60.0)
+
+
+func _release(code: int) -> void:
+	Input.parse_input_event(_key(code, false))
+	await process_frame
+
+
 func _test_a_real_key_event_toggles_the_page_once_per_press() -> void:
 	var main: Main = _seat()
 	await process_frame
@@ -45,21 +59,13 @@ func _test_a_real_key_event_toggles_the_page_once_per_press() -> void:
 	var page: SettingsPage = main.stack.settings
 	_check(not page.open, "the page starts closed")
 	# K through the engine's own input pipeline -- the SETTINGS action's key (Controls.defaults).
-	Input.parse_input_event(_key(KEY_K, true))
-	await process_frame   # one tree iteration: the event is delivered, the action pressed, _unhandled_input ran
+	await _press(main, KEY_K)
 	_check(Input.is_action_pressed(Controls.SETTINGS), "the synthetic K press reached the InputMap action")
-	for _i: int in 4:
-		main._physics_process(1.0 / 60.0)
 	_check(page.open, "one K press opens the page exactly once (the tick's edge, not the callback)")
-	Input.parse_input_event(_key(KEY_K, false))
-	await process_frame
-	Input.parse_input_event(_key(KEY_K, true))
-	await process_frame
-	for _i: int in 4:
-		main._physics_process(1.0 / 60.0)
+	await _release(KEY_K)
+	await _press(main, KEY_K)
 	_check(not page.open, "the second press closes it -- exactly once")
-	Input.parse_input_event(_key(KEY_K, false))
-	await process_frame
+	await _release(KEY_K)
 	for _i: int in 4:
 		main._physics_process(1.0 / 60.0)
 	_check(not page.open, "...and it stays closed across further ticks (the D0446 double-toggle shape)")
@@ -74,32 +80,20 @@ func _test_escape_closes_once_and_a_routed_key_moves_the_page_cursor() -> void:
 		_check(false, "the seat boots headless")
 		return
 	var page: SettingsPage = main.stack.settings
-	Input.parse_input_event(_key(KEY_K, true))
-	await process_frame
-	for _i: int in 4:
-		main._physics_process(1.0 / 60.0)
+	await _press(main, KEY_K)
 	_check(page.open, "K opened the page")
-	Input.parse_input_event(_key(KEY_K, false))
-	await process_frame
+	await _release(KEY_K)
 	# ESC is bound to the same SETTINGS action and was D0446's re-toggle: the callback must NOT close it
 	# a second way. Under the defect the page ended this press OPEN again -- closed is the assertion.
-	Input.parse_input_event(_key(KEY_ESCAPE, true))
-	await process_frame
-	for _i: int in 4:
-		main._physics_process(1.0 / 60.0)
+	await _press(main, KEY_ESCAPE)
 	_check(not page.open, "ESC closes the open page -- once, not twice in one tick (D0446)")
-	Input.parse_input_event(_key(KEY_ESCAPE, false))
-	await process_frame
+	await _release(KEY_ESCAPE)
 	for _i: int in 4:
 		main._physics_process(1.0 / 60.0)
 	_check(not page.open, "...and it stays closed")
 	# Re-open, then a routed key: a real DOWN event lands in _unhandled_input -> HudBridge.key -> the cursor.
-	Input.parse_input_event(_key(KEY_K, true))
-	await process_frame
-	for _i: int in 4:
-		main._physics_process(1.0 / 60.0)
-	Input.parse_input_event(_key(KEY_K, false))
-	await process_frame
+	await _press(main, KEY_K)
+	await _release(KEY_K)
 	var row0: int = page.row
 	Input.parse_input_event(_key(KEY_DOWN, true))
 	await process_frame
