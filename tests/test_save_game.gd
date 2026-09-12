@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_dangling_winch_routes_reconcile_without_losing_cargo()
 	_test_write_is_durable_and_read_recovers()
 	_test_the_hotbars_gaps_survive_a_round_trip()
+	_test_the_rubble_bank_survives_a_round_trip()
 	_cleanup()
 	_finish("save_game")
 
@@ -59,6 +60,7 @@ func _lived_in() -> void:
 	items.pack.add(&"gear", 1)
 	items.produced(&"gear", 1)
 	items.drop_item(Vector2i(14, 1), &"gear", 1)               # no floor in column 14: the sink
+	items.yield_break([Vector2i(20, 20)], [ROCK])               # a plain cell: a sixteenth in the bank (D0621)
 	machines.place(world, MachineDef.of(&"hopper"), Vector2i(5, 3))
 	machines.place(world, MachineDef.of(&"processor"), Vector2i(5, 6))
 	machines.place(world, MachineDef.of(&"generator"), Vector2i(10, 8))
@@ -209,6 +211,32 @@ func _test_write_is_durable_and_read_recovers() -> void:
 	_check(SaveGame.read(SCRATCH).is_empty() and SaveGame.last_read == SaveGame.Read.CORRUPT, "damaged primary, no backup: CORRUPT, not a new player")
 	DirAccess.remove_absolute(SCRATCH)
 	_check(SaveGame.read(SCRATCH).is_empty() and SaveGame.last_read == SaveGame.Read.NONE, "nothing on disk: NONE")
+
+
+## THE SIXTEENTHS BANK SURVIVES A SAVE (D0621). Signed state since D0354 -- "it decides when the next
+## free block appears" -- yet the envelope never carried it until C003's bot happened to mine plain
+## rock. This leg guards the key directly: `yield_break` banks through the real mining path, so the
+## guard stands whether or not any scenario still digs.
+func _test_the_rubble_bank_survives_a_round_trip() -> void:
+	var i1: Items = _hub_items()
+	var m1: Machines = _hub_machines(i1)
+	i1.yield_break([Vector2i(20, 20)], [ROCK])
+	var unsigned: String = i1.state_signature()
+	i1.yield_break([Vector2i(20, 21)], [ROCK])
+	_check(i1.rubble_capture() == {ROCK: 2} and i1.state_signature() != unsigned,
+		"two sixteenths banked and the signature moved -- the bank is signed state (D0354)")
+	var env: Dictionary = SaveGame.capture(i1.world, i1, m1)
+	_check(env.get("rubble", {}) == {ROCK: 2}, "the envelope carries the bank")
+	var i2: Items = _hub_items()
+	var m2: Machines = _hub_machines(i2)
+	_check(SaveGame.restore(i2.world, i2, m2, env) and i2.rubble_capture() == {ROCK: 2},
+		"the bank came back -- a reload mid-block does not reset the count")
+	var old: Dictionary = env.duplicate(true)
+	old.erase("rubble")
+	var i3: Items = _hub_items()
+	var m3: Machines = _hub_machines(i3)
+	_check(SaveGame.restore(i3.world, i3, m3, old) and i3.rubble_capture().is_empty(),
+		"a save written before the key existed opens with an empty bank -- optional, not corrupt")
 
 
 func _cleanup() -> void:
