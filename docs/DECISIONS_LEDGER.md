@@ -23622,3 +23622,14 @@ says SURE, the skin swap reaches the theme, a closed page takes the tree down. `
 make: whether the CONTROL face itself looks 2026 -- that is the director's frame-pick, and the two
 skins are the ballots.
 Reverse: revert this diff; `SettingsDraw` is in history.
+
+## D0633 · 2026-09-12 · shell/seat_flags.gd · the skin default is PAPER -- the director's frame-pick, landed
+
+The director looked at both ballots D0632 shipped and picked the paper field-notebook -- while saying
+the reference's real trait is CLEANLINESS (typographic discipline), not parchment colour, so the skin
+lands as the default before its typeset pass does. The flag stays a capture flag, not a saved setting
+(`--skin=instrument` still reaches the dark plate): a player's skin is a design ruling, not a toggle,
+per the flag's own header.
+Alternative: keep instrument the default until the typeset pass proved out -- refused, because then the
+default-on captures everyone runs keep measuring the skin the director already ruled off.
+Reverse: CHEAP -- flip the one dictionary literal back.
