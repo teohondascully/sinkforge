@@ -23641,3 +23641,19 @@ Also at the cap: `_hud_keys`' `page_open` param was dead (dropped), and `boot()`
 to `_boot_report` -- `boot()` was 55 lines over a D0632 addition, now 46. Another track builds on
 this seam, so it landed early rather than at the next cap.
 Reverse: revert this diff; the dispatch is verbatim what main.gd ran.
+
+## D0654 · 2026-09-12 · tests/test_seat_input.gd, .github/workflows/harness.yml · the dispatch seam driven with real events
+
+Every suite touching the page's input called `HudBridge.key(page, KEY_*)` directly -- exactly the seam
+bug class D0446 lived in (ESC handled in `_unhandled_input` AND re-toggled by the HUD-key edge in one
+tick). `tests/test_seat_input.gd` boots the real seat headless (test_main_boot's pattern), pushes
+`InputEventKey`s through `Input.parse_input_event` -- the hardware pipeline, not a shortcut into the
+bridge -- and asserts the page toggles ONCE per press: K opens and closes on the tick's edge, ESC
+closes and stays closed, a real DOWN event routed through `_unhandled_input` moves the page cursor,
+and a held RIGHT under the open page is deaf to the body. `Input.is_action_pressed` is asserted after
+each synthetic press so the suite cannot pass vacuously over events that never landed. Mutation-tested
+by restoring the D0446 double-close in `SeatInput.unhandled`: 4 of 11 assertions fail, as they must.
+Registered in harness.yml's suite list with the annotation and the 160 -> 161 count bump the D0317
+gate reconciles. Chose `parse_input_event` over `Viewport.push_input` because the former walks the
+whole engine pipeline a hardware key takes; the latter starts at the viewport.
+Reverse: delete the suite and its three harness.yml lines.
