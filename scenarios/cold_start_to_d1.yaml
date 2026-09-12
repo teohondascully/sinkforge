@@ -1,0 +1,26 @@
+# C003's scenario record (docs/ARCHITECTURE.md §6's format). There is no loader yet --
+# harness/scenario is a skeleton layer -- so today this file is the FIXTURE the claim and the suite
+# agree on: `tests/test_cold_start_d1.gd` runs exactly this start, this goal, and this budget through
+# the real door (Interface.apply/observe), and its measurement lives in the claim's history table.
+# When the driver exists, it consumes this file rather than a second description of the same run.
+name: cold_start_to_d1
+claim: C003
+seed: 20260825              # the suite's boot seed -- WorldSeeder.load_world(SHALLOW_CLAY, seed)
+world:
+  site: shallow_clay
+  start: tutorial           # data/starts/tutorial.yaml, stamped over the generated site
+rig:
+  demands_satisfied: []     # cold: the whole ladder ahead
+  stockpile: {}
+player:
+  start_depth: 0            # the seeder's own spawn cell, nothing built, pack empty
+  pack: []
+envelope: constrained       # the claim's intent; no fog-filtered envelope exists yet. The suite runs
+                            # the oracle spatial window with a policy that reads only authored
+                            # positions and surface solidity -- nothing hidden.
+goal:
+  type: demand_satisfied    # the rig's stage advance, read off Machines.events -> o.events
+  id: d1                    # "Deliver 2 ingots to the rig" (data/progression)
+budget_ticks: 30000         # ~8 game-minutes; the scripted policy measured 414 (2026-09-11)
+assertions:
+  - invariants_hold         # the suite checks item conservation over the whole run

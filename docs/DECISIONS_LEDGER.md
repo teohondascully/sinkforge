@@ -23187,3 +23187,28 @@ floor_ambiguity, interface_verbs, tree_fall, reach, softlock_ascent suites all g
 terrain.
 Reverse: delete the two fixture lines in tutorial.yaml, regen, revert the two TASTE_QUEUE
 annotations.
+
+## D0609 · 2026-09-11 · tests/test_cold_start_d1.gd, scenarios/cold_start_to_d1.yaml, claims/C003-cold-start-reaches-d1.md, harness.yml · C003 made executable: a scripted bot reaches d1 in 414 ticks
+Decided: the claim's substance lands as a suite, not the skeleton harness stack -- harness/scenario
+and harness/driver are READMEs-only, and building them is a project of their own. The bot drives the
+real door exclusively: Interface.apply(MOVE frames carrying the mine hold) for every world-advancing
+tick, Command.mine/select/drop/collect for the verbs between, observe() for every read. The scenario
+record (scenarios/cold_start_to_d1.yaml) is the agreed fixture -- seed, site, start, goal, budget --
+that a future driver consumes rather than a second description. The claim goes PASSING at 414 ticks
+(~6.9 sim-s) with item conservation clean; first_failed_at populated from this commit's mutation run
+(the event kind renamed: every leg green, the claim red). Threshold deliberately unset -- a scripted
+floor is measured now, but a pacing threshold wants a human playthrough or a ruling, per the claim's
+own rule.
+Two judgment calls inside: (a) the oracle envelope stands in for the claim's `constrained` -- no
+fog-filtered envelope exists, and the policy reads only authored fixture positions plus surface
+solidity, so nothing hidden enters; the suite's docstring says so. (b) hop-on-stall, not
+always-hop -- the first run's permanently-hopping body ended four metres up a ledge and the drop
+refused out_of_reach; the walk hops only after twenty ticks without progress.
+Why: C003 was the audit's load-bearing blocked claim -- "nothing else on the game list is measurable
+until this exists". The rig transaction, economy records and the demand event all predated this;
+what was missing was the run itself.
+Verified: suite green (4 asserted), red under the event mutation, restored green. Gates 15-16 now
+report a nonzero corpus PASS (1 scenario file citing a proven claim) instead of VOID. Suite count
+check passes at 158.
+Reverse: delete tests/test_cold_start_d1.gd and scenarios/cold_start_to_d1.yaml, revert the claim
+file and the two harness.yml lines.
