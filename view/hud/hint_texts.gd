@@ -54,6 +54,7 @@ const MOMENTS: Array[Dictionary] = [
 	{"id": &"pump", "text": "PUMP IT — hold [REEL] at the bottom of the arc, [LOWER] at the top."},
 	{"id": &"chain", "text": "CHAIN IT — press [GRAPPLE] again in mid-air to plant the next line, and the speed you left with is the speed you keep."},
 	{"id": &"wrapped", "text": "THE LINE CAUGHT — it bent around the rock instead of through it. A short line whips you round harder."},
+	{"id": &"dig_plan", "text": "THE PLAN — those dashes mark cells for your pick: while you hold [MINE] it works the nearest dash in reach. Let go and the plan is forgotten."},
 	{"id": &"hard_landing", "text": "HARD LANDING — a long drop costs your footing. A line fired on the way DOWN takes the fall instead of your legs."},
 ]
 

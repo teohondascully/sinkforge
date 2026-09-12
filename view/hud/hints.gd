@@ -215,6 +215,7 @@ func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> 
 	note(&"in_water", o.wet)
 	_note_edge(o)
 	note(&"way_down", _way_down_wanted(o))
+	note(&"dig_plan", not o.dig_marks.is_empty())   # T030: the painted dashes get a name (D0477: a release forgets them)
 	note(&"deep_enough", float(MaterialLook.depth_m(o.cell.y)) >= DEPTH_HINT_M)
 	if o.grapple_live:
 		_thrown = true

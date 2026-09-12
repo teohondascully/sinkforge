@@ -34,7 +34,7 @@ func _test_the_acquisition_edge_fires_once_and_never_on_the_first_frame() -> voi
 	h.observe(_hint_obs([]), 0.016)
 	h.observe(_hint_obs([["torch", 1]]), 0.016)
 	_check(h.queued() == 0, "re-acquiring the torch does not re-queue it")
-	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 24, "nine pack lessons and twenty-four moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
+	_check(Hints.DEFS.size() == 9 and Hints.MOMENTS.size() == 25, "nine pack lessons and twenty-five moments (%d, %d)" % [Hints.DEFS.size(), Hints.MOMENTS.size()])
 
 
 ## D0436: the same slash held on open air teaches NOTHING THERE, on a longer count that a break restarts; the
@@ -137,6 +137,18 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	h.observe(fall, 0.016)
 	h.observe(_hint_obs(), 0.016)
 	_check(h.active_id() == &"hard_landing", "a terminal landing fires the hard-landing lesson (%s)" % h.active_id())
+	for _i: int in 30:
+		h.observe(fall, 0.5)
+	# T030: the first painted dashes get a name while they live (the hold); a second plan does not re-teach.
+	var planned: Interface.Observation = _hint_obs()
+	planned.dig_marks = [Vector2i(4, 5), Vector2i(5, 5)]
+	h.observe(planned, 0.016)
+	_check(h.active_id() == &"dig_plan", "first dig marks fire the plan lesson (%s)" % h.active_id())
+	for _i: int in 30:
+		h.observe(planned, 0.5)
+	h.observe(_hint_obs(), 0.016)
+	h.observe(planned, 0.016)
+	_check(h.active_id() != &"dig_plan", "a second dig plan does not re-teach (%s)" % h.active_id())
 
 
 func _test_busy_freezes_and_hides_and_the_ceremony_holds() -> void:

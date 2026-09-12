@@ -227,10 +227,16 @@ green block appear beside the ingots, and believed it was wood; the counter stay
 beside the miner as it lands in the pack?* The payout tick now says "+1 sapling" / "-7 ore"; the hotbar's
 label is unchanged. The director may still want a name on hover as well.
 
-**T030 · The drag paints a dig plan a stranger cannot name.** Holding MINE while the pointer moves marks
-cells for later digging (legacy's plan); the second stranger left yellow dashes on distant canopies and a
-trunk and had no word for them or a way to clear them it knew (D0423). *Question: gate the plan behind a
-modifier, teach it as a lesson when the first dash lands, or make CLEAR_PLAN a visible control?*
+**T030 · The drag paints a dig plan a stranger cannot name.** *TAKEN provisionally (D0611): a lesson
+names the dashes when the first one lands. "THE PLAN — those dashes mark cells for your pick: while you
+hold [MINE] it works the nearest dash in reach. Let go and the plan is forgotten." The moment fires on
+the first nonempty `dig_marks` and latches once. D0477 already makes a release clear the whole plan, so
+the lesson teaches "let go" rather than a CLEAR key the stranger also had no word for; the modifier gate
+and the visible CLEAR_PLAN control remain open if naming proves insufficient.* Holding MINE while the
+pointer moves marks cells for later digging (legacy's plan); the second stranger left yellow dashes on
+distant canopies and a trunk and had no word for them or a way to clear them it knew (D0423). *Question:
+gate the plan behind a modifier, teach it as a lesson when the first dash lands, or make CLEAR_PLAN a
+visible control?*
 
 **T031 · TAKEN 2026-09-06, provisionally (D0434): two metres of clay cap the mouth in the tutorial start; two record lines reverse it.** The shaft beside the pad swallows a stranger who walks right for two seconds. The third
 stranger, beside the forge with the smelt rung open, pressed D for 120 ticks and stood 22 m down THE

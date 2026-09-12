@@ -23222,3 +23222,13 @@ art inside a port -- but the port is done and the material is NAMED copper. Warm
 cool blue-white). Verified: test_wall_lode 173 asserted, worst ore/host plane-separation 0.314 against
 a 0.30 floor; data_codegen clean. Provisional per the taste-queue convention -- the director overrules
 by reverting one yaml line.
+
+## D0611 · 2026-09-11 · view/hud/hint_texts.gd, view/hud/hints.gd, tests/test_hints.gd, docs/TASTE_QUEUE.md · T030 taken provisionally: a lesson names the dig plan on the first dash
+
+T030's three options were: gate the plan behind a modifier, teach it as a lesson when the first dash
+lands, or make CLEAR_PLAN a visible control. Chose the lesson. The system's moments exist for exactly
+this shape (a state edge the player cannot name), and D0477 already makes a MINE release clear the
+whole plan -- so the honest teaching is "let go and the plan is forgotten", not a CLEAR key the second
+stranger also had no word for. The moment `dig_plan` fires on the first nonempty `o.dig_marks` and
+latches once; mutation-tested (suppressed note -> the suite's new asserts fail). The modifier gate and
+the visible CLEAR_PLAN control stay open if naming proves insufficient.
