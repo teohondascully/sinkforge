@@ -1,11 +1,11 @@
 # Working state
 
-**Last updated: 2026-09-12 (visual queue arc landed. Queue 30 falling leaves `b6a258cd`; queue 39
-diegetic depth/band as a minimap ruler `6f9abfb3`; queue 49's moving-camera leg instrumented —
-`--pan` sweeps the real `CameraRig` (`e8e68941`), strips held on both axes. Earlier: all-37 gate
-verdicts in `docs/audits/2026-09-11-gate-reconciliation.md` (30 ENFORCED / 3 ADVISORY / 4 NO-CODE /
-0 CANNOT-FAIL); C003's yaml-driven scenario driver (ed4efd99) plus mid-run checkpoint/resume
-(de9fea2b, which caught the `_rubble` save gap, 95bfb37a). The 931-line predecessor is archived at
+**Last updated: 2026-09-12 (route + terrain arc landed and PUSHED. Queue 44's seat route `6cb107db`;
+`trees-footing-and-crowns` landed `9daf1223` (D0626/D0627, renumbered from the branch's colliding
+D0600/D0601) — trees refuse broken ground, six lobed crowns; the `_rubble` bank got a direct save-suite
+guard `abef1778`. CI green on HEAD (run 34706318299). Earlier: all-37 gate verdicts in
+`docs/audits/2026-09-11-gate-reconciliation.md` (30 ENFORCED / 3 ADVISORY / 4 NO-CODE / 0 CANNOT-FAIL);
+C003 executable with mid-run checkpoint/resume. The 931-line predecessor is archived at
 `docs/archive/working/WORKING-2026-09-11.md`.)**
 
 **THE DIRECTOR'S INSTRUCTIONS, VERBATIM, because they are the whole shape of the run:**
@@ -63,7 +63,8 @@ end, a self-dug pit. Reports under [playtests](playtests/).
 
 P008 (public module interfaces / reach-in), P014 (MODULE.md headroom), P038/P044 (queue items 51/52),
 the C003 pacing threshold, the `history/` image cull (168 vs cap 12 — the director's own call per
-`history/README.md`). No completed CI run has been observed for HEAD; remote outcomes unconfirmed.
+`history/README.md`), P046 (tree density knob). CI ran on HEAD `abef1778` 2026-09-12 (run
+34706318299): all 160 suites, structural gates, headed boot, authorship — green.
 
 ## Standing items
 
