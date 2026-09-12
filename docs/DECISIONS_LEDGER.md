@@ -23622,3 +23622,22 @@ says SURE, the skin swap reaches the theme, a closed page takes the tree down. `
 make: whether the CONTROL face itself looks 2026 -- that is the director's frame-pick, and the two
 skins are the ballots.
 Reverse: revert this diff; `SettingsDraw` is in history.
+
+## D0653 · 2026-09-12 · shell/seat_input.gd, shell/main.gd · the seat's input dispatch on its own seam
+
+`shell/main.gd` was absorbing boot, the tick, camera, screenshots AND every input path. Extracted the
+dispatch half into `shell/seat_input.gd` as `SeatInput`, a RefCounted of statics taking `main` -- the
+same shape SeatSession/SeatHud/SeatDrive already use, chosen over a child Node receiving
+`_unhandled_input` itself because every shell/ split so far is that shape and a runtime-added child
+would also need `owned=false` care under `find_child`. What moved: which modal is open (`page_open`,
+`map_open`, `scripted`), the hands read deaf while one is (`read_hands`), the HUD-key edges
+(`hud_keys`, `hud_keys_driven`), the scripted hand's `pressed` Callable, `_unhandled_input`'s routing
+to `HudBridge.key`/`finish_capture`, and the click route -- `settings_ctl`'s `payload` signal now
+wired by `SeatInput.wire_page` to the same `HudBridge.apply` then verb path a key takes. The single
+mutation path is unchanged. `_unhandled_input`, `_game_verb` and `_digit_down` keep one-line
+delegates on the node because the engine names the callback there and the suites name the other two
+(`test_settings_live` calls `main._game_verb`, `test_main_boot` calls `Main._digit_down`).
+Also at the cap: `_hud_keys`' `page_open` param was dead (dropped), and `boot()`'s report tail split
+to `_boot_report` -- `boot()` was 55 lines over a D0632 addition, now 46. Another track builds on
+this seam, so it landed early rather than at the next cap.
+Reverse: revert this diff; the dispatch is verbatim what main.gd ran.
