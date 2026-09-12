@@ -77,8 +77,8 @@ func _test_the_two_materials_exist_with_legacys_look() -> void:
 	_check(WorldMaterials.exists(&"wood") and WorldMaterials.exists(&"leaves"), "wood and leaves are material records")
 	var wood: Dictionary = MaterialsRecords.RECORDS.get("wood", {})
 	var leaves: Dictionary = MaterialsRecords.RECORDS.get("leaves", {})
-	_check(wood.get("base_color", []) == [0.42, 0.28, 0.16] and leaves.get("base_color", []) == [0.18, 0.40, 0.23],
-		"their colours are legacy's wood.tres and leaves.tres")
+	_check(wood.get("base_color", []) == [0.84, 0.56, 0.32] and leaves.get("base_color", []) == [0.36, 0.8, 0.46],
+		"their colours are legacy's wood.tres and leaves.tres, doubled by P036's palette step (D0630)")
 	_check(not WorldMaterials.is_ore_like(&"wood") and not WorldMaterials.is_soil(&"leaves"), "neither is ore-like, leaves are not soil")
 	_check(WorldMaterials.hardness(&"leaves") < WorldMaterials.hardness(&"clay") and WorldMaterials.hardness(&"wood") > WorldMaterials.hardness(&"clay"),
 		"leaves cut faster than clay and wood slower, as legacy's seconds had it (%.2f, %.2f, %.2f)"

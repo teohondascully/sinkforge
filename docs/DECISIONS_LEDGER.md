@@ -23657,3 +23657,24 @@ Registered in harness.yml's suite list with the annotation and the 160 -> 161 co
 gate reconciles. Chose `parse_input_event` over `Viewport.push_input` because the former walks the
 whole engine pipeline a hardware key takes; the latter starts at the viewport.
 Reverse: delete the suite and its three harness.yml lines.
+
+## D0655 · 2026-09-12 · tests/fixture_shaft_golden.gd, tests/test_tree_pass.gd, tests/test_rock_laminae.gd · the re-pin the queue's worldgen commits owed (D0167's route)
+
+The queue's commits ahead of main (D0628's strata/materials, D0629's shared bedding warp, D0631's lip
+mantle) legitimately moved `test_shaft_replay_determinism`'s golden from checkpoint **0** -- the
+generation-change shape, not a regression. By D0167/D0388's protocol: pushed `repin/shaft-replay-golden`,
+opened draft PR #53, let CI's pinned Linux build print the mismatch dump (run 34721500632), spliced its
+200-hash sequence in. Discriminators read off that run, not assumed: two OS processes bit-identical (-1),
+seed+1 diverges at 0, coverage `jumps=833 mantles=0 stepups=0 digs=345 corner_ok=5 corner_unconsented=0`
+identical to the prior pin (the path is unchanged; the world under it differs). CI's dump equalled the
+local macOS dump ELEMENTWISE at 200/200 before splicing; the spliced file then passed locally 21/21.
+The same run failed two sibling pins the same commits moved, re-pinned here: `test_tree_pass`'s colour
+expectations (P036 doubled the palette -- `[0.42,0.28,0.16]` -> `[0.84,0.56,0.32]` and
+`[0.18,0.40,0.23]` -> `[0.36,0.8,0.46]`, label updated to say so) and `test_rock_laminae`'s per-cell
+dip bound: P044 put `bedding_metres` on `Angle.sin_milli`'s 256-entry table so the tone and the
+generator's contacts read THE SAME line, quantizing a single-cell step at ~0.148 m (identical on both
+platforms -- integer table math is portable by construction). Re-pinned `< 0.1` to `< 0.2`: above the
+quantization bound with headroom, far under the stair the assertion exists to refuse (a full bed is a
+metre+). Chose loosening the bound over re-deriving a tighter one because the semantic -- "a line, not
+a stair" -- is about metres, not the table's step size.
+Reverse: revert this diff; the old array is in history and re-breaks CI on purpose, per the note above it.
