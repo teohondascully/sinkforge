@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_test_the_frame_fits_the_aspect()
 	_test_the_texture_rebuilds_only_on_a_new_version()
 	_test_the_overlays_land_by_the_scale()
+	_test_the_chart_carries_its_own_depth_scale()
 	await _test_a_real_observation_carries_the_plane()
 	_finish("minimap")
 
@@ -127,6 +128,45 @@ func _test_the_overlays_land_by_the_scale() -> void:
 	m.large = true
 	_check(bool(m.layout(f)["large"]) and (m.layout(f)["rect"] as Rect2).size.x > rect.size.x, "large: the big frame")
 	_check(m.layout(null).is_empty(), "no frame, nothing")
+
+
+## Queue item 39: the ruler is the diegetic answer -- the player's own survey chart carries the depth
+## scale. Asserted on the marks as DATA (which metres, which y, which colour), because a line drawn at
+## the wrong row is a readable failure and a missing one is not.
+func _test_the_chart_carries_its_own_depth_scale() -> void:
+	var m: Minimap = Minimap.new()
+	var look: MaterialLook = MaterialLook.new()
+	var f: Frame = Frame.new()
+	f.obs = _obs(Vector2i(64, 300))
+	f.obs.pos_x = 32 * 16 * S
+	f.obs.pos_y = 200 * 16 * S     # 200 m down: corner window 176..224 logic rows = 156..204 m
+	f.look = look
+	var l: Dictionary = m.layout(f)
+	var ruler: Array = l["ruler"]
+	var rect: Rect2 = l["rect"]
+	var ticks: Array = ruler.filter(func(t: Dictionary) -> bool: return not t.has("seam"))
+	var seams: Array = ruler.filter(func(t: Dictionary) -> bool: return t.has("seam"))
+	_check(ticks.map(func(t: Dictionary) -> int: return int(t["m"])) == [160, 170, 180, 190, 200],
+		"a nub every ten metres through the window (%s)" % str(ticks.map(func(t: Dictionary) -> int: return int(t["m"]))))
+	_check(seams.size() == 1 and int(seams[0]["m"]) == 200 and String(seams[0]["name"]) == "THE SEAL",
+		"and the one band boundary in view is the seal's, at its own metre (%s)" % str(seams))
+	if not seams.is_empty():
+		_check(_close(seams[0]["color"], look.band_color(880)),
+			"the seam is the band's own colour, not a generic line (%s vs %s)" %
+			[str(seams[0]["color"]), str(look.band_color(880))])
+	_check(ticks.all(func(t: Dictionary) -> bool: return rect.position.y < float(t["y"]) and float(t["y"]) < rect.end.y),
+		"every mark lands inside the chart")
+	# The surface datum itself is a mark: a body at 0 m sees the 0 m seam the bands start from.
+	var top: Frame = Frame.new()
+	top.obs = _obs(Vector2i(64, 300))
+	top.obs.pos_x = 32 * 16 * S
+	top.obs.pos_y = 44 * 16 * S    # window 20..68 logic rows = 0..48 m: seams at the datum, 10, 24, 40
+	top.look = look
+	var shallow: Array = (m.layout(top)["ruler"] as Array).filter(func(t: Dictionary) -> bool: return t.has("seam"))
+	_check(shallow.map(func(t: Dictionary) -> int: return int(t["m"])) == [0, 10, 24, 40],
+		"at the surface the chart rules off the datum itself (%s)" % str(shallow.map(func(t: Dictionary) -> int: return int(t["m"]))))
+	_check((Minimap.ruler_marks(null, rect, Rect2(0, 0, 64, 48), Vector2.ONE)).is_empty(),
+		"and no palette is no ruler rather than a crash")
 
 
 func _test_a_real_observation_carries_the_plane() -> void:

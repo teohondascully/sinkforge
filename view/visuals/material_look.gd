@@ -112,6 +112,12 @@ func band_color(row: int) -> Color:
 	return _to_color(band_at(row)["color"])
 
 
+## The ladder itself, sorted shallow -> deep. `band_at` answers for one row; this answers for the
+## BOUNDARIES, which is the question the minimap's depth ruler asks (queue item 39).
+func bands() -> Array[Dictionary]:
+	return _bands
+
+
 ## Metres below the surface datum. Negative above it, deliberately, exactly as legacy: "standing on a
 ## hilltop reads as a negative depth rather than a clamped zero, so the number is never fudged."
 static func depth_m(row: int) -> int:

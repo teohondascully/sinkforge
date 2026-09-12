@@ -23346,3 +23346,26 @@ via the same delta gate WaterDrips uses.
 against a posed crown (plus bare-ground control, view cull, zero-delta, cap) -- the D0595 rule that
 counting particles cannot catch an emitter firing from the wrong cells. Mutation witness: suppressing
 the emit turns five checks red.
+
+## D0623 · 2026-09-11 · view/hud/minimap.gd, view/visuals/material_look.gd, tests/test_minimap.gd · queue item 39's provisional take: the survey chart rules itself
+
+"A diegetic depth and band indicator" is one line with no options written, so the fork is recorded
+here rather than silently picked:
+
+**Taken provisionally -- the map rules itself.** The minimap is the player's own survey instrument
+(the fiction's own object), so the diegetic answer that invents nothing is a depth ruler on the chart:
+a nub every ten metres down the left edge, and a hairline at each band boundary in that band's own
+colour with its depth in metres beside it -- the seam drawn where the band colour CHANGES, which is
+the half the painted bands alone cannot say. The 0 m datum is a mark too: the chart rules off the
+surface itself. `MaterialLook.bands()` is the small public accessor the ruler needed (the ladder was
+private); the marks are layout data in the established `layout()`/`paint()` split, asserted on
+which-metres-which-y rather than on pixels drawn.
+
+**The fork this does NOT take, left for the director:** marks IN the world -- surveyor's ticks on
+dug wall faces at metre intervals -- would be the stronger diegetic answer but invents fiction
+(who marked them?) and belongs with queue item 52's layer-contacts work, where a real strata seam in
+the rock would make the terrain itself the band indicator. The two compose: the chart rules in metres
+now, and if the world later reads its own seams the chart still does not lie.
+
+**Mutation witness:** suppressing the seam emission turns the boundary asserts red; the tick/nub
+asserts pin the continuous scale the same way.

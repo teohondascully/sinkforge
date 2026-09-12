@@ -51,6 +51,17 @@ const SEEN_ORE_DARKEN: float = 0.30   ## a seen ore cell on the map: the ore fam
 const MAP_DESATURATE: float = 0.55    ## how far the ladder's band colours pull toward grey on the chart
 const YOU_COLOR := Color(0.97, 0.86, 0.36)
 const VIEW_COLOR := Color(1.0, 1.0, 1.0, 0.55)
+## THE CHART'S OWN DEPTH SCALE (queue item 39). The map is the player's survey instrument, so depth
+## belongs on IT rather than only on the HUD chip: a nub every RULER_TICK_M metres down the left edge
+## for a continuous scale, and a hairline across the whole chart at each band boundary in that band's
+## own colour with its depth beside it. The bands already paint as colours; the seam line is where the
+## colour CHANGES, which is the half a colour alone cannot say.
+const RULER_TICK_M: int = 10
+const RULER_TICK_PX: float = 3.0
+const RULER_ALPHA: float = 0.38
+const RULER_SEAM_ALPHA: float = 0.55
+const RULER_SIZE: int = 7
+const SURFACE_M: int = MaterialLook.SURFACE_ROW / MaterialLook.CELLS_PER_METRE   ## the datum in logic rows
 
 var shown: bool = true
 var large: bool = false
@@ -225,7 +236,35 @@ func layout(frame: Frame) -> Dictionary:
 			dots.append(rect.position + (Vector2(cell) - window.position) * scale)
 	return {"rect": rect, "scale": scale, "window": window, "you": rect.position + (body - window.position) * scale,
 		"view": view_rect.intersection(rect) if view.size.x > 0.0 else Rect2(), "dots": dots,
-		"dot": Vector2(maxf(scale.x, 2.0), maxf(scale.y, 2.0)), "large": large}
+		"dot": Vector2(maxf(scale.x, 2.0), maxf(scale.y, 2.0)), "large": large,
+		"ruler": ruler_marks(frame.look, rect, window, scale)}
+
+
+## The ruler's ticks and seams as data (depth_chip.gd's layout rule: the paint transcribes, the
+## decisions are all here). `window` is in logic cells and a logic cell IS a metre, so a depth in
+## metres is the logic row less the surface datum -- `MaterialLook`'s own conversion, re-expressed
+## rather than duplicated. A 10-metre nub carries only its depth; a seam carries the band's colour and
+## name too, so the label question stays one paint line rather than a second decision list.
+static func ruler_marks(look: MaterialLook, rect: Rect2, window: Rect2, scale: Vector2) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if look == null or scale.y <= 0.0:
+		return out
+	var top_m: int = int(floor(window.position.y)) - SURFACE_M
+	var bottom_m: int = int(ceil(window.end.y)) - SURFACE_M
+	var y_of := func(m: float) -> float:
+		return rect.position.y + (m + SURFACE_M - window.position.y) * scale.y
+	var m: int = top_m - posmod(top_m, RULER_TICK_M)
+	while m <= bottom_m:
+		if m > 0 and m >= top_m:
+			out.append({"y": y_of.call(m), "m": m})
+		m += RULER_TICK_M
+	for band: Dictionary in look.bands():
+		var fm: int = int(band["from_m"])
+		if fm >= 0 and fm >= top_m and fm <= bottom_m:
+			out.append({"y": y_of.call(fm), "m": fm, "seam": true,
+				"name": String(band.get("display_name", "")),
+				"color": look.band_color((fm + SURFACE_M) * MaterialLook.CELLS_PER_METRE)})
+	return out
 
 
 func paint(frame: Frame, ci: CanvasItem) -> void:
@@ -241,6 +280,18 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 	var tex: ImageTexture = ensure_texture(frame.obs, frame.look)
 	if tex != null:
 		ci.draw_texture_rect_region(tex, rect, l["window"])   # one texel per logic cell: the window IS the region
+	var font: Font = ThemeDB.fallback_font
+	for t: Dictionary in l["ruler"]:
+		var ty: float = t["y"]
+		if t.has("seam"):
+			var seam: Color = t["color"]
+			ci.draw_line(Vector2(rect.position.x, ty), Vector2(rect.end.x, ty),
+				Color(seam, RULER_SEAM_ALPHA))
+			ci.draw_string(font, Vector2(rect.position.x + UiTheme.px(3.0), ty + UiTheme.pt(RULER_SIZE) + UiTheme.px(1.0)),
+				"%d m" % int(t["m"]), HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.pt(RULER_SIZE), seam)
+		else:
+			ci.draw_line(Vector2(rect.position.x, ty), Vector2(rect.position.x + UiTheme.px(RULER_TICK_PX), ty),
+				Color(UiTheme.UI_TEXT, RULER_ALPHA))
 	for d: Vector2 in l["dots"]:
 		ci.draw_rect(Rect2(d, l["dot"]), UiTheme.UI_ACCENT)
 	var view: Rect2 = l["view"]
