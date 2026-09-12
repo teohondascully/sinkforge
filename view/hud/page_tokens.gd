@@ -106,6 +106,14 @@ static func make_theme(tokens: Dictionary) -> Theme:
 	_button_type(t, "Chip", tokens)
 	_button_type(t, "ChipWarn", tokens, true)
 	_slider_type(t, tokens)
+	# A custom type name is INVISIBLE to the theme lookup until its base is declared -- without these,
+	# a "PagePlate" PanelContainer resolves straight to the class's default panel (verified on a
+	# capture: the plate drew the stock translucent panel, not this fill).
+	t.set_type_variation("PagePlate", "PanelContainer")
+	t.set_type_variation("PageRail", "PanelContainer")
+	t.set_type_variation("RailTab", "Button")
+	t.set_type_variation("Chip", "Button")
+	t.set_type_variation("ChipWarn", "Button")
 	return t
 
 
