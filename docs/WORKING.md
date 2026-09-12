@@ -472,6 +472,44 @@ nothing and saved most of a night.
          already dips its tone bands +/-6 m; the tone dips and the material does not. Two-line fix,
          gated on a cross-platform golden re-pin, so it is the director's call.
 
+### Phase 5b -- THE TREES (director, 2026-09-11: *"notice how trees randomly spawn on flat
+platforms over shafts"*)
+
+**Both items change TERRAIN CELLS, not a painter -- a canopy is `leaves` in the grid and a trunk is
+`wood` -- so both are world-GENERATION changes and both need the same cross-platform golden re-pin
+(`tests/fixture_shaft_golden.gd`, the draft-PR route of D0388). One re-pin covers both. That is the
+argument for doing them together, and the reason item 52 should ride the same re-pin if it is ruled.**
+
+- [~] 53 **BUILT (D0601), awaiting its capture and the golden re-pin. THE TREES WERE LOLLIPOPS.** Every tree in the world is the same ellipse on the same straight
+         stick. `TreePass.geometry` computes `rx`/`ry` ONCE per world from the site record -- from
+         `shallow_clay.yaml`'s `canopy_w_m: 3.0` / `canopy_h_m: 2.5` that is rx=6, ry=5, a 13x11 cell
+         ellipse -- and `_canopy` draws that same integer ellipse at every tree; the trunk is a straight
+         `trunk_w_m: 0.5` = 2-cell column. The ONLY thing that differs between two trees is trunk height,
+         `trunk_min_m: 2` to `trunk_max_m: 3`: one of two values. `BeddingTone.foliage_tone` (D0584)
+         already gives each individual its own green; the shape is what is left. Now that the stars draw
+         and the grass softened the ground line this is the most 2016 thing on the surface.
+- [~] 54 **BUILT (D0600), awaiting the golden re-pin. A TREE'S FOOTING WAS TESTED AT ONE CELL, AND THE TRUNK IS WIDER THAN THAT (director-reported).**
+         `TreePass.plant` accepts a column on `grid.is_solid(Vector2i(col, surface[col]))` -- one column,
+         one cell -- and then `plant_one` writes wood across `col .. col + trunk_w - 1` at that same row.
+         The second trunk column is never tested, and nothing is tested deeper than a single cell. The
+         rifts, sinkholes and caverns all run BEFORE the tree pass and are refused only within `cave_band`
+         of the surface, so the lid they leave is exactly what a tree gets planted on. Measured on the
+         shipped seed 20260826, per root column, as solid cells straight down before the first open one:
+         `25/26 -> 79/78`, `37/38 -> 67/67`, **`56/57 -> 1/0`**, **`69/70 -> 1/1`**, **`214/215 -> 175/0`**.
+         A lid of 0 is a trunk column standing on an open cell; 214/215 is ONE tree with one half in 175
+         cells of rock and the other half over a void. `min_lid=0` in four of eight seeds sampled.
+         **FIXED:** `_footed` tests every trunk column for the whole `cave.min_depth_cells` band -- the
+         ground every other carve pass in the generator already refuses to break, so the depth is derived
+         and not picked. After: `thin_lid_le8 = 0` on all eight seeds and `min_lid >= 24` with two seeds
+         landing exactly ON the band. Three mutations witnessed, each firing its own guard alone.
+         The density cost is measured and is NOT the depth: old 34 trees over eight worlds, 30 once the
+         far trunk column is tested at all, 28 at two cells, 27 at the full band. The shipped seed is the
+         unlucky draw at 5 -> 2, which is P046.
+- [ ] 55 **THE TRUNK IS STILL A STRAIGHT STICK.** D0601 gave the canopy six shapes; the trunk underneath
+         it is an unbroken 2-cell column of `wood`, perfectly vertical, identical at every tree. If the
+         crowns are not enough on the frame, the lean is the next lever -- and it is more work than the
+         crown was, because `_blocked` and `TreeFall.unsupported_leaves` both assume a straight trunk.
+
 ### Phase 9 -- VERIFY
 
 - [ ] 44 Opus playthrough again, same route as item 1. The only honest test of phases 1-5.
