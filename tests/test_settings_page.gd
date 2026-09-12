@@ -104,8 +104,10 @@ func _test_the_geometry_and_the_rise() -> void:
 	_check(lines.size() >= 2, "a long sentence wraps at the plate's width (%d lines)" % lines.size())
 
 
-## The modal as a real tree (D0632): the shell builds around the model, faces materialize per
-## category, and the payloads the painter's hit-rects spoke now come off real control signals.
+## The modal as a real tree (D0632), re-cut typeset (D0634): the shell builds around the model, faces
+## materialize per category, the head is an overline over a display title over a rule, every row sits
+## on a hairline, the plate hugs its content, and the payloads the painter's hit-rects spoke now come
+## off real control signals.
 func _test_the_control_tree_is_the_page() -> void:
 	var page: SettingsPage = SettingsPage.new()
 	page.state = _state()
@@ -125,6 +127,22 @@ func _test_the_control_tree_is_the_page() -> void:
 	for _i: int in 3:
 		await process_frame
 	_check(ctl.visible and is_equal_approx(page.ease(), 1.0), "an open page raises a visible tree")
+	var overline: Label = ctl.find_child("overline", true, false)
+	var title: Label = ctl.find_child("title", true, false)
+	_check(overline != null and overline.text == "SETTINGS" and title != null and title.text == "Audio"
+		and ctl.find_child("head_rule", true, false) != null,
+		"the head typesets itself: tracked overline, the category as display title, a rule under it")
+	_check((overline.get_theme_font("font") as FontVariation).spacing_glyph > 0
+		and (title.get_theme_font("font") as FontVariation).variation_embolden > 0.0,
+		"the fake-it hierarchy is real: the overline is tracked, the title emboldened")
+	_check(is_zero_approx(plate.custom_minimum_size.y),
+		"the plate hugs content -- no authored height floor to float an empty lower half")
+	var wrap0: Control = ctl._focusables[0].get_meta("ring")
+	var ruled: bool = false
+	for k: Node in (wrap0.get_child(0) as Container).get_children():
+		if (k as Control).theme_type_variation == &"PageRule":
+			ruled = true
+	_check(ruled, "every row sits on a PageRule hairline, not a filled box")
 	var sliders: Array = ctl.find_children("*", "HSlider", true, false)
 	var chips: Array = ctl.find_children("*", "Button", true, false)
 	_check(sliders.size() == 4 and chips.size() == SettingsPage.RAIL_ORDER.size() + 1,
@@ -161,6 +179,9 @@ func _test_the_control_tree_is_the_page() -> void:
 	_check((ctl.theme.get_stylebox("panel", "PagePlate") as StyleBoxFlat).bg_color.is_equal_approx(PageTokens.PAPER["plate"])
 		and plate.theme_type_variation == &"PagePlate",
 		"the paper skin reaches the theme the plate draws from")
+	_check((ctl._detail as Label).get_theme_color("font_color").is_equal_approx(PageTokens.PAPER["ink_faint"])
+		and (ctl._foot as Label).get_theme_color("font_color").is_equal_approx(PageTokens.PAPER["ink_faint"]),
+		"the note ink rides the swap whole -- the capture's stale-INSTRUMENT-ink bug cannot recur (D0634)")
 	page.open = false
 	for _i: int in 40:
 		page.advance(0.05)

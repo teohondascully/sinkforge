@@ -1,17 +1,25 @@
 class_name SettingsControl
 extends Control
 
-## THE SETTINGS PAGE AS A REAL CONTROL TREE (D0632, the Hybrid ruling): the painter HUD keeps its
-## one-frame-per-tick contract for the in-world chrome; this modal -- which never needed per-tick
-## drawing -- is a retained tree with a Theme. `SettingsPage` stays the model: which face is open, where
-## the keyboard cursor sits, what a row answers. This node presents it and speaks the same PAYLOADS the
-## painter's hit-rects did, so `HudBridge.apply` and the seat's `_game_verb` are untouched.
+## THE SETTINGS PAGE AS A REAL CONTROL TREE (D0632, the Hybrid ruling), re-cut as a TYPESET page
+## (D0634): the reference look the director picked is typographic discipline -- a tracked overline
+## over a display title, hairline rules between rows, numerals right-aligned in their own column,
+## and a plate that hugs its content instead of a fixed window with an empty lower half. The painter
+## HUD keeps its one-frame-per-tick contract for the in-world chrome; this modal -- which never
+## needed per-tick drawing -- is a retained tree with a Theme. `SettingsPage` stays the model: which
+## face is open, where the keyboard cursor sits, what a row answers. This node presents it and speaks
+## the same PAYLOADS the painter's hit-rects did, so `HudBridge.apply` and the seat's `_game_verb`
+## are untouched.
 ##
 ## ONE NAVIGATOR, NOT TWO: every control here is `FOCUS_NONE`, so Enter/arrows are never consumed as
 ## gui input and always reach the seat's `_unhandled_input` -> `HudBridge.key`, the tested path. The
 ## cursor is drawn as a stylebox override on `page.row`'s control -- the same ring, outside the rect,
-## that the painter drew by hand. Mouse hover feeds only the detail plate, matching the drawn page's
+## that the painter drew by hand. Mouse hover feeds only the detail note, matching the drawn page's
 ## own precedence.
+##
+## THE SKIN IS THE THEME: every colour and type rung resolves through `PageTokens.make_theme` (the
+## D0634 restructure -- a capture caught per-node overrides still printing the previous skin's ink).
+## This file owns only GEOMETRY: sizes, spacings, the hairline's one pixel, the plate's content hug.
 ##
 ## TWO SKINS, ONE TREE: `PageTokens.INSTRUMENT` / `.PAPER`, switched whole by `apply_skin`. The rise
 ## keeps `SettingsPage`'s own counter/ease, applied as the plate's offset and alpha.
@@ -33,7 +41,8 @@ var _ring_key: StringName = &"panel"
 var _scrim: ColorRect = null
 var _plate: PanelContainer = null
 var _rail: VBoxContainer = null
-var _head: Label = null
+var _overline: Label = null
+var _title: Label = null
 var _rows: VBoxContainer = null
 var _detail: Label = null
 var _foot: Label = null
@@ -83,8 +92,9 @@ func _process(delta: float) -> void:
 	_focus_mirror()
 
 
-## The fixed skeleton: scrim over everything, the plate centred, rail down its left and the face on
-## its right. Children of a CanvasLayer draw in screen pixels, so every length is authored x UI_SCALE.
+## The fixed skeleton: scrim over everything, the plate centred, rail down its left, a vertical
+## hairline, then the face -- overline, display title, head rule, the ruled rows, the footnote detail,
+## the legend. Children of a CanvasLayer draw in screen pixels, so every length is authored x UI_SCALE.
 func _build_shell() -> void:
 	_scrim = ColorRect.new()
 	_scrim.name = "scrim"
@@ -106,44 +116,69 @@ func _build_shell() -> void:
 	_rail = VBoxContainer.new()
 	_rail.name = "rail"
 	_rail.custom_minimum_size.x = UiTheme.px(UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD)
+	_rail.add_theme_constant_override("separation", int(UiTheme.px(5.0)))
 	split.add_child(_rail)
 	for slot: int in SettingsPage.RAIL_ORDER.size():
 		var c: int = SettingsPage.RAIL_ORDER[slot]
 		var tab := _chip("%d %s" % [slot + 1, SettingsPage.CAT_NAMES[c]], {"cat": c}, &"RailTab")
 		tab.toggle_mode = true
-		tab.add_theme_font_size_override("font_size", int(_tokens["rail_size"]))
 		tab.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_rail.add_child(tab)
+	# The rail's own edge: a vertical hairline, the same rule as the horizontal ones turned on end.
+	var vrule := PanelContainer.new()
+	vrule.theme_type_variation = &"PageRule"
+	vrule.custom_minimum_size.x = 1.0
+	split.add_child(vrule)
 	var face := VBoxContainer.new()
 	face.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	face.add_theme_constant_override("separation", int(UiTheme.px(7.0)))
 	split.add_child(face)
-	_head = Label.new()
-	_head.name = "head"
-	_head.add_theme_font_size_override("font_size", int(_tokens["display_size"]))
-	face.add_child(_head)
+	var head := VBoxContainer.new()
+	head.name = "head"
+	head.add_theme_constant_override("separation", int(UiTheme.px(3.0)))
+	face.add_child(head)
+	_overline = Label.new()
+	_overline.name = "overline"
+	_overline.theme_type_variation = &"PageOverline"
+	head.add_child(_overline)
+	_title = Label.new()
+	_title.name = "title"
+	_title.theme_type_variation = &"PageTitle"
+	head.add_child(_title)
+	var head_rule := _rule()
+	head_rule.name = "head_rule"
+	head.add_child(head_rule)
 	_rows = VBoxContainer.new()
 	_rows.name = "rows"
-	_rows.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_rows.add_theme_constant_override("separation", int(UiTheme.px(4.0)))
 	face.add_child(_rows)
 	var detail_plate := PanelContainer.new()
-	detail_plate.theme_type_variation = &"PageRail"
+	detail_plate.theme_type_variation = &"PageDetail"
 	face.add_child(detail_plate)
 	_detail = Label.new()
 	_detail.name = "detail"
+	_detail.theme_type_variation = &"NoteLabel"
 	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail.add_theme_font_size_override("font_size", int(_tokens["small_size"]))
-	_detail.add_theme_color_override("font_color", _tokens["ink_faint"])
 	detail_plate.add_child(_detail)
 	_foot = Label.new()
 	_foot.name = "foot"
-	_foot.add_theme_font_size_override("font_size", int(_tokens["small_size"]))
-	_foot.add_theme_color_override("font_color", _tokens["ink_faint"])
+	_foot.theme_type_variation = &"NoteLabel"
 	face.add_child(_foot)
 
 
-## Rebuild the open face's rows. The plate asks for the face's own size, so CONTROLS' two-column table
-## gets its width and AUDIO keeps its compact one -- `SettingsPage`'s own numbers, one hop away.
+## A hairline as a PanelContainer in the PageRule skin: the colour is the theme's, the height is the
+## geometry's -- one canvas pixel.
+func _rule() -> PanelContainer:
+	var r := PanelContainer.new()
+	r.theme_type_variation = &"PageRule"
+	r.custom_minimum_size.y = 1.0
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+
+## Rebuild the open face's rows. The plate hugs content now -- only its WIDTH is the face's own number
+## (CONTROLS' two-column table vs the compact faces), so a short face like GAME no longer floats an
+## empty lower half. The title carries the category; the overline stays the section eyebrow.
 func _build_face() -> void:
 	_built_cat = page.cat
 	for kid: Node in _rows.get_children():
@@ -152,9 +187,9 @@ func _build_face() -> void:
 	_dyn.clear()
 	_ringed = null
 	_hover_row = -1
-	_head.text = "SETTINGS  %s" % SettingsPage.CAT_NAMES[page.cat]
-	_plate.custom_minimum_size = Vector2(
-		UiTheme.px(SettingsPage.width_for(page.cat)), UiTheme.px(SettingsPage.wanted_h(page.cat)))
+	_overline.text = "SETTINGS"
+	_title.text = SettingsPage.CAT_NAMES[page.cat].capitalize()
+	_plate.custom_minimum_size = Vector2(UiTheme.px(SettingsPage.width_for(page.cat)), 0.0)
 	_foot.text = "arrows move   ENTER rebinds   1-4 tab   ESC closes" if page.cat == SettingsPage.CAT_CONTROLS \
 		else "up/down row  left/right adjust  ENTER  1-4 tab  ESC"
 	match page.cat:
@@ -165,6 +200,7 @@ func _build_face() -> void:
 
 
 ## AUDIO: the mute chip, then one slider row per level -- the shell's snapshot order, row 0 first.
+## The percent is a numeral column: right-aligned on a fixed width so the digits stack like a table.
 func _face_audio() -> void:
 	_add_row("sound", _chip("SOUND ON", {"toggle": "mute"}, &"Chip", "mute"))
 	for r: Array in SettingsPage.AUDIO_ROWS:
@@ -181,8 +217,9 @@ func _face_audio() -> void:
 		slider.value_changed.connect(func(v: float) -> void: _emit({"slider": id, "frac": v}))
 		_dyn[id] = slider
 		var pct := Label.new()
-		pct.add_theme_font_size_override("font_size", int(_tokens["body_size"]))
-		pct.custom_minimum_size.x = UiTheme.px(14.0)
+		pct.theme_type_variation = &"NumLabel"
+		pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		pct.custom_minimum_size.x = UiTheme.px(22.0)
 		_dyn["pct:" + id] = pct
 		_add_row(String(r[0]), slider, pct)
 
@@ -205,13 +242,12 @@ func _face_game() -> void:
 
 
 ## CONTROLS: two columns of [verb -- binding chip], RESET KEYS last -- the same focus order the
-## model's `row_payload` already assigns.
+## model's `row_payload` already assigns. Every cell is a ruled row, so the grid reads as a table.
 func _face_controls() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", int(UiTheme.px(SettingsPage.REMAP_GAP)))
-	grid.add_theme_constant_override("v_separation", int(UiTheme.px(2.0)))
-	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("v_separation", int(UiTheme.px(3.0)))
 	_rows.add_child(grid)
 	var per_col: int = SettingsPage.remap_per_col()
 	_focusables.resize(SettingsPage.REMAP_ROWS.size())   ## indexed by MODEL row: the grid is filled
@@ -222,7 +258,7 @@ func _face_controls() -> void:
 	var reset := _chip("RESET KEYS", {"reset": true}, &"Chip", "reset")
 	_focusables.append(reset)
 	_wire_hover(reset, _focusables.size() - 1)
-	_rows.add_child(reset)
+	_rows.add_child(_rule_wrap(reset))
 
 
 ## One labelled row into `_rows` (or a supplied container), the verb on the left and its control(s) on
@@ -241,8 +277,7 @@ func _add_row(label: String, control: Control, extra: Control = null, into: Cont
 	h.add_theme_constant_override("separation", int(UiTheme.px(8.0)))
 	var l := Label.new()
 	l.text = label
-	l.add_theme_font_size_override("font_size", int(_tokens["body_size"]))
-	l.add_theme_color_override("font_color", _tokens["ink_dim"])
+	l.theme_type_variation = &"RowLabel"
 	if into == null:
 		l.custom_minimum_size.x = UiTheme.px(SettingsPage.SET_CTRL_DX - 8.0)
 	else:
@@ -252,15 +287,26 @@ func _add_row(label: String, control: Control, extra: Control = null, into: Cont
 	h.add_child(control)
 	if extra != null:
 		h.add_child(extra)
-	# The ring's bed: a PanelContainer whose `panel` starts EMPTY and takes the focus stylebox when
-	# `page.row` lands here. A Button could carry `normal` itself, but an HSlider has no "normal" to
-	# override -- the wrapper gives every row the same ringable surface.
+	var wrap := _rule_wrap(h)
+	control.set_meta("ring", wrap)
+	(into if into != null else _rows).add_child(wrap)
+
+
+## The row's ruled bed: a PanelContainer whose `panel` starts EMPTY and takes the focus stylebox when
+## `page.row` lands here, over a VBox that carries the row and the hairline under it -- the typeset
+## version of the painter's boxed rows. The rule is a child, NOT the stylebox, so the ring witness
+## (an unfocused row has no `panel` override) stays true. A Button could carry `normal` itself, but an
+## HSlider has no "normal" to override -- the wrapper gives every row the same ringable surface.
+func _rule_wrap(inner: Control) -> PanelContainer:
 	var wrap := PanelContainer.new()
 	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	wrap.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
-	wrap.add_child(h)
-	control.set_meta("ring", wrap)
-	(into if into != null else _rows).add_child(wrap)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", int(UiTheme.px(1.5)))
+	box.add_child(inner)
+	box.add_child(_rule())
+	wrap.add_child(box)
+	return wrap
 
 
 func _chip(text: String, p: Dictionary, variation: StringName, dyn_id: String = "") -> Button:
@@ -268,7 +314,6 @@ func _chip(text: String, p: Dictionary, variation: StringName, dyn_id: String = 
 	b.theme_type_variation = variation
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", int(_tokens["body_size"]))
 	b.pressed.connect(_emit.bind(p))
 	if dyn_id != "":
 		b.set_meta("dyn_id", dyn_id)
@@ -288,7 +333,8 @@ func _wire_hover(c: Control, i: int) -> void:
 
 ## The frame's moving parts, re-read from the snapshot while the page is up: slider values (except the
 ## one in the hand), chip texts, the capture and the arm, the clash marks. Every `_dyn` read is guarded
-## -- a key only exists while its face is built.
+## -- a key only exists while its face is built. These colour overrides are the legitimate kind: state,
+## not skin -- they re-read `_tokens` every frame, so a skin swap cannot leave them stale.
 func _refresh() -> void:
 	var st: Dictionary = page.state
 	var muted: bool = bool(st.get("muted", false))
@@ -326,7 +372,7 @@ func _refresh() -> void:
 	_detail.text = _detail_text()
 
 
-## What the detail plate says: the hovered control's own sentence wins (the more deliberate pointer),
+## What the detail note says: the hovered control's own sentence wins (the more deliberate pointer),
 ## else the focused row's, else the category's standing line -- the drawn page's exact precedence.
 func _detail_text() -> String:
 	var i: int = _hover_row if _hover_row >= 0 else page.row

@@ -91,7 +91,6 @@ const SET_BAR_W: float = 78.0
 const REMAP_ROW_H: float = 15.0
 const REMAP_GAP: float = 16.0
 const RISE_PER_S: float = 6.0         ## the plate's rise, seconds to full
-const HEIGHT_EASE: float = 0.25       ## the plate's height follows the open face by this much a frame
 
 var open: bool = false
 var cat: int = CAT_AUDIO
@@ -101,7 +100,6 @@ var armed: String = ""                ## the GAME row whose first press was take
 ## The shell's snapshot: muted, levels {id: 0..1}, shake, auto_pickup, zoom_label, bindings {action:
 ## label}, event_labels {action: [labels]}, all_actions [action]. Empty until the shell fills it.
 var state: Dictionary = {}
-var _set_h: float = SET_MIN_H         ## authored px, eased toward wanted_h
 var _set_t: float = 0.0               ## the rise, 0..1
 
 
@@ -177,6 +175,8 @@ static func width_for(c: int) -> float:
 
 
 ## How tall the page wants to be for the face that is open; every term is taken from what draws it.
+## Since D0634 this is the page's own MEASURE, not the plate's size -- the retained tree sizes itself
+## to content, so no mechanism reads this; the suite pins it as the authored geometry spec.
 static func wanted_h(c: int) -> float:
 	var need: float = 0.0
 	match c:
@@ -237,10 +237,9 @@ func ease() -> float:
 	return 1.0 - u * u * u
 
 
-## Step the rise toward open or closed and the height toward the open face's wanted height.
+## Step the rise toward open or closed.
 func advance(delta: float) -> void:
 	_set_t = move_toward(_set_t, 1.0 if open else 0.0, delta * RISE_PER_S)
-	_set_h = lerpf(_set_h, wanted_h(cat), HEIGHT_EASE)
 
 
 func visible() -> bool:

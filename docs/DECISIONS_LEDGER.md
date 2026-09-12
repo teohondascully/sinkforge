@@ -23633,3 +23633,34 @@ per the flag's own header.
 Alternative: keep instrument the default until the typeset pass proved out -- refused, because then the
 default-on captures everyone runs keep measuring the skin the director already ruled off.
 Reverse: CHEAP -- flip the one dictionary literal back.
+
+## D0634 · 2026-09-12 · view/hud/{page_tokens,settings_control,settings_page}.gd, tests/test_settings_page.gd · the page-language pass: the settings page as a typeset leaf, not a boxed panel
+
+The director picked PAPER and named the miss: the reference look is CLEANLINESS -- typographic
+discipline -- not parchment colour. The re-cut keeps D0632's tree and model contract and rebuilds
+only the page language: a small tracked overline (FontVariation `spacing_glyph`, the eyebrow faked
+since no font ships) over the category as a large emboldened display title over a hairline; every row
+on a one-pixel PageRule hairline instead of a filled box; the percent numerals right-aligned in their
+own column; the rail's selected tab reading through a two-pixel accent underline rather than a filled
+well; the detail plate becoming a footnote block (rule above, small print, no card); and the plate
+itself hugging content -- only the width stays the face's own number, so GAME's two rows no longer
+float the empty lower half the before-capture showed (plate measured ~700px tall for five rows).
+`_set_h`/`HEIGHT_EASE` die with the floor: the retained tree measures itself; `wanted_h` stays as the
+model's authored measure, pinned by the suite as spec rather than read as mechanism. PAPER's own
+palette aged (plate off printer-white, #E8DFCB -> #DFD4B6) and its ink ladder darkened for print
+legibility (ink_dim #5C5546 -> #494235, ink_faint #7A7260 -> #655D4B).
+
+Found on the BEFORE-capture, fixed structurally in the same diff: the paper page was printing the
+INSTRUMENT skin's ink_faint on its detail and footer lines (sampled 128,138,158 -- the dark skin's
+blue-grey -- on the cream leaf). `apply_skin` rebuilds the Theme but per-node `add_theme_color_override`
+values set in `_build_shell` keep the skin they were built with. The fix is the rule now written in the
+token header: everything that says what a thing LOOKS LIKE lives in theme variations (PageOverline,
+PageTitle, RowLabel, NoteLabel, NumLabel, PageRule, PageDetail); the only per-node colours left are the
+ones `_refresh` re-states from live state each frame (muted, clashes), which re-read `_tokens` anyway.
+The suite gained the regression witness: detail and foot resolve PAPER's ink_faint after the swap.
+Alternatives weighed: keeping the fixed wanted_h floor but retuning it face-by-face (rejected -- a
+hand-tuned floor re-derives what the container measures exactly, and drifts the next time a row
+changes); hairlines as the wrap's own bottom-border stylebox (rejected -- the ring replaces `panel`
+wholesale, which would steal a focused row's underline AND break the suite's "ring moved off" witness,
+so the rule is a child of the wrap instead).
+Reverse: revert this diff; the D0632 boxed page is in history.
