@@ -128,6 +128,20 @@ const RECORDS: Dictionary = {
 			},
 			{
 				"kind": "solid",
+				"dx": -2,
+				"dy": 1,
+				"material": "ore_iron",
+				"deposit": 13,
+			},
+			{
+				"kind": "solid",
+				"dx": -2,
+				"dy": 2,
+				"material": "ore_iron",
+				"deposit": 13,
+			},
+			{
+				"kind": "solid",
 				"dx": 5,
 				"dy": 0,
 				"material": "coal",

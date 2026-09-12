@@ -265,9 +265,19 @@ metres on two presses and never mined; three of the last six first-rung failures
 held for two thirds of a second carried stranger 11 seven metres, past the forge pocket, the vein, the
 adit and the drill shaft -- the whole authored opening -- before the first frame came back. Two of three
 strangers on the capped world overshot the pad on their first key. The world is 64 m wide, so the east
-edge is three seconds of walking from spawn. *Question: is the pad too small for the speed, or the speed
+edge is three seconds of walking from spawn. *Measured (D0608): the walk/run split already exists, in
+time rather than on a key — `Gait` holds base RUN_SPEED for close work and only after a 54-tick
+sustained-travel delay ramps toward 232 px/s; its own docstring names base speed "the property that
+keeps the mining feel untouched". Stopping is already crisp (4-tick decel ≈ 0.3 m), so the overshoot
+is hold-duration × speed: fitting a stranger's ~0.67 s hold inside the 3.2 m reach window needs ~75
+px/s, which doubles every traversal of a 64 m world — the trade does not close. And the failures are
+two-press overshoots: first press past the vein, correction back past it — a body that cannot see a
+reason to stop will not find the window at any plausible speed. The evidence points at the target,
+not the gait: T037's exposed ore face and the D0411 target ring are the fixes this entry's strangers
+were actually asking for.* *Question: is the pad too small for the speed, or the speed
 too high for the pad? A walk/run split (shift), a wider pad, or a slower legacy constant re-derived for
-a body 1.25 m tall.*
+a body 1.25 m tall. Recommended answer: none of the three — fix what there is to stop AT first, then
+re-measure.*
 
 **T036 · The world ends without a wall.** *TAKEN provisionally (D0457): the edge blocks the body like rock
 (two lines in `WorldSurroundings.blocks`); what the edge LOOKS like stays open.* *More (D0444): at the edge the camera clamps and the body leaves
@@ -283,7 +293,9 @@ after 24 m of surface ranged with rock broken once and nothing below 4 m. Overru
 ore in the first hold and then walked the pad for a minute looking for "an entrance" to the caverns
 visible below, pressing Q, E, Tab and Shift; "no access to deep areas" was the verdict. The GDD's identity
 is solid earth you carve into, and the only sentence that says so is the fourth rung's "dig down to it".
-*Question: a moment lesson ("THE WAY DOWN — the ground is rock you can cut: point at the floor and hold
+*Terrain answer added (D0608): the starter vein now dips two metres under its left cell, so mining the
+surface ore opens more ore below and the hole the player made IS the descent — the world proposes the
+verb the lesson only says. Reversible by deleting two lines in tutorial.yaml.* *Question: a moment lesson ("THE WAY DOWN — the ground is rock you can cut: point at the floor and hold
 [MINE]") fired when the first rung is done and the body has crossed the pad without digging; or the
 first rung's own how-to naming the floor as rock; or leave it to the fourth rung and accept the walk.*
 

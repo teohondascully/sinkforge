@@ -23169,3 +23169,21 @@ Verified: check fails on the pre-doc tree naming exactly the four view/ subdirs;
 rule, exempt tops ignored, empty population exits 2). Formatter PASS.
 Reverse: delete tools/layer_lint/{check_module_docs.py,test_check_module_docs.py}, the four
 view/*/MODULE.md files, the harness step, revert the gate-6 text.
+
+## D0608 · 2026-09-11 · data/starts/tutorial.yaml, docs/TASTE_QUEUE.md · the vein dips: T037's terrain answer, and the T035 measurement that said the speed is not the defect
+Decided: two related calls. (a) T037's terrain answer: two ore_iron metres continue the starter vein
+under its left cell (dx -2, dy 1-2), so mining the surface ore opens more ore below -- the hole the
+player just made IS the descent, the world proposing the verb D0440's lesson only says. (b) T035 left
+UNTOUCHED, with the measurement recorded on the entry: Gait is already the walk/run split (base
+RUN_SPEED for close work, the stride ramp only after 54 ticks of sustained travel -- its docstring
+names base speed the property that keeps mining feel untouched); decel is 4 ticks (~0.3 m), so the
+5 m overshoot is hold-duration x speed and fixing it at the constant needs ~75 px/s, which doubles
+every traversal; and the failures were two-press overshoots -- a targeting failure, not a gait one.
+Why: stranger 15 mined four ore and then looked for "an entrance" -- the surface vein ended flush
+with the pad, so nothing said the way down was through the floor. The dipped seam makes the first
+mining site into the first shaft. Reversible by deleting two yaml lines.
+Verified: data_codegen --check and schema PASS; world_seeder, boot_snapshot, tutorial_teaching,
+floor_ambiguity, interface_verbs, tree_fall, reach, softlock_ascent suites all green over the new
+terrain.
+Reverse: delete the two fixture lines in tutorial.yaml, regen, revert the two TASTE_QUEUE
+annotations.

@@ -8,6 +8,13 @@ fixtures:
   # The surface ore vein beside spawn (STARTER_VEIN_CELL 47 and 48): the bootstrap ore you hand-mine.
   - {kind: solid, dx: -2, dy: 0, material: ore_iron, deposit: 13}
   - {kind: solid, dx: -1, dy: 0, material: ore_iron, deposit: 13}
+  # THE VEIN DIPS (T037's terrain answer, D0608). Flush with the pad, the first thing mined read as
+  # surface rock, not as the way down -- stranger 15 mined four and then walked the pad looking for
+  # "an entrance" to the caverns. Two metres continue under the left cell: mining the top opens ore
+  # below, and the hole the player just made IS the descent -- the world proposes the verb D0440's
+  # lesson only says. Delete these two lines to reverse; the lesson stays as the spoken version.
+  - {kind: solid, dx: -2, dy: 1, material: ore_iron, deposit: 13}
+  - {kind: solid, dx: -2, dy: 2, material: ore_iron, deposit: 13}
   # The guaranteed surface coal (TUTORIAL_COAL_CELLS 54): the drill's fuel. TWO METRES WIDE (D0497): one
   # black metre beside the shaft's black mouth at +7 read as shadow, and four of six strangers (76-81)
   # never held coal. The seam runs +5 and +6, between the rig's well at +2 and the shaft's lip at +7; the
