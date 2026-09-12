@@ -17,9 +17,18 @@ func _route(anchor: Vector2i) -> Array:
 	var bore: Vector2i = anchor + Vector2i(3, 0)     ## the capped column the pile rests over
 	var forge: Vector2i = anchor + Vector2i(3, 7)  ## the jam-variant forge at the bore's foot
 	return [
-		{"kind": &"walk_to", "col": anchor.x + 4, "slack": 1, "max_row": anchor.y},
+		## Park WEST OF THE WEST CAP CELL, on natural ground -- never on any cell the pick will
+		## take. A digger standing on the cap falls in when its footing breaks (and footing rules
+		## spare the cell under the boots, so an underfoot aim never clears); dug from the flank
+		## every cap cell stays in front of the pick (D0646).
+		{"kind": &"walk_to", "col": anchor.x + 1, "slack": 0, "max_row": anchor.y},
 		{"kind": &"note", "key": "before", "machines": [forge], "piles": [bore + Vector2i(0, -1)]},
-		{"kind": &"dig", "metres": [bore, bore + Vector2i(0, 1)]},
+		## TWO cap cells, not one: the mouth must be as wide as the bore under it. The body is one
+		## metre wide and the collision box reads its edge pixels, so a same-width mouth has NO
+		## position with air under the whole box -- the probe measured it perching on the west lip,
+		## stepping off, and landing on the east lip forever. `nearest_solid` takes the nearer west
+		## cell first, which is also the only one in line of sight.
+		{"kind": &"dig", "metres": [bore + Vector2i(-1, 0), bore]},
 		{"kind": &"await_status", "at": forge, "status": &"working", "timeout_ticks": 120},
 		{"kind": &"note", "key": "forge_working", "machines": [forge],
 			"piles": [bore + Vector2i(0, -1), forge + Vector2i(0, 1)]},
@@ -40,15 +49,18 @@ func _step_custom(leg: Dictionary, out: Dictionary) -> int:
 
 
 ## One tick of a dig leg: hold MINE on the named metres' nearest solid cell until none remains -- the
-## mine stepper with the yield clause removed; what is left is the hole. Walks toward the aim only
-## when it sits past the pick's reach, and NEVER hops: the cap is dug from beside, and a hop at the
-## lip is how the walker falls in before the pile does.
+## mine stepper with the yield clause removed; what is left is the hole. Walks toward the aim when it
+## sits past the pick's reach OR over the stance margin the 40px rule was measured on -- the cap's
+## far corner sat 1.3px outside `Mining.in_reach` with d_px exactly 40, so a distance-only threshold
+## stood still forever. NEVER hops: the cap is dug from beside, and a hop at the lip is how the
+## walker falls in before the pile does.
 func _step_dig(f: InputFrame, leg: Dictionary) -> int:
 	var aim: Vector2i = nearest_solid(leg["metres"])
 	if aim == Vector2i(-1, -1):
 		return 1
 	var d_px: int = absi(aim.x * 4 + 2 - body.pos_x / Fx.SCALE)
-	_fill(f, signi(aim.x * 4 - body.pos_x / Fx.SCALE) if d_px > 40 else 0, aim, true)
+	var approach: bool = d_px > 40 or not Mining.in_reach(body.pos_x, body.pos_y, aim)
+	_fill(f, signi(aim.x * 4 - body.pos_x / Fx.SCALE) if approach else 0, aim, true)
 	return 0
 
 

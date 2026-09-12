@@ -23682,3 +23682,39 @@ Known red at commit: the route's legs never fire -- every leg including the firs
 RouteBot itself is sound (test_cold_start_d1 passes 20/20 on the same machinery), which localises the
 fault to the probe world's layout or the leg goals, not the shared engine.
 Reverse: `git revert` this commit removes the override and the fixture; the failing suite goes with it.
+
+## D0646 · 2026-09-12 · data/starts/conveyor_probe.yaml, harness/bots/{conveyor_bot,route_bot}.gd · the conveyor route's physics, measured and fixed -- mouth width, wall material, reach margin, hands off while falling
+
+D0645's red is resolved; each fix is a measured fact about the fixture or the body, not a tuned
+guess, and the probe (`tools/scratch/probe_conveyor.gd`) is the evidence. In the order they surfaced:
+
+1. CLAY CANNOT BE THE CAP. The site's loose material slumps into every dug wake (D0562): the first
+   clay bore refilled itself and the body perched on the refill reading `on_floor`. Cap and walls are
+   `hardrock`; the foreign item stays clay in the pack.
+2. A ONE-METRE SHAFT IS A PERFECT PISTON. The body is one metre wide and the collider reads its edge
+   pixels, so a same-width gap has no position with air under the whole box -- the probe measured the
+   body standing at px=568 over open air, alternating lips for thousands of ticks. The bore is two
+   metres; so is the MOUTH the dig opens (the `dig` leg takes two cap cells, and the stance moves one
+   metre west so no aimed cell is ever underfoot).
+3. THE BITE BITES THE WALL BEHIND THE TARGET. `DEFAULT_BITE_RADIUS` 2 reaches two terrain cells past
+   the charged cell: digging the west cap cell nicked `(135,81..84)`, natural clay, and the measured
+   cascade poured ~30 cells through the breach and refilled the bore to logic row 24. The west wall is
+   hardrock two cells deep, matching the east wall D0645 already made.
+4. HANDS OFF WHILE FALLING, STEP OFF THE LIP YOU CAUGHT. `_step_descend` steers for the bore's centre
+   above the rim, applies no direction while airborne below it (a pressed edge is what lip cells
+   catch), and on a mid-shaft perch steps AWAY from whichever box edge has a solid cell under it
+   (`_lip_escape`) -- a centre nudge there oscillated the same two pixels until the auto-step climbed
+   out. No hop-on-stall: the stall detector's job here would be to climb out of the hole.
+5. `Mining.in_reach` IS THE APPROACH TEST, NOT A PX RULE. The cap's far corner sat 1.3px outside the
+   3.2m reach with d_px exactly 40, so `_step_dig`'s distance-only threshold stood still forever --
+   `refusal: far` on a held pick. The dig now approaches whenever the aim is not in reach (or is past
+   the old margin), which also covers the general "cell just outside the circle" case a fixed px rule
+   cannot.
+
+Measured: `test_conveyor_jam` 18/18 -- route completes in 311 ticks; ore and coal flow (35,19)->
+(35,27) through the dug column, the forge reads `working`, the tossed clay lands (35,25)->(35,27),
+the forge reads `blocked` with `{ore:4, coal:2, clay:1}` in the intake, the `pass` control passes the
+clay through and never blocks, conservation holds. `test_cold_start_d1` unaffected (the descend
+stepper is new machinery the cold route never calls).
+Reverse: narrow the bore to one metre and revert `_step_descend`/`_step_dig`; the per-charge notes
+name which measurement re-breaks.

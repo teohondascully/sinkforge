@@ -50,28 +50,105 @@ const RECORDS: Dictionary = {
 			{
 				"kind": "solid",
 				"dx": 3,
+				"dy": 0,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 2,
+				"dy": 0,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 4,
+				"dy": 0,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 4,
 				"dy": 1,
-				"material": "clay",
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 4,
+				"dy": 2,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 1,
+				"dy": 0,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 1,
+				"dy": 1,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 1,
+				"dy": 2,
+				"material": "hardrock",
 				"deposit": 0,
 			},
 			{
 				"kind": "open",
 				"cells": [
 					[
+						2,
+						1,
+					],
+					[
 						3,
+						1,
+					],
+					[
+						2,
 						2,
 					],
 					[
 						3,
+						2,
+					],
+					[
+						2,
 						3,
+					],
+					[
+						3,
+						3,
+					],
+					[
+						2,
+						4,
 					],
 					[
 						3,
 						4,
 					],
 					[
+						2,
+						5,
+					],
+					[
 						3,
 						5,
+					],
+					[
+						2,
+						6,
 					],
 					[
 						3,
