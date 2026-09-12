@@ -192,10 +192,18 @@ depth scale, or a wider pool that the deep earns with a better lamp?*
 world and the pack kept (D0396). *Question: should being stranded cost something -- the pack, the line,
 a walk -- or is a free way out the right price for a game about not getting stuck?*
 
-**T022 · "Seen" is an eight-metre disc on a hub tick.** It counts ore behind a metre of rock whose face
+**T022 · "Seen" is an eight-metre disc on a hub tick.** *TAKEN provisionally (D0612): the disc keeps the
+word. A sight-line model would be strictly worse: ore plainly visible in a lamp-lit shaft face would stay
+unmarked whenever a corner blocks line-of-sight, and the map would then contradict what the player just
+saw. The disc reads as "the lamp's reach" (its own comment says so), it is monotone, and the minimap's
+whole perf shape (D0403's incremental repaint) rests on its cheapness. The one-cell-behind-the-face
+generosity is the price, and it is small.* It counts ore behind a metre of rock whose face
 the lamp lit (D0400). *Question: is that the survey's meaning of seen, or does the map want a sight line?*
 
-**T023 · The status beacon breathes at 0.9 Hz between 0.30 and 0.75 in the status colour.** *Question:
+**T023 · The status beacon breathes at 0.9 Hz between 0.30 and 0.75 in the status colour.** *TAKEN
+provisionally (D0613): the pulse stays. Motion in the periphery reads as a REQUEST; a steady lamp reads
+as state, and "wants something" is a request. The 0.30 floor keeps the beacon lit at the trough, so the
+pulse never reads as the lamp dying.* *Question:
 is a pulse the right call for "wants something", or a steady colour with the working glow off?*
 
 ## The integration pass (D0409–D0414) — the calls made from a stranger's first ten minutes
@@ -218,7 +226,10 @@ fixture, legacy's shape; the body walks it fine and the ambiguous-floor invarian
 (D0414). *Question: is the thin crust the intended tease of what lies under, or should the pocket be a
 step down the stranger can see?*
 
-**T028 · The score costs 50 ms of boot and is silent until the body is deep.** Mounted so the MUSIC slider
+**T028 · The score costs 50 ms of boot and is silent until the body is deep.** *TAKEN provisionally
+(D0614): keep it mounted. The score is not a missing track -- it is an authored three-bed synthesis whose
+mix is a pure function of depth, and its 50 ms is a one-time boot price. Stubbing it would hand the MUSIC
+slider back its dead consumer, recreating the exact defect D0410 closed.* Mounted so the MUSIC slider
 has a consumer (D0410). *Question: worth its boot cost before any music is authored, or a stub until it is?*
 
 **T029 · TAKEN 2026-09-06 by its third option, provisionally (D0424).** Only the selected hotbar slot carries its name. The first stranger cut a tree's leaves, saw a

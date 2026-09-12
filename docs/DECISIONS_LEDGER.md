@@ -23232,3 +23232,25 @@ whole plan -- so the honest teaching is "let go and the plan is forgotten", not 
 stranger also had no word for. The moment `dig_plan` fires on the first nonempty `o.dig_marks` and
 latches once; mutation-tested (suppressed note -> the suite's new asserts fail). The modifier gate and
 the visible CLEAR_PLAN control stay open if naming proves insufficient.
+
+## D0612 · 2026-09-11 · docs/TASTE_QUEUE.md · T022 taken provisionally: "seen" keeps the disc
+
+T022 asked whether the minimap's seen plane wants a sight line instead of the 8 m radius disc. Kept the
+disc. A sight-line model is strictly worse at the only place it differs that matters: ore plainly
+visible in a lamp-lit shaft face stays unmarked whenever a corner blocks line-of-sight, so the map
+would contradict the player's own eyes. The disc reads as "the lamp's reach" (SeenPlane's own framing),
+is monotone, deterministic, carried by the save, and the minimap's incremental repaint (D0403) rests on
+its cheapness. The price -- ore one cell behind a lit face counts as seen -- is small and consistent.
+
+## D0613 · 2026-09-11 · docs/TASTE_QUEUE.md · T023 taken provisionally: the status beacon keeps its pulse
+
+T023 asked whether "wants something" should be a 0.9 Hz breath or a steady colour. Kept the pulse:
+motion in the periphery reads as a REQUEST where a steady lamp reads as state, and the 0.30 floor keeps
+the beacon visibly lit at the trough so the pulse never reads as the lamp dying.
+
+## D0614 · 2026-09-11 · docs/TASTE_QUEUE.md · T028 taken provisionally: the score stays mounted
+
+T028 asked whether the score's 50 ms of boot earns its keep before any music is authored. The premise
+undersells it: the score IS the authored music -- a three-bed synthesis mixed as a pure function of
+depth -- and 50 ms is a one-time price. Stubbing it would hand the MUSIC slider back the dead consumer
+D0410 closed.
