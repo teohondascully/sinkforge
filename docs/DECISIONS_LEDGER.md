@@ -22994,3 +22994,23 @@ overshoots brightness, and the reference's own light is more SATURATED than ours
 which is a taste call about what a headlamp IS and stays the director's (queue item 51).
 Also recorded, from the same frame: P044, the layer contacts are one row across all 256 columns.
 Reverse: docs only -- nothing shipped changed.
+
+## D0600 · 2026-09-11 · tests/fixture_bounds_pressure_probe.gd · gate 24's named suite could not see a disabled clamp
+Decided: `fixture_bounds_pressure_probe.gd` now checks `_box_in_bounds` after every tick and quits
+non-zero on a sighting, so `test_bounds_invariant.gd`'s existing `exit_code == 0` check fails on a real
+containment failure rather than only on a crash.
+Why: a fresh-eyes audit mutation-tested gate 24 directly -- `return` inserted before the correction
+block of `body.gd::_enforce_grid_bounds` produced a body genuinely outside the grid for ~199 ticks of
+the pressure probe, and `test_bounds_invariant.gd` still printed ALL PASS. The suite's containment
+tests exercise scenarios where `_try_step`'s preemptive refusal or the terrain itself is what holds the
+body in (its own docstring verifies this); the edge-pressure probe -- the one scenario where the
+post-hoc clamp is the ONLY thing between the body and open boundary -- asserted only the report latch,
+not containment. The defect class QUALITY.md §2 names: a guard whose trigger condition normal execution
+rarely reaches survives being deliberately broken. The property stayed enforced by luck of adjacency:
+`test_reachability_sweep.gd` (gate 25) failed on the same mutation, but gate 24's named instrument did
+not.
+Also measured: `quit(2)` inside the probe's tick loop without a `return` is overwritten by the trailing
+`quit(0)` -- the exit code is the LAST call's, and a probe that detects and then finishes clean reports
+clean. First version of this fix was itself a CANNOT-FAIL; the return is load-bearing.
+Reverse: delete the `_box_in_bounds` block and the docstring paragraph; the probe returns to log-latch
+duty only.
