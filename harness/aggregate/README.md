@@ -22,8 +22,14 @@ changed `data/` value).
 
 ## Public API
 
-None yet. This directory is a skeleton — no code has been written.
+`DecisionMeter` (`decision_meter.gd`) — the decisions-per-minute instrument (D0643). `record(tick,
+payload)` takes each `RouteBot.step()` emission, `report()` bins it into 3600-tick sim-minutes:
+decisions (all emissions), active vs idle payloads, a histogram of action kinds read off the
+payload's own buttons, leg-kind attribution, and the traversal/digging/processing/observe/idle
+bucket roll-up. `ScenarioDriver.run_metered` is its driver; `tools/measure_decisions.gd` prints it.
 
 ## Gotchas
 
-None yet.
+`elapsed_ticks` must be set by the driver (the world clock, `bot.ticks` — which includes idle ticks
+a goal watch spends deciding nothing). Without it the report bins only to the last decision and a
+decision-free tail disappears instead of reading as zeros.

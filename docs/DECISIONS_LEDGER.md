@@ -23790,3 +23790,43 @@ inside the chain test -- "the last metre and a half is not asserted here" -- now
 suite, since P035 ruled and the verb exists. Alternative: raise or waive the limits -- refused, the gate
 is the guard, and each split landed on a boundary that was already there.
 Reverse: CHEAP -- revert the diff; the suites all still assert the same things, just filed differently.
+## D0643 · 2026-09-12 · harness/aggregate/decision_meter.gd, harness/driver/scenario_driver.gd, tools/measure_decisions.gd, tests/test_decision_meter.gd · the decision meter -- what counts as a decision, and what an empty minute means
+Decided: the pacing instrument the brief's minute-25 question needs counts ONE EMITTED `decide()`
+PAYLOAD per decision -- the `{frame, commands}` pair the world owes one tick for -- recorded by the
+driver at the emission point (`bot.step()`), never inferred from world ticks and never filtered by
+"did anything happen." A payload carrying no verb is still a decision (the policy chose to idle) and
+is tagged `idle`; `active` is the signal a flat count would hide. Binning is 3600-tick sim-minutes;
+`elapsed_ticks` comes from the bot's own tick count so a minute the policy emitted nothing into
+still exists in the series -- the honest tail is the answer to the question, not a bug in the
+instrument. Each payload also carries its acting leg's `kind`, so ticks whose buttons say nothing
+(a body falling down its own hole) still attribute to a phase; `BUCKETS` rolls leg kinds into
+traversal/digging/processing/observe/idle for the commute split. `run_metered` checks the goal on
+the observation each apply just produced (the metered path sees `flow_landed` mid-route, which the
+`observe()`-drained `await_goal` loop could not); it runs the route to completion rather than
+stopping at first goal match, because the report wants the policy measured whole.
+Measured: `godot --headless --path . --script res://tools/measure_decisions.gd -- cold_start_to_d1`
+reports 419 decisions over 420 ticks (186 active, 233 idle; kinds: mine 109, walk 85, select 3,
+drop 3, collect 8; legs: mine 111, deliver 67, await 241). With `--to-budget` the record's 30000-tick
+clock runs the full 8.3 sim-minutes and every minute after the route's 7 s end reads zero decisions
+-- the route simply has nothing left to decide, which IS the minute-25 datum this task was built to
+surface. `test_decision_meter` pins classification (23 assertions: empty frame = idle, pressed verbs
+all tag, minute bins at the 3600 boundary, to-budget tail has a bin with zero decisions).
+Reverse: delete the meter, the tool and the suite; `run`/`await_goal` keep their old shape.
+
+## D0644 · 2026-09-12 · harness/bots/route_bot.gd, harness/bots/cold_start.gd, harness/bots/README.md, tests/test_cold_start_d1.gd · RouteBot -- the decide/apply machinery is the base class, the route is the subclass
+Decided: `ColdStartBot`'s machinery (legs, leg bookkeeping, `decide`, `execute`, the walk/mine/
+deliver/await steppers, `attach`/`pos`/`carried`/`nearest_solid`) lifts verbatim into `RouteBot`;
+`ColdStartBot` becomes the subclass that supplies `_route` and nothing else. The conveyor and
+commute probes need the same decide/apply contract for different routes, and copying the class
+twice is how the two paths drift (D0625's whole point was ONE policy). New to the base for the
+probes: `step()` (execute's loop body split open so `run_metered` counts the emitted payload),
+`legs_done`/`legs_ok` accessors, a `leg_kind` field on the payload for phase attribution, a `notes`
+evidence channel, and `_step_leg` dispatching unknown kinds to `_step_custom` (default: fail the
+leg). Leg kinds are shared verbs; routes are policies -- a probe's own kinds live in its
+`_step_custom`, not the base's table.
+Measured: `test_cold_start_d1` (20 assertions: d1 reached, checkpoint reload, mid-run resume) and
+`test_seat_route` (8 assertions; leg boundaries at ticks 60/71/122/149/390/419, identical to the
+pre-refactor trace) both pass -- the extraction is behavior-identical. The only test-side change is
+`as ColdStartBot` casts on `bot_for` (its return type widened to `RouteBot`).
+Reverse: fold `route_bot.gd` back into `cold_start.gd` and drop the casts; nothing else depends on
+the split yet.

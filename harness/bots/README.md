@@ -27,6 +27,12 @@ observation shape).
 
 ## Public API
 
+`RouteBot` (`route_bot.gd`) — the scripted T0 policy base (D0644). Legs, `decide`/`execute`/`step`,
+and the shared leg vocabulary (`mine`, `deliver`, `await`) live here; a subclass supplies `_route`
+and overrides `_step_custom` for probe-only leg kinds. `step()` is `execute`'s loop body split open —
+one decide+apply pair returning the emitted payload, which is where `DecisionMeter` counts. `notes`
+is the evidence channel a `note` leg snapshots observable state into.
+
 `ColdStartBot` (`cold_start.gd`) — the scripted T0 policy for `agent: cold_start` scenarios:
 `execute(anchor)` runs the tutorial route (mine vein, feed forge, mine coal, feed forge, collect
 ingots, deliver to the rig) through `Interface.apply`/`observe` only. Named `execute` rather than
@@ -35,4 +41,5 @@ is not a check.
 
 ## Gotchas
 
-None yet.
+A leg kind is a shared verb; a route is a policy. New kinds a probe alone uses belong in its
+`_step_custom`, not the base's dispatch — the base's table is what every probe must agree on.
