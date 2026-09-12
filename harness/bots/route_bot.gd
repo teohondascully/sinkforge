@@ -50,6 +50,7 @@ var _last_x: int = -1
 var _phase: int = 0
 var _since_scoop: int = 0
 var _drop_before: int = 0
+var _waited: int = 0
 
 
 func _init(p_budget: int) -> void:
@@ -165,6 +166,16 @@ func _step_leg(leg: Dictionary, out: Dictionary) -> int:
 			return _step_deliver(out, leg)
 		&"await":
 			return _step_await(out, leg)
+		&"walk_to":
+			return 1 if _step_walk(out["frame"], int(leg["col"]), int(leg.get("slack", 1)),
+				int(leg.get("max_row", 1 << 30))) else 0
+		&"descend":
+			return _step_descend(out["frame"], leg)
+		&"await_status":
+			return _step_await_status(leg)
+		&"note":
+			_note(leg)
+			return 1
 	return _step_custom(leg, out)
 
 
@@ -205,6 +216,7 @@ func _reset_leg() -> void:
 	_phase = 0
 	_since_scoop = 0
 	_drop_before = 0
+	_waited = 0
 
 
 ## The frame's fields, in one place so `tick` and the steppers cannot disagree about what a hop is:
@@ -286,6 +298,43 @@ func _step_await(out: Dictionary, leg: Dictionary) -> int:
 	var m: Vector2i = leg["at"]
 	_fill(out["frame"], signi(m.x + 1 - pos().x))
 	return 0
+
+
+## One tick of a descend leg: walk toward `col` until the body stands at or below `row` -- the shaft
+## descent's honest shape. No hop-on-stall: the stall detector's job here would be to climb back out
+## of the hole the leg is walking into, so it steers by position, not by progress.
+func _step_descend(f: InputFrame, leg: Dictionary) -> int:
+	var p: Vector2i = pos()
+	if p.y >= int(leg["row"]) and p.x == int(leg["col"]) and body.on_floor:
+		return 1
+	_fill(f, signi(int(leg["col"]) - p.x) if p.y < int(leg["row"]) else 0)
+	return 0
+
+
+## One tick of an await_status leg: poll the machine records the observation carries for the machine
+## at `at`, until its `status` reads the wanted string or `timeout_ticks` (default 600) runs out.
+func _step_await_status(leg: Dictionary) -> int:
+	for rec: Dictionary in o.machines:
+		if rec.get("cell") == leg["at"] and rec.get("status") == StringName(leg["status"]):
+			return 1
+	_waited += 1
+	return 2 if _waited >= int(leg.get("timeout_ticks", 600)) else 0
+
+
+## The `note` leg's whole job: snapshot the observation into `notes` under `key` -- machine records
+## and pile contents at the named cells, with the tick, so a claim cites what the run SAW.
+func _note(leg: Dictionary) -> void:
+	var entry: Dictionary = {"tick": ticks, "key": String(leg.get("key", "")), "pos": pos(),
+		"machines": {}, "piles": {}}
+	for c: Vector2i in leg.get("machines", []):
+		for rec: Dictionary in o.machines:
+			if rec.get("cell") == c:
+				(entry["machines"] as Dictionary)[c] = rec.duplicate(true)
+	for c: Vector2i in leg.get("piles", []):
+		var pile: Dictionary = o.pile_at(c)
+		if not pile.is_empty():
+			(entry["piles"] as Dictionary)[c] = pile.duplicate()
+	notes.append(entry)
 
 
 ## The body's current logic cell.

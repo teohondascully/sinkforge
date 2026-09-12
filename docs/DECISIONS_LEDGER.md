@@ -23663,3 +23663,22 @@ pre-refactor trace) both pass -- the extraction is behavior-identical. The only 
 `as ColdStartBot` casts on `bot_for` (its return type widened to `RouteBot`).
 Reverse: fold `route_bot.gd` back into `cold_start.gd` and drop the casts; nothing else depends on
 the split yet.
+
+## D0645 · 2026-09-12 · sim/machines/{machine_state,runners}.gd, sim/run/world_seeder.gd, shell/save_game.gd, data/starts/{SCHEMA,generated,conveyor_probe}, scenarios/conveyor_jam.yaml, harness/bots/conveyor_bot.gd, harness/driver/scenario_driver.gd, tests/test_conveyor_jam.gd · WIP: the conveyor-jam beat's fixture -- the placed-instance intake override and the probe route
+
+PARKED MID-DEBUG on `wip/conveyor-jam`: committed to preserve the state, not because it is done -- the
+suite's own run says so (8 of 18 assertions fail; see the entry's Reverse). What is here and ruled:
+the conveyor-discovery claim needs a machine whose intake rule differs from its record's, so a placed
+instance can carry an `intake` override (`machine_state.gd`) that the runner reads before the def
+(`runners.gd`) -- the jam-variant forge takes clay as intake where the shipped record does not. The
+override round-trips the save format (`save_game.gd`), and the seeder applies it when a start record's
+placed machine carries the field (`world_seeder.gd`). The probe start (`conveyor_probe`) authors a
+capped bore with a resting ore/coal pile and the jam forge at its foot; `ConveyorBot` (RouteBot
+subclass) routes the discovery: dig the cap, watch the pile ride the column into the intake, descend,
+toss the foreign item. `ScenarioDriver` gained the `await_status` leg's machine-status poll for the
+blocked end state.
+Known red at commit: the route's legs never fire -- every leg including the first `walk_to` reports
+"goal event never fired inside 6000 ticks" -- so the jam sequence is choreographed but unproven.
+RouteBot itself is sound (test_cold_start_d1 passes 20/20 on the same machinery), which localises the
+fault to the probe world's layout or the leg goals, not the shared engine.
+Reverse: `git revert` this commit removes the override and the fixture; the failing suite goes with it.

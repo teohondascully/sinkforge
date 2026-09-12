@@ -34,4 +34,40 @@ const RECORDS: Dictionary = {
 			"invariants_hold",
 		],
 	},
+	"conveyor_jam": {
+		"name": "conveyor_jam",
+		"claim": "C005",
+		"seed": 20260825,
+		"world": {
+			"site": "shallow_clay",
+			"start": "conveyor_probe",
+		},
+		"agent": "conveyor_probe",
+		"rig": {
+			"demands_satisfied": [],
+			"stockpile": {},
+		},
+		"player": {
+			"start_depth": 0,
+			"pack": [
+				{
+					"item": "clay",
+					"count": 1,
+				},
+			],
+		},
+		"envelope": "oracle",
+		"goal": {
+			"type": "machine_status",
+			"cell": [
+				35,
+				27,
+			],
+			"status": "blocked",
+		},
+		"budget_ticks": 6000,
+		"assertions": [
+			"invariants_hold",
+		],
+	},
 }

@@ -28,6 +28,75 @@ const RECORDS: Dictionary = {
 			},
 		],
 	},
+	"conveyor_probe": {
+		"id": "conveyor_probe",
+		"site": "shallow_clay",
+		"spawn_col_m": 32,
+		"fixtures": [
+			{
+				"kind": "pile",
+				"item": "ore",
+				"count": 4,
+				"dx": 3,
+				"dy": -1,
+			},
+			{
+				"kind": "pile",
+				"item": "coal",
+				"count": 2,
+				"dx": 3,
+				"dy": -1,
+			},
+			{
+				"kind": "solid",
+				"dx": 3,
+				"dy": 1,
+				"material": "clay",
+				"deposit": 0,
+			},
+			{
+				"kind": "open",
+				"cells": [
+					[
+						3,
+						2,
+					],
+					[
+						3,
+						3,
+					],
+					[
+						3,
+						4,
+					],
+					[
+						3,
+						5,
+					],
+					[
+						3,
+						6,
+					],
+					[
+						3,
+						7,
+					],
+				],
+			},
+			{
+				"kind": "machine",
+				"id": "processor",
+				"dx": 3,
+				"dy": 7,
+				"intake": "jam",
+			},
+			{
+				"kind": "pack",
+				"item": "clay",
+				"count": 1,
+			},
+		],
+	},
 	"dev_kit": {
 		"id": "dev_kit",
 		"fixtures": [

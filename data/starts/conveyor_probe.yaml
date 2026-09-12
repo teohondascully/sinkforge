@@ -1,0 +1,22 @@
+# The conveyor-discovery fixture (D0645, C005's scenario world): a capped bore three metres east of
+# spawn -- an old shaft, two metres of cap over an open drop, a cold forge at its foot -- with a
+# supply pile resting on the cap. Dig the cap out from under the pile and the pile rides the hole
+# down into the forge's intake: the hole you dig is the conveyor. The forge is a placed-instance
+# `intake: jam` variant -- the shipped records all stay `pass` (test_machine_defs pins that
+# population), and the variant exists so the claim can show the self-inflicted jam a `pass` intake
+# can never produce. The pack carries one clay: the foreign item the route feeds it.
+id: conveyor_probe
+site: shallow_clay
+spawn_col_m: 32
+fixtures:
+  # THE SUPPLY PILE over the cap: enough ore and coal for the forge to actually run before the jam.
+  - {kind: pile, item: ore, count: 4, dx: 3, dy: -1}
+  - {kind: pile, item: coal, count: 2, dx: 3, dy: -1}
+  # THE CAP: the pad's own surface metre plus one more -- two digs open the bore.
+  - {kind: solid, dx: 3, dy: 1, material: clay, deposit: 0}
+  # THE BORE: an open drop under the cap down to the forge's cell.
+  - {kind: open, cells: [[3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7]]}
+  # THE COLD FORGE at the foot, authored `intake: jam` on this placed instance only (D0645).
+  - {kind: machine, id: processor, dx: 3, dy: 7, intake: jam}
+  # The foreign item for the self-inflicted jam: one clay in the pack.
+  - {kind: pack, item: clay, count: 1}

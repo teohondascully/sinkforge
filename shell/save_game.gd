@@ -80,7 +80,7 @@ static func capture(world: World, items: Items, machines: Machines) -> Dictionar
 			"in": m.input_buffer.duplicate(), "out": m.output_buffer.duplicate(),
 			"progress_ticks": m.progress_ticks, "route_toggle": m.route_toggle, "fuel": m.fuel,
 			"power_permille": m.power_permille, "fed": m.fed, "facing": m.facing, "mode": m.mode,
-			"filter": String(m.filter), "stage": m.stage,
+			"filter": String(m.filter), "stage": m.stage, "intake": String(m.intake),
 		})
 	return {
 		"version": VERSION,
@@ -255,6 +255,7 @@ static func _stage_machines(env: Dictionary, world: World) -> Machines:
 			m.set(field, int(entry.get(field, 0)))
 		m.power_permille = int(entry.get("power_permille", 1000))
 		m.filter = StringName(str(entry.get("filter", "")))
+		m.intake = StringName(str(entry.get("intake", "")))   # absent on saves before D0645: the def's rule
 	machines.winch_routes = (env.get("winch_routes", {}) as Dictionary).duplicate()
 	machines.winch_transit = (env.get("winch_transit", {}) as Dictionary).duplicate(true)
 	return machines
