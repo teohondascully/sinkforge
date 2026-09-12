@@ -23030,21 +23030,6 @@ trusted. Same story as D0115: the guard you haven't seen fail is a decoration.
 Reverse: remove `FORBIDDEN_AUTOLOAD_PREFIXES`/`autoload_violations` and the test file; the docstring
 reverts to an overclaim.
 
-## D0601 · 2026-09-11 · tools/layer_lint/check_project_settings.py, no_engine_imports.py, test_check_project_settings.py · gate 5 gets a real check, in the file that can see it
-Decided: gate 5's autoload clause is enforced by `check_project_settings.py`, which now scans
-`[autoload]` entries and fails on any target under `res://sim/` or `res://core/` (POLICED_DIRS parity
-with `no_engine_imports.py`). `no_engine_imports.py`'s docstring is corrected: it listed "autoloads /
-singletons" as a checked category while carrying no pattern for one -- the declaration lives in
-project.godot, outside every file that tool greps. A docstring overclaim in a tool whose own docstring
-warns about exactly that failure class.
-Why: the Phase 1 audit proved the escape live -- an `[autoload]` entry pointing into sim/ passed every
-gate. And the new check's own first version was itself silently broken: the strip order
-(`lstrip("*")` before removing quotes) left the `*` in the path, so a starred sim/ autoload matched no
-prefix and reported clean -- caught by the mutation test written alongside, before the check was ever
-trusted. Same story as D0115: the guard you haven't seen fail is a decoration.
-Reverse: remove `FORBIDDEN_AUTOLOAD_PREFIXES`/`autoload_violations` and the test file; the docstring
-reverts to an overclaim.
-
 ## D0602 · 2026-09-11 · docs/QUALITY.md · the gate list now says which gates are gates
 Decided: each of the 37 numbered gates states its audited status inline. Amendments: gate 4's
 complexity clause marked measured-not-gated; gate 5 now cites the real enforcement point; gates 6, 10,
@@ -23137,25 +23122,6 @@ Decided: `check_module_docs.py` requires every .gd-bearing directory in a police
 (layer_lint.ALLOWED) to carry MODULE.md or README.md -- the tree practices both conventions
 (sim/core/interface the first, view/shell/harness the second), so the gate checks for a doc, not a
 filename. `data/` is exempt: its subdirs are one generated catalog (ADR 0004), documented by the
-generator and the ADR, not eight hand files that would only ever drift. Unpoliced tops (tests/,
-playtest/, legacy/) carry no obligation, by the same rule that keeps them out of the dependency
-graph. The four view/ subdirs got MODULE.md files because they are module-shaped (a separable
-concern with its own contract), while view/ itself keeps the README the layer already chose.
-Why: the audit found gate 6 declared "MODULE.md present and current in every module directory" while
-nothing checked presence and view/'s four subdirs shipped undocumented. Presence is now enforced;
-"current" stays unclaimed -- no cheap check verifies content freshness, and the gate text says so
-rather than implying it.
-Verified: check fails on the pre-doc tree naming exactly the four view/ subdirs; mutation test
-9/9 branches (missing doc reported, layer README not covering a new subdir, README satisfying the
-rule, exempt tops ignored, empty population exits 2). Formatter PASS.
-Reverse: delete tools/layer_lint/{check_module_docs.py,test_check_module_docs.py}, the four
-view/*/MODULE.md files, the harness step, revert the gate-6 text.
-
-## D0607 · 2026-09-11 · tools/layer_lint/check_module_docs.py, view/{audio,fx,hud,visuals}/MODULE.md, harness.yml, docs/QUALITY.md · gate 6's presence half, enforced against the tree's real doc convention
-Decided: check_module_docs.py requires every .gd-bearing directory in a policed layer
-(layer_lint.ALLOWED) to carry MODULE.md or README.md -- the tree practices both conventions
-(sim/core/interface the first, view/shell/harness the second), so the gate checks for a doc, not a
-filename. data/ is exempt: its subdirs are one generated catalog (ADR 0004), documented by the
 generator and the ADR, not eight hand files that would only ever drift. Unpoliced tops (tests/,
 playtest/, legacy/) carry no obligation, by the same rule that keeps them out of the dependency
 graph. The four view/ subdirs got MODULE.md files because they are module-shaped (a separable
@@ -23274,3 +23240,14 @@ generations of cleanup summaries. Same move as D0159: the full file is preserved
 instructions, the queue's open items (21, 30, 39, 44, 45, 51, 52, the match loop), the current-stage
 paragraph, the 24-seat opening funnel, and pointers rather than copies for the programme detail.
 check_working_freshness passes; every link in the new page resolves.
+
+## D0617 · 2026-09-11 · tools/check_corrections_freshness.py, tools/test_corrections_freshness.py, docs/DECISIONS_LEDGER.md · two live gate findings fixed: a duplicated ledger pair and a filename false positive
+
+Gate-status's local sweep found two reds. (1) The ledger itself: D0601 and D0607 were each declared
+twice -- the earlier shell-quoting failure appended the entry, the commit failed, the retry appended it
+again. Both second copies removed; check_ledger_integrity is green. (2) check_corrections_freshness
+flagged D0603 as drift because its header names `test_corrections_freshness.py` -- the tool's own
+filename carries the "correct" substring the same way CORRECTIONS.md does, and FILENAME_RE only ever
+stripped the .md. Generalized the strip to any filename token containing "correct"; the mutation test
+gained the .py-naming case. The finding is the same class the tool was already built to catch: a
+filename, not a correction.

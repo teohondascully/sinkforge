@@ -39,7 +39,10 @@ KEYWORD_RE = re.compile(
 )
 
 
-FILENAME_RE = re.compile(r"(docs/)?CORRECTIONS\.md", re.IGNORECASE)
+# Any filename token containing "correct", not just CORRECTIONS.md itself: the tool's own name
+# (`tools/check_corrections_freshness.py`, `tools/test_corrections_freshness.py`) carries the same
+# substring and flagged a mutation-test entry (D0603) as drift for citing the tool it tests.
+FILENAME_RE = re.compile(r"\S*correct\S*\.(?:md|py)", re.IGNORECASE)
 
 
 def candidate_ids(ledger_text: str) -> list[str]:

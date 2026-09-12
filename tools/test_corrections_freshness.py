@@ -31,6 +31,8 @@ def main() -> int:
                 candidate_ids("## D0103 · the lamp dial is not connected\n") == [])
     LOG.observe("a header merely NAMING CORRECTIONS.md is not collected (the live false positive)",
                 candidate_ids("## D0104 · wrote docs/CORRECTIONS.md for the audit\n") == [])
+    LOG.observe("a header naming the tool's own .py files is not collected (the D0603 false positive)",
+                candidate_ids("## D0107 · tools/test_corrections_freshness.py, tools/check_corrections_freshness.py get tests\n") == [])
     LOG.observe("a non-header line carrying the keyword is not collected (headers only)",
                 candidate_ids("body text: this corrects nothing in the header sense\n") == [])
     LOG.observe("mixed set: only the real correction header comes back",
