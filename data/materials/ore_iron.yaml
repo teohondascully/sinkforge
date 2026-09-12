@@ -15,7 +15,7 @@ yields: ore   # the vein is iron ore; what you carry and smelt is `ore` (D0409, 
 #
 # Legacy `iron`, lifted verbatim. Cool blue-white flecks on a blue-grey host.
 
-base_color: [0.21, 0.24, 0.31]
+base_color: [0.42, 0.48, 0.62]
 grain: true
 grammar: clastic
 depth_darken: 0.3

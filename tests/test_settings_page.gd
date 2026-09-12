@@ -1,9 +1,11 @@
 extends "res://tests/test_base.gd"
-## D0372. `view/hud/settings_page.gd` + `settings_draw.gd`: legacy's split kept, the pure half posed
-## headless. The claims are legacy's own cursor and payload rules on this build's four actions: the
-## same payload for a click and for ENTER, clamped rather than wrapped, the column jump only on the
-## two-column face; the clash detection over every action; the page's wanted height from what draws
-## it; the rise; and, after a real redraw, a click routed against the rectangles that were painted.
+## D0372 + D0632. `view/hud/settings_page.gd` is the pure model, posed headless; `settings_control.gd`
+## is the face, a real Control tree witnessed in a real tree. The claims: the cursor and payload rules
+## on this build's actions (same payload for a click and for ENTER, clamped rather than wrapped, the
+## column jump only on the two-column face); the clash detection over every action; the wanted height;
+## the rise. On the tree: every face's controls exist and take no gui focus, a slider emits its frac,
+## a chip its payload, the ring mirrors `page.row` -- on CONTROLS, by MODEL row, not insertion order --
+## the armed door says so, the skin swaps whole, and a closed page takes its tree with it.
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_settings_page.gd
 const S: int = Fx.SCALE
@@ -15,7 +17,8 @@ func _initialize() -> void:
 	_test_the_cursor_steps_and_jumps()
 	_test_the_clashes()
 	_test_the_geometry_and_the_rise()
-	await _test_a_click_lands_on_what_was_painted()
+	await _test_the_control_tree_is_the_page()
+	await _test_signals_skin_and_the_ring()
 	_finish("settings_page")
 
 
@@ -94,8 +97,6 @@ func _test_the_geometry_and_the_rise() -> void:
 	for _i: int in 30:
 		p.advance(0.05)
 	_check(is_equal_approx(p.ease(), 1.0), "a second on it is fully up")
-	var g: Dictionary = p.geometry()
-	_check((g["origin"] as Vector2).x > 0.0 and is_equal_approx(float(g["w"]), UiTheme.px(SettingsPage.SET_W_COMPACT)) and (g["content"] as Rect2).size.x > 0.0, "the plate is centred at the compact width with a content rect (%s)" % str(g["content"]))
 	p.open = false
 	for _i: int in 30:
 		p.advance(0.05)
@@ -104,61 +105,134 @@ func _test_the_geometry_and_the_rise() -> void:
 	_check(lines.size() >= 2, "a long sentence wraps at the plate's width (%d lines)" % lines.size())
 
 
-func _test_a_click_lands_on_what_was_painted() -> void:
-	var items: Items = _hub_items(20, 20)
-	var machines: Machines = _hub_machines(items)
-	var world: World = items.world
-	for col: int in range(20):
-		for row: int in range(15, 20):
-			world.set_solid(Vector2i(col, row), &"clay")
-	var body: Body = Body.new(Fx.from_int(40), Fx.from_int(14 * 16 + 8) - Body.HEIGHT_PX / 2 * S)
-	var door: Interface = Interface.new(world.grid, body, Mining.new(), world, items, machines)
-	var view: WorldView = WorldView.new()
-	var cam: Camera2D = Camera2D.new()
-	root.add_child(view)
-	view.add_child(cam)
-	view.setup(door, MaterialLook.new(), cam)
+## The modal as a real tree (D0632), re-cut typeset (D0634): the shell builds around the model, faces
+## materialize per category, the head is an overline over a display title over a rule, every row sits
+## on a hairline, the plate hugs its content, and the payloads the painter's hit-rects spoke now come
+## off real control signals.
+func _test_the_control_tree_is_the_page() -> void:
 	var page: SettingsPage = SettingsPage.new()
 	page.state = _state()
+	var ctl := SettingsControl.new()
+	ctl.page = page
+	root.add_child(ctl)
+	await process_frame
+	var plate: PanelContainer = ctl.find_child("plate", true, false)   # runtime nodes are unowned
+	var rail: VBoxContainer = ctl.find_child("rail", true, false)
+	_check(ctl.theme != null and plate != null and rail != null and ctl.find_child("detail", true, false) != null,
+		"the shell: a themed plate with a rail and a detail plate")
+	_check(not ctl.visible, "a closed page keeps its tree dark")
+	_check(rail.get_child_count() == SettingsPage.RAIL_ORDER.size(), "one rail tab per face, in rail order")
 	page.open = true
 	for _i: int in 40:
 		page.advance(0.05)
-	var ran: Array = [0]
-	view.add_hud().add_chip(func(f: Frame, ci: CanvasItem) -> void:
-		page.paint(f, ci)
-		ran[0] = int(ran[0]) + 1)
-	await process_frame
-	view.refresh()
-	view.add_hud().refresh()
 	for _i: int in 3:
 		await process_frame
-	_check(int(ran[0]) > 0 and page.hit_count() == SettingsPage.RAIL_ORDER.size() + 1 + 4, "the AUDIO face painted every rail tab, the mute and four sliders as hits (%d runs, %d hits)" % [int(ran[0]), page.hit_count()])
-	var g: Dictionary = page.geometry()
-	var c: Rect2 = g["content"]
-	var bar_x: float = c.position.x + UiTheme.px(SettingsPage.SET_CTRL_DX)
-	var bar_y: float = c.position.y + UiTheme.px(14.0) + UiTheme.px(SettingsPage.SET_ROW) * 2.0 - UiTheme.px(4.0)
-	var hit: Dictionary = page.click(Vector2(bar_x + UiTheme.px(SettingsPage.SET_BAR_W) * 0.5, bar_y))
-	_check(hit.get("slider", "") == "sound" and absf(float(hit.get("frac", -1.0)) - 0.5) < 0.05, "a click on the middle of the second level is that slider at half (%s)" % str(hit))
-	_check(page.click(Vector2(2.0, 2.0)).is_empty(), "a click on nothing is nothing")
-	page.set_cat(SettingsPage.CAT_CONTROLS)
-	view.refresh()
-	view.add_hud().refresh()
+	_check(ctl.visible and is_equal_approx(page.ease(), 1.0), "an open page raises a visible tree")
+	var overline: Label = ctl.find_child("overline", true, false)
+	var title: Label = ctl.find_child("title", true, false)
+	_check(overline != null and overline.text == "SETTINGS" and title != null and title.text == "Audio"
+		and ctl.find_child("head_rule", true, false) != null,
+		"the head typesets itself: tracked overline, the category as display title, a rule under it")
+	_check((overline.get_theme_font("font") as FontVariation).spacing_glyph > 0
+		and (title.get_theme_font("font") as FontVariation).variation_embolden > 0.0,
+		"the fake-it hierarchy is real: the overline is tracked, the title emboldened")
+	_check(is_zero_approx(plate.custom_minimum_size.y),
+		"the plate hugs content -- no authored height floor to float an empty lower half")
+	var wrap0: Control = ctl._focusables[0].get_meta("ring")
+	var ruled: bool = false
+	for k: Node in (wrap0.get_child(0) as Container).get_children():
+		if (k as Control).theme_type_variation == &"PageRule":
+			ruled = true
+	_check(ruled, "every row sits on a PageRule hairline, not a filled box")
+	var sliders: Array = ctl.find_children("*", "HSlider", true, false)
+	var chips: Array = ctl.find_children("*", "Button", true, false)
+	_check(sliders.size() == 4 and chips.size() == SettingsPage.RAIL_ORDER.size() + 1,
+		"AUDIO: four sliders, the rail, and the mute chip (%d sliders, %d chips)" % [sliders.size(), chips.size()])
+	var unfocused: bool = true
+	for c: Control in ctl.find_children("*", "Control", true, false):
+		if c.focus_mode != Control.FOCUS_NONE:
+			unfocused = false
+	_check(unfocused, "no control takes gui focus -- keys stay the seat's")
+	ctl.queue_free()
+
+
+## The same tree TALKS (D0632, re-cut D0634): the payloads the painter's hit-rects spoke come off
+## real control signals, the ring mirrors the model's row, the other faces hold their own, and a
+## skin swap reaches the theme the plate and the note ink draw from.
+func _test_signals_skin_and_the_ring() -> void:
+	var page: SettingsPage = SettingsPage.new()
+	page.state = _state()
+	var ctl := SettingsControl.new()
+	ctl.page = page
+	root.add_child(ctl)
+	page.open = true
+	for _i: int in 4:
+		await process_frame
+	var rail: VBoxContainer = ctl.find_child("rail", true, false)
+	var sliders: Array = ctl.find_children("*", "HSlider", true, false)
+	var got: Array = []
+	ctl.payload.connect(func(p: Dictionary) -> void: got.append(p))
+	(sliders[1] as HSlider).value = 0.25   # the snapshot seats sound at 0.5; a change is what emits
+	_check(not got.is_empty() and got[0].get("slider") == "sound" and absf(float(got[0].get("frac", -1.0)) - 0.25) < 0.05,
+		"the second slider answers at a quarter: %s" % str(got))
+	got.clear()
+	for c: Control in ctl.find_children("*", "Button", true, false):
+		if String(c.get_meta("dyn_id", "")) == "mute":
+			(c as Button).pressed.emit()
+	_check(got == [{"toggle": "mute"}], "the mute chip's payload is the model's: %s" % str(got))
+	got.clear()
+	(rail.get_child(3) as Button).pressed.emit()
+	_check(got == [{"cat": SettingsPage.CAT_CONTROLS}], "the fourth rail tab selects CONTROLS: %s" % str(got))
+	page.row = 2
+	await process_frame
+	_check((ctl._focusables[2].get_meta("ring") as Control).has_theme_stylebox_override("panel")
+		and not (ctl._focusables[0].get_meta("ring") as Control).has_theme_stylebox_override("panel"),
+		"the ring mirrors page.row and moves off the row it left")
+	await _controls_and_game_faces(page, ctl)
+	ctl.apply_skin("paper")
 	for _i: int in 2:
 		await process_frame
-	_check(page.hit_count() == SettingsPage.RAIL_ORDER.size() + SettingsPage.REMAP_ROWS.size() + 1, "the CONTROLS face painted the rail, every binding and RESET (%d)" % page.hit_count())
-	await _game_face_paints(page, view)
-	view.queue_free()
+	# `ctl.theme` is the skin carrier: `apply_skin` rebuilds it whole, and the plate reads its
+	# "panel" stylebox under the PagePlate variation from it.
+	var plate: Control = ctl.find_child("plate", true, false)
+	_check((ctl.theme.get_stylebox("panel", "PagePlate") as StyleBoxFlat).bg_color.is_equal_approx(PageTokens.PAPER["plate"])
+		and plate != null and plate.theme_type_variation == &"PagePlate",
+		"the paper skin reaches the theme the plate draws from")
+	_check((ctl._detail as Label).get_theme_color("font_color").is_equal_approx(PageTokens.PAPER["ink_faint"])
+		and (ctl._foot as Label).get_theme_color("font_color").is_equal_approx(PageTokens.PAPER["ink_faint"]),
+		"the note ink rides the swap whole -- the capture's stale-INSTRUMENT-ink bug cannot recur (D0634)")
+	page.open = false
+	for _i: int in 40:
+		page.advance(0.05)
+	for _i: int in 3:
+		await process_frame
+	_check(not ctl.visible, "a closed page takes the tree with it")
+	ctl.queue_free()
 
 
-## The GAME face (D0396): the rail and its two doors are hits, and the second door's chip is NEW GAME.
-func _game_face_paints(page: SettingsPage, view: WorldView) -> void:
+## CONTROLS and GAME (D0632): the two-column face rings by MODEL row even though the grid is filled
+## column-major, and the armed second door says SURE on the chip itself.
+func _controls_and_game_faces(page: SettingsPage, ctl: SettingsControl) -> void:
+	page.set_cat(SettingsPage.CAT_CONTROLS)
+	for _i: int in 2:
+		await process_frame
+	_check(ctl._focusables.size() == SettingsPage.REMAP_ROWS.size() + 1, "the bindings plus RESET are the cursor's stops")
+	_check(String((ctl._focusables[1] as Control).get_meta("dyn_id", "")) == "bind:" + String(SettingsPage.REMAP_ROWS[1][0]),
+		"row 1's ring lands on the model's second binding, not the grid's second cell")
+	_check((ctl._focusables[1].get_meta("ring") as Control).get_parent() is GridContainer, "the rows live in the two-column grid")
+	page.row = 1
+	await process_frame
+	_check((ctl._focusables[1].get_meta("ring") as Control).has_theme_stylebox_override("panel"), "the ring follows the cursor into the second binding")
 	page.set_cat(SettingsPage.CAT_GAME)
 	page.armed = "new"
-	view.refresh()
-	view.add_hud().refresh()
 	for _i: int in 2:
 		await process_frame
-	_check(page.hit_count() == SettingsPage.RAIL_ORDER.size() + 2, "the GAME face painted the rail and its two doors as hits (%d)" % page.hit_count())
-	var c2: Rect2 = page.geometry()["content"]
-	var chip_hit: Dictionary = page.click(Vector2(c2.position.x + UiTheme.px(SettingsPage.SET_CTRL_DX) + UiTheme.px(8.0), c2.position.y + UiTheme.px(14.0) + UiTheme.px(SettingsPage.SET_ROW)))
-	_check(chip_hit == {"game": "new"}, "the second door's chip is NEW GAME's payload (%s)" % str(chip_hit))
+	var new_chip: Button = null
+	for c: Control in ctl.find_children("*", "Button", true, false):
+		if String(c.get_meta("dyn_id", "")) == "new":
+			new_chip = c
+	var got: Array = []
+	ctl.payload.connect(func(p: Dictionary) -> void: got.append(p))
+	new_chip.pressed.emit()
+	_check(new_chip.text.contains("SURE") and got == [{"game": "new"}],
+		"the armed door says SURE and still speaks its payload (%s / %s)" % [new_chip.text, str(got)])

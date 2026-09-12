@@ -1045,9 +1045,20 @@ committed pair predates it.
 
 ---
 
-## P031 · The world is 12 metres wide, and the ported framing needs 40 — the shaft width is now a blocker
+## P031 · EXECUTED 2026-09-01 as D0335 — ruled 64 m (256 cells), shipped, framing derived; entry left open by oversight
 
-**RULING WANTED: does the play world stay a 12-metre shaft, or widen?** This is a design question, not a
+**This item was ruled the evening it was filed and has been resolved since `a3574b8b`** — "Ruled by the
+director as P031: 256 cells / 64 m, not legacy's own 512." `shallow_clay` has carried `width_cells: 256`
+since D0335, and `CameraRig.default_zoom_for()` derives the default (legacy's 40 m rung unless the world
+is too narrow — at 64 m the 40 m frame IS the default, the "largest visible improvement" this entry said
+was blocked). The "12-metre" measurement below is the pre-D0335 world; a 2026-09-12 queue picked this
+entry up as still-open and the correction is recorded here so it does not get picked up a third time.
+What remains genuinely open about width is the *next* question — whether the factory floor wants more
+than two screens — and that is a play-evidence question, not this one.
+
+---
+
+**RULING WANTED (answered above): does the play world stay a 12-metre shaft, or widen?** This is a design question, not a
 port, which is why it is parked rather than decided. Everything below is measured.
 
 ### What forced it
@@ -1129,7 +1140,7 @@ sites mechanically in one commit. It is a large diff and a tiny risk -- every si
 the compiler catches every miss, and no behaviour moves. Roughly an hour. Do it before the next feature
 that needs an observation field, not after.
 
-## P035 · 2026-09-10 · the last metre and a half out of a shaft belongs to no verb
+## P035 · 2026-09-10 · the last metre and a half out of a shaft belongs to no verb  **[EXECUTED D0631]**
 
 **Measurement.** With D0567's fix the line now lifts a body out of a shaft it dug: row 55 to row 26 of a
 10 m shaft in `tests/test_grapple_body.gd`. It stops there, and the stop is geometric rather than a bug.
@@ -1163,6 +1174,13 @@ chip 5 m -> 2 m), cut a step into the lip and walk out (3 bursts, chip 1 m, "ENT
 **27 bursts** against 515-and-never. So P035 is polish, not a blocker: the player CAN get out today, and
 the ruling is only about whether the last metre and a half should feel like a climb or like a dig.
 
+**EXECUTED 2026-09-12 (D0631).** Option (1) landed, but not through `_try_step`: the reel-stop hang
+leaves the feet ~41px under the lip and the box-overlap mantle cannot see a ledge overhead -- the
+needed lift exceeds `MANTLE_PX` at any bite. The verb lives in `BodySwing._lip_mantle`: toward-and-up
+on a held line lands the feet on the top of the hitch's solid run, reach-bounded by the reel's own
+ceiling. `grapple.taut` also satisfies the horizontal-resolve mantle's grounded gate (the auto step-up
+keeps `recently_grounded`). Measured on the shaft rig, mutation-witnessed, fuzz-clean.
+
 ## P036 · 2026-09-10 · our lights can only ever DARKEN, and the reference's add
 
 **Measurement, all off the `lighting_bench` frame and the reference, same 5x5 mean luma.**
@@ -1195,6 +1213,14 @@ reversible in data and answers most of the gap; (2) is the better model and can 
 without undoing it.
 
 **Not a root blocker.** Phase 3 (rock texture, strata, cobbles) is independent and continues.
+
+**EXECUTED 2026-09-12 (`6c7d05b9`, D0630).** Option (1) landed: every material base x2 (glimmer x1.5,
+clips otherwise); coal's speckle re-gapped over the new matrix or the wall-lode and palette bounds both
+fail. The `test_rock_tone` clamp control moved to a synthetic near-black input -- a doubled palette
+legitimately never reaches zero, so the mechanism is proven on an input that needs it. Arithmetic
+against the measured veil levels lands the entry's own prediction (deepstone 0.181 unlit / 0.315 lit).
+A `lighting_bench` capture is the remaining visual confirmation; option (2) stays parked unless the
+frame still reads flat.
 
 ## P037 · 2026-09-10 · the 400-line file cap now blocks adding a DATA record  **[RESOLVED D0574]**
 
@@ -1435,6 +1461,16 @@ then the forge, then the press, and only then a demand for plates.
 
 Which is the sentence this item's original title got wrong.
 
+### SUPERSEDED, 2026-09-12 (D0628): the metal route, in the mandated order
+
+The director's "correct all of those in order" overrode the park. The ruling's constraints held anyway:
+a real `iron` source first (`iron:`'s own `material:` field, decorative until now), then the forge (d4),
+then the press and mill (d5), and only then a demand that wants plates and gears (d6). `rich_ore`
+came from `lode.rich_chance` — legacy's RICH_CHANCE promoted out of `pending_sim_economy`. Wood burns at
+half a coal off `Runners.FUEL_FACTOR`. Gate 37 exits 0 bare; `--report-only` is off the CI step. The
+reclamation beat this item recommended is not in the ladder — `pump` arrives at d7 with `lift` instead —
+and whether the aquifer pull should lead the mid-game remains the design call this ruling named.
+
 ## P043 · Loose cells are a real feature at a magnitude nobody chose. Which material should carry them?
 
 **The director asked whether the cascading dig was a bug or a feature.** It is a feature — D0562/D0563/
@@ -1540,6 +1576,16 @@ spends most of its time. But it changes every world anyone has generated, and th
 **A cheaper half, if the answer is no:** the view could blend the two materials' colours across a band at
 the contact. I would rather not — the colour would stop telling the truth about what a cell IS, and a
 player mining at 39 m and 41 m gets different materials either way.
+
+### EXECUTED, 2026-09-12 (D0629) — "correct all of those in order" un-parked it
+
+Landed exactly as scoped: the warp moved to `core/bedding_dip.gd` on `Angle`'s integer sine table (the
+core invariant bans libm transcendentals on state paths — the table, not `sin()`, is what made this
+shareable at all), `_fill_base` writes contacts at `threshold - dip_cells(col)`, and
+`BeddingTone.bedding_metres` reads the same function so material and tone are ONE line. Mutation-
+witnessed both ways: a flat fill fails the bedding-coordinate check on every clean contact, and the
+tone drifting back to float `sin` disagrees by 0.1375 m — over half a cell — which is the misalignment
+the fix exists to kill. Rides the shared golden re-pin with the economy batch.
 
 ## P045 · RULED 2026-09-12 -- the trees landed alone; P044 stays parked at its own re-pin cost
 

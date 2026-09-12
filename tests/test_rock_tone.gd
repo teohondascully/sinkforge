@@ -277,15 +277,12 @@ func _test_no_stack_of_darkeners_punches_a_hole_in_the_rock() -> void:
 		"worst_frac": 0.0, "worst_id": ""}
 	for id: String in MaterialsRecords.RECORDS:
 		_sweep_material(tone, look, id, tally)
-	var checked: int = int(tally["checked"])
 	var out_of_gamut: int = int(tally["out_of_gamut"])
 	var clamped_to_zero: int = int(tally["clamped"])
-	var materials: int = int(tally["materials"])
 	var worst_black_frac: float = float(tally["worst_frac"])
-	var worst_id: String = String(tally["worst_id"])
-	_check_over(checked, out_of_gamut == 0,
+	_check_over(int(tally["checked"]), out_of_gamut == 0,
 		"no channel over %d samples of %d real materials leaves [0,1] -- %d did"
-			% [checked, materials, out_of_gamut])
+			% [int(tally["checked"]), int(tally["materials"]), out_of_gamut])
 	# MEASURED, not guessed, AND RE-MEASURED WHEN ITS SUBJECT MOVED (D0494). Coal is still the worst
 	# clipper and every other material still reads 0.0%, but coal's base went 0.160 -> 0.2308 luma to get
 	# out of the colour of a hole, and its black fraction went 1.0-1.5% -> 0.08% with it. A 3% bound set
@@ -294,13 +291,22 @@ func _test_no_stack_of_darkeners_punches_a_hole_in_the_rock() -> void:
 	# nothing too, since it is already true of six of the seven materials.
 	_check(worst_black_frac < 0.01,
 		"the worst material (%s) is %.2f%% fully black, under the 1%% bound measured off coal's own 0.08%%"
-			% [worst_id, 100.0 * worst_black_frac])
-	# CONTROL: the clamp actually FIRES. If it never did, `min` would sit above zero and the invariant
-	# above would be true of an expression that never needed clamping -- a guard that cannot be observed
-	# working is not a guard. This is the row that makes the one above a measurement.
-	_check(clamped_to_zero > 0,
-		"CONTROL: the clamp fired on %d channel(s), so the in-gamut result above is the clamp's doing and "
-			% clamped_to_zero + "not a property the arithmetic had anyway")
+			% [String(tally["worst_id"]), 100.0 * worst_black_frac])
+	# CONTROL: the clamp actually FIRES. The doubled palette (P036) no longer reaches zero on its own --
+	# which is the change's point -- so the mechanism is proven on a synthetic near-black input instead of
+	# requiring a shipped material to clip. A guard that cannot be observed working is not a guard; the
+	# palette's own `clamped` count is still reported above it.
+	var synth: int = 0
+	var synth_neg: int = 0
+	for col: int in range(0, 40):
+		for row: int in range(150, 200):
+			var c: Color = tone.shade(Color(0.004, 0.004, 0.005), col, row, look.grammar_of(&"deepstone"))
+			synth_neg += int(c.r < 0.0 or c.g < 0.0 or c.b < 0.0)
+			synth += int(c.r == 0.0 or c.g == 0.0 or c.b == 0.0)
+	_check(synth > 0 and synth_neg == 0,
+		"CONTROL: the clamp fired on %d synthetic near-black channel(s), %d escaping negative "
+		% [synth, synth_neg] + "(shipped palette %d) -- the invariant is the clamp's doing, not luck"
+		% clamped_to_zero)
 
 
 ## One material's sweep, accumulated into `tally`. Split out of the test above at QUALITY gate 4's 50-line

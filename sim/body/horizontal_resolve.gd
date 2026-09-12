@@ -116,7 +116,15 @@ static func _try_climb(body: Body, grid: TileGrid, input: InputFrame, extends_fo
 	# mechanic: a climb is something the body does FROM THE GROUND. That is also what makes an instant
 	# translation tolerable at all -- a 16px pop while walking reads as stepping onto a kerb, the same pop
 	# mid-flight reads as a teleport, because in the air there was an expected trajectory to violate.
-	if (recently_grounded and extends_forward and body.vel_x != 0
+	#
+	# D0631 (P035's ruling): a TAUT LINE counts as that ground for the mantle only. A reel stops
+	# `Grapple.MIN_LENGTH` under the hitch -- about a metre and a half under a shaft's own lip, the
+	# topmost solid cell it can see -- and no chain of hooks closes it because every anchor IS the lip.
+	# The body hanging there is supported the way a floor supports: the line carries the weight, the arc
+	# is not ballistic, so a pop up onto the lip is a climb finishing, not a jump being bypassed. The
+	# auto step-up above keeps `recently_grounded` alone: it fires without consent, and on a line that
+	# yank is D0209's exact problem.
+	if ((recently_grounded or body.grapple.taut) and extends_forward and body.vel_x != 0
 			and lift <= Body.MANTLE_PX * Fx.SCALE and input.mantle_hold
 			and _try_step(body, grid, lift)):
 		body.mantled_this_tick = true

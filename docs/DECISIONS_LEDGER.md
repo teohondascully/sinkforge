@@ -23491,3 +23491,302 @@ apart and each is 13 wide, so the window around one root was reading its NEIGHBO
 the trees posed 7 m apart does M5 fail, at "6 trees wearing 2 canopy SHAPES".
 Six mutations witnessed in all across D0626 and D0627.
 Reverse: CHEAP as code. Rides the same golden re-pin as D0626.
+
+## D0628 · 2026-09-12 · data/materials/iron.yaml, data/materials/rich_ore.yaml, data/progression/d3-d7.yaml, data/strata/{shallow_clay,reveal_test_dense,reveal_test_sparse}.yaml, sim/terrain_gen/{shaft_generator,plane_passes}.gd, sim/machines/{runners,machines}.gd, tests/test_ore_bodies.gd, tests/test_material_palette.gd, .github/workflows/harness.yml, docs/QUALITY.md, tools/layer_lint/check_content_reachable.py · the ladder extension: P042's parked chain, wired whole
+Decided: P042's correction ruled the metal route's order (iron source first, then forge, then press,
+then the demand for plates) and forbade d3/d4 records that only named orphan machines; the director's
+"correct all of those in order" superseded the park, so the chain landed complete rather than as a
+grant that could not run. `iron:`'s `material:` field was decorative -- written `ore_iron` and ignored
+at the port, code hardcoding the same id, a lie of omission -- and now drives `_scatter_iron`; the deep
+scatter grows `iron` (item `iron`, `smelt_iron`'s feedstock) while `ore_iron` survives only as a deep
+lode and the start's authored starter vein, which is where `ore` has always come from in play. Deep
+lodes roll `rich_chance` (0.45, legacy's RICH_CHANCE promoted out of `ore.pending_sim_economy` where it
+sat unconsumed) into `rich_ore`, the `smelt_rich` input. `Runners.FUEL_FACTOR` is the one table
+`machine_eats` and the burner both read: coal 1.0, wood 0.5 -- the fuel question legacy answered "coal"
+because nothing else could burn. The ladder: d3 pays rope/torch/saplings for a copper assay (the
+shallow-vein material nothing consumed), d4 pays iron_forge + conduit for volume ingots (the deep feed
+needs the d1 drill), d5 pays gear_mill + plate_press for iron_ingot, d6 pays blast_furnace for gear +
+plate, d7 pays pump + lift for volume ingots. Gate 37 exits 0 bare for the first time; `--report-only`
+came off the CI step and the flag stays in the tool for the next question it cannot answer. Its own
+disclaimer still stands: the graph models `recipe.inputs`, not whether a granted machine is reachable,
+useful, or placed -- the runtime walkthrough is the remaining proof, not this commit.
+THE APPEARANCE RECORDS ARE TEST-DERIVED, not picked: `iron` failed `test_rock_tone`'s black tail at
+1.17% (bound 1%) and `test_wall_lode`'s plane separation at 0.188 (bound 0.30) until its base and mark
+moved into ore_iron's family; a WARM nugget is a longer recess path than the bound allows, because the
+wall recesses toward COOL. `nugget_count` moves retention the WRONG way -- the mark share grows `was`
+faster than it closes `now`.
+Reverse: revert the yaml/delegation edits and d3-d7; the gate returns to report-only and fifteen
+content entries re-orphan. Rides the shared golden re-pin: the world it generates moved.
+
+## D0629 · 2026-09-12 · core/angle.gd, core/bedding_dip.gd, core/MODULE.md, sim/terrain_gen/{relief,vertical_passes,shaft_generator}.gd, view/visuals/bedding_tone.gd, tests/test_relief.gd, docs/NEEDS_DIRECTOR.md P044 · the contacts ride the bedding -- one warp, shared by the generator and the tone
+Decided: P044, executed under "correct all of those in order". The material layer contacts were flat
+absolute rows while `BeddingTone.bedding_metres` dipped its tone bands +/-6 m by legacy's two sines --
+tone and material disagreed, which is why the contact read as a drawn line. The fix as scoped: move the
+warp to core/ so sim/ could reach it. THE SHAPE THE INVARIANT FORCED: `core/` bans libm transcendentals
+on state paths (D0167's platform-divergence class is exactly this), so a float `sin` in core would have
+re-opened the very hole the module exists to close. `Relief` already carried the project's answer -- a
+256-entry integer sine table -- so the kit moved to `core/angle.gd` (Relief delegates; the header and
+`test_relief.gd`'s table pins carry over, plus a delegation pin so a re-grown private sine cannot
+silently uncouple the hills from the warp). `core/bedding_dip.gd` holds legacy's dip verbatim,
+dip(x) = 2.4 sin(0.055x) + 3.6 sin(0.021x) metres, as `dip_milli_m`/`dip_cells`. `_fill_base` writes
+each contact at `threshold_row - dip_cells(col)`: both thresholds shift together so band thickness is
+preserved, and a contact riding above the local surface pinches out -- tilted strata against reliefed
+ground. `bedding_metres` reads the same table value, so the bands the tone paints and the boundaries
+the generator writes are THE SAME line, not two functions agreeing within a cell on one libm.
+Measured on the read-back: every clean clay/hardrock contact sits within half a cell of its bedding
+coordinate (0 off of 232), and the contacts land on 19 distinct rows -- they dip, provably. Mutations
+witnessed: a flat fill fails all three new assertions; the tone on its own float sine disagrees with
+the shared dip by 0.1375 m (over half a cell) and breaks the bedding-coordinate check with it.
+Reverse: revert the delegate, the two new core files, and the `_fill_base` dip; the contacts go flat
+and P044 re-parks. Rides the shared golden re-pin with D0628.
+
+## D0630 · 2026-09-12 · data/materials/*.yaml, tests/test_rock_tone.gd · P036 step one: the palette doubles
+Decided: the P036 ruling's recommended first step -- material `base_color` x2 in data/, reversible,
+before any additive light pass. The multiply model caps a lit cell at its albedo; doubling the bases
+lifts the ceiling to the reference's range. All eleven materials moved; `glimmer` at x1.5 because x2
+clips its green/blue channels to a flat cyan (it is the Reveal-layer test material, not economy rock,
+and its mark is the point). Nugget marks were NOT doubled -- they already sit near the top; the one
+exception is coal's speckle, which had to keep its absolute gap over the new matrix ([0.37,0.40,0.48]
+-> [0.58,0.62,0.74]) or the mark would drown in the doubled base -- `test_wall_lode`'s mark-vs-matrix
+bound and `test_material_palette`'s coal-metre spread both caught it.
+The one casualty is a CONTROL, not a property: `test_rock_tone` proved the [0,1] clamp by counting
+channels the palette pinned to zero -- and a doubled palette simply does not reach zero, which is the
+change's entire point. The control now proves the mechanism on a synthetic near-black input and
+reports the palette's own clamp count above it; a guard must be observed working, but it does not get
+to require that its subject still fails.
+Arithmetic check against the entry's own predictions, from the measured veil levels (unlit ~0.46,
+lit ~0.80): deepstone's doubled base luma 0.394 reads 0.181 unlit (entry predicted 0.184, reference
+0.190) and 0.315 lit (predicted ~0.32, reference 0.377). The bench capture is the remaining visual
+confirmation; the additive pass stays available if the frame still reads flat.
+Reverse: halve the bases back (the yaml diff is the whole change) and restore the palette-fired
+control if the palette is also reverted.
+
+## D0631 · 2026-09-12 · sim/body/body_swing.gd, sim/body/horizontal_resolve.gd, tests/test_grapple_body.gd · P035: the lip mantle -- the line finishes its own climb
+Decided: P035's ruled option (1) -- toward-and-up while hanging closes the last stretch -- but NOT
+through the mechanism the entry imagined. `_try_step`'s box-overlap mantle can only see a ledge that
+intersects the body's own box, and a reel-stop hang leaves the feet ~41px under the lip with the lip
+itself overhead: no candidate cell produces the needed lift, and `MIN_LENGTH + half-height = 33.6px`
+exceeds `MANTLE_PX` (32px) even at a perfect bite. So the verb lives in `BodySwing`, the line's own
+pass: on `mantle_hold` + a direction while ANCHORED, `_lip_mantle` lands the feet on the TOP of the
+solid run the hitch sits in -- the surface, not the face cell the hook happened to bite (the rig's
+hook bites one row below the lip). Reach is the reel's own ceiling (`MIN_LENGTH` + body height + one
+cell of bite depth = 45.6px vs the measured 41px); horizontal slack is one body-width + a cell; the
+landing is clearance-checked and counts as the line moving the body (`swung_this_tick`), the same
+consent exemption every swing correction gets. The `horizontal_resolve` side gets the small sibling
+change too: `grapple.taut` satisfies the mantle's grounded gate (NOT the auto step-up, which keeps
+`recently_grounded` -- an unsolicited yank on a line is D0209's exact problem). This covers the
+ledge-beside-the-hang case the swing-side path can't see.
+Measured: hook the lip of a 10 m shaft, reel to the stop, toward-and-up -- the body stands on the
+surface (row 15, on_floor). Control holds: pressing into the wall WITHOUT `mantle_hold` does not
+climb. Mutation: `_lip_mantle` stubbed false fails the verb assertion. Full body fuzz (369s) and the
+12-suite body cluster are clean -- randomized `mantle_hold` produced no invariant violations.
+Untested by name: the `move_dir`-toward-the-hitch check (feel, not a gate) and the wrapped-pivot
+quadrant pick (first solid quadrant; a corner shared by two solids lands on the first found).
+Reverse: revert this diff; the dig-the-last-step answer keeps working either way.
+
+## D0632 · 2026-09-12 · view/hud/settings_control.gd, view/hud/page_tokens.gd, view/hud/settings_page.gd, shell/hud_bridge.gd, shell/main.gd, shell/seat_flags.gd, view/view_stack.gd, view/hud/MODULE.md, tests/test_settings_page.gd, tests/test_main_boot.gd, deleted view/hud/settings_draw.gd · the modal page as a real Control tree -- the Hybrid ruling
+
+The director asked how a 2026-looking menu gets rendered in this stack and named the answer: HYBRID --
+the painter HUD keeps its one-frame-per-tick contract for in-world chrome (hotbar, chips, toasts read
+the sim frame and need it), and the modal settings page -- which never needed per-tick drawing --
+becomes a retained Control tree with a Theme. Chosen over rebuilding the page in the painter's own
+language (option A) because the page's layout arithmetic was already the worst of the painter code and
+a second modal would only grow it; over a full Control migration because the in-world HUD's
+frame-per-tick draw is the correct tool where it lives.
+
+The model/view split hardens rather than dissolves: `SettingsPage` keeps every table, the cursor
+arithmetic, the payloads, the rise counter, and the shell's snapshot contract; `SettingsControl`
+presents it. ONE navigator: every control is FOCUS_NONE so Enter/arrows are never eaten as gui input
+and always reach `_unhandled_input` -> `HudBridge.key` -- the tested path. The cursor is a stylebox
+override on the row wrapper at `page.row` (a PanelContainer per row, because an HSlider has no
+"normal" to override); hover feeds only the detail plate, the drawn page's own precedence. Sliders
+carry their own `frac` in the payload now -- the hit-rect `click()`/`slider_frac()`/`geometry()` API
+and `SettingsDraw` are deleted, not kept, since the suite proved nothing else called them.
+
+Two skins ship for the frame-pick: `PageTokens.INSTRUMENT` (the dark plate the game already speaks)
+and `PAPER` (the field-notebook the reference frames argue for) under `--skin=`. The measured rule --
+nothing brighter than lit rock -- is kept honestly: it was measured on HUD chrome over the world, and
+a modal already suppresses the world behind a scrim, so PAPER's light plate does not break the
+measurement it stands on. Known gap named in the token file: no font asset ships, so the type ramp
+rides `ThemeDB.fallback_font` until the faces are picked (a director call: licensing).
+
+Found while wiring, fixed in the same commit: `HudBridge.snapshot` now carries `event_labels` +
+`all_actions`, which `SettingsPage.clashes` always read -- the collision warning was dead by omission
+since D0372, impossible to see because the painter's callers never exercised it.
+
+Witnessed: `test_settings_page` poses the tree in a real tree -- shell builds, faces materialize per
+category, slider/chip/rail signals emit the model's payloads, the ring mirrors `page.row` on
+CONTROLS by MODEL row though the grid fills column-major, no control takes gui focus, the armed door
+says SURE, the skin swap reaches the theme, a closed page takes the tree down. `test_main_boot` and
+`test_settings_live` boot the real seat with the tree mounted. One judgment call the test cannot
+make: whether the CONTROL face itself looks 2026 -- that is the director's frame-pick, and the two
+skins are the ballots.
+Reverse: revert this diff; `SettingsDraw` is in history.
+
+## D0633 · 2026-09-12 · shell/seat_flags.gd · the skin default is PAPER -- the director's frame-pick, landed
+
+The director looked at both ballots D0632 shipped and picked the paper field-notebook -- while saying
+the reference's real trait is CLEANLINESS (typographic discipline), not parchment colour, so the skin
+lands as the default before its typeset pass does. The flag stays a capture flag, not a saved setting
+(`--skin=instrument` still reaches the dark plate): a player's skin is a design ruling, not a toggle,
+per the flag's own header.
+Alternative: keep instrument the default until the typeset pass proved out -- refused, because then the
+default-on captures everyone runs keep measuring the skin the director already ruled off.
+Reverse: CHEAP -- flip the one dictionary literal back.
+
+## D0634 · 2026-09-12 · view/hud/{page_tokens,settings_control,settings_page}.gd, tests/test_settings_page.gd · the page-language pass: the settings page as a typeset leaf, not a boxed panel
+
+The director picked PAPER and named the miss: the reference look is CLEANLINESS -- typographic
+discipline -- not parchment colour. The re-cut keeps D0632's tree and model contract and rebuilds
+only the page language: a small tracked overline (FontVariation `spacing_glyph`, the eyebrow faked
+since no font ships) over the category as a large emboldened display title over a hairline; every row
+on a one-pixel PageRule hairline instead of a filled box; the percent numerals right-aligned in their
+own column; the rail's selected tab reading through a two-pixel accent underline rather than a filled
+well; the detail plate becoming a footnote block (rule above, small print, no card); and the plate
+itself hugging content -- only the width stays the face's own number, so GAME's two rows no longer
+float the empty lower half the before-capture showed (plate measured ~700px tall for five rows).
+`_set_h`/`HEIGHT_EASE` die with the floor: the retained tree measures itself; `wanted_h` stays as the
+model's authored measure, pinned by the suite as spec rather than read as mechanism. PAPER's own
+palette aged (plate off printer-white, #E8DFCB -> #DFD4B6) and its ink ladder darkened for print
+legibility (ink_dim #5C5546 -> #494235, ink_faint #7A7260 -> #655D4B).
+
+Found on the BEFORE-capture, fixed structurally in the same diff: the paper page was printing the
+INSTRUMENT skin's ink_faint on its detail and footer lines (sampled 128,138,158 -- the dark skin's
+blue-grey -- on the cream leaf). `apply_skin` rebuilds the Theme but per-node `add_theme_color_override`
+values set in `_build_shell` keep the skin they were built with. The fix is the rule now written in the
+token header: everything that says what a thing LOOKS LIKE lives in theme variations (PageOverline,
+PageTitle, RowLabel, NoteLabel, NumLabel, PageRule, PageDetail); the only per-node colours left are the
+ones `_refresh` re-states from live state each frame (muted, clashes), which re-read `_tokens` anyway.
+The suite gained the regression witness: detail and foot resolve PAPER's ink_faint after the swap.
+Alternatives weighed: keeping the fixed wanted_h floor but retuning it face-by-face (rejected -- a
+hand-tuned floor re-derives what the container measures exactly, and drifts the next time a row
+changes); hairlines as the wrap's own bottom-border stylebox (rejected -- the ring replaces `panel`
+wholesale, which would steal a focused row's underline AND break the suite's "ring moved off" witness,
+so the rule is a child of the wrap instead).
+Reverse: revert this diff; the D0632 boxed page is in history.
+
+## D0635 · 2026-09-12 · view/hud/settings_control.gd · the plate was never centred -- a container child cannot own its position
+
+Found on the D0634 verification capture and measured, not eyeballed: the plate sat at screen y~4
+instead of centred (y~211 for its height). The rise wrote `_plate.position.y = (1-t)*offset` every
+frame -- an ABSOLUTE y on a CenterContainer child, so the rise ran the 28px offset correctly but at
+t=1 the assignment pinned the plate's y to ~0 for the page's whole first life; the before-captures
+show the same defect, shipped with D0632. Fix: the centre wrapper is now a plain Control and the
+plate's rect is computed honestly each frame -- size from `get_combined_minimum_size()` (which keeps
+the content hug exact) and position = centred + rise offset. Verified on both skins: plate y
+210..868 for AUDIO (658px of 1080, centred to the pixel) and 294..784 for GAME (490px -- the floor
+that used to leave an empty half-page). Also confirmed on the captures: every row hairline draws
+(2px blended rule), the selected rail tab's accent underline tracks the open face (y~280 AUDIO,
+y~490 GAME, x 549..683 both skins), the pct numerals right-align at the face's right edge, and the
+detail/foot ink is now the paper skin's own ink_faint (101,93,75 measured -- was the instrument
+skin's 128,138,158 on the before-capture).
+Reverse: CHEAP -- revert the hunk; the page goes back to top-glued but still works.
+
+## D0636 · 2026-09-12 · view/hud/{settings_page,page_tokens,settings_control}.gd, tests/test_settings_page.gd · the note's sentence is the model's; the ring is the theme's -- two leaks the size gate made visible
+
+The size gate flagged the D0634/D0635 pass (settings_control 427 lines, one 69-line shell builder,
+one 81-line test) and the fix surfaced two misplaced owners rather than mere length. First: the
+detail note's sentence-selection was a view method switching on model tables -- moved to
+`SettingsPage.detail_text(hover)`, so the sentence is posed headless like every other table the
+suite already drills; the view passes only the pointer's row. Second: the focus ring's stylebox was
+built in the view from token colours -- the D0634 rule (the theme says what a thing LOOKS LIKE) now
+covers it as `PageTokens.ring_style`, next to the other token-derived surfaces. The rest is honest
+shortening: `_build_shell` split at its real seams (`_build_rail`, `_build_head`), dead
+`_focus_row_of` and three one-line indirections (`_emit`, `tokens_scrim`, the `_detail_text`
+wrapper) removed, and the tree test split at its own seam -- structure witness vs signals/skin
+witness. Gate now reports only the five violations it reported before this pass began.
+Alternative: split the file for real (faces into a second script) -- refused, because the builders
+share every member (`_focusables`, `_dyn`, the node refs); a factory file would pass the control
+back into itself to save thirty comment lines.
+Reverse: CHEAP -- revert the diff; no behaviour moved except the note's sentence (into the model)
+and the ring stylebox (into the tokens).
+## D0653 · 2026-09-12 · shell/seat_input.gd, shell/main.gd · the seat's input dispatch on its own seam
+
+`shell/main.gd` was absorbing boot, the tick, camera, screenshots AND every input path. Extracted the
+dispatch half into `shell/seat_input.gd` as `SeatInput`, a RefCounted of statics taking `main` -- the
+same shape SeatSession/SeatHud/SeatDrive already use, chosen over a child Node receiving
+`_unhandled_input` itself because every shell/ split so far is that shape and a runtime-added child
+would also need `owned=false` care under `find_child`. What moved: which modal is open (`page_open`,
+`map_open`, `scripted`), the hands read deaf while one is (`read_hands`), the HUD-key edges
+(`hud_keys`, `hud_keys_driven`), the scripted hand's `pressed` Callable, `_unhandled_input`'s routing
+to `HudBridge.key`/`finish_capture`, and the click route -- `settings_ctl`'s `payload` signal now
+wired by `SeatInput.wire_page` to the same `HudBridge.apply` then verb path a key takes. The single
+mutation path is unchanged. `_unhandled_input`, `_game_verb` and `_digit_down` keep one-line
+delegates on the node because the engine names the callback there and the suites name the other two
+(`test_settings_live` calls `main._game_verb`, `test_main_boot` calls `Main._digit_down`).
+Also at the cap: `_hud_keys`' `page_open` param was dead (dropped), and `boot()`'s report tail split
+to `_boot_report` -- `boot()` was 55 lines over a D0632 addition, now 46. Another track builds on
+this seam, so it landed early rather than at the next cap.
+Reverse: revert this diff; the dispatch is verbatim what main.gd ran.
+
+## D0654 · 2026-09-12 · tests/test_seat_input.gd, .github/workflows/harness.yml · the dispatch seam driven with real events
+
+Every suite touching the page's input called `HudBridge.key(page, KEY_*)` directly -- exactly the seam
+bug class D0446 lived in (ESC handled in `_unhandled_input` AND re-toggled by the HUD-key edge in one
+tick). `tests/test_seat_input.gd` boots the real seat headless (test_main_boot's pattern), pushes
+`InputEventKey`s through `Input.parse_input_event` -- the hardware pipeline, not a shortcut into the
+bridge -- and asserts the page toggles ONCE per press: K opens and closes on the tick's edge, ESC
+closes and stays closed, a real DOWN event routed through `_unhandled_input` moves the page cursor,
+and a held RIGHT under the open page is deaf to the body. `Input.is_action_pressed` is asserted after
+each synthetic press so the suite cannot pass vacuously over events that never landed. Mutation-tested
+by restoring the D0446 double-close in `SeatInput.unhandled`: 4 of 11 assertions fail, as they must.
+Registered in harness.yml's suite list with the annotation and the 160 -> 161 count bump the D0317
+gate reconciles. Chose `parse_input_event` over `Viewport.push_input` because the former walks the
+whole engine pipeline a hardware key takes; the latter starts at the viewport.
+Reverse: delete the suite and its three harness.yml lines.
+
+## D0655 · 2026-09-12 · tests/fixture_shaft_golden.gd, tests/test_tree_pass.gd, tests/test_rock_laminae.gd · the re-pin the queue's worldgen commits owed (D0167's route)
+
+The queue's commits ahead of main (D0628's strata/materials, D0629's shared bedding warp, D0631's lip
+mantle) legitimately moved `test_shaft_replay_determinism`'s golden from checkpoint **0** -- the
+generation-change shape, not a regression. By D0167/D0388's protocol: pushed `repin/shaft-replay-golden`,
+opened draft PR #53, let CI's pinned Linux build print the mismatch dump (run 34721500632), spliced its
+200-hash sequence in. Discriminators read off that run, not assumed: two OS processes bit-identical (-1),
+seed+1 diverges at 0, coverage `jumps=833 mantles=0 stepups=0 digs=345 corner_ok=5 corner_unconsented=0`
+identical to the prior pin (the path is unchanged; the world under it differs). CI's dump equalled the
+local macOS dump ELEMENTWISE at 200/200 before splicing; the spliced file then passed locally 21/21.
+The same run failed two sibling pins the same commits moved, re-pinned here: `test_tree_pass`'s colour
+expectations (P036 doubled the palette -- `[0.42,0.28,0.16]` -> `[0.84,0.56,0.32]` and
+`[0.18,0.40,0.23]` -> `[0.36,0.8,0.46]`, label updated to say so) and `test_rock_laminae`'s per-cell
+dip bound: P044 put `bedding_metres` on `Angle.sin_milli`'s 256-entry table so the tone and the
+generator's contacts read THE SAME line, quantizing a single-cell step at ~0.148 m (identical on both
+platforms -- integer table math is portable by construction). Re-pinned `< 0.1` to `< 0.2`: above the
+quantization bound with headroom, far under the stair the assertion exists to refuse (a full bed is a
+metre+). Chose loosening the bound over re-deriving a tighter one because the semantic -- "a line, not
+a stair" -- is about metres, not the table's step size.
+Reverse: revert this diff; the old array is in history and re-breaks CI on purpose, per the note above it.
+
+## D0656 · 2026-09-12 · /tmp/lighting_bench_p036.png · the P036 capture the doubled palette still owed
+
+P036's option (1) shipped at `6c7d05b9` (D0630) on arithmetic alone; its own close-out named the
+`lighting_bench` capture "the remaining visual confirmation". Ran the bench headed -- NOT headless,
+the headless renderer is a dummy that saves blank frames (capture_moments.sh's header):
+`godot --path . -- --start=lighting_bench --warp=128,322 --fresh --muted --screenshot-tick=120
+--screenshot-out=/tmp/lighting_bench_p036.png` (D0570's record: 40 m chamber 60 m down, torch at one
+end, fuelled-end forge, bare hardrock the unlit floor of the range; boot `warped to feet cell
+(119,317)`, shutter at `body_cell=(120,313)`, zoom 2.00 -> 12 img px/cell, body at screen centre).
+5x5 mean luma off the PNG, the same instrument P036 used: lit rock peaks at **0.77** in the headlamp
+pool on the ceiling rock (img 1060,560) -- a frame the OLD palette could never paint, where the
+multiply capped at base 0.35 x veil<=1. Lit hardrock floor under the torch reads **0.60**, the
+chamber floor row **0.35-0.56** end to end, rock beside a source **0.42-0.60** against the old
+bench's 0.157. The doubled material bases land in the output; option (2)'s additive pass stays
+parked, per the entry's own condition -- the frame no longer reads flat at the sources.
+The capture is routine run output (EVIDENCE.md): left at the /tmp path, regenerable byte-for-byte
+from the command above on this commit; the numbers, not the PNG, are the record.
+Reverse: none -- a measurement, not a change.
+
+## D0657 · 2026-09-12 · tests/test_lip_mantle.gd, tests/test_grapple_body.gd, tests/test_rock_tone.gd, shell/seat_flags.gd, core/MODULE.md, .github/workflows/harness.yml · the size-gate debt the batch owed, paid at real seams
+
+QUALITY gate 4's structural pass on the merge found four violations the day's commits had introduced:
+`test_grapple_body.gd` 436 (P035's lip-mantle test), `test_rock_tone.gd` 404 (P036's clamp control),
+`seat_flags.gd` `parse()` 54 (the `--skin` arm, D0633), and `core/MODULE.md` 106 (P044's `BeddingDip`
+line, D0629). The remedy follows the gate's own rule -- split at seams, don't shave: the lip mantle
+moved to `tests/test_lip_mantle.gd` extending `test_grapple_body.gd` (the rig, helpers, and constants
+are inherited; the parent's `_initialize` list is the only dispatch, so the child runs its one verb and
+nothing else), the `--skin` arm became a `_skin()` helper beside `_route()`/`_workload()`, the rock-tone
+test inlined three single-use tally unpackings and collapsed the synthetic-sweep counters into `int()`
+casts, and MODULE.md's gotchas bullets were compressed without dropping a fact. The stale tail comment
+inside the chain test -- "the last metre and a half is not asserted here" -- now points at the sibling
+suite, since P035 ruled and the verb exists. Alternative: raise or waive the limits -- refused, the gate
+is the guard, and each split landed on a boundary that was already there.
+Reverse: CHEAP -- revert the diff; the suites all still assert the same things, just filed differently.

@@ -84,7 +84,7 @@ iron:
   # legacy IRON_ATTEMPTS_PER_COL / IRON_SIZE_MIN / IRON_SIZE_DEPTH_BONUS. Legacy gated iron below a
   # research-progression "seal" (SEAL_TOP); that gate is dead pre-pivot design, so this port gates iron
   # by depth threshold (stonereach_end) alone.
-  material: ore_iron
+  material: iron
   attempts_per_col: 0.125
   size_min: 160
   size_depth_bonus: 480
@@ -183,6 +183,10 @@ lode:
   amount_base: 40
   amount_depth_bonus: 170
   min_depth_m: 14
+  # Legacy's RICH_CHANCE (0.45), promoted out of `ore.pending_sim_economy` to where it is consumed:
+  # a deep lode (below stonereach) is `rich_ore` with this probability instead of `ore_iron`. Rich
+  # feeds the blast furnace's doubled-ingot `smelt_rich`; the ladder pays the furnace for it.
+  rich_chance: 0.45
 
 richness:
   # HORIZONTAL_STRENGTH, HORIZONTAL_FREQ, FRONTIER_BIAS

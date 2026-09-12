@@ -1,0 +1,24 @@
+# The Deep Works' high-grade iron deposit -- placed by `ShaftGenerator._scatter_iron` strictly below
+# `stonereach_end` (the pass legacy gated behind a seal; this port gates by depth alone). Yields `iron`,
+# the item `smelt_iron` (iron_forge) consumes on the way to `iron_ingot`, `gear` and `plate`. Deliberately
+# NOT `ore`: `ore_iron` veins are the low-grade feedstock the crude Forge already smelts; this is the
+# material the mid-game ladder pays the iron_forge for (D0484's ladder, extended).
+id: iron
+layer: deep_works
+kind: ore
+hardness: 4.0
+display_name: Deep iron
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Authored for this build on ore_iron's idiom (clastic host + glinting nuggets), darker and greyer so
+# the deep deposit reads richer than the shallow ore it sits beside: a near-black host with a cool
+# silver fleck -- cool because the wall plane recesses marks toward COOL, and a warm fleck's recess
+# path is longer than the separation bound `test_wall_lode` keeps (ore_iron's blue-white is the family).
+
+base_color: [0.4, 0.4, 0.48]
+grain: true
+grammar: clastic
+depth_darken: 0.25
+glitters: true
+nugget_color: [0.72, 0.78, 0.88]
+nugget_count: 7

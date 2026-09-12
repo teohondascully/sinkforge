@@ -54,6 +54,15 @@ static func step(body: Body, grid: TileGrid, input: InputFrame) -> void:
 		return
 	var centre := Vector2i(body.pos_x, body.pos_y)
 	g.update_line(grid, centre)
+	# D0631 (P035's ruled answer): the LIP MANTLE. A reel stops `MIN_LENGTH` under the hitch, so the
+	# feet hang about a metre and a half under the lip the hitch sits in -- and the box-overlap mantle
+	# in `horizontal_resolve` can only see a ledge that intersects the box, never one overhead. On the
+	# line the body is SUPPORTED rather than ballistic, so toward-and-up finishes the climb here, onto
+	# the top face of the cell the rope is actually holding.
+	if (input.mantle_hold and input.move_dir != 0 and not body.on_floor
+			and not body.mantled_this_tick and not body.stepped_up_this_tick
+			and _lip_mantle(body, grid, g, input)):
+		return
 	var swung: Vector2i = g.constrain_position_fx(centre)
 	if not g.taut:
 		return
@@ -164,6 +173,65 @@ static func _blocked_at(body: Body, grid: TileGrid, at: Vector2i) -> bool:
 	var hw: int = (Body.WIDTH_PX * Fx.SCALE) / 2
 	var hh: int = (Body.HEIGHT_PX * Fx.SCALE) / 2
 	return body._box_blocked(grid, at.x - hw, at.y - hh, at.x + hw, at.y + hh)
+
+
+## The cell the line is effectively holding: the hook's own bite, or for a wrapped line the solid
+## quadrant at the last pivot's corner -- checked, because a corner point is shared by four cells and
+## only the solid one is a ledge.
+static func _hitch_cell(g: Grapple, grid: TileGrid) -> Vector2i:
+	if g.pivots.is_empty():
+		return g.anchor_cell
+	var p: Vector2i = g.pivots[g.pivots.size() - 1]
+	var c: int = Body.CELL_PX * Fx.SCALE
+	var base := Vector2i(p.x / c, p.y / c)
+	for d: Vector2i in [Vector2i(0, -1), Vector2i(-1, -1), Vector2i(-1, 0), Vector2i(0, 0)]:
+		if grid.is_solid(base + d):
+			return base + d
+	return base
+
+
+## Toward-and-up on a held line climbs onto the hitch's LIP: the box is shifted toward the line until
+## its near edge sits flush with the anchor column, so the whole footprint lands on the surface the
+## lip belongs to rather than straddling the hole. The lip itself is the top of the solid run the
+## hitch sits in -- a face bite lands mid-wall and the climb's end is the surface, not the cell the
+## hook happened to hit. The reach is the reel's own ceiling -- `MIN_LENGTH` of line, the body's
+## height off it, and one cell the bite can sit deep in -- i.e. the exact gap the verb exists to close
+## and no further, so a hitch far overhead on a long line cannot be teleported to. The horizontal
+## bound is one body-width plus a cell: an edge further sideways than that is "across", not "over".
+## Everything the move needs is clearance-checked against the same box predicate the resolvers use,
+## and it counts as the line moving the body (`swung_this_tick`), the same consent exemption every
+## swing correction gets.
+static func _lip_mantle(body: Body, grid: TileGrid, g: Grapple, input: InputFrame) -> bool:
+	var cell: Vector2i = _hitch_cell(g, grid)
+	if not grid.is_solid(cell):
+		return false
+	while cell.y > 0 and grid.is_solid(cell + Vector2i(0, -1)):
+		cell.y -= 1
+	var s: int = Fx.SCALE
+	var top_y: int = cell.y * Body.CELL_PX * s
+	var gap: int = body._bottom_y() - top_y
+	if gap <= 0 or gap > Grapple.MIN_LENGTH + (Body.HEIGHT_PX + Body.CELL_PX) * s:
+		return false
+	var hx: int = (cell.x * Body.CELL_PX + Body.CELL_PX / 2) * s
+	if input.move_dir * (hx - body.pos_x) < 0:
+		return false
+	if absi(hx - body.pos_x) > (Body.WIDTH_PX + Body.CELL_PX) * s:
+		return false
+	var hw: int = (Body.WIDTH_PX * s) / 2
+	var hh: int = (Body.HEIGHT_PX * s) / 2
+	var centre_x: int = ((cell.x + 1) * Body.CELL_PX * s - hw) if input.move_dir < 0 \
+			else (cell.x * Body.CELL_PX * s + hw)
+	if body._box_blocked(grid, centre_x - hw, top_y - 2 * hh, centre_x + hw, top_y):
+		return false
+	body.pos_x = centre_x
+	body.pos_y = top_y - hh
+	body.vel_x = 0
+	body.vel_y = 0
+	body.on_floor = true
+	body.floor_source_this_tick = &"lip_mantle"
+	body.mantled_this_tick = true
+	body.swung_this_tick = true
+	return true
 
 
 ## Taking line in at the reel rate means the body approaches the hitch at that rate, so the inward radial

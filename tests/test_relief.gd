@@ -26,6 +26,8 @@ func _initialize() -> void:
 	_test_the_generator_fills_from_each_columns_own_surface()
 	_test_the_cave_band_is_protected_under_every_column_not_just_the_datum()
 	_test_the_same_site_and_seed_make_the_same_relief()
+	_test_the_layer_contacts_ride_the_bedding_dip()
+	_test_the_tone_warps_by_the_same_dip_the_generator_used()
 	_finish("relief")
 
 
@@ -55,7 +57,7 @@ func _rows() -> PackedInt32Array:
 
 
 func _test_the_table_is_a_sine() -> void:
-	var t: PackedInt32Array = Relief.SIN_MILLI
+	var t: PackedInt32Array = Angle.SIN_MILLI
 	_check(t.size() == 256, "256 entries (%d)" % t.size())
 	_check(t[0] == 0 and t[128] == 0, "zero at 0 and half a turn (%d, %d)" % [t[0], t[128]])
 	_check(t[64] == 1000 and t[192] == -1000, "the quarter points are +-1000 (%d, %d)" % [t[64], t[192]])
@@ -73,13 +75,17 @@ func _test_the_table_is_a_sine() -> void:
 
 
 func _test_sin_milli_wraps_and_takes_a_negative_angle() -> void:
-	var q: int = Relief.TURN / 4
+	var q: int = Angle.TURN / 4
 	_check(Relief.sin_milli(0) == 0, "sin 0")
 	_check(Relief.sin_milli(q) == 1000, "sin of a quarter turn (%d)" % Relief.sin_milli(q))
 	_check(Relief.sin_milli(-q) == -1000, "a negative quarter (%d)" % Relief.sin_milli(-q))
-	_check(Relief.sin_milli(Relief.TURN + q) == 1000, "a full turn past it (%d)" % Relief.sin_milli(Relief.TURN + q))
+	_check(Relief.sin_milli(Angle.TURN + q) == 1000, "a full turn past it (%d)" % Relief.sin_milli(Angle.TURN + q))
 	_check(Relief.sin_milli(-1) == -25 or Relief.sin_milli(-1) == 0,
 		"just under zero reads the last entry, not an index error (%d)" % Relief.sin_milli(-1))
+	# The delegation itself is pinned: the table lives in core/ now (P044), and a Relief that grew its
+	# own sine back would silently uncouple the hills from the warp the contacts and tone share.
+	_check(Relief.sin_milli(12345) == Angle.sin_milli(12345) and Relief.units(0.5) == Angle.units(0.5),
+		"Relief's sine IS Angle's -- the delegates have not been quietly reimplemented")
 
 
 ## Worked once by hand (and in Python) so a change to the conversions is a change to these.
@@ -279,3 +285,66 @@ func _test_the_same_site_and_seed_make_the_same_relief() -> void:
 	other["pad_centre_m"] = 20
 	var c: PackedInt32Array = Relief.surface_rows({"relief": other}, W, DATUM, CPM)
 	_check(a != c, "CONTROL: moving the pad moves the surface")
+
+
+## P044. `_fill_base` writes its contacts at `threshold_row - BeddingDip.dip_cells(col)`, which makes
+## each contact sit at a CONSTANT bedding coordinate -- a bedding plane, not a flat row warped to look
+## like one. Read back the clean clay-over-hardrock and hardrock-over-deepstone contacts and their
+## `bedding_metres` is the threshold's own depth to half a cell. The control matters as much: the
+## contact rows must actually VARY across columns, or a flat fill would pass the bedding-coordinate
+## check untouched.
+func _test_the_layer_contacts_ride_the_bedding_dip() -> void:
+	var site: Dictionary = _relief_site()
+	# bedding_metres is a GRID-ROW coordinate: thresholds are metres below the datum row, so the
+	# contact's bedding coordinate is the datum's own depth plus the threshold's.
+	var sky_m: float = float(DATUM) / float(CPM)
+	var clay_end_m: float = sky_m + float(site["layer_thresholds_m"]["topsoil_shale_end"])
+	var stone_end_m: float = sky_m + float(site["layer_thresholds_m"]["stonereach_end"])
+	var grid: TileGrid = ShaftGenerator.generate(site, 20260826)
+	var half_cell_m: float = 0.5 / float(CPM) + 0.03
+	var clay_hits: int = 0
+	var stone_hits: int = 0
+	var clay_bad: int = 0
+	var stone_bad: int = 0
+	var contact_rows: Dictionary = {}
+	for col: int in W:
+		for row: int in range(1, grid.height):
+			var above: StringName = grid.get_material(Vector2i(col, row - 1))
+			var here: StringName = grid.get_material(Vector2i(col, row))
+			if above == &"clay" and here == &"hardrock":
+				clay_hits += 1
+				contact_rows[col] = row
+				if absf(BeddingTone.bedding_metres(float(col), float(row)) - clay_end_m) > half_cell_m:
+					clay_bad += 1
+			elif above == &"hardrock" and here == &"deepstone":
+				stone_hits += 1
+				if absf(BeddingTone.bedding_metres(float(col), float(row)) - stone_end_m) > half_cell_m:
+					stone_bad += 1
+	_check(clay_hits > 0 and clay_bad == 0,
+		"every clean clay/hardrock contact sits ON the bedding plane at %.0f m (%d off of %d)"
+		% [clay_end_m, clay_bad, clay_hits])
+	_check(stone_hits > 0 and stone_bad == 0,
+		"every clean hardrock/deepstone contact sits ON the bedding plane at %.0f m (%d off of %d)"
+		% [stone_end_m, stone_bad, stone_hits])
+	var distinct: Dictionary = {}
+	for row: int in contact_rows.values():
+		distinct[row] = true
+	_check(distinct.size() > 8,
+		"CONTROL: the clay contact lands on %d different rows across the world -- a flat fill would "
+		% distinct.size() + "pass the bedding check while never dipping at all")
+
+
+## The view reads the warp the generator wrote: `bedding_metres(col, row)` is the row in metres plus
+## `BeddingDip`'s value at the column -- not a second, float-sine dip that happens to agree on one
+## libm. If the tone drifts back to its own sine the contacts stop being bedding planes exactly where
+## it matters.
+func _test_the_tone_warps_by_the_same_dip_the_generator_used() -> void:
+	var worst: float = 0.0
+	for col: int in range(0, W, 7):
+		var shared: float = float(BeddingDip.dip_milli_m(col, CPM)) / 1000.0
+		var row: float = 300.0
+		var tone_dip: float = BeddingTone.bedding_metres(float(col), row) - row / float(CPM)
+		worst = maxf(worst, absf(tone_dip - shared))
+	_check(worst <= 0.002,
+		"the tone's dip IS BeddingDip's (worst disagreement %.4f m over %d columns)"
+		% [worst, W / 7])

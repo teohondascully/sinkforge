@@ -34,6 +34,9 @@ extends RefCounted
 ##                           control of a lighting comparison. Unset: `VeilOcclusion.K`.
 ##   --muted                 the Master bus muted for this boot, whatever the settings file says: a
 ##                           scripted seat on a machine somebody is using (D0437)
+##   --skin=instrument|paper the settings page's face (D0632): the paper field-notebook the director
+##                           picked (D0633), or the dark instrument plate it shipped on first. A capture
+##                           flag, not a saved setting -- a player's skin is a design ruling, not a toggle.
 ##   --shader-tone           the terrain's molded tone from a per-chunk data texture in
 ##                           `view/visuals/rock_tone.gdshader` instead of per-cell on the CPU (D0528,
 ##                           T040's evidence). NOT PARSED HERE, and that is the layer rule rather than an
@@ -72,12 +75,22 @@ static func _route(f: Dictionary, arg: String) -> void:
 		push_error("--route=%s: not one of %s" % [name, SeatRoute.ROUTES])
 
 
+## `--skin=instrument|paper`, refused on the same rule: a page skin the tree cannot pose is a capture
+## that never happened, which a silent default would report as a pass.
+static func _skin(f: Dictionary, arg: String) -> void:
+	var skin: String = arg.substr("--skin=".length())
+	if skin == "instrument" or skin == "paper":
+		f["skin"] = skin
+	else:
+		push_error("--skin=%s: instrument or paper" % skin)
+
+
 static func parse(args: PackedStringArray) -> Dictionary:
 	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
 		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false, "start": "",
 		"mute": PackedStringArray(), "lamp_occlusion": -1.0, "muted": false, "seed": 0,
 		"workload": SeatDrive.WALK, "unfocused": false, "interpolate": false,
-		"route": &"", "route_out": ""}
+		"route": &"", "route_out": "", "skin": "paper"}
 	for a: String in args:
 		if a.begins_with("--quit-after="):
 			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
@@ -119,6 +132,8 @@ static func parse(args: PackedStringArray) -> Dictionary:
 			f["unfocused"] = true
 		elif a == "--muted":
 			f["muted"] = true
+		elif a.begins_with("--skin="):
+			_skin(f, a)
 	return f
 
 

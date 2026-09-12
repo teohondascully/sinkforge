@@ -16,7 +16,7 @@ loose: true  # D0562: topsoil slumps. The tutorial world's rock, so the world an
 # Legacy has no `clay`; `earth` IS its topsoil rock and the appearance transfers 1:1.
 # Keeps the grass cap -- the only capped material in either set.
 
-base_color: [0.34, 0.24, 0.155]
+base_color: [0.68, 0.48, 0.31]
 grain: true
 grammar: clastic
 depth_darken: 0.38

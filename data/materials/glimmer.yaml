@@ -18,7 +18,7 @@ display_name: Glimmer
 # high-contrast cyan in the legacy IDIOM (dark host + bright flecks) instead of the flat cyan blob, and
 # the distance is re-measured in tests/test_material_palette.gd rather than assumed to survive.
 
-base_color: [0.16, 0.52, 0.55]
+base_color: [0.24, 0.78, 0.825]
 grain: true
 grammar: massive
 depth_darken: 0.1

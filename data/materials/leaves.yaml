@@ -10,7 +10,7 @@ display_name: Leaves
 # --- appearance -----------------------------------------------------------------------------------
 # Lifted from `legacy/src/data/materials/leaves.tres`: colour verbatim, grain on, no cap, no nugget, no
 # depth darkening.
-base_color: [0.18, 0.40, 0.23]
+base_color: [0.36, 0.8, 0.46]
 grain: true
 depth_darken: 0.0
 glitters: false

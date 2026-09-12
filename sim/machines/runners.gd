@@ -142,17 +142,26 @@ static func _take_from_buffer(buffer: Dictionary, item: StringName, n: int) -> v
 		buffer.erase(item)
 
 
-## Burn one tick of the current fuel; when it is spent, refuel from the coal in the input buffer,
-## crediting the coal as consumed. Returns false when there is neither fuel nor coal.
+## WHAT A BURNER WILL TAKE, and what a unit of it is worth: the item id -> the fraction of the machine's
+## `fuel_ticks` it burns for. Coal is the fuel the fiction names (the one); wood burns at half -- the
+## same energy-content intuition legacy priced coal against nothing else burning at all. Dictionary
+## order IS the burn preference (coal first), and GDScript dictionaries keep insertion order, so the
+## choice is deterministic. Anything the pack can hold that the world calls burnable belongs here, and
+## `Machines.machine_eats` reads the same table so a mis-aimed log cannot vanish into a cold drill.
+const FUEL_FACTOR: Dictionary = {&"coal": 1.0, &"wood": 0.5}
+
+## Burn one tick of the current fuel; when it is spent, refuel from the input buffer's first fuel,
+## crediting the item as consumed. Returns false when there is neither fuel nor anything burnable.
 static func _burn_or_refuel(m: MachineState, items: Items) -> bool:
 	if m.fuel > 0:
 		return true
-	if int(m.input_buffer.get(&"coal", 0)) <= 0:
-		return false
-	_take_from_buffer(m.input_buffer, &"coal", 1)
-	items.consumed(&"coal", 1)
-	m.fuel = m.def.fuel_ticks
-	return true
+	for item: StringName in FUEL_FACTOR:
+		if int(m.input_buffer.get(item, 0)) > 0:
+			_take_from_buffer(m.input_buffer, item, 1)
+			items.consumed(item, 1)
+			m.fuel = maxi(1, int(m.def.fuel_ticks * float(FUEL_FACTOR[item])))
+			return true
+	return false
 
 
 ## A generator burns coal into power (which `PowerFlow` reads off `fuel > 0`); it makes no item.

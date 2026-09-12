@@ -54,7 +54,7 @@ const RECORDS: Dictionary = {
 			},
 		},
 		"iron": {
-			"material": "ore_iron",
+			"material": "iron",
 			"attempts_per_col": 0.125,
 			"size_min": 160,
 			"size_depth_bonus": 480,
@@ -120,7 +120,7 @@ const RECORDS: Dictionary = {
 			},
 		},
 		"iron": {
-			"material": "ore_iron",
+			"material": "iron",
 			"attempts_per_col": 0.125,
 			"size_min": 160,
 			"size_depth_bonus": 480,
@@ -187,7 +187,7 @@ const RECORDS: Dictionary = {
 			},
 		},
 		"iron": {
-			"material": "ore_iron",
+			"material": "iron",
 			"attempts_per_col": 0.125,
 			"size_min": 160,
 			"size_depth_bonus": 480,
@@ -313,6 +313,7 @@ const RECORDS: Dictionary = {
 			"amount_base": 40,
 			"amount_depth_bonus": 170,
 			"min_depth_m": 14,
+			"rich_chance": 0.45,
 		},
 		"richness": {
 			"strength": 0.55,

@@ -1,0 +1,21 @@
+# A rich lode: the deposit the `lode` pass occasionally grows below `deep_row` at `rich_chance`
+# (legacy's RICH_CHANCE, promoted from `ore.pending_sim_economy`). Yields `rich_ore`, which the
+# blast furnace's `smelt_rich` turns into two ingots a unit -- the depth upgrade the ladder's
+# blast_furnace grant exists to unlock.
+id: rich_ore
+layer: deep_works
+kind: ore
+hardness: 3.5
+display_name: Rich ore
+
+# --- appearance (Slice 0) ---------------------------------------------------------------
+# Authored for this build: ore_iron's clastic host warmed toward the metal it carries, with a denser
+# nugget field so a rich lode reads as the same rock holding more of the good stuff.
+
+base_color: [0.48, 0.48, 0.6]
+grain: true
+grammar: clastic
+depth_darken: 0.25
+glitters: true
+nugget_color: [0.75, 0.84, 1.0]
+nugget_count: 7

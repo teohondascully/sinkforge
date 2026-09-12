@@ -1,12 +1,12 @@
 # Working state
 
-**Last updated: 2026-09-12 (route + terrain arc landed and PUSHED. Queue 44's seat route `6cb107db`;
-`trees-footing-and-crowns` landed `9daf1223` (D0626/D0627, renumbered from the branch's colliding
-D0600/D0601) — trees refuse broken ground, six lobed crowns; the `_rubble` bank got a direct save-suite
-guard `abef1778`. CI green on HEAD (run 34706318299). Earlier: all-37 gate verdicts in
-`docs/audits/2026-09-11-gate-reconciliation.md` (30 ENFORCED / 3 ADVISORY / 4 NO-CODE / 0 CANNOT-FAIL);
-C003 executable with mid-run checkpoint/resume. The 931-line predecessor is archived at
-`docs/archive/working/WORKING-2026-09-11.md`.)**
+**Last updated: 2026-09-12 (the "catch the game up to the process" batch landed: economy wiring
+`add2a5ad` — iron + rich_ore materials, wood-as-fuel, d3–d7 ladder, gate 37 genuinely blocking;
+P044 bedding dip `3db2f6c0`; P031 closed-as-shipped `b41f35dd`; P036 palette ×2 `6c7d05b9`;
+P035 lip mantle `450aeb51`. Settings page is now a real Control tree (D0632, Hybrid) — pending
+commit. Earlier: CI green on `abef1778` (run 34706318299); all-37 gate verdicts in
+`docs/audits/2026-09-11-gate-reconciliation.md` (30 ENFORCED / 3 ADVISORY / 4 NO-CODE / 0 CANNOT-FAIL).
+The 931-line predecessor is archived at `docs/archive/working/WORKING-2026-09-11.md`.)**
 
 **THE DIRECTOR'S INSTRUCTIONS, VERBATIM, because they are the whole shape of the run:**
 - *"Your goal is to complete all items in the queue overnight without stopping, and if you ever reach a
@@ -24,13 +24,16 @@ The full 49-item queue with phase detail lives in the archive snapshot. Open:
 - [x] 44 Route-driven playthrough — D0625: `ColdStartBot.decide()` is one policy for headless AND the real seat (`--route=cold_start`, legs 60/71/122/149/388/417, captures per boundary). Found: seat-path obs-sharing contract + anchor row bug.
 - [ ] 45 Stranger batch started at rung 4, six seats.
 - [ ] 51 The lamp's real lever (P038/D0599): `LAMP_TINT` nearly inert.
-- [ ] 52 Layer contacts dead flat (P044).
+- [x] 52 Layer contacts dead flat (P044) — `3db2f6c0` (D0629): shared `BeddingDip` in core/, contacts + tone agree, mutation-witnessed both ways.
 - [~] 49/Phase 10 THE MATCH LOOP — perpetual; all 4 conditions now have instruments. Moving camera: `--pan` strip lands `e8e68941` (D0624) — holds on both axes; honest residual is sub-tick judder (strips sample ticks, not presented frames).
 
 ## Current stage
 
 The A′ legacy port has implemented the playable systems through presentation and generation.
-The rig-as-consumer economy (A′ step 7) remains unimplemented.
+The rig-as-consumer economy is wired end to end (`add2a5ad`, D0628): iron and rich_ore veins feed
+forge → mill/press → blast furnace → pump/lift across d3–d7; wood burns at half a coal; gate 37 now
+fails rather than reports. The settings modal is a retained Control tree (`SettingsControl` +
+`PageTokens`, two skins under `--skin=`); `SettingsPage` remains the model.
 [The backlog](BACKLOG.md) owns task routing; [the plan](A_PRIME_REFACTOR_PLAN.md) retains port detail.
 
 ## This session — gate arming, readability, scenario driver (2026-09-11)
@@ -49,8 +52,10 @@ single source, schema-validated (gate 13 now covers `scenarios/`), code-generate
 `agent` field and reports the envelope it actually used (`oracle`, not the requested `constrained`).
 T037 dips the starter vein below the pad so mining opens the descent. T001 gave copper a copper mark;
 T030 names the dig plan on the first dash; T026 made the ten hotbar wells real remappable actions.
-T022/T023/T028 ruled provisional keeps. P042/D0588 stands: no d3/d4; the iron chain is a parked chain;
-the ruled next beat is reclamation (earn `pump`, claim a wet chamber).
+T022/T023/T028 ruled provisional keeps. P042/D0588 SUPERSEDED (D0628): the director ordered the
+corrections executed; the iron chain is wired d3-d7 in the mandated order (source → forge → press/mill
+→ plate demand), gate 37 exits 0 bare and is blocking again; `pump`/`lift` arrive at d7 rather than
+through the reclamation beat the earlier ruling recommended.
 
 ## Where the opening stands
 

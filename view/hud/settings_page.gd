@@ -4,11 +4,12 @@ extends RefCounted
 ## WHAT THE SETTINGS PAGE SHOWS, WHICH IS NOT THE SAME QUESTION AS WHAT THE SETTINGS ARE (A' step 6j,
 ## D0372). Legacy `scenes/settings_page.gd`'s split, kept: the shell's `Settings` owns the values and
 ## their persistence; this owns the PAGE -- which rows exist, in which category, in what order, what
-## sentence each carries, and where the keyboard cursor goes next. ABOVE the drawing banner everything
-## is data or a pure function of (category, row), reachable without a running game; the drawing is
-## `SettingsDraw`. The view may not reach `shell/`, so the values arrive as a SNAPSHOT (`state`) the
-## shell hands over each frame, and the page returns the same payload for a click and for ENTER, so the
-## shell's one mutation path serves both pointers.
+## sentence each carries, and where the keyboard cursor goes next. Everything here is data or a pure
+## function of (category, row), reachable without a running game; the drawing is `SettingsControl`, a
+## real Control tree (D0632, the Hybrid ruling -- the hit-rect painter `SettingsDraw` is gone). The
+## view may not reach `shell/`, so the values arrive as a SNAPSHOT (`state`) the shell hands over each
+## frame, and the page returns the same payload for a click and for ENTER, so the shell's one mutation
+## path serves both pointers.
 ##
 ## Content re-authored: legacy's twenty-three bindings are this build's four actions; the audio levels
 ## and the feel toggles are the shell's own.
@@ -87,11 +88,9 @@ const SET_ROW: float = 22.0
 const SET_MIN_H: float = 236.0
 const SET_CTRL_DX: float = 84.0
 const SET_BAR_W: float = 78.0
-const SET_VALUE_DX: float = 172.0     ## SET_CTRL_DX + SET_BAR_W + 10
 const REMAP_ROW_H: float = 15.0
 const REMAP_GAP: float = 16.0
 const RISE_PER_S: float = 6.0         ## the plate's rise, seconds to full
-const HEIGHT_EASE: float = 0.25       ## the plate's height follows the open face by this much a frame
 
 var open: bool = false
 var cat: int = CAT_AUDIO
@@ -101,9 +100,6 @@ var armed: String = ""                ## the GAME row whose first press was take
 ## The shell's snapshot: muted, levels {id: 0..1}, shake, auto_pickup, zoom_label, bindings {action:
 ## label}, event_labels {action: [labels]}, all_actions [action]. Empty until the shell fills it.
 var state: Dictionary = {}
-var _hits: Array[Dictionary] = []     ## clickable controls this frame: [{rect, payload}]
-var _slider_rects: Dictionary = {}    ## slider id -> its bar Rect2 this frame (canvas px)
-var _set_h: float = SET_MIN_H         ## authored px, eased toward wanted_h
 var _set_t: float = 0.0               ## the rise, 0..1
 
 
@@ -179,6 +175,8 @@ static func width_for(c: int) -> float:
 
 
 ## How tall the page wants to be for the face that is open; every term is taken from what draws it.
+## Since D0634 this is the page's own MEASURE, not the plate's size -- the retained tree sizes itself
+## to content, so no mechanism reads this; the suite pins it as the authored geometry spec.
 static func wanted_h(c: int) -> float:
 	var need: float = 0.0
 	match c:
@@ -233,30 +231,15 @@ static func wrap(font: Font, text: String, width: float, size: int) -> Array:
 
 # ---- the page's state ----------------------------------------------------------------------------
 
-## The plate's geometry in CANVAS px for the current face and eased height.
-func geometry() -> Dictionary:
-	var h: float = UiTheme.px(_set_h)
-	var w: float = UiTheme.px(width_for(cat))
-	var origin := Vector2((UiTheme.CANVAS.x - w) * 0.5, (UiTheme.CANVAS.y - h) * 0.5)
-	var inner_x: float = origin.x + UiTheme.px(UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD)
-	var inner_w: float = w - UiTheme.px(UiTheme.BAZAAR_RAIL + UiTheme.BAZAAR_PAD * 2.0)
-	var body_h: float = h - UiTheme.px(SET_HEAD + SET_FOOT)
-	var content := Rect2(inner_x, origin.y + UiTheme.px(SET_HEAD), inner_w, body_h - UiTheme.px(SET_DETAIL + 8.0))
-	return {"origin": origin, "w": w, "h": h, "content": content,
-		"detail": Rect2(inner_x, content.end.y + UiTheme.px(8.0), inner_w, UiTheme.px(SET_DETAIL)),
-		"col_w": (inner_w - UiTheme.px(REMAP_GAP)) * 0.5}
-
-
-## The rise, on the counter's curve.
+## The rise, on the counter's curve. `SettingsControl` reads this for the plate's offset and alpha.
 func ease() -> float:
 	var u: float = 1.0 - _set_t
 	return 1.0 - u * u * u
 
 
-## Step the rise toward open or closed and the height toward the open face's wanted height.
+## Step the rise toward open or closed.
 func advance(delta: float) -> void:
 	_set_t = move_toward(_set_t, 1.0 if open else 0.0, delta * RISE_PER_S)
-	_set_h = lerpf(_set_h, wanted_h(cat), HEIGHT_EASE)
 
 
 func visible() -> bool:
@@ -281,42 +264,6 @@ func focus_action() -> StringName:
 	return row_action(cat, row)
 
 
-## Registered by the drawing pass: every clickable control and every slider's bar.
-func begin_hits() -> void:
-	_hits.clear()
-	_slider_rects.clear()
-
-
-func add_hit(rect: Rect2, payload: Dictionary) -> void:
-	_hits.append({"rect": rect, "payload": payload})
-
-
-func set_slider_rect(id: String, rect: Rect2) -> void:
-	_slider_rects[id] = rect
-
-
-func hit_count() -> int:
-	return _hits.size()
-
-
-## The control payload under a canvas point, or {} for none; a slider adds the clicked fraction.
-func click(canvas_pos: Vector2) -> Dictionary:
-	for hit: Dictionary in _hits:
-		if (hit["rect"] as Rect2).has_point(canvas_pos):
-			var payload: Dictionary = (hit["payload"] as Dictionary).duplicate()
-			if payload.has("slider"):
-				payload["frac"] = slider_frac(String(payload["slider"]), canvas_pos.x)
-			return payload
-	return {}
-
-
-func slider_frac(id: String, canvas_x: float) -> float:
-	var bar: Rect2 = _slider_rects.get(id, Rect2())
-	if bar.size.x <= 0.0:
-		return 0.0
-	return clampf((canvas_x - bar.position.x) / bar.size.x, 0.0, 1.0)
-
-
 func level(id: String) -> float:
 	return float((state.get("levels", {}) as Dictionary).get(id, 1.0))
 
@@ -325,20 +272,32 @@ func binding_label(action: StringName) -> String:
 	return String((state.get("bindings", {}) as Dictionary).get(action, "?"))
 
 
-static func _pointer(ci: CanvasItem) -> Vector2:
-	var vp: Viewport = ci.get_viewport()
-	return vp.get_mouse_position() if vp != null else Vector2(-1.0, -1.0)
-
-
-var _last_time: float = 0.0
-
-
-func paint(frame: Frame, ci: CanvasItem) -> void:
-	if frame == null or frame.obs == null:
-		return
-	var dt: float = clampf(frame.anim_time - _last_time, 0.0, 0.1)
-	_last_time = frame.anim_time
-	advance(dt)
-	if not visible():
-		return
-	SettingsDraw.overlay(self, ci, ThemeDB.fallback_font, _pointer(ci))
+## The detail note's sentence: what a row answers, which is the model's question, not the view's --
+## moved here in D0634 so the text is posed headless like every other table. `hover` is the pointer's
+## row (-1 for none): it wins over the keyboard cursor, else the category's standing line.
+func detail_text(hover: int) -> String:
+	var i: int = hover if hover >= 0 else row
+	match cat:
+		CAT_CONTROLS:
+			if i >= REMAP_ROWS.size():
+				return "puts every binding back to its default"
+			var act: StringName = row_action(cat, i)
+			if capture == act and act != &"":
+				return "press any key to bind it — ESC cancels"
+			var clash: Array = clashes(state).get(act, [])
+			if not clash.is_empty():
+				return " and ".join(clash)
+			var r: Array = REMAP_ROWS[i]
+			return String(r[2]) if String(r[2]) != "" else "%s — press Enter to rebind" % String(r[1])
+		CAT_FEEL:
+			if i >= 0 and i < FEEL_ROWS.size():
+				return String(FEEL_ROWS[i][2])
+		CAT_GAME:
+			if i >= 0 and i < GAME_ROWS.size():
+				return String(GAME_ROWS[i][2])
+		_:
+			if i == 0:
+				return "silences everything at once; the levels below are kept"
+			if i > 0 and i <= AUDIO_ROWS.size():
+				return String(AUDIO_ROWS[i - 1][2])
+	return CATEGORY_LINE[cat]

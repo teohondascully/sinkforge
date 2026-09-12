@@ -83,6 +83,7 @@ const PAYOUT_Z: int = 30  ## the "+N" ticks: over the body they rise from and ov
 ## lessons the hints have taught. Filled by `build_stack`; empty on a bare `ViewStack.new()`.
 var view: WorldView = null
 var settings: SettingsPage = null
+var settings_ctl: SettingsControl = null   ## the modal's Control tree; `settings` stays the model (D0632)
 var minimap: Minimap = null
 var hints: Hints = null
 var objectives: Objectives = null
@@ -198,9 +199,14 @@ static func _mount_hud(view: WorldView, stack: ViewStack, hints: Hints = null, m
 	view.add_hud().add_stateful_chip(legend, &"paint")
 	# The settings page is a modal over everything, the legend included, mounted CLOSED: opening it and
 	# feeding it the shell's snapshot is the shell's work (6j, D0372; the shell does it since 6q, D0380).
+	# D0632 (the Hybrid ruling): it is a real Control tree now -- `SettingsPage` stays the model and the
+	# painter is gone; the node is a direct child of the HUD's CanvasLayer, so it draws in screen pixels.
 	var settings: SettingsPage = SettingsPage.new()
-	view.add_hud().add_stateful_chip(settings, &"paint")
+	var ctl := SettingsControl.new()
+	ctl.page = settings
+	view.add_hud().add_child(ctl)
 	stack.settings = settings
+	stack.settings_ctl = ctl
 	stack.minimap = minimap
 	stack.hints = dock.hints
 	stack.objectives = line.objectives

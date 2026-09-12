@@ -10,25 +10,31 @@ const LEVEL_IDS: Array[String] = ["master", "sound", "ambience", "music"]
 const LEVEL_STEP: float = 0.05   ## one arrow press on a slider (D0410)
 
 
-## What the page shows: the levels, the mute, the feel toggles, the zoom's label, every binding's label.
+## What the page shows: the levels, the mute, the feel toggles, the zoom's label, every binding's label,
+## and -- D0632 -- every action's full event label list plus the action set itself. The clash check needs
+## both, and it was DEAD before this: `SettingsPage.clashes` reads `event_labels`/`all_actions`, which no
+## snapshot ever carried, so a colliding rebind could never be marked on the seat.
 static func snapshot() -> Dictionary:
 	var levels: Dictionary = {"master": Settings.master, "sound": Settings.sound, "ambience": Settings.ambience, "music": Settings.music}
 	var bindings: Dictionary = {}
-	for action: StringName in Controls.defaults():
+	var event_labels: Dictionary = {}
+	var all: Array = Controls.defaults().keys()
+	for action: Variant in all:
 		bindings[action] = SettingsBindings.binding_label(action)
+		event_labels[action] = SettingsBindings.event_labels(action)
 	var zoom: float = CameraRig.ZOOM_LEVELS[clampi(Settings.zoom_idx, 0, CameraRig.ZOOM_LEVELS.size() - 1)]
 	return {"levels": levels, "muted": Settings.muted, "shake": Settings.screen_shake, "auto_pickup": Settings.auto_pickup,
-		"zoom_label": "%.2fx" % zoom, "bindings": bindings}
+		"zoom_label": "%.2fx" % zoom, "bindings": bindings, "event_labels": event_labels, "all_actions": all}
 
 
-## Apply one payload the page answered a click or a key with. `canvas_x` is where the pointer was, for a
-## slider. Returns what changed, for a test to read.
+## Apply one payload the page answered a click or a key with. Sliders carry their own `frac` (D0632: the
+## Control's HSlider knows its value; the hit-rect path that needed `canvas_x` is gone). Returns what
+## changed, for a test to read.
 static func apply(payload: Dictionary, page: SettingsPage, canvas_x: float) -> StringName:
 	if payload.has("toggle"):
 		return toggle(String(payload["toggle"]))
 	if payload.has("slider"):
-		var id: String = String(payload["slider"])
-		set_level(id, page.slider_frac(id, canvas_x))
+		set_level(String(payload["slider"]), float(payload.get("frac", 0.0)))
 		return &"level"
 	if payload.has("cycle"):
 		Settings.zoom_idx = (Settings.zoom_idx + 1) % CameraRig.ZOOM_LEVELS.size()

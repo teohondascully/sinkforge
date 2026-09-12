@@ -387,10 +387,10 @@ func _test_it_chains_hooks_the_whole_way_out() -> void:
 	print("  [OBSERVED] chained hooks: row %d -> %d (the reel ceiling is %d)" % [start_row, climbed, reel_ceiling])
 	_check(climbed <= reel_ceiling, "chained hooks carry the body to the reel's ceiling (row %d, ceiling %d)" % [climbed, reel_ceiling])
 	_check(PropertyChecks.solid_overlap_count(body, grid) == 0, "...and it never ends the climb inside rock")
-	# THE LAST METRE AND A HALF IS NOT THE LINE'S, and it is not asserted here. `Grapple.MIN_LENGTH`
-	# forbids winching closer than 25.6 px to the hitch, and the topmost SOLID wall cell of a shaft is its
-	# own mouth, so a reeled body hangs about six rows under the lip by geometry and no chain of hooks
-	# closes that. Measured on this rig: cutting the line to jump drops the body (it is airborne the
-	# instant the rope goes, and a jump needs a floor) and it falls the whole shaft; holding mantle on the
-	# rope does not fire either, toward the anchor or away from it. Logged as P035 with the numbers. What
-	# a player has that this rig does not is a pick, which is why the end-to-end lives in a seat.
+	# THE LAST METRE AND A HALF IS NOT THE LINE'S -- it is the mantle's, asserted in test_lip_mantle.gd
+	# (P035, D0631). `Grapple.MIN_LENGTH` forbids winching closer than 25.6 px to the hitch, and the
+	# topmost SOLID wall cell of a shaft is its own mouth, so a reeled body hangs about six rows under
+	# the lip by geometry and no chain of hooks closes that. Measured on this rig before the mantle
+	# ruled: cutting the line to jump drops the body (it is airborne the instant the rope goes, and a
+	# jump needs a floor) and it falls the whole shaft; holding mantle on the rope did not fire either,
+	# toward the anchor or away from it -- which is exactly the gap the lip mantle now fills.

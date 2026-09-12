@@ -1,0 +1,400 @@
+class_name SettingsControl
+extends Control
+
+## THE SETTINGS PAGE AS A REAL CONTROL TREE (D0632, the Hybrid ruling), re-cut as a TYPESET page
+## (D0634): the reference look the director picked is typographic discipline -- a tracked overline
+## over a display title, hairline rules between rows, numerals right-aligned in their own column,
+## and a plate that hugs its content instead of a fixed window with an empty lower half. The painter
+## HUD keeps its one-frame-per-tick contract for the in-world chrome; this modal -- which never
+## needed per-tick drawing -- is a retained tree with a Theme. `SettingsPage` stays the model: which
+## face is open, where the keyboard cursor sits, what a row answers (the note's sentence lives there
+## too, `detail_text`). This node presents it and speaks the same PAYLOADS the painter's hit-rects
+## did, so `HudBridge.apply` and the seat's `_game_verb` are untouched.
+##
+## ONE NAVIGATOR, NOT TWO: every control here is `FOCUS_NONE`, so Enter/arrows are never consumed as
+## gui input and always reach the seat's `_unhandled_input` -> `HudBridge.key`, the tested path. The
+## cursor is drawn as a stylebox override on `page.row`'s control -- the same ring, outside the rect,
+## that the painter drew by hand. Mouse hover feeds only the detail note, matching the drawn page's
+## own precedence.
+##
+## THE SKIN IS THE THEME: every colour and type rung resolves through `PageTokens.make_theme` (the
+## D0634 restructure -- a capture caught per-node overrides still printing the previous skin's ink).
+## This file owns only GEOMETRY: sizes, spacings, the hairline's one pixel, the plate's content hug.
+## `PageTokens.INSTRUMENT` / `.PAPER`, switched whole by `apply_skin`; the rise keeps the model's own
+## counter/ease, applied as the plate's offset and alpha.
+
+signal payload(p: Dictionary)
+
+## The model the shell already owns. `page.state` is the snapshot `HudBridge.snapshot()` hands over;
+## `page.row`/`cat`/`capture`/`armed` are the keyboard face this mirrors.
+var page: SettingsPage = null
+
+var _tokens: Dictionary = PageTokens.INSTRUMENT
+var _built_cat: int = -1
+var _focusables: Array[Control] = []
+var _hover_row: int = -1
+var _dragging: HSlider = null
+var _ringed: Control = null
+var _ring_key: StringName = &"panel"
+
+var _scrim: ColorRect = null
+var _centre: Control = null
+var _plate: PanelContainer = null
+var _rail: VBoxContainer = null
+var _overline: Label = null
+var _title: Label = null
+var _rows: VBoxContainer = null
+var _detail: Label = null
+var _foot: Label = null
+var _dyn: Dictionary = {}   ## id -> the Control that re-reads the snapshot each frame
+
+
+func _init() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	visible = false
+
+
+func _ready() -> void:
+	theme = PageTokens.make_theme(_tokens)
+	_build_shell()
+
+
+func apply_skin(skin: String) -> void:
+	_tokens = PageTokens.named(skin)
+	if is_inside_tree():
+		theme = PageTokens.make_theme(_tokens)
+		_scrim.color = Color(_tokens["scrim"], 0.0)
+		_ringed = null
+		_built_cat = -1
+
+
+func _process(delta: float) -> void:
+	if page == null:
+		visible = false
+		return
+	page.advance(delta)
+	if not page.visible():
+		visible = false
+		return
+	visible = true
+	var t: float = page.ease()
+	_plate.modulate.a = t
+	# Centring is manual, not CenterContainer: the rise needs the plate's CENTERED y plus an offset,
+	# and writing `position.y` alone pinned it to the canvas top in the before-capture -- a container
+	# child cannot own its position. The size is the combined minimum, which keeps the content hug.
+	_plate.size = _plate.get_combined_minimum_size()
+	_plate.position = (_centre.size - _plate.size) * 0.5 + Vector2(0.0, (1.0 - t) * UiTheme.px(14.0))
+	_scrim.color = Color(_tokens["scrim"], float(_tokens["scrim"].a) * t)
+	if _built_cat != page.cat:
+		_build_face()
+	_refresh()
+	_focus_mirror()
+
+
+## The fixed skeleton: scrim over everything, the plate centred (manually -- see `_process`), rail
+## down its left, a vertical hairline, then the face -- masthead, ruled rows, footnote, legend.
+## Children of a CanvasLayer draw in screen pixels, so every length is authored x UI_SCALE.
+func _build_shell() -> void:
+	_scrim = ColorRect.new()
+	_scrim.name = "scrim"
+	_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_scrim.mouse_filter = Control.MOUSE_FILTER_STOP   ## a modal eats the clicks it covers
+	_scrim.color = Color(_tokens["scrim"], 0.0)
+	add_child(_scrim)
+	_centre = Control.new()
+	_centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_centre)
+	_plate = PanelContainer.new()
+	_plate.name = "plate"
+	_plate.theme_type_variation = &"PagePlate"
+	_centre.add_child(_plate)
+	var split := HBoxContainer.new()
+	split.add_theme_constant_override("separation", int(UiTheme.px(UiTheme.BAZAAR_PAD)))
+	_plate.add_child(split)
+	_build_rail(split)
+	# The rail's own edge: a vertical hairline, the same rule as the horizontal ones turned on end.
+	var vrule := PanelContainer.new()
+	vrule.theme_type_variation = &"PageRule"
+	vrule.custom_minimum_size.x = 1.0
+	split.add_child(vrule)
+	var face := VBoxContainer.new()
+	face.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	face.add_theme_constant_override("separation", int(UiTheme.px(7.0)))
+	split.add_child(face)
+	_build_head(face)
+	_rows = VBoxContainer.new()
+	_rows.name = "rows"
+	_rows.add_theme_constant_override("separation", int(UiTheme.px(4.0)))
+	face.add_child(_rows)
+	var detail_plate := PanelContainer.new()
+	detail_plate.theme_type_variation = &"PageDetail"
+	face.add_child(detail_plate)
+	_detail = Label.new()
+	_detail.name = "detail"
+	_detail.theme_type_variation = &"NoteLabel"
+	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail_plate.add_child(_detail)
+	_foot = Label.new()
+	_foot.name = "foot"
+	_foot.theme_type_variation = &"NoteLabel"
+	face.add_child(_foot)
+
+
+## The tab rail: one quiet text tab per face in RAIL_ORDER; the selected one reads through the accent
+## underline its RailTab stylebox carries, not a filled well.
+func _build_rail(split: Container) -> void:
+	_rail = VBoxContainer.new()
+	_rail.name = "rail"
+	_rail.custom_minimum_size.x = UiTheme.px(UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD)
+	_rail.add_theme_constant_override("separation", int(UiTheme.px(5.0)))
+	split.add_child(_rail)
+	for slot: int in SettingsPage.RAIL_ORDER.size():
+		var c: int = SettingsPage.RAIL_ORDER[slot]
+		var tab := _chip("%d %s" % [slot + 1, SettingsPage.CAT_NAMES[c]], {"cat": c}, &"RailTab")
+		tab.toggle_mode = true
+		tab.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_rail.add_child(tab)
+
+
+## The head: the tracked eyebrow naming the section, the category as the display title, a hairline
+## under both -- the page's masthead.
+func _build_head(face: Container) -> void:
+	var head := VBoxContainer.new()
+	head.name = "head"
+	head.add_theme_constant_override("separation", int(UiTheme.px(3.0)))
+	face.add_child(head)
+	_overline = Label.new()
+	_overline.name = "overline"
+	_overline.theme_type_variation = &"PageOverline"
+	head.add_child(_overline)
+	_title = Label.new()
+	_title.name = "title"
+	_title.theme_type_variation = &"PageTitle"
+	head.add_child(_title)
+	var head_rule := _rule()
+	head_rule.name = "head_rule"
+	head.add_child(head_rule)
+
+
+## A hairline: a PanelContainer in the PageRule skin, one canvas pixel tall -- colour is the theme's.
+func _rule() -> PanelContainer:
+	var r := PanelContainer.new()
+	r.theme_type_variation = &"PageRule"
+	r.custom_minimum_size.y = 1.0
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+
+## Rebuild the open face's rows. The plate hugs content -- only its WIDTH stays the face's own number
+## (CONTROLS' table vs the compact faces), so a short face like GAME no longer floats an empty lower
+## half. The title carries the category; the overline stays the section eyebrow.
+func _build_face() -> void:
+	_built_cat = page.cat
+	for kid: Node in _rows.get_children():
+		kid.queue_free()
+	_focusables.clear()
+	_dyn.clear()
+	_ringed = null
+	_hover_row = -1
+	_overline.text = "SETTINGS"
+	_title.text = SettingsPage.CAT_NAMES[page.cat].capitalize()
+	_plate.custom_minimum_size = Vector2(UiTheme.px(SettingsPage.width_for(page.cat)), 0.0)
+	_foot.text = "arrows move   ENTER rebinds   1-4 tab   ESC closes" if page.cat == SettingsPage.CAT_CONTROLS \
+		else "up/down row  left/right adjust  ENTER  1-4 tab  ESC"
+	match page.cat:
+		SettingsPage.CAT_CONTROLS: _face_controls()
+		SettingsPage.CAT_FEEL: _face_feel()
+		SettingsPage.CAT_GAME: _face_game()
+		_: _face_audio()
+
+
+## AUDIO: the mute chip, then one slider row per level -- snapshot order, row 0 first. The percent is
+## a numeral column: right-aligned on a fixed width so the digits stack like a table.
+func _face_audio() -> void:
+	_add_row("sound", _chip("SOUND ON", {"toggle": "mute"}, &"Chip", "mute"))
+	for r: Array in SettingsPage.AUDIO_ROWS:
+		var id: String = String(r[1])
+		var slider := HSlider.new()
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.01
+		slider.focus_mode = Control.FOCUS_NONE
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slider.custom_minimum_size.x = UiTheme.px(SettingsPage.SET_BAR_W)
+		slider.drag_started.connect(func() -> void: _dragging = slider)
+		slider.drag_ended.connect(func(_c: bool) -> void: _dragging = null)
+		slider.value_changed.connect(func(v: float) -> void: payload.emit({"slider": id, "frac": v}))
+		_dyn[id] = slider
+		var pct := Label.new()
+		pct.theme_type_variation = &"NumLabel"
+		pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		pct.custom_minimum_size.x = UiTheme.px(22.0)
+		_dyn["pct:" + id] = pct
+		_add_row(String(r[0]), slider, pct)
+
+
+## FEEL: a chip per row -- toggles print ON/OFF, the zoom prints its own label.
+func _face_feel() -> void:
+	for r: Array in SettingsPage.FEEL_ROWS:
+		var id: String = String(r[1])
+		_add_row(String(r[0]), _chip("", SettingsPage.row_payload(page.cat, _focusables.size()), &"Chip", id))
+
+
+## GAME: the two doors; NEW GAME's second press is the one that acts, said on the chip itself.
+func _face_game() -> void:
+	for r: Array in SettingsPage.GAME_ROWS:
+		var id: String = String(r[1])
+		var chip := _chip("RETURN TO SURFACE" if id != "new" else "NEW GAME",
+				SettingsPage.row_payload(page.cat, _focusables.size()),
+				&"ChipWarn" if id == "new" else &"Chip", id)
+		_add_row(String(r[0]), chip)
+
+
+## CONTROLS: two columns of [verb -- binding chip], RESET KEYS last -- the same focus order the
+## model's `row_payload` assigns. Every cell is a ruled row, so the grid reads as a table.
+func _face_controls() -> void:
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", int(UiTheme.px(SettingsPage.REMAP_GAP)))
+	grid.add_theme_constant_override("v_separation", int(UiTheme.px(3.0)))
+	_rows.add_child(grid)
+	var per_col: int = SettingsPage.remap_per_col()
+	_focusables.resize(SettingsPage.REMAP_ROWS.size())   ## indexed by MODEL row: the grid is filled
+	for pos: int in SettingsPage.REMAP_ROWS.size():       ## column-major while `page.row` is row-major
+		var i: int = (pos % 2) * per_col + pos / 2
+		var r: Array = SettingsPage.REMAP_ROWS[i]
+		_add_row(String(r[1]), _chip("?", {"bind": String(r[0])}, &"Chip", "bind:" + String(r[0])), null, grid, i)
+	var reset := _chip("RESET KEYS", {"reset": true}, &"Chip", "reset")
+	_focusables.append(reset)
+	_wire_hover(reset, _focusables.size() - 1)
+	_rows.add_child(_rule_wrap(reset))
+
+
+## One labelled row into `_rows` (or a supplied container), verb left, control(s) right; registers
+## the control in `_focusables`/`_dyn`/`_hover` under the row's own index, so the keyboard cursor and
+## the pointer name the same thing.
+func _add_row(label: String, control: Control, extra: Control = null, into: Container = null, row_idx: int = -1) -> void:
+	var idx: int = row_idx if row_idx >= 0 else _focusables.size()
+	if row_idx >= 0:
+		_focusables[row_idx] = control
+	else:
+		_focusables.append(control)
+	if control.get_meta("dyn_id", "") != "":
+		_dyn[control.get_meta("dyn_id")] = control
+	_wire_hover(control, idx)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", int(UiTheme.px(8.0)))
+	var l := Label.new()
+	l.text = label
+	l.theme_type_variation = &"RowLabel"
+	if into == null:
+		l.custom_minimum_size.x = UiTheme.px(SettingsPage.SET_CTRL_DX - 8.0)
+	else:
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(l)
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL if into == null else Control.SIZE_SHRINK_END
+	h.add_child(control)
+	if extra != null:
+		h.add_child(extra)
+	var wrap := _rule_wrap(h)
+	control.set_meta("ring", wrap)
+	(into if into != null else _rows).add_child(wrap)
+
+
+## The row's ruled bed: a PanelContainer whose `panel` starts EMPTY and takes the focus stylebox when
+## `page.row` lands here, over a VBox carrying the row and its hairline. The rule is a child, NOT the
+## stylebox, so the ring witness (an unfocused row has no `panel` override) stays true; and a Button
+## could carry `normal` itself but an HSlider cannot -- the wrapper gives every row the same surface.
+func _rule_wrap(inner: Control) -> PanelContainer:
+	var wrap := PanelContainer.new()
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", int(UiTheme.px(1.5)))
+	box.add_child(inner)
+	box.add_child(_rule())
+	wrap.add_child(box)
+	return wrap
+
+
+func _chip(text: String, p: Dictionary, variation: StringName, dyn_id: String = "") -> Button:
+	var b := Button.new()
+	b.theme_type_variation = variation
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(func() -> void: payload.emit(p))
+	if dyn_id != "":
+		b.set_meta("dyn_id", dyn_id)
+	return b
+
+
+func _wire_hover(c: Control, i: int) -> void:
+	c.mouse_entered.connect(func() -> void: _hover_row = i)
+	c.mouse_exited.connect(func() -> void:
+		if _hover_row == i:
+			_hover_row = -1)
+
+
+## The frame's moving parts, re-read from the snapshot: slider values (except the one in the hand),
+## chip texts, the capture and the arm, the clash marks. `_dyn` reads are guarded -- a key exists only
+## while its face is built. The colour overrides are state, not skin, re-read each frame -- a swap
+## cannot leave them stale.
+func _refresh() -> void:
+	var st: Dictionary = page.state
+	var muted: bool = bool(st.get("muted", false))
+	var mute: Button = _dyn.get("mute")
+	if mute != null:
+		mute.text = "MUTED" if muted else "SOUND ON"
+	for id: String in ["master", "sound", "ambience", "music"]:
+		var s: HSlider = _dyn.get(id)
+		if s != null and s != _dragging:
+			s.set_value_no_signal(page.level(id))
+		var pct: Label = _dyn.get("pct:" + id)
+		if pct != null:
+			pct.text = "%d%%" % int(round(page.level(id) * 100.0))
+			pct.add_theme_color_override("font_color", _tokens["ink_dim"] if muted else _tokens["ink"])
+	for id: String in ["shake", "auto_pickup"]:
+		var b: Button = _dyn.get(id)
+		if b != null:
+			b.text = "ON" if bool(st.get("shake" if id == "shake" else "auto_pickup", true)) else "OFF"
+	var zoom_b: Button = _dyn.get("zoom")
+	if zoom_b != null:
+		zoom_b.text = String(st.get("zoom_label", ""))
+	var new_b: Button = _dyn.get("new")
+	if new_b != null:
+		new_b.text = "NEW GAME · SURE?" if page.armed == "new" else "NEW GAME"
+	var clashes: Dictionary = SettingsPage.clashes(st)
+	for r: Array in SettingsPage.REMAP_ROWS:
+		var b: Button = _dyn.get("bind:" + String(r[0]))
+		if b == null:
+			continue
+		var act: StringName = r[0]
+		b.text = "press a key…" if page.capture == act else page.binding_label(act)
+		b.add_theme_color_override("font_color", _tokens["warn"] if clashes.has(act) else _tokens["ink"])
+	for slot: int in _rail.get_child_count():
+		(_rail.get_child(slot) as Button).set_pressed_no_signal(SettingsPage.RAIL_ORDER[slot] == page.cat)
+	# The note's sentence is the model's; the hover index is the only view input (it wins over the
+	# keyboard cursor, the drawn page's own precedence).
+	_detail.text = page.detail_text(_hover_row)
+
+
+## The keyboard cursor as a drawn ring: the row wrapper at `page.row` gets `PageTokens.ring_style` --
+## the lit bed and an accent border pushed outside the rect; focus RINGS from outside, the drawn
+## page's own rule. Nothing takes real gui focus here, so keys stay the seat's.
+func _focus_mirror() -> void:
+	var want: Control = _focusables[page.row] if page.row >= 0 and page.row < _focusables.size() else null
+	var target: Control = want
+	var key := &"normal"
+	if want != null and want.has_meta("ring"):
+		target = want.get_meta("ring")
+		key = &"panel"
+	if target == _ringed:
+		return
+	if _ringed != null and is_instance_valid(_ringed):
+		_ringed.remove_theme_stylebox_override(_ring_key)
+	_ringed = target
+	_ring_key = key
+	if _ringed != null:
+		_ringed.add_theme_stylebox_override(key, PageTokens.ring_style(_tokens))

@@ -4,11 +4,14 @@ extends RefCounted
 ## `terrace`/`_terrace_raw` (:145-155) and `on_scarp` (:158-163). A flat pad about the spawn, one wave of
 ## long-wavelength roll fading in over the first ramp beyond it, two more fading in over the second, and
 ## authored scarps that step the ground between terraces. Ported in A' step 8b (D0382) onto the
-## deterministic generator: every quantity is an integer, and the three sines are read from `SIN_MILLI`,
-## a 256-entry table of `round(sin(2*pi*i/256) * 1000)`, because `sin` is a libm call and the generation
-## path may not make one (D0381). The angle unit is 1/65536 of a turn; a table entry is 256 units, so a
-## phase resolves to 1.4 degrees, which at these amplitudes (at most 6.4 cells) is under a hundredth of
-## a cell.
+## deterministic generator: every quantity is an integer, and the three sines are read from
+## `Angle.SIN_MILLI`, a 256-entry table of `round(sin(2*pi*i/256) * 1000)`, because `sin` is a libm
+## call and the generation path may not make one (D0381). The table lived here until P044 --
+## `core/bedding_dip.gd` needed the same sine where `view/` could reach it, and `Relief` is the wrong
+## address for that (view may not depend on sim), so the deterministic trig kit moved to
+## `core/angle.gd` and these names now delegate. The angle unit is 1/65536 of a turn; a table entry
+## is 256 units, so a phase resolves to 1.4 degrees, which at these amplitudes (at most 6.4 cells) is
+## under a hundredth of a cell.
 ##
 ## Everything reads a `relief` site config (`data/strata/*.yaml`); a site without one is flat at the
 ## datum, which is exactly the generator before this pass existed. The record's units are legacy's own
@@ -19,46 +22,22 @@ extends RefCounted
 ## legacy rounded to metre steps come out as quarter-metre steps here: the wave slopes are at most 0.76
 ## cells a column, so off a scarp face no two neighbouring columns differ by more than one cell.
 
-const TURN: int = 65536       ## angle units in a full turn
-const TABLE_SHIFT: int = 8    ## TURN / SIN_MILLI.size(): 256 angle units per table entry
 const MILLI: int = 1000
 
-## round(sin(2*pi*i/256) * 1000) for i in 0..255. Generated, then checked in `tests/test_relief.gd`
-## against the values a sine must have (the quarter points, the octant, odd symmetry).
-const SIN_MILLI: PackedInt32Array = [
-	0, 25, 49, 74, 98, 122, 147, 171, 195, 219, 243, 267, 290, 314, 337, 360,
-	383, 405, 428, 450, 471, 493, 514, 535, 556, 576, 596, 615, 634, 653, 672, 690,
-	707, 724, 741, 757, 773, 788, 803, 818, 831, 845, 858, 870, 882, 893, 904, 914,
-	924, 933, 942, 950, 957, 964, 970, 976, 981, 985, 989, 992, 995, 997, 999, 1000,
-	1000, 1000, 999, 997, 995, 992, 989, 985, 981, 976, 970, 964, 957, 950, 942, 933,
-	924, 914, 904, 893, 882, 870, 858, 845, 831, 818, 803, 788, 773, 757, 741, 724,
-	707, 690, 672, 653, 634, 615, 596, 576, 556, 535, 514, 493, 471, 450, 428, 405,
-	383, 360, 337, 314, 290, 267, 243, 219, 195, 171, 147, 122, 98, 74, 49, 25,
-	0, -25, -49, -74, -98, -122, -147, -171, -195, -219, -243, -267, -290, -314, -337, -360,
-	-383, -405, -428, -450, -471, -493, -514, -535, -556, -576, -596, -615, -634, -653, -672, -690,
-	-707, -724, -741, -757, -773, -788, -803, -818, -831, -845, -858, -870, -882, -893, -904, -914,
-	-924, -933, -942, -950, -957, -964, -970, -976, -981, -985, -989, -992, -995, -997, -999, -1000,
-	-1000, -1000, -999, -997, -995, -992, -989, -985, -981, -976, -970, -964, -957, -950, -942, -933,
-	-924, -914, -904, -893, -882, -870, -858, -845, -831, -818, -803, -788, -773, -757, -741, -724,
-	-707, -690, -672, -653, -634, -615, -596, -576, -556, -535, -514, -493, -471, -450, -428, -405,
-	-383, -360, -337, -314, -290, -267, -243, -219, -195, -171, -147, -122, -98, -74, -49, -25,
-]
 
-
-## sin(angle) in thousandths, any integer angle: `>>` is arithmetic, so a negative angle lands on the
-## right entry after the mask, and a full turn past it lands on the same one.
+## sin(angle) in thousandths -- delegates to `Angle.sin_milli`, the one table the project shares.
 static func sin_milli(angle_units: int) -> int:
-	return SIN_MILLI[(angle_units >> TABLE_SHIFT) & (SIN_MILLI.size() - 1)]
+	return Angle.sin_milli(angle_units)
 
 
 ## Legacy's radians to angle units, once, at load.
 static func units(rad: float) -> int:
-	return int(round(rad / TAU * float(TURN)))
+	return Angle.units(rad)
 
 
 ## Legacy's radians per metre to angle units per terrain column.
 static func units_per_cell(freq_rad_per_m: float, cells_per_m: int) -> int:
-	return int(round(freq_rad_per_m / float(cells_per_m) / TAU * float(TURN)))
+	return int(round(freq_rad_per_m / float(cells_per_m) / TAU * float(Angle.TURN)))
 
 
 ## Legacy's metres to thousandths of a cell.
@@ -66,10 +45,10 @@ static func milli_cells(metres: float, cells_per_m: int) -> int:
 	return int(round(metres * float(cells_per_m) * float(MILLI)))
 
 
-## Thousandths to whole, rounding half away from zero (legacy's `int(round(h))`); integer `/` truncates
-## toward zero, so the half is added on the side of the sign.
+## Thousandths to whole, rounding half away from zero -- `Angle.round_milli`, kept under the name the
+## pass was written against.
 static func round_milli(v: int) -> int:
-	return (v + MILLI / 2) / MILLI if v >= 0 else (v - MILLI / 2) / MILLI
+	return Angle.round_milli(v)
 
 
 ## A surface at one row across the width: the generator before relief, and every site without the key.

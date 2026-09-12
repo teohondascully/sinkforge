@@ -19,7 +19,7 @@ display_name: Copper ore
 # (ore_iron's mark is cool blue-white). `base_color` stays legacy's neutral grey host -- the nugget is
 # the mark; the country rock does not need to blush. Revert the one line to reverse.
 
-base_color: [0.29, 0.3, 0.34]
+base_color: [0.58, 0.6, 0.68]
 grain: true
 grammar: clastic
 depth_darken: 0.25

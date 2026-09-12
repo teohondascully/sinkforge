@@ -15,7 +15,7 @@ display_name: Hardrock
 # stone the shaft cuts through -- flat laminae, seams that run with the beds -- and deepstone below it is
 # the massive one, so the two rocks are told apart by their structure and not by their hue alone.
 
-base_color: [0.355, 0.35, 0.335]
+base_color: [0.71, 0.7, 0.67]
 grain: true
 grammar: bedded
 depth_darken: 0.3

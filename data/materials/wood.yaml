@@ -11,7 +11,7 @@ display_name: Wood
 # --- appearance -----------------------------------------------------------------------------------
 # Lifted from `legacy/src/data/materials/wood.tres`: colour verbatim, grain on, no cap, no nugget, no
 # depth darkening (a tree stands in the sky).
-base_color: [0.42, 0.28, 0.16]
+base_color: [0.84, 0.56, 0.32]
 grain: true
 depth_darken: 0.0
 glitters: false
