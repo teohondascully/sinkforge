@@ -19,6 +19,9 @@ static func run(record: Dictionary) -> Dictionary:
 	if not bool(boot["ok"]):
 		out["reason"] = boot["reason"]
 		return out
+	# The live door rides the report so a suite can checkpoint the resulting state through
+	# `Session.capture` (shell/ is the save's layer; harness may not reach it, tests may).
+	out["session"] = boot["iface"]
 
 	var budget: int = int(record.get("budget_ticks", 30000))
 	var bot: ColdStartBot = null

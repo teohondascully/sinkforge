@@ -77,8 +77,12 @@ full falsifiable form:
 - **The threshold is still unset.** The scripted floor is now measured (414 ticks); a human-pacing
   threshold wants either a real playthrough number or a director ruling on what multiple of the bot
   floor counts as completable.
-- **Checkpoint re-derivation is not exercised here.** The claim asks for a re-loadable resulting
-  state; the suite does not save/reload mid-run. `shell/save_game.gd` exists for it.
+- **Checkpoint re-derivation is now exercised (D0621).** The suite captures the run's resulting state
+  through `Session`, round-trips it through the binary serializer, and asserts the restored session
+  signs identically on every saved part and stays identical under 30 further ticks. The leg's first
+  run found a real defect: `Items._rubble` — signed state since D0354 — had never been written to the
+  envelope; the key exists now. What remains unproven is *mid-run* resume — the checkpoint is taken at
+  the goal, not partway through.
 
 The previous blockers are resolved: the rig demand transaction (`sim/economy/demands.gd` + the rig
 runner), D1's unlock (`drill` granted at stage advance), economy records (`data/progression`), the
@@ -113,3 +117,4 @@ its first real checkpoint.
 | 2026-08-27 | — | — | not measured | BLOCKED | Claim authored to replace retired `C001` (`docs/DECISIONS_LEDGER.md` D0076). Blocked on nearly the entire remaining build sequence — see above. |
 | 2026-09-11 | D0605+D0609 | d1 wants 2 ingots | 414 ticks | PASSING | `test_cold_start_d1.gd` + `scenarios/cold_start_to_d1.yaml`. Scripted bot through apply/observe only; conservation clean. First-failed via the same commit's event-kind mutation. Threshold still unset. |
 | 2026-09-11 | D0620 | d1 wants 2 ingots | within 30000-tick budget | PASSING | Same run now driven by `harness/driver` consuming the generated scenario record — yaml is the single source, the suite asserts over the driver's report. Event-suppression mutation re-verified red. |
+| 2026-09-11 | D0621 | d1 wants 2 ingots | 414 ticks; checkpoint re-loads signature-identically | PASSING | The resulting-state clause is exercised: `Session.capture` → binary serializer → `from_save` → saved parts sign identically and stay so under 30 ticks. Found and fixed `Items._rubble` missing from the envelope (signed since D0354, unsaved until now). Verbs selection differs by design (D0355). Mid-run resume still unproven. |

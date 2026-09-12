@@ -95,6 +95,7 @@ static func capture(world: World, items: Items, machines: Machines) -> Dictionar
 		"ground": items.piles.ground.duplicate(true),
 		"sink": items.piles.sink.duplicate(),
 		"produced": items.total_produced.duplicate(), "consumed": items.total_consumed.duplicate(),
+		"rubble": items.rubble_capture(),
 		"machines": saved,
 		"winch_routes": machines.winch_routes.duplicate(),
 		"winch_transit": machines.winch_transit.duplicate(true),
@@ -169,6 +170,9 @@ static func _stage(data: Dictionary) -> Dictionary:
 	items.piles.sink = (env["sink"] as Dictionary).duplicate()
 	items.total_produced = (env["produced"] as Dictionary).duplicate()
 	items.total_consumed = (env["consumed"] as Dictionary).duplicate()
+	# Sixteenths banked toward a free block (D0621): signed state since D0354, unsaved until now.
+	# OPTIONAL like `pack_order` -- a save from before the key restores the empty bank it always had.
+	items.rubble_restore(env.get("rubble", {}))
 	var machines: Machines = _stage_machines(env, world)
 	if machines == null:
 		return {}
@@ -268,6 +272,7 @@ static func _commit(world: World, items: Items, machines: Machines, s: Dictionar
 	items.piles = it.piles
 	items.total_produced = it.total_produced
 	items.total_consumed = it.total_consumed
+	items.rubble_restore(it.rubble_capture())
 	items.flow_events.clear()
 	items.last_drop_landing = Vector2i(-1, -1)
 	machines.adopt_from(s["machines"])

@@ -23286,3 +23286,27 @@ fired twice during the build and was answered honestly each time: SCHEMA.yaml ex
 scenario glob (it is the contract, not a record), and the bot's route method named `execute` not
 `run` (func run( is the check-registration heuristic; a policy is not a check). Mutation re-verified:
 suppress demand_satisfied, the goal assert fails while legs stay green.
+
+## D0621 · 2026-09-11 · `Items._rubble` enters the save envelope; C003's checkpoint leg exists
+
+**What:** `SaveGame.capture` gains a `rubble` key (sixteenths of a block banked per material toward a
+free block, D0354), staged and restored like `pack_order` -- optional, absent in older saves meaning the
+empty bank they always produced. `test_cold_start_d1.gd` gains the claim's last open clause: the
+resulting state is captured through `Session`, round-tripped through the binary serializer, rebuilt with
+`Session.from_save`, and must sign identically on every saved part and stay identical under 30 further
+ticks on both sides. The driver's report now carries the live door (`rep["session"]`) because `harness`
+may not reach `shell/` -- the save surface lives there and tests compose it.
+
+**Why the gap hid so long:** `_rubble` was declared "STATE, in the signature" at D0354 but never
+entered the v3 envelope, and every existing round-trip fixture fed machines without mining plain rock --
+an empty bank signs identically to an empty bank, so the omission was green for weeks. C003's bot mines
+real rock; the first signature compare went red on `items` and on nothing else. Same failure class as
+the session's other finds: a check can be green for exactly as long as its subject never exercises the
+uncovered field.
+
+**The verbs part is asserted to DIFFER, not match (D0355):** the selection is session-scoped by
+decision; a checkpoint restores a default hotbar selection and the pin says so rather than pretending
+the envelope carries it.
+
+**Mutation witness:** `rubble_capture` returning `{}` turns "every saved part signs as the run's end
+state" red.

@@ -42,6 +42,20 @@ func _init(p_world: World) -> void:
 	world = p_world
 
 
+## The sixteenths bank for the save (D0621): D0354 declared it signed state -- it decides when the next
+## free block appears -- but the envelope never carried it, invisible until a save caught a session that
+## had mined plain rock (the round-trip fixture never did; C003's bot did). Absent in an older save:
+## an empty bank, exactly what those saves always produced.
+func rubble_capture() -> Dictionary:
+	return _rubble.duplicate()
+
+
+func rubble_restore(saved: Dictionary) -> void:
+	_rubble.clear()
+	for item: Variant in saved:
+		_rubble[StringName(str(item))] = int(saved[item])
+
+
 func produced(item: StringName, n: int) -> void:
 	total_produced[item] = int(total_produced.get(item, 0)) + n
 
