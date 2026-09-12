@@ -23681,3 +23681,22 @@ y~490 GAME, x 549..683 both skins), the pct numerals right-align at the face's r
 detail/foot ink is now the paper skin's own ink_faint (101,93,75 measured -- was the instrument
 skin's 128,138,158 on the before-capture).
 Reverse: CHEAP -- revert the hunk; the page goes back to top-glued but still works.
+
+## D0636 · 2026-09-12 · view/hud/{settings_page,page_tokens,settings_control}.gd, tests/test_settings_page.gd · the note's sentence is the model's; the ring is the theme's -- two leaks the size gate made visible
+
+The size gate flagged the D0634/D0635 pass (settings_control 427 lines, one 69-line shell builder,
+one 81-line test) and the fix surfaced two misplaced owners rather than mere length. First: the
+detail note's sentence-selection was a view method switching on model tables -- moved to
+`SettingsPage.detail_text(hover)`, so the sentence is posed headless like every other table the
+suite already drills; the view passes only the pointer's row. Second: the focus ring's stylebox was
+built in the view from token colours -- the D0634 rule (the theme says what a thing LOOKS LIKE) now
+covers it as `PageTokens.ring_style`, next to the other token-derived surfaces. The rest is honest
+shortening: `_build_shell` split at its real seams (`_build_rail`, `_build_head`), dead
+`_focus_row_of` and three one-line indirections (`_emit`, `tokens_scrim`, the `_detail_text`
+wrapper) removed, and the tree test split at its own seam -- structure witness vs signals/skin
+witness. Gate now reports only the five violations it reported before this pass began.
+Alternative: split the file for real (faces into a second script) -- refused, because the builders
+share every member (`_focusables`, `_dyn`, the node refs); a factory file would pass the control
+back into itself to save thirty comment lines.
+Reverse: CHEAP -- revert the diff; no behaviour moved except the note's sentence (into the model)
+and the ring stylebox (into the tokens).

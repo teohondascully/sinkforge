@@ -122,6 +122,18 @@ static func font_display(tokens: Dictionary) -> Font:
 	return fv
 
 
+## The keyboard cursor's ring, tokenized like every other surface: the lit bed and the accent border
+## pushed OUTSIDE the rect (expand margins), the drawn page's own rule that focus rings from outside.
+static func ring_style(tokens: Dictionary) -> StyleBoxFlat:
+	var ring := StyleBoxFlat.new()
+	ring.bg_color = tokens["row_lit"]
+	ring.border_color = tokens["accent_pale"]
+	ring.set_border_width_all(2)
+	ring.set_corner_radius_all(int(float(tokens["radius"]) * 0.5) + 2)
+	ring.set_expand_margin_all(3.0)
+	return ring
+
+
 ## One `Theme` for the whole page tree: a named variation per surface and per TYPE RUNG, so a row, a
 ## rail tab, the overline and the plate can disagree without per-node overrides. Geometry stays in
 ## `SettingsControl`; everything that says what a thing looks like lives here.

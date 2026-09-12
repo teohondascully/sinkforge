@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_test_the_clashes()
 	_test_the_geometry_and_the_rise()
 	await _test_the_control_tree_is_the_page()
+	await _test_signals_skin_and_the_ring()
 	_finish("settings_page")
 
 
@@ -152,13 +153,30 @@ func _test_the_control_tree_is_the_page() -> void:
 		if c.focus_mode != Control.FOCUS_NONE:
 			unfocused = false
 	_check(unfocused, "no control takes gui focus -- keys stay the seat's")
+	ctl.queue_free()
+
+
+## The same tree TALKS (D0632, re-cut D0634): the payloads the painter's hit-rects spoke come off
+## real control signals, the ring mirrors the model's row, the other faces hold their own, and a
+## skin swap reaches the theme the plate and the note ink draw from.
+func _test_signals_skin_and_the_ring() -> void:
+	var page: SettingsPage = SettingsPage.new()
+	page.state = _state()
+	var ctl := SettingsControl.new()
+	ctl.page = page
+	root.add_child(ctl)
+	page.open = true
+	for _i: int in 4:
+		await process_frame
+	var rail: VBoxContainer = ctl.find_child("rail", true, false)
+	var sliders: Array = ctl.find_children("*", "HSlider", true, false)
 	var got: Array = []
 	ctl.payload.connect(func(p: Dictionary) -> void: got.append(p))
 	(sliders[1] as HSlider).value = 0.25   # the snapshot seats sound at 0.5; a change is what emits
 	_check(not got.is_empty() and got[0].get("slider") == "sound" and absf(float(got[0].get("frac", -1.0)) - 0.25) < 0.05,
 		"the second slider answers at a quarter: %s" % str(got))
 	got.clear()
-	for c: Control in chips:
+	for c: Control in ctl.find_children("*", "Button", true, false):
 		if String(c.get_meta("dyn_id", "")) == "mute":
 			(c as Button).pressed.emit()
 	_check(got == [{"toggle": "mute"}], "the mute chip's payload is the model's: %s" % str(got))
@@ -176,8 +194,9 @@ func _test_the_control_tree_is_the_page() -> void:
 		await process_frame
 	# `ctl.theme` is the skin carrier: `apply_skin` rebuilds it whole, and the plate reads its
 	# "panel" stylebox under the PagePlate variation from it.
+	var plate: Control = ctl.find_child("plate", true, false)
 	_check((ctl.theme.get_stylebox("panel", "PagePlate") as StyleBoxFlat).bg_color.is_equal_approx(PageTokens.PAPER["plate"])
-		and plate.theme_type_variation == &"PagePlate",
+		and plate != null and plate.theme_type_variation == &"PagePlate",
 		"the paper skin reaches the theme the plate draws from")
 	_check((ctl._detail as Label).get_theme_color("font_color").is_equal_approx(PageTokens.PAPER["ink_faint"])
 		and (ctl._foot as Label).get_theme_color("font_color").is_equal_approx(PageTokens.PAPER["ink_faint"]),

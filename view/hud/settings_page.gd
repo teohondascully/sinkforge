@@ -270,3 +270,34 @@ func level(id: String) -> float:
 
 func binding_label(action: StringName) -> String:
 	return String((state.get("bindings", {}) as Dictionary).get(action, "?"))
+
+
+## The detail note's sentence: what a row answers, which is the model's question, not the view's --
+## moved here in D0634 so the text is posed headless like every other table. `hover` is the pointer's
+## row (-1 for none): it wins over the keyboard cursor, else the category's standing line.
+func detail_text(hover: int) -> String:
+	var i: int = hover if hover >= 0 else row
+	match cat:
+		CAT_CONTROLS:
+			if i >= REMAP_ROWS.size():
+				return "puts every binding back to its default"
+			var act: StringName = row_action(cat, i)
+			if capture == act and act != &"":
+				return "press any key to bind it — ESC cancels"
+			var clash: Array = clashes(state).get(act, [])
+			if not clash.is_empty():
+				return " and ".join(clash)
+			var r: Array = REMAP_ROWS[i]
+			return String(r[2]) if String(r[2]) != "" else "%s — press Enter to rebind" % String(r[1])
+		CAT_FEEL:
+			if i >= 0 and i < FEEL_ROWS.size():
+				return String(FEEL_ROWS[i][2])
+		CAT_GAME:
+			if i >= 0 and i < GAME_ROWS.size():
+				return String(GAME_ROWS[i][2])
+		_:
+			if i == 0:
+				return "silences everything at once; the levels below are kept"
+			if i > 0 and i <= AUDIO_ROWS.size():
+				return String(AUDIO_ROWS[i - 1][2])
+	return CATEGORY_LINE[cat]

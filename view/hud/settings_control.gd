@@ -7,9 +7,9 @@ extends Control
 ## and a plate that hugs its content instead of a fixed window with an empty lower half. The painter
 ## HUD keeps its one-frame-per-tick contract for the in-world chrome; this modal -- which never
 ## needed per-tick drawing -- is a retained tree with a Theme. `SettingsPage` stays the model: which
-## face is open, where the keyboard cursor sits, what a row answers. This node presents it and speaks
-## the same PAYLOADS the painter's hit-rects did, so `HudBridge.apply` and the seat's `_game_verb`
-## are untouched.
+## face is open, where the keyboard cursor sits, what a row answers (the note's sentence lives there
+## too, `detail_text`). This node presents it and speaks the same PAYLOADS the painter's hit-rects
+## did, so `HudBridge.apply` and the seat's `_game_verb` are untouched.
 ##
 ## ONE NAVIGATOR, NOT TWO: every control here is `FOCUS_NONE`, so Enter/arrows are never consumed as
 ## gui input and always reach the seat's `_unhandled_input` -> `HudBridge.key`, the tested path. The
@@ -20,9 +20,8 @@ extends Control
 ## THE SKIN IS THE THEME: every colour and type rung resolves through `PageTokens.make_theme` (the
 ## D0634 restructure -- a capture caught per-node overrides still printing the previous skin's ink).
 ## This file owns only GEOMETRY: sizes, spacings, the hairline's one pixel, the plate's content hug.
-##
-## TWO SKINS, ONE TREE: `PageTokens.INSTRUMENT` / `.PAPER`, switched whole by `apply_skin`. The rise
-## keeps `SettingsPage`'s own counter/ease, applied as the plate's offset and alpha.
+## `PageTokens.INSTRUMENT` / `.PAPER`, switched whole by `apply_skin`; the rise keeps the model's own
+## counter/ease, applied as the plate's offset and alpha.
 
 signal payload(p: Dictionary)
 
@@ -65,13 +64,9 @@ func apply_skin(skin: String) -> void:
 	_tokens = PageTokens.named(skin)
 	if is_inside_tree():
 		theme = PageTokens.make_theme(_tokens)
-		_scrim.color = Color(tokens_scrim(), 0.0)
+		_scrim.color = Color(_tokens["scrim"], 0.0)
 		_ringed = null
 		_built_cat = -1
-
-
-func tokens_scrim() -> Color:
-	return _tokens["scrim"]
 
 
 func _process(delta: float) -> void:
@@ -86,27 +81,26 @@ func _process(delta: float) -> void:
 	var t: float = page.ease()
 	_plate.modulate.a = t
 	# Centring is manual, not CenterContainer: the rise needs the plate's CENTERED y plus an offset,
-	# and writing `position.y` alone pinned the plate to the canvas top for its whole first life
-	# (the before-capture measured it at y~4 instead of centred -- a container child cannot own its
-	# position). The plate's size is its own combined minimum, so this also keeps the content hug.
+	# and writing `position.y` alone pinned it to the canvas top in the before-capture -- a container
+	# child cannot own its position. The size is the combined minimum, which keeps the content hug.
 	_plate.size = _plate.get_combined_minimum_size()
 	_plate.position = (_centre.size - _plate.size) * 0.5 + Vector2(0.0, (1.0 - t) * UiTheme.px(14.0))
-	_scrim.color = Color(tokens_scrim(), float(_tokens["scrim"].a) * t)
+	_scrim.color = Color(_tokens["scrim"], float(_tokens["scrim"].a) * t)
 	if _built_cat != page.cat:
 		_build_face()
 	_refresh()
 	_focus_mirror()
 
 
-## The fixed skeleton: scrim over everything, the plate centred, rail down its left, a vertical
-## hairline, then the face -- overline, display title, head rule, the ruled rows, the footnote detail,
-## the legend. Children of a CanvasLayer draw in screen pixels, so every length is authored x UI_SCALE.
+## The fixed skeleton: scrim over everything, the plate centred (manually -- see `_process`), rail
+## down its left, a vertical hairline, then the face -- masthead, ruled rows, footnote, legend.
+## Children of a CanvasLayer draw in screen pixels, so every length is authored x UI_SCALE.
 func _build_shell() -> void:
 	_scrim = ColorRect.new()
 	_scrim.name = "scrim"
 	_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scrim.mouse_filter = Control.MOUSE_FILTER_STOP   ## a modal eats the clicks it covers
-	_scrim.color = Color(tokens_scrim(), 0.0)
+	_scrim.color = Color(_tokens["scrim"], 0.0)
 	add_child(_scrim)
 	_centre = Control.new()
 	_centre.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -119,17 +113,7 @@ func _build_shell() -> void:
 	var split := HBoxContainer.new()
 	split.add_theme_constant_override("separation", int(UiTheme.px(UiTheme.BAZAAR_PAD)))
 	_plate.add_child(split)
-	_rail = VBoxContainer.new()
-	_rail.name = "rail"
-	_rail.custom_minimum_size.x = UiTheme.px(UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD)
-	_rail.add_theme_constant_override("separation", int(UiTheme.px(5.0)))
-	split.add_child(_rail)
-	for slot: int in SettingsPage.RAIL_ORDER.size():
-		var c: int = SettingsPage.RAIL_ORDER[slot]
-		var tab := _chip("%d %s" % [slot + 1, SettingsPage.CAT_NAMES[c]], {"cat": c}, &"RailTab")
-		tab.toggle_mode = true
-		tab.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		_rail.add_child(tab)
+	_build_rail(split)
 	# The rail's own edge: a vertical hairline, the same rule as the horizontal ones turned on end.
 	var vrule := PanelContainer.new()
 	vrule.theme_type_variation = &"PageRule"
@@ -139,21 +123,7 @@ func _build_shell() -> void:
 	face.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	face.add_theme_constant_override("separation", int(UiTheme.px(7.0)))
 	split.add_child(face)
-	var head := VBoxContainer.new()
-	head.name = "head"
-	head.add_theme_constant_override("separation", int(UiTheme.px(3.0)))
-	face.add_child(head)
-	_overline = Label.new()
-	_overline.name = "overline"
-	_overline.theme_type_variation = &"PageOverline"
-	head.add_child(_overline)
-	_title = Label.new()
-	_title.name = "title"
-	_title.theme_type_variation = &"PageTitle"
-	head.add_child(_title)
-	var head_rule := _rule()
-	head_rule.name = "head_rule"
-	head.add_child(head_rule)
+	_build_head(face)
 	_rows = VBoxContainer.new()
 	_rows.name = "rows"
 	_rows.add_theme_constant_override("separation", int(UiTheme.px(4.0)))
@@ -172,8 +142,43 @@ func _build_shell() -> void:
 	face.add_child(_foot)
 
 
-## A hairline as a PanelContainer in the PageRule skin: the colour is the theme's, the height is the
-## geometry's -- one canvas pixel.
+## The tab rail: one quiet text tab per face in RAIL_ORDER; the selected one reads through the accent
+## underline its RailTab stylebox carries, not a filled well.
+func _build_rail(split: Container) -> void:
+	_rail = VBoxContainer.new()
+	_rail.name = "rail"
+	_rail.custom_minimum_size.x = UiTheme.px(UiTheme.BAZAAR_RAIL - UiTheme.BAZAAR_PAD)
+	_rail.add_theme_constant_override("separation", int(UiTheme.px(5.0)))
+	split.add_child(_rail)
+	for slot: int in SettingsPage.RAIL_ORDER.size():
+		var c: int = SettingsPage.RAIL_ORDER[slot]
+		var tab := _chip("%d %s" % [slot + 1, SettingsPage.CAT_NAMES[c]], {"cat": c}, &"RailTab")
+		tab.toggle_mode = true
+		tab.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_rail.add_child(tab)
+
+
+## The head: the tracked eyebrow naming the section, the category as the display title, a hairline
+## under both -- the page's masthead.
+func _build_head(face: Container) -> void:
+	var head := VBoxContainer.new()
+	head.name = "head"
+	head.add_theme_constant_override("separation", int(UiTheme.px(3.0)))
+	face.add_child(head)
+	_overline = Label.new()
+	_overline.name = "overline"
+	_overline.theme_type_variation = &"PageOverline"
+	head.add_child(_overline)
+	_title = Label.new()
+	_title.name = "title"
+	_title.theme_type_variation = &"PageTitle"
+	head.add_child(_title)
+	var head_rule := _rule()
+	head_rule.name = "head_rule"
+	head.add_child(head_rule)
+
+
+## A hairline: a PanelContainer in the PageRule skin, one canvas pixel tall -- colour is the theme's.
 func _rule() -> PanelContainer:
 	var r := PanelContainer.new()
 	r.theme_type_variation = &"PageRule"
@@ -182,9 +187,9 @@ func _rule() -> PanelContainer:
 	return r
 
 
-## Rebuild the open face's rows. The plate hugs content now -- only its WIDTH is the face's own number
-## (CONTROLS' two-column table vs the compact faces), so a short face like GAME no longer floats an
-## empty lower half. The title carries the category; the overline stays the section eyebrow.
+## Rebuild the open face's rows. The plate hugs content -- only its WIDTH stays the face's own number
+## (CONTROLS' table vs the compact faces), so a short face like GAME no longer floats an empty lower
+## half. The title carries the category; the overline stays the section eyebrow.
 func _build_face() -> void:
 	_built_cat = page.cat
 	for kid: Node in _rows.get_children():
@@ -205,8 +210,8 @@ func _build_face() -> void:
 		_: _face_audio()
 
 
-## AUDIO: the mute chip, then one slider row per level -- the shell's snapshot order, row 0 first.
-## The percent is a numeral column: right-aligned on a fixed width so the digits stack like a table.
+## AUDIO: the mute chip, then one slider row per level -- snapshot order, row 0 first. The percent is
+## a numeral column: right-aligned on a fixed width so the digits stack like a table.
 func _face_audio() -> void:
 	_add_row("sound", _chip("SOUND ON", {"toggle": "mute"}, &"Chip", "mute"))
 	for r: Array in SettingsPage.AUDIO_ROWS:
@@ -220,7 +225,7 @@ func _face_audio() -> void:
 		slider.custom_minimum_size.x = UiTheme.px(SettingsPage.SET_BAR_W)
 		slider.drag_started.connect(func() -> void: _dragging = slider)
 		slider.drag_ended.connect(func(_c: bool) -> void: _dragging = null)
-		slider.value_changed.connect(func(v: float) -> void: _emit({"slider": id, "frac": v}))
+		slider.value_changed.connect(func(v: float) -> void: payload.emit({"slider": id, "frac": v}))
 		_dyn[id] = slider
 		var pct := Label.new()
 		pct.theme_type_variation = &"NumLabel"
@@ -248,7 +253,7 @@ func _face_game() -> void:
 
 
 ## CONTROLS: two columns of [verb -- binding chip], RESET KEYS last -- the same focus order the
-## model's `row_payload` already assigns. Every cell is a ruled row, so the grid reads as a table.
+## model's `row_payload` assigns. Every cell is a ruled row, so the grid reads as a table.
 func _face_controls() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
@@ -267,9 +272,9 @@ func _face_controls() -> void:
 	_rows.add_child(_rule_wrap(reset))
 
 
-## One labelled row into `_rows` (or a supplied container), the verb on the left and its control(s) on
-## the right; registers the control in `_focusables`/`_dyn`/`_hover` under the row's own index, which
-## is what keeps the keyboard cursor and the pointer naming the same thing.
+## One labelled row into `_rows` (or a supplied container), verb left, control(s) right; registers
+## the control in `_focusables`/`_dyn`/`_hover` under the row's own index, so the keyboard cursor and
+## the pointer name the same thing.
 func _add_row(label: String, control: Control, extra: Control = null, into: Container = null, row_idx: int = -1) -> void:
 	var idx: int = row_idx if row_idx >= 0 else _focusables.size()
 	if row_idx >= 0:
@@ -299,10 +304,9 @@ func _add_row(label: String, control: Control, extra: Control = null, into: Cont
 
 
 ## The row's ruled bed: a PanelContainer whose `panel` starts EMPTY and takes the focus stylebox when
-## `page.row` lands here, over a VBox that carries the row and the hairline under it -- the typeset
-## version of the painter's boxed rows. The rule is a child, NOT the stylebox, so the ring witness
-## (an unfocused row has no `panel` override) stays true. A Button could carry `normal` itself, but an
-## HSlider has no "normal" to override -- the wrapper gives every row the same ringable surface.
+## `page.row` lands here, over a VBox carrying the row and its hairline. The rule is a child, NOT the
+## stylebox, so the ring witness (an unfocused row has no `panel` override) stays true; and a Button
+## could carry `normal` itself but an HSlider cannot -- the wrapper gives every row the same surface.
 func _rule_wrap(inner: Control) -> PanelContainer:
 	var wrap := PanelContainer.new()
 	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -320,14 +324,10 @@ func _chip(text: String, p: Dictionary, variation: StringName, dyn_id: String = 
 	b.theme_type_variation = variation
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.pressed.connect(_emit.bind(p))
+	b.pressed.connect(func() -> void: payload.emit(p))
 	if dyn_id != "":
 		b.set_meta("dyn_id", dyn_id)
 	return b
-
-
-func _emit(p: Dictionary) -> void:
-	payload.emit(p)
 
 
 func _wire_hover(c: Control, i: int) -> void:
@@ -337,10 +337,10 @@ func _wire_hover(c: Control, i: int) -> void:
 			_hover_row = -1)
 
 
-## The frame's moving parts, re-read from the snapshot while the page is up: slider values (except the
-## one in the hand), chip texts, the capture and the arm, the clash marks. Every `_dyn` read is guarded
-## -- a key only exists while its face is built. These colour overrides are the legitimate kind: state,
-## not skin -- they re-read `_tokens` every frame, so a skin swap cannot leave them stale.
+## The frame's moving parts, re-read from the snapshot: slider values (except the one in the hand),
+## chip texts, the capture and the arm, the clash marks. `_dyn` reads are guarded -- a key exists only
+## while its face is built. The colour overrides are state, not skin, re-read each frame -- a swap
+## cannot leave them stale.
 func _refresh() -> void:
 	var st: Dictionary = page.state
 	var muted: bool = bool(st.get("muted", false))
@@ -375,43 +375,14 @@ func _refresh() -> void:
 		b.add_theme_color_override("font_color", _tokens["warn"] if clashes.has(act) else _tokens["ink"])
 	for slot: int in _rail.get_child_count():
 		(_rail.get_child(slot) as Button).set_pressed_no_signal(SettingsPage.RAIL_ORDER[slot] == page.cat)
-	_detail.text = _detail_text()
+	# The note's sentence is the model's; the hover index is the only view input (it wins over the
+	# keyboard cursor, the drawn page's own precedence).
+	_detail.text = page.detail_text(_hover_row)
 
 
-## What the detail note says: the hovered control's own sentence wins (the more deliberate pointer),
-## else the focused row's, else the category's standing line -- the drawn page's exact precedence.
-func _detail_text() -> String:
-	var i: int = _hover_row if _hover_row >= 0 else page.row
-	match page.cat:
-		SettingsPage.CAT_CONTROLS:
-			if i >= SettingsPage.REMAP_ROWS.size():
-				return "puts every binding back to its default"
-			var act: StringName = SettingsPage.row_action(page.cat, i)
-			if page.capture == act and act != &"":
-				return "press any key to bind it — ESC cancels"
-			var clash: Array = SettingsPage.clashes(page.state).get(act, [])
-			if not clash.is_empty():
-				return " and ".join(clash)
-			var r: Array = SettingsPage.REMAP_ROWS[i]
-			return String(r[2]) if String(r[2]) != "" else "%s — press Enter to rebind" % String(r[1])
-		SettingsPage.CAT_FEEL:
-			if i >= 0 and i < SettingsPage.FEEL_ROWS.size():
-				return String(SettingsPage.FEEL_ROWS[i][2])
-		SettingsPage.CAT_GAME:
-			if i >= 0 and i < SettingsPage.GAME_ROWS.size():
-				return String(SettingsPage.GAME_ROWS[i][2])
-		_:
-			if i == 0:
-				return "silences everything at once; the levels below are kept"
-			if i > 0 and i <= SettingsPage.AUDIO_ROWS.size():
-				return String(SettingsPage.AUDIO_ROWS[i - 1][2])
-	return SettingsPage.CATEGORY_LINE[page.cat]
-
-
-## The keyboard cursor as a drawn ring: the row wrapper at `page.row` gets the focus stylebox -- the
-## face's lit bed and an accent border pushed outside the rect; focus RINGS from outside, the drawn
-## page's own rule. A bare control (RESET) rings on its own `normal`. Nothing here takes real gui
-## focus, so keys stay the seat's.
+## The keyboard cursor as a drawn ring: the row wrapper at `page.row` gets `PageTokens.ring_style` --
+## the lit bed and an accent border pushed outside the rect; focus RINGS from outside, the drawn
+## page's own rule. Nothing takes real gui focus here, so keys stay the seat's.
 func _focus_mirror() -> void:
 	var want: Control = _focusables[page.row] if page.row >= 0 and page.row < _focusables.size() else null
 	var target: Control = want
@@ -425,18 +396,5 @@ func _focus_mirror() -> void:
 		_ringed.remove_theme_stylebox_override(_ring_key)
 	_ringed = target
 	_ring_key = key
-	if _ringed == null:
-		return
-	var ring := StyleBoxFlat.new()
-	ring.bg_color = _tokens["row_lit"]
-	ring.border_color = _tokens["accent_pale"]
-	ring.set_border_width_all(2)
-	ring.set_corner_radius_all(int(float(_tokens["radius"]) * 0.5) + 2)
-	ring.set_expand_margin_all(3.0)
-	_ringed.add_theme_stylebox_override(key, ring)
-
-
-## The control's row index in `_focusables`, or -1 -- the ring's bookkeeping, kept honest because a
-## rebuilt face reuses neither list nor nodes.
-func _focus_row_of(c: Control) -> int:
-	return _focusables.find(c)
+	if _ringed != null:
+		_ringed.add_theme_stylebox_override(key, PageTokens.ring_style(_tokens))
