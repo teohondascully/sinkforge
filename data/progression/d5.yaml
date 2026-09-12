@@ -1,0 +1,7 @@
+# D5: parts. Iron ingots buy the two machines that consume them -- the gear mill (`mill_gear`) and the
+# plate press (`press_plate`), both orphans until now. Provisional numbers.
+id: d5
+order: 5
+wants: {iron_ingot: 4}
+grants: {gear_mill: 1, plate_press: 1}
+goal: Deliver 4 iron ingots to the rig

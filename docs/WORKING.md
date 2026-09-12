@@ -49,8 +49,10 @@ single source, schema-validated (gate 13 now covers `scenarios/`), code-generate
 `agent` field and reports the envelope it actually used (`oracle`, not the requested `constrained`).
 T037 dips the starter vein below the pad so mining opens the descent. T001 gave copper a copper mark;
 T030 names the dig plan on the first dash; T026 made the ten hotbar wells real remappable actions.
-T022/T023/T028 ruled provisional keeps. P042/D0588 stands: no d3/d4; the iron chain is a parked chain;
-the ruled next beat is reclamation (earn `pump`, claim a wet chamber).
+T022/T023/T028 ruled provisional keeps. P042/D0588 SUPERSEDED (D0628): the director ordered the
+corrections executed; the iron chain is wired d3-d7 in the mandated order (source → forge → press/mill
+→ plate demand), gate 37 exits 0 bare and is blocking again; `pump`/`lift` arrive at d7 rather than
+through the reclamation beat the earlier ruling recommended.
 
 ## Where the opening stands
 

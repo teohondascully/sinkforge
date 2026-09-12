@@ -234,10 +234,9 @@ trimmed back to the limit rather than split, and the pattern repeated a fourth t
     partition that silently fell back to every start would count a lighting bench's placed forge as
     shipped progression. **What it does NOT model, and says so in its own output:**
     `Machines.machine_eats` is a union of four rules and only `recipe.inputs` is in `data/`, so this
-    answers "can this recipe ever run", never "is this item ever wanted". **Reported-only for now**
-    (D0591): it lands red on today's tree and what it is red about is P042, an open director question;
-    a gate that blocks every push on a design call it cannot make is worse than no gate. Drop
-    `--report-only` when P042 is answered. Mutation-tested at
+    answers "can this recipe ever run", never "is this item ever wanted". **Blocking** (D0591; was
+    reported-only while P042 was open -- the d3-d7 ladder extension answered it by wiring every
+    orphan machine a source, and the bare check exits 0 on the wired tree). Mutation-tested at
     `tools/layer_lint/test_check_content_reachable.py`, seven cases, including a seeded production loop
     that must PASS beside an unseeded one that must FAIL (a topological sort rejects both), and a machine
     placed only by a bench that must not count as shipped -- without that last case the fixture exclusion

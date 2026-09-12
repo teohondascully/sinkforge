@@ -101,7 +101,12 @@ static func seed_lodes(world: World, rng: SplitRng, cfg: Dictionary, surface: Pa
 		# cells of a metre square (D0353's rule), at least one.
 		var per_m: int = int(cfg["amount_base"]) * MILLI + df * int(cfg["amount_depth_bonus"]) * hfield[cx] / MILLI
 		var amount: int = maxi(1, (per_m + MILLI * area / 2) / (MILLI * area))
-		var material: StringName = &"ore_iron" if cy >= deep_row else &"ore_copper"
+		# Below `deep_row` a lode can come up RICH (legacy's `RICH_CHANCE`, promoted from
+		# `ore.pending_sim_economy` where it sat unconsumed): `rich_ore` feeds `smelt_rich` on the
+		# blast furnace, the doubled-ingot tier the ladder's late grant pays for.
+		var material: StringName = &"ore_copper"
+		if cy >= deep_row:
+			material = &"rich_ore" if rng.next_float() < float(cfg.get("rich_chance", 0.0)) else &"ore_iron"
 		seeded += grow_lode(world, rng, Vector2i(cx, cy), size, amount, material, surface, min_depth)
 	return seeded
 

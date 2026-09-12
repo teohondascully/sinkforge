@@ -1,0 +1,8 @@
+# D7: the works kit. Volume ingots -- cheap now that the furnace runs rich lodes -- pay for the two
+# powered machines the generator's line was laid for at d4: the pump (the aquifer answer the deep
+# world already poses) and the lift (the powered haul the winch is not). Provisional numbers.
+id: d7
+order: 7
+wants: {ingot: 16}
+grants: {pump: 1, lift: 1}
+goal: Deliver 16 ingots to the rig

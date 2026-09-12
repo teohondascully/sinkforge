@@ -157,12 +157,10 @@ jobs:
       - name: Schema validation for data/ (QUALITY gate 13)
         run: python3 tools/schema_validator/schema_validator.py
 
-      # REPORTED-ONLY ON PURPOSE (D0591). The gate lands red on today's tree, and what it is red ABOUT
-      # is P042 -- an open director question about what demand tiers three and four should ask for.
-      # A gate that blocks every push on a design call it cannot make is worse than no gate. Drop the
-      # `--report-only` flag when P042 is answered; the mutation tests already run unconditionally.
+      # BLOCKING as of the ladder extension (d3-d7 wire every orphan machine; the bare check exits 0).
+      # Was report-only while P042 was open; the flag stays in the tool for the next open question.
       - name: Every recipe, machine and tier is reachable from a new game (QUALITY gate 37, D0591)
-        run: python3 tools/layer_lint/check_content_reachable.py --report-only
+        run: python3 tools/layer_lint/check_content_reachable.py
 
       - name: Every scenario and harness layer names a claim (QUALITY gates 15-16)
         run: python3 tools/layer_lint/check_claim_references.py

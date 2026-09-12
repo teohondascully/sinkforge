@@ -29,9 +29,9 @@ discriminator is `shell/main.gd`'s `const START`, so that is what this parses --
 constant names no record, because a partition that silently falls back to everything would count a
 lighting bench's placed forge as shipped progression.
 
---report-only prints the same findings and exits 0. The gate lands RED on today's tree (P042 is an open
-director question about what tiers three and four should ASK FOR), and a gate that blocks every push on
-a design call it cannot make is worse than no gate. Drop the flag when P042 is answered.
+--report-only prints the same findings and exits 0. It ran report-only while P042 was open; the d3-d7
+ladder extension wired every orphan machine a source, the bare check exits 0, and CI invokes it
+without the flag. The flag stays for the next open design question this gate cannot answer.
 
 Exit 0 clean, 1 on unreachable content -- or on a population it could not load, which is the same
 refusal every gate here makes rather than passing vacuously.

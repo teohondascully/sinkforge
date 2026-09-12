@@ -302,7 +302,10 @@ static func _scatter_iron(grid: TileGrid, rng: SplitRng, cfg: Dictionary, stoner
 		var cy: int = rng.next_range(stonereach_end, grid.height - 1)
 		var depth_frac: float = float(cy - stonereach_end) / float(span)
 		var size: int = int(cfg["size_min"]) + int(round(depth_frac * float(cfg["size_depth_bonus"])))
-		grow_vein(grid, rng, Vector2i(cx, cy), size, &"ore_iron", stonereach_end)
+		# The material comes from the record now (`iron:` names `iron`, the deep-deposit material that
+		# yields `iron` items): the field was written and ignored at the port, which made it a lie of
+		# omission -- the yaml said one thing and the code did another.
+		grow_vein(grid, rng, Vector2i(cx, cy), size, StringName(str(cfg.get("material", "iron"))), stonereach_end)
 
 
 ## Grow one vein as a compact accretion blob: repeatedly take a random frontier cell, keep it if it's

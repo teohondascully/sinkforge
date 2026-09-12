@@ -23491,3 +23491,29 @@ apart and each is 13 wide, so the window around one root was reading its NEIGHBO
 the trees posed 7 m apart does M5 fail, at "6 trees wearing 2 canopy SHAPES".
 Six mutations witnessed in all across D0626 and D0627.
 Reverse: CHEAP as code. Rides the same golden re-pin as D0626.
+
+## D0628 · 2026-09-12 · data/materials/iron.yaml, data/materials/rich_ore.yaml, data/progression/d3-d7.yaml, data/strata/{shallow_clay,reveal_test_dense,reveal_test_sparse}.yaml, sim/terrain_gen/{shaft_generator,plane_passes}.gd, sim/machines/{runners,machines}.gd, tests/test_ore_bodies.gd, tests/test_material_palette.gd, .github/workflows/harness.yml, docs/QUALITY.md, tools/layer_lint/check_content_reachable.py · the ladder extension: P042's parked chain, wired whole
+Decided: P042's correction ruled the metal route's order (iron source first, then forge, then press,
+then the demand for plates) and forbade d3/d4 records that only named orphan machines; the director's
+"correct all of those in order" superseded the park, so the chain landed complete rather than as a
+grant that could not run. `iron:`'s `material:` field was decorative -- written `ore_iron` and ignored
+at the port, code hardcoding the same id, a lie of omission -- and now drives `_scatter_iron`; the deep
+scatter grows `iron` (item `iron`, `smelt_iron`'s feedstock) while `ore_iron` survives only as a deep
+lode and the start's authored starter vein, which is where `ore` has always come from in play. Deep
+lodes roll `rich_chance` (0.45, legacy's RICH_CHANCE promoted out of `ore.pending_sim_economy` where it
+sat unconsumed) into `rich_ore`, the `smelt_rich` input. `Runners.FUEL_FACTOR` is the one table
+`machine_eats` and the burner both read: coal 1.0, wood 0.5 -- the fuel question legacy answered "coal"
+because nothing else could burn. The ladder: d3 pays rope/torch/saplings for a copper assay (the
+shallow-vein material nothing consumed), d4 pays iron_forge + conduit for volume ingots (the deep feed
+needs the d1 drill), d5 pays gear_mill + plate_press for iron_ingot, d6 pays blast_furnace for gear +
+plate, d7 pays pump + lift for volume ingots. Gate 37 exits 0 bare for the first time; `--report-only`
+came off the CI step and the flag stays in the tool for the next question it cannot answer. Its own
+disclaimer still stands: the graph models `recipe.inputs`, not whether a granted machine is reachable,
+useful, or placed -- the runtime walkthrough is the remaining proof, not this commit.
+THE APPEARANCE RECORDS ARE TEST-DERIVED, not picked: `iron` failed `test_rock_tone`'s black tail at
+1.17% (bound 1%) and `test_wall_lode`'s plane separation at 0.188 (bound 0.30) until its base and mark
+moved into ore_iron's family; a WARM nugget is a longer recess path than the bound allows, because the
+wall recesses toward COOL. `nugget_count` moves retention the WRONG way -- the mark share grows `was`
+faster than it closes `now`.
+Reverse: revert the yaml/delegation edits and d3-d7; the gate returns to report-only and fifteen
+content entries re-orphan. Rides the shared golden re-pin: the world it generates moved.

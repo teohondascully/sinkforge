@@ -92,14 +92,15 @@ func first_machine_below(world: World, logic_cell: Vector2i) -> MachineState:
 	return null
 
 
-## Would this machine consume `item` if fed it? A recipe machine's ingredients, a coal-burner's coal,
+## Would this machine consume `item` if fed it? A recipe machine's ingredients, a burner's fuel
+## (`Runners.FUEL_FACTOR` -- coal, and wood at half a burn),
 ## the winch head's bulk cargo; false for everything else, so a mis-aimed handful cannot vanish into a
 ## box that will sit on it forever. The player-facing question; `Items.deposit` stays unfiltered.
 static func machine_eats(machine: MachineState, item: StringName) -> bool:
 	if machine == null:
 		return false
 	var behavior: StringName = machine.def.behavior
-	if item == &"coal" and Runners.COAL_BURNERS.has(behavior):
+	if Runners.FUEL_FACTOR.has(item) and Runners.COAL_BURNERS.has(behavior):
 		return true
 	if behavior == &"winch_head":
 		return Pack.is_bulk_item(item)

@@ -38,7 +38,10 @@ const MEASURED_WIDTH: int = 48
 const EXPECTED: Dictionary = {
 	&"ore_copper": {"median": 550.0, "cells": 26556, "bodies_max": 120},
 	&"coal": {"median": 402.0, "cells": 17368, "bodies_max": 110},
-	&"ore_iron": {"median": 429.0, "cells": 8447, "bodies_max": 60},
+	# `iron`, not `ore_iron`: the deep scatter emits the material the record names (`iron:`'s own
+	# `material:` field, decorative until the ladder needed a real `iron` item). Constants unchanged,
+	# so these are ore_iron's own measured statistics under the material the pass actually grows now.
+	&"iron": {"median": 429.0, "cells": 8447, "bodies_max": 60},
 }
 
 ## What the world looked like BEFORE the conversion, kept as the other end of the comparison. A band
@@ -46,7 +49,7 @@ const EXPECTED: Dictionary = {
 const BEFORE: Dictionary = {
 	&"ore_copper": {"median": 32.0, "bodies": 477},
 	&"coal": {"median": 20.0, "bodies": 531},
-	&"ore_iron": {"median": 24.0, "bodies": 263},
+	&"iron": {"median": 24.0, "bodies": 263},
 }
 
 const MEDIAN_BAND: float = 0.25

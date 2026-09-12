@@ -52,7 +52,7 @@ coal:
     amount_depth_bonus: 170
 
 iron:
-  material: ore_iron
+  material: iron
   attempts_per_col: 0.125
   size_min: 160
   size_depth_bonus: 480

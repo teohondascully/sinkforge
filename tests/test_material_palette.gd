@@ -130,7 +130,7 @@ func _test_an_unmapped_material_still_draws() -> void:
 ## retyped here that could drift away from it.
 func _test_every_generated_material_has_an_appearance_record() -> void:
 	var emitted: Array[StringName] = [&"clay", &"hardrock", &"deepstone", &"ore_copper", &"coal",
-		&"ore_iron", &"glimmer", &"wood", &"leaves"]
+		&"ore_iron", &"iron", &"rich_ore", &"glimmer", &"wood", &"leaves"]
 	var missing: Array[String] = []
 	for id: StringName in emitted:
 		var rec: Dictionary = MaterialsRecords.RECORDS.get(id, {})

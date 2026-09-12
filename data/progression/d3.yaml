@@ -1,0 +1,9 @@
+# D3: the shallow-ore assay. The world's common scattered veins are copper and nothing consumed them --
+# the rig pays for raw samples and hands back the descent kit: rope and torches are the placed items
+# `BuildVerbs` already knows how to spend (both were machine records with no source), and saplings let
+# a stripped surface be replanted. Provisional numbers.
+id: d3
+order: 3
+wants: {ore_copper: 10}
+grants: {rope: 8, torch: 4, sapling: 3}
+goal: Deliver 10 copper ore to the rig

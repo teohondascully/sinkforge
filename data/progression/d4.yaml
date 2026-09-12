@@ -1,0 +1,10 @@
+# D4: the iron tier. Pays for volume ingots with the machine that smelts `iron` into `iron_ingot`, plus
+# the conduit that carries the cached generator's power down the shaft -- both were orphan records the
+# economy never minted. The deep `iron` deposits this feeds sit below stonereach (`ShaftGenerator`'s
+# `iron:` pass), so the want is only honest because the drill from d1 exists to reach them.
+# Provisional numbers.
+id: d4
+order: 4
+wants: {ingot: 12}
+grants: {iron_forge: 1, conduit: 6}
+goal: Deliver 12 ingots to the rig

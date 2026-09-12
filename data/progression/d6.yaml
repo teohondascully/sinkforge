@@ -1,0 +1,8 @@
+# D6: components for components. Gears and plates buy the blast furnace, whose `smelt_rich` turns the
+# deep `rich_ore` lodes (the `lode.rich_chance` fraction below stonereach) into two ingots a unit --
+# the ladder paying for the yield upgrade, not a bigger number. Provisional numbers.
+id: d6
+order: 6
+wants: {gear: 2, plate: 2}
+grants: {blast_furnace: 1}
+goal: Deliver 2 gears and 2 plates to the rig

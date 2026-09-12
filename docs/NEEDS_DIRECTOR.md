@@ -1435,6 +1435,16 @@ then the forge, then the press, and only then a demand for plates.
 
 Which is the sentence this item's original title got wrong.
 
+### SUPERSEDED, 2026-09-12 (D0628): the metal route, in the mandated order
+
+The director's "correct all of those in order" overrode the park. The ruling's constraints held anyway:
+a real `iron` source first (`iron:`'s own `material:` field, decorative until now), then the forge (d4),
+then the press and mill (d5), and only then a demand that wants plates and gears (d6). `rich_ore`
+came from `lode.rich_chance` — legacy's RICH_CHANCE promoted out of `pending_sim_economy`. Wood burns at
+half a coal off `Runners.FUEL_FACTOR`. Gate 37 exits 0 bare; `--report-only` is off the CI step. The
+reclamation beat this item recommended is not in the ladder — `pump` arrives at d7 with `lift` instead —
+and whether the aquifer pull should lead the mid-game remains the design call this ruling named.
+
 ## P043 · Loose cells are a real feature at a magnitude nobody chose. Which material should carry them?
 
 **The director asked whether the cascading dig was a bug or a feature.** It is a feature — D0562/D0563/
