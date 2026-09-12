@@ -23774,3 +23774,19 @@ parked, per the entry's own condition -- the frame no longer reads flat at the s
 The capture is routine run output (EVIDENCE.md): left at the /tmp path, regenerable byte-for-byte
 from the command above on this commit; the numbers, not the PNG, are the record.
 Reverse: none -- a measurement, not a change.
+
+## D0657 · 2026-09-12 · tests/test_lip_mantle.gd, tests/test_grapple_body.gd, tests/test_rock_tone.gd, shell/seat_flags.gd, core/MODULE.md, .github/workflows/harness.yml · the size-gate debt the batch owed, paid at real seams
+
+QUALITY gate 4's structural pass on the merge found four violations the day's commits had introduced:
+`test_grapple_body.gd` 436 (P035's lip-mantle test), `test_rock_tone.gd` 404 (P036's clamp control),
+`seat_flags.gd` `parse()` 54 (the `--skin` arm, D0633), and `core/MODULE.md` 106 (P044's `BeddingDip`
+line, D0629). The remedy follows the gate's own rule -- split at seams, don't shave: the lip mantle
+moved to `tests/test_lip_mantle.gd` extending `test_grapple_body.gd` (the rig, helpers, and constants
+are inherited; the parent's `_initialize` list is the only dispatch, so the child runs its one verb and
+nothing else), the `--skin` arm became a `_skin()` helper beside `_route()`/`_workload()`, the rock-tone
+test inlined three single-use tally unpackings and collapsed the synthetic-sweep counters into `int()`
+casts, and MODULE.md's gotchas bullets were compressed without dropping a fact. The stale tail comment
+inside the chain test -- "the last metre and a half is not asserted here" -- now points at the sibling
+suite, since P035 ruled and the verb exists. Alternative: raise or waive the limits -- refused, the gate
+is the guard, and each split landed on a boundary that was already there.
+Reverse: CHEAP -- revert the diff; the suites all still assert the same things, just filed differently.

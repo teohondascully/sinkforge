@@ -410,6 +410,7 @@ jobs:
       #   test_grapple.gd                                test_grapple (the grapple's solver alone: bite, miss, the ghost agrees with the hook around the compass, reel, projection never outside, tangent kept, pump, wrap, chain, round trip -- A' step 5b, D0359)
       #   test_grapple_safety.gd                         test_grapple_safety (the swing's COLLISION POLICY: the correction is bounded by the body's own box so an endpoint check is sound, a refused pull gives its line back instead of ratcheting, the landing datum follows the accepted move -- A9, D0578)
       #   test_grapple_body.gd                           test_grapple_body (the line on the body: it bites, swings faster than the legs, lifts, crosses the chasm, keeps its speed on release; the wall stand-in; consent -- A' step 5c, D0360)
+      #   test_lip_mantle.gd                             test_lip_mantle (the hang's last stretch is the mantle's -- toward-and-up off the line stands the body on the lip, and without mantle_hold the same hang does not climb -- P035, D0631; extends test_grapple_body for the shaft rig)
       #   test_body_medium.gd                            test_body_medium (the medium: rope grip and climb, the updraft, water wading, machines block and wood passes, the step-down snap, place -- A' step 5c, D0360)
       #   test_rope_painter.gd                           test_rope_painter (the rope painter, structural: the sag bows down and is bounded, the hook bites past the anchor, the ghost is a stub, the carry look saturates, a real redraw with a live line -- A' step 5d, D0361)
       #   test_water_painter.gd                          test_water_painter (the water painter and the drips, structural: the surface rises with level, a step tapers, an interior cell is full, only the top cell ripples, depth runs out, the wet cells reach the observation sparsely, a real redraw over a pool -- A' step 6a, D0362)
@@ -576,6 +577,7 @@ jobs:
             res://tests/test_interface_verbs.gd \
             res://tests/test_grapple.gd \
             res://tests/test_grapple_body.gd \
+            res://tests/test_lip_mantle.gd \
             res://tests/test_grapple_safety.gd \
             res://tests/test_body_medium.gd \
             res://tests/test_rope_painter.gd \

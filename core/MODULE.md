@@ -74,33 +74,25 @@ Every other layer: sim, interface, harness, experiment, view, shell.
   `tests/test_entity_id_pool.gd`, both re-run and unchanged (ALL PASS) after the extraction. `Fx` doesn't
   need this helper: its rescale step (`mul`'s `>>`) wants arithmetic (sign-preserving) shift semantics,
   which is what GDScript already gives it for free.
-- **GDScript's parser rejects `>>`/`<<` where the LEFT OPERAND is syntactically a negative literal, a
-  negative const, or a direct unary-minus expression** ("Invalid operands for bit shifting. Only positive
-  operands are supported") — but allows it fine at runtime through a plain variable that happens to hold
-  a negative value, even one assigned from an identical expression one line earlier. This is a syntactic
-  restriction, not a value-based one: never write `(-x) >> n` directly; assign the negated value to a
-  variable first, then shift the variable.
+- **GDScript's parser rejects `>>`/`<<` where the LEFT OPERAND is syntactically negative** — a literal,
+  a negative const, or a unary-minus expression ("Invalid operands for bit shifting") — yet allows the
+  same shift at runtime through a plain variable holding a negative value. Syntactic, not value-based:
+  never write `(-x) >> n` directly; assign the negated value to a variable first, then shift it.
 - **An unguarded runtime script error's effect on a bare `--headless --script` run depends on exactly
   where it happens, and the more common location is the more dangerous one, not the more obvious one
   (`docs/DECISIONS_LEDGER.md` D0115/D0116, correcting this note's original, narrower claim).** Directly
-  inside `_initialize()` itself, it HANGS — nothing after the error runs, the bare SceneTree idles forever
-  with no further output, no exit code. But inside any function `_initialize()` CALLS (every real
-  `test_base.gd` suite's own `_test_*()` functions, since `_initialize()` is always just a flat list of
-  calls to them), it does neither: the crashing expression logs a `SCRIPT ERROR:` and evaluates to a
-  type-default value, execution continues from the very next line in the SAME function, and the suite can
-  finish normally — `_finish()` reached, `ALL PASS` printed, process exits 0 — having silently lost
-  whatever that one function's remaining `_check()` calls would have reported. Any arithmetic in `core/`
-  or `sim/` that could divide by a caller-supplied value must still guard it explicitly (`push_error()`
-  logs without triggering either mode, a raw `/` does not) — but for TEST suites specifically, trusting a
-  bare invocation's own exit code/printed summary is no longer enough either way; use
+  inside `_initialize()` itself it HANGS — nothing after the error runs, the bare SceneTree idles
+  forever, no exit code. But inside any function `_initialize()` CALLS (every real suite's `_test_*()`s,
+  since `_initialize()` is a flat list of calls to them), it does neither: the expression logs a
+  `SCRIPT ERROR:`, evaluates to a type-default value, and execution continues from the next line in the
+  SAME function — the suite can finish normally, `ALL PASS` printed, exit 0, having silently lost that
+  function's remaining `_check()`s. Arithmetic that could divide by a caller-supplied value must still
+  guard explicitly (`push_error()` logs without triggering either mode; a raw `/` does not) — and for
+  TEST suites, trusting a bare invocation's exit code or printed summary is not enough either way; use
   `tools/run_gd_test.sh` (D0116), which catches both.
-- **GDScript hex literals cannot represent values ≥ 2^63.** Any 64-bit constant with its top bit set
-  (several of SplitMix64's) has to be written as its signed two's-complement decimal equivalent, computed
-  externally — `python3 -c "print(x - (1<<64) if x >= (1<<63) else x)"` — not typed as hex.
-- **`free` is reserved.** Every GDScript class inherits `Object.free()`. `EntityIdPool`'s release
-  operation is named `release()`, not `free()`, to avoid the collision — caught by a parse error, not a
-  silent shadow, but worth knowing before reaching for the obvious name again.
-- **The global script class cache does not rebuild itself for a bare `--headless --script` run.** A
-  freshly added or renamed `class_name` isn't visible until `godot --headless --path . --import` runs
-  once. If a test suite reports "Identifier not declared in the current scope" for a class you just
-  wrote, this is almost always why — not a real reference error.
+- **GDScript hex literals cannot represent values ≥ 2^63.** A top-bit-set 64-bit constant (several of SplitMix64's) must be written as signed two's-complement decimal, computed externally (`python3 -c "print(x - (1<<64) if x >= (1<<63) else x)"`) — not hex.
+- **`free` is reserved.** Every class inherits `Object.free()`; `EntityIdPool`'s release operation is
+  `release()`, not `free()` — caught by a parse error, not a silent shadow, but worth knowing.
+- **The script class cache does not rebuild for a bare `--headless --script` run.** A new or renamed
+  `class_name` isn't visible until `godot --headless --path . --import` runs once — the usual cause of
+  "Identifier not declared in the current scope" for a class you just wrote, not a real reference error.
