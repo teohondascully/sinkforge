@@ -15,6 +15,16 @@ extends Node2D
 ##   godot --path . tests/body/reveal_scene.tscn -- --play --sky --zoom=6.5 --camera=24,84
 ##   (the camera row is relative to the surface, which is `ShaftGenerator.SKY_ROWS` -- P017/D0292)
 ##
+## The moving-camera strip (queue item 49's fourth condition, D0624) sweeps the real `CameraRig`
+## between two terrain cells and captures a frame every `RevealPan.TICKS_PER_SHOT` ticks:
+##
+##   godot --resolution 1920x1080 --path . tests/body/reveal_scene.tscn -- \
+##       --site=shallow_clay --pan=40,96:190,120 --pan-shots=6 --pan-out=/tmp/pan
+##
+## Headed only -- the headless renderer writes blank captures. On the 48-cell test sites a horizontal
+## sweep is clamped to the centred world (the world is narrower than the frame at play zoom); use the
+## 64-metre `shallow_clay` site to exercise horizontal motion.
+##
 ## Agent mode (default) drives a short, deterministic walk-and-dig sequence toward the nearest shallow
 ## glimmer pocket the generated seed actually placed -- built for this scene's own verification and for
 ## producing a reproducible screenshot, NOT a claims/C004 measurement driver: C004 needs recorded,
