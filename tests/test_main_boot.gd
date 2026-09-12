@@ -77,6 +77,7 @@ func _test_the_hands() -> void:
 
 
 func _test_the_verbs() -> void:
+	Controls.register()   # idempotent (D0615): the slot wells poll InputMap actions now, not physical keys
 	var hands: PlayInput = PlayInput.new()
 	var none_digit: Callable = func(_i: int) -> bool: return false
 	var cmds: Array[Command] = hands.verbs(_hand({Controls.BUILD: true, Controls.DROP: true}), none_digit, Vector2i(4, 9), false)

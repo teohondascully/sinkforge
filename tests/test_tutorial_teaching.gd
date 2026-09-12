@@ -355,7 +355,8 @@ func _test_wrong_stack_through_the_door() -> void:
 	var items: Items = door.services()["items"]
 	var body: Body = door.services()["body"]
 	var oracle: Interface.Envelope = Interface.Envelope.oracle_over(world.grid)
-	var hints: Hints = Hints.new()
+	var hints: Hints = Hints.new()   # this leg is about the WRONG STACK, so the plan lesson is pre-taught (T030)
+	hints.restore_taught([&"dig_plan"])
 	var anchor := Vector2i(32, 20)
 	var tick: Callable = func(f: InputFrame, verbs: Array) -> Interface.Observation:
 		door.apply(Command.move(f))
@@ -379,11 +380,8 @@ func _test_wrong_stack_through_the_door() -> void:
 	mine_until.call(Vector2i(anchor.x * 4 + 5, anchor.y * 4 + 5), &"clay", 600)      # and beside it: a sixteenth a cell, the boots' cells spared (D0509, D0512)
 	mine_until.call(Vector2i((anchor.x - 1) * 4 + 1, anchor.y * 4 + 1), &"ore", 600)  # the vein a step left
 	_check(items.pack.count(&"clay") > 0 and items.pack.count(&"ore") > 0, "control: the pack holds clay (%d) and ore (%d) after the two digs" % [items.pack.count(&"clay"), items.pack.count(&"ore")])
-	var clay_slot: int = -1
 	var slots: Array[Dictionary] = items.pack.slots()
-	for i: int in slots.size():
-		if slots[i]["item"] == &"clay":
-			clay_slot = i
+	var clay_slot: int = slots.find_custom(func(s: Dictionary) -> bool: return s["item"] == &"clay")
 	var target_x: float = float(anchor.x - 2) * 16.0 + 8.0                             # a metre right of the forge pocket
 	for _i: int in 600:
 		var dx: float = target_x - float(body.pos_x) / float(Fx.SCALE)

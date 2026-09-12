@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_the_acquisition_edge_fires_once_and_never_on_the_first_frame()
 	_test_one_bubble_at_a_time_in_table_order()
 	_test_the_moments_are_rising_edges_off_the_observation()
+	_test_the_first_painted_dashes_get_a_name()
 	_test_busy_freezes_and_hides_and_the_ceremony_holds()
 	_test_the_linger_cap_and_the_fade()
 	_test_taught_ids_and_resync()
@@ -137,9 +138,11 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	h.observe(fall, 0.016)
 	h.observe(_hint_obs(), 0.016)
 	_check(h.active_id() == &"hard_landing", "a terminal landing fires the hard-landing lesson (%s)" % h.active_id())
-	for _i: int in 30:
-		h.observe(fall, 0.5)
-	# T030: the first painted dashes get a name while they live (the hold); a second plan does not re-teach.
+
+
+# T030: the first painted dashes get a name while they live (the hold); a second plan does not re-teach.
+func _test_the_first_painted_dashes_get_a_name() -> void:
+	var h: Hints = Hints.new()
 	var planned: Interface.Observation = _hint_obs()
 	planned.dig_marks = [Vector2i(4, 5), Vector2i(5, 5)]
 	h.observe(planned, 0.016)

@@ -23260,7 +23260,7 @@ QUALITY.md plus tool output. Consolidated into a dated report: 30 ENFORCED (7 ca
 0 CANNOT-FAIL. Gates 15/16's QUALITY text updated: the corpus healed at D0609 (one scenario naming
 C003) -- VOID no longer applies. Every commit hash cited in the report was verified against git log.
 
-## D0619 · 2026-09-11 · docs/BRIEF.md · the meta-analysis findings recorded; stale C003 line corrected
+## D0619 · 2026-09-11 · docs/BRIEF.md · the meta-analysis findings recorded; stale C003 line refreshed
 
 The four meta questions the audit opened with now have measured answers in BRIEF.md: (1) the
 instrument:game ratio is a velocity gate wearing an absolute number's clothes -- 50.7k/32.3k is

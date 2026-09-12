@@ -31,8 +31,7 @@ extends RefCounted
 ## `Interface.Observation`, split into its own file at A' step 4 (D0356). A `const` rather than a
 ## `class_name` keeps the one name it is reached by (see that file's header).
 const Observation = preload("res://interface/observation.gd")
-## `Interface.Units` (P034): the restated sim constants, lifted out of `Observation` when that file hit
-## its 400-line cap. Same `const`-preload pattern, same one-door rule.
+## `Interface.Units` (P034): the sim constants lifted out of `Observation` at its cap, same one-door rule.
 const Units = preload("res://interface/units.gd")
 ## The hub's planes, filled by `interface/hub_planes.gd` (A' step 4, D0356).
 const HubPlanes = preload("res://interface/hub_planes.gd")

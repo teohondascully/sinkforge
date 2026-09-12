@@ -68,9 +68,8 @@ lift, splitter, winch, crusher and spur follow in step 3e or wait on a ruling (p
   `World.logic_open`; registers `&"machine"` in `LogicGrid`), `remove(world, items, cell)` (destroys the
   buffers, credits them consumed), `first_machine_below()`, static `machine_eats()`, the derived `power`
   field with `power_at()` (milli) and `power_throttle(cell, demand_milli) → per-mille` (THE cost rule),
-  `attach_to(items)` (hands `Items` its two buffer Callables), `state_signature()` (power excluded),
-  and `events` (D0605) — the lifecycle channel: `demand_satisfied` and its kin, appended by runners,
-  drained by `observe()` onto `o.events`, never read back, never saved.
+  `attach_to(items)` (hands `Items` its buffer Callables), `state_signature()` (power excluded), and
+  `events` (D0605): runners append lifecycle events (`demand_satisfied`); `observe()` drains them to `o.events`.
 - `PowerFlow` (`power_flow.gd`) — `compute(world, machines) → field`, legacy's pass in milli-units with
   the generator's and the conduit's record fields; the field is derived, recomputed every hub tick.
 - `Runners` (`runners.gd`) — `run(m, world, items, machines)` by behaviour tag (recipe default),
