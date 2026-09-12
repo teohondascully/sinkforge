@@ -1045,9 +1045,20 @@ committed pair predates it.
 
 ---
 
-## P031 · The world is 12 metres wide, and the ported framing needs 40 — the shaft width is now a blocker
+## P031 · EXECUTED 2026-09-01 as D0335 — ruled 64 m (256 cells), shipped, framing derived; entry left open by oversight
 
-**RULING WANTED: does the play world stay a 12-metre shaft, or widen?** This is a design question, not a
+**This item was ruled the evening it was filed and has been resolved since `a3574b8b`** — "Ruled by the
+director as P031: 256 cells / 64 m, not legacy's own 512." `shallow_clay` has carried `width_cells: 256`
+since D0335, and `CameraRig.default_zoom_for()` derives the default (legacy's 40 m rung unless the world
+is too narrow — at 64 m the 40 m frame IS the default, the "largest visible improvement" this entry said
+was blocked). The "12-metre" measurement below is the pre-D0335 world; a 2026-09-12 queue picked this
+entry up as still-open and the correction is recorded here so it does not get picked up a third time.
+What remains genuinely open about width is the *next* question — whether the factory floor wants more
+than two screens — and that is a play-evidence question, not this one.
+
+---
+
+**RULING WANTED (answered above): does the play world stay a 12-metre shaft, or widen?** This is a design question, not a
 port, which is why it is parked rather than decided. Everything below is measured.
 
 ### What forced it

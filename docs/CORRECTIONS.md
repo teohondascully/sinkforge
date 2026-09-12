@@ -988,3 +988,23 @@ phases_ms` had printed, which is what made it look like a running game.
 reached invents a rate for a loop that never advanced. `[[read-the-count-not-the-rate]]`, and
 `[[elaboration-is-the-tell]]` — the explanations were getting more elaborate, which meant the instrument
 was wrong.
+
+## 2026-09-12 · The queue asked to implement a ruling that had already shipped
+
+**What the queue said:** "P031: world width 12m → 128m (512 cells) — site data + framing + same re-pin
+batch", carried forward from my own summary that P031 was an open design fork.
+
+**What the tree said:** P031 was ruled the evening it was filed — D0335 (`a3574b8b`, 26 minutes after
+the entry landed) widened `shallow_clay` to 256 cells / 64 m on the director's own ruling, and
+`CameraRig.default_zoom_for()` has derived the default since. The 12-metre world the entry measures is
+the pre-D0335 site. The entry simply never got its resolved marker, and an open heading in
+`NEEDS_DIRECTOR.md` reads as an open question forever.
+
+**The number was wrong twice over:** even read as the queue intended, 512 cells is the width the ruling
+explicitly declined — 256 was the ruling. Both the status and the figure were stale.
+
+**What made it durable:** the same shape as the hand-count corrections this file already records — a
+documented state (`width_cells: 48`) captured in prose outlived the commit that changed it, and nothing
+checked the entry against the record it describes. `[[read-the-entry-not-the-heading]]` — the fix was
+marking the entry EXECUTED with the ruling's own commit, so the next reader gets the state, not the
+question.
