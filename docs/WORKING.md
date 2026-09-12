@@ -1,8 +1,9 @@
 # Working state
 
-**Last updated: 2026-09-11 (gate-arming arc + readability batch. Gate 24's blind probe fixed, gate 5's
-autoload check real, gates 10 and 6 scoped and armed with mutation-tested suites; C003 executable at
-414 ticks; T001/T030/T026 landed, T022/T023/T028 provisional keeps, T035/T037 recorded. The 931-line
+**Last updated: 2026-09-11 (reconciliation + structural arc closed. All-37 gate verdicts in
+`docs/audits/2026-09-11-gate-reconciliation.md` (30 ENFORCED / 3 ADVISORY / 4 NO-CODE / 0 CANNOT-FAIL);
+C003's yaml-driven scenario driver landed (ed4efd99); the structural survey and meta-analysis are in
+BRIEF.md; the local battery's six catches are fixed at 656c3767 — 158/158 suites green. The 931-line
 predecessor is archived at `docs/archive/working/WORKING-2026-09-11.md`.)**
 
 **THE DIRECTOR'S INSTRUCTIONS, VERBATIM, because they are the whole shape of the run:**
@@ -30,7 +31,7 @@ The A′ legacy port has implemented the playable systems through presentation a
 The rig-as-consumer economy (A′ step 7) remains unimplemented.
 [The backlog](BACKLOG.md) owns task routing; [the plan](A_PRIME_REFACTOR_PLAN.md) retains port detail.
 
-## This session — gate arming + gameplay readability (2026-09-11)
+## This session — gate arming, readability, scenario driver (2026-09-11)
 
 Landed: gate 24's instrument now mutation-witnessed; gate 5 gained a real `[autoload]` scan in
 `check_project_settings.py`; gate 10 scoped to two authored geometries and armed
@@ -40,10 +41,14 @@ glob-run test citations and `--report-only` advisory steps (gates 11, 14, 19, 37
 
 Game side: `demand_satisfied` flows through `observe()` (e3caae87) and C003 is executable —
 `tests/test_cold_start_d1.gd` drives a scripted bot through apply/observe to d1 in 414 ticks
-(bf662a85), mutation-tested. T037 dips the starter vein below the pad so mining opens the descent.
-T001 gave copper a copper mark; T030 names the dig plan on the first dash; T026 made the ten hotbar
-wells real remappable actions. T022/T023/T028 ruled provisional keeps. P042/D0588 stands: no d3/d4;
-the iron chain is a parked chain; the ruled next beat is reclamation (earn `pump`, claim a wet chamber).
+(bf662a85), mutation-tested. The scenario layer is real: `scenarios/cold_start_to_d1.yaml` is the run's
+single source, schema-validated (gate 13 now covers `scenarios/`), code-generated into
+`scenarios/generated.gd`, consumed by `harness/driver/scenario_driver.gd` which selects the bot by the
+`agent` field and reports the envelope it actually used (`oracle`, not the requested `constrained`).
+T037 dips the starter vein below the pad so mining opens the descent. T001 gave copper a copper mark;
+T030 names the dig plan on the first dash; T026 made the ten hotbar wells real remappable actions.
+T022/T023/T028 ruled provisional keeps. P042/D0588 stands: no d3/d4; the iron chain is a parked chain;
+the ruled next beat is reclamation (earn `pump`, claim a wet chamber).
 
 ## Where the opening stands
 

@@ -54,6 +54,30 @@ Prose-heavy code pays when the prose is *load-bearing* — named defects, dated 
 cannot tell its subject from its failure text". It fails when it merely narrates. The check that
 distinguishes them is unautomatable, which is why it lives in the ledger.
 
+## What was learned — the shape of the tree is not the shape the docs describe
+
+The structural survey (652 `.gd` files) inverted two assumptions the prose carries:
+
+- **`view/` is the largest code layer, not `sim/`**: 97 files / 17.9k LOC vs 65 / 9.7k. The renderer
+  outweighs the simulation ~1.85:1 — and it is real decomposition, not sprawl: 18 painters, a 5-file
+  bake pipeline, 10 look files; zero duplicate functions across all 2,833 GDScript functions checked;
+  production complexity median 2.0, p95 9.0. A game about *how the world reads* spends its code where
+  the reading happens — the ratio is the NORTH_STAR budget, paid.
+- **`harness/` and `experiment/` were skeleton layers until this arc.** The architecture described a
+  driver/bot/scenario stack that did not exist; it does now (`scenario_driver.gd`, `cold_start.gd`,
+  265 LOC — C003's home). `experiment/` remains five READMEs and zero code — an honest stub, named as
+  such by D0098's excluded-stub rule rather than pretending at weight.
+- **The 400-line cap is under standing pressure**: ~60 files live in the 300-399 warn band and two sit
+  exactly at 400. The cap is doing its job — it is the thing that produced `Units`, `HubPlanes`, and
+  the `observation.gd` split — but the band is a queue of future forced decompositions, and it grows
+  every time a feature lands without a split first.
+- **`tools/layer_lint` is drifting toward a hub** (coupling check, fan-in 3 over fence 0 — the only
+  flag in either language). Expected: the lint is where every structural rule converges. Worth naming
+  because the same check cleared everything else.
+- **The ledger does not just get read — it routes.** P042's ruling (parked chains preferred over
+  filler; reclamation is the next beat) was found by reading back, and it redirected this session's
+  queue. That is the write-only-log question answered by behaviour, not by the count of back-references.
+
 ## What was learned — every claim about how it LOOKS, made without a frame, was wrong. Four for four.
 
 The director lent the screen late in the session. Four separate things I had measured, asserted and
