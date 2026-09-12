@@ -22972,3 +22972,25 @@ MEASURED on a real night capture before the fix: `visible_stars()` returned 42 w
 Mutation-tested: restoring the fixed band fires the spread guard at "46 px of 909 available", which is
 the defect's own number.
 Reverse: CHEAP -- both are one line each.
+
+## D0599 · 2026-09-11 · docs/NEEDS_DIRECTOR.md, docs/WORKING.md · the lamp dial is not connected
+Decided: P038 is answered on a frame rather than ruled on. No constant moved.
+Why: P038 asked the director to choose between `LAMP_TINT` 0.62 and 0.38, and Astra's D5 said "neither
+yet, re-judge on a current frame". Judged, on three captures of the same world at the same tick with one
+variable each:
+  reference                       pool luma 0.377   warmth (r-b) +0.327
+  shipped (TINT .62, BLOOM .23)              0.327                +0.093
+  TINT .38, BLOOM .23                        0.331                +0.086
+  TINT .62, BLOOM .45                        0.483                +0.222
+A 63% change in `LAMP_TINT` moves the pool's warmth by 8%; a 96% change in `LAMP_BLOOM` moves it by 139%.
+THE CONSTANT T012 RULED ON AND D0571 REVISED IS VERY NEARLY INERT, so the whole argument about whether
+0.62 overruled the director's 0.38 was an argument about a number that does not reach the screen.
+D0585 had already written half the reason: the pool is `material x veil_light` plus an ADDITIVE pass, and
+the multiplicative half is at its ceiling -- "base x lamp_tint" saturates, so raising the tint has
+nothing left to scale.
+The lever is the additive pass, and it is a different question: `LAMP_BLOOM` 0.45 reaches the warmth but
+overshoots brightness, and the reference's own light is more SATURATED than ours -- normalised,
+(1.00, 0.615, 0.409) against `LAMP_COLOR`'s (1.00, 0.82, 0.50). A more amber lamp at a moderate bloom,
+which is a taste call about what a headlamp IS and stays the director's (queue item 51).
+Also recorded, from the same frame: P044, the layer contacts are one row across all 256 columns.
+Reverse: docs only -- nothing shipped changed.

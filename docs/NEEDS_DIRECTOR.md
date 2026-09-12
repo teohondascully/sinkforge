@@ -1224,7 +1224,39 @@ complexity and coupling gates keep their corpus. D0570's `lighting_bench` is res
 **P034 is the same shape and is NOT resolved by it.** `interface/observation.gd` is hand-written and
 stays capped, correctly. Its 120-site split is still owed.
 
-## P038 · Does `LAMP_TINT` 0.62 supersede your T012 ruling, or overrule it? (A12)
+## P038 · ANSWERED 2026-09-11 ON A FRAME (D0599): the dial you were asked to set is not connected
+
+**The question below asks you to choose between `LAMP_TINT` 0.62 and 0.38. Measured on a real 45 m
+capture, those two values are visually the same**, and neither reaches the reference. Three frames, same
+world, same tick, same camera, one variable each:
+
+| | pool luma | warmth (r−b) |
+|---|---|---|
+| **the reference** (`docs/media/reference/2026-09-10-lighting-reference.jpg`) | **0.377** | **+0.327** |
+| shipped — `LAMP_TINT` 0.62, `LAMP_BLOOM` 0.23 | 0.327 | +0.093 |
+| `LAMP_TINT` **0.38**, `LAMP_BLOOM` 0.23 | 0.331 | +0.086 |
+| `LAMP_TINT` 0.62, `LAMP_BLOOM` **0.45** | 0.483 | **+0.222** |
+
+**A 63% change in `LAMP_TINT` moves the pool's warmth by 8%. A 96% change in `LAMP_BLOOM` moves it by
+139%.** So the constant T012 ruled on and D0571 revised is very nearly inert in the shipped composite,
+and the argument about whether 0.62 overruled your 0.38 was an argument about a number that does not
+reach the screen.
+
+**Why, and D0585 had already written half of it down:** the pool is `material × veil_light` plus an
+ADDITIVE `LightPainter` pass, and the multiplicative half is at its ceiling there — "base × `lamp_tint`"
+saturates, so raising the tint has nothing left to scale. The additive pass owns the pool's colour.
+
+**What the lever actually is, and it is a different question than the one asked.** `LAMP_BLOOM` 0.45
+reaches warmth +0.222 but overshoots brightness (0.483 against 0.377). The reference's own light is more
+SATURATED than ours: normalise its pool and it is (1.00, 0.615, 0.409) against `LightPainter.LAMP_COLOR`'s
+(1.00, 0.82, 0.50). So matching it wants a more amber `LAMP_COLOR` at a moderate bloom, not more of a
+paler light — which is a taste call about what a headlamp IS, and still yours.
+
+Frames: `docs/media/moments/2026-09-11-deep-lamp-tint062.png`, `-tint038.png`, `-bloom045.png`.
+
+**The original question stands for the record, and its premise is now withdrawn:**
+
+## P038 (as originally asked) · Does `LAMP_TINT` 0.62 supersede your T012 ruling, or overrule it? (A12)
 
 **Astra's objection, and it is a fair one.** T012 (2026-09-05) ruled: *"keep it warm, and if it reads
 more campfire than headlamp ease it toward 0.38"* — a number, from you. D0571 moved it to **0.62** and
@@ -1470,3 +1502,41 @@ of that was designed either. A material that flows into any space you cut is a c
 *against*, and a corridor that needs shoring is a different game from one that doesn't, not a broken
 one. This entry stays open as a design question with no owed action; nothing above is to be treated as a
 queue item until the director says otherwise.
+
+## P044 · The layer contacts are dead flat across the whole world, and it is the most 2016 thing in the deep frame
+
+**Found on a real 45 m capture, 2026-09-11** (`docs/media/moments/2026-09-11-deep-lamp-tint062.png`). A
+razor-sharp horizontal line runs across the ENTIRE frame: warm brown above, cool grey below, with no
+transition. Measured, the mean warmth (r−b) swings from **+0.028 to −0.047 across sixty pixels**.
+
+**It is not a rendering artifact. It is the generator.** `ShaftGenerator._fill_base`:
+
+```gdscript
+if row < topsoil_end:      material = &"clay"
+elif row < stonereach_end: material = &"hardrock"
+else:                      material = &"deepstone"
+```
+
+`topsoil_end` is one row — the same row in all 256 columns. `data/strata/shallow_clay.yaml` sets
+`topsoil_shale_end: 40`, so clay becomes hardrock at exactly 40 m everywhere, and again at 140 m.
+
+**And the world already knows better.** `BeddingTone.bedding_metres` warps its tone bands along x by
+`sin(xm * 0.055) * 2.4 + sin(xm * 0.021) * 3.6` — up to ±6 m of dip — because a bed that ruled a straight
+line across the world "at any real zoom is a stripe pattern and not bedding" (its own header). So the
+TONE dips and the MATERIAL contact does not. They disagree, and the disagreement is what makes the
+contact read as a drawn line rather than as geology.
+
+**The fix is small and its cost is not.** Warping the contact by the same function the bedding already
+uses is a two-line change in `_fill_base` plus moving that warp to `core/` so `sim/` may reach it (it
+lives in `view/` today, and sim may not depend on view). But it changes what every seed generates, so
+`tests/fixture_shaft_golden.gd` and the determinism goldens need re-pinning across platforms — the
+draft-PR-on-CI-Linux process. That is why this is parked rather than done: it is the "expensive decision
+parked, not decided in-loop" rule, and the expense is entirely in the re-pin, not the change.
+
+**What I need from you:** whether a dipping layer contact is worth a golden re-pin. I think it is — this
+is the single most artificial thing in an otherwise good deep frame, and the deep frame is where the game
+spends most of its time. But it changes every world anyone has generated, and that is your call.
+
+**A cheaper half, if the answer is no:** the view could blend the two materials' colours across a band at
+the contact. I would rather not — the colour would stop telling the truth about what a cell IS, and a
+player mining at 39 m and 41 m gets different materials either way.

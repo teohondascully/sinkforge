@@ -460,6 +460,18 @@ nothing and saved most of a night.
          **Build (a) the graph and a member-listing reported-only gate. Defer the blocking verdict, the
          `shipped:` field and every quantity/fuel increment until P042 is answered.**
 
+- [ ] 51 **THE LAMP'S REAL LEVER (P038 answered, D0599).** `LAMP_TINT` is nearly inert: 0.62 vs 0.38
+         moves the pool's warmth from +0.093 to +0.086, because the multiplicative half is saturated and
+         the ADDITIVE pass owns the colour. `LAMP_BLOOM` 0.23 -> 0.45 moves it to +0.222 but overshoots
+         brightness. The reference's own light is more SATURATED than ours -- normalised, (1.00, 0.615,
+         0.409) against `LAMP_COLOR`'s (1.00, 0.82, 0.50). Wants a more amber `LAMP_COLOR` at a moderate
+         bloom; that is a taste call about what a headlamp is, so it waits for the director.
+- [ ] 52 **THE LAYER CONTACTS ARE DEAD FLAT (P044).** `ShaftGenerator._fill_base` switches clay to
+         hardrock at ONE row across all 256 columns, so a razor line runs the width of the world at 40 m
+         and again at 140 m -- measured warmth swinging +0.028 to -0.047 in sixty pixels. `BeddingTone`
+         already dips its tone bands +/-6 m; the tone dips and the material does not. Two-line fix,
+         gated on a cross-platform golden re-pin, so it is the director's call.
+
 ### Phase 9 -- VERIFY
 
 - [ ] 44 Opus playthrough again, same route as item 1. The only honest test of phases 1-5.
