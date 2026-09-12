@@ -69,14 +69,11 @@ which is the observation §10a asks for — the measurement path can fail.
 Updated 2026-09-11. The run is executable and green; what remains between this suite and the claim's
 full falsifiable form:
 
-- **`harness/scenario` + `harness/driver` are still skeletons.** `scenarios/cold_start_to_d1.yaml`
-  now exists as the agreed fixture (seed, site, start, goal, budget) but nothing loads it yet; the
-  suite duplicates that description in code. When the driver lands, it should consume the record,
-  not a second copy.
 - **The envelope is `oracle`, not `constrained`.** No fog-filtered envelope exists — `Envelope` is a
   spatial window only. The scripted policy reads only authored fixture positions and surface
   solidity, so no hidden state enters the run; the honest upgrade is a constrained window once the
-  type exists, and the policy would not need to change.
+  type exists, and the policy would not need to change. The driver's report names the envelope it
+  actually used so the gap stays visible rather than silently read as satisfied.
 - **The threshold is still unset.** The scripted floor is now measured (414 ticks); a human-pacing
   threshold wants either a real playthrough number or a director ruling on what multiple of the bot
   floor counts as completable.
@@ -85,7 +82,11 @@ full falsifiable form:
 
 The previous blockers are resolved: the rig demand transaction (`sim/economy/demands.gd` + the rig
 runner), D1's unlock (`drill` granted at stage advance), economy records (`data/progression`), the
-demand event, and the scenario record all exist and are exercised.
+demand event, and the scenario record all exist and are exercised. **The driver exists (D0620):**
+`harness/driver/scenario_driver.gd` consumes the record via `ScenarioRecords` (generated from the
+yaml by the same codegen pass as `data/`, schema-validated by `scenarios/SCHEMA.yaml`), boots the
+named site/start/seed, and hands the run to the bot `agent:` names (`harness/bots/cold_start.gd`).
+The suite is now an assertion shell over that machinery, not a second copy of the route.
 
 ## What this claim does not measure
 
@@ -111,3 +112,4 @@ its first real checkpoint.
 |---|---|---|---|---|---|
 | 2026-08-27 | — | — | not measured | BLOCKED | Claim authored to replace retired `C001` (`docs/DECISIONS_LEDGER.md` D0076). Blocked on nearly the entire remaining build sequence — see above. |
 | 2026-09-11 | D0605+D0609 | d1 wants 2 ingots | 414 ticks | PASSING | `test_cold_start_d1.gd` + `scenarios/cold_start_to_d1.yaml`. Scripted bot through apply/observe only; conservation clean. First-failed via the same commit's event-kind mutation. Threshold still unset. |
+| 2026-09-11 | D0620 | d1 wants 2 ingots | within 30000-tick budget | PASSING | Same run now driven by `harness/driver` consuming the generated scenario record — yaml is the single source, the suite asserts over the driver's report. Event-suppression mutation re-verified red. |

@@ -167,6 +167,51 @@ def main() -> int:
             out_path.write_text(rendered, encoding="utf-8")
             written.append(out_path.relative_to(ROOT).as_posix())
 
+    # The same mechanical translation for scenarios/: flat yaml records keyed by `name` (not `id` --
+    # a scenario is named, not identified), emitted as scenarios/generated.gd so harness/ reads typed
+    # records and never a YAML parser. scenarios/SCHEMA.yaml is validated by schema_validator, which
+    # now scans the directory as a kind of its own.
+    scenarios_dir = ROOT / "scenarios"
+    if scenarios_dir.is_dir():
+        scenario_files = sorted(p for p in scenarios_dir.glob("*.yaml") if p.name != "SCHEMA.yaml")
+        if scenario_files:
+            records = {}
+            for p in scenario_files:
+                try:
+                    doc = safe_load_yaml(p)
+                except ValueError as e:
+                    print(f"data_codegen: FAIL -- {e}", file=sys.stderr)
+                    return 2
+                if not isinstance(doc, dict) or "name" not in doc:
+                    print(f"data_codegen: FAIL -- {p.relative_to(ROOT)}: no top-level 'name' field to "
+                          f"key RECORDS by", file=sys.stderr)
+                    return 2
+                records[doc["name"]] = doc
+            lines = [
+                "# GENERATED FILE -- do not edit by hand.",
+                "# Source: scenarios/*.yaml. Regenerate with:",
+                "#   python3 tools/data_codegen/generate.py",
+                "# tools/data_codegen/generate.py --check is a CI gate (docs/QUALITY.md gate 22) that fails if",
+                "# this file is stale relative to its source. docs/adr/0004-data-codegen.md has the contract.",
+                "class_name ScenarioRecords",
+                "extends RefCounted",
+                "",
+                "const RECORDS: Dictionary = {",
+            ]
+            for name in sorted(records):
+                lines.append(f'\t"{name}": {gdscript_literal(records[name], 1)},')
+            lines.append("}")
+            lines.append("")
+            rendered = "\n".join(lines)
+            out_path = scenarios_dir / "generated.gd"
+            current = out_path.read_text(encoding="utf-8") if out_path.is_file() else None
+            if current != rendered:
+                if check_mode:
+                    stale.append(out_path.relative_to(ROOT).as_posix())
+                else:
+                    out_path.write_text(rendered, encoding="utf-8")
+                    written.append(out_path.relative_to(ROOT).as_posix())
+
     print(f"data_codegen: {eligible} codegen-eligible data kind(s) found under data/")
     if skipped:
         print(f"data_codegen: {len(skipped)} kind(s) have data files but no eligible SCHEMA.yaml "

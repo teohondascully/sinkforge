@@ -101,7 +101,9 @@ def find_scenario_files(root: Path = ROOT) -> list[Path]:
     scenarios_dir = root / "scenarios"
     if not scenarios_dir.is_dir():
         return []
-    return sorted(scenarios_dir.glob("*.yaml"))
+    # SCHEMA.yaml is the directory's own contract, not a scenario record -- same exclusion
+    # generate.py and schema_validator make.
+    return sorted(p for p in scenarios_dir.glob("*.yaml") if p.name != "SCHEMA.yaml")
 
 
 def find_harness_layer_files(root: Path = ROOT) -> list[Path]:

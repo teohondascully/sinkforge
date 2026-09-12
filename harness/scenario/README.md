@@ -31,7 +31,11 @@ set of fixtures.
 
 ## Public API
 
-None yet. This directory is a skeleton — no code has been written.
+The loader is codegen, not a parser: `tools/data_codegen/generate.py` translates
+`scenarios/*.yaml` into `scenarios/generated.gd` (`ScenarioRecords.RECORDS`, keyed by `name`),
+the same way `data/` records are generated -- gate 22's freshness check covers it, and
+`scenarios/SCHEMA.yaml` is validated by `tools/schema_validator` (gate 13). No GDScript YAML
+parser exists or is wanted.
 
 ## Gotchas
 

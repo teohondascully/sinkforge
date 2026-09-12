@@ -23270,3 +23270,19 @@ correction-shaped; (3) CORRECTIONS.md is the load-bearing projection of that net
 earns its 31% comment density in sim/ when it is load-bearing (named defects, dated numbers), and this
 arc collected direct instances. Also corrected BRIEF's own stale line: it still read "C003 remains
 BLOCKED" after bf662a85 made the claim executable -- a document-staleness instance of the same class.
+
+## D0620 · 2026-09-11 · scenarios/SCHEMA.yaml, scenarios/generated.gd, harness/bots/cold_start.gd, harness/driver/scenario_driver.gd, tools/data_codegen/generate.py, tools/schema_validator/schema_validator.py, tools/layer_lint/check_claim_references.py, sim/run/world_seeder.gd, tests/test_cold_start_d1.gd, claims/C003, docs/QUALITY.md · the scenario driver exists; the yaml is the run's single source
+
+The skeleton layers got their first real contents. Scenario yaml is schema-validated
+(schema_validator now scans scenarios/ as a flat kind -- gate 13's text updated) and code-generated
+into `ScenarioRecords` by the same pass that serves data/ -- the ADR 0004 answer to "no GDScript YAML
+parser": there is none and none is wanted. `ScenarioDriver.run(record)` boots the named site/start/
+seed, hands the run to the bot `agent:` names, and reports `{ok, reason, ticks_used, goal_event,
+legs_ok, conservation_error, envelope}` -- envelope naming what was actually used, so `constrained`
+in the yaml cannot silently read as satisfied. The bot moved from the test into
+harness/bots/cold_start.gd; the test is now an assertion shell. `WorldSeeder.start_record` keeps the
+harness->data edge inside sim where it already lives (harness may not read data/). The claim gate
+fired twice during the build and was answered honestly each time: SCHEMA.yaml excluded from the
+scenario glob (it is the contract, not a record), and the bot's route method named `execute` not
+`run` (func run( is the check-registration heuristic; a policy is not a check). Mutation re-verified:
+suppress demand_satisfied, the goal assert fails while legs stay green.

@@ -27,7 +27,11 @@ observation shape).
 
 ## Public API
 
-None yet. This directory is a skeleton — no code has been written.
+`ColdStartBot` (`cold_start.gd`) — the scripted T0 policy for `agent: cold_start` scenarios:
+`execute(anchor)` runs the tutorial route (mine vein, feed forge, mine coal, feed forge, collect
+ingots, deliver to the rig) through `Interface.apply`/`observe` only. Named `execute` rather than
+`run` because `check_claim_references` reads `func run(` as a check-registering file and a policy
+is not a check.
 
 ## Gotchas
 

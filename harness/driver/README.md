@@ -32,7 +32,11 @@ Per run: `result.json`, `telemetry.jsonl`, `state_hashes.txt`, `input.log`,
 
 ## Public API
 
-None yet. This directory is a skeleton — no code has been written.
+`ScenarioDriver.run(record: Dictionary) -> Dictionary` — consumes a `ScenarioRecords` entry
+(generated from `scenarios/*.yaml`), boots the named site/start/seed through `WorldSeeder`, hands
+the run to the bot `record.agent` names, and returns `{ok, reason, ticks_used, goal_event, legs_ok,
+conservation_error, envelope}`. The envelope field names what was ACTUALLY used -- a record asking
+for `constrained` runs oracle today and the report says so.
 
 ## Gotchas
 

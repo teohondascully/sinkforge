@@ -76,6 +76,12 @@ static func _tree_cfg(site_id: String) -> Dictionary:
 	return StrataData.get_site(StringName(site_id)).get("tree", TREE_FALLBACK)
 
 
+## The start record by id, or {} -- the sim-layer read for callers (harness/) that may not touch
+## data/ themselves. Keeps the data edge inside sim where it already lives.
+static func start_record(start_id: StringName) -> Dictionary:
+	return StartsRecords.RECORDS.get(String(start_id), {})
+
+
 ## The air metre the body stands in at a new game: above the surface at the spawn column.
 static func spawn_logic_cell(start: Dictionary) -> Vector2i:
 	return Vector2i(int(start.get("spawn_col_m", 0)), SURFACE_ROW_M - 1)

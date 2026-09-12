@@ -41,6 +41,7 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
+SCENARIOS_DIR = ROOT / "scenarios"
 
 TYPE_MAP = {"str": str, "int": int, "float": (int, float), "bool": bool, "list": list, "dict": dict}
 
@@ -83,6 +84,10 @@ def main() -> int:
         return 0
 
     kinds = [d for d in DATA_DIR.iterdir() if d.is_dir()]
+    # scenarios/ is a flat kind of its own (SCHEMA.yaml beside the records, no kind subdirectory);
+    # gate 13's claim is "every data file validates" and a scenario yaml is a data file.
+    if SCENARIOS_DIR.is_dir():
+        kinds.append(SCENARIOS_DIR)
     if not kinds:
         print("schema_validator: data/ has no subdirectories yet — nothing to check.")
         print("schema_validator: PASS (vacuously)")

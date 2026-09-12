@@ -1,14 +1,13 @@
-# C003's scenario record (docs/ARCHITECTURE.md §6's format). There is no loader yet --
-# harness/scenario is a skeleton layer -- so today this file is the FIXTURE the claim and the suite
-# agree on: `tests/test_cold_start_d1.gd` runs exactly this start, this goal, and this budget through
-# the real door (Interface.apply/observe), and its measurement lives in the claim's history table.
-# When the driver exists, it consumes this file rather than a second description of the same run.
+# C003's scenario record (docs/ARCHITECTURE.md §6's format). Schema-validated by
+# scenarios/SCHEMA.yaml and code-generated into scenarios/generated.gd (ScenarioRecords) the same
+# way data/ records are -- the driver consumes the record, not a second description of the run.
 name: cold_start_to_d1
 claim: C003
-seed: 20260825              # the suite's boot seed -- WorldSeeder.load_world(SHALLOW_CLAY, seed)
+seed: 20260825              # the boot seed -- WorldSeeder.load_world(SHALLOW_CLAY, seed)
 world:
   site: shallow_clay
   start: tutorial           # data/starts/tutorial.yaml, stamped over the generated site
+agent: cold_start           # harness/bots/cold_start.gd -- the scripted T0 policy
 rig:
   demands_satisfied: []     # cold: the whole ladder ahead
   stockpile: {}

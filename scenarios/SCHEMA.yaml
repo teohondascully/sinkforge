@@ -1,0 +1,16 @@
+# The scenario format's contract (docs/ARCHITECTURE.md §6, harness/scenario/README.md). Flat
+# top-level fields; the nested blocks (world/rig/player/goal) are dicts whose inner shape the
+# driver owns. `agent` names the harness/bots policy that can run it headless; a scenario with no
+# agent is still a valid fixture -- a human is a legal driver.
+fields:
+  name: {required: true, type: str}
+  claim: {required: true, type: str}
+  seed: {required: true, type: int}
+  world: {required: true, type: dict}
+  rig: {required: false, type: dict}
+  player: {required: false, type: dict}
+  envelope: {required: false, type: str}
+  agent: {required: false, type: str}
+  goal: {required: true, type: dict}
+  budget_ticks: {required: true, type: int}
+  assertions: {required: false, type: list}
