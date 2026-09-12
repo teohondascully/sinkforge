@@ -27,7 +27,7 @@ const MERGE_AGE: float = 0.45       ## ...as long as that tick is still this you
 const FONT_SIZE: int = 11
 const PIP_R: float = 3.6            ## radius of the item-coloured diamond ahead of the number
 const LOSS_DIM: float = 0.7         ## a loss tick's alpha against a gain's: legible, not a reward
-const SCALE: float = float(Interface.Observation.LOGIC_PX) / 32.0
+const SCALE: float = float(Interface.Units.LOGIC_PX) / 32.0
 
 var _t: Array[Dictionary] = []      ## each tick: pos (legacy px), item, count, age
 var _prev_pack: Dictionary = {}
@@ -75,8 +75,8 @@ static func coming(o: Interface.Observation, item: StringName) -> int:
 	var body := Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
 	var more: int = 0
 	for rec: Dictionary in o.machines:
-		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
-		if at.distance_to(body) > float(Interface.Observation.REACH_PX):
+		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Units.LOGIC_PX)
+		if at.distance_to(body) > float(Interface.Units.REACH_PX):
 			continue
 		more += int((rec.get("output", {}) as Dictionary).get(item, 0))
 		var recipe: Dictionary = RecipesRecords.RECORDS.get(String(rec.get("recipe", &"")), {})

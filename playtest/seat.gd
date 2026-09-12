@@ -158,7 +158,7 @@ func _note_refusal() -> void:
 		return
 	if pointed.is_empty() and not bridge.held_buttons.is_empty():
 		var w: Vector2 = Controls.pointer_world(game.view)                 # the posed pointer, world px
-		var c: int = Interface.Observation.CELL_PX
+		var c: int = Interface.Units.CELL_PX
 		pointed = {"raw": [floori(w.x / float(c)), floori(w.y / float(c))], "aim": [f.obs.aim_cell.x, f.obs.aim_cell.y], "body": [f.obs.cell.x, f.obs.cell.y]}
 	if f.obs.aim_refusal != &"":
 		if last_refusal == &"":

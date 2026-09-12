@@ -111,7 +111,7 @@ func _test_landing_hard_and_stepping_off() -> void:
 	var vc: VoiceCues = VoiceCues.new()
 	var air: Interface.Observation = _obs()
 	air.on_floor = false
-	air.vel_y = Interface.Observation.MAX_FALL_PX_S * S
+	air.vel_y = Interface.Units.MAX_FALL_PX_S * S
 	_check(vc.cues(air, 0.016).is_empty(), "falling is silent")
 	var floor: Interface.Observation = _obs()
 	var cues: Array[Dictionary] = vc.cues(floor, 0.016)

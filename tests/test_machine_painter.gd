@@ -7,7 +7,7 @@ extends "res://tests/test_base.gd"
 ## machines LOOK like hardware; that is the director's eye at the play scene.
 
 const S: int = Fx.SCALE
-const CELL: float = float(Interface.Observation.LOGIC_PX)
+const CELL: float = float(Interface.Units.LOGIC_PX)
 
 
 func _initialize() -> void:

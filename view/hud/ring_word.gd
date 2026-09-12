@@ -74,7 +74,7 @@ static func word(id: StringName, o: Interface.Observation, at: Vector2) -> Strin
 
 ## The logic metre a world point lies in.
 static func metre_of(at: Vector2) -> Vector2i:
-	var m: float = float(Interface.Observation.LOGIC_PX)
+	var m: float = float(Interface.Units.LOGIC_PX)
 	return Vector2i(floori(at.x / m), floori(at.y / m))
 
 

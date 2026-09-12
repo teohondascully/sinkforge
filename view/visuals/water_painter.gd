@@ -19,8 +19,8 @@ extends RefCounted
 ## sampled its waterline every 16 px against a 46 px ripple and documented the fold; sampled every 2 px
 ## here, 23 px means 23.
 
-const CELL: float = float(Interface.Observation.CELL_PX)
-const WATER_MAX: int = Interface.Observation.WATER_MAX
+const CELL: float = float(Interface.Units.CELL_PX)
+const WATER_MAX: int = Interface.Units.WATER_MAX
 const WATER_COLOR := Color(0.16, 0.42, 0.72)          ## deep cool blue: reads as water, stays see-through
 const WATER_DEEP := Color(0.03, 0.13, 0.46)           ## the colour the body tends toward with depth
 const WATER_SURFACE := Color(0.42, 0.72, 0.95)        ## a brighter waterline so the top edge reads

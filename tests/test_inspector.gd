@@ -184,7 +184,7 @@ func _test_the_terrain_answers() -> void:
 	o.placed.clear()
 	o.water[30 * W + 30] = 3
 	d = Inspector.describe(o)
-	_check(d.get("name", "") == "Water" and String(d["mode"]).begins_with("3 of %d" % Interface.Observation.WATER_MAX), "water reports its units (%s)" % str(d))
+	_check(d.get("name", "") == "Water" and String(d["mode"]).begins_with("3 of %d" % Interface.Units.WATER_MAX), "water reports its units (%s)" % str(d))
 	o.water[30 * W + 30] = 0
 	o.ore_yield.clear()
 	o.materials[30 * W + 30] = 1
@@ -242,8 +242,8 @@ func _test_recipe_machines_and_the_rate() -> void:
 	var recipe: Dictionary = RecipesRecords.RECORDS[String(MachinesRecords.RECORDS["gear_mill"]["recipe"])]
 	# D0461: a recipe's ticks are hub ticks, twenty a second, so a 40-tick smelt is 2.0 s, not the 0.7 s the
 	# card said while stranger 37 waited two seconds and left with one ingot of two.
-	var secs: float = float(recipe["time_ticks"]) / float(Interface.Observation.HUB_HZ)
-	_check(String(d["mode"]).begins_with("makes") and String(d["mode"]).contains("%.1fs" % secs) and Interface.Observation.HUB_HZ * HubTick.HUB_TICK_DIVISOR == Interface.Observation.TICK_HZ,
+	var secs: float = float(recipe["time_ticks"]) / float(Interface.Units.HUB_HZ)
+	_check(String(d["mode"]).begins_with("makes") and String(d["mode"]).contains("%.1fs" % secs) and Interface.Units.HUB_HZ * HubTick.HUB_TICK_DIVISOR == Interface.Units.TICK_HZ,
 		"a recipe machine names its product and cycle from the data, in hub seconds (%s)" % str(d["mode"]))
 	_check((d["in"] as Array).size() == (recipe["inputs"] as Dictionary).size(), "its input chips are the recipe's")
 	_check(not d.has("rate"), "no live rate, no rate line")

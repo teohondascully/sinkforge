@@ -67,7 +67,7 @@ func _init(world_seed: int) -> void:
 ## then the band gate.
 static func column_surface_row(o: Interface.Observation, col: int) -> int:
 	var y: int = o.surface_y_at_terrain_col(col)
-	if y == Interface.Observation.NO_FLOOR or o.cell_px <= 0:
+	if y == Interface.Units.NO_FLOOR or o.cell_px <= 0:
 		return NONE
 	var row: int = y / (o.cell_px * Fx.SCALE)
 	return row if is_walked(row) else NONE

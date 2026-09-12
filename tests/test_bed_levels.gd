@@ -8,6 +8,7 @@ extends "res://tests/test_base.gd"
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_bed_levels.gd
 const S: int = Fx.SCALE
 const O := Interface.Observation
+const U := Interface.Units
 const W: int = 256
 const H: int = 64
 
@@ -34,7 +35,7 @@ func _obs(body_px: Vector2 = Vector2(100.0, 100.0)) -> Interface.Observation:
 	o.water.resize(W * H)
 	o.pos_x = int(body_px.x) * S
 	o.pos_y = int(body_px.y) * S
-	o.cell = Vector2i(int(body_px.x) / O.CELL_PX, int(body_px.y) / O.CELL_PX)
+	o.cell = Vector2i(int(body_px.x) / U.CELL_PX, int(body_px.y) / U.CELL_PX)
 	return o
 
 
@@ -65,19 +66,19 @@ func _test_the_heartbeat_counts_working_machines_within_reach() -> void:
 
 func _test_the_ambience_measures_against_the_generated_datum() -> void:
 	var o: Interface.Observation = _obs()
-	o.cell.y = O.SKY_ROWS
+	o.cell.y = U.SKY_ROWS
 	var a: Dictionary = BedLevels.ambience(o)
 	_check(is_equal_approx(float(a["surface"]), 1.0) and float(a["cave"]) == 0.0, "at the datum: full wind, no cave")
-	o.cell.y = O.SKY_ROWS + 8
+	o.cell.y = U.SKY_ROWS + 8
 	a = BedLevels.ambience(o)
 	_check(is_equal_approx(float(a["surface"]), 0.5) and is_equal_approx(float(a["cave"]), 0.2), "two metres down: wind 0.5, cave 0.2 (%s)" % str(a))
-	o.cell.y = O.SKY_ROWS + 16
+	o.cell.y = U.SKY_ROWS + 16
 	a = BedLevels.ambience(o)
 	_check(float(a["surface"]) == 0.0 and is_equal_approx(float(a["cave"]), 0.4), "four metres down: the wind has died (%s)" % str(a))
-	o.cell.y = O.SKY_ROWS + 40
+	o.cell.y = U.SKY_ROWS + 40
 	a = BedLevels.ambience(o)
 	_check(is_equal_approx(float(a["cave"]), 1.0), "ten metres down: full cave air (%s)" % str(a))
-	o.cell.y = O.SKY_ROWS - 16
+	o.cell.y = U.SKY_ROWS - 16
 	a = BedLevels.ambience(o)
 	_check(is_equal_approx(float(a["surface"]), 1.0) and float(a["cave"]) == 0.0, "in the sky: clamped to full wind, no cave")
 	_check(is_equal_approx(BedLevels.depth_m(o), -4.0), "and depth reads minus four metres there (%.1f)" % BedLevels.depth_m(o))
@@ -85,12 +86,12 @@ func _test_the_ambience_measures_against_the_generated_datum() -> void:
 
 func _test_the_rush_starts_at_a_run() -> void:
 	var o: Interface.Observation = _obs()
-	o.vel_x = O.RUN_SPEED_PX_S * S
+	o.vel_x = U.RUN_SPEED_PX_S * S
 	_check(BedLevels.rush(o) == 0.0, "a run is the zero point (%.2f)" % BedLevels.rush(o))
 	o.vel_x = 0
-	o.vel_y = O.MAX_FALL_PX_S * S
+	o.vel_y = U.MAX_FALL_PX_S * S
 	_check(is_equal_approx(BedLevels.rush(o), 1.0), "terminal fall is one (%.2f)" % BedLevels.rush(o))
-	o.vel_y = ((O.RUN_SPEED_PX_S + O.MAX_FALL_PX_S) / 2) * S
+	o.vel_y = ((U.RUN_SPEED_PX_S + U.MAX_FALL_PX_S) / 2) * S
 	_check(is_equal_approx(BedLevels.rush(o), 0.5), "midway is a half (%.2f)" % BedLevels.rush(o))
 	o.vel_y = 0
 	_check(BedLevels.rush(o) == 0.0, "standing still is not a negative rush")
@@ -105,7 +106,7 @@ func _test_a_pour_is_a_wet_cell_over_an_open_unfull_cell() -> void:
 	o.materials[31 * W + 25] = 1
 	_check(BedLevels.pour(o) == 0.0, "the same cell over rock: nothing pours (%.2f)" % BedLevels.pour(o))
 	o.materials[31 * W + 25] = 0
-	o.water[31 * W + 25] = O.WATER_MAX
+	o.water[31 * W + 25] = U.WATER_MAX
 	_check(BedLevels.pour(o) == 0.0, "over a FULL cell: nothing pours (%.2f)" % BedLevels.pour(o))
 	o.water[31 * W + 25] = 0
 	o.wet_cells = [Vector2i(200, 30)]
@@ -128,7 +129,7 @@ func _test_the_pump_bed_counts_working_pumps_only() -> void:
 
 func _test_the_haul_is_line_taken_in_per_tick() -> void:
 	var lv: BedLevels = BedLevels.new()
-	var per_tick: int = (O.REEL_PX_S * S) / O.TICK_HZ
+	var per_tick: int = (U.REEL_PX_S * S) / U.TICK_HZ
 	var o: Interface.Observation = _obs()
 	o.grapple_anchored = true
 	o.tick = 100

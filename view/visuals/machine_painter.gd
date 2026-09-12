@@ -23,7 +23,7 @@ extends RefCounted
 ## hopper's `feed_cap` is this build's one capped belly and a candidate), the objective guide's airspace
 ## rule (no objectives yet), the silhouette and bare-machine debug switches.
 
-const CELL: float = float(Interface.Observation.LOGIC_PX)
+const CELL: float = float(Interface.Units.LOGIC_PX)
 const CHROME_SCALE: float = CELL / 32.0
 const TEXT_ZOOM: float = 1.3      ## legacy 0.65: would 8 px type survive at this scale
 const DETAIL_ZOOM: float = 1.24   ## legacy 0.62: rivets and vents only when resolvable
@@ -139,7 +139,7 @@ static func total(buffer: Dictionary) -> int:
 static func aim_logic(o: Interface.Observation) -> Vector2i:
 	if o.aim_cell == Vector2i(-1, -1):
 		return o.aim_cell
-	var n: int = Interface.Observation.LOGIC_PX / Interface.Observation.CELL_PX
+	var n: int = Interface.Units.LOGIC_PX / Interface.Units.CELL_PX
 	return Vector2i(_floor_div(o.aim_cell.x, n), _floor_div(o.aim_cell.y, n))
 
 

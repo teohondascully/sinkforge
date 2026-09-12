@@ -37,7 +37,7 @@ const PUMP_DOWN: float = 0.85            ## cos(~32 degrees): near enough the bo
 ## The lesson's landing is a LONG drop: terminal speed, a fall of eleven metres or more (D0471). The
 ## thud's threshold (`VoiceCues.LAND_HARD_PX_S`, 240) is a two-metre step; a plain jump lands at 365 and
 ## taught the grapple to three strangers who had only hopped.
-const LAND_HARD_PX_S: float = float(Interface.Observation.MAX_FALL_PX_S)
+const LAND_HARD_PX_S: float = float(Interface.Units.MAX_FALL_PX_S)
 
 ## The lesson tables live in `HintTexts` (D0469); these aliases keep every reader's name.
 const DEFS: Array[Dictionary] = HintTexts.DEFS
@@ -140,7 +140,7 @@ func _left_working(o: Interface.Observation, counts: Dictionary) -> bool:
 
 ## The surface walked from edge to edge with the verb known and nothing dug down (T037).
 func _way_down_wanted(o: Interface.Observation) -> bool:
-	var x_m: float = float(o.pos_x) / float(Fx.SCALE) / float(Interface.Observation.LOGIC_PX)
+	var x_m: float = float(o.pos_x) / float(Fx.SCALE) / float(Interface.Units.LOGIC_PX)
 	_min_x_m = minf(_min_x_m, x_m)
 	_max_x_m = maxf(_max_x_m, x_m)
 	_deepest_m = maxf(_deepest_m, MaterialLook.depth_m_exact(o.cell.y))
@@ -195,7 +195,7 @@ func _ready_to_show(id: StringName) -> bool:
 func observe(o: Interface.Observation, delta: float, ceremony: bool = false) -> void:
 	if o == null:
 		return
-	var run: float = float(Interface.Observation.RUN_SPEED_PX_S)
+	var run: float = float(Interface.Units.RUN_SPEED_PX_S)
 	var speed: float = Vector2(float(o.vel_x), float(o.vel_y)).length() / float(Fx.SCALE)
 	_busy = speed > run * (BUSY_RELEASE if _busy else BUSY_ARM)
 	_ceremony = ceremony

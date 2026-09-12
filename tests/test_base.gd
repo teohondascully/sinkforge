@@ -189,8 +189,8 @@ func _hint_obs(pack: Array = []) -> Interface.Observation:
 		typed.append({"item": StringName(p[0]), "count": int(p[1])})
 	o.pack = typed
 	o.on_floor = true
-	o.cell = Vector2i(10, Interface.Observation.SKY_ROWS)
-	o.bottom_y = (o.cell.y + 5) * Interface.Observation.CELL_PX * Fx.SCALE   # the feet five cells under the centre (a 40 px body)
+	o.cell = Vector2i(10, Interface.Units.SKY_ROWS)
+	o.bottom_y = (o.cell.y + 5) * Interface.Units.CELL_PX * Fx.SCALE   # the feet five cells under the centre (a 40 px body)
 	return o
 
 

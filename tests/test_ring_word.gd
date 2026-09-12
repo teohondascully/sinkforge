@@ -41,7 +41,7 @@ func _initialize() -> void:
 ## `Reach.in_reach_metre` -- the sim's own call, via the same path `Verbs.can_reach` uses -- flips there
 ## and nowhere else. `[[constant-must-dominate-constant]]`: the drawn radius may not be its own authority.
 func _test_the_reach_line_is_the_locus_of_the_rule_it_draws() -> void:
-	var m: int = Interface.Observation.LOGIC_PX
+	var m: int = Interface.Units.LOGIC_PX
 	var cell := Vector2i(40, 30)
 	var centre: Vector2i = Reach.metre_centre_fx(cell, m)
 	var radius_m: float = RingPainter.reach_radius_m()
@@ -78,7 +78,7 @@ func _test_the_reach_line_is_the_locus_of_the_rule_it_draws() -> void:
 ## must EXIST a position the box admits and a metre-centre circle refuses, or this whole shape is a
 ## no-op dressed as a fix. `[[print-the-discriminating-quantity]]`.
 func _test_the_reach_line_on_rock_is_the_cells_locus_and_not_the_metres() -> void:
-	var m: int = Interface.Observation.LOGIC_PX
+	var m: int = Interface.Units.LOGIC_PX
 	var cell := Vector2i(40, 30)
 	var at := Vector2(float(cell.x * m + m / 2), float(cell.y * m + m / 2))
 	var o: Interface.Observation = Interface.Observation.new()
@@ -108,7 +108,7 @@ func _test_the_reach_line_on_rock_is_the_cells_locus_and_not_the_metres() -> voi
 
 ## The sim's own answer: is ANY terrain cell of this metre within a hold's reach?
 func _any_cell_in_reach(o: Interface.Observation, metre: Vector2i, m: int) -> bool:
-	var per: int = m / Interface.Observation.CELL_PX
+	var per: int = m / Interface.Units.CELL_PX
 	for cx: int in per:
 		for cy: int in per:
 			if Mining.in_reach(o.pos_x, o.pos_y, metre * per + Vector2i(cx, cy)):
@@ -181,7 +181,7 @@ func _test_the_deliver_ring_goes_to_a_dropped_stack_first() -> void:
 	items.piles.pile(spawn + Vector2i(8, 0))[&"ingot"] = 3               # S94's stack, 8 m right on the surface
 	var dropped: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))
 	var at: Vector2 = TargetGuide.target(&"deliver", dropped)
-	var pile_px: Vector2 = (Vector2(spawn + Vector2i(8, 0)) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+	var pile_px: Vector2 = (Vector2(spawn + Vector2i(8, 0)) + Vector2(0.5, 0.5)) * float(Interface.Units.LOGIC_PX)
 	_check(at == pile_px and RingWord.word(&"deliver", dropped, at) == "INGOTS", "the pack empty and ingots on the ground: the ring goes to the pile, the word INGOTS (%s at %s)" % [RingWord.word(&"deliver", dropped, at), str(at)])
 	items.pack.add(&"ingot", 1)
 	var holding: Interface.Observation = door.observe(Interface.Envelope.oracle_over(world.grid))

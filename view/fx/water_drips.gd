@@ -10,8 +10,8 @@ extends RefCounted
 ## solid), writes only the cosmetic particle layer; `randf` is safe here for the reason `particles.gd`
 ## states -- nothing here is ever read back by the sim.
 
-const CELL: float = float(Interface.Observation.CELL_PX)
-const WATER_MAX: int = Interface.Observation.WATER_MAX
+const CELL: float = float(Interface.Units.CELL_PX)
+const WATER_MAX: int = Interface.Units.WATER_MAX
 const DRIP_PERIOD: float = 0.9                       ## a cell sheds at most one drip per this window
 const DRIP_MAX_PER_FRAME: int = 6                    ## hard cap so a wide sheet cannot flood the pool
 const SPLASH_REACH: int = 32                         ## cells a pour is followed down for its splash (legacy 8 of 32 px)

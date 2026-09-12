@@ -177,11 +177,11 @@ func _test_a_headless_boot_ticks_and_saves() -> void:
 	# The two doors of the GAME face (D0396), on this booted seat.
 	var body: Body = main.door.services()["body"]
 	var home := Vector2i(body.pos_x, body.pos_y)
-	body.place(body.pos_x, body.pos_y + 40 * Interface.Observation.CELL_PX * Fx.SCALE)   # forty cells down: in the rock, the way a stranded body might be
+	body.place(body.pos_x, body.pos_y + 40 * Interface.Units.CELL_PX * Fx.SCALE)   # forty cells down: in the rock, the way a stranded body might be
 	body.grapple.restore({"state": Grapple.State.ANCHORED, "length": Grapple.MAX_RANGE, "anchor": [0, 0], "tip": [0, 0]})
 	main.return_to_surface()
 	var back := Vector2i(body.pos_x, body.pos_y)
-	_check(absi(back.x - home.x) <= Interface.Observation.CELL_PX * Fx.SCALE * 4 and back.y <= home.y + Interface.Observation.CELL_PX * Fx.SCALE, "RETURN TO SURFACE stands the body at the spawn again (home %s, back %s)" % [home, back])
+	_check(absi(back.x - home.x) <= Interface.Units.CELL_PX * Fx.SCALE * 4 and back.y <= home.y + Interface.Units.CELL_PX * Fx.SCALE, "RETURN TO SURFACE stands the body at the spawn again (home %s, back %s)" % [home, back])
 	_check(body.grapple.state == Grapple.State.IDLE and body.vel_y == 0, "...with the line stowed and no velocity carried")
 	var scratch: String = "user://test_main_boot_slot.save"
 	main.save_path = scratch

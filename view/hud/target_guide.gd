@@ -54,7 +54,7 @@ const NEAR_FILL: float = 0.14
 ## how-to still said "at your feet". Each held MINE on it under TOO FAR a dozen times and never came back.
 ## A hit farther than a reach above or below the body's centre -- reachable only by digging, climbing or a
 ## fall -- ranks behind every hit in the body's own reach band, whatever the distance across.
-const BAND_PX: float = float(Interface.Observation.REACH_PX)
+const BAND_PX: float = float(Interface.Units.REACH_PX)
 const OUT_OF_BAND: float = 1.0e12      ## px^2 added to a hit outside the band: past any in-window distance
 
 ## THE SEARCH IS PAID ONCE PER CELL MOVED, NOT PER FRAME (D0414). The first cut scanned the full 81x81
@@ -215,7 +215,7 @@ static func _nearest_machine(o: Interface.Observation, body: Vector2, id: String
 	for rec: Dictionary in o.machines:
 		if rec.get("id", &"") != id:   # the machine's record id; its `behavior` is a routing tag, empty for a forge
 			continue
-		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+		var at: Vector2 = (Vector2(rec["cell"]) + Vector2(0.5, 0.5)) * float(Interface.Units.LOGIC_PX)
 		var d: float = ranked(at, body)
 		if d < best_d:
 			best_d = d
@@ -229,7 +229,7 @@ static func _nearest_pile(o: Interface.Observation, body: Vector2, item: StringN
 	for cell: Vector2i in o.piles:
 		if int((o.piles[cell] as Dictionary).get(item, 0)) <= 0:
 			continue
-		var at: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+		var at: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * float(Interface.Units.LOGIC_PX)
 		var d: float = ranked(at, body)
 		if d < best_d:
 			best_d = d
@@ -257,7 +257,7 @@ func paint(frame: Frame, ci: CanvasItem) -> void:
 ## from three metres up cannot say "here". Empty when the target is not buried (a solid metre must stand
 ## over it) or the column's top is out of the window.
 static func cut_metre(o: Interface.Observation, at: Vector2) -> Rect2:
-	var m: float = float(Interface.Observation.LOGIC_PX)
+	var m: float = float(Interface.Units.LOGIC_PX)
 	var col: int = int(floorf(at.x / m))
 	var row: int = int(floorf(at.y / m)) - 1
 	var top: int = -1                                                       # the topmost solid metre of the roof over the target
@@ -292,7 +292,7 @@ static func _metre_has_rock(o: Interface.Observation, col: int, row: int) -> boo
 
 ## The metre (world px) the target cell lies in: what the pointer has to land on.
 static func target_metre(at: Vector2) -> Rect2:
-	var m: float = float(Interface.Observation.LOGIC_PX)
+	var m: float = float(Interface.Units.LOGIC_PX)
 	return Rect2(Vector2(floorf(at.x / m), floorf(at.y / m)) * m, Vector2(m, m))
 
 
@@ -361,4 +361,4 @@ static func o_px_per_m(frame: Frame) -> float:
 	var r: Rect2 = frame.view_world_rect
 	if r.size.x <= 0.0:
 		return 0.0
-	return UiTheme.CANVAS.x / r.size.x * float(MaterialLook.CELLS_PER_METRE * Interface.Observation.CELL_PX)
+	return UiTheme.CANVAS.x / r.size.x * float(MaterialLook.CELLS_PER_METRE * Interface.Units.CELL_PX)

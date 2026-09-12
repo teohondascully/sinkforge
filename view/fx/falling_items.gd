@@ -22,8 +22,8 @@ const NUGGET_R: float = 6.0
 const TRAIL_SIZE: float = 5.5
 const TRAIL_SHRINK: float = 0.6
 const DRAW_PAD: float = maxf(RING_R0 + RING_GROW + RING_WIDTH * 0.5, maxf(SMEAR_REACH, NUGGET_R))
-const SCALE: float = float(Interface.Observation.LOGIC_PX) / 32.0
-const CELL: float = float(Interface.Observation.LOGIC_PX)
+const SCALE: float = float(Interface.Units.LOGIC_PX) / 32.0
+const CELL: float = float(Interface.Units.LOGIC_PX)
 
 var _items: Array[Dictionary] = []   ## from/to in legacy px, t (0..1), color
 var _pool: Array[Dictionary] = []    ## retired drops, reused so steady-state streaming allocates nothing

@@ -271,6 +271,7 @@ static func _commit(world: World, items: Items, machines: Machines, s: Dictionar
 	items.flow_events.clear()
 	items.last_drop_landing = Vector2i(-1, -1)
 	machines.adopt_from(s["machines"])
+	machines.events.clear()   # a consumed channel like flow_events: events pending at save time died with that session (D0605)
 	machines.attach_to(items)
 
 

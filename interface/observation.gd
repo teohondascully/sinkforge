@@ -209,28 +209,9 @@ func _offset_of(c: Vector2i) -> int:
 ## The metre cells `window` covers, in `logic_cell` units.
 var logic_window: Rect2i
 var hub_tick: int = 0
-## Row-major over `window`, one byte per terrain cell: water units, 0..WATER_MAX. The two constants a
-## painter needs are restated HERE, because the view may not reach into `sim/` for them (layer lint).
-const WATER_MAX: int = WaterPlane.WATER_MAX
-const CELL_PX: int = Heightfield.TERRAIN_CELL_PX
-const LOGIC_PX: int = LogicGrid.TERRAIN_PER_LOGIC * Heightfield.TERRAIN_CELL_PX   # the machine cell, 16 px
-## The body's numbers the audio beds derive their levels from (A' step 6f, D0366), restated here for the
-## same layer reason: a walk is the rush bed's zero and terminal fall its one; the line's load is read
-## against gravity; a haul is a length delta per tick against the reel rate.
-const TICK_HZ: int = Body.TICK_HZ
-const HUB_HZ: int = ProductionRate.HUB_HZ   ## a recipe's `time_ticks` are HUB ticks: 20 a second, not 60 (D0461)
-const RUN_SPEED_PX_S: int = Body.RUN_SPEED_PX_S
-const MAX_FALL_PX_S: int = Body.MAX_FALL_PX_S
-const GRAVITY_PX_S2: int = Body.GRAVITY_PX_S2
-const REEL_PX_S: int = (Grapple.REEL_PER_TICK * Body.TICK_HZ) / Fx.SCALE
-## The generator's surface datum in terrain rows. The cave bed measures depth against the GENERATED
-## ground, never against a scanned surface: legacy learned that a scan answers with the floor of your
-## own shaft the moment you dig, so the bed that exists to sell descent was loudest where descent had
-## happened (`legacy/scenes/main.gd:883-889`).
-const SKY_ROWS: int = ShaftGenerator.SKY_ROWS
-## The "no walkable floor in this column" sentinel `surface_height_at` answers with, restated so a
-## painter can compare against it without naming the sim class that owns it (A' step 6k, D0373).
-const NO_FLOOR: int = Heightfield.NO_FLOOR
+## Row-major over `window`, one byte per terrain cell: water units, 0..Units.WATER_MAX. The sim
+## constants a painter needs are restated on `Interface.Units` (P034's lift -- this file is at its cap),
+## because the view may not reach into `sim/` for them (layer lint).
 var water: PackedByteArray
 ## The wet terrain cells inside `window`, in `Ordering.cells` order: the sparse walk a per-frame painter
 ## takes instead of the whole window (A' step 6a, D0362).
@@ -260,6 +241,9 @@ var pack_slots: int = 0
 ## THE CONSUMED CHANNEL: every flow event since the last `observe`, then cleared by the door -- the
 ## one thing `observe` empties, and not sim state (plan §3.2 on legacy's `FallingItems`).
 var flow_events: Array[Dictionary] = []
+## The machine-lifecycle channel (D0605): `demand_satisfied` and its kin, drained from
+## `Machines.events` on the same one-observe-wide rule as `flow_events`. C003's metric reads this.
+var events: Array[Dictionary] = []
 var rates: Array[Dictionary] = []   # [{item, rate_centi}] fastest first
 var winch_routes: Dictionary = {}
 var winch_transit: Dictionary = {}
@@ -272,16 +256,11 @@ var aim_cell: Vector2i = Vector2i(-1, -1)
 ## world verb uses. The inspector answers nothing out of reach (6h, D0369): a readout on a cell you
 ## cannot act on is an invitation to walk into a wall.
 var aim_in_reach: bool = false
-const REACH_PX: int = (Mining.REACH_NUM * LOGIC_PX) / Mining.REACH_DEN   # that reach in world px, for the view
 ## THE WHOLE WORLD, COARSELY (A' step 6i, D0371): one class byte per logic cell over `map_cells`, the
-## grid's own coarse plane (`TileGrid.COARSE_*`), copied by value like every other plane -- a
-## PackedByteArray copy is copy-on-write, so the copy costs nothing until someone writes. `map_version`
-## is what the minimap keys its cached image on. `map_machines` is every machine's logic cell, whole
-## world, since the machine records are window-only.
-const MAP_VOID: int = TileGrid.COARSE_VOID
-const MAP_WALL: int = TileGrid.COARSE_WALL
-const MAP_ROCK: int = TileGrid.COARSE_ROCK
-const MAP_ORE: int = TileGrid.COARSE_ORE
+## grid's own coarse plane (`TileGrid.COARSE_*`, restated as `Units.MAP_*`), copied by value like every
+## other plane -- a PackedByteArray copy is copy-on-write, so the copy costs nothing until someone
+## writes. `map_version` is what the minimap keys its cached image on. `map_machines` is every machine's
+## logic cell, whole world, since the machine records are window-only.
 var map: PackedByteArray = PackedByteArray()
 var map_cells: Vector2i = Vector2i.ZERO
 var map_version: int = 0

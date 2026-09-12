@@ -56,7 +56,7 @@ func _obs(material: StringName = &"clay") -> Interface.Observation:
 			o.walls[row * w + col] = 1          # six rows of exposed wall above the ground line
 	var surf := PackedInt32Array()
 	for _col: int in w:
-		surf.append(int(SURF) * Interface.Observation.CELL_PX * Fx.SCALE)
+		surf.append(int(SURF) * Interface.Units.CELL_PX * Fx.SCALE)
 	o.surface_y = surf
 	return o
 

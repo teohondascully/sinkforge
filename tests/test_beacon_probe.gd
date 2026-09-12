@@ -35,11 +35,11 @@ func _test_the_record_stamps_a_starved_processor_ten_metres_from_the_warp() -> v
 	_check(status == &"no_input", "and it is starved: status %s" % status)
 	_check(StatusLook.of(status).fix != &"none", "a starved status is one the veil beacons (fix %s)" % StatusLook.of(status).fix)
 	var body: Body = door.services()["body"]
-	var cell_px: int = Interface.Observation.CELL_PX
+	var cell_px: int = Interface.Units.CELL_PX
 	var feet: Vector2i = SeatFlags.stand_near(world.grid, WARP, (Body.HEIGHT_PX + cell_px - 1) / cell_px + 1)
 	_check(feet != SeatFlags.NO_WARP and feet.y == 331, "the warp finds the corridor's floor at %s" % [feet])
 	body.place((feet.x * cell_px + cell_px / 2) * Fx.SCALE, ((feet.y + 1) * cell_px - Body.HEIGHT_PX / 2) * Fx.SCALE)
-	var body_m: float = float(body.pos_x) / float(Fx.SCALE) / float(Interface.Observation.CELL_PX * MaterialLook.CELLS_PER_METRE)
+	var body_m: float = float(body.pos_x) / float(Fx.SCALE) / float(Interface.Units.CELL_PX * MaterialLook.CELLS_PER_METRE)
 	var machine_m: float = float(MACHINE_LOGIC.x) + 0.5
 	var apart: float = machine_m - body_m
 	_check(apart > 9.5 and apart < 10.5 and apart > VeilPainter.LAMP_BEAM_M,

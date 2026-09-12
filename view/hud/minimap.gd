@@ -112,7 +112,7 @@ static func window_of(map_cells: Vector2i, body: Vector2, span_m: float, box: Ve
 ## family's colour, toned to the map; one they have not is the rock it sits in, so the map rewards memory
 ## and leaves the reason to explore where it was.
 static func class_color(cls: int, logic_row: int, look: MaterialLook, seen: bool = false) -> Color:
-	var n: int = Interface.Observation.LOGIC_PX / Interface.Observation.CELL_PX
+	var n: int = Interface.Units.LOGIC_PX / Interface.Units.CELL_PX
 	var band: Color = look.band_color(logic_row * n + n / 2) if look != null else Color(0.4, 0.4, 0.45)
 	# The ladder's colours are the chip's announcement colours, saturated for type; on a chart they shout
 	# (D0400: the re-placed ladder put the seal's violet on a third of the map). Pulled most of the way
@@ -120,10 +120,10 @@ static func class_color(cls: int, logic_row: int, look: MaterialLook, seen: bool
 	var grey: float = band.get_luminance()
 	band = band.lerp(Color(grey, grey, grey), MAP_DESATURATE)
 	match cls:
-		Interface.Observation.MAP_ORE:
+		Interface.Units.MAP_ORE:
 			return ORE_COLOR.darkened(SEEN_ORE_DARKEN) if seen else band.darkened(ROCK_DARKEN)
-		Interface.Observation.MAP_ROCK: return band.darkened(ROCK_DARKEN)
-		Interface.Observation.MAP_WALL: return band.darkened(WALL_DARKEN)
+		Interface.Units.MAP_ROCK: return band.darkened(ROCK_DARKEN)
+		Interface.Units.MAP_WALL: return band.darkened(WALL_DARKEN)
 	return VOID_COLOR
 
 
@@ -139,7 +139,7 @@ func ensure_texture(o: Interface.Observation, look: MaterialLook) -> ImageTextur
 	# other change (the terrain, a skipped version, a restore) rebuilds.
 	if _tex != null and _img != null and _tex_version == o.map_version and _tex_cells == o.map_cells and _tex_seen_version == o.map_seen_version - 1 and not o.map_seen_recent.is_empty():
 		for i: int in o.map_seen_recent:
-			if o.map[i] == Interface.Observation.MAP_ORE:
+			if o.map[i] == Interface.Units.MAP_ORE:
 				_img.set_pixel(i % o.map_cells.x, i / o.map_cells.x, class_color(o.map[i], i / o.map_cells.x, look, true))
 		_tex.update(_img)
 		_stamp(o)
@@ -213,7 +213,7 @@ func layout(frame: Frame) -> Dictionary:
 	if o.map_cells.x <= 0 or o.map_cells.y <= 0:
 		return {}
 	var rect: Rect2 = frame_rect(o.map_cells, large)
-	var px_per_logic: float = float(Interface.Observation.LOGIC_PX)
+	var px_per_logic: float = float(Interface.Units.LOGIC_PX)
 	var body := Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE) / px_per_logic
 	var window: Rect2 = large_window(o.map_cells, body) if large else corner_window(o.map_cells, body)
 	var scale := Vector2(rect.size.x / window.size.x, rect.size.y / window.size.y)

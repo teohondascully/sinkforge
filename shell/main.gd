@@ -103,7 +103,7 @@ func boot(load_save: bool) -> bool:
 	# The camera may not show past the world (D0333's clamp; the reveal scene set it, the seat never did --
 	# VISUAL_QUEUE v2 V05: a quarter of the frame was void from most of a 64 m world).
 	var grid: TileGrid = (door.services()["world"] as World).grid
-	rig.set_world_limits(Rect2(0.0, 0.0, float(grid.width * Interface.Observation.CELL_PX), float(grid.height * Interface.Observation.CELL_PX)))
+	rig.set_world_limits(Rect2(0.0, 0.0, float(grid.width * Interface.Units.CELL_PX), float(grid.height * Interface.Units.CELL_PX)))
 	rig.warp_to(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE))
 	camera.position = rig.step(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE), Vector2.ZERO, zoom, 1280.0, 0.0)
 	var t3: int = Time.get_ticks_msec()
@@ -151,7 +151,7 @@ func _warp(body: Body) -> void:
 	if at == SeatFlags.NO_WARP:
 		return
 	var grid: TileGrid = (door.services()["world"] as World).grid
-	var cell_px: int = Interface.Observation.CELL_PX
+	var cell_px: int = Interface.Units.CELL_PX
 	var feet: Vector2i = SeatFlags.stand_near(grid, at, (Body.HEIGHT_PX + cell_px - 1) / cell_px + 1)
 	if feet == SeatFlags.NO_WARP:
 		push_warning("--warp=%s: no floor within reach; the body stays at the spawn" % at)
@@ -266,7 +266,7 @@ func _hud_keys_driven() -> void:
 
 ## The hands, deaf while the settings page is open: a modal takes the keys, and the body stands still.
 func _read_hands(page_open: bool) -> InputFrame:
-	var cell_px: int = Interface.Observation.CELL_PX
+	var cell_px: int = Interface.Units.CELL_PX
 	if page_open:
 		return hands.read(func(_a: StringName) -> bool: return false, Vector2.ZERO, cell_px, func(_c: Vector2i) -> bool: return false)
 	var grid: TileGrid = (door.services()["world"] as World).grid
@@ -355,7 +355,7 @@ func return_to_surface() -> void:
 	var body: Body = door.services()["body"]
 	var grid: TileGrid = (door.services()["world"] as World).grid
 	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS[String(SeatFlags.start_id(flags, START))])
-	var cell_px: int = Interface.Observation.CELL_PX
+	var cell_px: int = Interface.Units.CELL_PX
 	var n: int = LogicGrid.TERRAIN_PER_LOGIC
 	var feet: Vector2i = SeatFlags.stand_near(grid, Vector2i(spawn.x * n + n / 2, spawn.y * n + n - 1), (Body.HEIGHT_PX + cell_px - 1) / cell_px + 1)
 	body.grapple.cut()

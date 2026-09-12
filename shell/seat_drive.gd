@@ -182,7 +182,7 @@ static func meter_tick(main: Main, began: int) -> void:
 		# `still`, that it did not). Every zero this fixture has produced so far was a workload that had
 		# quietly stopped doing its own work, and none of them was visible in a timing number.
 		print("WINDOW tick=%d workload=%s body=(%d,%d)" % [main.tick, String(main.flags.get("workload", WALK)),
-			at.pos_x / (Fx.SCALE * Interface.Observation.CELL_PX), at.pos_y / (Fx.SCALE * Interface.Observation.CELL_PX)])
+			at.pos_x / (Fx.SCALE * Interface.Units.CELL_PX), at.pos_y / (Fx.SCALE * Interface.Units.CELL_PX)])
 		print(main.meter.report())
 		print(main.view.draw_cost_report())
 		print(BakeCost.report(300))

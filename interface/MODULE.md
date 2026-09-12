@@ -52,15 +52,18 @@ every owned state's signature: the replay contract for the whole session.
 - `services() -> Dictionary` / `reset_transients()` — THE SHELL'S HANDLE: the owned services for
   `shell/session.gd`'s save and boot (`Session.capture`/`restore`/`new_game`), and nothing else above
   L2. The layer lint lets only the shell reach `sim/`; the view reads observations.
-- `Envelope`, `Observation`, `Result` are reached as `Interface.X`; all three live in their own files
-  behind a `const` preload (one name, no second door).
+- `Envelope`, `Observation`, `Result`, `Units` are reached as `Interface.X`; all live in their own
+  files behind a `const` preload (one name, no second door). `Units` (P034's lift, D0605) carries the
+  restated sim constants -- `CELL_PX`, `LOGIC_PX`, `TICK_HZ`, `MAP_*` and their kin -- because
+  `observation.gd` is at its 400-line cap and closed to new fields.
 - `Observation` carries the hub's planes as window-bounded COPIES (`interface/hub_planes.gd`): water
   per terrain cell, lodes with amount and per-mille, seeded ore yields plus `ore_default` and an
   ore-like legend, the placed layers and saplings per metre, machine records (id, behavior, status,
   power and progress per mille, facing, fuel, filter, both buffers), the power field, piles, the sink,
   the pack in hotbar order with its cap, the rates, the winch tables, the plan's marks, the lode-work
-  target and progress, the aim; and `flow_events`, THE CONSUMED CHANNEL -- every flow event since the
-  last observe, emptied by that observe. Accessors: `water_at`, `lode_at`, `lode_permille`,
+  target and progress, the aim; `flow_events`, THE CONSUMED CHANNEL -- every flow event since the
+  last observe, emptied by that observe; and `events` (D0605), the machine-lifecycle channel on the
+  same one-observe-wide rule (`demand_satisfied` -- C003's metric). Accessors: `water_at`, `lode_at`, `lode_permille`,
   `deposit_at`, `is_ore_like_at`, `placed_at`, `has_conduit`, `is_climbable`, `has_torch`,
   `machine_at`, `power_at`, `pile_at`, `sapling_age`.
 

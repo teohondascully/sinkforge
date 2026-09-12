@@ -78,7 +78,7 @@ static func describe(o: Interface.Observation) -> Dictionary:
 	if o == null or not o.aim_in_reach or o.aim_cell == Vector2i(-1, -1):
 		return {}
 	var aim: Vector2i = o.aim_cell
-	var n: int = Interface.Observation.LOGIC_PX / Interface.Observation.CELL_PX
+	var n: int = Interface.Units.LOGIC_PX / Interface.Units.CELL_PX
 	var logic := Vector2i(floori(float(aim.x) / float(n)), floori(float(aim.y) / float(n)))
 	var rec: Dictionary = o.machine_at(logic)
 	if rec.is_empty():
@@ -157,7 +157,7 @@ static func _mode_line(rec: Dictionary, recipe: Dictionary, status: StringName, 
 			# A recipe's ticks are the hub's, twenty a second (D0461): the forge's 40 are 2.0 s, and the card
 			# said 0.7 s while stranger 37 waited two seconds for the second ingot and left with one.
 			return "makes %s  (%.1fs a cycle)" % [_cap(StringName(outs[0])) if not outs.is_empty() else "?",
-				float(recipe.get("time_ticks", 0)) / float(Interface.Observation.HUB_HZ)]
+				float(recipe.get("time_ticks", 0)) / float(Interface.Units.HUB_HZ)]
 	return ""
 
 
@@ -183,7 +183,7 @@ static func _describe_terrain(o: Interface.Observation, aim: Vector2i, logic: Ve
 		return {"name": "Power Conduit", "mode": "carries power along the line"}
 	var w: int = o.water_at(aim)
 	if w > 0:
-		return {"name": "Water", "mode": "%d of %d — it pours wherever the floor below is open" % [w, Interface.Observation.WATER_MAX]}
+		return {"name": "Water", "mode": "%d of %d — it pours wherever the floor below is open" % [w, Interface.Units.WATER_MAX]}
 	return {}
 
 

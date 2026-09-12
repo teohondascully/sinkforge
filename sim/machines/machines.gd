@@ -27,6 +27,11 @@ var power: Dictionary = {}               # logic_cell -> milli-power, derived ea
 ## the Head's own tick advancing a trip already in flight (`Movers`).
 var winch_routes: Dictionary = {}
 var winch_transit: Dictionary = {}
+## THE LIFECYCLE CHANNEL (D0605): machine-level events since the last drain -- `demand_satisfied` today.
+## A consumed channel like `Items.flow_events`: the sim appends, `observe()` empties it onto the
+## observation as `o.events`, and nothing in the sim reads it back -- so it is never in the signature
+## and never saved. `save_game.gd` clears it on load the same place `flow_events` is cleared.
+var events: Array[Dictionary] = []
 
 
 func machine_at(logic_cell: Vector2i) -> MachineState:

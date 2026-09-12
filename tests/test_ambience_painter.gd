@@ -100,13 +100,13 @@ func _rest(vx_px_s: float, vy_px_s: float) -> Interface.Observation:
 	o.pos_y = 100 * S
 	o.top_y = o.pos_y - 12 * S
 	o.bottom_y = o.pos_y + 12 * S
-	o.vel_x = int(round(vx_px_s * float(Fx.SCALE) / float(Interface.Observation.TICK_HZ)))
-	o.vel_y = int(round(vy_px_s * float(Fx.SCALE) / float(Interface.Observation.TICK_HZ)))
+	o.vel_x = int(round(vx_px_s * float(Fx.SCALE) / float(Interface.Units.TICK_HZ)))
+	o.vel_y = int(round(vy_px_s * float(Fx.SCALE) / float(Interface.Units.TICK_HZ)))
 	return o
 
 
 func _test_the_streaks() -> void:
-	var run: float = float(Interface.Observation.RUN_SPEED_PX_S)
+	var run: float = float(Interface.Units.RUN_SPEED_PX_S)
 	_check(AmbiencePainter.streaks(_rest(0.0, 0.0)).is_empty(), "at rest, no streak")
 	_check(AmbiencePainter.streaks(_rest(run, 0.0)).is_empty(), "at the run speed, none: the floor is 1.15x")
 	var fast: Array[Dictionary] = AmbiencePainter.streaks(_rest(run * 2.0, 0.0))

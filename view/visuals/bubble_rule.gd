@@ -71,7 +71,7 @@ static func ringed_metre(obj: Objectives, o: Interface.Observation) -> Vector2i:
 	var at: Vector2 = TargetGuide.target(id, o)
 	if at == TargetGuide.NONE:
 		return NO_METRE
-	var m: float = float(Interface.Observation.LOGIC_PX)
+	var m: float = float(Interface.Units.LOGIC_PX)
 	return Vector2i(floori(at.x / m), floori(at.y / m))
 
 

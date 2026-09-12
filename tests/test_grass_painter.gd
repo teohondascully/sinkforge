@@ -168,7 +168,7 @@ func _grassy_obs(material: StringName = &"clay") -> Interface.Observation:
 			o.materials[row * w + col] = 1
 	var surf := PackedInt32Array()
 	for _col: int in w:
-		surf.append(20 * Interface.Observation.CELL_PX * Fx.SCALE)
+		surf.append(20 * Interface.Units.CELL_PX * Fx.SCALE)
 	o.surface_y = surf
 	return o
 

@@ -41,8 +41,8 @@ const WATER_SHEEN_BASE: float = 0.07
 const WATER_SHEEN_LEVEL: float = 0.11
 const WATER_SHEEN_RADIUS_M: float = 2.4
 const WATER_SHEEN_SPREAD: float = 0.42
-const M: float = float(Interface.Observation.LOGIC_PX)        ## world px per metre
-const CELL: float = float(Interface.Observation.CELL_PX)
+const M: float = float(Interface.Units.LOGIC_PX)        ## world px per metre
+const CELL: float = float(Interface.Units.CELL_PX)
 ## The largest pool any source paints, so the view cull cannot clip a pool at the screen edge. Derived.
 const CULL_M: float = maxf(maxf(TORCH_R_M, MACHINE_POOL_R_M), maxf(LAMP_RADIUS_M, WATER_SHEEN_RADIUS_M))
 
@@ -192,7 +192,7 @@ static func row_at_depth(depth_m: float) -> int:
 
 static func _surface_row(o: Interface.Observation, terrain_col: int) -> int:
 	var y: int = o.surface_y_at_terrain_col(terrain_col)
-	if y == Interface.Observation.NO_FLOOR:
+	if y == Interface.Units.NO_FLOOR:
 		return o.world_cells.y
 	return int(floor(float(y) / float(Fx.SCALE) / CELL))
 
@@ -285,6 +285,6 @@ func _paint_water_sheen(o: Interface.Observation, ci: CanvasItem, t: float, view
 			continue
 		if o.water_at(wc - Vector2i(0, 1)) > 0 and o.water_at(wc + Vector2i(-1, 0)) > 0 and o.water_at(wc + Vector2i(1, 0)) > 0:
 			continue
-		var frac: float = clampf(float(o.water_at(wc)) / float(Interface.Observation.WATER_MAX), 0.0, 1.0)
+		var frac: float = clampf(float(o.water_at(wc)) / float(Interface.Units.WATER_MAX), 0.0, 1.0)
 		var shim: float = 0.9 + 0.1 * sin(t * 1.8 + float(wc.x) * 0.6 + float(wc.y) * 0.4)
 		draw_glow(ci, at, r, WATER_SHEEN, (WATER_SHEEN_BASE + WATER_SHEEN_LEVEL * frac) * WATER_SHEEN_SPREAD * shim)

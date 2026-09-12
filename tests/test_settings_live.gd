@@ -26,9 +26,9 @@ func _test_the_audio_levels_reach_their_layers_and_the_score_is_mounted() -> voi
 	_check(is_equal_approx(Settings.sound_db(), linear_to_db(clampf(Settings.sound, 0.001, 1.0))), "and the shell's level is the dB the layer adds")
 	var o: Interface.Observation = Interface.Observation.new()
 	o.map_cells = Vector2i(64, 276)
-	o.cell = Vector2i(0, Interface.Observation.SKY_ROWS + 128 * MaterialLook.CELLS_PER_METRE)
+	o.cell = Vector2i(0, Interface.Units.SKY_ROWS + 128 * MaterialLook.CELLS_PER_METRE)
 	_check(is_equal_approx(SceneAudio.depth_fraction(o), 0.5), "the score's one input: 128 m down a 256 m world is 0.5 (%.3f)" % SceneAudio.depth_fraction(o))
-	o.cell.y = Interface.Observation.SKY_ROWS - 40
+	o.cell.y = Interface.Units.SKY_ROWS - 40
 	_check(SceneAudio.depth_fraction(o) == 0.0, "...and the sky clamps to 0")
 	audio.queue_free()
 

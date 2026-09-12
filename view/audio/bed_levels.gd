@@ -16,9 +16,9 @@ const SURFACE_FADE_M: float = 4.0   ## metres below the datum at which the wind 
 const CAVE_FULL_M: float = 10.0     ## metres below the datum at which the cave air is full
 const POUR_FULL: float = 4.0        ## pouring cells within reach for a full pour bed
 const PUMP_FULL: float = 2.0        ## working pumps within reach for a full drain bed
-const TENSION_FULL: float = float(Interface.Observation.GRAVITY_PX_S2) * 2.6   ## the load at which the fibre sings flat out
-const LOGIC_PX: float = float(Interface.Observation.LOGIC_PX)
-const CELL_PX: float = float(Interface.Observation.CELL_PX)
+const TENSION_FULL: float = float(Interface.Units.GRAVITY_PX_S2) * 2.6   ## the load at which the fibre sings flat out
+const LOGIC_PX: float = float(Interface.Units.LOGIC_PX)
+const CELL_PX: float = float(Interface.Units.CELL_PX)
 const NEAR_PX_SQ: float = float(NEAR_CELLS) * LOGIC_PX * float(NEAR_CELLS) * LOGIC_PX
 
 var _prev_length: int = -1
@@ -52,7 +52,7 @@ static func hum(o: Interface.Observation) -> float:
 
 ## Metres below the generated surface datum; negative in the sky.
 static func depth_m(o: Interface.Observation) -> float:
-	return float(o.cell.y - Interface.Observation.SKY_ROWS) * CELL_PX / LOGIC_PX
+	return float(o.cell.y - Interface.Units.SKY_ROWS) * CELL_PX / LOGIC_PX
 
 
 ## Wind above ground, dying within a few metres of descent; cave air swelling to full ten metres down.
@@ -65,8 +65,8 @@ static func ambience(o: Interface.Observation) -> Dictionary:
 ## to mean faster than you can run, which only the rope and a drop ever give you.
 static func rush(o: Interface.Observation) -> float:
 	var speed: float = Vector2(float(o.vel_x), float(o.vel_y)).length() / float(Fx.SCALE)
-	var run: float = float(Interface.Observation.RUN_SPEED_PX_S)
-	var fall: float = float(Interface.Observation.MAX_FALL_PX_S)
+	var run: float = float(Interface.Units.RUN_SPEED_PX_S)
+	var fall: float = float(Interface.Units.MAX_FALL_PX_S)
 	return clampf((speed - run) / (fall - run), 0.0, 1.0)
 
 
@@ -78,7 +78,7 @@ static func pour(o: Interface.Observation) -> float:
 		if not near(o, terrain_centre(c)):
 			continue
 		var under: Vector2i = c + Vector2i(0, 1)
-		if o.in_window(under) and not o.solid_at(under) and o.water_at(under) < Interface.Observation.WATER_MAX:
+		if o.in_window(under) and not o.solid_at(under) and o.water_at(under) < Interface.Units.WATER_MAX:
 			pouring += 1.0
 	return clampf(pouring / POUR_FULL, 0.0, 1.0)
 
@@ -101,8 +101,8 @@ func haul(o: Interface.Observation) -> float:
 	var out: float = 0.0
 	if _prev_length >= 0 and o.tick > _prev_tick:
 		var reeled_px: float = float(_prev_length - o.grapple_length) / float(Fx.SCALE)
-		var seconds: float = float(o.tick - _prev_tick) / float(Interface.Observation.TICK_HZ)
-		out = clampf((reeled_px / seconds) / float(Interface.Observation.REEL_PX_S), 0.0, 1.0)
+		var seconds: float = float(o.tick - _prev_tick) / float(Interface.Units.TICK_HZ)
+		out = clampf((reeled_px / seconds) / float(Interface.Units.REEL_PX_S), 0.0, 1.0)
 	_prev_length = o.grapple_length
 	_prev_tick = o.tick
 	return out
@@ -119,7 +119,7 @@ static func line_load(o: Interface.Observation) -> float:
 		return 0.0
 	var v: Vector2 = Vector2(float(o.vel_x), float(o.vel_y)) / float(Fx.SCALE)
 	var centripetal: float = v.length_squared() / r
-	var weight: float = float(Interface.Observation.GRAVITY_PX_S2) * maxf(0.0, d.y / r)
+	var weight: float = float(Interface.Units.GRAVITY_PX_S2) * maxf(0.0, d.y / r)
 	return clampf((centripetal + weight) / TENSION_FULL, 0.0, 1.0)
 
 

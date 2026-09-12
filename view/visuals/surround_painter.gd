@@ -50,8 +50,8 @@ const RECEDE_FLOOR: float = 0.22
 
 const FALLBACK: Color = Color(0.42, 0.34, 0.24)   ## `matrix_color`'s own unmapped-material brown
 
-const CELL: float = float(Interface.Observation.CELL_PX)
-const M: float = float(Interface.Observation.LOGIC_PX)
+const CELL: float = float(Interface.Units.CELL_PX)
+const M: float = float(Interface.Units.LOGIC_PX)
 
 
 ## How much light survives `dist_m` metres past the boundary.
@@ -146,6 +146,6 @@ static func _dim(c: Color, k: float) -> Color:
 ## to the generator's own surface datum rather than to the top of the view, which would put sky underground.
 static func _edge_surface_row(o: Interface.Observation, edge_col: int) -> float:
 	var y: int = o.surface_y_at_terrain_col(edge_col)
-	if y == Interface.Observation.NO_FLOOR:
+	if y == Interface.Units.NO_FLOOR:
 		return float(MaterialLook.SURFACE_ROW)
 	return floor(float(y) / float(Fx.SCALE) / CELL)

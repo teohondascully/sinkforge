@@ -67,7 +67,7 @@ func _wrong_stack(o: Interface.Observation, counts: Dictionary, fell: Dictionary
 	var body: Vector2 = body_px(o)
 	var wanted: StringName = &""
 	for rec: Dictionary in o.machines:
-		if cell_px(rec["cell"]).distance_to(body) > WANTED_RANGE_M * float(Interface.Observation.LOGIC_PX):
+		if cell_px(rec["cell"]).distance_to(body) > WANTED_RANGE_M * float(Interface.Units.LOGIC_PX):
 			continue
 		var inputs: Dictionary = RecipesRecords.RECORDS.get(String(rec.get("recipe", &"")), {}).get("inputs", {})
 		for need: Variant in inputs:
@@ -104,7 +104,7 @@ func _short_drop(o: Interface.Observation, subs: Dictionary) -> bool:
 func refresh_short(o: Interface.Observation, subs: Dictionary) -> bool:
 	if _short_cell == Vector2i(-1, -1):
 		return false
-	if Reach.in_reach_metre(o.pos_x, o.pos_y, _short_cell, Interface.Observation.LOGIC_PX):
+	if Reach.in_reach_metre(o.pos_x, o.pos_y, _short_cell, Interface.Units.LOGIC_PX):
 		_short_cell = Vector2i(-1, -1)
 		return false
 	var held: Dictionary = subs.get(&"dropped_short", {})
@@ -122,7 +122,7 @@ func _short_subs(o: Interface.Observation, cell: Vector2i, item: String) -> Dict
 	# and refused. `EDGE_TEXT` keeps its own "to your {dir}" and is always given LEFT or RIGHT.
 	var way: String = ("BELOW you" if d.y > 0.0 else "ABOVE you") if absf(d.y) > absf(d.x) else ("to your RIGHT" if d.x > 0.0 else "to your LEFT")
 	return {"{eater}": eater_label(o.machine_at(cell)), "{item}": item,
-		"{dist}": str(roundi(d.length() / float(Interface.Observation.LOGIC_PX))), "{dir}": way}
+		"{dist}": str(roundi(d.length() / float(Interface.Units.LOGIC_PX))), "{dir}": way}
 
 
 ## The receipt for a drop that FED a machine (D0517): "6 COAL → FORGE" -- the pack's fall in that item and
@@ -179,4 +179,4 @@ static func body_px(o: Interface.Observation) -> Vector2:
 
 
 static func cell_px(cell: Vector2i) -> Vector2:
-	return (Vector2(cell) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+	return (Vector2(cell) + Vector2(0.5, 0.5)) * float(Interface.Units.LOGIC_PX)

@@ -23090,3 +23090,24 @@ QUALITY.md's own gate text named its suite files (Tier 2's existing rule); gate 
 needed (b). Post-change split at this commit: 32/37 linked, NO-CODE [10, 17, 18, 20, 21],
 ADVISORY [14, 33, 37].
 Reverse: revert this entry's two hunks in tools/gate_status.py.
+
+## D0605 · 2026-09-11 · interface/units.gd, interface/observation.gd, interface/interface.gd, sim/machines/{machines,runners}.gd, shell/save_game.gd, interface/MODULE.md, sim/machines/MODULE.md, tests/test_demand_satisfied.gd, harness.yml · the constants lift P034 asked for, and the `demand_satisfied` event it unblocked
+Decided: two coupled changes, one arc. (a) `Interface.Units`: the sixteen sim constants `Observation`
+re-exported (`CELL_PX`, `LOGIC_PX`, `TICK_HZ`, `HUB_HZ`, `RUN_SPEED_PX_S`, `MAX_FALL_PX_S`,
+`GRAVITY_PX_S2`, `REEL_PX_S`, `SKY_ROWS`, `NO_FLOOR`, `WATER_MAX`, `REACH_PX`, `MAP_VOID/WALL/ROCK/ORE`)
+moved to `interface/units.gd`, reached as `Interface.Units` behind the same `const` preload that keeps
+`Observation` to one door; ~140 read sites rewritten mechanically (`Interface.Observation.X` ->
+`Interface.Units.X`; `O.X` in test_bed_levels -> `U.X` beside a new `const U`). `observation.gd`:
+400 -> 376 lines. (b) `demand_satisfied`: `Machines.events`, a consumed lifecycle channel on the
+`Items.flow_events` pattern (appended by runners, drained by `observe()` onto `o.events`, never read
+back, never in the signature, cleared on load); `_run_rig` emits `{kind, id, stage, cell}` at the stage
+advance -- the moment a demand goes from asking to met.
+Why: P034's entry says do the lift "before the next feature that needs an observation field, not
+after" -- and C003's metric (`demand_satisfied.id`) is exactly that feature. The event is emitted where
+the demand completes rather than reconstructed by the observer from `wants` transitions, because a
+reconstruction cannot tell a demand met from a ladder edited under it.
+Verified: `test_demand_satisfied` 9 asserted, mutation-tested by suppressing the event kind (2 FAILs,
+restored green). bed_levels, main_boot, seen_plane, inspector, machines, rig, save_game, transport
+suites green over the rewrite. Formatter and size gates pass.
+Reverse: delete `interface/units.gd`, move the consts back onto `Observation`, delete the `events`
+field/queue/emission/suite.

@@ -114,7 +114,7 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 		h.observe(dry, 0.5)
 	_air_pins(h, far, dry)
 	var deep: Interface.Observation = _hint_obs()
-	deep.cell.y = Interface.Observation.SKY_ROWS + 40
+	deep.cell.y = Interface.Units.SKY_ROWS + 40
 	h.observe(deep, 0.016)
 	_check(h.active_id() == &"deep_enough", "ten metres down fires the grapple lesson (%s)" % h.active_id())
 	for _i: int in 30:
@@ -133,7 +133,7 @@ func _test_the_moments_are_rising_edges_off_the_observation() -> void:
 	_check(h.active_id() != &"hard_landing" and Hints.LAND_HARD_PX_S > VoiceCues.LAND_HARD_PX_S, "a plain jump's landing teaches nothing: the lesson's threshold is past the thud's (D0471) (%s)" % h.active_id())
 	var fall: Interface.Observation = _hint_obs()
 	fall.on_floor = false
-	fall.vel_y = Interface.Observation.MAX_FALL_PX_S * S
+	fall.vel_y = Interface.Units.MAX_FALL_PX_S * S
 	h.observe(fall, 0.016)
 	h.observe(_hint_obs(), 0.016)
 	_check(h.active_id() == &"hard_landing", "a terminal landing fires the hard-landing lesson (%s)" % h.active_id())
@@ -147,11 +147,11 @@ func _test_busy_freezes_and_hides_and_the_ceremony_holds() -> void:
 	h.observe(calm, 1.0)
 	_check(h.active_alpha() > 0.99, "a second in, the bubble is fully up (%.2f)" % h.active_alpha())
 	var fast: Interface.Observation = _hint_obs([["torch", 1]])
-	fast.vel_x = int(float(Interface.Observation.RUN_SPEED_PX_S) * 1.5) * S
+	fast.vel_x = int(float(Interface.Units.RUN_SPEED_PX_S) * 1.5) * S
 	h.observe(fast, 5.0)
 	_check(h.busy() and h.active_alpha() == 0.0 and h.active_id() == &"torch", "at 1.5x a run the bubble hides and its clock freezes: five seconds cost nothing")
 	var cruising: Interface.Observation = _hint_obs([["torch", 1]])
-	cruising.vel_x = int(float(Interface.Observation.RUN_SPEED_PX_S) * 1.0) * S
+	cruising.vel_x = int(float(Interface.Units.RUN_SPEED_PX_S) * 1.0) * S
 	h.observe(cruising, 0.016)
 	_check(h.busy(), "hysteresis: at 1.0x a run, still busy once armed")
 	h.observe(calm, 0.016)
@@ -170,7 +170,7 @@ func _test_the_linger_cap_and_the_fade() -> void:
 	h.observe(_hint_obs([["torch", 1]]), Hints.FADE_IN * 0.5)
 	_check(absf(h.active_alpha() - 0.5) < 0.05, "half a fade-in later it is half up (%.2f)" % h.active_alpha())
 	var fast: Interface.Observation = _hint_obs([["torch", 1]])
-	fast.vel_x = Interface.Observation.MAX_FALL_PX_S * S
+	fast.vel_x = Interface.Units.MAX_FALL_PX_S * S
 	for _i: int in 60:
 		h.observe(fast, 0.5)
 	_check(h.active_id() == &"", "thirty busy seconds hit the linger cap and the bubble is gone (cap %.0f s)" % Hints.MAX_LINGER)
@@ -206,7 +206,7 @@ func _test_a_waiting_lesson_makes_the_active_one_yield_on_wall_time() -> void:
 	h.observe(_hint_obs([["torch", 1]]), 0.016)
 	_check(h.active_id() == &"torch", "the torch is up")
 	var fast_wet: Interface.Observation = _hint_obs([["torch", 1]])
-	fast_wet.vel_x = Interface.Observation.MAX_FALL_PX_S * S
+	fast_wet.vel_x = Interface.Units.MAX_FALL_PX_S * S
 	fast_wet.wet = true
 	h.observe(fast_wet, 0.016)
 	_check(h.queued() == 1 and h.active_id() == &"torch", "wading fast: AQUIFER queues behind the torch (%d, %s)" % [h.queued(), h.active_id()])
@@ -222,7 +222,7 @@ func _test_a_waiting_lesson_makes_the_active_one_yield_on_wall_time() -> void:
 	c.observe(_hint_obs(), 0.016)
 	c.observe(_hint_obs([["torch", 1]]), 0.016)
 	var fast: Interface.Observation = _hint_obs([["torch", 1]])
-	fast.vel_x = Interface.Observation.MAX_FALL_PX_S * S
+	fast.vel_x = Interface.Units.MAX_FALL_PX_S * S
 	for _i: int in 14:
 		c.observe(fast, 0.5)
 	_check(c.active_id() == &"torch" and c.queued() == 0, "control: seven busy seconds with nothing waiting and the torch still holds (%s)" % c.active_id())

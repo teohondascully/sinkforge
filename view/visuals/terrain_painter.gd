@@ -137,6 +137,6 @@ static func _paint_tuft(frame: Frame, ci: CanvasItem, col: int, row: int, cell_p
 	var cap: Color = SurfaceTone.cap_color(frame.obs.material_at(Vector2i(col, row + 1)))
 	if cap.a <= 0.0:
 		return
-	var s: float = float(Interface.Observation.LOGIC_PX) / 32.0
+	var s: float = float(Interface.Units.LOGIC_PX) / 32.0
 	var x: float = float(col * cell_px) + float((Seams.grain(Vector2i(col, 0)) >> 9) % maxi(cell_px - 1, 1))
 	ci.draw_rect(Rect2(x, float((row + 1) * cell_px) - 4.0 * s, 2.0 * s, 4.0 * s), cap, true)

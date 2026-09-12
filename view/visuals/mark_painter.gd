@@ -22,7 +22,7 @@ extends RefCounted
 ## tier refusal ("rock over your drive's tier"): this build's mining has no tier gate. The map pin: no
 ## map click. The sonar: dead.
 
-const CELL: float = float(Interface.Observation.LOGIC_PX)
+const CELL: float = float(Interface.Units.LOGIC_PX)
 const S: float = CELL / 32.0                       ## legacy px to ours
 const CHROME: Color = MachinePainter.CHROME        ## one chrome, shared with the factory's own chrome
 const REFUSE := Color(0.95, 0.45, 0.40)            ## the one red a refusal is drawn in

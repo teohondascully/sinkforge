@@ -47,7 +47,7 @@ const LEAN_CELLS: float = 0.55
 const GRASS_DARKEN: float = 0.18
 const WIDTH_PX: float = 1.0
 
-const CELL: float = float(Interface.Observation.CELL_PX)
+const CELL: float = float(Interface.Units.CELL_PX)
 
 
 ## The green a column's grass is, before the veil. Public because it is the part that can be silently
@@ -139,6 +139,6 @@ static func paint(frame: Frame, ci: CanvasItem) -> void:
 ## The walkable surface row of a column, or -1 where the column has none inside the window.
 static func _surface_row(o: Interface.Observation, terrain_col: int) -> int:
 	var y: int = o.surface_y_at_terrain_col(terrain_col)
-	if y == Interface.Observation.NO_FLOOR:
+	if y == Interface.Units.NO_FLOOR:
 		return -1
 	return int(floor(float(y) / float(Fx.SCALE) / CELL))

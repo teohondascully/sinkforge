@@ -51,7 +51,7 @@ const SATURATE: float = 0.20                          ## emitted light is a pure
 const PIP_PICK: int = 4                               ## one pip per this many face cells (a legacy cell)
 const PIP_MIN_PX: float = 0.9
 const SCALE: float = 0.5                              ## legacy px to ours, WG-4
-const CELL: float = float(Interface.Observation.CELL_PX)
+const CELL: float = float(Interface.Units.CELL_PX)
 
 var _glint: GlintPainter
 var _seams: Array[Dictionary] = []

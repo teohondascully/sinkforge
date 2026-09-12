@@ -34,7 +34,7 @@ static func find(o: Interface.Observation, body: Vector2) -> Vector2:
 		var mouth := Vector2i(col * 4 + 2, (vein_row - 1) * 4 + 2)
 		if not o.in_window(mouth) or o.solid_at(mouth):
 			continue
-		var at: Vector2 = (Vector2(col, vein_row - 1) + Vector2(0.5, 0.5)) * float(Interface.Observation.LOGIC_PX)
+		var at: Vector2 = (Vector2(col, vein_row - 1) + Vector2(0.5, 0.5)) * float(Interface.Units.LOGIC_PX)
 		var d: float = TargetGuide.ranked(at, body)
 		if d < best_d:
 			best_d = d

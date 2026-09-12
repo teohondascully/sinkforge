@@ -30,7 +30,7 @@ static func draw(frame: Frame, ci: CanvasItem, id: StringName, at: Vector2, alph
 	var reached: bool = RingWord.metre_target(id, o, at) and in_reach(o, at)
 	var breath: float = 1.0 if reached else 0.55 + 0.45 * sin(frame.anim_time * TAU * TargetGuide.BREATH_HZ)
 	var body: Vector2 = Vector2(float(o.pos_x), float(o.pos_y)) / float(Fx.SCALE)
-	var dist_m: float = body.distance_to(at) / float(Interface.Observation.LOGIC_PX)
+	var dist_m: float = body.distance_to(at) / float(Interface.Units.LOGIC_PX)
 	var r: float = TargetGuide.ring_m(dist_m) * TargetGuide.o_px_per_m(frame) * (0.92 + 0.08 * breath)
 	var ink: float = alpha * (0.55 + 0.4 * breath)
 	if reached:
@@ -120,11 +120,11 @@ static func reach_line(frame: Frame, ci: CanvasItem, id: StringName, at: Vector2
 ## so the outline closes into a circle. Rock's is the box its terrain-cell centres span, which is the
 ## metre inset by half a terrain cell on every side.
 static func inner_of(frame: Frame, o: Interface.Observation, id: StringName, at: Vector2) -> Rect2:
-	var m: float = float(Interface.Observation.LOGIC_PX)
+	var m: float = float(Interface.Units.LOGIC_PX)
 	var cell: Vector2i = RingWord.metre_of(at)
 	if RingWord.metre_target(id, o, at):
 		return Rect2(frame.canvas_of((Vector2(cell) + Vector2(0.5, 0.5)) * m), Vector2.ZERO)
-	var half: float = float(Interface.Observation.CELL_PX) * 0.5
+	var half: float = float(Interface.Units.CELL_PX) * 0.5
 	var lo: Vector2 = frame.canvas_of(Vector2(cell) * m + Vector2(half, half))
 	var hi: Vector2 = frame.canvas_of(Vector2(cell + Vector2i.ONE) * m - Vector2(half, half))
 	return Rect2(lo, hi - lo)
@@ -176,8 +176,8 @@ static func _dash_line(ci: CanvasItem, a: Vector2, b: Vector2, pitch: float, ink
 static func within_reach(o: Interface.Observation, id: StringName, at: Vector2) -> bool:
 	if RingWord.metre_target(id, o, at):
 		return in_reach(o, at)
-	var m: int = Interface.Observation.LOGIC_PX
-	var half: int = Interface.Observation.CELL_PX / 2
+	var m: int = Interface.Units.LOGIC_PX
+	var half: int = Interface.Units.CELL_PX / 2
 	var cell: Vector2i = RingWord.metre_of(at)
 	var lo := Vector2(cell * m + Vector2i(half, half))
 	var hi := Vector2((cell + Vector2i.ONE) * m - Vector2i(half, half))
@@ -190,7 +190,7 @@ static func within_reach(o: Interface.Observation, id: StringName, at: Vector2) 
 ## ringed metre's centre, through `Reach.in_reach_metre` -- the same call `Verbs.can_reach` makes on the
 ## sim side via `Aim.in_reach_logic`, with the same inputs, so the ring and the drop cannot disagree.
 static func in_reach(o: Interface.Observation, at: Vector2) -> bool:
-	return Reach.in_reach_metre(o.pos_x, o.pos_y, RingWord.metre_of(at), Interface.Observation.LOGIC_PX)
+	return Reach.in_reach_metre(o.pos_x, o.pos_y, RingWord.metre_of(at), Interface.Units.LOGIC_PX)
 
 
 ## The target's metre, or the metre to cut, drawn as the one white square with its rim.

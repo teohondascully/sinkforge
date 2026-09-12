@@ -21,7 +21,7 @@ extends RefCounted
 ## NOT HERE: the seal's violet breath (no sealrock band in this world), the sonar (dead), the splitter's
 ## lateral guide (ruling 4 of §8), the rock's grain (`SeamPainter`, S6's one ported function).
 
-const CELL: float = float(Interface.Observation.LOGIC_PX)
+const CELL: float = float(Interface.Units.LOGIC_PX)
 const S: float = CELL / 32.0
 const COPPER := Color(0.46, 0.32, 0.20)
 const GLOW_DEAD := Color(0.26, 0.22, 0.17)
@@ -119,7 +119,7 @@ static func guide_end_y(o: Interface.Observation, col: int, start_row: int, stub
 ## The first open terrain row above a lift, scanning the column's centre cell up to the window's top: the
 ## top of the shaft the updraft climbs.
 static func shaft_top_row(o: Interface.Observation, lift_cell: Vector2i) -> int:
-	var n: int = Interface.Observation.LOGIC_PX / Interface.Observation.CELL_PX
+	var n: int = Interface.Units.LOGIC_PX / Interface.Units.CELL_PX
 	var tc: int = lift_cell.x * n + n / 2
 	var top: int = o.window.position.y
 	for row: int in range(lift_cell.y * n - 1, o.window.position.y - 1, -1):
@@ -176,7 +176,7 @@ static func sapling_pose(cell: Vector2i, age: int, t: float) -> Dictionary:
 
 ## The body's velocity in world pixels a second, off the observation's per-tick fixed-point numbers.
 static func speed_px_s(o: Interface.Observation) -> Vector2:
-	return Vector2(float(o.vel_x), float(o.vel_y)) * float(Interface.Observation.TICK_HZ) / float(Fx.SCALE)
+	return Vector2(float(o.vel_x), float(o.vel_y)) * float(Interface.Units.TICK_HZ) / float(Fx.SCALE)
 
 
 ## The speed streaks: nothing below 1.15x the run, then a fan of five that grows in toward the swing's
@@ -185,7 +185,7 @@ static func streaks(o: Interface.Observation) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var v: Vector2 = speed_px_s(o)
 	var speed: float = v.length()
-	var run: float = float(Interface.Observation.RUN_SPEED_PX_S)
+	var run: float = float(Interface.Units.RUN_SPEED_PX_S)
 	var floor_speed: float = run * STREAK_MIN
 	if speed < floor_speed:
 		return out

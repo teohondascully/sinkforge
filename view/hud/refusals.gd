@@ -126,7 +126,7 @@ func slot_kind() -> StringName:
 
 ## The terrain row the body's feet stand in: the bottom edge, in cells (the observation's `bottom_y` is Fx px).
 static func feet_row(o: Interface.Observation) -> int:
-	return int(floor(float(o.bottom_y) / float(Fx.SCALE) / float(Interface.Observation.CELL_PX)))
+	return int(floor(float(o.bottom_y) / float(Fx.SCALE) / float(Interface.Units.CELL_PX)))
 
 
 ## The lesson a refusal names on its FIRST frame, before any count: what the slot says.

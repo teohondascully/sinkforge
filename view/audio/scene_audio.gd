@@ -101,7 +101,7 @@ func note_frame(frame: Frame, delta: float) -> void:
 
 ## How far down the body is, 0 at the generated surface and 1 at the world's floor: the score's one input.
 static func depth_fraction(o: Interface.Observation) -> float:
-	var total_m: float = float(o.map_cells.y) - float(Interface.Observation.SKY_ROWS) / float(MaterialLook.CELLS_PER_METRE)
+	var total_m: float = float(o.map_cells.y) - float(Interface.Units.SKY_ROWS) / float(MaterialLook.CELLS_PER_METRE)
 	if total_m <= 0.0:
 		return 0.0
 	return clampf(float(MaterialLook.depth_m(o.cell.y)) / total_m, 0.0, 1.0)

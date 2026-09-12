@@ -53,7 +53,7 @@ static func run(m: MachineState, world: World, items: Items, machines: Machines)
 		&"winch_station":
 			pass                                  # a pure receiver: the Head lands trips in it
 		&"rig":
-			_run_rig(m, items)
+			_run_rig(m, items, machines)
 		_:
 			_run_recipe(m, items)
 
@@ -61,13 +61,16 @@ static func run(m: MachineState, world: World, items: Items, machines: Machines)
 ## THE RIG (D0484): holds what the current demand asks for (`machine_eats` admits nothing else); when the
 ## demand is met it consumes the delivery, sets the granted machine down into its output -- the scoop
 ## takes it as it takes a forge's ingots -- and moves to the next demand. The ledger sees both sides.
-static func _run_rig(m: MachineState, items: Items) -> void:
+static func _run_rig(m: MachineState, items: Items, machines: Machines) -> void:
 	var wants: Dictionary = Demands.wants(m.stage)
 	if wants.is_empty():
 		return
 	for item: StringName in wants:
 		if int(m.input_buffer.get(item, 0)) < int(wants[item]):
 			return
+	# `demand_satisfied` (D0605): the event C003's metric reads. Emitted at the stage advance -- the one
+	# moment a demand goes from asking to met -- so an observer counts demands, not deliveries.
+	var demand: Dictionary = Demands.at(m.stage)
 	for item: StringName in wants:
 		_take_from_buffer(m.input_buffer, item, int(wants[item]))
 		items.consumed(item, int(wants[item]))
@@ -75,6 +78,8 @@ static func _run_rig(m: MachineState, items: Items) -> void:
 	for item: StringName in grants:
 		m.output_buffer[item] = int(m.output_buffer.get(item, 0)) + int(grants[item])
 		items.produced(item, int(grants[item]))
+	machines.events.append({"kind": &"demand_satisfied", "id": StringName(String(demand.get("id", ""))),
+		"stage": m.stage, "cell": m.logic_cell})
 	m.stage += 1
 
 

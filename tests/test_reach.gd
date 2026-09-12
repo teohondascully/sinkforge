@@ -5,7 +5,7 @@ extends "res://tests/test_base.gd"
 ## boundary cells 128-130 at row 75 among them; the first disagreeing point is printed. (2) The rule IS the
 ## Euclidean 3.2 m, inclusive: the same grid against an independent float compare, with the ins and outs
 ## counted so a degenerate population cannot pass. (3) The edge is D0520's own probe: at row 75 px 514 is
-## in and 515 out, and the circle is 16/5 and not `Observation.REACH_PX`'s truncated 51 px.
+## in and 515 out, and the circle is 16/5 and not `Units.REACH_PX`'s truncated 51 px.
 ##
 ## Run: tools/run_gd_test.sh <godot> res://tests/test_reach.gd
 const S: int = Fx.SCALE
@@ -84,7 +84,7 @@ func _test_the_edge_is_the_probes_own() -> void:
 	_check(cells == [false, true, true, false, false], "cells 106, 107, 128, 129, 130 at row 75: out, in, in, out, out (%s)" % str(cells))
 	# Not the truncated REACH_PX: an offset of (51, 4) px is 2617 px^2, inside 51.2^2 and outside 51^2.
 	var fine: bool = Reach.in_reach((472 + 51) * S, (328 + 4) * S, 472 * S, 328 * S, TILE)
-	_check(fine and Interface.Observation.REACH_PX == 51, "the circle is 16/5 (51.2 px), not Observation.REACH_PX's %d: an offset of (51, 4) px is in (%s)" % [Interface.Observation.REACH_PX, str(fine)])
+	_check(fine and Interface.Units.REACH_PX == 51, "the circle is 16/5 (51.2 px), not Observation.REACH_PX's %d: an offset of (51, 4) px is in (%s)" % [Interface.Units.REACH_PX, str(fine)])
 	# The axis reject admits nothing the circle refuses: 52 px straight along one axis is out.
 	_check(not Reach.in_reach((472 + 52) * S, 328 * S, 472 * S, 328 * S, TILE) and Reach.in_reach((472 + 51) * S, 328 * S, 472 * S, 328 * S, TILE), "along one axis 51 px is in and 52 out")
 

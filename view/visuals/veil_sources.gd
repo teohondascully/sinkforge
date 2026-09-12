@@ -82,7 +82,7 @@ static func _cut(centre: Vector2, radius_m: float, strength: float, tint: Color 
 
 
 static func _logic_centre_cells(cell: Vector2i) -> Vector2:
-	return (Vector2(cell) + Vector2(0.5, 0.5)) * (float(Interface.Observation.LOGIC_PX) / float(Interface.Observation.CELL_PX))
+	return (Vector2(cell) + Vector2(0.5, 0.5)) * (float(Interface.Units.LOGIC_PX) / float(Interface.Units.CELL_PX))
 
 
 ## The cuts for this frame. `seams` are `OrePainter` seams (cells), `motes` are `FallingItems` motes (px),
@@ -118,7 +118,7 @@ static func cuts(obs: Interface.Observation, seams: Array[Dictionary], motes: Ar
 		# A seam glows from INSIDE the rock (D0432): the occlusion march would put its own rock between it
 		# and every pixel, so it is the one source kind the shader does not occlude.
 		out.append({"centre": pos, "radius": float(seam["radius"]), "strength": seam_strength(t, pos.x), "tint": light_tint(OrePainter.SEAM_LIGHT), "in_rock": true})
-	var cell_px: float = float(Interface.Observation.CELL_PX)
+	var cell_px: float = float(Interface.Units.CELL_PX)
 	for m: Dictionary in motes:
 		var at: Vector2 = (m["pos"] as Vector2) / cell_px
 		if cull.has_point(at):

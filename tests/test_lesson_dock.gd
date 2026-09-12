@@ -14,7 +14,7 @@ const TEXT: String = "ROPE — set it above a drop. Climb it up and down; leap o
 ## covers the miner too. And the body is not always at the canvas centre: the camera leads it by
 ## `LEAD_TIME` x velocity, and a lesson is visible up to `Hints.BUSY_ARM` x a run (above that the busy
 ## rule hides it), so the body can stand that far from centre with a lesson up.
-const REACH_WORLD_PX: float = float(Mining.REACH_NUM) / float(Mining.REACH_DEN) * float(MaterialLook.CELLS_PER_METRE * Interface.Observation.CELL_PX)
+const REACH_WORLD_PX: float = float(Mining.REACH_NUM) / float(Mining.REACH_DEN) * float(MaterialLook.CELLS_PER_METRE * Interface.Units.CELL_PX)
 const HALF_BODY_WORLD_PX: float = float(Body.HEIGHT_PX) * 0.5
 const LEAD_WORLD_PX: float = float(Body.RUN_SPEED_PX_S) * Hints.BUSY_ARM * CameraRig.LEAD_TIME
 
@@ -40,8 +40,8 @@ func _frame(body_px: Vector2 = Vector2(320.0, 180.0)) -> Frame:
 	f.obs.pos_x = int(body_px.x) * S
 	f.obs.pos_y = int(body_px.y) * S
 	f.obs.top_y = int(body_px.y - 20.0) * S
-	f.obs.cell = Vector2i(int(body_px.x) / 4, Interface.Observation.SKY_ROWS)
-	f.obs.bottom_y = (f.obs.cell.y + 5) * Interface.Observation.CELL_PX * S   # the feet five cells under the centre's cell: the buried rule measures from them (D0504)
+	f.obs.cell = Vector2i(int(body_px.x) / 4, Interface.Units.SKY_ROWS)
+	f.obs.bottom_y = (f.obs.cell.y + 5) * Interface.Units.CELL_PX * S   # the feet five cells under the centre's cell: the buried rule measures from them (D0504)
 	f.view_world_rect = Rect2(0.0, 0.0, 640.0, 360.0)
 	return f
 

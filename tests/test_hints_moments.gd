@@ -25,9 +25,9 @@ func _initialize() -> void:
 ## without standing WAY_DOWN_DEPTH_M down is told the ground is the way; one that went down already is not.
 func _test_way_down_pins() -> void:
 	var h: Hints = Hints.new()
-	var m: int = Interface.Observation.LOGIC_PX * S
+	var m: int = Interface.Units.LOGIC_PX * S
 	var o: Interface.Observation = _hint_obs()
-	o.cell.y = Interface.Observation.SKY_ROWS - 2               # standing on the surface
+	o.cell.y = Interface.Units.SKY_ROWS - 2               # standing on the surface
 	o.mining_broke = true
 	h.observe(o, 0.016)
 	o.mining_broke = false
@@ -40,18 +40,18 @@ func _test_way_down_pins() -> void:
 		"the surface walked %.0f m across with rock broken once and nothing dug teaches THE WAY DOWN (%s)" % [float(o.pos_x) / float(m), h.active_id()])
 	var h2: Hints = Hints.new()
 	var deep: Interface.Observation = _hint_obs()
-	deep.cell.y = Interface.Observation.SKY_ROWS + int(Hints.WAY_DOWN_DEPTH_M + 1.0) * 4   # five metres down once
+	deep.cell.y = Interface.Units.SKY_ROWS + int(Hints.WAY_DOWN_DEPTH_M + 1.0) * 4   # five metres down once
 	deep.mining_broke = true
 	h2.observe(deep, 0.016)
 	deep.mining_broke = false
-	deep.cell.y = Interface.Observation.SKY_ROWS - 2
+	deep.cell.y = Interface.Units.SKY_ROWS - 2
 	for i: int in 40:
 		deep.pos_x = i * m
 		h2.observe(deep, 0.016)
 	_check(h2.active_id() == &"" and h2.queued() == 0, "control: a body that once stood five metres down is not told, however far it walks (%s)" % h2.active_id())
 	var h3: Hints = Hints.new()
 	var never: Interface.Observation = _hint_obs()
-	never.cell.y = Interface.Observation.SKY_ROWS - 2
+	never.cell.y = Interface.Units.SKY_ROWS - 2
 	for i: int in 40:
 		never.pos_x = i * m
 		h3.observe(never, 0.016)
@@ -168,7 +168,7 @@ func _test_far_below_pins() -> void:
 	var buried: Interface.Observation = _hint_obs()
 	buried.aim_refusal = &"far"
 	buried.cell = Vector2i(100, 75)
-	buried.bottom_y = 80 * Interface.Observation.CELL_PX * Fx.SCALE                 # the feet on row 80
+	buried.bottom_y = 80 * Interface.Units.CELL_PX * Fx.SCALE                 # the feet on row 80
 	buried.aim_cell = Vector2i(100, 80 + Hints.BELOW_CELLS)
 	for _i: int in Hints.FAR_TICKS:
 		h.observe(buried, 0.016)
@@ -177,7 +177,7 @@ func _test_far_below_pins() -> void:
 	var across: Interface.Observation = _hint_obs()
 	across.aim_refusal = &"far"
 	across.cell = Vector2i(100, 75)
-	across.bottom_y = 80 * Interface.Observation.CELL_PX * Fx.SCALE
+	across.bottom_y = 80 * Interface.Units.CELL_PX * Fx.SCALE
 	across.aim_cell = Vector2i(120, 80 + Hints.BELOW_CELLS - 1)
 	for _i: int in Hints.FAR_TICKS:
 		level.observe(across, 0.016)
@@ -188,7 +188,7 @@ func _test_far_below_pins() -> void:
 	var at_seam: Interface.Observation = _hint_obs()
 	at_seam.aim_refusal = &"far"
 	at_seam.cell = Vector2i(100, 75)
-	at_seam.bottom_y = 80 * Interface.Observation.CELL_PX * Fx.SCALE
+	at_seam.bottom_y = 80 * Interface.Units.CELL_PX * Fx.SCALE
 	at_seam.aim_cell = Vector2i(116, 83)
 	for _i: int in Hints.FAR_TICKS:
 		seam.observe(at_seam, 0.016)
@@ -197,7 +197,7 @@ func _test_far_below_pins() -> void:
 	var under: Interface.Observation = _hint_obs()
 	under.aim_refusal = &"far"
 	under.cell = Vector2i(100, 75)
-	under.bottom_y = 80 * Interface.Observation.CELL_PX * Fx.SCALE
+	under.bottom_y = 80 * Interface.Units.CELL_PX * Fx.SCALE
 	under.aim_cell = Vector2i(100, 88)
 	for _i: int in Hints.FAR_TICKS:
 		deep.observe(under, 0.016)

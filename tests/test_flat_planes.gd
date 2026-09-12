@@ -92,7 +92,7 @@ func _test_openness_metres_is_open_in_air_buried_in_rock_and_graded_between() ->
 	o.map.resize(20 * 12)
 	for y: int in 12:
 		for x: int in 20:
-			o.map[y * 20 + x] = Interface.Observation.MAP_ROCK if y >= 6 else Interface.Observation.MAP_VOID
+			o.map[y * 20 + x] = Interface.Units.MAP_ROCK if y >= 6 else Interface.Units.MAP_VOID
 	var field: PackedByteArray = VeilLayer.openness_metres(o, Rect2i(0, 0, 20, 12))
 	_check(field.size() == 240 and field[0] == 255 and field[20 * 11 + 10] == 0, "deep in the air the field is fully open (255) and deep in the rock fully buried (0)")
 	var above: int = field[20 * 5 + 10]

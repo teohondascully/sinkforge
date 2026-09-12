@@ -12,7 +12,7 @@ extends RefCounted
 ## ripple must climb for a player and reproduce for a capture (D0277, D0328). Mounted over the veil and the
 ## tooth and under the additive pools, so hot air bends the rock but not the light.
 
-const CELL: float = float(Interface.Observation.LOGIC_PX)
+const CELL: float = float(Interface.Units.LOGIC_PX)
 const S: float = CELL / 32.0
 const PLUME_W: float = 0.72       ## of a cell
 const PLUME_H: float = 2.1        ## cells up

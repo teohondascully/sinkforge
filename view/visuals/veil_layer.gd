@@ -49,7 +49,7 @@ func _init(ore: OrePainter = null, falling: FallingItems = null) -> void:
 	if shader != null:
 		material = ShaderMaterial.new()
 		material.shader = shader
-		material.set_shader_parameter(&"cell_px", float(Interface.Observation.CELL_PX))
+		material.set_shader_parameter(&"cell_px", float(Interface.Units.CELL_PX))
 		material.set_shader_parameter(&"cells_per_metre", float(PER_M))
 		material.set_shader_parameter(&"surface_row", float(MaterialLook.SURFACE_ROW))
 		material.set_shader_parameter(&"mass_shade", VeilPainter.MASS_SHADE)
@@ -91,8 +91,8 @@ static func openness_metres(obs: Interface.Observation, rect_m: Rect2i) -> Packe
 		var my: int = clampi(rect_m.position.y + row, 0, last.y)
 		for col: int in w:
 			var mx: int = clampi(rect_m.position.x + col, 0, last.x)
-			var cls: int = obs.map[my * mw + mx] if have_map else Interface.Observation.MAP_VOID
-			raw[row * w + col] = 0.0 if (cls == Interface.Observation.MAP_ROCK or cls == Interface.Observation.MAP_ORE) else 1.0
+			var cls: int = obs.map[my * mw + mx] if have_map else Interface.Units.MAP_VOID
+			raw[row * w + col] = 0.0 if (cls == Interface.Units.MAP_ROCK or cls == Interface.Units.MAP_ORE) else 1.0
 	var reach: int = int(VeilPainter.MASS_REACH_M)
 	var blur: PackedFloat32Array = VeilPainter._blur_axis(VeilPainter._blur_axis(raw, w, h, true, reach), w, h, false, reach)
 	var out := PackedByteArray()

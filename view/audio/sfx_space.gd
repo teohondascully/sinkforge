@@ -24,8 +24,8 @@ const OCCLUSION_REACH: int = 24        ## logic cells walked at most between a s
 ## A placeholder, not a tuned value: how many dB a fully-occluded source loses on top of distance
 ## falloff. Conservative on purpose; the curve is a listening call and stays open for a tuning pass.
 const OCCLUSION_DB_MAX: float = 10.0
-const LOGIC_PX: float = float(Interface.Observation.LOGIC_PX)
-const CELL_PX: float = float(Interface.Observation.CELL_PX)
+const LOGIC_PX: float = float(Interface.Units.LOGIC_PX)
+const CELL_PX: float = float(Interface.Units.CELL_PX)
 ## Mean free path: 2 cells is a crawlway and 12 or more a hall.
 const ROOM_NEAR: float = 2.0
 const ROOM_FAR_SPAN: float = 10.0

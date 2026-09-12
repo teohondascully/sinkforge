@@ -18,8 +18,8 @@ const GAIN_PITCH: float = 1.4
 const DRIP_MIN_CAVE: float = 0.3
 const DRIP_GAP_MIN: float = 3.0
 const DRIP_GAP_MAX: float = 9.0
-const LOGIC_PX: float = float(Interface.Observation.LOGIC_PX)
-const CELL_PX: float = float(Interface.Observation.CELL_PX)
+const LOGIC_PX: float = float(Interface.Units.LOGIC_PX)
+const CELL_PX: float = float(Interface.Units.CELL_PX)
 
 var _rng: SplitRng
 ## The last frame, as the three scalars the edges need rather than the observation itself: holding the
@@ -152,7 +152,7 @@ func _line(o: Interface.Observation, out: Array[Dictionary]) -> void:
 func _body(o: Interface.Observation, delta: float, out: Array[Dictionary]) -> void:
 	var impact: float = landing_impact(_had_prev, _prev_on_floor, _prev_vel_y, o)
 	if impact >= LAND_HARD_PX_S:
-		var imp: float = clampf((impact - LAND_HARD_PX_S) / (float(Interface.Observation.MAX_FALL_PX_S) - LAND_HARD_PX_S), 0.0, 1.0)
+		var imp: float = clampf((impact - LAND_HARD_PX_S) / (float(Interface.Units.MAX_FALL_PX_S) - LAND_HARD_PX_S), 0.0, 1.0)
 		out.append(_cue(&"thump", feet_px(o), 0.6 + imp * 0.5, -5.0))
 	var vx: float = absf(float(o.vel_x)) / float(Fx.SCALE)
 	if o.on_floor and vx > STEP_MIN_SPEED:
