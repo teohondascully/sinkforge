@@ -23560,3 +23560,26 @@ lit ~0.80): deepstone's doubled base luma 0.394 reads 0.181 unlit (entry predict
 confirmation; the additive pass stays available if the frame still reads flat.
 Reverse: halve the bases back (the yaml diff is the whole change) and restore the palette-fired
 control if the palette is also reverted.
+
+## D0631 · 2026-09-12 · sim/body/body_swing.gd, sim/body/horizontal_resolve.gd, tests/test_grapple_body.gd · P035: the lip mantle -- the line finishes its own climb
+Decided: P035's ruled option (1) -- toward-and-up while hanging closes the last stretch -- but NOT
+through the mechanism the entry imagined. `_try_step`'s box-overlap mantle can only see a ledge that
+intersects the body's own box, and a reel-stop hang leaves the feet ~41px under the lip with the lip
+itself overhead: no candidate cell produces the needed lift, and `MIN_LENGTH + half-height = 33.6px`
+exceeds `MANTLE_PX` (32px) even at a perfect bite. So the verb lives in `BodySwing`, the line's own
+pass: on `mantle_hold` + a direction while ANCHORED, `_lip_mantle` lands the feet on the TOP of the
+solid run the hitch sits in -- the surface, not the face cell the hook happened to bite (the rig's
+hook bites one row below the lip). Reach is the reel's own ceiling (`MIN_LENGTH` + body height + one
+cell of bite depth = 45.6px vs the measured 41px); horizontal slack is one body-width + a cell; the
+landing is clearance-checked and counts as the line moving the body (`swung_this_tick`), the same
+consent exemption every swing correction gets. The `horizontal_resolve` side gets the small sibling
+change too: `grapple.taut` satisfies the mantle's grounded gate (NOT the auto step-up, which keeps
+`recently_grounded` -- an unsolicited yank on a line is D0209's exact problem). This covers the
+ledge-beside-the-hang case the swing-side path can't see.
+Measured: hook the lip of a 10 m shaft, reel to the stop, toward-and-up -- the body stands on the
+surface (row 15, on_floor). Control holds: pressing into the wall WITHOUT `mantle_hold` does not
+climb. Mutation: `_lip_mantle` stubbed false fails the verb assertion. Full body fuzz (369s) and the
+12-suite body cluster are clean -- randomized `mantle_hold` produced no invariant violations.
+Untested by name: the `move_dir`-toward-the-hitch check (feel, not a gate) and the wrapped-pivot
+quadrant pick (first solid quadrant; a corner shared by two solids lands on the first found).
+Reverse: revert this diff; the dig-the-last-step answer keeps working either way.

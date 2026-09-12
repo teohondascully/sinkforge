@@ -1140,7 +1140,7 @@ sites mechanically in one commit. It is a large diff and a tiny risk -- every si
 the compiler catches every miss, and no behaviour moves. Roughly an hour. Do it before the next feature
 that needs an observation field, not after.
 
-## P035 · 2026-09-10 · the last metre and a half out of a shaft belongs to no verb
+## P035 · 2026-09-10 · the last metre and a half out of a shaft belongs to no verb  **[EXECUTED D0631]**
 
 **Measurement.** With D0567's fix the line now lifts a body out of a shaft it dug: row 55 to row 26 of a
 10 m shaft in `tests/test_grapple_body.gd`. It stops there, and the stop is geometric rather than a bug.
@@ -1174,6 +1174,13 @@ chip 5 m -> 2 m), cut a step into the lip and walk out (3 bursts, chip 1 m, "ENT
 **27 bursts** against 515-and-never. So P035 is polish, not a blocker: the player CAN get out today, and
 the ruling is only about whether the last metre and a half should feel like a climb or like a dig.
 
+**EXECUTED 2026-09-12 (D0631).** Option (1) landed, but not through `_try_step`: the reel-stop hang
+leaves the feet ~41px under the lip and the box-overlap mantle cannot see a ledge overhead -- the
+needed lift exceeds `MANTLE_PX` at any bite. The verb lives in `BodySwing._lip_mantle`: toward-and-up
+on a held line lands the feet on the top of the hitch's solid run, reach-bounded by the reel's own
+ceiling. `grapple.taut` also satisfies the horizontal-resolve mantle's grounded gate (the auto step-up
+keeps `recently_grounded`). Measured on the shaft rig, mutation-witnessed, fuzz-clean.
+
 ## P036 · 2026-09-10 · our lights can only ever DARKEN, and the reference's add
 
 **Measurement, all off the `lighting_bench` frame and the reference, same 5x5 mean luma.**
@@ -1206,6 +1213,14 @@ reversible in data and answers most of the gap; (2) is the better model and can 
 without undoing it.
 
 **Not a root blocker.** Phase 3 (rock texture, strata, cobbles) is independent and continues.
+
+**EXECUTED 2026-09-12 (`6c7d05b9`, D0630).** Option (1) landed: every material base x2 (glimmer x1.5,
+clips otherwise); coal's speckle re-gapped over the new matrix or the wall-lode and palette bounds both
+fail. The `test_rock_tone` clamp control moved to a synthetic near-black input -- a doubled palette
+legitimately never reaches zero, so the mechanism is proven on an input that needs it. Arithmetic
+against the measured veil levels lands the entry's own prediction (deepstone 0.181 unlit / 0.315 lit).
+A `lighting_bench` capture is the remaining visual confirmation; option (2) stays parked unless the
+frame still reads flat.
 
 ## P037 · 2026-09-10 · the 400-line file cap now blocks adding a DATA record  **[RESOLVED D0574]**
 

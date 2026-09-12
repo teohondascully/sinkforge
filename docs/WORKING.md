@@ -24,7 +24,7 @@ The full 49-item queue with phase detail lives in the archive snapshot. Open:
 - [x] 44 Route-driven playthrough — D0625: `ColdStartBot.decide()` is one policy for headless AND the real seat (`--route=cold_start`, legs 60/71/122/149/388/417, captures per boundary). Found: seat-path obs-sharing contract + anchor row bug.
 - [ ] 45 Stranger batch started at rung 4, six seats.
 - [ ] 51 The lamp's real lever (P038/D0599): `LAMP_TINT` nearly inert.
-- [ ] 52 Layer contacts dead flat (P044).
+- [x] 52 Layer contacts dead flat (P044) — `3db2f6c0` (D0629): shared `BeddingDip` in core/, contacts + tone agree, mutation-witnessed both ways.
 - [~] 49/Phase 10 THE MATCH LOOP — perpetual; all 4 conditions now have instruments. Moving camera: `--pan` strip lands `e8e68941` (D0624) — holds on both axes; honest residual is sub-tick judder (strips sample ticks, not presented frames).
 
 ## Current stage
