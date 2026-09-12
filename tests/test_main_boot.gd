@@ -121,10 +121,9 @@ func _test_the_hud_bridge() -> void:
 	HudBridge.apply({"cycle": "zoom"}, page, 0.0)
 	_check(Settings.zoom_idx == (was_zoom + 1) % CameraRig.ZOOM_LEVELS.size(), "the zoom cycles through the rig's levels")
 	Settings.zoom_idx = was_zoom
-	page.set_slider_rect("sound", Rect2(100.0, 0.0, 200.0, 10.0))
 	var was_sound: float = Settings.sound
-	HudBridge.apply({"slider": "sound"}, page, 150.0)
-	_check(is_equal_approx(Settings.sound, 0.25), "a slider click a quarter along sets the level to 0.25 (%.2f)" % Settings.sound)
+	HudBridge.apply({"slider": "sound", "frac": 0.25}, page, 0.0)
+	_check(is_equal_approx(Settings.sound, 0.25), "a slider payload carries its own fraction (%.2f)" % Settings.sound)
 	Settings.sound = was_sound
 	Settings.apply_audio()
 	_check(HudBridge.apply({"bind": String(Controls.JUMP)}, page, 0.0) == &"capture" and page.capture == Controls.JUMP, "a bind payload arms the capture")

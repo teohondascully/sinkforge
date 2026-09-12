@@ -23583,3 +23583,42 @@ climb. Mutation: `_lip_mantle` stubbed false fails the verb assertion. Full body
 Untested by name: the `move_dir`-toward-the-hitch check (feel, not a gate) and the wrapped-pivot
 quadrant pick (first solid quadrant; a corner shared by two solids lands on the first found).
 Reverse: revert this diff; the dig-the-last-step answer keeps working either way.
+
+## D0632 · 2026-09-12 · view/hud/settings_control.gd, view/hud/page_tokens.gd, view/hud/settings_page.gd, shell/hud_bridge.gd, shell/main.gd, shell/seat_flags.gd, view/view_stack.gd, view/hud/MODULE.md, tests/test_settings_page.gd, tests/test_main_boot.gd, deleted view/hud/settings_draw.gd · the modal page as a real Control tree -- the Hybrid ruling
+
+The director asked how a 2026-looking menu gets rendered in this stack and named the answer: HYBRID --
+the painter HUD keeps its one-frame-per-tick contract for in-world chrome (hotbar, chips, toasts read
+the sim frame and need it), and the modal settings page -- which never needed per-tick drawing --
+becomes a retained Control tree with a Theme. Chosen over rebuilding the page in the painter's own
+language (option A) because the page's layout arithmetic was already the worst of the painter code and
+a second modal would only grow it; over a full Control migration because the in-world HUD's
+frame-per-tick draw is the correct tool where it lives.
+
+The model/view split hardens rather than dissolves: `SettingsPage` keeps every table, the cursor
+arithmetic, the payloads, the rise counter, and the shell's snapshot contract; `SettingsControl`
+presents it. ONE navigator: every control is FOCUS_NONE so Enter/arrows are never eaten as gui input
+and always reach `_unhandled_input` -> `HudBridge.key` -- the tested path. The cursor is a stylebox
+override on the row wrapper at `page.row` (a PanelContainer per row, because an HSlider has no
+"normal" to override); hover feeds only the detail plate, the drawn page's own precedence. Sliders
+carry their own `frac` in the payload now -- the hit-rect `click()`/`slider_frac()`/`geometry()` API
+and `SettingsDraw` are deleted, not kept, since the suite proved nothing else called them.
+
+Two skins ship for the frame-pick: `PageTokens.INSTRUMENT` (the dark plate the game already speaks)
+and `PAPER` (the field-notebook the reference frames argue for) under `--skin=`. The measured rule --
+nothing brighter than lit rock -- is kept honestly: it was measured on HUD chrome over the world, and
+a modal already suppresses the world behind a scrim, so PAPER's light plate does not break the
+measurement it stands on. Known gap named in the token file: no font asset ships, so the type ramp
+rides `ThemeDB.fallback_font` until the faces are picked (a director call: licensing).
+
+Found while wiring, fixed in the same commit: `HudBridge.snapshot` now carries `event_labels` +
+`all_actions`, which `SettingsPage.clashes` always read -- the collision warning was dead by omission
+since D0372, impossible to see because the painter's callers never exercised it.
+
+Witnessed: `test_settings_page` poses the tree in a real tree -- shell builds, faces materialize per
+category, slider/chip/rail signals emit the model's payloads, the ring mirrors `page.row` on
+CONTROLS by MODEL row though the grid fills column-major, no control takes gui focus, the armed door
+says SURE, the skin swap reaches the theme, a closed page takes the tree down. `test_main_boot` and
+`test_settings_live` boot the real seat with the tree mounted. One judgment call the test cannot
+make: whether the CONTROL face itself looks 2026 -- that is the director's frame-pick, and the two
+skins are the ballots.
+Reverse: revert this diff; `SettingsDraw` is in history.

@@ -17,9 +17,10 @@ already answer.
   `target_guide.gd` + `ring_painter.gd` + `ring_word.gd` + `shaft_mouth.gd` (the target ring: what is
   ringed, the ring's draw pass, the word under it, the BUILD rung's mouth), `arrival_plate.gd` (the
   stratum ceremony), `wanted_rule.gd` (which pack item a machine in sight is asking for, D0592).
-- **Pages:** `page_draw.gd` (the primitives every modal page shares), `settings_page.gd` +
-  `settings_draw.gd` (what the settings page *shows*, which is not the same question as what the
-  settings are), `ui_theme.gd` (the ink and the plates, owned in one place).
+- **Pages:** `page_draw.gd` (the primitives the painted pages share), `settings_page.gd` (what the
+  settings page *shows* — the model: rows, cursor, payloads) + `settings_control.gd` (the modal as a
+  real Control tree, D0632) + `page_tokens.gd` (the modal's two skins as Theme vocabulary),
+  `ui_theme.gd` (the ink and the plates the painters share, owned in one place).
 - **The host:** `hud_layer.gd` — the prerequisite every Lane H row hung off (`docs/LEGACY_GAP.md`
   H-01).
 

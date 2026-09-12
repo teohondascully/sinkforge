@@ -101,6 +101,12 @@ func boot(load_save: bool) -> bool:
 		VeilLayer.lamp_occlusion = float(flags["lamp_occlusion"])   # the lighting comparison's dial (D0427)
 	var t1: int = Time.get_ticks_msec()
 	stack = ViewStack.build_stack(self, door, look, camera, true, falling, payouts)
+	# D0632: the modal page is a real Control tree -- its rows emit payloads directly, so the seat's
+	# mutation path stays exactly one: `HudBridge.apply` then `_game_verb`, same as a key ever did.
+	if stack.settings_ctl != null:
+		stack.settings_ctl.payload.connect(
+			func(p: Dictionary) -> void: _game_verb(HudBridge.apply(p, stack.settings, 0.0)))
+		stack.settings_ctl.apply_skin(String(flags.get("skin", "instrument")))
 	view = stack.view
 	phases["stack"] = Time.get_ticks_msec() - t1
 	SeatHud.restore(stack, env)   # the shell's own keys, once the HUD exists to take them (D0411)
@@ -331,11 +337,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 		if HudBridge.finish_capture(page, ev):
 			get_viewport().set_input_as_handled()
 		return
-	if ev is InputEventMouseButton and ev.pressed and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-		var at: Vector2 = get_viewport().get_mouse_position()
-		_game_verb(HudBridge.apply(page.click(at), page, at.x))
-		get_viewport().set_input_as_handled()
-	elif ev is InputEventKey and ev.pressed and not ev.echo:
+	if ev is InputEventKey and ev.pressed and not ev.echo:
 		# ESC is the SETTINGS action's own key and closes the page through `_hud_keys`' edge (D0446); closing
 		# it here as well re-toggled it open the same tick, and no stranger could leave the page by ESC.
 		if (ev as InputEventKey).keycode != KEY_ESCAPE:
