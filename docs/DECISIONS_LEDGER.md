@@ -23111,3 +23111,23 @@ restored green). bed_levels, main_boot, seen_plane, inspector, machines, rig, sa
 suites green over the rewrite. Formatter and size gates pass.
 Reverse: delete `interface/units.gd`, move the consts back onto `Observation`, delete the `events`
 field/queue/emission/suite.
+
+## D0606 · 2026-09-11 · tests/test_softlock_ascent.gd, harness.yml, docs/QUALITY.md · gate 10 scoped to a provable claim, then armed
+Decided: gate 10 restated as the scoped claim the audit proposed -- "from the deepest authored point,
+scripted ascent reaches the surface" -- and enforced by a new two-case suite. Case 1 digs a 28-column
+shaft into solid rock (the hostile-chamber fixture's slab-over-void geometry was rejected as a venue:
+it lets digging breach void, which is a fixture artifact, not a game claim), then escapes it by the
+mine-a-notch-and-mantle policy in ~2,583 ticks. Case 2 climbs out of the tutorial supply room's floor,
+the deepest authored interior, by climbing alone in ~3,045 ticks. The notch scan is bottom-row-first,
+farthest-column-first -- that order IS the policy: it cuts the staircase's next step before the space
+above, letting the body enter the cavity progressively; the top-first variant carves a sealed ceiling
+cavity and stalls.
+Why: the audit found gate 10 had no enforcing code because its universal phrasing ("any reachable
+state") is unprovable. The scoped form names the two geometries that actually matter -- a shaft the
+player dug and the deepest room the game authored. Mutation-tested: `Mining.ticks_to_break` * 1000
+fails the shaft case (escape -1) while the adit case still passes, so the suite discriminates on the
+ascent mechanism, not the venue.
+Verified: suite green clean (3 asserted), red under the mining mutation, restored green. Suite count
+check passes at 157.
+Reverse: delete tests/test_softlock_ascent.gd, its harness.yml line and catalog comment, revert the
+gate-10 text.
