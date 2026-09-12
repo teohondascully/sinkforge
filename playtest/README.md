@@ -32,8 +32,9 @@ python3 playtest/stranger.py validate /absolute/path/to/session --json
 Keep diagnostic evaluator receipts distinct from the player-visible observation.
 Freeze the tested build during an episode and identify loaded checkpoint provenance.
 A valid episode proves only its measured outcome. Invalid episodes retain artifacts and do not count
-as player successes or failures. See [evidence retention](../docs/EVIDENCE.md) and
-[the active backlog](../docs/BACKLOG.md).
+as player successes or failures. A stranger batch measures scripted bot seats replaying intent, not
+humans — a wall inside the funnel may be a bot limitation, not a player-facing defect. See
+[evidence retention](../docs/EVIDENCE.md) and [the active backlog](../docs/BACKLOG.md).
 
 ## Iteration tools (opt-in)
 
