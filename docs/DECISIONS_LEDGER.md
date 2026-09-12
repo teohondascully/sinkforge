@@ -23664,3 +23664,20 @@ changes); hairlines as the wrap's own bottom-border stylebox (rejected -- the ri
 wholesale, which would steal a focused row's underline AND break the suite's "ring moved off" witness,
 so the rule is a child of the wrap instead).
 Reverse: revert this diff; the D0632 boxed page is in history.
+
+## D0635 · 2026-09-12 · view/hud/settings_control.gd · the plate was never centred -- a container child cannot own its position
+
+Found on the D0634 verification capture and measured, not eyeballed: the plate sat at screen y~4
+instead of centred (y~211 for its height). The rise wrote `_plate.position.y = (1-t)*offset` every
+frame -- an ABSOLUTE y on a CenterContainer child, so the rise ran the 28px offset correctly but at
+t=1 the assignment pinned the plate's y to ~0 for the page's whole first life; the before-captures
+show the same defect, shipped with D0632. Fix: the centre wrapper is now a plain Control and the
+plate's rect is computed honestly each frame -- size from `get_combined_minimum_size()` (which keeps
+the content hug exact) and position = centred + rise offset. Verified on both skins: plate y
+210..868 for AUDIO (658px of 1080, centred to the pixel) and 294..784 for GAME (490px -- the floor
+that used to leave an empty half-page). Also confirmed on the captures: every row hairline draws
+(2px blended rule), the selected rail tab's accent underline tracks the open face (y~280 AUDIO,
+y~490 GAME, x 549..683 both skins), the pct numerals right-align at the face's right edge, and the
+detail/foot ink is now the paper skin's own ink_faint (101,93,75 measured -- was the instrument
+skin's 128,138,158 on the before-capture).
+Reverse: CHEAP -- revert the hunk; the page goes back to top-glued but still works.

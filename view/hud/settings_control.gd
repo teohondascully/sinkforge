@@ -39,6 +39,7 @@ var _ringed: Control = null
 var _ring_key: StringName = &"panel"
 
 var _scrim: ColorRect = null
+var _centre: Control = null
 var _plate: PanelContainer = null
 var _rail: VBoxContainer = null
 var _overline: Label = null
@@ -84,7 +85,12 @@ func _process(delta: float) -> void:
 	visible = true
 	var t: float = page.ease()
 	_plate.modulate.a = t
-	_plate.position.y = (1.0 - t) * UiTheme.px(14.0)
+	# Centring is manual, not CenterContainer: the rise needs the plate's CENTERED y plus an offset,
+	# and writing `position.y` alone pinned the plate to the canvas top for its whole first life
+	# (the before-capture measured it at y~4 instead of centred -- a container child cannot own its
+	# position). The plate's size is its own combined minimum, so this also keeps the content hug.
+	_plate.size = _plate.get_combined_minimum_size()
+	_plate.position = (_centre.size - _plate.size) * 0.5 + Vector2(0.0, (1.0 - t) * UiTheme.px(14.0))
 	_scrim.color = Color(tokens_scrim(), float(_tokens["scrim"].a) * t)
 	if _built_cat != page.cat:
 		_build_face()
@@ -102,14 +108,14 @@ func _build_shell() -> void:
 	_scrim.mouse_filter = Control.MOUSE_FILTER_STOP   ## a modal eats the clicks it covers
 	_scrim.color = Color(tokens_scrim(), 0.0)
 	add_child(_scrim)
-	var centre := CenterContainer.new()
-	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
-	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(centre)
+	_centre = Control.new()
+	_centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_centre)
 	_plate = PanelContainer.new()
 	_plate.name = "plate"
 	_plate.theme_type_variation = &"PagePlate"
-	centre.add_child(_plate)
+	_centre.add_child(_plate)
 	var split := HBoxContainer.new()
 	split.add_theme_constant_override("separation", int(UiTheme.px(UiTheme.BAZAAR_PAD)))
 	_plate.add_child(split)
