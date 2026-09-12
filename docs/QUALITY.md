@@ -100,8 +100,8 @@ Every gate below is intended to be CI-enforced **where enforcement is mechanical
 
 ### Claims
 
-15. **Every harness layer names a claim.** A check that cannot state which claim it serves does not merge. This is the single most important process gate in this document. Enforced by `check_claim_references.py` — which currently reports **VOID over an empty corpus** (zero scenarios, zero qualifying harness files), so the declared property asserts nothing today; only the 40-active-claim cap can fire (D0602).
-16. **Every scenario names a claim.** Same check, same empty-corpus caveat as gate 15 (D0602).
+15. **Every harness layer names a claim.** A check that cannot state which claim it serves does not merge. This is the single most important process gate in this document. Enforced by `check_claim_references.py`. **Corpus healed (D0609):** `scenarios/cold_start_to_d1.yaml` names C003, so the check now runs over a real population of 1 rather than reporting VOID on empty — a thin corpus, but the property asserts something now.
+16. **Every scenario names a claim.** Same check, same thin-corpus caveat as gate 15 (D0602, D0609).
 17. **No claim regresses.** A change that moves a passing claim to failing fails the build and names the claim. **Process rule, not a CI gate** — claims are not executable artifacts in CI, so no machinery exists; enforcement is review (D0602).
 
 ### Performance

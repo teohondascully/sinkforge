@@ -23251,3 +23251,11 @@ filename carries the "correct" substring the same way CORRECTIONS.md does, and F
 stripped the .md. Generalized the strip to any filename token containing "correct"; the mutation test
 gained the .py-naming case. The finding is the same class the tool was already built to catch: a
 filename, not a correction.
+
+## D0618 · 2026-09-11 · docs/audits/2026-09-11-gate-reconciliation.md, docs/QUALITY.md · the 37-gate verdict table, consolidated
+
+The audit's deliverable existed only as per-gate "audited status" annotations scattered through
+QUALITY.md plus tool output. Consolidated into a dated report: 30 ENFORCED (7 carrying a live WARN,
+8/10/26 honestly scoped), 3 ADVISORY (14, 33, 37), 4 NO-CODE (17/18/20/21, process rules now labelled),
+0 CANNOT-FAIL. Gates 15/16's QUALITY text updated: the corpus healed at D0609 (one scenario naming
+C003) -- VOID no longer applies. Every commit hash cited in the report was verified against git log.
