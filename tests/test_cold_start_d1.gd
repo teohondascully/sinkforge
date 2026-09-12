@@ -87,7 +87,7 @@ func _test_a_mid_run_checkpoint_resumes_the_same_route_to_the_goal() -> void:
 	_check(bool(booted["ok"]), "the world boots for the checkpoint leg (%s)" % booted.get("reason", ""))
 	if not bool(booted["ok"]):
 		return
-	var bot: ColdStartBot = ScenarioDriver.bot_for(record)
+	var bot: ColdStartBot = ScenarioDriver.bot_for(record) as ColdStartBot
 	bot.attach(booted["world"], booted["items"], booted["body"], booted["iface"], booted["env"])
 	var first: Dictionary = bot.execute(booted["anchor"], 0, 3)
 	_check(bool(first["legs_ok"]), "the first three legs ran before the checkpoint (%d ticks)" % first["ticks"])
@@ -98,7 +98,7 @@ func _test_a_mid_run_checkpoint_resumes_the_same_route_to_the_goal() -> void:
 	if restored == null:
 		return
 	var rs: Dictionary = restored.services()
-	var resumed: ColdStartBot = ScenarioDriver.bot_for(record)
+	var resumed: ColdStartBot = ScenarioDriver.bot_for(record) as ColdStartBot
 	resumed.attach(rs["world"], rs["items"], rs["body"], restored, Interface.Envelope.oracle_over(rs["world"].grid))
 	var second: Dictionary = resumed.execute(booted["anchor"], 3, -1)
 	_check(bool(second["legs_ok"]), "the resumed route finished its legs on the restored session (%d ticks)" % second["ticks"])

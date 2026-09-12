@@ -12,10 +12,11 @@ extends RefCounted
 ## silently read oracle as constrained.
 
 ## The report's shape: {ok, reason, ticks_used, goal_event, legs_ok, conservation_error, envelope,
-## session}. The phases are public (`boot`, `bot_for`, `await_goal`) so a suite can compose them
-## around a `Session.capture`/`from_save` pair -- the save lives in `shell/`, a layer harness may not
-## reach, so a mid-run checkpoint is necessarily test-side (D0621). `run` is those pieces composed;
-## the checkpoint leg drives the same machinery, not a parallel copy.
+## session} -- `run_metered` adds {decisions, notes}. The phases are public (`boot`, `bot_for`,
+## `await_goal`, `match_goal`) so a suite can compose them around a `Session.capture`/`from_save`
+## pair -- the save lives in `shell/`, a layer harness may not reach, so a mid-run checkpoint is
+## necessarily test-side (D0621). `run` is those pieces composed; the checkpoint leg drives the same
+## machinery, not a parallel copy.
 static func run(record: Dictionary) -> Dictionary:
 	var out: Dictionary = {"ok": false, "reason": "", "ticks_used": 0, "goal_event": {},
 		"legs_ok": false, "conservation_error": null, "envelope": &"oracle"}
@@ -25,7 +26,7 @@ static func run(record: Dictionary) -> Dictionary:
 		return out
 	out["session"] = booted["iface"]
 
-	var bot: ColdStartBot = bot_for(record)
+	var bot: RouteBot = bot_for(record)
 	if bot == null:
 		out["reason"] = "no bot registered for agent '%s'" % record.get("agent", "")
 		return out
@@ -36,23 +37,72 @@ static func run(record: Dictionary) -> Dictionary:
 	return await_goal(record, out, bot)
 
 
+## `run` with the decision meter attached (D0643): the same boot, the same bot, but the route loop is
+## driven through `bot.step()` so every payload `decide()` emits is counted, and the goal is checked
+## on the observation each apply just produced -- a `flow_landed` goal the route lands mid-leg is
+## seen here, not lost to the channel `observe()` already drained. The route still runs to completion
+## once its goal has been seen: the report wants the whole policy measured, not the first match.
+## `observe_to_budget` keeps the clock running to the record's budget after the route ends -- the
+## minute-25 question's honest tail: decisions stop, ticks do not.
+## The report is `run`'s plus `decisions` (the meter's per-minute series) and `notes` (the bot's
+## evidence checkpoints).
+static func run_metered(record: Dictionary, observe_to_budget: bool = false) -> Dictionary:
+	var out: Dictionary = {"ok": false, "reason": "", "ticks_used": 0, "goal_event": {},
+		"legs_ok": false, "conservation_error": null, "envelope": &"oracle",
+		"decisions": {}, "notes": []}
+	var booted: Dictionary = boot(record)
+	if not bool(booted["ok"]):
+		out["reason"] = booted["reason"]
+		return out
+	out["session"] = booted["iface"]
+	var bot: RouteBot = bot_for(record)
+	if bot == null:
+		out["reason"] = "no bot registered for agent '%s'" % record.get("agent", "")
+		return out
+	bot.attach(booted["world"], booted["items"], booted["body"], booted["iface"], booted["env"])
+	bot.begin(booted["anchor"])
+	var budget: int = int(record.get("budget_ticks", 30000))
+	var meter := DecisionMeter.new()
+	var goal_ev: Dictionary = {}
+	while not bot.legs_done() and bot.ticks < budget:
+		var d: Dictionary = bot.step()
+		meter.record(bot.ticks, d)
+		var o: Interface.Observation = bot.iface.observe(bot.env)
+		if goal_ev.is_empty():
+			goal_ev = match_goal(record, o)
+	while goal_ev.is_empty() and bot.ticks < budget:
+		bot.tick(0)
+		goal_ev = match_goal(record, bot.iface.observe(bot.env))
+	if observe_to_budget:
+		while bot.ticks < budget:
+			bot.tick(0)
+	meter.elapsed_ticks = bot.ticks
+	out["ticks_used"] = bot.ticks
+	out["legs_ok"] = bot.legs_ok()
+	out["ok"] = not goal_ev.is_empty()
+	out["goal_event"] = goal_ev
+	out["decisions"] = meter.report()
+	out["notes"] = bot.notes
+	out["conservation_error"] = Invariants.check_item_conservation(bot.items, 5)
+	out["reason"] = "goal met" if bool(out["ok"]) \
+		else "goal event never fired inside %d ticks" % budget
+	return out
+
+
 ## The goal half of `run`: idle the world (through the bot's own tick, so a resumed bot drives the
 ## session it was re-attached to) until the record's event shows on `o.events`, or the budget ends.
-static func await_goal(record: Dictionary, out: Dictionary, bot: ColdStartBot) -> Dictionary:
+static func await_goal(record: Dictionary, out: Dictionary, bot: RouteBot) -> Dictionary:
 	var budget: int = int(record.get("budget_ticks", 30000))
-	var goal: Dictionary = record.get("goal", {})
-	var want_kind: StringName = StringName(goal.get("type", ""))
-	var want_id: StringName = StringName(goal.get("id", ""))
 	while bot.ticks < budget:
 		var o: Interface.Observation = bot.iface.observe(bot.env)
-		for ev: Dictionary in o.events:
-			if ev.get("kind") == want_kind and (want_id == &"" or ev.get("id") == want_id):
-				out["goal_event"] = ev
-				out["ok"] = true
-				out["reason"] = "goal met"
-				out["ticks_used"] = bot.ticks
-				out["conservation_error"] = Invariants.check_item_conservation(bot.items, 5)
-				return out
+		var ev: Dictionary = match_goal(record, o)
+		if not ev.is_empty():
+			out["goal_event"] = ev
+			out["ok"] = true
+			out["reason"] = "goal met"
+			out["ticks_used"] = bot.ticks
+			out["conservation_error"] = Invariants.check_item_conservation(bot.items, 5)
+			return out
 		bot.tick(0)
 	out["reason"] = "goal event never fired inside %d ticks" % budget
 	out["ticks_used"] = bot.ticks
@@ -60,8 +110,31 @@ static func await_goal(record: Dictionary, out: Dictionary, bot: ColdStartBot) -
 	return out
 
 
+## Does this observation carry the record's goal? Two channels: `o.events` for the machine-lifecycle
+## kinds (`demand_satisfied` with an optional `id`), and `o.flow_events` for `flow_landed` -- an item
+## routed to a named logic cell, the routing-claim's end state (D0635). `{}` when it does not.
+static func match_goal(record: Dictionary, o: Interface.Observation) -> Dictionary:
+	var goal: Dictionary = record.get("goal", {})
+	var want_kind: StringName = StringName(goal.get("type", ""))
+	if want_kind == &"flow_landed":
+		var want_item: StringName = StringName(goal.get("item", ""))
+		var to: Variant = goal.get("to", null)
+		var cell: Vector2i = Vector2i(int(to[0]), int(to[1])) \
+			if to is Array and to.size() >= 2 else Vector2i(-1, -1)
+		for ev: Dictionary in o.flow_events:
+			if ev.get("item") == want_item and (cell == Vector2i(-1, -1) or ev.get("to") == cell):
+				return {"kind": &"flow_landed", "item": want_item, "from": ev.get("from"),
+					"to": ev.get("to"), "count": ev.get("count")}
+		return {}
+	var want_id: StringName = StringName(goal.get("id", ""))
+	for ev: Dictionary in o.events:
+		if ev.get("kind") == want_kind and (want_id == &"" or ev.get("id") == want_id):
+			return ev
+	return {}
+
+
 ## The `agent` field's bot, unattached; null when no bot is registered for it.
-static func bot_for(record: Dictionary) -> ColdStartBot:
+static func bot_for(record: Dictionary) -> RouteBot:
 	match StringName(record.get("agent", "")):
 		&"cold_start":
 			return ColdStartBot.new(int(record.get("budget_ticks", 30000)))
