@@ -23,8 +23,8 @@ const RAIL_ORDER: Array[int] = [CAT_AUDIO, CAT_FEEL, CAT_GAME, CAT_CONTROLS]
 
 ## The bindings, each with the sentence its key does not tell you; an empty sentence draws no plate.
 ## EVERY action the hand reads, not four of fifteen (D0410; the new-player review: "KEYS · 4" exposed only
-## movement, jump and mining while grapple, reel, build and drop went unlisted). The hotbar digits are
-## polled as physical keys, not actions, so they are not here -- a known gap, not an omission.
+## movement, jump and mining while grapple, reel, build and drop went unlisted). The ten hotbar wells are
+## the last rows (T026, D0615): they used to be physical-key polls no remap could reach.
 const REMAP_ROWS: Array[Array] = [
 	[Controls.LEFT, "move left", ""], [Controls.RIGHT, "move right", ""],
 	[Controls.JUMP, "jump", ""],
@@ -40,6 +40,16 @@ const REMAP_ROWS: Array[Array] = [
 	[Controls.MAP, "map", "the corner map grows and shrinks"],
 	[Controls.SETTINGS, "settings", ""],
 	[Controls.SAVE, "save", "write the slot now"],
+	[Controls.SLOTS[0], "slot 1", "select the first hotbar well"],
+	[Controls.SLOTS[1], "slot 2", ""],
+	[Controls.SLOTS[2], "slot 3", ""],
+	[Controls.SLOTS[3], "slot 4", ""],
+	[Controls.SLOTS[4], "slot 5", ""],
+	[Controls.SLOTS[5], "slot 6", ""],
+	[Controls.SLOTS[6], "slot 7", ""],
+	[Controls.SLOTS[7], "slot 8", ""],
+	[Controls.SLOTS[8], "slot 9", ""],
+	[Controls.SLOTS[9], "slot 0", "the tenth well"],
 ]
 const AUDIO_ROWS: Array[Array] = [
 	["master", "master", "everything, including the ambience bed"],

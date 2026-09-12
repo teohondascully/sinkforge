@@ -33,6 +33,13 @@ const CLIMB_DOWN := &"sf_climb_down"
 const MAP := &"sf_map"              ## M: the corner map grows and shrinks
 const SETTINGS := &"sf_settings"    ## K: the settings page
 const SAVE := &"sf_save"            ## F5: write the slot now (the close box writes it too)
+## THE TEN HOTBAR WELLS AS ACTIONS (T026, D0615): the digits used to be polled as physical keys off the
+## driver's state -- ten slots that no remap could reach in a build that lists every other verb. Each
+## well is an ordinary action now: `SLOTS[i]` selects well i, and the tenth well is the 0 key (D0412).
+const SLOTS: Array[StringName] = [
+	&"sf_slot_1", &"sf_slot_2", &"sf_slot_3", &"sf_slot_4", &"sf_slot_5",
+	&"sf_slot_6", &"sf_slot_7", &"sf_slot_8", &"sf_slot_9", &"sf_slot_0",
+]
 
 
 ## Deafness: the one switch that disconnects live hardware from the running game.
@@ -63,7 +70,7 @@ static func pressed(action: StringName) -> bool:
 ## verbatim, because it is about the verb rather than the build: "a trigger is the only analogue control a
 ## finger can rest on for whole seconds without fatigue, and mining is measured in seconds."
 static func defaults() -> Dictionary:
-	return {
+	var out: Dictionary = {
 		LEFT: [{"key": KEY_A}, {"key": KEY_LEFT}, {"axis": JOY_AXIS_LEFT_X, "dir": -1}],
 		RIGHT: [{"key": KEY_D}, {"key": KEY_RIGHT}, {"axis": JOY_AXIS_LEFT_X, "dir": 1}],
 		JUMP: [{"key": KEY_SPACE}, {"pad": JOY_BUTTON_A}],
@@ -82,6 +89,11 @@ static func defaults() -> Dictionary:
 		SETTINGS: [{"key": KEY_K}, {"key": KEY_ESCAPE}, {"pad": JOY_BUTTON_START}],
 		SAVE: [{"key": KEY_F5}],
 	}
+	# The wells' defaults are physical positions: the row of digits, the tenth on 0. Physical keycodes,
+	# so an AZERTY hand gets the same shape of row rather than the same digits.
+	for i: int in SLOTS.size():
+		out[SLOTS[i]] = [{"key": KEY_0 if i == 9 else KEY_1 + i}]
+	return out
 
 
 ## The one place a binding spec becomes an event. Never duplicate this if/else elsewhere: a copy that

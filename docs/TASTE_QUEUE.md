@@ -217,9 +217,13 @@ marks). *Question: does a lesson want a second, tiny cue at the body -- a pip th
 action area round the miner and the aim; the tooltip was not named and was left. *Question: a tooltip
 that docks beside the lesson, or a tooltip that yields while MINE is held?*
 
-**T026 · The hotbar's ten digits are physical keys, not actions.** The remap page lists fifteen actions
-and none of them is a slot (D0412). *Question: ten more rows on the remap page, or a single "hotbar
-keys" row that cycles layouts?*
+**T026 · The hotbar's ten digits are physical keys, not actions.** *TAKEN (D0615): ten actions, ten
+rows. `Controls.SLOTS[i]` is `sf_slot_1..9`/`sf_slot_0` with physical-key defaults (the digit row by
+position, so AZERTY keeps its shape); `_digit_down` polls `Controls.pressed`, which also closes a
+deafness hole the physical poll had left open. The settings page's own completeness check -- every
+action in `Controls.defaults()` must appear in REMAP_ROWS -- is what guards the listing now.* The remap
+page lists fifteen actions and none of them is a slot (D0412). *Question: ten more rows on the remap
+page, or a single "hotbar keys" row that cycles layouts?*
 
 **T027 · The tutorial's opening cavity is a metre of crust over four metres of pocket.** D0353's `open`
 fixture, legacy's shape; the body walks it fine and the ambiguous-floor invariant logs on every crossing

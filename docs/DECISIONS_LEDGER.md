@@ -23254,3 +23254,13 @@ T028 asked whether the score's 50 ms of boot earns its keep before any music is 
 undersells it: the score IS the authored music -- a three-bed synthesis mixed as a pure function of
 depth -- and 50 ms is a one-time price. Stubbing it would hand the MUSIC slider back the dead consumer
 D0410 closed.
+
+## D0615 · 2026-09-11 · view/controls.gd, shell/main.gd, view/hud/settings_page.gd, tests/test_settings_page.gd, docs/TASTE_QUEUE.md · T026 taken: hotbar digits become ten remappable actions
+
+T026's options were ten remap rows or a single "hotbar keys" row cycling layouts. Chose ten real
+actions (`Controls.SLOTS`, `sf_slot_1..9`/`sf_slot_0`, physical-key defaults so the binding follows the
+digit row's position). A cycle-layouts row would have been a second binding system pretending to be
+one row. Side fix: `_digit_down` used to read the driver directly and stayed live while the game was
+deafened -- through `Controls.pressed` it deafens with everything else. The settings page's completeness
+test (every `defaults()` action listed) is the guard: the suite goes red if a future action is added
+without a row.

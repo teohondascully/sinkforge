@@ -30,7 +30,7 @@ func _state() -> Dictionary:
 func _test_the_tables_and_the_labels() -> void:
 	var n: int = SettingsPage.REMAP_ROWS.size()
 	var per: int = SettingsPage.remap_per_col()
-	_check(n == 15 and per == 8, "every action the hand reads, eight a column (%d, %d) -- D0410, not four of fifteen" % [n, per])
+	_check(n == 25 and per == 13, "every action the hand reads, thirteen a column (%d, %d) -- D0410 + D0615's ten wells, not four of fifteen" % [n, per])
 	var listed: Dictionary = {}
 	for row: Array in SettingsPage.REMAP_ROWS:
 		listed[row[0]] = true
