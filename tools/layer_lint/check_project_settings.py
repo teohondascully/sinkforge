@@ -23,6 +23,14 @@ REQUIRED = {
     },
 }
 
+# QUALITY.md gate 5 ("no autoloads in sim/") -- an autoload is declared HERE, in project.godot, not in
+# any .gd file, so the grep-level no_engine_imports.py cannot see one no matter what its docstring's
+# category list used to claim. Measured live during the Phase 1 audit: an `[autoload]` entry pointing
+# at res://sim/world/world.gd passed every gate in the tree. Policed prefix set matches
+# no_engine_imports.py's POLICED_DIRS: autoloading a sim/ or core/ script makes engine-free,
+# deterministic code reachable as global mutable state -- the exact thing both rules exist against.
+FORBIDDEN_AUTOLOAD_PREFIXES = ("res://sim/", "res://core/")
+
 
 def parse_settings(text: str) -> dict[str, dict[str, str]]:
     """Minimal .godot/.ini reader -- not configparser, which rejects the top-level config_version=5
@@ -45,6 +53,23 @@ def parse_settings(text: str) -> dict[str, dict[str, str]]:
     return sections
 
 
+def autoload_violations(sections: dict[str, dict[str, str]]) -> list[str]:
+    """Every [autoload] entry whose target lives under a policed prefix is a failure.
+
+    Kept as a function over parsed sections (not a read of PROJECT_GODOT) so the mutation test can
+    feed it synthetic autoload tables without standing up a scratch project."""
+    failures = []
+    for name, target in sections.get("autoload", {}).items():
+        # Value shape: `"*res://path/to/script.gd"` -- the * inside the quotes marks enabled. Strip
+        # quotes FIRST, then the marker: lstrip("*") on the raw value sees `"`, not `*`, and the
+        # marker survives into the prefix match (caught by this file's own mutation test).
+        path = target.strip().strip('"').lstrip("*")
+        if any(path.startswith(p) for p in FORBIDDEN_AUTOLOAD_PREFIXES):
+            failures.append(f"[autoload] {name} targets {path} -- no autoloads in core/ or sim/ "
+                            f"(QUALITY.md gate 5, CONTEXT.md 'no global mutable state')")
+    return failures
+
+
 def main() -> int:
     if not PROJECT_GODOT.is_file():
         print("check_project_settings: FAIL -- project.godot does not exist.")
@@ -62,7 +87,9 @@ def main() -> int:
             if got != want:
                 failures.append(f"[{section}] {key} = {got!r}, want {want!r}")
 
-    checked = sum(len(keys) for keys in REQUIRED.values())
+    failures += autoload_violations(sections)
+
+    checked = sum(len(keys) for keys in REQUIRED.values()) + len(sections.get("autoload", {}))
     print(f"check_project_settings: {checked} required key(s) checked in project.godot")
     if failures:
         for f in failures:

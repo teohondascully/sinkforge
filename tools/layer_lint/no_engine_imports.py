@@ -58,7 +58,11 @@ Categories checked, each mapped to the architecture rule it enforces:
                                 side-effecting IO, just not to a file)
   - OS-level side effects     (OS.execute() et al. run arbitrary subprocesses
                                 or show OS UI — engine coupling and IO both)
-  - autoloads / singletons    ("no global mutable state", CONTEXT.md)
+  - autoloads / singletons    ("no global mutable state", CONTEXT.md) --
+                                enforced by `check_project_settings.py`, NOT here: an autoload is
+                                declared in project.godot's `[autoload]` section, so no grep of .gd
+                                files can see it. Listed because the claim belongs to this file's
+                                category map; the pattern does not and cannot exist in this list.
 
 Deliberately NOT blocked, considered and rejected: Geometry2D/Geometry3D and
 Marshalls (pure deterministic math/encoding utilities, no engine state

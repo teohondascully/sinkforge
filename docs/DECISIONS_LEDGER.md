@@ -23014,3 +23014,33 @@ Also measured: `quit(2)` inside the probe's tick loop without a `return` is over
 clean. First version of this fix was itself a CANNOT-FAIL; the return is load-bearing.
 Reverse: delete the `_box_in_bounds` block and the docstring paragraph; the probe returns to log-latch
 duty only.
+
+## D0601 · 2026-09-11 · tools/layer_lint/check_project_settings.py, no_engine_imports.py, test_check_project_settings.py · gate 5 gets a real check, in the file that can see it
+Decided: gate 5's autoload clause is enforced by `check_project_settings.py`, which now scans
+`[autoload]` entries and fails on any target under `res://sim/` or `res://core/` (POLICED_DIRS parity
+with `no_engine_imports.py`). `no_engine_imports.py`'s docstring is corrected: it listed "autoloads /
+singletons" as a checked category while carrying no pattern for one -- the declaration lives in
+project.godot, outside every file that tool greps. A docstring overclaim in a tool whose own docstring
+warns about exactly that failure class.
+Why: the Phase 1 audit proved the escape live -- an `[autoload]` entry pointing into sim/ passed every
+gate. And the new check's own first version was itself silently broken: the strip order
+(`lstrip("*")` before removing quotes) left the `*` in the path, so a starred sim/ autoload matched no
+prefix and reported clean -- caught by the mutation test written alongside, before the check was ever
+trusted. Same story as D0115: the guard you haven't seen fail is a decoration.
+Reverse: remove `FORBIDDEN_AUTOLOAD_PREFIXES`/`autoload_violations` and the test file; the docstring
+reverts to an overclaim.
+
+## D0601 · 2026-09-11 · tools/layer_lint/check_project_settings.py, no_engine_imports.py, test_check_project_settings.py · gate 5 gets a real check, in the file that can see it
+Decided: gate 5's autoload clause is enforced by `check_project_settings.py`, which now scans
+`[autoload]` entries and fails on any target under `res://sim/` or `res://core/` (POLICED_DIRS parity
+with `no_engine_imports.py`). `no_engine_imports.py`'s docstring is corrected: it listed "autoloads /
+singletons" as a checked category while carrying no pattern for one -- the declaration lives in
+project.godot, outside every file that tool greps. A docstring overclaim in a tool whose own docstring
+warns about exactly that failure class.
+Why: the Phase 1 audit proved the escape live -- an `[autoload]` entry pointing into sim/ passed every
+gate. And the new check's own first version was itself silently broken: the strip order
+(`lstrip("*")` before removing quotes) left the `*` in the path, so a starred sim/ autoload matched no
+prefix and reported clean -- caught by the mutation test written alongside, before the check was ever
+trusted. Same story as D0115: the guard you haven't seen fail is a decoration.
+Reverse: remove `FORBIDDEN_AUTOLOAD_PREFIXES`/`autoload_violations` and the test file; the docstring
+reverts to an overclaim.
