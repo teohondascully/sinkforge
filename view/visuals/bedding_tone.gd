@@ -142,11 +142,14 @@ static func _strata(col: int, row: int) -> float:
 
 ## The warped bedding coordinate at a cell, in metres: the row in metres, dipped and raised along x by
 ## legacy's two slow sines, so a bed follows the same line wherever it is read. Shared by `_strata` (the
-## hue bands) and `RockTone.lamina` (the parting lines), which is what keeps the lines ON the beds.
+## hue bands) and `RockTone.lamina` (the parting lines), which is what keeps the lines ON the beds --
+## and since P044 by `ShaftGenerator._fill_base`, whose layer contacts now ride this same warp: the
+## dip is `core/bedding_dip.gd`'s table-sine value, identical on every platform and identical to the
+## row arithmetic the generator wrote the contacts with. A float `sin` here would paint beds the
+## material boundaries were never built on.
 static func bedding_metres(x: float, y: float) -> float:
-	var xm: float = x / float(MaterialLook.CELLS_PER_METRE)
 	var ym: float = y / float(MaterialLook.CELLS_PER_METRE)
-	return ym + sin(xm * 0.055) * 2.4 + sin(xm * 0.021) * 3.6
+	return ym + float(BeddingDip.dip_milli_m(floori(x), MaterialLook.CELLS_PER_METRE)) / 1000.0
 
 
 ## Legacy `world_renderer.gd:1624-1629 _cell_jitter`. A smooth, spatially-coherent value nudge over

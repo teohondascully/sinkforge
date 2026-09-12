@@ -156,11 +156,19 @@ static func enrich(world: World, site: Dictionary, seed: int) -> void:
 static func _fill_base(grid: TileGrid, surface: PackedInt32Array, topsoil_end: int, stonereach_end: int) -> void:
 	var blocks: Dictionary = {}
 	for col: int in grid.width:
+		# The contacts DIP with the bedding (P044): `BeddingDip` is the same function the tone warps
+		# its bands by, so a layer boundary sits ON a bedding line rather than ruling a flat row across
+		# rock that visibly dips. Both thresholds shift by the same amount, so the band between them
+		# keeps its thickness; a contact that rides above the local surface simply pinches out, which
+		# is what tilted strata against a reliefed ground do.
+		var dip: int = BeddingDip.dip_cells(col, TERRAIN_CELLS_PER_METER)
+		var clay_end: int = topsoil_end - dip
+		var stone_end: int = stonereach_end - dip
 		for row: int in range(surface[col], grid.height):
 			var material: StringName
-			if row < topsoil_end:
+			if row < clay_end:
 				material = &"clay"
-			elif row < stonereach_end:
+			elif row < stone_end:
 				material = &"hardrock"
 			else:
 				material = &"deepstone"

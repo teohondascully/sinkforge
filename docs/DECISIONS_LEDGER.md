@@ -23517,3 +23517,25 @@ wall recesses toward COOL. `nugget_count` moves retention the WRONG way -- the m
 faster than it closes `now`.
 Reverse: revert the yaml/delegation edits and d3-d7; the gate returns to report-only and fifteen
 content entries re-orphan. Rides the shared golden re-pin: the world it generates moved.
+
+## D0629 · 2026-09-12 · core/angle.gd, core/bedding_dip.gd, core/MODULE.md, sim/terrain_gen/{relief,vertical_passes,shaft_generator}.gd, view/visuals/bedding_tone.gd, tests/test_relief.gd, docs/NEEDS_DIRECTOR.md P044 · the contacts ride the bedding -- one warp, shared by the generator and the tone
+Decided: P044, executed under "correct all of those in order". The material layer contacts were flat
+absolute rows while `BeddingTone.bedding_metres` dipped its tone bands +/-6 m by legacy's two sines --
+tone and material disagreed, which is why the contact read as a drawn line. The fix as scoped: move the
+warp to core/ so sim/ could reach it. THE SHAPE THE INVARIANT FORCED: `core/` bans libm transcendentals
+on state paths (D0167's platform-divergence class is exactly this), so a float `sin` in core would have
+re-opened the very hole the module exists to close. `Relief` already carried the project's answer -- a
+256-entry integer sine table -- so the kit moved to `core/angle.gd` (Relief delegates; the header and
+`test_relief.gd`'s table pins carry over, plus a delegation pin so a re-grown private sine cannot
+silently uncouple the hills from the warp). `core/bedding_dip.gd` holds legacy's dip verbatim,
+dip(x) = 2.4 sin(0.055x) + 3.6 sin(0.021x) metres, as `dip_milli_m`/`dip_cells`. `_fill_base` writes
+each contact at `threshold_row - dip_cells(col)`: both thresholds shift together so band thickness is
+preserved, and a contact riding above the local surface pinches out -- tilted strata against reliefed
+ground. `bedding_metres` reads the same table value, so the bands the tone paints and the boundaries
+the generator writes are THE SAME line, not two functions agreeing within a cell on one libm.
+Measured on the read-back: every clean clay/hardrock contact sits within half a cell of its bedding
+coordinate (0 off of 232), and the contacts land on 19 distinct rows -- they dip, provably. Mutations
+witnessed: a flat fill fails all three new assertions; the tone on its own float sine disagrees with
+the shared dip by 0.1375 m (over half a cell) and breaks the bedding-coordinate check with it.
+Reverse: revert the delegate, the two new core files, and the `_fill_base` dip; the contacts go flat
+and P044 re-parks. Rides the shared golden re-pin with D0628.

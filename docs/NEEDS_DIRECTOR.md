@@ -1551,6 +1551,16 @@ spends most of its time. But it changes every world anyone has generated, and th
 the contact. I would rather not — the colour would stop telling the truth about what a cell IS, and a
 player mining at 39 m and 41 m gets different materials either way.
 
+### EXECUTED, 2026-09-12 (D0629) — "correct all of those in order" un-parked it
+
+Landed exactly as scoped: the warp moved to `core/bedding_dip.gd` on `Angle`'s integer sine table (the
+core invariant bans libm transcendentals on state paths — the table, not `sin()`, is what made this
+shareable at all), `_fill_base` writes contacts at `threshold - dip_cells(col)`, and
+`BeddingTone.bedding_metres` reads the same function so material and tone are ONE line. Mutation-
+witnessed both ways: a flat fill fails the bedding-coordinate check on every clean contact, and the
+tone drifting back to float `sin` disagrees by 0.1375 m — over half a cell — which is the misalignment
+the fix exists to kill. Rides the shared golden re-pin with the economy batch.
+
 ## P045 · RULED 2026-09-12 -- the trees landed alone; P044 stays parked at its own re-pin cost
 
 **Authored on `trees-footing-and-crowns` 2026-09-11, landed verbatim.** The re-pin both tree changes

@@ -12,7 +12,7 @@ extends RefCounted
 ## flared toward the sky, over the column with the tallest fall beneath it.
 ##
 ## Two of legacy's transcendental shapes live here and both are integer tables (D0381): the width sine
-## reads `Relief.SIN_MILLI`; the flare `pow(up, 2.2)` reads `FLARE_MILLI`, 65 entries linearly
+## reads `Angle.SIN_MILLI`; the flare `pow(up, 2.2)` reads `FLARE_MILLI`, 65 entries linearly
 ## interpolated. Positions are carried in thousandths of a cell, as legacy carried them in floats.
 ## Rates, lengths and widths come from the site's `vertical` record in legacy's own units.
 
@@ -64,7 +64,7 @@ static func carve_rifts(grid: TileGrid, rng: SplitRng, cfg: Dictionary, surface:
 			+ rng.next_range(int(cfg["top_min_m"]) * cells_per_m, int(cfg["top_max_m"]) * cells_per_m)
 		var length: int = rng.next_range(int(cfg["min_len_m"]) * cells_per_m, int(cfg["max_len_m"]) * cells_per_m)
 		var drift: int = rng.next_range(-wander, wander)
-		var phase: int = rng.next_range(0, Relief.TURN - 1)
+		var phase: int = rng.next_range(0, Angle.TURN - 1)
 		var pinch: int = rng.next_range(pinch_lo, pinch_hi)      # how fast the width breathes down the fall
 		for i: int in length:
 			var row: int = top + i

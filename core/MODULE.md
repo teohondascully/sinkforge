@@ -55,6 +55,12 @@ Every other layer: sim, interface, harness, experiment, view, shell.
 - `Reach` (`reach.gd`, D0521) — the one reach rule: `NUM/DEN` (16/5, 3.2 metres) and the squared, inclusive
   Euclidean compare over `Fx` points: `.in_reach()`, `.in_reach_metre()`, `.metre_centre_fx()`; the metre's px is
   a parameter (this module may not know `Body`'s tile). `Aim.in_reach_point` delegates here; `RingPainter` reads it.
+- `Angle` (`angle.gd`, D0629) — the deterministic sine: a 256-entry milli table looked up by 1/65536-turn
+  integer angles (`.sin_milli()`, `.units()`, `.round_milli()`), because `sin` is a libm call and no state
+  path may make one. Hoisted from `Relief`, which still exposes the names as delegates.
+- `BeddingDip` (`bedding_dip.gd`, D0629) — the bedding warp, in metres and cells: `.dip_milli_m(col, cpm)`,
+  `.dip_cells(col, cpm)`. One function for the generator's layer contacts (`_fill_base`) and the view's
+  tone (`BeddingTone.bedding_metres`), so a stratum's material boundary IS a bedding line.
 
 ## Gotchas
 
