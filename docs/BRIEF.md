@@ -1,5 +1,25 @@
 # Brief
 
+## What was learned — the headless harness proved the policy; the seat proved the harness wrong (D0625, queue 44)
+
+Splitting `ColdStartBot` into a per-tick `decide()` let one route drive both the scenario driver and
+the real seat (`--route=cold_start`). The two paths are textually identical and still disagreed — the
+seat found two bugs the headless run structurally cannot see:
+
+- **`Interface.observe()` owns a consumed events channel.** A route-side observe steals every event
+  the view's refresh needs — hints fire off events, so a self-observing route would have played a
+  different game than a player sees. The fix: the seat hands the route the LAST rendered frame's
+  observation. Any future seat-driven instrument inherits this contract; it is why `decide(obs)`
+  takes a parameter rather than observing internally.
+- **The route anchor was one row deep.** `_bot.pos()` already returns the anchor row the feet rest
+  on; `+ (0,1)` aimed every leg a metre under the fixtures. The ore leg passed anyway — T037's
+  dipping vein puts ore below the surface row — and only the coal seam (surface-row only) exposed it,
+  as a 30k-tick stall, not a crash. A leg boundary that can only fail by timeout is weak coverage;
+  the anchor bug was itself the accidental mutation that proved leg-level asserts discriminate.
+
+Pattern for future two-frontend policies: **the harness verifies the decision; only the seat verifies
+the wiring.** Timing stayed honest — 417 ticks headed vs 420 headless, legs identical.
+
 ## What was learned — the audit instrument itself had the defect it was built to find (gate-reconciliation arc, 2026-09-11)
 
 The 37-gate reconciliation (`docs/audits/2026-09-11-gate-reconciliation.md`: 30 ENFORCED, 3 ADVISORY,

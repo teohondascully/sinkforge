@@ -67,8 +67,10 @@ the C003 pacing threshold, the `history/` image cull (168 vs cap 12 — the dire
 
 ## Standing items
 
-Gate 7 has a live WARN; gate 33's margin is thin; the full fuzz sweep is schedule-only (nightly);
-headed_boot is unverifiable on this macOS seat. See `docs/QUALITY.md` audited-status lines per gate.
+Gate 7 has a live WARN; gate 33's margin has recovered (65.4% vs the 61.8% ratchet floor as of
+2026-09-12 — QUALITY.md's "three untested functions turns it red" note predates the recovery); the
+full fuzz sweep is schedule-only (nightly); headed_boot is unverifiable on this macOS seat. See
+`docs/QUALITY.md` audited-status lines per gate.
 
 ## Performance programme
 
