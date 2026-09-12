@@ -185,3 +185,48 @@ static func follow_camera(rig: CameraRig, body: Body, zoom: float, vp: Viewport,
 		Vector2(float(body.pos_x) / float(Fx.SCALE), float(body.pos_y) / float(Fx.SCALE)),
 		Vector2(float(body.vel_x) / float(Fx.SCALE), float(body.vel_y) / float(Fx.SCALE)),
 		zoom, screen_width, delta)
+
+
+## `--mine-down` (D0195). The scan window only has to cover the reach itself -- 51.2px is 12.8 terrain
+## cells -- so 16 rows is the reach plus margin, not an arbitrary depth.
+const MINE_DOWN_SCAN_ROWS: int = 16
+
+
+## `--mine-down` agent mode's input policy: sink a shaft straight down through the body's own footprint.
+## It exists to give the Slice 1 mining verb a deterministic, headless proof -- an agent trace is NOT a
+## human `--play` session and the two are different evidence (`tests/body/recordings/README.md`), but it
+## is mechanically reproducible, which a human session is not.
+##
+## It aims at the SHALLOWEST solid cell under the body's own width, not at one column: the body is 16px
+## wide, four terrain cells, so a one-cell-wide hole is something it can never descend into. Clearing the
+## shallowest cell across the footprint first means the shaft comes down layer by layer and the body falls
+## into each one as it opens -- which is precisely the acceptance question, "can the body descend into
+## what it mined", answered by construction rather than by hoping.
+##
+## Moved out of `reveal_scene.gd` under the same pressure `follow_camera` records above: the scene was
+## over its cap and an input POLICY is a pure function of grid and body, not scene work.
+static func mine_down_input(grid: TileGrid, body: Body) -> InputFrame:
+	var input: InputFrame = InputFrame.new()
+	var left_col: int = Body._px_to_cell(body._left_x())
+	var right_col: int = Body._px_to_cell(body._right_x() - 1)
+	var feet_row: int = Body._px_to_cell(body._bottom_y() - 1)
+	var best_row: int = 1 << 30
+	var best_col: int = -1
+	for col: int in range(left_col, right_col + 1):
+		for row: int in range(feet_row, feet_row + MINE_DOWN_SCAN_ROWS):
+			var cell: Vector2i = Vector2i(col, row)
+			if not grid.in_bounds(cell):
+				break
+			if not grid.is_solid(cell):
+				continue
+			if Mining.in_reach(body.pos_x, body.pos_y, cell) and row < best_row:
+				best_row = row
+				best_col = col
+			break  # only the shallowest solid cell in this column is a candidate
+	if best_col < 0:
+		return input
+	input.has_aim = true
+	input.aim_col = best_col
+	input.aim_row = best_row
+	input.mine_held = true
+	return input

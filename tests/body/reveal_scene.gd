@@ -41,9 +41,6 @@ const WIDE_VIEW_ROW_CAP: int = 180
 const COLOR_BG: Color = BackdropPainter.COLOR_BG  ## D0276: one definition, in the painter that fills it
 const COLOR_BODY: Color = Color(0.85, 0.25, 0.25)
 const COLOR_BODY_GROUNDED: Color = Color(0.95, 0.75, 0.15)
-## `--mine-down` (D0195). The scan window only has to cover the reach itself -- 51.2px is 12.8 terrain
-## cells -- so 16 rows is the reach plus margin, not an arbitrary depth.
-const MINE_DOWN_SCAN_ROWS: int = 16
 ## How far the scripted shaft sinks before the run is done, in terrain cells. 24 cells is 96px, six logic
 ## tiles, six metres: deep enough that descending is unambiguous rather than a single ledge step.
 const MINE_DOWN_TARGET_ROWS: int = 24
@@ -82,6 +79,7 @@ var _last_input: InputFrame = InputFrame.new()  ## what `_draw` should draw the 
 var _spawn_row: int = 0  ## the row the body started on -- `--mine-down`'s descent is measured against it
 var _fixed_camera: Vector2 = Vector2.ZERO  ## `--camera=col,row`, for comparable milestone frames
 var _has_fixed_camera: bool = false  ## a real bool, not a Vector2 compared against null (D0194's note)
+var _pan: RevealPan = null  ## `--pan=c0,r0:c1,r1` engages it; null is "no sweep" (queue item 49)
 var _sky: bool = false  ## `--sky` (D0244): draw the lifted SkyPainter behind the world
 var _sky_view: WorldView = null  ## the real coordinator, so this proves the whole contract
 var _rig: CameraRig = CameraRig.new()  ## D0273: the ported follow; warped to the spawn in `_ready`
@@ -161,6 +159,7 @@ func _parse_args() -> Dictionary:
 	_wide_view = cfg["wide_view"]
 	_sky = cfg["sky"]
 	_play_mode = cfg["play"]
+	_pan = RevealPan.build(cfg)
 	if int(cfg["bite_radius"]) >= 0:
 		_mining.bite_radius = int(cfg["bite_radius"])
 	return {"site_id": cfg["site_id"], "seed": cfg["seed"]}
@@ -187,6 +186,10 @@ func _physics_process(delta: float) -> void:
 	_tick_count += 1
 	_update_camera(delta)
 	queue_redraw()
+
+	if _pan != null:
+		await _step_pan()
+		return
 
 	if _screenshot_tick >= 0 and _tick_count == _screenshot_tick:
 		# Held across the shutter's awaits so the world stops while the pixels are read; the reason,
@@ -291,7 +294,7 @@ func _dig_edge(dig_held: bool) -> bool:
 ## not to produce a trustworthy pull measurement.
 func _scripted_approach_input() -> InputFrame:
 	if _mine_down:
-		return _mine_down_input()
+		return DebugSceneCommon.mine_down_input(_grid, _body)
 	var input: InputFrame = InputFrame.new()
 	if _target_glimmer_col < 0:
 		return input
@@ -304,43 +307,6 @@ func _scripted_approach_input() -> InputFrame:
 	return input
 
 
-## `--mine-down` agent mode: sink a shaft straight down through the body's own footprint. This exists to
-## give the Slice 1 mining verb a deterministic, headless proof -- an agent trace is NOT a human `--play`
-## session and the two are different evidence (`tests/body/recordings/README.md`), but it is mechanically
-## reproducible, which a human session is not.
-##
-## It aims at the SHALLOWEST solid cell under the body's own width, not at one column: the body is 16px
-## wide, four terrain cells, so a one-cell-wide hole is something it can never descend into. Clearing the
-## shallowest cell across the footprint first means the shaft comes down layer by layer and the body falls
-## into each one as it opens -- which is precisely the acceptance question, "can the body descend into what
-## it mined", answered by construction rather than by hoping.
-func _mine_down_input() -> InputFrame:
-	var input: InputFrame = InputFrame.new()
-	var left_col: int = Body._px_to_cell(_body._left_x())
-	var right_col: int = Body._px_to_cell(_body._right_x() - 1)
-	var feet_row: int = Body._px_to_cell(_body._bottom_y() - 1)
-	var best_row: int = 1 << 30
-	var best_col: int = -1
-	for col: int in range(left_col, right_col + 1):
-		for row: int in range(feet_row, feet_row + MINE_DOWN_SCAN_ROWS):
-			var cell: Vector2i = Vector2i(col, row)
-			if not _grid.in_bounds(cell):
-				break
-			if not _grid.is_solid(cell):
-				continue
-			if _grid.is_solid(cell) and Mining.in_reach(_body.pos_x, _body.pos_y, cell) and row < best_row:
-				best_row = row
-				best_col = col
-			break  # only the shallowest solid cell in this column is a candidate
-	if best_col < 0:
-		return input
-	input.has_aim = true
-	input.aim_col = best_col
-	input.aim_row = best_row
-	input.mine_held = true
-	return input
-
-
 func _record_tick(input: InputFrame) -> void:
 	_recording.append(DebugSceneCommon.record_reveal_row(
 		_tick_count, input.move_dir, input.jump_pressed, input.jump_held, input.dig_pressed,
@@ -350,8 +316,19 @@ func _record_tick(input: InputFrame) -> void:
 func _update_camera(delta: float) -> void:
 	if _wide_view:
 		return  # camera stays fixed on the grid midpoint, set once in _ready() -- not the body
+	if _pan != null:
+		_camera.position = _pan.camera_position(_tick_count, _rig, _camera_zoom, get_viewport(), delta)
+		return
 	_camera.position = _fixed_camera if _has_fixed_camera else DebugSceneCommon.follow_camera(
 		_rig, _body, _camera_zoom, get_viewport(), delta)
+
+
+## The scene-side half of the sweep's pacing (`tests/body/reveal_pan.gd` owns the state): hold the world
+## across the shutter's awaits exactly as the still path does, so a strip frame is a frame, not a smear.
+func _step_pan() -> void:
+	_shutter_held = true
+	await _pan.step(self, _tick_count, _camera, _camera_zoom, _body, _sky_view)
+	_shutter_held = false
 
 
 func _draw() -> void:

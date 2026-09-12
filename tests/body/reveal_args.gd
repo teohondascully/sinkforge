@@ -50,6 +50,11 @@ static func defaults() -> Dictionary:
 		"wide_view": false,
 		"sky": false,
 		"play": false,   ## the MODE flag -- see `parse()`'s note on why it arrived late
+		"panning": false,
+		"pan_from": Vector2.ZERO,
+		"pan_to": Vector2.ZERO,
+		"pan_shots": 8,
+		"pan_out": "",
 	}
 
 
@@ -70,13 +75,13 @@ static func parse(argv: PackedStringArray) -> Dictionary:
 		elif arg.begins_with("--zoom="):
 			cfg["camera_zoom"] = float(arg.trim_prefix("--zoom="))
 		elif arg.begins_with("--camera="):
-			# `--camera=col,row` pins the camera to a stated terrain cell and leaves it there. Milestone
-			# captures need a FIXED frame across commits -- a body-following camera makes two shots of the
-			# same world incomparable, which defeats the whole point of a before/after pair.
-			var parts: PackedStringArray = arg.trim_prefix("--camera=").split(",")
-			cfg["has_fixed_camera"] = parts.size() == 2
-			if parts.size() == 2:
-				cfg["fixed_camera"] = Vector2(float(parts[0]) * CELL, float(parts[1]) * CELL)
+			_camera_into(cfg, arg.trim_prefix("--camera="))
+		elif arg.begins_with("--pan="):
+			_pan_into(cfg, arg.trim_prefix("--pan="))
+		elif arg.begins_with("--pan-shots="):
+			cfg["pan_shots"] = int(arg.trim_prefix("--pan-shots="))
+		elif arg.begins_with("--pan-out="):
+			cfg["pan_out"] = arg.trim_prefix("--pan-out=")
 		elif arg.begins_with("--bite="):
 			# D0200 (Slice 1.5). The probe's own dial, and its own control: `--bite=0` is exactly the
 			# Slice 1 single-cell blow, so a director sweeping this flag is running the experiment rather
@@ -102,3 +107,34 @@ static func parse(argv: PackedStringArray) -> Dictionary:
 			## deliberately -- every existing milestone shot, replay and suite was taken without it, and a
 			## backdrop that appeared unasked would change what those captures mean.
 	return cfg
+
+
+## `--camera=col,row` pins the camera to a stated terrain cell and leaves it there. Milestone captures
+## need a FIXED frame across commits -- a body-following camera makes two shots of the same world
+## incomparable, which defeats the whole point of a before/after pair. A malformed value must not
+## half-apply: `has_fixed_camera` is a real bool precisely so a caller never infers "pinned" from a
+## Vector2 that happens to be non-zero (D0194's note).
+static func _camera_into(cfg: Dictionary, spec: String) -> void:
+	var parts: PackedStringArray = spec.split(",")
+	cfg["has_fixed_camera"] = parts.size() == 2
+	if parts.size() == 2:
+		cfg["fixed_camera"] = Vector2(float(parts[0]) * CELL, float(parts[1]) * CELL)
+
+
+## `--pan=c0,r0:c1,r1` sweeps the camera linearly between two stated terrain cells while
+## `--pan-shots=N` captures land at `--pan-out`_i.png -- the moving-camera strip queue item 49's fourth
+## condition asks to be judged on. A sweep rather than a body-follow because the named failure modes
+## (pixel-snap, the veil's per-frame sampling, parallax) are all camera-rect work, and a scripted
+## segment is reproducible where a walk is not. Both ends must parse or nothing engages -- a half-formed
+## segment sweeping halfway is `--camera=24`'s failure one level deeper.
+static func _pan_into(cfg: Dictionary, spec: String) -> void:
+	var seg: PackedStringArray = spec.split(":")
+	if seg.size() != 2:
+		return
+	var a: PackedStringArray = seg[0].split(",")
+	var b: PackedStringArray = seg[1].split(",")
+	if a.size() != 2 or b.size() != 2:
+		return
+	cfg["panning"] = true
+	cfg["pan_from"] = Vector2(float(a[0]) * CELL, float(a[1]) * CELL)
+	cfg["pan_to"] = Vector2(float(b[0]) * CELL, float(b[1]) * CELL)

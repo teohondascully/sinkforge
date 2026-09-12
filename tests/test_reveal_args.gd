@@ -15,6 +15,7 @@ extends "res://tests/test_base.gd"
 func _initialize() -> void:
 	_test_defaults_are_what_the_scene_would_have_used()
 	_test_camera_converts_cells_to_pixels()
+	_test_pan_converts_both_ends_and_refuses_a_half_segment()
 	_test_unknown_arguments_are_ignored_not_rejected()
 	_test_every_flag_is_reachable()
 	_test_the_scene_reads_no_flag_behind_this_parser_s_back()
@@ -48,6 +49,18 @@ func _test_camera_converts_cells_to_pixels() -> void:
 		"a one-part --camera= does not pin anything rather than pinning half of one")
 
 
+## `--pan=` is `--camera=`'s moving sibling, so it carries the same two quiet failures: cells must
+## become pixels on BOTH ends, and a half-formed segment must not engage the sweep at all.
+func _test_pan_converts_both_ends_and_refuses_a_half_segment() -> void:
+	var cfg: Dictionary = RevealArgs.parse(PackedStringArray(["--pan=8,84:40,220"]))
+	_check(bool(cfg["panning"]), "--pan= engages the sweep")
+	_check(cfg["pan_from"] == Vector2(8.0 * RevealArgs.CELL, 84.0 * RevealArgs.CELL)
+		and cfg["pan_to"] == Vector2(40.0 * RevealArgs.CELL, 220.0 * RevealArgs.CELL),
+		"both ends converted cells to pixels (%s -> %s)" % [cfg["pan_from"], cfg["pan_to"]])
+	var bad: Dictionary = RevealArgs.parse(PackedStringArray(["--pan=8,84"]))
+	_check(not bool(bad["panning"]), "a one-ended --pan= does not sweep rather than sweeping halfway")
+
+
 func _test_unknown_arguments_are_ignored_not_rejected() -> void:
 	var cfg: Dictionary = RevealArgs.parse(PackedStringArray(
 		["--headless", "--path", ".", "--", "--seed=99", "--not-a-flag"]))
@@ -63,7 +76,7 @@ func _test_every_flag_is_reachable() -> void:
 	var cfg: Dictionary = RevealArgs.parse(PackedStringArray([
 		"--screenshot-tick=7", "--screenshot-out=/tmp/x.png", "--site=reveal_test_sparse",
 		"--seed=5", "--zoom=2.5", "--camera=1,2", "--bite=3", "--mine-down", "--wide-view", "--sky",
-		"--play"]))
+		"--play", "--pan=8,84:40,220", "--pan-shots=5", "--pan-out=/tmp/pan"]))
 	var unmoved: Array = []
 	var defaults: Dictionary = RevealArgs.defaults()
 	for key: String in defaults:

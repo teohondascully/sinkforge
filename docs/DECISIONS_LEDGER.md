@@ -23369,3 +23369,34 @@ now, and if the world later reads its own seams the chart still does not lie.
 
 **Mutation witness:** suppressing the seam emission turns the boundary asserts red; the tick/nub
 asserts pin the continuous scale the same way.
+
+## D0624 · 2026-09-12 · tests/body/reveal_args.gd, tests/body/reveal_pan.gd, tests/body/reveal_scene.gd, tests/body/debug_scene_common.gd, tests/test_reveal_args.gd, docs/media/moments/2026-09-11-pan-*.png · queue item 49's fourth condition: the moving camera gets an instrument, and the instrument's first measurement is a surprise
+
+The match loop's last un-moved condition asked for "a short recorded pan" to judge whether the render
+holds under a moving camera. What exists now is a flag set, not a one-off: `--pan=c0,r0:c1,r1`,
+`--pan-shots=N`, `--pan-out=PREFIX` drive a scripted sweep that captures one frame every 30 ticks.
+
+**Through the rig, not around it.** The sweep hands `CameraRig.step` a synthetic body target and
+velocity rather than lerping `camera.position` directly -- a direct pan would test the painters and
+certify nothing about the follow, lead, screen-pixel snap or world clamp the condition actually names.
+The first cut did exactly that and was thrown out for it. The measured difference is real: through the
+rig, the shallow_clay strip's step deltas ease 160 -> 132 -> 121 -> 120 -> 119 px (the exponential
+spin-up), where the direct lerp produced dead-even steps.
+
+**What the instrument measured on its first run.** On the 48-cell test sites a horizontal sweep is
+clamped ENTIRELY -- the world (192 px) is narrower than the frame at play zoom, so `clamp_to_limits`
+centres the camera and x never moves. The strip had to move to `shallow_clay` (64 m) to exercise
+horizontal motion at all. The condition is therefore answered in two halves: a vertical descent strip
+on the dense test site (bands, veil, depth seams -- `2026-09-11-pan-*.png`) and a horizontal strip on
+the play site (`2026-09-11-pan-clay-*`, and `--sky` on the test site: `2026-09-11-pan-sky-*`). Both hold: no tearing, no half-drawn
+columns, HUD and the new chart ruler stable across the sweep. What the stills CANNOT prove is
+frame-to-frame shimmer between shots 30 ticks apart -- sub-tick judder is `presented_camera`'s claim,
+and the honest residual is that this strip samples ticks, not presented frames.
+
+**File moves, recorded because the cap forced them:** the sweep's state and cadence became
+`RevealPan`, and `--mine-down`'s input policy moved into `DebugSceneCommon` beside `follow_camera` --
+the same "code leaves where the reasoning has room" move D0244/D0273 already made twice. `parse()`
+shed its two nested branches into `_camera_into`/`_pan_into` under the 50-line function gate.
+
+Mutation witness: a one-ended `--pan=8,84` parses to "no sweep" (asserted), and suppressing the rig
+call back to a direct lerp is exactly the wrongness the suite's flag-reachability population now pins.
