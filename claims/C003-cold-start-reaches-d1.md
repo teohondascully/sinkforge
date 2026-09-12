@@ -57,12 +57,14 @@ number to reason from, not before.
 
 ## Current value
 
-**Measured 2026-09-11: 414 ticks** (~6.9 sim-seconds at 60 Hz) — `tests/test_cold_start_d1.gd` drives
-a scripted bot through `Interface.apply`/`observe` on the stamped tutorial site: mine the surface
-vein, feed the forge, mine the coal seam, feed it again, scoop two ingots, feed the rig. The event
-arrived; item conservation held over the whole run. `first_failed_at` is populated from the same
-commit's mutation run: suppressing the event kind left every leg green and the claim's assertion red,
-which is the observation §10a asks for — the measurement path can fail.
+**Measured 2026-09-12: 420 ticks headless, 417 through the real seat** (~7 sim-seconds at 60 Hz) —
+`tests/test_cold_start_d1.gd` drives `ColdStartBot` through `Interface.apply`/`observe` on the stamped
+tutorial site, and `tests/test_seat_route.gd` plus a headed `--route=cold_start` run prove the SAME
+`decide()` policy drives the game's own seat: legs at 60/71/122/149/388/417 ticks, one capture per
+leg boundary. The +6 over the first measurement is the decide/apply split's leg-boundary ticks
+(D0625). The event arrived; item conservation held over the whole run. `first_failed_at` is populated
+from the same commit's mutation run: suppressing the event kind left every leg green and the claim's
+assertion red, which is the observation §10a asks for — the measurement path can fail.
 
 ## Current blockers and available foundation
 
@@ -74,15 +76,15 @@ full falsifiable form:
   solidity, so no hidden state enters the run; the honest upgrade is a constrained window once the
   type exists, and the policy would not need to change. The driver's report names the envelope it
   actually used so the gap stays visible rather than silently read as satisfied.
-- **The threshold is still unset.** The scripted floor is now measured (414 ticks); a human-pacing
-  threshold wants either a real playthrough number or a director ruling on what multiple of the bot
-  floor counts as completable.
+- **The threshold is still unset.** The scripted floor is now measured (420 ticks headless, 417
+  through the headed seat); a human-pacing threshold wants either a real playthrough number or a
+  director ruling on what multiple of the bot floor counts as completable.
 - **Checkpoint re-derivation is now exercised (D0621), at the end AND mid-run.** The suite captures
   the run's resulting state through `Session`, round-trips it through the binary serializer, and
   asserts the restored session signs identically on every saved part and stays identical under 30
   further ticks. A second leg checkpoints after route leg 3 (ore and coal delivered, the forge holding
   work in flight), restores onto fresh services, and a new bot instance resumes the route's remaining
-  legs to the same goal (125 + 291 ticks vs the uninterrupted 414). The leg seam is explicit —
+  legs to the same goal (122 + 297 ticks vs the uninterrupted 420). The leg seam is explicit —
   `ColdStartBot.execute(anchor, from_leg, to_leg)` — because a delivered stack reads as un-mined and
   the policy cannot re-derive progress from the pack. The first end-state run found a real defect:
   `Items._rubble` — signed state since D0354 — had never been written to the envelope; the key exists
@@ -123,3 +125,4 @@ its first real checkpoint.
 | 2026-09-11 | D0620 | d1 wants 2 ingots | within 30000-tick budget | PASSING | Same run now driven by `harness/driver` consuming the generated scenario record — yaml is the single source, the suite asserts over the driver's report. Event-suppression mutation re-verified red. |
 | 2026-09-11 | D0621 | d1 wants 2 ingots | 414 ticks; checkpoint re-loads signature-identically | PASSING | The resulting-state clause is exercised: `Session.capture` → binary serializer → `from_save` → saved parts sign identically and stay so under 30 ticks. Found and fixed `Items._rubble` missing from the envelope (signed since D0354, unsaved until now). Verbs selection differs by design (D0355). Mid-run resume still unproven. |
 | 2026-09-11 | D0621 (mid-run) | d1 wants 2 ingots | 125+291 ticks across a save/load vs 414 uninterrupted | PASSING | Checkpoint after leg 3 (forge holding work in flight) restores onto fresh services and a fresh bot resumes the route to the same goal. `execute(anchor, from_leg, to_leg)` is the seam -- delivered stacks are not pack-idempotent. Mutation witness: stripping machine buffers from the capture starves the resumed forge and the goal never fires. |
+| 2026-09-12 | D0625 | d1 wants 2 ingots | 420 ticks headless; 122+297 across the checkpoint; 417 headed | PASSING | The bot became a per-tick `decide()` policy so the SAME route drives the headless scenario AND the real seat (`--route=cold_start`, `SeatRoute`): legs 60/71/122/149/388/417, captures per leg boundary. The seat path decides on the LAST rendered observation -- `observe()` owns the consumed events channel, so a route-side observe would steal the view's events. Headed run found the anchor bug `pos()+1` aimed legs a metre deep (ore survived on the dipping vein; coal mined rock to the budget). Mutation witness: suppressing the leg-boundary shots fails the strip assertion. |

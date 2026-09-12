@@ -23400,3 +23400,27 @@ shed its two nested branches into `_camera_into`/`_pan_into` under the 50-line f
 
 Mutation witness: a one-ended `--pan=8,84` parses to "no sweep" (asserted), and suppressing the rig
 call back to a direct lerp is exactly the wrongness the suite's flag-reachability population now pins.
+## D0625 · 2026-09-12 · harness/bots/cold_start.gd, shell/seat_route.gd, shell/seat_flags.gd, shell/seat_session.gd, shell/main.gd, tests/test_seat_route.gd, .github/workflows/harness.yml, claims/C003 · queue item 44: one route policy drives both the headless scenario and the real seat
+
+The cold-start run existed only inside the harness; the seat could not play it. The refactor splits
+`ColdStartBot` into `decide()` -- one tick's `InputFrame` plus the tick's own commands as data -- and
+the callers that apply them: `execute()` applies to the driver's door, `SeatRoute.tick` applies to the
+seat's. The headed run is now `--route=cold_start --route-out=PREFIX`, one capture per leg boundary
+(leg0..leg5, done), legs_ok=true at tick 417 on both headed runs -- deterministic.
+
+**Two bugs the seat path found that the harness path could not.** (1) `observe()` owns a consumed
+events channel: a route observing on its own would steal every event the view's refresh needs (the
+hint bubbles fire off events). The route therefore decides on the LAST rendered frame's observation,
+handed in by the seat -- `decide(obs)` takes the parameter, and `test_seat_route` mirrors the same
+order: observe, tick, move, observe. (2) The route's anchor was `pos() + (0,1)` where `pos()` already
+returns the anchor row the feet rest on -- every leg aimed a metre deep. The ore leg survived it
+because T037's dipping vein puts ore below the surface row; the coal seam does not dip, so leg 2
+mined plain rock until the 30000-tick budget ran out. The headless path never saw either: it
+self-observes (no channel to steal) and derives its anchor from the spawn record, not the body.
+
+**`SeatSession`, the second size-cap move this file has needed** (the SeatHud/SeatEffects seam):
+`open`/`capture`/`restore`/`save`/`retire_slot`/`new_game`/`return_to_surface` left `main.gd` when the
+route wiring put it over 400; thin delegators keep the seat's public surface the suites call.
+
+Mutation witness: suppressing the leg-boundary `shot.call` fails the strip assertion; the anchor bug
+itself was the accidental mutation that proved leg-boundary coverage discriminates.

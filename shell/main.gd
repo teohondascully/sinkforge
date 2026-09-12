@@ -48,6 +48,9 @@ var meter: FrameMeter = null
 ## `--perf-drive`: with the meter, a scripted hand -- 240 ticks right, 240 left, a jump every 90 -- so
 ## the meter measures a MOVING camera. Standstill numbers flatter every window-keyed cache (2026-09-04).
 var drive: bool = false
+## `--route=NAME`: the seat driven by a route policy (`shell/seat_route.gd`) instead of the keyboard --
+## the playthrough as an instrument, one `decide()` per physics tick (D0625, queue item 44).
+var route: SeatRoute = null
 ## The landing's own memory: the on-floor edge and the speed the fall carried into it (D0403).
 var effects: SeatEffects = SeatEffects.new()   ## the per-tick particles, the shake (D0410)
 
@@ -62,6 +65,10 @@ func _ready() -> void:
 		RenderingServer.frame_pre_draw.connect(_on_pre_draw)     # the seat's own methods: dropped with the node
 		RenderingServer.frame_post_draw.connect(_on_post_draw)
 	drive = flags["drive"]
+	if flags["route"] != &"":
+		route = SeatRoute.build(flags["route"])
+		if route == null:
+			push_error("--route=%s: no such route" % flags["route"])
 	if autoboot:
 		boot(not bool(flags["fresh"]))
 
@@ -78,7 +85,7 @@ func boot(load_save: bool) -> bool:
 	Settings.persist = load_save
 	Controls.register()
 	Settings.load_settings(bool(flags["muted"]))   # --muted: this boot only, never saved (D0437)
-	var env: Dictionary = _open_session(load_save, phases)
+	var env: Dictionary = SeatSession.open(self, load_save, phases)
 	if door == null:
 		push_error("boot: the start refused: %s" % WorldSeeder.last_refusal)
 		return false
@@ -123,28 +130,6 @@ func boot(load_save: bool) -> bool:
 	return true
 
 
-## The session: from the slot when it reads (D0397 -- generating a shaft only to swap it out was most of
-## the load), else a new game, the way a missing slot always was. Returns the envelope read, {} for none;
-## `door` is null when both refuse. `phases` takes each step's milliseconds for the boot line.
-func _open_session(load_save: bool, phases: Dictionary) -> Dictionary:
-	var env: Dictionary = {}
-	var t: int = Time.get_ticks_msec()
-	if load_save and FileAccess.file_exists(save_path):
-		env = SaveGame.read(save_path)
-		phases["read"] = Time.get_ticks_msec() - t
-	if not env.is_empty():
-		t = Time.get_ticks_msec()
-		door = Session.from_save(env)
-		phases["restore"] = Time.get_ticks_msec() - t
-		if door == null:
-			push_warning("boot: the slot was refused (%s); a new game instead" % SaveGame.last_invalid)
-	if door == null:
-		t = Time.get_ticks_msec()
-		door = Session.new_game(StrataData.get_site(SITE), world_seed(), SeatFlags.start_id(flags, START), phases)   # its sub-phases too (D0518)
-		phases["new_game"] = Time.get_ticks_msec() - t
-	return env
-
-
 ## `--warp=col,row`: stand the body on the nearest floor to the cell, for a capture of the game at depth.
 func _warp(body: Body) -> void:
 	var at: Vector2i = flags["warp"]
@@ -163,29 +148,39 @@ func _warp(body: Body) -> void:
 ## `--screenshot-tick=N --screenshot-out=PATH`: the frame after tick N, saved; quits unless the smoke's
 ## own flag is running the clock.
 func _shutter() -> void:
+	shot(String(flags["screenshot_out"]), quit_after < 0)
+
+
+## The seat's capture, usable more than once a run: `--route-out=` calls it at every leg boundary.
+## The two-frame await lets the renderer settle before the pixels are read -- the world is NOT held
+## across it (the reveal scene's shutter is the held one); a seat capture is a frame, two ticks on.
+func shot(path: String, quit_when_done: bool = false) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var img: Image = get_viewport().get_texture().get_image()
-	img.save_png(flags["screenshot_out"])
+	img.save_png(path)
 	var body: Body = door.services()["body"]
-	print("%s screenshot %s tick=%d zoom=%.2f body_cell=(%d,%d)" % [BOOT_LINE, flags["screenshot_out"], tick, zoom,
+	print("%s screenshot %s tick=%d zoom=%.2f body_cell=(%d,%d)" % [BOOT_LINE, path, tick, zoom,
 		Body._px_to_cell(body.pos_x), Body._px_to_cell(body.pos_y)])
-	if quit_after < 0:
+	if quit_when_done:
 		get_tree().quit(0)
 
 
-## The session with the shell's own key: the lessons the hints have taught.
+## The route's visual record: one frame per leg boundary, `--route-out=PREFIX`_legN.png and _done.png.
+func _route_shot(tag: String) -> void:
+	var prefix: String = String(flags["route_out"])
+	if prefix != "":
+		shot("%s_%s.png" % [prefix, tag])
+
+
+## The session verbs live in `SeatSession` (split at the file cap, the SeatHud/SeatEffects seam); these
+## stay because the suites call them on the seat.
 func capture_session() -> Dictionary:
-	var env: Dictionary = Session.capture(door)
-	SeatHud.capture(stack, env)
-	return env
+	return SeatSession.capture(self)
 
 
 func restore(env: Dictionary) -> bool:
-	if env.is_empty() or not Session.restore(door, env):
-		return false
-	SeatHud.restore(stack, env)
-	return true
+	return SeatSession.restore(self, env)
 
 
 ## The world's seed: the shipped one unless `--seed=<n>` names another (the holdout run, D0460).
@@ -194,7 +189,7 @@ func world_seed() -> int:
 
 
 func save() -> bool:
-	return SaveGame.write(save_path, capture_session())
+	return SeatSession.save(self)
 
 
 func _on_pre_draw() -> void:
@@ -220,9 +215,19 @@ func _physics_process(delta: float) -> void:
 	var began: int = Time.get_ticks_usec()
 	var page_open: bool = stack.settings != null and stack.settings.open
 	var map_open: bool = stack.minimap != null and stack.minimap.large   # the large map is a modal too (D0410)
-	var frame_in: InputFrame = _read_hands(page_open or map_open)
+	var scripted: bool = drive or String(flags["act"]) != "" or route != null   # then the verbs and the HUD keys come from the script, never from a real keyboard (D0535)
+	var frame_in: InputFrame
+	if route != null and not (page_open or map_open):
+		# The route's decide runs BEFORE the move applies: its commands (select, drop, collect) land
+		# inside this tick exactly as they did inside the bot's own loop (D0625). It decides on the
+		# LAST rendered frame's observation rather than observing itself -- `observe` owns a consumed
+		# events channel the view's own refresh needs intact (seat_route.gd's docstring).
+		var last: Frame = view.current_frame() if view != null else null
+		route.tick(door, _route_shot, last.obs if last != null else null)
+		frame_in = route.frame()
+	else:
+		frame_in = _read_hands(page_open or map_open)
 	door.apply(Command.move(frame_in))
-	var scripted: bool = drive or String(flags["act"]) != ""   # then the verbs and the HUD keys come from the script, never from a real keyboard (D0535)
 	if not (page_open or map_open):
 		for c: Command in hands.verbs(_driven if scripted else Controls.pressed,
 				SeatDrive.no_digit if scripted else _digit_down, PlayInput.aim_logic_of(frame_in), Settings.auto_pickup):
@@ -279,7 +284,11 @@ func _read_hands(page_open: bool) -> InputFrame:
 
 
 ## The scripted hand (`shell/seat_drive.gd`), bound here so a Callable can be handed to the hands.
+## Under a route the answer is never: the route speaks in whole frames and applies its own verb
+## commands, so nothing it does may reach the key-driven edges in `verbs` or `hud_keys`.
 func _driven(action: StringName) -> bool:
+	if route != null:
+		return false
 	return SeatDrive.driven(flags, tick, action)
 
 
@@ -349,43 +358,18 @@ func _game_verb(verb: StringName) -> void:
 		zoom = CameraRig.ZOOM_LEVELS[clampi(Settings.zoom_idx, 0, CameraRig.ZOOM_LEVELS.size() - 1)]
 
 
-## The spawn's own metre may have changed hands since the new game (a machine, a dig), so the body stands
-## on the nearest floor to it that fits, the way `--warp` does; the raw spawn only if nothing fits.
+## RETURN TO SURFACE stands the body on the spawn with the line stowed and the world kept -- the same
+## intervention `--warp` makes, for a player the shaft has. In `SeatSession` with the rest of the verbs.
 func return_to_surface() -> void:
-	var body: Body = door.services()["body"]
-	var grid: TileGrid = (door.services()["world"] as World).grid
-	var spawn: Vector2i = WorldSeeder.spawn_logic_cell(StartsRecords.RECORDS[String(SeatFlags.start_id(flags, START))])
-	var cell_px: int = Interface.Units.CELL_PX
-	var n: int = LogicGrid.TERRAIN_PER_LOGIC
-	var feet: Vector2i = SeatFlags.stand_near(grid, Vector2i(spawn.x * n + n / 2, spawn.y * n + n - 1), (Body.HEIGHT_PX + cell_px - 1) / cell_px + 1)
-	body.grapple.cut()
-	if feet == SeatFlags.NO_WARP:
-		body.place(spawn.x * Aim.LOGIC_FX + Aim.LOGIC_FX / 2, (spawn.y + 1) * Aim.LOGIC_FX - Body.HEIGHT_PX * Fx.SCALE / 2)
-	else:
-		body.place((feet.x * cell_px + cell_px / 2) * Fx.SCALE, ((feet.y + 1) * cell_px - Body.HEIGHT_PX / 2) * Fx.SCALE)
-	body.vel_x = 0
-	body.vel_y = 0
-	rig.warp_to(Vector2(float(body.pos_x), float(body.pos_y)) / float(Fx.SCALE))
-	if stack != null and stack.settings != null:
-		stack.settings.open = false
-	print("%s returned to surface: feet %s" % [BOOT_LINE, feet])
+	SeatSession.return_to_surface(self)
 
 
 func new_game() -> void:
-	retire_slot()
-	print("%s new game: the slot moved to %s, the scene reloads" % [BOOT_LINE, SaveGame.BAK_SUFFIX])
-	get_tree().reload_current_scene()
+	SeatSession.new_game(self)
 
 
-## Move the slot aside rather than delete it: `.bak` is where `SaveGame.write` keeps the previous good
-## save, so a NEW GAME leaves one generation to recover by hand. Returns whether a slot was there.
 func retire_slot() -> bool:
-	if not (Settings.persist and FileAccess.file_exists(save_path)):
-		return false
-	var dir: DirAccess = DirAccess.open(save_path.get_base_dir())
-	if dir == null:
-		return false
-	return dir.rename(save_path, save_path + SaveGame.BAK_SUFFIX) == OK
+	return SeatSession.retire_slot(self)
 
 
 func _draw() -> void:

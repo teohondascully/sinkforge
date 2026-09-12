@@ -1,10 +1,12 @@
 # Working state
 
-**Last updated: 2026-09-11 (reconciliation + structural arc closed. All-37 gate verdicts in
-`docs/audits/2026-09-11-gate-reconciliation.md` (30 ENFORCED / 3 ADVISORY / 4 NO-CODE / 0 CANNOT-FAIL);
-C003's yaml-driven scenario driver landed (ed4efd99); the structural survey and meta-analysis are in
-BRIEF.md; the local battery's six catches are fixed at 656c3767 — 158/158 suites green. The 931-line
-predecessor is archived at `docs/archive/working/WORKING-2026-09-11.md`.)**
+**Last updated: 2026-09-12 (visual queue arc landed. Queue 30 falling leaves `b6a258cd`; queue 39
+diegetic depth/band as a minimap ruler `6f9abfb3`; queue 49's moving-camera leg instrumented —
+`--pan` sweeps the real `CameraRig` (`e8e68941`), strips held on both axes. Earlier: all-37 gate
+verdicts in `docs/audits/2026-09-11-gate-reconciliation.md` (30 ENFORCED / 3 ADVISORY / 4 NO-CODE /
+0 CANNOT-FAIL); C003's yaml-driven scenario driver (ed4efd99) plus mid-run checkpoint/resume
+(de9fea2b, which caught the `_rubble` save gap, 95bfb37a). The 931-line predecessor is archived at
+`docs/archive/working/WORKING-2026-09-11.md`.)**
 
 **THE DIRECTOR'S INSTRUCTIONS, VERBATIM, because they are the whole shape of the run:**
 - *"Your goal is to complete all items in the queue overnight without stopping, and if you ever reach a
@@ -17,13 +19,13 @@ predecessor is archived at `docs/archive/working/WORKING-2026-09-11.md`.)**
 The full 49-item queue with phase detail lives in the archive snapshot. Open:
 
 - [ ] 21 Provenance plane — RULED do-not-build (Astra D8); scoped, kept open as a marker.
-- [ ] 30 Falling/drifting leaves — NOT ATTEMPTED; needs an ambient emitter keyed to canopies.
-- [ ] 39 A diegetic depth and band indicator.
-- [ ] 44 Opus playthrough, item-1 route — the honest test of phases 1–5.
+- [x] 30 Falling/drifting leaves — `b6a258cd` (D0622): `LeafDrift` off `sky_floor`, sway field, mutation-witnessed.
+- [x] 39 Diegetic depth/band — `6f9abfb3` (D0623): the minimap rules itself (10 m nubs + band seams). Provisional; in-world ticks left for the director.
+- [x] 44 Route-driven playthrough — D0625: `ColdStartBot.decide()` is one policy for headless AND the real seat (`--route=cold_start`, legs 60/71/122/149/388/417, captures per boundary). Found: seat-path obs-sharing contract + anchor row bug.
 - [ ] 45 Stranger batch started at rung 4, six seats.
 - [ ] 51 The lamp's real lever (P038/D0599): `LAMP_TINT` nearly inert.
 - [ ] 52 Layer contacts dead flat (P044).
-- [~] 49/Phase 10 THE MATCH LOOP — perpetual; pass 1 moved 3 of 4 conditions (moving-camera untested).
+- [~] 49/Phase 10 THE MATCH LOOP — perpetual; all 4 conditions now have instruments. Moving camera: `--pan` strip lands `e8e68941` (D0624) — holds on both axes; honest residual is sub-tick judder (strips sample ticks, not presented frames).
 
 ## Current stage
 

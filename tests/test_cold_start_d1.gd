@@ -56,16 +56,22 @@ func _test_the_resulting_state_is_a_checkpoint_that_reloads_identically() -> voi
 		"every saved part signs as the run's end state")
 	_check(a[7] != b[7], "the bot's hotbar selection is verbs state, never saved (D0355) -- the pin is that it differs")
 	# The run ends quiescent -- nothing in flight, so empty ticks would not move the signature and the
-	# equality below would be a no-op. A held jump puts the body in the air: part 0 must move.
-	var jump: InputFrame = InputFrame.new()
-	jump.jump_held = true
+	# equality below would be a no-op. Held input must move the body: a bare `jump_held` proved too
+	# weak (no press edge, and a hop can land back on its own footprint -- it did, once the route's
+	# end position shifted a few ticks), so this walks east off the pad with a real press edge.
+	var hop: InputFrame = InputFrame.new()
+	hop.move_dir = 1
+	hop.jump_pressed = true
+	hop.jump_held = true
+	var walk: InputFrame = InputFrame.new()
+	walk.move_dir = 1
 	for i: int in 30:
-		var f: InputFrame = jump if i < 3 else InputFrame.new()
+		var f: InputFrame = hop if i == 0 else (walk if i < 10 else InputFrame.new())
 		door.apply(Command.move(f))
 		restored.apply(Command.move(f))
 	var s1: PackedStringArray = door.state_signature().split("||")
 	var s2: PackedStringArray = restored.state_signature().split("||")
-	_check(s1[0] != a[0], "30 ticks with a held jump moved the body (the equality below is not a no-op)")
+	_check(s1[0] != a[0], "30 ticks of held input moved the body (the equality below is not a no-op)")
 	_check(s1[0] == s2[0] and s1[1] == s2[1] and s1[2] == s2[2] and s1[3] == s2[3] and s1[4] == s2[4] and s1[5] == s2[5] and s1[6] == s2[6],
 		"...and the restored session's saved parts moved to the same place")
 

@@ -25,6 +25,11 @@ extends RefCounted
 ##   --act=mine|far|map|settings|game  a scripted hand for a capture: hold MINE at the rock ahead from tick 20
 ##                           with the pointer posed (far: six metres ahead, a refused press, D0488), or press
 ##                           the map / settings key once at tick 20 (game: the GAME face)
+##   --route=cold_start      the playthrough as an instrument (D0625, queue item 44): the seat is driven
+##   --route-out=PREFIX        one `decide()` a tick by the C003 bot itself, and each leg boundary
+##                           saves PREFIX_legN.png / PREFIX_done.png. Pairs with --fresh: the route
+##                           targets the tutorial start's authored fixtures, so a loaded save or a
+##                           --start that is not the tutorial one mis-aims it.
 ##   --lamp-occlusion=K      the veil lamp's loss per solid cell crossed (D0427); 0 is legacy's pass, the
 ##                           control of a lighting comparison. Unset: `VeilOcclusion.K`.
 ##   --muted                 the Master bus muted for this boot, whatever the settings file says: a
@@ -55,11 +60,24 @@ static func _workload(f: Dictionary, arg: String) -> void:
 		push_error("--perf-drive=%s: not one of %s" % [name, SeatDrive.WORKLOADS])
 
 
+## `--route=NAME`, refused on the same rule as a workload: a route the seat cannot drive is a playthrough
+## that never happened, which a silent default would report as a pass.
+static func _route(f: Dictionary, arg: String) -> void:
+	if not arg.begins_with("--route="):
+		return
+	var name: StringName = StringName(arg.substr("--route=".length()))
+	if SeatRoute.ROUTES.has(name):
+		f["route"] = name
+	else:
+		push_error("--route=%s: not one of %s" % [name, SeatRoute.ROUTES])
+
+
 static func parse(args: PackedStringArray) -> Dictionary:
 	var f: Dictionary = {"quit_after": -1, "perf": false, "drive": false, "warp": NO_WARP,
 		"zoom": 0.0, "screenshot_tick": -1, "screenshot_out": "", "act": "", "fresh": false, "start": "",
 		"mute": PackedStringArray(), "lamp_occlusion": -1.0, "muted": false, "seed": 0,
-		"workload": SeatDrive.WALK, "unfocused": false, "interpolate": false}
+		"workload": SeatDrive.WALK, "unfocused": false, "interpolate": false,
+		"route": &"", "route_out": ""}
 	for a: String in args:
 		if a.begins_with("--quit-after="):
 			f["quit_after"] = maxi(int(a.substr("--quit-after=".length())), 0)
@@ -83,6 +101,10 @@ static func parse(args: PackedStringArray) -> Dictionary:
 			f["mute"] = a.substr("--mute=".length()).split(",", false)
 		elif a.begins_with("--act="):
 			f["act"] = a.substr("--act=".length())
+		elif a.begins_with("--route="):
+			_route(f, a)
+		elif a.begins_with("--route-out="):
+			f["route_out"] = a.substr("--route-out=".length())
 		elif a == "--fresh":
 			f["fresh"] = true
 		elif a.begins_with("--start="):
