@@ -174,6 +174,15 @@ def link_gates(gates: dict[int, dict], steps: list[dict]) -> tuple[dict[int, lis
     # A directory-only citation is instead evidence only for the one script conventionally named after its
     # own directory (tools/layer_lint/layer_lint.py) -- the "primary" check the directory-only prose is
     # naming -- never for every other, differently-purposed script that merely happens to live alongside it.
+    # A gate whose enforcement is a tools/**/test_*.py file is run by the "Gate mutation tests" step,
+    # whose run: command is `find tools -name 'test_*.py'` -- the literal filename never appears in the
+    # command, so plain substring matching can never see the link. The extension is deliberately
+    # narrow: the citation must be a test_*.py path under tools/ that EXISTS ON DISK (a typo'd or
+    # deleted citation must not link), and the step's run: must contain the find-glob that runs it.
+    # Found on gate 19 during the 2026-09-11 audit: test_perf_fixture.py is the refusal rules' only CI
+    # coverage and this tool reported the gate NO-CODE for it (D0604).
+    GLOB_RUN_RE = re.compile(r"find\s+tools\b[^\n]*-name\s+['\"]test_\*\.py['\"]")
+
     for n, g in gates.items():
         if links[n]:
             continue
@@ -185,6 +194,9 @@ def link_gates(gates: dict[int, dict], steps: list[dict]) -> tuple[dict[int, lis
         for p in candidate_paths:
             if FILE_EXT_RE.search(p):
                 matched = [s for s in steps if p in s["run"]]
+                if not matched and p.startswith("tools/") and Path(p).name.startswith("test_") \
+                        and (ROOT / p).is_file():
+                    matched = [s for s in steps if GLOB_RUN_RE.search(s["run"])]
             else:
                 dirname = p.rstrip("/").rsplit("/", 1)[-1]
                 primary_re = re.compile(r"(^|/)%s\.(py|gd|sh)\b" % re.escape(dirname))
@@ -295,8 +307,17 @@ def resolve_status(gate_steps: list[dict], ci_steps: dict[str, str], local_resul
     """Rolls up each linked step's own classify_step() verdict into the gate's single status, worst-first:
     FAIL (a real failure anywhere) beats SKIPPED (CI never exercised some evidence) beats UNKNOWN (no
     data at all) beats PASS. A gate is never reported PASS on the strength of a step CI did not run."""
-    if any(s["coe"] for s in gate_steps):
-        return "ADVISORY", ["continue-on-error: true in harness.yml"]
+    # `--report-only` is the same structural property as continue-on-error, expressed inside the run:
+    # command instead of beside it -- check_content_reachable.py maps its own exit 1 to 0 under that
+    # flag (gate 37, D0591). A step that can only exit 0 is advisory no matter which mechanism
+    # achieves it; checking only `coe` reported gate 37 as a blocking step that cannot fail (D0604).
+    advisory = [s for s in gate_steps if s["coe"] or "--report-only" in s["run"]]
+    if advisory:
+        reasons = [
+            "continue-on-error: true in harness.yml" if s["coe"] else "--report-only in its run: command (exit 1 mapped to 0)"
+            for s in advisory
+        ]
+        return "ADVISORY", reasons
 
     details = []
     statuses = []

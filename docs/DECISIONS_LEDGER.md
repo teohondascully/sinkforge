@@ -23074,3 +23074,19 @@ Why: these gates were proven to fire by live transient mutation during the audit
 nobody next month. A gate with no mutation test is a gate whose failure path nobody has seen since it
 was written; every one of these now runs under the "Gate mutation tests" glob step in CI.
 Reverse: delete the four test files.
+
+## D0604 · 2026-09-11 · tools/gate_status.py · two matcher gaps closed: glob-run test citations and --report-only steps
+Decided: two precise extensions to link_gates/resolve_status. (a) A QUALITY.md citation of a
+`tools/**/test_*.py` file that exists on disk now links to a step whose `run:` is the
+`find tools -name 'test_*.py'` glob -- previously unmatchable, which is why gate 19 (whose only CI
+coverage is `tools/test_perf_fixture.py`, run by the glob step) reported NO-CODE. (b) A step whose
+`run:` carries `--report-only` resolves ADVISORY for the same reason `continue-on-error: true` does --
+`check_content_reachable.py` maps exit 1 to 0 under that flag, so gate 37's step cannot fail;
+`coe`-only classification reported it as a blocking step. No keyword heuristic was added; both
+extensions are exact-match on real properties of the cited file and the step's own command.
+Why: the audit's NO-CODE list was overstated by 2 (gates 11, 19) and its ADVISORY list understated by
+1 (gate 37) for matcher reasons, not enforcement reasons. Gate 11 healed without a code change once
+QUALITY.md's own gate text named its suite files (Tier 2's existing rule); gate 19 needed (a); gate 37
+needed (b). Post-change split at this commit: 32/37 linked, NO-CODE [10, 17, 18, 20, 21],
+ADVISORY [14, 33, 37].
+Reverse: revert this entry's two hunks in tools/gate_status.py.
