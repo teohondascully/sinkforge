@@ -23700,3 +23700,77 @@ share every member (`_focusables`, `_dyn`, the node refs); a factory file would 
 back into itself to save thirty comment lines.
 Reverse: CHEAP -- revert the diff; no behaviour moved except the note's sentence (into the model)
 and the ring stylebox (into the tokens).
+## D0653 · 2026-09-12 · shell/seat_input.gd, shell/main.gd · the seat's input dispatch on its own seam
+
+`shell/main.gd` was absorbing boot, the tick, camera, screenshots AND every input path. Extracted the
+dispatch half into `shell/seat_input.gd` as `SeatInput`, a RefCounted of statics taking `main` -- the
+same shape SeatSession/SeatHud/SeatDrive already use, chosen over a child Node receiving
+`_unhandled_input` itself because every shell/ split so far is that shape and a runtime-added child
+would also need `owned=false` care under `find_child`. What moved: which modal is open (`page_open`,
+`map_open`, `scripted`), the hands read deaf while one is (`read_hands`), the HUD-key edges
+(`hud_keys`, `hud_keys_driven`), the scripted hand's `pressed` Callable, `_unhandled_input`'s routing
+to `HudBridge.key`/`finish_capture`, and the click route -- `settings_ctl`'s `payload` signal now
+wired by `SeatInput.wire_page` to the same `HudBridge.apply` then verb path a key takes. The single
+mutation path is unchanged. `_unhandled_input`, `_game_verb` and `_digit_down` keep one-line
+delegates on the node because the engine names the callback there and the suites name the other two
+(`test_settings_live` calls `main._game_verb`, `test_main_boot` calls `Main._digit_down`).
+Also at the cap: `_hud_keys`' `page_open` param was dead (dropped), and `boot()`'s report tail split
+to `_boot_report` -- `boot()` was 55 lines over a D0632 addition, now 46. Another track builds on
+this seam, so it landed early rather than at the next cap.
+Reverse: revert this diff; the dispatch is verbatim what main.gd ran.
+
+## D0654 · 2026-09-12 · tests/test_seat_input.gd, .github/workflows/harness.yml · the dispatch seam driven with real events
+
+Every suite touching the page's input called `HudBridge.key(page, KEY_*)` directly -- exactly the seam
+bug class D0446 lived in (ESC handled in `_unhandled_input` AND re-toggled by the HUD-key edge in one
+tick). `tests/test_seat_input.gd` boots the real seat headless (test_main_boot's pattern), pushes
+`InputEventKey`s through `Input.parse_input_event` -- the hardware pipeline, not a shortcut into the
+bridge -- and asserts the page toggles ONCE per press: K opens and closes on the tick's edge, ESC
+closes and stays closed, a real DOWN event routed through `_unhandled_input` moves the page cursor,
+and a held RIGHT under the open page is deaf to the body. `Input.is_action_pressed` is asserted after
+each synthetic press so the suite cannot pass vacuously over events that never landed. Mutation-tested
+by restoring the D0446 double-close in `SeatInput.unhandled`: 4 of 11 assertions fail, as they must.
+Registered in harness.yml's suite list with the annotation and the 160 -> 161 count bump the D0317
+gate reconciles. Chose `parse_input_event` over `Viewport.push_input` because the former walks the
+whole engine pipeline a hardware key takes; the latter starts at the viewport.
+Reverse: delete the suite and its three harness.yml lines.
+
+## D0655 · 2026-09-12 · tests/fixture_shaft_golden.gd, tests/test_tree_pass.gd, tests/test_rock_laminae.gd · the re-pin the queue's worldgen commits owed (D0167's route)
+
+The queue's commits ahead of main (D0628's strata/materials, D0629's shared bedding warp, D0631's lip
+mantle) legitimately moved `test_shaft_replay_determinism`'s golden from checkpoint **0** -- the
+generation-change shape, not a regression. By D0167/D0388's protocol: pushed `repin/shaft-replay-golden`,
+opened draft PR #53, let CI's pinned Linux build print the mismatch dump (run 34721500632), spliced its
+200-hash sequence in. Discriminators read off that run, not assumed: two OS processes bit-identical (-1),
+seed+1 diverges at 0, coverage `jumps=833 mantles=0 stepups=0 digs=345 corner_ok=5 corner_unconsented=0`
+identical to the prior pin (the path is unchanged; the world under it differs). CI's dump equalled the
+local macOS dump ELEMENTWISE at 200/200 before splicing; the spliced file then passed locally 21/21.
+The same run failed two sibling pins the same commits moved, re-pinned here: `test_tree_pass`'s colour
+expectations (P036 doubled the palette -- `[0.42,0.28,0.16]` -> `[0.84,0.56,0.32]` and
+`[0.18,0.40,0.23]` -> `[0.36,0.8,0.46]`, label updated to say so) and `test_rock_laminae`'s per-cell
+dip bound: P044 put `bedding_metres` on `Angle.sin_milli`'s 256-entry table so the tone and the
+generator's contacts read THE SAME line, quantizing a single-cell step at ~0.148 m (identical on both
+platforms -- integer table math is portable by construction). Re-pinned `< 0.1` to `< 0.2`: above the
+quantization bound with headroom, far under the stair the assertion exists to refuse (a full bed is a
+metre+). Chose loosening the bound over re-deriving a tighter one because the semantic -- "a line, not
+a stair" -- is about metres, not the table's step size.
+Reverse: revert this diff; the old array is in history and re-breaks CI on purpose, per the note above it.
+
+## D0656 · 2026-09-12 · /tmp/lighting_bench_p036.png · the P036 capture the doubled palette still owed
+
+P036's option (1) shipped at `6c7d05b9` (D0630) on arithmetic alone; its own close-out named the
+`lighting_bench` capture "the remaining visual confirmation". Ran the bench headed -- NOT headless,
+the headless renderer is a dummy that saves blank frames (capture_moments.sh's header):
+`godot --path . -- --start=lighting_bench --warp=128,322 --fresh --muted --screenshot-tick=120
+--screenshot-out=/tmp/lighting_bench_p036.png` (D0570's record: 40 m chamber 60 m down, torch at one
+end, fuelled-end forge, bare hardrock the unlit floor of the range; boot `warped to feet cell
+(119,317)`, shutter at `body_cell=(120,313)`, zoom 2.00 -> 12 img px/cell, body at screen centre).
+5x5 mean luma off the PNG, the same instrument P036 used: lit rock peaks at **0.77** in the headlamp
+pool on the ceiling rock (img 1060,560) -- a frame the OLD palette could never paint, where the
+multiply capped at base 0.35 x veil<=1. Lit hardrock floor under the torch reads **0.60**, the
+chamber floor row **0.35-0.56** end to end, rock beside a source **0.42-0.60** against the old
+bench's 0.157. The doubled material bases land in the output; option (2)'s additive pass stays
+parked, per the entry's own condition -- the frame no longer reads flat at the sources.
+The capture is routine run output (EVIDENCE.md): left at the /tmp path, regenerable byte-for-byte
+from the command above on this commit; the numbers, not the PNG, are the record.
+Reverse: none -- a measurement, not a change.

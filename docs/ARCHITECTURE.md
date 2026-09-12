@@ -68,6 +68,8 @@ Every structural decision below follows from that. If a decision here seems expe
            └──────────────────────────────────────────┘
 ```
 
+`view` deliberately speaks two UI paradigms: painter-drawn chips in-world (per-tick `Frame` readers) and a retained-mode `Control` tree for modal pages (the Hybrid ruling, D0632).
+
 The research loop this enables:
 
 ```

@@ -6,8 +6,9 @@ extends Node2D
 ##
 ## WHAT IT OWNS: the session (`Session.new_game`, or the slot restored over it), the tick (60 Hz: the hands
 ## read once, the body moved through the door, the verbs applied, the view refreshed), the camera rig, the
-## scene-side effects (particles, drips, landings, the audio rig), the HUD bridge (the settings page fed
-## and answered, the map key, the save key), and the save on the close box. WHAT IT DOES NOT: anything a
+## scene-side effects (particles, drips, landings, the audio rig), and the save on the close box. The input
+## dispatch the tick consults -- the modals, the deaf hands, the HUD-key edges, the page's key/click doors --
+## is `SeatInput`'s (`shell/seat_input.gd`, split at the function cap). WHAT IT DOES NOT: anything a
 ## painter, the sim or the door already decides. The debug scene (`tests/body/reveal_scene.gd`) keeps its
 ## agent mode and its flags; this is the human's seat only.
 ##
@@ -101,12 +102,7 @@ func boot(load_save: bool) -> bool:
 		VeilLayer.lamp_occlusion = float(flags["lamp_occlusion"])   # the lighting comparison's dial (D0427)
 	var t1: int = Time.get_ticks_msec()
 	stack = ViewStack.build_stack(self, door, look, camera, true, falling, payouts)
-	# D0632: the modal page is a real Control tree -- its rows emit payloads directly, so the seat's
-	# mutation path stays exactly one: `HudBridge.apply` then `_game_verb`, same as a key ever did.
-	if stack.settings_ctl != null:
-		stack.settings_ctl.payload.connect(
-			func(p: Dictionary) -> void: _game_verb(HudBridge.apply(p, stack.settings, 0.0)))
-		stack.settings_ctl.apply_skin(String(flags.get("skin", "instrument")))
+	SeatInput.wire_page(self)   # D0632's Control page emits payloads; SeatInput lands them on HudBridge.apply
 	view = stack.view
 	phases["stack"] = Time.get_ticks_msec() - t1
 	SeatHud.restore(stack, env)   # the shell's own keys, once the HUD exists to take them (D0411)
@@ -128,12 +124,18 @@ func boot(load_save: bool) -> bool:
 	if is_inside_tree():
 		get_tree().root.title = "Sinkforge"
 	booted = true
+	_boot_report(phases)
+	return true
+
+
+## The boot line the smoke greps for (`tools/check_headed_boot.sh`), the ablation profile's mute
+## label (D0418), and the phase timings -- the report half of boot(), split at the function cap.
+func _boot_report(phases: Dictionary) -> void:
 	print("%s site=%s seed=%d start=%s" % [BOOT_LINE, SITE, world_seed(), SeatFlags.start_id(flags, START)])
 	var mute: PackedStringArray = flags["mute"]
 	if not mute.is_empty():
-		print("%s muted=%s" % [BOOT_LINE, ",".join(DrawCost.mute(view, mute))])   # the ablation profile's run label (D0418)
+		print("%s muted=%s" % [BOOT_LINE, ",".join(DrawCost.mute(view, mute))])
 	print("%s phases_ms %s" % [BOOT_LINE, phases])
-	return true
 
 
 ## `--warp=col,row`: stand the body on the nearest floor to the cell, for a capture of the game at depth.
@@ -219,9 +221,9 @@ func _physics_process(delta: float) -> void:
 	if not booted:
 		return
 	var began: int = Time.get_ticks_usec()
-	var page_open: bool = stack.settings != null and stack.settings.open
-	var map_open: bool = stack.minimap != null and stack.minimap.large   # the large map is a modal too (D0410)
-	var scripted: bool = drive or String(flags["act"]) != "" or route != null   # then the verbs and the HUD keys come from the script, never from a real keyboard (D0535)
+	var page_open: bool = SeatInput.page_open(self)
+	var map_open: bool = SeatInput.map_open(self)
+	var scripted: bool = SeatInput.scripted(self)
 	var frame_in: InputFrame
 	if route != null and not (page_open or map_open):
 		# The route's decide runs BEFORE the move applies: its commands (select, drop, collect) land
@@ -232,13 +234,13 @@ func _physics_process(delta: float) -> void:
 		route.tick(door, _route_shot, last.obs if last != null else null)
 		frame_in = route.frame()
 	else:
-		frame_in = _read_hands(page_open or map_open)
+		frame_in = SeatInput.read_hands(self, page_open or map_open)
 	door.apply(Command.move(frame_in))
 	if not (page_open or map_open):
-		for c: Command in hands.verbs(_driven if scripted else Controls.pressed,
+		for c: Command in hands.verbs(SeatInput.scripted_pressed(self) if scripted else Controls.pressed,
 				SeatDrive.no_digit if scripted else _digit_down, PlayInput.aim_logic_of(frame_in), Settings.auto_pickup):
 			door.apply(c)
-	_hud_keys_driven() if scripted else _hud_keys(page_open)
+	SeatInput.hud_keys_driven(self) if scripted else SeatInput.hud_keys(self)
 	last_input = frame_in
 	view.refresh()
 	_effects(delta)
@@ -261,61 +263,12 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 
-## `--act=map|settings`: the HUD key as the scripted hand presses it.
-func _hud_keys_driven() -> void:
-	var keys: Dictionary = hands.hud_keys(_driven)
-	if bool(keys["settings"]) and stack.settings != null:
-		stack.settings.open = not stack.settings.open
-		if String(flags["act"]) == "game":
-			stack.settings.set_cat(SettingsPage.CAT_GAME)
-	if bool(keys["map"]) and stack.minimap != null:
-		stack.minimap.large = not stack.minimap.large
-	if stack.settings != null and stack.settings.open:
-		stack.settings.state = HudBridge.snapshot()
-		SeatHud.push_bindings()   # a rebinding rewrites every lesson's key on the next frame (D0411)
-
-
-## The hands, deaf while the settings page is open: a modal takes the keys, and the body stands still.
-func _read_hands(page_open: bool) -> InputFrame:
-	var cell_px: int = Interface.Units.CELL_PX
-	if page_open:
-		return hands.read(func(_a: StringName) -> bool: return false, Vector2.ZERO, cell_px, func(_c: Vector2i) -> bool: return false)
-	var grid: TileGrid = (door.services()["world"] as World).grid
-	var grid_ok: Callable = func(c: Vector2i) -> bool: return grid.in_bounds(c)
-	if drive or String(flags["act"]) != "":
-		if SeatDrive.poses_pointer(flags):   # the scripted hand's own pointer (`SeatDrive.feet_aim`)
-			Controls.pose_pointer(SeatDrive.feet_aim(flags, door.services()["body"], tick))
-		return hands.read(_driven, Controls.pointer_world(self), cell_px, grid_ok)
-	return hands.read(Controls.pressed, Controls.pointer_world(self), cell_px, grid_ok)
-
-
-## The scripted hand (`shell/seat_drive.gd`), bound here so a Callable can be handed to the hands.
-## Under a route the answer is never: the route speaks in whole frames and applies its own verb
-## commands, so nothing it does may reach the key-driven edges in `verbs` or `hud_keys`.
-func _driven(action: StringName) -> bool:
-	if route != null:
-		return false
-	return SeatDrive.driven(flags, tick, action)
-
-
+## The seat's input dispatch lives in `shell/seat_input.gd` (split at the function cap, the same seam
+## as SeatHud/SeatSession): which modal is open, the hands read deaf while one is, the HUD-key edges,
+## and the settings page's key and click doors. What stays here is what a suite or the engine names on
+## the node itself.
 static func _digit_down(i: int) -> bool:
-	return Controls.pressed(Controls.SLOTS[i])   # the tenth well is the 0 key (D0412); an action now, so it remaps and it deafens (D0615)
-
-
-func _hud_keys(page_open: bool) -> void:
-	var keys: Dictionary = hands.hud_keys(Controls.pressed)
-	if stack.settings != null and stack.minimap != null:
-		var next: Dictionary = HudBridge.hud_toggles(keys, stack.settings.open, stack.minimap.large)
-		if bool(next["settings"]) != stack.settings.open:
-			stack.settings.open = bool(next["settings"])
-			stack.settings.capture = &""
-			stack.settings.armed = ""
-		stack.minimap.large = bool(next["map"])
-	if bool(keys["save"]):
-		save()
-	if stack.settings != null and stack.settings.open:
-		stack.settings.state = HudBridge.snapshot()
-		SeatHud.push_bindings()   # a rebinding rewrites every lesson's key on the next frame (D0411)
+	return SeatInput.digit_down(i)
 
 
 func _effects(delta: float) -> void:
@@ -328,36 +281,16 @@ func _effects(delta: float) -> void:
 
 
 ## The settings page's own input: a capture takes the next key, a click lands on a control, the arrows
-## and Enter drive the focus.
+## and Enter drive the focus. The engine names the callback on the node; the dispatch is SeatInput's.
 func _unhandled_input(ev: InputEvent) -> void:
-	if not booted or stack.settings == null or not stack.settings.open:
-		return
-	var page: SettingsPage = stack.settings
-	if page.capture != &"":
-		if HudBridge.finish_capture(page, ev):
-			get_viewport().set_input_as_handled()
-		return
-	if ev is InputEventKey and ev.pressed and not ev.echo:
-		# ESC is the SETTINGS action's own key and closes the page through `_hud_keys`' edge (D0446); closing
-		# it here as well re-toggled it open the same tick, and no stranger could leave the page by ESC.
-		if (ev as InputEventKey).keycode != KEY_ESCAPE:
-			var payload: Dictionary = HudBridge.key(page, (ev as InputEventKey).keycode)
-			if not payload.is_empty():
-				_game_verb(HudBridge.apply(payload, page, -1.0))
-		get_viewport().set_input_as_handled()
+	SeatInput.unhandled(self, ev)
 
 
-## The GAME face's two doors (D0396). RETURN TO SURFACE stands the body on the spawn with the line
-## stowed and the world kept: the same intervention `--warp` makes, for a player the shaft has. NEW
-## GAME moves the slot aside to `.bak` (the previous good save's own place, so one generation survives)
-## and reloads the scene, which boots a fresh world the way `--fresh` does.
+## The GAME face's verdicts, applied to the seat (D0396): RETURN TO SURFACE stands the body on the
+## spawn with the line stowed and the world kept; NEW GAME moves the slot aside and reloads. Kept on
+## the node because the suites name `main._game_verb`; the dispatch itself is `SeatInput.game_verb`.
 func _game_verb(verb: StringName) -> void:
-	if verb == &"surface":
-		return_to_surface()
-	elif verb == &"new_game":
-		new_game()
-	elif verb == &"zoom":   # the FEEL page's zoom, live: the rig reads `zoom` every tick (D0410)
-		zoom = CameraRig.ZOOM_LEVELS[clampi(Settings.zoom_idx, 0, CameraRig.ZOOM_LEVELS.size() - 1)]
+	SeatInput.game_verb(self, verb)
 
 
 ## RETURN TO SURFACE stands the body on the spawn with the line stowed and the world kept -- the same

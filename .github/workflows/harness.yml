@@ -394,6 +394,7 @@ jobs:
       #   test_softlock_ascent.gd                        test_softlock_ascent (gate 10's scoped form: a wide self-dug shaft escaped by the dig-notch policy, the tutorial's deepest floor by climbing -- D0606)
       #   test_cold_start_d1.gd                          test_cold_start_d1 (C003 made executable: a scripted bot through apply/observe mines, feeds, smelts and delivers to demand_satisfied d1 -- D0609)
       #   test_seat_route.gd                             test_seat_route (the cold_start route drives the seat's own Interface to d1, every leg finishing and the leg-boundary strip firing in order; unknown route names refused -- D0625, queue item 44)
+      #   test_seat_input.gd                             test_seat_input (real InputEventKeys through Input.parse_input_event into the live seat: the page toggles once per press, ESC closes once -- the D0446 seam driven, not just HudBridge.key called -- D0654)
       #   test_rig.gd                                    test_rig (the crew's rig: the demand ladder from data/progression, D1 met pays the drill, the stage rides the save -- D0484)
       #   test_ring_word.gd                              test_ring_word (the ring's word drawn by the real pass over the seeded world; a finished ladder draws nothing -- D0499, D0500)
       #   test_reach.gd                                  test_reach (the one reach rule in core: Reach agrees with Aim on a 400-point grid, is the Euclidean 3.2 m, and D0520's px 514/515 edge -- D0521)
@@ -529,7 +530,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 160 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 161 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -560,6 +561,7 @@ jobs:
             res://tests/test_softlock_ascent.gd \
             res://tests/test_cold_start_d1.gd \
             res://tests/test_seat_route.gd \
+            res://tests/test_seat_input.gd \
             res://tests/test_rig.gd \
             res://tests/test_ring_word.gd \
             res://tests/test_reach.gd \

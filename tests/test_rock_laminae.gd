@@ -25,7 +25,11 @@ func _test_the_bedding_coordinate_is_shared() -> void:
 	var max_step: float = 0.0
 	for col: int in range(0, 255):
 		max_step = maxf(max_step, absf(BeddingTone.bedding_metres(float(col + 1), 300.0) - BeddingTone.bedding_metres(float(col), 300.0)))
-	_check(max_step < 0.1, "...and dips no more than a tenth of a metre a cell along a row (%.3f), so a parting is a line and not a stair" % max_step)
+	# P044 moved this coordinate onto `Angle.sin_milli`'s 256-entry table so the tone and the generator's
+	# contacts read THE SAME line: a single-cell step is now bounded by the table's quantization (~0.148 m
+	# measured on both this platform and CI's), not by the float sine's smoothness. The claim is unchanged
+	# -- a line, not a stair: a real stair jumps a whole bed, a metre or more.
+	_check(max_step < 0.2, "...and dips no more than the table sine's quantization step a cell along a row (%.3f < 0.2), so a parting is a line and not a stair" % max_step)
 ## D0398 (T017, "more bedding"): bedded rock carries parting planes -- one row in four at the metre bed,
 ## one in eight at the thick, one in two at the fine lamination -- and no other grammar does. Asserted on
 ## the term itself and on the shaded colour, so a grammar table that silently zeroed the term (the class
