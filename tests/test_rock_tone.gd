@@ -295,12 +295,23 @@ func _test_no_stack_of_darkeners_punches_a_hole_in_the_rock() -> void:
 	_check(worst_black_frac < 0.01,
 		"the worst material (%s) is %.2f%% fully black, under the 1%% bound measured off coal's own 0.08%%"
 			% [worst_id, 100.0 * worst_black_frac])
-	# CONTROL: the clamp actually FIRES. If it never did, `min` would sit above zero and the invariant
-	# above would be true of an expression that never needed clamping -- a guard that cannot be observed
-	# working is not a guard. This is the row that makes the one above a measurement.
-	_check(clamped_to_zero > 0,
-		"CONTROL: the clamp fired on %d channel(s), so the in-gamut result above is the clamp's doing and "
-			% clamped_to_zero + "not a property the arithmetic had anyway")
+	# CONTROL: the clamp actually FIRES. The doubled palette (P036) no longer reaches zero on its own --
+	# which is the change's point -- so the mechanism is proven on a synthetic near-black input instead of
+	# requiring a shipped material to clip. A guard that cannot be observed working is not a guard; the
+	# palette's own `clamped` count is still reported above it.
+	var synth: int = 0
+	var synth_neg: int = 0
+	for col: int in range(0, 40):
+		for row: int in range(150, 200):
+			var c: Color = tone.shade(Color(0.004, 0.004, 0.005), col, row, look.grammar_of(&"deepstone"))
+			if c.r < 0.0 or c.g < 0.0 or c.b < 0.0:
+				synth_neg += 1
+			if c.r == 0.0 or c.g == 0.0 or c.b == 0.0:
+				synth += 1
+	_check(synth > 0 and synth_neg == 0,
+		"CONTROL: the clamp fired on %d synthetic near-black channel(s) with %d escaping negative "
+		% [synth, synth_neg] + "(the shipped palette fired %d) -- so the in-gamut invariant is the "
+		% clamped_to_zero + "clamp's doing, not a property the arithmetic had anyway")
 
 
 ## One material's sweep, accumulated into `tally`. Split out of the test above at QUALITY gate 4's 50-line

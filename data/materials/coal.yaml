@@ -37,10 +37,10 @@ display_name: Coal
 #     back to 0.290. It is a brighter grey-blue, not a glitter -- `glitters` is still false, so no
 #     glint flare, and at luma 0.40 it is nowhere near ore_iron's 0.66-0.95 mark.
 
-base_color: [0.21, 0.22, 0.26]
+base_color: [0.42, 0.44, 0.52]
 grain: true
 grammar: clastic
 depth_darken: 0.22
 glitters: false
-nugget_color: [0.37, 0.40, 0.48]
+nugget_color: [0.58, 0.62, 0.74]
 nugget_count: 17

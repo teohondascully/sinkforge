@@ -15,7 +15,7 @@ display_name: Deep iron
 # silver fleck -- cool because the wall plane recesses marks toward COOL, and a warm fleck's recess
 # path is longer than the separation bound `test_wall_lode` keeps (ore_iron's blue-white is the family).
 
-base_color: [0.20, 0.20, 0.24]
+base_color: [0.4, 0.4, 0.48]
 grain: true
 grammar: clastic
 depth_darken: 0.25

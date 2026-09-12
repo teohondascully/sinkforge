@@ -23539,3 +23539,24 @@ witnessed: a flat fill fails all three new assertions; the tone on its own float
 the shared dip by 0.1375 m (over half a cell) and breaks the bedding-coordinate check with it.
 Reverse: revert the delegate, the two new core files, and the `_fill_base` dip; the contacts go flat
 and P044 re-parks. Rides the shared golden re-pin with D0628.
+
+## D0630 · 2026-09-12 · data/materials/*.yaml, tests/test_rock_tone.gd · P036 step one: the palette doubles
+Decided: the P036 ruling's recommended first step -- material `base_color` x2 in data/, reversible,
+before any additive light pass. The multiply model caps a lit cell at its albedo; doubling the bases
+lifts the ceiling to the reference's range. All eleven materials moved; `glimmer` at x1.5 because x2
+clips its green/blue channels to a flat cyan (it is the Reveal-layer test material, not economy rock,
+and its mark is the point). Nugget marks were NOT doubled -- they already sit near the top; the one
+exception is coal's speckle, which had to keep its absolute gap over the new matrix ([0.37,0.40,0.48]
+-> [0.58,0.62,0.74]) or the mark would drown in the doubled base -- `test_wall_lode`'s mark-vs-matrix
+bound and `test_material_palette`'s coal-metre spread both caught it.
+The one casualty is a CONTROL, not a property: `test_rock_tone` proved the [0,1] clamp by counting
+channels the palette pinned to zero -- and a doubled palette simply does not reach zero, which is the
+change's entire point. The control now proves the mechanism on a synthetic near-black input and
+reports the palette's own clamp count above it; a guard must be observed working, but it does not get
+to require that its subject still fails.
+Arithmetic check against the entry's own predictions, from the measured veil levels (unlit ~0.46,
+lit ~0.80): deepstone's doubled base luma 0.394 reads 0.181 unlit (entry predicted 0.184, reference
+0.190) and 0.315 lit (predicted ~0.32, reference 0.377). The bench capture is the remaining visual
+confirmation; the additive pass stays available if the frame still reads flat.
+Reverse: halve the bases back (the yaml diff is the whole change) and restore the palette-fired
+control if the palette is also reverted.

@@ -12,7 +12,7 @@ display_name: Rich ore
 # Authored for this build: ore_iron's clastic host warmed toward the metal it carries, with a denser
 # nugget field so a rich lode reads as the same rock holding more of the good stuff.
 
-base_color: [0.24, 0.24, 0.30]
+base_color: [0.48, 0.48, 0.6]
 grain: true
 grammar: clastic
 depth_darken: 0.25
