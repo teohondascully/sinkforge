@@ -121,7 +121,10 @@ tutorial's ground a landmark or a hazard too close to home?*
 were one metre-cell each; these widths are the port's own (D0384). *Question: at 16 px a metre, do the
 teeth read as stalactites or as fangs, and is the rubble a boulder or a crate?*
 
-**T008 · Trees: a half-metre trunk and a 3 × 2.5 m elliptical canopy.** Legacy's trunk was a metre wide
+**T008 · Trees: a half-metre trunk and a 3 × 2.5 m elliptical canopy.** *TAKEN (D0627, landed from
+`trees-footing-and-crowns`): not the lollipop. Six crown tables of three overlapping lobes each, chosen
+as a pure function of the root column so the layout's draw order never moves; the site record still owns
+size, the table only owns shape.* Legacy's trunk was a metre wide
 with a six-cell T of leaves (D0387). *Question: tree, or lollipop? The record's four width fields are the
 dials.*
 

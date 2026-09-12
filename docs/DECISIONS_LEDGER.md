@@ -23424,3 +23424,70 @@ route wiring put it over 400; thin delegators keep the seat's public surface the
 
 Mutation witness: suppressing the leg-boundary `shot.call` fails the strip assertion; the anchor bug
 itself was the accidental mutation that proved leg-boundary coverage discriminates.
+
+LANDING NOTE (2026-09-12): the two entries below were authored on branch `trees-footing-and-crowns` as
+D0600/D0601 (2026-09-11) and are renumbered D0626/D0627 on landing because two sessions assigned
+D0600/D0601 concurrently -- main's entries at those numbers are the gate-work entries of the same date,
+and numbers are addresses. The branch's provenance is preserved; nothing in either entry's reasoning is
+edited.
+
+## D0626 · 2026-09-11 · sim/terrain_gen/tree_pass.gd, sim/terrain_gen/content_passes.gd · a tree's footing
+Decided: `TreePass.plant` tests the ground under EVERY trunk column, for the whole cave band, instead of
+under the root column for one cell.
+Why: the director, from the chair -- *"notice how trees randomly spawn on flat platforms over shafts"*.
+Measured on the shipped seed 20260826, per root column, as solid cells straight down before the first
+open one: `25/26 -> 79/78`, `37/38 -> 67/67`, `56/57 -> 1/0`, `69/70 -> 1/1`, `214/215 -> 175/0`. A lid
+of 0 is a trunk column standing on an open cell. 214/215 is ONE tree, trunk two cells wide, with one half
+in 175 cells of rock and the other half over a void. `min_lid=0` in four of eight seeds sampled.
+TWO FAULTS, ONE LINE. `plant` accepted a column on `grid.is_solid(Vector2i(col, surface[col]))` and then
+`plant_one` wrote wood across `col .. col + trunk_w - 1` AT THAT SAME ROW: the far trunk column was never
+tested, and nothing was tested deeper than a single cell. The rifts, sinkholes and caverns all run before
+the tree pass.
+THE DEPTH IS DERIVED, NOT PICKED, and that is the whole of why this needed no new constant. Every carve
+pass in the generator refuses the band under a column's own surface -- `_carve_caves`, `CavePasses`
+through `Relief.offset`, `VerticalPasses._carve_row`, `StuddingPasses.open_terrain_cells` all take
+`site.cave.min_depth_cells` -- so the world already guarantees that much unbroken ground everywhere it
+has not been deliberately broken open. The ONE pass that breaks it is `VerticalPasses.open_sinkholes`,
+cutting a mouth up from a rift's ceiling to daylight. A tree asking for the band is refused in exactly
+the places the promise was cut. That is the director's "flat platforms over shafts".
+AND THE DEPTH IS NEARLY FREE, swept rather than assumed -- trees over the same eight worlds:
+  old (one column, one cell)        34
+  band  1 (both columns, one cell)  30     testing the far column at all costs 4
+  band  2-8 (both columns, >=2)     28     the second cell costs 2
+  band 16-24 (the derived band)     27     everything deeper costs ONE
+So the 21% density drop is the defect being removed, not the depth being strict. The shipped seed is the
+unlucky draw: 5 trees to 2. `chance: 0.20` is the data knob if the director wants the density back, and
+that is a taste call, not this entry's.
+Three mutations witnessed, each firing its own guard and no other: the pre-fix check restores both new
+failures; the band under only the root column fires the far-column guard alone; one cell deep under every
+column fires the lid guard alone.
+Reverse: CHEAP as code -- one function. NOT cheap as a world: this moves every tree in every world and
+rides the golden re-pin with D0627.
+
+## D0627 · 2026-09-11 · sim/terrain_gen/tree_pass.gd · a canopy is boughs, not a ball
+Decided: six crowns of three overlapping lobes replace the one ellipse every tree in the world wore.
+Why: queue item 53. `geometry` computes `rx`/`ry` ONCE per world from the site record, and `_canopy` drew
+that one integer ellipse at every tree -- from `shallow_clay.yaml` a 13x11 cell ellipse, the same 13x11
+cell ellipse, on every trunk. The only thing that differed between two trees was trunk height, one of two
+values. A circle on a stick, repeated. Against the record's 91-cell ellipse the six crowns come out 98,
+84, 84, 67, 74 and 75 cells, each a single connected mass with a broken edge.
+THE CROWN IS A PURE FUNCTION OF THE ROOT COLUMN, not an RNG draw, and both halves of that mattered.
+`world_seeder.gd:144` plants the start record's guaranteed tree through `plant_one` with no stream to
+draw from (D0425), and keyed off the column it gets its own crown for free. And a draw here would sit
+inside `plant`'s loop, where the layout already depends on draw order: asking for a shape would change
+WHICH columns get trees. A shape change that moves the forest is a shape change nobody can review.
+THE FIRST TABLE FLOATED SEVEN CANOPIES OFF THEIR TRUNKS. Offsets in thousandths were converted to whole
+cells before use, and `140 * ry / 1000` with `ry` 5 is ZERO -- every offset under a fifth collapsed onto
+the centre and every crown came out a shrunken circle that no longer reached the trunk top. The
+arithmetic moved into thousandths of a cell; the largest term is ~1e15 against int64's 9.2e18. The
+resulting invariant is the one property of the table that is not taste, and it is now asserted: the
+canopy centre sits `ry` above the top trunk cell, so a crown must contain `(-1, ry - 1)` or it hovers
+over a bare stick, which is worse than the lollipop it replaced. Held at (6,5), (4,3), (9,7) and (12,10).
+THE SHAPE TEST WAS WRONG TWICE BEFORE IT COULD SEE ITS SUBJECT, and both are the house class. Mutation M5
+-- the table kept, every tree forced onto crown 0 -- passed the full suite green. First the signature was
+keyed to the GROUND, so two trunk heights made one crown look like two shapes: a trunk-height detector.
+Keyed to the crown's own top row it still passed, because at the record's 3 m gap two crowns are 12 cells
+apart and each is 13 wide, so the window around one root was reading its NEIGHBOUR's leaves. Only with
+the trees posed 7 m apart does M5 fail, at "6 trees wearing 2 canopy SHAPES".
+Six mutations witnessed in all across D0626 and D0627.
+Reverse: CHEAP as code. Rides the same golden re-pin as D0626.

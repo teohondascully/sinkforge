@@ -1540,3 +1540,33 @@ spends most of its time. But it changes every world anyone has generated, and th
 **A cheaper half, if the answer is no:** the view could blend the two materials' colours across a band at
 the contact. I would rather not — the colour would stop telling the truth about what a cell IS, and a
 player mining at 39 m and 41 m gets different materials either way.
+
+## P045 · RULED 2026-09-12 -- the trees landed alone; P044 stays parked at its own re-pin cost
+
+**Authored on `trees-footing-and-crowns` 2026-09-11, landed verbatim.** The re-pin both tree changes
+needed is paid (CI Linux run 34665748233); the ruling received with the merge directive was to land the
+trees without folding P044 in. P044's own cost estimate -- "two lines in `ShaftGenerator._fill_base`
+plus moving `bedding_metres` to `core/`, the expense entirely in the re-pin" -- stands for whenever it
+is ruled.
+
+## P046 · The shipped seed now grows two trees where it grew five. Do you want the density back?
+
+**A consequence of D0626, measured, not a defect.** Refusing the broken ground removes trees, and the
+draw order means a refusal reshuffles every tree after it. Over eight seeds: 34 trees before, 27 after.
+The sweep says the depth chosen is not what costs them --
+
+    old (one column, one cell)        34
+    band  1 (both columns, one cell)  30     testing the far column at all costs 4
+    band  2-8 (both columns, >=2)     28     the second cell costs 2
+    band 16-24 (the derived band)     27     everything deeper costs ONE
+
+-- so 27 is the honest number for a world whose trees all stand on ground.
+
+**The shipped seed is the unlucky draw: 20260826 goes from 5 trees to 2**, and that is the opening frame,
+which is the frame you judge the game by. Seven of the eight seeds lose one or none; this one loses
+three. `shallow_clay.yaml`'s `tree.chance: 0.20` is legacy's own TREE_CHANCE and is the knob.
+
+**Recommendation carried over from the branch: raise `chance` to 0.30 and leave `gap_m` at 3.** The gap
+still refuses anything closer than 3 m, so it cannot produce a hedge -- it only asks more often, which
+is what recovers the count the footing rule took. Not done: it is a look call about how wooded the
+surface is, it would ride its own re-pin, and it is one line of data whenever you want it.

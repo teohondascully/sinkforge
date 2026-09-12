@@ -57,4 +57,7 @@ static func trees(grid: TileGrid, rng: SplitRng, site: Dictionary, surface: Pack
 	var cpm: int = ShaftGenerator.TERRAIN_CELLS_PER_METER
 	var spawn: int = ShaftGenerator.spawn_col(site, grid.width)
 	var keep: int = int(site["tree"]["keepout_m"]) * cpm
-	TreePass.plant(grid, rng.split("trees"), site["tree"], surface, Vector2i(spawn - keep, spawn + keep), cpm)
+	# The same `cave.min_depth_cells` every other pass here takes, for the same reason: it is the ground
+	# the world guarantees under a column. `TreePass._footed` says what a tree does with it (D0626).
+	var band: int = int(site["cave"]["min_depth_cells"])
+	TreePass.plant(grid, rng.split("trees"), site["tree"], surface, Vector2i(spawn - keep, spawn + keep), cpm, band)

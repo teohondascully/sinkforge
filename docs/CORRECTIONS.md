@@ -941,3 +941,50 @@ green, and about nothing the player can see.
 game LOOKS that was made without a frame this session has been wrong: the band colours (D0590), the
 beyond's darkness (D0597), the grass that never drew (D0596), and this. Four for four. Measuring a
 function is not measuring a picture, and no amount of assertion density closes that gap.
+function is not measuring a picture, and no amount of assertion density closes that gap.
+
+## 2026-09-11 · The shape test that could not see the shape — twice in a row (D0627)
+
+**What I built.** Six crowns to replace the one ellipse every tree in the world wore, and a test meant to
+prove a planted forest shows more than one of them: collect each tree's leaf cells relative to its root
+column, count the distinct signatures, require at least three.
+
+**Mutation M5 kept the table and forced every tree onto crown 0. The full suite passed, 32 of 32.** The
+instrument written specifically to catch that defect could not see it. Twice:
+
+1. **Keyed to the ground.** The signature recorded `row - DATUM`, so two trees wearing the SAME crown at
+   the two available trunk heights produced different signatures. It was a trunk-height detector with a
+   crown-shaped name.
+2. **Keyed to the crown, but reading the neighbour.** Fixed to key off each crown's own top row, it
+   passed M5 again — at the record's `gap_m: 3` two crowns stand 12 cells apart and each is 13 wide, so
+   the window around one root was sampling the tree NEXT to it. Every signature differed for a reason
+   that had nothing to do with crowns.
+
+Only with the trees posed 7 m apart does M5 fail, at "6 trees wearing 2 canopy SHAPES".
+
+**What made it durable.** Both drafts produced a *plausible, varying* number — 5 shapes, 6 shapes — and a
+varying number reads as a working instrument. `[[instrument-cannot-register-subject]]`, and specifically
+the form where the subject is present but a confound of the same magnitude sits on top of it: trunk
+height in the first draft, spacing in the second. `[[control-inside-the-measurement]]` was what finally
+resolved it, in the mutation rather than in the test.
+
+**And the mutation is the only reason any of this was found.** M4 and M6 — the ellipse restored, and the
+offsets rounded to whole cells — both fired immediately and loudly. It would have been very easy to read
+two of three mutations firing as a pinned guard and move on. The standing rule is that each mutation
+fires ITS OWN guard; M5 fired nothing, and that was the finding.
+
+## 2026-09-11 · Four minutes of "slow ticks" that were zero ticks (D0626/D0627 capture)
+
+**What I was about to write:** that a headed capture run was taking about 2.7 seconds per tick, and to
+theorise about the occluded-window throttle (`[[window-regime-is-inside-the-measurement]]`) and the bake
+cost at zoom 2.0. Both plausible, both already in the memory.
+
+**`sample <pid> 3` took five seconds and refuted it.** The main thread was 100% inside
+`_DPSNextEvent -> _BlockUntilNextEventMatchingListInMode -> __CFRunLoopRun` — blocked in AppKit's event
+loop waiting for a window that could not become active. **Zero ticks had run.** `SINKFORGE_BOOT
+phases_ms` had printed, which is what made it look like a running game.
+
+**The error I nearly made is an arithmetic one:** dividing elapsed time by a tick count the process never
+reached invents a rate for a loop that never advanced. `[[read-the-count-not-the-rate]]`, and
+`[[elaboration-is-the-tell]]` — the explanations were getting more elaborate, which meant the instrument
+was wrong.
