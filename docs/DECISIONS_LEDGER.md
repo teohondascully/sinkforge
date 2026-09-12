@@ -23060,3 +23060,17 @@ look bigger than it is -- the same stated-vs-measured gap this project's correct
 Not changed: no numbers renumbered (gate numbers are addresses), no claim removed -- reclassified
 entries keep their text with their status stated.
 Reverse: docs only.
+
+## D0603 · 2026-09-11 · tools/layer_lint/test_no_engine_imports.py, test_check_coordinate_naming.py, test_check_working_freshness.py, tools/test_corrections_freshness.py · four blocking checks get their mutation tests
+Decided: dedicated `test_*.py` files for the four blocking checks the Phase 1 audit found with none:
+`no_engine_imports` (pattern-level: every pattern fires on a canonical violating line, the comment-skip
+is real, the deliberately-unblocked list stays unblocked), `check_coordinate_naming` (scratch files
+through `_check_file`, including the documented untyped-return blind spot pinned as visible rather than
+silently healed or widened), `check_working_freshness` (WORKING_MD pointed at scratch files; stale FAIL,
+equal/future pass, no-date-line FAIL, missing-file vacuous pass), `check_corrections_freshness`
+(synthetic headers through `candidate_ids`, including the CORRECTIONS.md-naming false positive it was
+built to not repeat).
+Why: these gates were proven to fire by live transient mutation during the audit -- which protects
+nobody next month. A gate with no mutation test is a gate whose failure path nobody has seen since it
+was written; every one of these now runs under the "Gate mutation tests" glob step in CI.
+Reverse: delete the four test files.
