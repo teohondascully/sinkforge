@@ -23310,3 +23310,39 @@ the envelope carries it.
 
 **Mutation witness:** `rubble_capture` returning `{}` turns "every saved part signs as the run's end
 state" red.
+
+## D0622 · 2026-09-11 · view/fx/leaf_drift.gd, view/fx/particles.gd, shell/seat_effects.gd, tests/test_leaf_drift.gd, view/fx/MODULE.md, .github/workflows/harness.yml · queue item 30: the ambient leaf shed, WaterDrips' shape exactly
+
+Falling and drifting leaves, the queue's own wording: an ambient emitter keyed to canopies, and
+nothing more was asked for. The judgment calls made and why:
+
+**The canopy comes from `surface_y`, not a new observation field.** There is no canopy list on the
+Observation, and adding one would be an interface field grown for a cosmetic. `sky_floor` already
+answers "what is the topmost solid under open sky" per column in O(1), and leaves are solid terrain
+cells, so the crown top is the surface where a tree stands. Each column walks its contiguous run of
+leaves down from there (bounded by CROWN_SCAN) and sheds off the run's underside -- a column without
+a tree costs one material read, the whole pass a few hundred. The D0338 lesson applied the other
+way: the plane scan was the expensive answer; the field the observation already maintains is the
+cheap one.
+
+**One edge per column, not per leaf cell.** Any leaves cell with non-leaf below is technically an
+underside, but in a contiguous run only the bottom cell qualifies, and a crown interrupted mid-column
+(a tunnel cut through it) sheds only off the top run's underside. Both come out of the same walk.
+
+**The leaf is its own tree's green.** `GrassPainter.blade_color`'s rule verbatim (D0584): `leaves`'
+`base_color` varied by `BeddingTone.foliage_tone(col, row)`, so a leaf reads as coming off the crown
+it fell from and "what plant looks like" keeps its one home.
+
+**Sway is a particle field, not a wind system.** `"sway"` is a per-particle phase applied in
+`advance` -- three lines, no wind state anywhere. A shared wind is the obvious next thing if the
+drift ever needs to agree with grass sway, and it is deferred deliberately for the same reason
+`grass_painter.gd` defers its own.
+
+**Rate: SHED_PERIOD 9 s per open edge, cap 3/frame.** A screen holds a few trees, not a forest; the
+number makes a grove shimmer and the cap makes a dense stand unable to snow. Frame-rate independent
+via the same delta gate WaterDrips uses.
+
+**The plan is asserted as data.** `shedding_edges` returns cells, and the suite pins WHICH cells
+against a posed crown (plus bare-ground control, view cull, zero-delta, cap) -- the D0595 rule that
+counting particles cannot catch an emitter firing from the wrong cells. Mutation witness: suppressing
+the emit turns five checks red.

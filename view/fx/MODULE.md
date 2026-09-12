@@ -12,6 +12,7 @@ state back. Each is a painter-style pass fed by the `Frame`, the observation, or
 - `light_layer.gd` — one lighting pass painted in world space, so a pass can carry its own blend mode.
 - `payouts.gd` — the "+3 ore" tick that rises off the body when the pack gains (D0365).
 - `water_drips.gd` — the water-motion cue; representation only (D0362).
+- `leaf_drift.gd` — the ambient leaf shed keyed to canopies; same shape as `water_drips` (queue item 30).
 
 ## Public API
 

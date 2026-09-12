@@ -31,6 +31,7 @@ func tick(frame: Frame, particles: Particles, look: MaterialLook, falling: Falli
 		_slump(frame.obs, particles, look, slump)
 		_landing(frame.obs, particles, look, shake_on)
 		WaterDrips.spawn(frame.obs, particles, view_rect, delta)
+		LeafDrift.spawn(frame.obs, particles, view_rect, delta)
 	var landings: Dictionary = falling.take_landings()
 	for cell: Vector2i in landings:
 		particles.pop(landings[cell]["pos"], landings[cell]["color"])

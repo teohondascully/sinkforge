@@ -512,6 +512,7 @@ jobs:
       #   test_interface.gd                              test_interface (L2 is a door — observe() is pure, an Observation is a copy, D0214)
       #   test_score.gd                                  test_score (the lifted score — seamless loop, deterministic beds, depth-driven mix, D0215)
       #   test_particles.gd                              test_particles (the cosmetic layer is capped, retires, and cannot move the sim — D0216)
+      #   test_leaf_drift.gd                             test_leaf_drift (the ambient leaf emitter: the crown's open underside as a plan, the cap, the view cull, the sway — queue item 30)
       #   test_reveal_spawn_bounds.gd                    test_reveal_spawn_bounds (the spawn never sits flush against a world edge — D0192/D0199)
       #   test_seams.gd                                  test_seams (rock grain, now in core/ so view can reach grain() — D0227/D0237)
       #   test_world_view.gd                             test_world_view (the coordinator skeleton — a painter gets its own canvas, D0240)
@@ -529,7 +530,7 @@ jobs:
       # derives it from this step's own argument list and fails when the two disagree. It said 49 while
       # 62 ran. A step `name:` cannot interpolate shell output, so a hand-written number is the only way
       # to have one at all -- this is how it is made safe to have.
-      - name: all 158 suites, in parallel (determinism, conservation, movement acceptance)
+      - name: all 159 suites, in parallel (determinism, conservation, movement acceptance)
         run: |
           set -o pipefail
           bash tools/run_suites.sh ./godot 4 \
@@ -678,6 +679,7 @@ jobs:
             res://tests/test_interface.gd \
             res://tests/test_score.gd \
             res://tests/test_particles.gd \
+            res://tests/test_leaf_drift.gd \
             res://tests/test_reveal_spawn_bounds.gd \
             res://tests/test_seams.gd \
             res://tests/test_world_view.gd \

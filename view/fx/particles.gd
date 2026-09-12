@@ -106,6 +106,20 @@ func water_splash(pos: Vector2) -> void:
 	burst(pos, 4, Color(0.62, 0.82, 0.98), 60.0, PI * 0.6, 1.8, 0.26, 340.0, PI * 0.5)
 
 
+## A leaf let go by a canopy's open underside (queue item 30): a slow fall on a whisper of gravity
+## with a sideways sway the particle carries a phase for. Longer-lived than a drip -- it has ground
+## to reach, and the fade-out is what excuses it never quite landing.
+func leaf(pos: Vector2, color: Color) -> void:
+	if _p.size() >= MAX:
+		return
+	_p.append({
+		"pos": pos + Vector2(randf_range(-2.0, 2.0), randf_range(-1.0, 0.0)),
+		"vel": Vector2(randf_range(-10.0, 10.0), randf_range(8.0, 16.0)),
+		"life": 2.4, "max_life": 2.4, "color": color.lightened(randf_range(-0.08, 0.12)),
+		"size": randf_range(1.4, 2.0), "grav": 24.0, "sway": randf() * TAU,
+	})
+
+
 func advance(delta: float) -> void:
 	var kept: Array[Dictionary] = []
 	for q: Dictionary in _p:
@@ -114,6 +128,9 @@ func advance(delta: float) -> void:
 			continue
 		q["vel"] = Vector2(q["vel"]) + Vector2(0.0, float(q["grav"]) * delta)
 		q["pos"] = Vector2(q["pos"]) + Vector2(q["vel"]) * delta
+		if q.has("sway"):
+			var t: float = float(q["max_life"]) - float(q["life"])
+			q["pos"] = Vector2(q["pos"]) + Vector2(sin(t * 4.5 + float(q["sway"])) * 16.0 * delta, 0.0)
 		kept.append(q)
 	_p = kept
 
