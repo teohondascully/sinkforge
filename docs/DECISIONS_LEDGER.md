@@ -23212,3 +23212,13 @@ report a nonzero corpus PASS (1 scenario file citing a proven claim) instead of 
 check passes at 158.
 Reverse: delete tests/test_cold_start_d1.gd and scenarios/cold_start_to_d1.yaml, revert the claim
 file and the two harness.yml lines.
+
+## D0610 · 2026-09-11 · data/materials/ore_copper.yaml, docs/TASTE_QUEUE.md · T001 taken provisionally: copper gets a copper mark
+
+T001 asked whether ore_copper keeps legacy's generic silvery ore fleck or is retinted toward copper.
+The original restraint was sound at port time -- inventing a hue under cover of a migration hides new
+art inside a port -- but the port is done and the material is NAMED copper. Warm fleck
+[0.80, 0.47, 0.24] on the unchanged grey host; it also maximises copper/iron contrast (iron's fleck is
+cool blue-white). Verified: test_wall_lode 173 asserted, worst ore/host plane-separation 0.314 against
+a 0.30 floor; data_codegen clean. Provisional per the taste-queue convention -- the director overrules
+by reverting one yaml line.

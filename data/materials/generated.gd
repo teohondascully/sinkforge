@@ -137,9 +137,9 @@ const RECORDS: Dictionary = {
 		"depth_darken": 0.25,
 		"glitters": true,
 		"nugget_color": [
-			0.78,
-			0.81,
-			0.85,
+			0.8,
+			0.47,
+			0.24,
 		],
 		"nugget_count": 6,
 	},

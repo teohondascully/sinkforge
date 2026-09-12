@@ -26,7 +26,11 @@ the actual taste questions; the working playtest adapter is documented in `playt
 Not fixtures in the `F###` sense (no fixture format exists yet); these are the two visual judgment calls
 Slice 0 produced that are the director's, not the engineer's.
 
-**T001 · `ore_copper` reads SILVER, not copper.** It maps to legacy's `ore`, which is legacy's GENERIC
+**T001 · `ore_copper` reads SILVER, not copper.** *TAKEN provisionally (D0610): the nugget is now a
+warm copper fleck `[0.80, 0.47, 0.24]` on legacy's unchanged grey host — the port-era reason not to
+retint ("new art under cover of a migration") expired with the port, and the material is named copper.
+The warm mark also maximises the copper/iron contrast (iron's fleck is cool blue-white). Revert one
+line in ore_copper.yaml to reverse.* It maps to legacy's `ore`, which is legacy's GENERIC
 ore-in-rock record — a grey host with a silvery-white fleck. Legacy never authored a copper-specific
 material, so there is nothing to lift. It was taken unaltered rather than retinted, because inventing a
 copper hue and calling it a port would hide new art inside a migration. *Question: retint it toward

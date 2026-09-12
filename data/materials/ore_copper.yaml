@@ -12,14 +12,17 @@ display_name: Copper ore
 # no retuning. `.tres` is a binary-ish resource format; gate 22 requires data/ be human-diffable
 # text, so the values move but the format does not.
 #
-# Legacy `ore` -- its GENERIC ore-in-rock record. Legacy never authored a copper-specific one,
-# so this nugget is SILVERY-WHITE, not copper. Lifted unaltered rather than invented: retinting it would
-# be authoring new art under cover of a port. Filed as a taste question in docs/TASTE_QUEUE.md, not a bug.
+# Legacy `ore` -- its GENERIC ore-in-rock record, lifted unaltered at the port because retinting then
+# would have hidden new art inside a migration. The port is done and the material is named copper, so
+# T001 is now TAKEN provisionally (D0610): `nugget_color` moves from legacy's silvery-white to a warm
+# copper fleck, which also maximises the iron/copper contrast a player uses to tell the two ores apart
+# (ore_iron's mark is cool blue-white). `base_color` stays legacy's neutral grey host -- the nugget is
+# the mark; the country rock does not need to blush. Revert the one line to reverse.
 
 base_color: [0.29, 0.3, 0.34]
 grain: true
 grammar: clastic
 depth_darken: 0.25
 glitters: true
-nugget_color: [0.78, 0.81, 0.85]
+nugget_color: [0.80, 0.47, 0.24]
 nugget_count: 6
