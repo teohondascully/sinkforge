@@ -148,6 +148,9 @@ jobs:
       - name: File and function size limits (QUALITY gates 3-4)
         run: python3 tools/layer_lint/check_size_limits.py
 
+      - name: Every .gd-bearing module dir carries a module doc (QUALITY gate 6, D0607)
+        run: python3 tools/layer_lint/check_module_docs.py
+
       - name: Instrument LOC must not exceed game LOC (QUALITY gate 7)
         run: python3 tools/layer_lint/check_loc_ratio.py
 

@@ -23131,3 +23131,41 @@ Verified: suite green clean (3 asserted), red under the mining mutation, restore
 check passes at 157.
 Reverse: delete tests/test_softlock_ascent.gd, its harness.yml line and catalog comment, revert the
 gate-10 text.
+
+## D0607 · 2026-09-11 · tools/layer_lint/check_module_docs.py, view/{audio,fx,hud,visuals}/MODULE.md, harness.yml, docs/QUALITY.md · gate 6's presence half, enforced against the tree's real doc convention
+Decided: `check_module_docs.py` requires every .gd-bearing directory in a policed layer
+(layer_lint.ALLOWED) to carry MODULE.md or README.md -- the tree practices both conventions
+(sim/core/interface the first, view/shell/harness the second), so the gate checks for a doc, not a
+filename. `data/` is exempt: its subdirs are one generated catalog (ADR 0004), documented by the
+generator and the ADR, not eight hand files that would only ever drift. Unpoliced tops (tests/,
+playtest/, legacy/) carry no obligation, by the same rule that keeps them out of the dependency
+graph. The four view/ subdirs got MODULE.md files because they are module-shaped (a separable
+concern with its own contract), while view/ itself keeps the README the layer already chose.
+Why: the audit found gate 6 declared "MODULE.md present and current in every module directory" while
+nothing checked presence and view/'s four subdirs shipped undocumented. Presence is now enforced;
+"current" stays unclaimed -- no cheap check verifies content freshness, and the gate text says so
+rather than implying it.
+Verified: check fails on the pre-doc tree naming exactly the four view/ subdirs; mutation test
+9/9 branches (missing doc reported, layer README not covering a new subdir, README satisfying the
+rule, exempt tops ignored, empty population exits 2). Formatter PASS.
+Reverse: delete tools/layer_lint/{check_module_docs.py,test_check_module_docs.py}, the four
+view/*/MODULE.md files, the harness step, revert the gate-6 text.
+
+## D0607 · 2026-09-11 · tools/layer_lint/check_module_docs.py, view/{audio,fx,hud,visuals}/MODULE.md, harness.yml, docs/QUALITY.md · gate 6's presence half, enforced against the tree's real doc convention
+Decided: check_module_docs.py requires every .gd-bearing directory in a policed layer
+(layer_lint.ALLOWED) to carry MODULE.md or README.md -- the tree practices both conventions
+(sim/core/interface the first, view/shell/harness the second), so the gate checks for a doc, not a
+filename. data/ is exempt: its subdirs are one generated catalog (ADR 0004), documented by the
+generator and the ADR, not eight hand files that would only ever drift. Unpoliced tops (tests/,
+playtest/, legacy/) carry no obligation, by the same rule that keeps them out of the dependency
+graph. The four view/ subdirs got MODULE.md files because they are module-shaped (a separable
+concern with its own contract), while view/ itself keeps the README the layer already chose.
+Why: the audit found gate 6 declared "MODULE.md present and current in every module directory" while
+nothing checked presence and view/'s four subdirs shipped undocumented. Presence is now enforced;
+"current" stays unclaimed -- no cheap check verifies content freshness, and the gate text says so
+rather than implying it.
+Verified: check fails on the pre-doc tree naming exactly the four view/ subdirs; mutation test
+9/9 branches (missing doc reported, layer README not covering a new subdir, README satisfying the
+rule, exempt tops ignored, empty population exits 2). Formatter PASS.
+Reverse: delete tools/layer_lint/{check_module_docs.py,test_check_module_docs.py}, the four
+view/*/MODULE.md files, the harness step, revert the gate-6 text.
