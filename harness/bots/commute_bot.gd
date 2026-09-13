@@ -77,8 +77,7 @@ func _step_ascend_grapple(out: Dictionary, leg: Dictionary) -> int:
 			if _stall > THROW_CAP:
 				return 2
 		1:  ## WAIT for the shot to resolve -- a find grows the line back out, a miss leaves it.
-			## `o` is a tick stale, so resolution counts only once the throw has actually been SEEN
-			## (`_since_scoop` doubles as the flag; it is free per-leg state like `_waited`).
+			## `o` is a tick stale, so resolution counts once the throw is SEEN (`_since_scoop` flags it).
 			_waited += 1
 			if _waited > WAIT_CAP:
 				return 2
@@ -86,15 +85,13 @@ func _step_ascend_grapple(out: Dictionary, leg: Dictionary) -> int:
 				_since_scoop = 1
 			elif _since_scoop == 1:
 				_since_scoop = 0
-				## A find goes to the reel. So does ANY resolution near the rim: the last bite lands
-				## inside a body's reach of the lip, where "line already out" reads like a miss --
-				## the rim hold in REEL is what gives the mantle its window instead of a re-bite loop.
+				## A find goes to the reel. So does ANY resolution near the rim: "line already out"
+				## there reads like a miss -- the rim hold in REEL gives the mantle its window.
 				var short: bool = o.grapple_length <= Grapple.MIN_LENGTH + REEL_EPS
 				_phase = 0 if short and p.y - row > MANTLE_ROWS else 2
 				_waited = 0
 		2:  ## REEL -- up held until the line is out. Near the rim toward-and-up rides too, and a
-			## reeled-out line holds it for RIM_HOLD before another throw: the last bite lands a
-			## body's reach under the lip, so "line out" there is the mantle's window, not a miss.
+			## reeled-out line holds it for RIM_HOLD before another throw (the mantle's window).
 			f.climb_dir = 1
 			var near_rim: bool = p.y - row <= MANTLE_ROWS
 			if near_rim:
@@ -110,15 +107,23 @@ func _step_ascend_grapple(out: Dictionary, leg: Dictionary) -> int:
 					_waited = 0
 			else:
 				_waited = 0
-		3:  ## CUT -- walk off the lip so the spent line goes taut, and hop: a jump cuts a taut line.
-			_waited += 1
-			f.move_dir = signi(int(leg["col"]) - 4 - p.x)
-			var hop: bool = body.on_floor and _waited % 12 == 0
-			f.jump_pressed = hop
-			f.jump_held = hop
-			if not o.grapple_anchored:
-				if p.y <= row and body.on_floor:
-					return 1
-			elif _waited > CUT_CAP:
-				return 2
+		3:
+			return _step_cut(out, leg, p, row)
+	return 0
+
+
+## One tick of the CUT phase: walk off the lip so the spent line goes taut, and hop -- a jump cuts a
+## taut line (body.gd's jump-on-taut, the only wired release).
+func _step_cut(out: Dictionary, leg: Dictionary, p: Vector2i, row: int) -> int:
+	_waited += 1
+	var f: InputFrame = out["frame"]
+	f.move_dir = signi(int(leg["col"]) - 4 - p.x)
+	var hop: bool = body.on_floor and _waited % 12 == 0
+	f.jump_pressed = hop
+	f.jump_held = hop
+	if not o.grapple_anchored:
+		if p.y <= row and body.on_floor:
+			return 1
+	elif _waited > CUT_CAP:
+		return 2
 	return 0

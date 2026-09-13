@@ -23925,3 +23925,21 @@ were empty frames (the fall and the hook flights). `test_commute_report` 9/9; `t
 23/23, `test_conveyor_jam` 18/18, `test_cold_start_d1` 20/20 unaffected; claim gate PASS.
 Reverse: delete the scenario and the `&"commute"` arm; the leg's phases name which observation
 each piece of the machine reads, so reverting the phase table re-breaks the ascent, not silently.
+
+## D0658 · 2026-09-13 · sim/run/world_seeder.gd, harness/bots/{route_bot,commute_bot}.gd · the batch's third size-gate remedy -- CI caught what the local sweep reported green
+
+CI's structural-gates job (run 34727556304, head b51b38e5) found three size violations the local
+gate_status run on the SAME commit reported as local=PASS: `_stamp_one` 51/50 (the D0645 intake
+block's 2-line comment pushed it over), `route_bot.gd` 415/400 (the probe vocabulary D0646/47
+added), `_step_ascend_grapple` 62/50. Remedy at seams, same policy as D0657: `_stamp_one`'s
+override comment folds to one line; `_step_ascend_grapple`'s CUT phase extracts to `_step_cut`
+(the phase boundary it already had); `route_bot.gd` sheds 15 lines of docstring redundancy -- the
+decide/apply, notes, descend, lip-escape, deliver and payload paragraphs keep every operational
+rule (centre-by-pixel, hands-off-while-falling, lip-escape direction, refused-drop-fails) while
+the measured evidence stays where it belongs, in D0646/D0647's own entries.
+The finding worth the entry: gate_status.py ran the size check locally on b51b38e5 and reported
+zero FAIL gates while the check itself exited 1 -- a false-green seam in the sweep tool, which
+means the sweep's green is not evidence for THIS gate; the checker's own exit code is.
+Measured: check_size_limits PASS after the edits; the seven affected suites (conveyor_jam,
+commute_report, cold_start_d1, seat_route, world_seeder, save_game, decision_meter) all PASS.
+Reverse: restore the three files; the gate re-fails at the same three sites.

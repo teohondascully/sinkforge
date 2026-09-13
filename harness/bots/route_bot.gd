@@ -13,16 +13,11 @@ extends RefCounted
 ## leg kind the shared vocabulary does not know falls through `_step_custom` -- leg kinds are verbs
 ## shared by every probe, routes are policies and belong to the subclass.
 ##
-## DECIDE/APPLY (D0625). `decide()` produces one tick's intent as DATA -- the `InputFrame` the world
-## should advance on plus the intra-tick `Command`s (select, drop, collect) that ride it -- and the
-## caller applies them. `execute()` is the black-box loop for drivers that only want the outcome;
-## `step()` is the same decide+apply pair split open for drivers that want the payload itself
-## (the decision meter, the goal watch), so the count of what `decide()` emits never has to be
-## inferred from the outside.
-##
-## `notes` is the probe's evidence channel: a `note` leg snapshots observable state (machine status,
-## pile contents) into it at a named tick, so a claim cites what the run SAW rather than what the
-## driver hoped. Notes are reads off the bot's own observation -- never privileged state.
+## DECIDE/APPLY (D0625). `decide()` produces one tick's intent as DATA (the `InputFrame` plus the
+## intra-tick `Command`s that ride it) and the caller applies them: `execute()` is the black-box
+## loop, `step()` the same pair split open for drivers that want the payload itself (the meter,
+## the goal watch). `notes` is the probe's evidence channel -- a `note` leg snapshots observed
+## state at a named tick, a read off the bot's own observation, never privileged state.
 
 var world: World
 var items: Items
@@ -117,18 +112,16 @@ func _route(_anchor: Vector2i) -> Array:
 	return []
 
 
-## One tick's decision: {frame, commands, finished, legs_done, leg_kind}. `finished` is the index of a
-## leg that completed or failed on this tick (for the seat's per-leg capture), `legs_done` is the route
-## over, `leg_kind` is the acting leg's kind so telemetry can attribute the tick to a phase (the
-## payload's own buttons say what was pressed; the leg says what the tick was FOR -- a falling body
-## emits an empty frame and the tick still belongs to the descent).
+## One tick's decision: {frame, commands, finished, legs_done, leg_kind}. `finished` is the index
+## of a leg that completed or failed on this tick (for the seat's per-leg capture), `legs_done`
+## the route over, `leg_kind` the acting leg's kind for telemetry's phase attribution (a falling
+## body emits an empty frame and the tick still belongs to the descent).
 ## `ticks` counts decisions -- the world owes one tick per decision, which is what makes the count
 ## mean the same thing in the driver's loop and under the seat's `_physics_process`.
 ##
-## `obs`, when given, is the observation to decide on INSTEAD of observing: `Interface.observe` owns a
-## consumed channel (`_events` clears on every call), so the seat hands over the frame it already
-## rendered -- the route reads exactly the picture the player was shown, one tick stale, and the
-## view's own observe keeps its events. A driver with no view passes nothing and the bot observes.
+## `obs`, when given, is decided on INSTEAD of observing: `Interface.observe` owns a consumed
+## channel (`_events` clears on every call), so the seat hands over the frame it rendered -- the
+## route reads the picture the player saw, one tick stale.
 func decide(obs: Interface.Observation = null) -> Dictionary:
 	o = obs if obs != null else iface.observe(env)
 	ticks += 1
@@ -263,10 +256,9 @@ func _step_mine(f: InputFrame, leg: Dictionary) -> int:
 	return 0
 
 
-## One tick of a deliver leg: walk level with the machine's row (a drop from a ledge above is out of
-## reach even one metre sideways), then select the stack, drop it, and on the following tick require
-## the pack to have shrunk -- a drop that was issued but did not land fails the leg, as the old
-## `r.ok or pack shrunk` did by refusing to count a refused drop as delivery.
+## One tick of a deliver leg: walk level with the machine's row (a ledge drop is out of reach one
+## metre sideways), select the stack, drop it, then require the pack to have shrunk -- a refused
+## drop fails the leg rather than counting as delivery.
 func _step_deliver(out: Dictionary, leg: Dictionary) -> int:
 	var m: Vector2i = leg["at"]
 	match _phase:
@@ -302,20 +294,14 @@ func _step_await(out: Dictionary, leg: Dictionary) -> int:
 	return 0
 
 
-## One tick of a descend leg: steer for `col`'s CENTRE until the body stands at or below `row` --
-## the shaft descent's honest shape. Centring by pixel, not by cell, is the difference between
-## falling in and perching: a body whose cell already reads `col` can still be straddling the
-## bore's lip, and `signi(col - p.x)` answering 0 there is exactly how the first version of this
-## stepper stood on the shaft's edge forever (D0646).
-##
-## The other half of the fix is HANDS OFF WHILE FALLING: pressing a direction below the rim
-## gives the shaft wall's lip cells a pressed edge to catch, and the measured run showed the
-## pressed body auto-stepping back OUT of the bore and circling. `_entry_y` is the row the leg
-## started on; a body airborne BELOW it is inside the hole and falls straighter alone. On a
-## floor it walks again -- the bottom is where "stand on `col` at `row`" still needs steering.
-## And a body caught ON a shaft lip steps AWAY from the caught edge (`_lip_escape`), because a
-## centre nudge there oscillates the same two pixels until the auto-step lifts it out.
-## No hop-on-stall: the stall detector's job here would be to climb out of the hole.
+## One tick of a descend leg: steer for `col`'s CENTRE until the body stands at or below `row`.
+## Centring by pixel, not cell, is what falls in rather than perching -- a body whose cell reads
+## `col` can still straddle the lip, and `signi(col - p.x)` answering 0 there stood the first
+## version on the edge forever (D0646). HANDS OFF WHILE FALLING: a pressed direction below the
+## rim gives lip cells an edge to catch (the pressed body auto-stepped back OUT and circled), so
+## a body airborne below `_entry_y` falls straighter alone; on a floor it steers again, and
+## caught ON a lip it steps AWAY from the caught edge (`_lip_escape`). No hop-on-stall: the
+## detector's job here would be to climb out of the hole.
 func _step_descend(f: InputFrame, leg: Dictionary) -> int:
 	var p: Vector2i = pos()
 	if p.y >= int(leg["row"]) and p.x == int(leg["col"]) and body.on_floor:
@@ -335,10 +321,9 @@ func _step_descend(f: InputFrame, leg: Dictionary) -> int:
 
 
 ## Which way to step when a lip caught the body mid-shaft: AWAY from whichever box edge has a
-## solid cell under it. Measured in `tools/scratch/probe_conveyor.gd`: the body is exactly one
-## metre wide, so descending a one-metre throat leaves an edge pixel resting on the wall's lip
-## -- `on_floor` with open air under the rest of the box. Stepping away from that edge drops the
-## whole underside onto air; stepping toward it is how the leg climbed back out of the bore.
+## solid cell under it (measured, probe_conveyor.gd: a one-metre body in a one-metre throat rests
+## an edge pixel on the lip -- `on_floor` over open air). Stepping away drops the whole
+## underside onto air; stepping toward it is how the leg climbed back out of the bore.
 func _lip_escape() -> int:
 	var foot_row: int = (body.pos_y + (Body.HEIGHT_PX / 2 + 1) * Fx.SCALE) / Fx.SCALE / 4
 	var right := Vector2i((body.pos_x + Body.WIDTH_PX / 2 * Fx.SCALE) / Fx.SCALE / 4, foot_row)

@@ -175,8 +175,7 @@ static func _stamp_one(world: World, items: Items, machines: Machines, f: Dictio
 			if m == null:
 				last_refusal = "machine %s at %s: the cell is not open by then (a record error; the world is part-stamped)" % [str(f["id"]), str(cells[0])]
 				return false
-			# The placed-instance intake override (D0645): the fixture authors a machine whose intake
-			# jams where the shipped record passes, without minting a data record for the variant.
+			# Placed-instance intake override (D0645): a fixture jams where the shipped record passes.
 			if f.has("intake"):
 				m.intake = StringName(str(f["intake"]))
 		"pack":
