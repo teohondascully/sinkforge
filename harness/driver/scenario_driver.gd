@@ -157,6 +157,8 @@ static func bot_for(record: Dictionary) -> RouteBot:
 			return ColdStartBot.new(int(record.get("budget_ticks", 30000)))
 		&"conveyor_probe":
 			return ConveyorBot.new(int(record.get("budget_ticks", 30000)))
+		&"commute":
+			return CommuteBot.new(int(record.get("budget_ticks", 30000)))
 	return null
 
 

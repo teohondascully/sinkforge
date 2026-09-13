@@ -1,0 +1,23 @@
+# B3's commute fixture (D0647): a two-metre shaft a hundred metres deep beside spawn, a forge in a
+# surface well west of spawn, and an ore face in the shaft's east wall at the bottom. The commute
+# the minute-25 question asks about is the round trip the route makes of it: fall ~100 m, mine,
+# grapple back up ~100 m, feed the forge -- ~200 m of vertical travel in one policy.
+id: commute_200
+site: shallow_clay
+spawn_col_m: 32
+fixtures:
+  # THE FORGE WELL west of spawn, the tutorial's own shape (a two-metre pocket so what the machine
+  # is fed and what it pays out both land in the open cell under it). The commute's demand side.
+  - {kind: open, cells: [[-3, 0], [-3, 1]]}
+  - {kind: solid, dx: -3, dy: 2, material: clay, deposit: 0}
+  - {kind: machine, id: processor, dx: -3, dy: 0}
+  # THE SHAFT: two metres wide, a hundred deep, hardrock floor. TWO METRES because the body is one
+  # metre wide with edge-pixel collision -- a same-width shaft has no position with air under the
+  # whole box (D0646's measurement), and the grapple ascent wants room to hang anyway.
+  - {kind: room, dx: 8, dy: 0, w: 2, h: 101, floor: hardrock}
+  # THE FACE at the bottom: ore in the east wall of the shaft's last two metres -- the thing the
+  # commute is FOR. Same per-cell stock the tutorial vein carries.
+  - {kind: solid, dx: 10, dy: 99, material: ore_iron, deposit: 13}
+  - {kind: solid, dx: 10, dy: 100, material: ore_iron, deposit: 13}
+  # The fuel half of the feed, carried down and back so the forge can read `working`.
+  - {kind: pack, item: coal, count: 2}

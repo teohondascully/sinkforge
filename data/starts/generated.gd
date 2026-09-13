@@ -28,6 +28,66 @@ const RECORDS: Dictionary = {
 			},
 		],
 	},
+	"commute_200": {
+		"id": "commute_200",
+		"site": "shallow_clay",
+		"spawn_col_m": 32,
+		"fixtures": [
+			{
+				"kind": "open",
+				"cells": [
+					[
+						-3,
+						0,
+					],
+					[
+						-3,
+						1,
+					],
+				],
+			},
+			{
+				"kind": "solid",
+				"dx": -3,
+				"dy": 2,
+				"material": "clay",
+				"deposit": 0,
+			},
+			{
+				"kind": "machine",
+				"id": "processor",
+				"dx": -3,
+				"dy": 0,
+			},
+			{
+				"kind": "room",
+				"dx": 8,
+				"dy": 0,
+				"w": 2,
+				"h": 101,
+				"floor": "hardrock",
+			},
+			{
+				"kind": "solid",
+				"dx": 10,
+				"dy": 99,
+				"material": "ore_iron",
+				"deposit": 13,
+			},
+			{
+				"kind": "solid",
+				"dx": 10,
+				"dy": 100,
+				"material": "ore_iron",
+				"deposit": 13,
+			},
+			{
+				"kind": "pack",
+				"item": "coal",
+				"count": 2,
+			},
+		],
+	},
 	"conveyor_probe": {
 		"id": "conveyor_probe",
 		"site": "shallow_clay",

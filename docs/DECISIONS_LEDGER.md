@@ -23718,3 +23718,43 @@ clay through and never blocks, conservation holds. `test_cold_start_d1` unaffect
 stepper is new machinery the cold route never calls).
 Reverse: narrow the bore to one metre and revert `_step_descend`/`_step_dig`; the per-charge notes
 name which measurement re-breaks.
+
+## D0647 · 2026-09-12 · data/starts/commute_200.yaml, scenarios/commute_200.yaml, harness/bots/commute_bot.gd, harness/driver/scenario_driver.gd, tests/test_commute_report.gd, claims/C006 · the ~200m commute probe -- a hundred-metre bore, a chained grapple back out, the meter's bucket split
+
+B3's commute instrument: the minute-25 question's commute half, measured instead of guessed.
+`CommuteBot` rides the same RouteBot decide/apply machinery and the same DecisionMeter report as
+B1's cold start, so the share is computed on emitted payloads exactly the way the pacing claim is.
+In the order the judgment calls surfaced:
+
+1. THE COMMUTE IS A ROUND TRIP, MEASURED AS ONE ROUTE. The design question is the cost of living
+   with a shaft: fall ~100m, mine the face at its foot, climb ~100m back out, feed the rig. One
+   route measures descent + ascent + both ends' work in one decision stream; the meter's leg
+   attribution does the splitting (traversal/digging/processing) with no new machinery.
+2. `Grapple.MAX_RANGE` IS 30m, SO THE CLIMB IS CHAINED. A hundred-metre wall cannot be taken in
+   one throw: the probe aims each hop ~20m up the bore's west wall face, and the sim's own chain
+   rule (a shot fired while anchored holds the old line until the new bite) keeps the body held
+   between bites. That IS the player's verb -- aim, press, reel, mantle, jump -- no sim reach-in.
+3. A CHAINED SHOT'S OBSERVABLE IS `throwing` ENDING, NEVER `anchored` DROPPING. The old line holds
+   for the whole flight, so `grapple_anchored` stays true; the first state machine read `anchored`
+   for "bite" and re-fired the hook every other tick -- the probe (`tools/scratch/probe_commute.gd`)
+   showed the tip sawtoothing at the hand and the body hanging 17m short of the rim until the
+   throw cap. Resolution is `grapple_throwing` going false; a find is `grapple_length` jumping back
+   out past MIN_LENGTH (a chained plant sets length to the new distance; a miss leaves the line).
+4. A REELED-OUT LINE NEAR THE RIM IS THE MANTLE'S WINDOW, NOT A MISS. The last bite lands a body's
+   reach under the lip where the line is already ~MIN_LENGTH, which reads exactly like a miss --
+   the re-bite loop the first run died in. Near the rim the reel holds toward-and-up for RIM_HOLD
+   ticks (the lip mantle, D0631, needs the inputs, not another throw) before another throw is
+   allowed. The mantle topped out at (39,20); the spent line was then walked taut off the lip and
+   cut by a jump -- body.gd's jump-on-taut, the only wired release.
+5. THE BORE IS TWO METRES AND HARDROCK-FLOORED. D0646's two measured facts apply unchanged: a
+   same-width gap is a perfect piston for a one-metre body, and loose wall material slumps into
+   every dug wake. The room is authored 2x101 with a `hardrock` floor row; the face is `ore_iron`
+   (yields `ore`) in the east wall's last two metres; the forge well is the tutorial's own shape.
+
+Measured: `tools/measure_decisions.gd -- commute_200` -- 608 decisions in 10.1s, goal met
+(`machine_status` reads `working`, intake `{ore:5, coal:2}`), legs_ok=true. Buckets: traversal 490
+(80.6%: walk 47, descend 193, ascend_grapple 250), digging 60, processing 58; 240 of the emissions
+were empty frames (the fall and the hook flights). `test_commute_report` 9/9; `test_decision_meter`
+23/23, `test_conveyor_jam` 18/18, `test_cold_start_d1` 20/20 unaffected; claim gate PASS.
+Reverse: delete the scenario and the `&"commute"` arm; the leg's phases name which observation
+each piece of the machine reads, so reverting the phase table re-breaks the ascent, not silently.
