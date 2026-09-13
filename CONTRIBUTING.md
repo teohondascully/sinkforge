@@ -48,6 +48,24 @@ Do not pipe verification commands into a command that hides their exit status.
 Use isolated fixtures for save-writing tests; the single-suite wrapper itself does not promise
 a machine lock or production-save isolation.
 
+A new `tests/test_*.gd` suite is not run until the workflow names it: add its `res://` line to the
+suite list in `harness.yml` and bump that step's `all N suites` label in the same change --
+`check_ci_suite_count.py` derives the label from the list, and `check_suite_coverage.py` requires
+every suite on disk to be referenced. Verify both:
+
+```sh
+python3 tools/layer_lint/check_ci_suite_count.py
+python3 tools/layer_lint/check_suite_coverage.py
+```
+
+Each checkout keeps its own `.godot/` script-class cache, worktrees included. After a merge or pull
+brings in a new `class_name` script, refresh the receiving checkout's cache before running suites or
+the new name reports `Identifier ... not declared`:
+
+```sh
+godot --headless --path . --import
+```
+
 Inspect gate implementation/status (this actively runs local checks, including mutation tests,
 and can take several minutes):
 
