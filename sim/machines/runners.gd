@@ -117,8 +117,11 @@ static func _run_recipe(m: MachineState, items: Items) -> void:
 
 
 ## A `jam` intake holding an item the recipe does not want (D0490); a `pass` intake never jams.
+## The rule read is the INSTANCE's override when one is set (D0645) -- a fixture-authored machine
+## can carry `jam` where its shipped record carries `pass`.
 static func jammed(m: MachineState, recipe: RecipeDef) -> bool:
-	if m.def.intake != &"jam":
+	var rule: StringName = m.intake if m.intake != &"" else m.def.intake
+	if rule != &"jam":
 		return false
 	for item: StringName in m.input_buffer:
 		if not recipe.inputs.has(item):

@@ -34,4 +34,76 @@ const RECORDS: Dictionary = {
 			"invariants_hold",
 		],
 	},
+	"commute_200": {
+		"name": "commute_200",
+		"claim": "C006",
+		"seed": 20260825,
+		"world": {
+			"site": "shallow_clay",
+			"start": "commute_200",
+		},
+		"agent": "commute",
+		"rig": {
+			"demands_satisfied": [],
+			"stockpile": {},
+		},
+		"player": {
+			"start_depth": 0,
+			"pack": [
+				{
+					"item": "coal",
+					"count": 2,
+				},
+			],
+		},
+		"envelope": "oracle",
+		"goal": {
+			"type": "machine_status",
+			"cell": [
+				29,
+				20,
+			],
+			"status": "working",
+		},
+		"budget_ticks": 7200,
+		"assertions": [
+			"invariants_hold",
+		],
+	},
+	"conveyor_jam": {
+		"name": "conveyor_jam",
+		"claim": "C005",
+		"seed": 20260825,
+		"world": {
+			"site": "shallow_clay",
+			"start": "conveyor_probe",
+		},
+		"agent": "conveyor_probe",
+		"rig": {
+			"demands_satisfied": [],
+			"stockpile": {},
+		},
+		"player": {
+			"start_depth": 0,
+			"pack": [
+				{
+					"item": "clay",
+					"count": 1,
+				},
+			],
+		},
+		"envelope": "oracle",
+		"goal": {
+			"type": "machine_status",
+			"cell": [
+				35,
+				27,
+			],
+			"status": "blocked",
+		},
+		"budget_ticks": 6000,
+		"assertions": [
+			"invariants_hold",
+		],
+	},
 }

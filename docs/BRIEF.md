@@ -1,5 +1,35 @@
 # Brief
 
+## What was learned — a chained grapple line never drops `anchored`, and the commute it buys is ~10 s (D0643–D0647)
+
+Three measurement slices landed on `wip/conveyor-jam`, all on the same `RouteBot.decide()` →
+`DecisionMeter` machinery: a pacing instrument (D0643), the dug-hole-is-a-conveyor discovery beat
+(D0645+D0646, C005 green at 311 ticks), and the ~200 m commute probe (D0647, C006). The durable
+findings:
+
+- **A chained shot's state is `ANCHORED`, not `FLYING`.** `Grapple.fire` while anchored sets
+  `_chain` and leaves `state` alone — the old line holds until the new bite — so "the shot
+  resolved" is `grapple_throwing` (`FLYING or _chain`) going false, and "the shot found something"
+  is `grapple_length` jumping back out past `MIN_LENGTH` (a chained plant sets length to the new
+  distance with no slack take-up). A bot that reads `anchored` for "bite" re-fires the hook every
+  other tick; the probe showed the tip sawtoothing at the hand while the body hung still. Same
+  trap near the rim: the last bite lands a body's reach under the lip where the line is already
+  ~`MIN_LENGTH`, which reads exactly like a miss — the lip mantle (D0631) needs toward-and-up held
+  for a window, not another throw.
+- **The grapple makes vertical distance cheap.** The measured 100 m bore commute: fall 193 ticks
+  (~3.2 s, free-fall ~31 m/s), chained ascent 250 ticks (~4.2 s, the winch drives approach at
+  420 px/s ≈ 26 m/s), whole round trip + mining + feeding 608 decisions = 10.1 s. Traversal is
+  80.6% of the commute's minute — the shaft IS dimensional, and the commute is real but short at
+  current movement constants. That's the honest input to "are long commutes acceptable": under
+  this movement model, depth costs seconds, not minutes.
+- **A failed route leg does not stop the route.** `RouteBot` marks the leg failed and advances —
+  which means a broken ascent leaves the body hanging on the rope while later legs burn the
+  budget in place. `legs_ok` is the only honest "did the route run" signal; bucket shares alone
+  cannot distinguish a stall (the deliver stall still counted thousands of `processing` ticks).
+
+`tools/scratch/probe_commute.gd` is the local trace for the ascent; `probe_conveyor.gd` stays the
+descent one. Both ignored, both useful.
+
 ## What was learned — the headless harness proved the policy; the seat proved the harness wrong (D0625, queue 44)
 
 Splitting `ColdStartBot` into a per-tick `decide()` let one route drive both the scenario driver and

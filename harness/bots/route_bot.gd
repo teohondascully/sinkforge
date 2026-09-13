@@ -50,6 +50,8 @@ var _last_x: int = -1
 var _phase: int = 0
 var _since_scoop: int = 0
 var _drop_before: int = 0
+var _waited: int = 0
+var _entry_y: int = -1                     ## the row a descend leg started on (-1: not taken yet)
 
 
 func _init(p_budget: int) -> void:
@@ -165,6 +167,16 @@ func _step_leg(leg: Dictionary, out: Dictionary) -> int:
 			return _step_deliver(out, leg)
 		&"await":
 			return _step_await(out, leg)
+		&"walk_to":
+			return 1 if _step_walk(out["frame"], int(leg["col"]), int(leg.get("slack", 1)),
+				int(leg.get("max_row", 1 << 30))) else 0
+		&"descend":
+			return _step_descend(out["frame"], leg)
+		&"await_status":
+			return _step_await_status(leg)
+		&"note":
+			_note(leg)
+			return 1
 	return _step_custom(leg, out)
 
 
@@ -205,6 +217,8 @@ func _reset_leg() -> void:
 	_phase = 0
 	_since_scoop = 0
 	_drop_before = 0
+	_waited = 0
+	_entry_y = -1
 
 
 ## The frame's fields, in one place so `tick` and the steppers cannot disagree about what a hop is:
@@ -286,6 +300,80 @@ func _step_await(out: Dictionary, leg: Dictionary) -> int:
 	var m: Vector2i = leg["at"]
 	_fill(out["frame"], signi(m.x + 1 - pos().x))
 	return 0
+
+
+## One tick of a descend leg: steer for `col`'s CENTRE until the body stands at or below `row` --
+## the shaft descent's honest shape. Centring by pixel, not by cell, is the difference between
+## falling in and perching: a body whose cell already reads `col` can still be straddling the
+## bore's lip, and `signi(col - p.x)` answering 0 there is exactly how the first version of this
+## stepper stood on the shaft's edge forever (D0646).
+##
+## The other half of the fix is HANDS OFF WHILE FALLING: pressing a direction below the rim
+## gives the shaft wall's lip cells a pressed edge to catch, and the measured run showed the
+## pressed body auto-stepping back OUT of the bore and circling. `_entry_y` is the row the leg
+## started on; a body airborne BELOW it is inside the hole and falls straighter alone. On a
+## floor it walks again -- the bottom is where "stand on `col` at `row`" still needs steering.
+## And a body caught ON a shaft lip steps AWAY from the caught edge (`_lip_escape`), because a
+## centre nudge there oscillates the same two pixels until the auto-step lifts it out.
+## No hop-on-stall: the stall detector's job here would be to climb out of the hole.
+func _step_descend(f: InputFrame, leg: Dictionary) -> int:
+	var p: Vector2i = pos()
+	if p.y >= int(leg["row"]) and p.x == int(leg["col"]) and body.on_floor:
+		return 1
+	if _entry_y < 0:
+		_entry_y = p.y
+	var dir: int = 0
+	if body.on_floor:
+		if p.y > _entry_y and p.y < int(leg["row"]):
+			dir = _lip_escape()
+		else:
+			dir = signi(int(leg["col"]) * 16 + 7 - body.pos_x / Fx.SCALE)
+	elif p.y <= _entry_y:
+		dir = signi(int(leg["col"]) * 16 + 7 - body.pos_x / Fx.SCALE)
+	_fill(f, dir)
+	return 0
+
+
+## Which way to step when a lip caught the body mid-shaft: AWAY from whichever box edge has a
+## solid cell under it. Measured in `tools/scratch/probe_conveyor.gd`: the body is exactly one
+## metre wide, so descending a one-metre throat leaves an edge pixel resting on the wall's lip
+## -- `on_floor` with open air under the rest of the box. Stepping away from that edge drops the
+## whole underside onto air; stepping toward it is how the leg climbed back out of the bore.
+func _lip_escape() -> int:
+	var foot_row: int = (body.pos_y + (Body.HEIGHT_PX / 2 + 1) * Fx.SCALE) / Fx.SCALE / 4
+	var right := Vector2i((body.pos_x + Body.WIDTH_PX / 2 * Fx.SCALE) / Fx.SCALE / 4, foot_row)
+	var left := Vector2i((body.pos_x - Body.WIDTH_PX / 2 * Fx.SCALE) / Fx.SCALE / 4, foot_row)
+	if world.grid.in_bounds(right) and world.grid.is_solid(right):
+		return -1
+	if world.grid.in_bounds(left) and world.grid.is_solid(left):
+		return 1
+	return -1   ## nothing solid under either edge but the flag still says floor: pick a side
+
+
+## One tick of an await_status leg: poll the machine records the observation carries for the machine
+## at `at`, until its `status` reads the wanted string or `timeout_ticks` (default 600) runs out.
+func _step_await_status(leg: Dictionary) -> int:
+	for rec: Dictionary in o.machines:
+		if rec.get("cell") == leg["at"] and rec.get("status") == StringName(leg["status"]):
+			return 1
+	_waited += 1
+	return 2 if _waited >= int(leg.get("timeout_ticks", 600)) else 0
+
+
+## The `note` leg's whole job: snapshot the observation into `notes` under `key` -- machine records
+## and pile contents at the named cells, with the tick, so a claim cites what the run SAW.
+func _note(leg: Dictionary) -> void:
+	var entry: Dictionary = {"tick": ticks, "key": String(leg.get("key", "")), "pos": pos(),
+		"machines": {}, "piles": {}}
+	for c: Vector2i in leg.get("machines", []):
+		for rec: Dictionary in o.machines:
+			if rec.get("cell") == c:
+				(entry["machines"] as Dictionary)[c] = rec.duplicate(true)
+	for c: Vector2i in leg.get("piles", []):
+		var pile: Dictionary = o.pile_at(c)
+		if not pile.is_empty():
+			(entry["piles"] as Dictionary)[c] = pile.duplicate()
+	notes.append(entry)
 
 
 ## The body's current logic cell.

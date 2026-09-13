@@ -28,6 +28,212 @@ const RECORDS: Dictionary = {
 			},
 		],
 	},
+	"commute_200": {
+		"id": "commute_200",
+		"site": "shallow_clay",
+		"spawn_col_m": 32,
+		"fixtures": [
+			{
+				"kind": "open",
+				"cells": [
+					[
+						-3,
+						0,
+					],
+					[
+						-3,
+						1,
+					],
+				],
+			},
+			{
+				"kind": "solid",
+				"dx": -3,
+				"dy": 2,
+				"material": "clay",
+				"deposit": 0,
+			},
+			{
+				"kind": "machine",
+				"id": "processor",
+				"dx": -3,
+				"dy": 0,
+			},
+			{
+				"kind": "room",
+				"dx": 8,
+				"dy": 0,
+				"w": 2,
+				"h": 101,
+				"floor": "hardrock",
+			},
+			{
+				"kind": "solid",
+				"dx": 10,
+				"dy": 99,
+				"material": "ore_iron",
+				"deposit": 13,
+			},
+			{
+				"kind": "solid",
+				"dx": 10,
+				"dy": 100,
+				"material": "ore_iron",
+				"deposit": 13,
+			},
+			{
+				"kind": "pack",
+				"item": "coal",
+				"count": 2,
+			},
+		],
+	},
+	"conveyor_probe": {
+		"id": "conveyor_probe",
+		"site": "shallow_clay",
+		"spawn_col_m": 32,
+		"fixtures": [
+			{
+				"kind": "pile",
+				"item": "ore",
+				"count": 4,
+				"dx": 3,
+				"dy": -1,
+			},
+			{
+				"kind": "pile",
+				"item": "coal",
+				"count": 2,
+				"dx": 3,
+				"dy": -1,
+			},
+			{
+				"kind": "solid",
+				"dx": 3,
+				"dy": 0,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 2,
+				"dy": 0,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 4,
+				"dy": 0,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 4,
+				"dy": 1,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 4,
+				"dy": 2,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 1,
+				"dy": 0,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 1,
+				"dy": 1,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "solid",
+				"dx": 1,
+				"dy": 2,
+				"material": "hardrock",
+				"deposit": 0,
+			},
+			{
+				"kind": "open",
+				"cells": [
+					[
+						2,
+						1,
+					],
+					[
+						3,
+						1,
+					],
+					[
+						2,
+						2,
+					],
+					[
+						3,
+						2,
+					],
+					[
+						2,
+						3,
+					],
+					[
+						3,
+						3,
+					],
+					[
+						2,
+						4,
+					],
+					[
+						3,
+						4,
+					],
+					[
+						2,
+						5,
+					],
+					[
+						3,
+						5,
+					],
+					[
+						2,
+						6,
+					],
+					[
+						3,
+						6,
+					],
+					[
+						3,
+						7,
+					],
+				],
+			},
+			{
+				"kind": "machine",
+				"id": "processor",
+				"dx": 3,
+				"dy": 7,
+				"intake": "jam",
+			},
+			{
+				"kind": "pack",
+				"item": "clay",
+				"count": 1,
+			},
+		],
+	},
 	"dev_kit": {
 		"id": "dev_kit",
 		"fixtures": [

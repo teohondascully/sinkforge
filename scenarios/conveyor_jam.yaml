@@ -1,0 +1,26 @@
+# C005's scenario record: the conveyor-discovery beat as a run. The route digs a capped bore open
+# under a supply pile so the pile rides the dug column into the forge's intake (the hole is the
+# conveyor, read off `o.flow_events`), descends and tosses a clay into the same column, and the
+# forge's `jam` intake holds it -- the first self-inflicted jam, read off `o.machines` as
+# `status: blocked` with the clay still in the intake.
+name: conveyor_jam
+claim: C005
+seed: 20260825              # the same boot seed as C003 -- the claim is about the fixture, not the strata
+world:
+  site: shallow_clay
+  start: conveyor_probe     # data/starts/conveyor_probe.yaml, stamped over the generated site
+agent: conveyor_probe       # harness/bots/conveyor_bot.gd -- the scripted T0 policy
+rig:
+  demands_satisfied: []
+  stockpile: {}
+player:
+  start_depth: 0
+  pack: [{item: clay, count: 1}]
+envelope: oracle            # honest: the route reads authored fixture positions; nothing hidden enters
+goal:
+  type: machine_status      # read off o.machines records, not the event channel
+  cell: [35, 27]            # the forge's logic cell (spawn 32 + dx 3, surface + dy 7)
+  status: blocked           # the jam: the clay the route fed it sits in the intake, nothing runs
+budget_ticks: 6000          # ~100 game-seconds; the scripted policy should land it in a few hundred
+assertions:
+  - invariants_hold         # the suite checks item conservation over the whole run

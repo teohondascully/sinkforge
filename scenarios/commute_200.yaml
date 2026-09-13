@@ -1,0 +1,26 @@
+# C006's scenario record (B3): the ~200 m commute as a run. A hundred-metre bore beside spawn, ore
+# in its foot wall, the forge in a well west of spawn: the route falls in, mines, grapples back out,
+# and feeds the forge. `measure_decisions -- commute_200` reports what the minute was spent on --
+# traversal (the fall, the grapple chain, the walks) against digging (the face) against processing
+# (the feeds). The claim's falsifiable clause is the traversal share the meter reports.
+name: commute_200
+claim: C006
+seed: 20260825              # the same boot seed as C003/C005 -- the claim is about the fixture
+world:
+  site: shallow_clay
+  start: commute_200        # data/starts/commute_200.yaml, stamped over the generated site
+agent: commute              # harness/bots/commute_bot.gd -- the scripted policy
+rig:
+  demands_satisfied: []
+  stockpile: {}
+player:
+  start_depth: 0
+  pack: [{item: coal, count: 2}]
+envelope: oracle            # honest: the route reads authored fixture positions; nothing hidden enters
+goal:
+  type: machine_status      # read off o.machines records, not the event channel
+  cell: [29, 20]            # the forge's logic cell (spawn 32 - 3, surface row)
+  status: working           # the commute ends when the fed forge runs
+budget_ticks: 7200          # two sim-minutes; the measured commute should land well under one
+assertions:
+  - invariants_hold         # the suite checks item conservation over the whole run

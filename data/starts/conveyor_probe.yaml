@@ -1,0 +1,43 @@
+# The conveyor-discovery fixture (D0645, C005's scenario world): a capped bore three metres east of
+# spawn -- an old shaft, two metres of cap over an open drop, a cold forge at its foot -- with a
+# supply pile resting on the cap. Dig the cap out from under the pile and the pile rides the hole
+# down into the forge's intake: the hole you dig is the conveyor. The forge is a placed-instance
+# `intake: jam` variant -- the shipped records all stay `pass` (test_machine_defs pins that
+# population), and the variant exists so the claim can show the self-inflicted jam a `pass` intake
+# can never produce. The pack carries one clay: the foreign item the route feeds it.
+id: conveyor_probe
+site: shallow_clay
+spawn_col_m: 32
+fixtures:
+  # THE SUPPLY PILE over the cap: enough ore and coal for the forge to actually run before the jam.
+  - {kind: pile, item: ore, count: 4, dx: 3, dy: -1}
+  - {kind: pile, item: coal, count: 2, dx: 3, dy: -1}
+  # THE CAP AND THE BORE'S EAST WALL ARE ROCK, NOT CLAY (D0646). Clay is the site's loose
+  # material (D0562): every cell the pick removes wakes the three cells above the blow, loose
+  # cells slide diagonally into the new hole, and the measured run showed the shaft's throat
+  # refilling -- the pile hung over open air and the body perched on the refill. Nothing in the
+  # dig's wake neighbourhood is loose, so the hole the route opens stays a hole.
+  # THE BORE IS TWO METRES WIDE. The body is exactly one metre wide, so a one-metre shaft is a
+  # perfect piston: whichever edge pixel meets the rim's lip cells reads a floor and the body
+  # perches mid-air -- the probe measured it standing at px=568 over open air for the whole
+  # descend. Two metres gives the box a position with air under every pixel at every row.
+  - {kind: solid, dx: 3, dy: 0, material: hardrock, deposit: 0}
+  - {kind: solid, dx: 2, dy: 0, material: hardrock, deposit: 0}
+  - {kind: solid, dx: 4, dy: 0, material: hardrock, deposit: 0}
+  - {kind: solid, dx: 4, dy: 1, material: hardrock, deposit: 0}
+  - {kind: solid, dx: 4, dy: 2, material: hardrock, deposit: 0}
+  # THE WEST WALL IS ROCK TOO, AND TWO CELLS OF IT. The mouth is dug two cells wide, so the pick
+  # charges the west cap cell -- and the r=2 bite reaches two terrain cells past the charge, into
+  # the wall behind it. Measured: (135,81..84) is natural clay, the bite nicked it, and the slump
+  # cascade poured through the breach and refilled the bore to logic row 24. Hardrock at the dig's
+  # own row is not enough; the bite reaches a row below it as well.
+  - {kind: solid, dx: 1, dy: 0, material: hardrock, deposit: 0}
+  - {kind: solid, dx: 1, dy: 1, material: hardrock, deposit: 0}
+  - {kind: solid, dx: 1, dy: 2, material: hardrock, deposit: 0}
+  # THE BORE: an open drop under the cap, two metres wide, down to the forge's cell.
+  - {kind: open, cells: [[2, 1], [3, 1], [2, 2], [3, 2], [2, 3], [3, 3], [2, 4], [3, 4],
+                         [2, 5], [3, 5], [2, 6], [3, 6], [3, 7]]}
+  # THE COLD FORGE at the foot, authored `intake: jam` on this placed instance only (D0645).
+  - {kind: machine, id: processor, dx: 3, dy: 7, intake: jam}
+  # The foreign item for the self-inflicted jam: one clay in the pack.
+  - {kind: pack, item: clay, count: 1}

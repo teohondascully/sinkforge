@@ -45,6 +45,11 @@ var mode: int = 0
 var filter: StringName = &""
 ## Rig only (D0484): demands met so far; `Demands.at(stage)` is the one it asks for now. Saved and signed.
 var stage: int = 0
+## THE PLACED-INSTANCE INTAKE OVERRIDE (D0645). &"" = the def's own rule. A fixture can author a machine
+## whose intake jams where the shipped record passes -- the teaching variant the conveyor-discovery
+## claim needs -- without minting a `data/machines` record for it: every shipped record stays `pass`
+## (test_machine_defs pins that population), and a save reloads this field with the rest of the state.
+var intake: StringName = &""
 
 
 func _init(machine_def: MachineDef, machine_logic_cell: Vector2i) -> void:

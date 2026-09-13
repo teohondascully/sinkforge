@@ -124,6 +124,9 @@ static func _valid(world: World, fixtures: Array, anchor: Vector2i) -> bool:
 		if kind == "machine" and not MachineDef.exists(StringName(str(f.get("id", "")))):
 			last_refusal = "unknown machine: %s" % str(f.get("id", ""))
 			return false
+		if kind == "machine" and f.has("intake") and not ["pass", "jam"].has(str(f["intake"])):
+			last_refusal = "machine intake must be pass or jam: %s" % str(f.get("intake", ""))
+			return false
 		if kind == "tree" and int(f.get("trunk_m", 0)) <= 0:
 			last_refusal = "tree fixture needs trunk_m in metres: %s" % [f]
 			return false
@@ -168,9 +171,14 @@ static func _stamp_one(world: World, items: Items, machines: Machines, f: Dictio
 			for terrain_cell: Vector2i in world.terrain_cells_of(cells[0]):
 				world.deposits.seed_lode(terrain_cell, StringName(str(f["material"])), int(f.get("amount", 0)))
 		"machine":
-			if machines.place(world, MachineDef.of(StringName(str(f["id"]))), cells[0]) == null:
+			var m: MachineState = machines.place(world, MachineDef.of(StringName(str(f["id"]))), cells[0])
+			if m == null:
 				last_refusal = "machine %s at %s: the cell is not open by then (a record error; the world is part-stamped)" % [str(f["id"]), str(cells[0])]
 				return false
+			# The placed-instance intake override (D0645): the fixture authors a machine whose intake
+			# jams where the shipped record passes, without minting a data record for the variant.
+			if f.has("intake"):
+				m.intake = StringName(str(f["intake"]))
 		"pack":
 			var item: StringName = StringName(str(f["item"]))
 			items.pack.add(item, int(f["count"]))

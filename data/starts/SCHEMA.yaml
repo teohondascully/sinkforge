@@ -13,7 +13,10 @@ fields:
   #   room    dx dy w h [floor]        -- a w x h rectangle of open metres from (dx, dy), and when `floor`
   #                                      names a material, the row under it solid in that material (D0407)
   #   lode    dx dy material amount    -- a lode in the metre's wall, `amount` per 4 px cell
-  #   machine id dx dy                 -- a machine placed there (the cell must be open by then)
+  #   machine id dx dy [intake]        -- a machine placed there (the cell must be open by then);
+  #                                      `intake: pass|jam` overrides the record's rule on this one
+  #                                      placed instance only (D0645) -- a fixture can author the
+  #                                      jam variant without minting a data/machines record for it
   #   pack    item count               -- items in the pack, counted as produced (conservation holds)
   #   pile    item count dx dy         -- items lying on the floor of that metre, to be walked over (D0409)
   #   tree    dx trunk_m               -- a tree rooted on the surface at dx, planted by the world's own tree

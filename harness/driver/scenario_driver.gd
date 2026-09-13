@@ -44,12 +44,13 @@ static func run(record: Dictionary) -> Dictionary:
 ## once its goal has been seen: the report wants the whole policy measured, not the first match.
 ## `observe_to_budget` keeps the clock running to the record's budget after the route ends -- the
 ## minute-25 question's honest tail: decisions stop, ticks do not.
-## The report is `run`'s plus `decisions` (the meter's per-minute series) and `notes` (the bot's
-## evidence checkpoints).
+## The report is `run`'s plus `decisions` (the meter's per-minute series), `notes` (the bot's
+## evidence checkpoints), and `flow_events` (every item movement the run produced -- the routing
+## claims' evidence channel).
 static func run_metered(record: Dictionary, observe_to_budget: bool = false) -> Dictionary:
 	var out: Dictionary = {"ok": false, "reason": "", "ticks_used": 0, "goal_event": {},
 		"legs_ok": false, "conservation_error": null, "envelope": &"oracle",
-		"decisions": {}, "notes": []}
+		"decisions": {}, "notes": [], "flow_events": []}
 	var booted: Dictionary = boot(record)
 	if not bool(booted["ok"]):
 		out["reason"] = booted["reason"]
@@ -68,11 +69,14 @@ static func run_metered(record: Dictionary, observe_to_budget: bool = false) -> 
 		var d: Dictionary = bot.step()
 		meter.record(bot.ticks, d)
 		var o: Interface.Observation = bot.iface.observe(bot.env)
+		(out["flow_events"] as Array).append_array(o.flow_events)
 		if goal_ev.is_empty():
 			goal_ev = match_goal(record, o)
 	while goal_ev.is_empty() and bot.ticks < budget:
 		bot.tick(0)
-		goal_ev = match_goal(record, bot.iface.observe(bot.env))
+		var o2: Interface.Observation = bot.iface.observe(bot.env)
+		(out["flow_events"] as Array).append_array(o2.flow_events)
+		goal_ev = match_goal(record, o2)
 	if observe_to_budget:
 		while bot.ticks < budget:
 			bot.tick(0)
@@ -110,12 +114,25 @@ static func await_goal(record: Dictionary, out: Dictionary, bot: RouteBot) -> Di
 	return out
 
 
-## Does this observation carry the record's goal? Two channels: `o.events` for the machine-lifecycle
-## kinds (`demand_satisfied` with an optional `id`), and `o.flow_events` for `flow_landed` -- an item
-## routed to a named logic cell, the routing-claim's end state (D0635). `{}` when it does not.
+## Does this observation carry the record's goal? Three channels: `o.events` for the
+## machine-lifecycle kinds (`demand_satisfied` with an optional `id`), `o.flow_events` for
+## `flow_landed` -- an item routed to a named logic cell -- and `o.machines` for `machine_status`:
+## the machine at `cell` reading the named `status`, the jam-claim's end state (D0645). `{}` when
+## it does not.
 static func match_goal(record: Dictionary, o: Interface.Observation) -> Dictionary:
 	var goal: Dictionary = record.get("goal", {})
 	var want_kind: StringName = StringName(goal.get("type", ""))
+	if want_kind == &"machine_status":
+		var mc: Variant = goal.get("cell", null)
+		var want_cell: Vector2i = Vector2i(int(mc[0]), int(mc[1])) \
+			if mc is Array and mc.size() >= 2 else Vector2i(-1, -1)
+		var want_status: StringName = StringName(goal.get("status", ""))
+		for rec: Dictionary in o.machines:
+			if rec.get("cell") == want_cell and rec.get("status") == want_status:
+				var ev: Dictionary = rec.duplicate(true)
+				ev["kind"] = &"machine_status"
+				return ev
+		return {}
 	if want_kind == &"flow_landed":
 		var want_item: StringName = StringName(goal.get("item", ""))
 		var to: Variant = goal.get("to", null)
@@ -138,6 +155,10 @@ static func bot_for(record: Dictionary) -> RouteBot:
 	match StringName(record.get("agent", "")):
 		&"cold_start":
 			return ColdStartBot.new(int(record.get("budget_ticks", 30000)))
+		&"conveyor_probe":
+			return ConveyorBot.new(int(record.get("budget_ticks", 30000)))
+		&"commute":
+			return CommuteBot.new(int(record.get("budget_ticks", 30000)))
 	return null
 
 

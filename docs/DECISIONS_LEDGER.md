@@ -23830,3 +23830,98 @@ pre-refactor trace) both pass -- the extraction is behavior-identical. The only 
 `as ColdStartBot` casts on `bot_for` (its return type widened to `RouteBot`).
 Reverse: fold `route_bot.gd` back into `cold_start.gd` and drop the casts; nothing else depends on
 the split yet.
+
+## D0645 · 2026-09-12 · sim/machines/{machine_state,runners}.gd, sim/run/world_seeder.gd, shell/save_game.gd, data/starts/{SCHEMA,generated,conveyor_probe}, scenarios/conveyor_jam.yaml, harness/bots/conveyor_bot.gd, harness/driver/scenario_driver.gd, tests/test_conveyor_jam.gd · WIP: the conveyor-jam beat's fixture -- the placed-instance intake override and the probe route
+
+PARKED MID-DEBUG on `wip/conveyor-jam`: committed to preserve the state, not because it is done -- the
+suite's own run says so (8 of 18 assertions fail; see the entry's Reverse). What is here and ruled:
+the conveyor-discovery claim needs a machine whose intake rule differs from its record's, so a placed
+instance can carry an `intake` override (`machine_state.gd`) that the runner reads before the def
+(`runners.gd`) -- the jam-variant forge takes clay as intake where the shipped record does not. The
+override round-trips the save format (`save_game.gd`), and the seeder applies it when a start record's
+placed machine carries the field (`world_seeder.gd`). The probe start (`conveyor_probe`) authors a
+capped bore with a resting ore/coal pile and the jam forge at its foot; `ConveyorBot` (RouteBot
+subclass) routes the discovery: dig the cap, watch the pile ride the column into the intake, descend,
+toss the foreign item. `ScenarioDriver` gained the `await_status` leg's machine-status poll for the
+blocked end state.
+Known red at commit: the route's legs never fire -- every leg including the first `walk_to` reports
+"goal event never fired inside 6000 ticks" -- so the jam sequence is choreographed but unproven.
+RouteBot itself is sound (test_cold_start_d1 passes 20/20 on the same machinery), which localises the
+fault to the probe world's layout or the leg goals, not the shared engine.
+Reverse: `git revert` this commit removes the override and the fixture; the failing suite goes with it.
+
+## D0646 · 2026-09-12 · data/starts/conveyor_probe.yaml, harness/bots/{conveyor_bot,route_bot}.gd · the conveyor route's physics, measured and fixed -- mouth width, wall material, reach margin, hands off while falling
+
+D0645's red is resolved; each fix is a measured fact about the fixture or the body, not a tuned
+guess, and the probe (`tools/scratch/probe_conveyor.gd`) is the evidence. In the order they surfaced:
+
+1. CLAY CANNOT BE THE CAP. The site's loose material slumps into every dug wake (D0562): the first
+   clay bore refilled itself and the body perched on the refill reading `on_floor`. Cap and walls are
+   `hardrock`; the foreign item stays clay in the pack.
+2. A ONE-METRE SHAFT IS A PERFECT PISTON. The body is one metre wide and the collider reads its edge
+   pixels, so a same-width gap has no position with air under the whole box -- the probe measured the
+   body standing at px=568 over open air, alternating lips for thousands of ticks. The bore is two
+   metres; so is the MOUTH the dig opens (the `dig` leg takes two cap cells, and the stance moves one
+   metre west so no aimed cell is ever underfoot).
+3. THE BITE BITES THE WALL BEHIND THE TARGET. `DEFAULT_BITE_RADIUS` 2 reaches two terrain cells past
+   the charged cell: digging the west cap cell nicked `(135,81..84)`, natural clay, and the measured
+   cascade poured ~30 cells through the breach and refilled the bore to logic row 24. The west wall is
+   hardrock two cells deep, matching the east wall D0645 already made.
+4. HANDS OFF WHILE FALLING, STEP OFF THE LIP YOU CAUGHT. `_step_descend` steers for the bore's centre
+   above the rim, applies no direction while airborne below it (a pressed edge is what lip cells
+   catch), and on a mid-shaft perch steps AWAY from whichever box edge has a solid cell under it
+   (`_lip_escape`) -- a centre nudge there oscillated the same two pixels until the auto-step climbed
+   out. No hop-on-stall: the stall detector's job here would be to climb out of the hole.
+5. `Mining.in_reach` IS THE APPROACH TEST, NOT A PX RULE. The cap's far corner sat 1.3px outside the
+   3.2m reach with d_px exactly 40, so `_step_dig`'s distance-only threshold stood still forever --
+   `refusal: far` on a held pick. The dig now approaches whenever the aim is not in reach (or is past
+   the old margin), which also covers the general "cell just outside the circle" case a fixed px rule
+   cannot.
+
+Measured: `test_conveyor_jam` 18/18 -- route completes in 311 ticks; ore and coal flow (35,19)->
+(35,27) through the dug column, the forge reads `working`, the tossed clay lands (35,25)->(35,27),
+the forge reads `blocked` with `{ore:4, coal:2, clay:1}` in the intake, the `pass` control passes the
+clay through and never blocks, conservation holds. `test_cold_start_d1` unaffected (the descend
+stepper is new machinery the cold route never calls).
+Reverse: narrow the bore to one metre and revert `_step_descend`/`_step_dig`; the per-charge notes
+name which measurement re-breaks.
+
+## D0647 · 2026-09-12 · data/starts/commute_200.yaml, scenarios/commute_200.yaml, harness/bots/commute_bot.gd, harness/driver/scenario_driver.gd, tests/test_commute_report.gd, claims/C006 · the ~200m commute probe -- a hundred-metre bore, a chained grapple back out, the meter's bucket split
+
+B3's commute instrument: the minute-25 question's commute half, measured instead of guessed.
+`CommuteBot` rides the same RouteBot decide/apply machinery and the same DecisionMeter report as
+B1's cold start, so the share is computed on emitted payloads exactly the way the pacing claim is.
+In the order the judgment calls surfaced:
+
+1. THE COMMUTE IS A ROUND TRIP, MEASURED AS ONE ROUTE. The design question is the cost of living
+   with a shaft: fall ~100m, mine the face at its foot, climb ~100m back out, feed the rig. One
+   route measures descent + ascent + both ends' work in one decision stream; the meter's leg
+   attribution does the splitting (traversal/digging/processing) with no new machinery.
+2. `Grapple.MAX_RANGE` IS 30m, SO THE CLIMB IS CHAINED. A hundred-metre wall cannot be taken in
+   one throw: the probe aims each hop ~20m up the bore's west wall face, and the sim's own chain
+   rule (a shot fired while anchored holds the old line until the new bite) keeps the body held
+   between bites. That IS the player's verb -- aim, press, reel, mantle, jump -- no sim reach-in.
+3. A CHAINED SHOT'S OBSERVABLE IS `throwing` ENDING, NEVER `anchored` DROPPING. The old line holds
+   for the whole flight, so `grapple_anchored` stays true; the first state machine read `anchored`
+   for "bite" and re-fired the hook every other tick -- the probe (`tools/scratch/probe_commute.gd`)
+   showed the tip sawtoothing at the hand and the body hanging 17m short of the rim until the
+   throw cap. Resolution is `grapple_throwing` going false; a find is `grapple_length` jumping back
+   out past MIN_LENGTH (a chained plant sets length to the new distance; a miss leaves the line).
+4. A REELED-OUT LINE NEAR THE RIM IS THE MANTLE'S WINDOW, NOT A MISS. The last bite lands a body's
+   reach under the lip where the line is already ~MIN_LENGTH, which reads exactly like a miss --
+   the re-bite loop the first run died in. Near the rim the reel holds toward-and-up for RIM_HOLD
+   ticks (the lip mantle, D0631, needs the inputs, not another throw) before another throw is
+   allowed. The mantle topped out at (39,20); the spent line was then walked taut off the lip and
+   cut by a jump -- body.gd's jump-on-taut, the only wired release.
+5. THE BORE IS TWO METRES AND HARDROCK-FLOORED. D0646's two measured facts apply unchanged: a
+   same-width gap is a perfect piston for a one-metre body, and loose wall material slumps into
+   every dug wake. The room is authored 2x101 with a `hardrock` floor row; the face is `ore_iron`
+   (yields `ore`) in the east wall's last two metres; the forge well is the tutorial's own shape.
+
+Measured: `tools/measure_decisions.gd -- commute_200` -- 608 decisions in 10.1s, goal met
+(`machine_status` reads `working`, intake `{ore:5, coal:2}`), legs_ok=true. Buckets: traversal 490
+(80.6%: walk 47, descend 193, ascend_grapple 250), digging 60, processing 58; 240 of the emissions
+were empty frames (the fall and the hook flights). `test_commute_report` 9/9; `test_decision_meter`
+23/23, `test_conveyor_jam` 18/18, `test_cold_start_d1` 20/20 unaffected; claim gate PASS.
+Reverse: delete the scenario and the `&"commute"` arm; the leg's phases name which observation
+each piece of the machine reads, so reverting the phase table re-breaks the ascent, not silently.

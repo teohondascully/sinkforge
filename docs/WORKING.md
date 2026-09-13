@@ -1,6 +1,12 @@
 # Working state
 
-**Last updated: 2026-09-12 (the "catch the game up to the process" batch landed: economy wiring
+**Last updated: 2026-09-12 (the minute-25 measurement batch landed on `wip/conveyor-jam`:
+B1 decision meter `2948e5d4` (D0643+D0644) — `measure_decisions` bins `decide()` payloads into
+traversal/digging/processing/observe/idle per sim-minute; B2 conveyor-jam beat `bcf09a2e`
+(D0645+D0646) — the dug hole routes the pile into the forge's intake, the forge works then blocks
+on a tossed clay, 18/18; B3 ~200 m commute probe — `commute_200` measured the round trip at
+608 decisions in 10.1 s, traversal 490 / digging 60 / processing 58 (D0647, C006). Earlier:
+the "catch the game up to the process" batch landed: economy wiring
 `add2a5ad` — iron + rich_ore materials, wood-as-fuel, d3–d7 ladder, gate 37 genuinely blocking;
 P044 bedding dip `3db2f6c0`; P031 closed-as-shipped `b41f35dd`; P036 palette ×2 `6c7d05b9`;
 P035 lip mantle `450aeb51`. Settings page is now a real Control tree (D0632, Hybrid) — pending
